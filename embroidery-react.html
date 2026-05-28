@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>EmbroideryPreview · React + k-means + SVG turbulence</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  :root { --bg:#f4f2ef; --ink:#191918; --border:#e5e4e0; --muted:#6b7280; }
+  html, body { margin:0; padding:0; font-family: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  .wrap { max-width: 920px; margin: 40px auto; padding: 0 24px; }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 22px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+  .row { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .panel { flex: 1; min-width: 320px; }
+  label.upload {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; min-height: 110px; border: 2px dashed #d1ceca; border-radius: 12px;
+    background: #fafaf7; color: var(--muted); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  label.upload:hover { border-color: var(--ink); background: #f6f5f4; color: var(--ink); }
+  label.upload input { display: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+  .ctrl input[type=range] { width: 140px; }
+  .swatches { display: flex; gap: 4px; margin-top: 10px; }
+  .swatch { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+  .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+  .preview-grid figure { margin: 0; }
+  .preview-grid figcaption { font-size: 11.5px; color: var(--muted); margin-top: 5px; text-align: center; font-weight: 600; }
+  .stage { position: relative; display: block; width: 100%; aspect-ratio: 1; background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .stage canvas, .stage svg.overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage canvas { display: block; }
+  .stage svg.overlay { pointer-events: none; }
+  .status { font-size: 12px; color: var(--muted); margin-top: 10px; min-height: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>EmbroideryPreview</h1>
+  <div class="sub">Drop an image → 6-color k-means quantization → canvas → SVG <code>feTurbulence</code> displacement + diagonal stitch overlay. Zero external APIs.</div>
+  <div id="root" class="card"></div>
+</div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ────────────────────────────────────────────────────────────────────────────
+   K-means quantization (6 colors by default).
+   – k-means++ initialization for stable seed centroids
+   – downsample large images to ≤ 32×32 grid for clustering speed
+   – 8 Lloyd iterations is enough for visual stability
+   – returns { quantizedImageData, palette: [[r,g,b], …] }
+   ──────────────────────────────────────────────────────────────────────────── */
+function kmeansQuantize(imageData, k = 6, iterations = 8) {
+  const { data, width, height } = imageData;
+  // Collect opaque-enough pixels into a flat sample array
+  const sampleStride = Math.max(1, Math.floor(Math.sqrt((width * height) / 1024)));
+  const samples = [];
+  for (let y = 0; y < height; y += sampleStride) {
+    for (let x = 0; x < width; x += sampleStride) {
+      const i = (y * width + x) * 4;
+      if (data[i + 3] < 128) continue;
+      samples.push([data[i], data[i + 1], data[i + 2]]);
+    }
+  }
+  if (samples.length === 0) {
+    return { imageData, palette: [] };
+  }
+  // k-means++ seeding — pick first centroid at random, then weight subsequent
+  // picks by squared distance to the nearest existing centroid. Produces
+  // dramatically better starting positions than uniform random.
+  const centroids = [samples[Math.floor(Math.random() * samples.length)].slice()];
+  while (centroids.length < k) {
+    const dists = samples.map(p => {
+      let min = Infinity;
+      for (const c of centroids) {
+        const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+        if (d < min) min = d;
+      }
+      return min;
+    });
+    const total = dists.reduce((a, b) => a + b, 0);
+    if (total === 0) { centroids.push(samples[0].slice()); continue; }
+    let r = Math.random() * total;
+    for (let i = 0; i < samples.length; i++) {
+      r -= dists[i];
+      if (r <= 0) { centroids.push(samples[i].slice()); break; }
+    }
+  }
+  // Lloyd's algorithm — assign each sample to nearest centroid, then re-mean
+  for (let iter = 0; iter < iterations; iter++) {
+    const sums = Array.from({ length: k }, () => [0, 0, 0, 0]); // r, g, b, count
+    for (const p of samples) {
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < k; i++) {
+        const c = centroids[i];
+        const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      sums[best][0] += p[0]; sums[best][1] += p[1]; sums[best][2] += p[2]; sums[best][3]++;
+    }
+    for (let i = 0; i < k; i++) {
+      if (sums[i][3] === 0) continue;
+      centroids[i] = [sums[i][0] / sums[i][3], sums[i][1] / sums[i][3], sums[i][2] / sums[i][3]];
+    }
+  }
+  // Paint the output: every opaque pixel gets snapped to its nearest centroid.
+  const out = new Uint8ClampedArray(data);
+  for (let i = 0; i < out.length; i += 4) {
+    if (out[i + 3] < 128) continue;
+    const p = [out[i], out[i + 1], out[i + 2]];
+    let best = 0, bestD = Infinity;
+    for (let j = 0; j < k; j++) {
+      const c = centroids[j];
+      const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    out[i] = centroids[best][0]; out[i + 1] = centroids[best][1]; out[i + 2] = centroids[best][2];
+  }
+  return {
+    imageData: new ImageData(out, width, height),
+    palette: centroids.map(c => c.map(v => Math.round(v))),
+  };
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   EmbroideryPreview
+   – paints a quantized image to its own <canvas>
+   – wraps the canvas in an SVG filter that applies feTurbulence-driven
+     displacement (so straight edges break into a hand-stitched wobble)
+   – overlays a diagonal stitch-line pattern via a second SVG using
+     mix-blend-mode for thread sheen + texture
+   ──────────────────────────────────────────────────────────────────────────── */
+function EmbroideryPreview({ src, size = 360, k = 6, displaceScale = 2.5, stitchAngle = 45, stitchSpacing = 3 }) {
+  const canvasRef = useRef(null);
+  const [palette, setPalette] = useState([]);
+  const [status, setStatus] = useState('Waiting for image…');
+  // Unique filter/pattern IDs so multiple instances on a page don't collide.
+  const uid = useMemo(() => 'eg' + Math.random().toString(36).slice(2, 8), []);
+
+  useEffect(() => {
+    if (!src) return;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      setStatus('Quantizing…');
+      // Fit-into with letterboxing on a transparent canvas
+      const canvas = canvasRef.current;
+      const W = size, H = size;
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, W, H);
+      const r = Math.min(W / img.width, H / img.height);
+      const dw = img.width * r, dh = img.height * r;
+      const dx = (W - dw) / 2, dy = (H - dh) / 2;
+      ctx.drawImage(img, dx, dy, dw, dh);
+      // Yield a frame so the "Quantizing…" status paints before the heavy work.
+      requestAnimationFrame(() => {
+        const start = performance.now();
+        const imageData = ctx.getImageData(0, 0, W, H);
+        const { imageData: quantized, palette: pal } = kmeansQuantize(imageData, k);
+        ctx.putImageData(quantized, 0, 0);
+        setPalette(pal);
+        setStatus(`Quantized to ${pal.length} colors · ${Math.round(performance.now() - start)}ms`);
+      });
+    };
+    img.onerror = () => setStatus('Could not load image');
+    img.src = src;
+  }, [src, k, size]);
+
+  return (
+    <div>
+      {/* Inline SVG defs — the filter pulls the canvas into SVG-space so
+          feDisplacementMap can warp the bitmap with the turbulence pattern. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <filter id={`disp-${uid}`} x="-5%" y="-5%" width="110%" height="110%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="2" seed="4" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale={displaceScale} xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+          {/* Two-line diagonal stitch: a brighter centre crown + darker edge
+              shadow per thread crest, repeated and rotated. The pattern lives
+              in user space so the rotation looks right at any element size. */}
+          <pattern id={`stitch-${uid}`} patternUnits="userSpaceOnUse"
+                   width={stitchSpacing * 2} height={stitchSpacing * 2}
+                   patternTransform={`rotate(${stitchAngle})`}>
+            <rect width={stitchSpacing * 2} height={stitchSpacing * 2} fill="transparent" />
+            <line x1={0} y1={0} x2={0} y2={stitchSpacing * 2}
+                  stroke="rgba(255,255,255,0.32)" strokeWidth="0.6" />
+            <line x1={stitchSpacing * 0.5} y1={0} x2={stitchSpacing * 0.5} y2={stitchSpacing * 2}
+                  stroke="rgba(0,0,0,0.28)" strokeWidth="0.5" />
+            <line x1={stitchSpacing} y1={0} x2={stitchSpacing} y2={stitchSpacing * 2}
+                  stroke="rgba(255,255,255,0.18)" strokeWidth="0.4" />
+          </pattern>
+        </defs>
+      </svg>
+
+      <div className="preview-grid">
+        {/* LEFT — quantized canvas only (debug view of the k-means output) */}
+        <figure>
+          <div className="stage">
+            <canvas ref={canvasRef} />
+          </div>
+          <figcaption>Quantized (k={k})</figcaption>
+        </figure>
+        {/* RIGHT — same canvas with the embroidery look applied. We render the
+            same DOM canvas inside an extra wrapper that owns the SVG filter +
+            stitch overlay. To avoid re-painting, we duplicate via foreignObject. */}
+        <figure>
+          <div className="stage">
+            {/* Wrap the canvas reference inside an SVG so we can apply the
+                turbulence filter to the bitmap directly. */}
+            <svg viewBox={`0 0 ${size} ${size}`} preserveAspectRatio="xMidYMid meet">
+              <foreignObject x="0" y="0" width={size} height={size} filter={`url(#disp-${uid})`}>
+                <CanvasMirror sourceRef={canvasRef} size={size} />
+              </foreignObject>
+              {/* Stitch lines on top, screen-blended so light strokes brighten
+                  and darker ones tint without muddying the colour. */}
+              <rect x="0" y="0" width={size} height={size}
+                    fill={`url(#stitch-${uid})`}
+                    style={{ mixBlendMode: 'overlay' }} />
+            </svg>
+          </div>
+          <figcaption>Embroidery preview</figcaption>
+        </figure>
+      </div>
+
+      <div className="status">{status}</div>
+      {palette.length > 0 && (
+        <div className="swatches" title="k-means palette">
+          {palette.map((c, i) => (
+            <div key={i} className="swatch" style={{ background: `rgb(${c[0]},${c[1]},${c[2]})` }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Re-paints the quantized canvas into a sibling canvas inside the SVG
+   <foreignObject> so the filter has bitmap to work with. We can't share one
+   canvas element across two DOM positions, so we copy the bytes each time the
+   source repaints. */
+function CanvasMirror({ sourceRef, size }) {
+  const mirrorRef = useRef(null);
+  useEffect(() => {
+    const draw = () => {
+      const src = sourceRef.current, dst = mirrorRef.current;
+      if (!src || !dst) return;
+      dst.width = src.width; dst.height = src.height;
+      dst.getContext('2d').drawImage(src, 0, 0);
+    };
+    draw();
+    // Poll a few frames after mount so we catch the quantization repaint that
+    // happens in the parent's requestAnimationFrame chain.
+    const ids = [50, 120, 250, 500, 900].map(ms => setTimeout(draw, ms));
+    return () => ids.forEach(clearTimeout);
+  });
+  return <canvas ref={mirrorRef} style={{ width: '100%', height: '100%', display: 'block' }} />;
+}
+
+/* ─── Demo wrapper ─────────────────────────────────────────────────────────── */
+function App() {
+  const [src, setSrc] = useState(null);
+  const [k, setK] = useState(6);
+  const [scale, setScale] = useState(2.5);
+  const [spacing, setSpacing] = useState(3);
+  const [angle, setAngle] = useState(45);
+
+  const handleFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setSrc(e.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div>
+      <div className="row">
+        <div className="panel">
+          <label className="upload">
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                   onChange={e => handleFile(e.target.files[0])} />
+            {src ? '↻ Replace image' : '↑ Drop or click to upload an image'}
+          </label>
+          <div className="controls">
+            <label className="ctrl">k (colors): {k}
+              <input type="range" min="2" max="12" value={k}
+                     onChange={e => setK(parseInt(e.target.value))} />
+            </label>
+            <label className="ctrl">Displacement: {scale.toFixed(1)}
+              <input type="range" min="0" max="8" step="0.5" value={scale}
+                     onChange={e => setScale(parseFloat(e.target.value))} />
+            </label>
+            <label className="ctrl">Stitch spacing: {spacing}px
+              <input type="range" min="2" max="8" value={spacing}
+                     onChange={e => setSpacing(parseInt(e.target.value))} />
+            </label>
+            <label className="ctrl">Stitch angle: {angle}°
+              <input type="range" min="0" max="180" value={angle}
+                     onChange={e => setAngle(parseInt(e.target.value))} />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {src && (
+        <EmbroideryPreview
+          src={src}
+          k={k}
+          displaceScale={scale}
+          stitchSpacing={spacing}
+          stitchAngle={angle}
+        />
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

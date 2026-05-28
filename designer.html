@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design Board — EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="egfulfill-store.js"></script>
+<script src="egfulfill-drag.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;color:#191918;min-height:100vh}
+.sidebar{width:210px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:#f6f5f4;color:#191918}.ni.on{background:#e8e7e3;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px;border:none}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.65}.ni.on svg{opacity:1}
+.ibtn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;font-size:14px;font-weight:500;color:#555550;cursor:pointer;transition:all .15s;background:none;border:none;font-family:inherit;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4;color:#191918}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-dk{background:#111827;color:#fff}.btn-dk:hover{background:#1f2937}
+.btn-out{background:#fff;color:#374151;border:1.5px solid #e5e4e0}.btn-out:hover{border-color:#9ca3af}
+.btn-gold{background:#191918;color:#fff}.btn-gold:hover{background:#b8880f}
+.btn-green{background:#15803d;color:#fff}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;line-height:1.6}
+.input{width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 11px;font-size:14px;color:#191918;background:#fff;font-family:inherit;outline:none;transition:border-color .15s}
+.input:focus{border-color:#111827}
+.tab-btn{padding:6px 14px;border-radius:8px;font-size:14px;font-weight:500;color:#6b7280;cursor:pointer;border:none;background:transparent;font-family:inherit;white-space:nowrap;transition:all .15s}
+.tab-btn.on{background:#fff;color:#111827;font-weight:600;border:1px solid #e5e4e0;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.tab-btn:hover:not(.on){background:#f6f5f4;color:#374151}
+/* Kanban */
+.kb-board{display:flex;gap:14px;padding:16px 20px;min-height:calc(100vh - 140px);overflow-x:auto;align-items:flex-start}
+.kb-col{width:272px;flex-shrink:0;display:flex;flex-direction:column}
+.kb-col-header{display:flex;align-items:center;gap:7px;padding:10px 11px;border-radius:10px 10px 0 0;font-size:13.5px;font-weight:700}
+.kb-col-body{background:#ece9e4;border-radius:0 0 10px 10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:100px;transition:background .15s}
+.kb-col-body.drag-over{background:#d8d4ce}
+.kb-card{background:#fff;border:1px solid #e5e4e0;border-radius:10px;cursor:pointer;transition:box-shadow .15s,transform .15s;overflow:hidden;user-select:none}
+.kb-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.10);transform:translateY(-1px)}
+.kb-card.dragging{opacity:.35;transform:scale(.97)}
+.db-drop-ghost{border-radius:10px;background:rgba(78,101,206,.1);box-shadow:0 0 0 2px rgba(78,101,206,.4),0 4px 20px rgba(78,101,206,.2);pointer-events:none;flex-shrink:0}
+.kb-card-img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block}
+.kb-card-img-ph{width:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#f4f2ef,#e8e5e0);display:flex;align-items:center;justify-content:center}
+.kb-card-body{padding:10px 11px 11px}
+.drop-zone{border:2px dashed #9ca3af;border-radius:8px;padding:18px;text-align:center;font-size:14px;color:#9ca3af;cursor:pointer;transition:all .15s;background:#fafaf9}
+.drop-zone:hover,.drop-zone.drag-over{border-color:#111827;background:#f4f2ef;color:#374151}
+.file-chip{display:inline-flex;align-items:center;gap:5px;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:6px;padding:4px 8px;font-size:12.5px;color:#374151;font-weight:500}
+.note-bubble{background:#f9f8f7;border-radius:8px;padding:9px 11px;margin-bottom:6px}
+.progress-bar{height:4px;background:#e5e4e0;border-radius:999px;overflow:hidden}
+.progress-fill{height:100%;border-radius:999px;transition:width .3s}
+.stat-card{background:#f4f2ef;border:1px solid #e5e4e0;border-radius:12px;padding:16px 18px}
+.wcard{background:#fff;border:1px solid transparent;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07);position:relative}
+.wcard .drag-handle{display:none;position:absolute;top:10px;right:12px;color:#c4c3be;cursor:grab;padding:3px;border-radius:5px;transition:color .15s;align-items:center;z-index:3}
+.wcard .drag-handle:hover{color:#6b7280;background:#f6f5f4}
+.trend-up{color:#374151;font-size:12.5px;font-weight:700;background:#f0ede9;padding:2px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:2px}
+.card{background:#fff;border:1px solid transparent;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+html[data-theme=dark] .wcard{background:#252220!important;border-color:#302e2c!important}
+/* type badges */
+.ds-dtg{background:#eeecf8;color:#5f52b0;border:1px solid #d8d5f0}
+.ds-sub{background:#f8f0e4;color:#904a18;border:1px solid #e8d8c0}
+.ds-emb{background:#e4f4ea;color:#286038;border:1px solid #b8dcbf}
+.ds-scr{background:#e4f6f2;color:#1a7060;border:1px solid #b0d8d0}
+/* status */
+.b-incoming,.b-inprog,.b-review,.b-approved,.b-paid{background:#e5e4e0;color:#191918}
+.pay-pending{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
+.pay-approved{background:#e4f4ea;color:#286038;border:1px solid #86efac}
+.pay-released{background:#eeecf8;color:#5f52b0;border:1px solid #c4b5fd}
+.pri-high{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+#db-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 18px;border-radius:8px;font-size:14px;font-weight:600;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
+/* DARK MODE */
+html[data-theme=dark]{color-scheme:dark}
+html[data-theme=dark] body{background:#1a1917!important}
+html[data-theme=dark] .sidebar{background:#1f1d1b!important;border-right-color:#302e2c!important}
+html[data-theme=dark] header{background:#1f1d1b!important;border-bottom-color:#302e2c!important}
+html[data-theme=dark] .card,html[data-theme=dark] .stat-card{background:#252220;border-color:#302e2c}
+html[data-theme=dark] .card{background:#252220!important;border-color:#302e2c!important}
+html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
+html[data-theme=dark] .ni{color:#7a7874!important}
+html[data-theme=dark] .ni.on{background:#302e2c!important;color:#e8e4e0!important}
+html[data-theme=dark] .ni:hover:not(.on){background:#252220!important}
+html[data-theme=dark] .ibtn{color:#7a7874!important}
+html[data-theme=dark] .ibtn:hover{background:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{background:#252220!important;border-color:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
+html[data-theme=dark] .progress-bar{background:#302e2c!important}
+html[data-theme=dark] .kb-col-body{background:#211f1d!important;border:1px solid #302e2c!important;border-top:none!important}
+html[data-theme=dark] .kb-col-header{border-bottom:1px solid #302e2c!important}
+html[data-theme=dark] .kb-col-body.drag-over{background:#2a2724!important;border-color:rgba(201,195,186,.3)!important}
+html[data-theme=dark] .kb-card{background:#252220!important;border-color:#302e2c!important}
+html[data-theme=dark] .kb-card:hover{border-color:rgba(201,195,186,.3)!important}
+html[data-theme=dark] .kb-card.dragging{border-color:#c9c3ba!important;box-shadow:0 0 0 1px rgba(201,195,186,.3)!important}
+html[data-theme=dark] .kb-card-img-ph{background:linear-gradient(135deg,#252220,#1a1917)!important}
+html[data-theme=dark] .drop-zone{background:#252220!important;border-color:#302e2c!important;color:#7a7874!important}
+html[data-theme=dark] .file-chip{background:#302e2c!important;border-color:#3a3835!important;color:#a8a29e!important}
+html[data-theme=dark] .note-bubble{background:#252220!important}
+html[data-theme=dark] .tab-btn{color:#7a7874!important}
+html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
+html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
+html[data-theme=dark] [style*="background:#fff;"]{background:#252220!important}
+html[data-theme=dark] [style*="background: #fff"]{background:#252220!important}
+html[data-theme=dark] [style*="background:#f4f2ef"]{background:#1a1917!important}
+html[data-theme=dark] [style*="background:#f9f8f7"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f3f3f1"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#fafaf9"]{background:#1f1d1b!important}
+html[data-theme=dark] [style*="background:#fffbeb"]{background:#211900!important}
+html[data-theme=dark] [style*="color:#191918"]{color:#d8d4d0!important}
+html[data-theme=dark] [style*="color:#111827"]{color:#e0deda!important}
+html[data-theme=dark] [style*="color:#374151"]{color:#a8a29e!important}
+html[data-theme=dark] [style*="color:#6b7280"]{color:#6a6764!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#565452!important}
+html[data-theme=dark] [style*="border:1px solid #e5e4e0"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #e5e4e0"]{border-bottom-color:#302e2c!important}
+html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#302e2c!important}
+html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
+html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
+html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
+html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
+html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+html[data-theme=dark] [style*="background:linear-gradient(135deg,#0f172a"]{background:linear-gradient(135deg,#0a0e18,#141c2e)!important}
+html[data-theme=dark] .b-incoming{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-inprog{background:#2dcaf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-review{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-approved{background:#2eeeca!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-paid{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .ds-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] .ds-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
+html[data-theme=dark] .ds-scr{background:#2dcaf0!important;color:#fff!important;border-color:#18a8cc!important}
+html[data-theme=dark] .pay-pending{background:rgba(212,160,23,0.15)!important;color:#fbbf24!important;border-color:rgba(212,160,23,0.3)!important}
+html[data-theme=dark] .pay-approved{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
+html[data-theme=dark] .pay-released{background:rgba(151,73,212,0.15)!important;color:#c084fc!important;border-color:rgba(151,73,212,0.3)!important}
+html[data-theme=dark] .pri-high{background:rgba(230,53,97,0.15)!important;color:#e63561!important;border-color:rgba(230,53,97,0.3)!important}
+html[data-theme=dark] #db-toast{background:#252220!important;border:1px solid #302e2c!important}
+html[data-theme=dark] #pref-panel{background:#252220!important;border-color:#302e2c!important;box-shadow:0 8px 28px rgba(0,0,0,.5)!important}
+html[data-theme=dark] [style*="background:#ece9e4"]{background:#252220!important}
+
+/* ── EG uniform dark separators + readable accent numbers (auto) ── */
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="dashed #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #eee"],html[data-theme=dark] [style*="solid #ececec"],html[data-theme=dark] [style*="solid #fafaf9"],html[data-theme=dark] [style*="solid #f3f4f6"],html[data-theme=dark] [style*="solid #d1d5db"]{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .dtable th,html[data-theme=dark] .dtable td,html[data-theme=dark] .dtable tr.exp-row td{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] [style*="color:#191918"],html[data-theme=dark] [style*="color:#374151"],html[data-theme=dark] [style*="color:#191918"]{color:#c9c3ba!important}
+html[data-theme=dark] [style*="background:#f7f5f0"],html[data-theme=dark] [style*="background:#f7f6f4"]{background:#1a1917!important}
+
+/* ── EG dark readability: lighter text + softer light-grey separators ── */
+html[data-theme=dark] .dtable th{color:#9c968e!important;border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .dtable td{border-color:rgba(255,255,255,.08)!important;color:#bdb8b1!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#9c968e!important}
+html[data-theme=dark] [style*="color:#6b7280"]{color:#a8a29b!important}
+html[data-theme=dark] [style*="color:#c4c3be"],html[data-theme=dark] [style*="color:#c4c2be"],html[data-theme=dark] [style*="color:#d1d5db"]{color:#8f8a83!important}
+html[data-theme=dark] [style*="color:#b0aaa4"],html[data-theme=dark] [style*="color:#b8b3ad"]{color:#a39d96!important}
+html[data-theme=dark] .tab-btn{color:#9c968e!important}
+html[data-theme=dark] .ni{color:#9c968e!important}
+html[data-theme=dark] .seg{color:#9c968e!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #f3f4f6"]{border-color:rgba(255,255,255,.1)!important}
+
+/* eg-kanban-harmonize */
+/* Kanban columns (light mode): NO body background by default — only show it on drag-over. */
+html:not([data-theme=dark]) .kb-col-body{background:transparent!important;border:none!important;border-top:none!important}
+html:not([data-theme=dark]) .kb-col-body.drag-over{background:#ece9e4!important;border:1px solid #c9c4bc!important;border-top:none!important}
+html:not([data-theme=dark]) .kb-col-header{border-left:none!important;border-right:none!important}
+/* Dark mode: keep the existing subtle outlined body */
+html[data-theme=dark] .kb-col-body{background:rgba(201,195,186,.08)!important;border:1px solid rgba(201,195,186,.3)!important;border-top:none!important}
+html[data-theme=dark] .kb-col-header{border-left:1px solid rgba(201,195,186,.3)!important;border-right:1px solid rgba(201,195,186,.3)!important}
+html[data-theme=dark] .kb-col-body.drag-over{background:rgba(201,195,186,.14)!important}
+
+/* eg-kbheader2 */
+/* Kanban column header strip — light mode: opaque #191918 with beige lettering. Dark mode: keep existing beige bar. */
+html:not([data-theme=dark]) .kb-col-header{background:#191918!important}
+html:not([data-theme=dark]) .kb-col-header,html:not([data-theme=dark]) .kb-col-header span,html:not([data-theme=dark]) .kb-col-header button,html:not([data-theme=dark]) .kb-col-header svg{color:#c9c3ba!important}
+html[data-theme=dark] .kb-col-header{background:#c9c3ba!important}
+html[data-theme=dark] .kb-col-header,html[data-theme=dark] .kb-col-header span,html[data-theme=dark] .kb-col-header button,html[data-theme=dark] .kb-col-header svg{color:#191918!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+</style>
+<style id="eg-outline-btns">
+/* ── EG button scheme: dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+/* === Dark-mode harmonization with seller side === */
+/* (a) Muted separators everywhere — bright #f3f3f1/#f9f8f7 lines incl. dropdown/list rows + sidebar footer rule */
+html[data-theme=dark] [style*="border-top:1px solid #f3f3f1"]{border-top-color:#302e2c!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:#302e2c!important}
+html[data-theme=dark] [style*="border:1px solid #f3f3f1"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border-top:1px solid #f9f8f7"]{border-top-color:#302e2c!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #f9f8f7"]{border-bottom-color:#302e2c!important}
+html[data-theme=dark] [style*="border-top:1px solid #f0ede9"]{border-top-color:#282624!important}
+html[data-theme=dark] .dtable td{border-bottom-color:#282624!important}
+/* (c) Cards: consistent surface + border */
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
+/* (e) Sidebar nav count badge -> seller grey-beige treatment */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+/* (d) Settings nav selected item (.fstab.on) -> seller selected grey-beige surface + outline */
+html[data-theme=dark] #sec-settings .fstab{color:#9c968e!important}
+html[data-theme=dark] #sec-settings .fstab:hover:not(.on){background:rgba(201,195,186,.06)!important;color:#d8d4cc!important}
+html[data-theme=dark] #sec-settings .fstab.on{background:rgba(201,195,186,.14)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.42)!important;font-weight:600!important}
+html[data-theme=dark] #sec-settings .fstab.on svg{opacity:1!important;color:#c9c3ba!important}
+</style>
+<style id="eg-card-soft">/* eg-card-soft */
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+</style>
+<!-- Universal header CSS (ported from seller.html) -->
+<style id="eg-univ-header">
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
+html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:2px 2px 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip:hover{background:rgba(201,195,186,.10)!important;color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:hover #balance-val{color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip #balance-val{color:#d8d4cc!important}
+#hdr-theme-knob{transform:translateX(0);transition:transform .25s}
+html[data-theme=dark] #hdr-theme-knob{transform:translateX(16px)}
+#hdr-theme-track{background:#e5e4e0}
+html[data-theme=dark] #hdr-theme-track{background:#374151}
+header [style*="width:1px"][style*="background:#e5e4e0"]{background:#f0ede9!important}
+html[data-theme=dark] header [style*="width:1px"][style*="background:#e5e4e0"]{background:rgba(201,195,186,.14)!important}
+.ibtn:hover #notif-dot{border-color:#f6f5f4}
+html[data-theme=dark] .ibtn:hover #notif-dot{border-color:#302e2c!important}
+html[data-theme=dark] #new-menu-btn{background:#c9c3ba!important;border-color:#c9c3ba!important;color:#191918!important}
+html[data-theme=dark] #new-menu-btn svg [stroke="white"],html[data-theme=dark] #new-menu-btn svg [stroke="#fff"]{stroke:#191918!important}
+</style>
+<script>
+window._egLang = (function(){ try { return localStorage.getItem('egfulfill_lang') || 'en'; } catch(e){ return 'en'; } })();
+function toggleLang(){
+  window._egLang = (window._egLang === 'en') ? 'vi' : 'en';
+  try { localStorage.setItem('egfulfill_lang', window._egLang); } catch(e){}
+  var lc = document.getElementById('hdr-lang-code'); if (lc) lc.textContent = window._egLang.toUpperCase();
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var lc = document.getElementById('hdr-lang-code'); if (lc) lc.textContent = (window._egLang||'en').toUpperCase();
+});
+</script>
+<style id="eg-card-dark-retro">/* eg-card-dark-retro */
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
+</style>
+<style id="eg-sel-outline">/* eg-sel-outline */
+html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
+</style>
+<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
+.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
+.eg-sel-btn svg{color:#191918!important}
+.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
+.eg-sel.open{z-index:6000!important}
+.eg-sel-menu{z-index:6001!important}
+.fb:not(.filter-btn){color:#191918!important}
+.fb:not(.filter-btn) svg{color:#191918!important}
+html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
+html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
+</style>
+<style id="eg-card-press">/* Overview cards: offset "sticker" shadow = height. Hover raises (shadow grows + 1px up); click/drag presses in (shadow shrinks + 3px down). Uses top, not transform (the .fi fadeUp animation locks transform). */
+.wcard,.stat-card{position:relative;transition:box-shadow .16s ease,top .14s cubic-bezier(.4,0,.2,1)}
+html:not([data-theme=dark]) .wcard:hover,html:not([data-theme=dark]) .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #40403d!important}
+html[data-theme=dark] .wcard:hover,html[data-theme=dark] .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #c9c3ba!important}
+html:not([data-theme=dark]) .wcard:active,html:not([data-theme=dark]) .stat-card:active{top:3px;box-shadow:1px 1px 0 #40403d!important}
+html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:3px;box-shadow:1px 1px 0 #c9c3ba!important}
+</style>
+<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
+.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div style="height:54px;box-sizing:border-box;padding:0 18px 0 14px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0;display:flex;align-items:center">
+    <div style="display:flex;align-items:baseline;gap:6px">
+      <a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a>
+      <span style="font-size:10px;font-weight:700;color:#191918;letter-spacing:.06em">DESIGNER</span>
+    </div>
+  </div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni on" data-sec="overview" onclick="showSec('overview')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Overview</a>
+    <a class="ni" data-sec="board" onclick="showSec('board')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Board<span id="nav-badge-board" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">7</span></a>
+    <a class="ni" data-sec="wallet" onclick="showSec('wallet')">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" data-sec="settings" onclick="showSec('settings')">
+      <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div style="padding:12px 14px;border-top:1px solid #f0ede9;flex-shrink:0;cursor:pointer;transition:background .15s;border-radius:8px;margin:4px 6px" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div style="width:30px;height:30px;background:#111827;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#191918;flex-shrink:0">P</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Phan M.</div>
+        <div style="font-size:12px;color:#9ca3af">Designer</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div style="margin-left:210px;min-height:100vh;display:flex;flex-direction:column;padding-top:54px">
+
+<!-- TOPBAR -->
+<header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px 0 230px;position:fixed;left:0;right:0;top:0;z-index:35;gap:8px;flex-shrink:0">
+  <div id="hdr-title" style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em;flex-shrink:0">Design Board</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+    <div style="display:flex;align-items:center;gap:4px;position:relative">
+      <div id="dsn-hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+        <div style="position:relative;margin-right:4px">
+          <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <input id="dsn-hdr-search-input" name="dsn-search-nofill" autocomplete="new-password" oninput="dsnRunHdrSearch&amp;&amp;dsnRunHdrSearch(this.value)" onblur="dsnScheduleCollapseSearch&amp;&amp;dsnScheduleCollapseSearch()" onkeydown="dsnHdrSearchKey&amp;&amp;dsnHdrSearchKey(event)" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search design cards…"/>
+        </div>
+      </div>
+      <button class="ibtn" id="dsn-hdr-search-btn" onclick="dsnToggleSearch&amp;&amp;dsnToggleSearch()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <div id="dsn-hdr-search-dd" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);z-index:300;overflow:hidden"></div>
+    </div>
+    <button class="ibtn" id="hdr-lang-btn" onclick="toggleLang&amp;&amp;toggleLang()" title="Toggle language">
+      <span id="hdr-lang-code" style="font-size:12.5px;font-weight:700;letter-spacing:.04em">EN</span>
+    </button>
+    <button class="ibtn" onclick="toggleTheme&amp;&amp;toggleTheme()" id="pref-btn" title="Toggle light / dark mode" style="padding:6px 8px">
+      <span id="hdr-theme-track" style="display:inline-block;position:relative;width:34px;height:18px;border-radius:11px;background:#e5e4e0;transition:background .25s;flex-shrink:0">
+        <span id="hdr-theme-knob" style="position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s"></span>
+      </span>
+    </button>
+    <button class="ibtn" style="position:relative" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">3</span></button>
+    <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+    <button class="bal-chip" type="button" onclick="(typeof showSec==='function'&amp;&amp;showSec('wallet'))" title="Wallet" style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:inherit">
+      <span id="balance-val" style="font-variant-numeric:tabular-nums">$340.00</span>
+    </button>
+    <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+    <div class="ibtn" style="cursor:pointer" onclick="(typeof showSec==='function'&amp;&amp;showSec('settings'))"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">D</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Designer</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">designer@egops.com</div></div></div>
+  </div>
+</header>
+
+<!-- Board sub-header (only in board section) -->
+<div id="board-subheader" style="background:transparent;padding:10px 20px 0;display:none;align-items:center;gap:6px;flex-shrink:0">
+  <div style="display:flex;gap:3px">
+    <button class="tab-btn on" onclick="dbFilter('all',this)">All</button>
+    <button class="tab-btn" onclick="dbFilter('dtg',this)">DTG</button>
+    <button class="tab-btn" onclick="dbFilter('sub',this)">SUB</button>
+    <button class="tab-btn" onclick="dbFilter('emb',this)">EMB</button>
+  </div>
+  <!-- Designers can only view cards routed to them — card creation lives on
+       seller/operator surfaces. Header create-buttons removed accordingly. -->
+  <div style="margin-left:auto;display:flex;gap:6px">
+    <button id="btn-add-col" onclick="openAddCol()" class="btn btn-out" style="font-size:13px;padding:4px 11px;display:none">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Column</button>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION: OVERVIEW ═══════════ -->
+<div id="sec-overview" style="display:block;padding:24px 32px;flex:1;max-width:1600px;margin:0 auto;width:100%">
+  <div style="font-size:21px;font-weight:800;color:#191918;margin-bottom:4px">Good morning, Phan <svg width="16" height="16" viewBox="0 0 18 18" fill="none" style="display:inline-block;vertical-align:-2px;margin-left:1px"><path d="M9 2l1.3 4.2a2 2 0 001.5 1.5L16 9l-4.2 1.3a2 2 0 00-1.5 1.5L9 16l-1.3-4.2a2 2 0 00-1.5-1.5L2 9l4.2-1.3a2 2 0 001.5-1.5z" fill="#191918"/></svg></div>
+  <div style="font-size:14.5px;color:#9ca3af;margin-bottom:22px">Here's your design workload at a glance.</div>
+  <div id="dsn-overview-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+    <div class="wcard" id="dsn-w-active" style="padding:20px 20px 16px;overflow:hidden">
+      <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Active Cards</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1" id="ov-active">2</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span class="trend-up">↑ 8.0%</span><span style="font-size:12.5px;color:#9ca3af">Currently in progress</span></div>
+      </div>
+      <div id="sp-dsn-active" style="height:52px;margin-top:4px"></div>
+    </div>
+    <div class="wcard" id="dsn-w-review" style="padding:20px 20px 16px;overflow:hidden">
+      <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">In Review</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1" id="ov-review">1</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span class="trend-up">↑ 3.1%</span><span style="font-size:12.5px;color:#9ca3af">Awaiting admin review</span></div>
+      </div>
+      <div id="sp-dsn-review" style="height:52px;margin-top:4px"></div>
+    </div>
+    <div class="wcard" id="dsn-w-approved" style="padding:20px 20px 16px;overflow:hidden">
+      <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Approved</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1" id="ov-approved">1</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span class="trend-up">↑ 5.4%</span><span style="font-size:12.5px;color:#9ca3af">Approved this month</span></div>
+      </div>
+      <div id="sp-dsn-approved" style="height:52px;margin-top:4px"></div>
+    </div>
+    <div class="wcard" id="dsn-w-earned" style="padding:20px 20px 16px;overflow:hidden">
+      <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Earned</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1" id="ov-earned">$364</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px"><span class="trend-up">↑ 10.1%</span><span style="font-size:12.5px;color:#9ca3af">Paid out this month</span></div>
+      </div>
+      <div id="sp-dsn-earned" style="height:52px;margin-top:4px"></div>
+    </div>
+  </div>
+  <!-- My active cards -->
+  <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:10px">My Active Cards</div>
+  <div id="ov-cards" style="display:flex;flex-direction:column;gap:8px"></div>
+</div>
+
+<!-- ═══════════ SECTION: BOARD ═══════════ -->
+<div id="sec-board" style="flex:1;display:none;flex-direction:column">
+  <div id="db-board" class="kb-board"></div>
+</div>
+
+<!-- ═══════════ SECTION: WALLET ═══════════ -->
+<div id="sec-wallet" style="display:none;padding:24px 32px;flex:1;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box">
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
+    <div class="wcard" style="padding:20px 20px 16px;overflow:hidden">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Available</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1">$340.00</div>
+        <div style="font-size:12.5px;color:#9ca3af;margin-top:4px">Ready to withdraw</div>
+      </div>
+      <div id="sp-wal-available" style="height:52px"></div>
+    </div>
+    <div class="wcard" style="padding:20px 20px 16px;overflow:hidden">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Pending</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1">$125.00</div>
+        <div style="font-size:12.5px;color:#9ca3af;margin-top:4px">Cards in review/progress</div>
+      </div>
+      <div id="sp-wal-pending" style="height:52px"></div>
+    </div>
+    <div class="wcard" style="padding:20px 20px 16px;overflow:hidden">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total Earned</div>
+        <div style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1">$1,248.00</div>
+        <div style="font-size:12.5px;color:#9ca3af;margin-top:4px">All time</div>
+      </div>
+      <div id="sp-wal-earned" style="height:52px"></div>
+    </div>
+  </div>
+  <!-- Payout -->
+  <div class="card" style="padding:18px 20px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;color:#191918">Request Payout</div>
+      <span style="font-size:12.5px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:2px 10px;border-radius:999px">PayPal connected</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <input class="input" type="number" value="340" placeholder="Amount" style="max-width:180px">
+      <div style="font-size:13.5px;color:#9ca3af">→ phanmylinh04@gmail.com</div>
+      <button onclick="dbRequestPayout()" class="btn" style="background:#15803d;color:#fff;margin-left:auto">Request Payout →</button>
+    </div>
+    <div style="font-size:12.5px;color:#9ca3af;margin-top:8px">Processing time: 1–2 business days · Fee: none</div>
+  </div>
+  <!-- History -->
+  <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:10px">Payment History</div>
+  <div class="card" style="overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead><tr style="background:#f9f8f7">
+        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e4e0">CARD</th>
+        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e4e0">DATE</th>
+        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e4e0">AMOUNT</th>
+        <th style="padding:10px 14px;text-align:left;font-size:12px;font-weight:700;color:#6b7280;border-bottom:1px solid #e5e4e0">STATUS</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;font-weight:500">NYC Skyline Print</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;color:#6b7280">Apr 29, 2026</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;font-weight:700;color:#191918">$24.00</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9"><span class="badge pay-released">Released</span></td></tr>
+        <tr><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;font-weight:500">Olivia Hoodie Pattern</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;color:#6b7280">May 5, 2026</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9;font-weight:700;color:#191918">$36.00</td><td style="padding:10px 14px;border-bottom:1px solid #f0ede9"><span class="badge pay-approved">Approved</span></td></tr>
+        <tr><td style="padding:10px 14px;font-weight:500">Coffee Mug Wrap</td><td style="padding:10px 14px;color:#6b7280">—</td><td style="padding:10px 14px;font-weight:700;color:#191918">$18.00</td><td style="padding:10px 14px"><span class="badge pay-pending">Pending</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════ SECTION: SETTINGS ═══════════ -->
+<div id="sec-settings" style="display:none;padding:24px 32px;flex:1;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box">
+  <style>
+    #sec-settings .fstab{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:14px;font-weight:500;color:#374151;cursor:pointer;text-decoration:none;transition:background .15s}
+    #sec-settings .fstab:hover{background:#f1f0ec}#sec-settings .fstab.on{background:#eeede9;color:#111827;font-weight:600}
+    #sec-settings .fstab svg{width:15px;height:15px;flex-shrink:0;opacity:.65}#sec-settings .fstab.on svg{opacity:.9}
+    #sec-settings .card{background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;padding:2px 0 22px!important;max-width:640px}
+  </style>
+  <div style="font-size:21px;font-weight:800;color:#191918;margin-bottom:20px">Settings</div>
+  <div style="display:flex;gap:24px;align-items:flex-start;max-width:1040px;width:100%">
+    <div style="width:208px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
+      <a class="fstab on" onclick="dsnSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
+      <a class="fstab" onclick="dsnSettingsTab('payout',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 7h13" stroke="currentColor" stroke-width="1.3"/></svg>Payout</a>
+      <a class="fstab" onclick="dsnSettingsTab('appearance',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Appearance</a>
+    </div>
+    <div style="flex:1;min-width:0">
+      <!-- Profile -->
+      <div id="dsnpanel-profile" class="card fi">
+        <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:14px">My Profile</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px">
+          <div style="width:56px;height:56px;border-radius:12px;background:#191918;color:#e8e4dd;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0">P</div>
+          <div><button class="btn btn-out" style="font-size:13px">Change avatar</button><div style="font-size:12px;color:#9ca3af;margin-top:5px">JPG, PNG up to 1MB</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">First Name</label><input class="input" value="Phan"/></div>
+          <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Last Name</label><input class="input" value="M."/></div>
+        </div>
+        <div style="margin-bottom:12px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Email</label><input class="input" value="phanmylinh04@gmail.com" type="email"/></div>
+        <div style="margin-bottom:16px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Role</label><input class="input" value="Designer" disabled style="background:#f4f2ef;color:#9ca3af;cursor:not-allowed"/></div>
+        <button class="btn btn-dk" style="font-size:13px">Save Changes</button>
+      </div>
+      <!-- Payout -->
+      <div id="dsnpanel-payout" class="card fi" style="display:none">
+        <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:3px">Payout</div>
+        <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Payouts are sent here automatically after approval.</div>
+        <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">PayPal Account</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="input" value="phanmylinh04@gmail.com" style="max-width:320px"/>
+          <span style="font-size:12.5px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:3px 10px;border-radius:999px;white-space:nowrap">✓ Verified</span>
+        </div>
+        <button class="btn btn-out" style="margin-top:14px;font-size:13px">Update PayPal</button>
+      </div>
+      <!-- Appearance -->
+      <div id="dsnpanel-appearance" class="card fi" style="display:none">
+        <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:14px">Appearance</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;max-width:360px">
+          <span style="font-size:14.5px;color:#374151" id="theme-label2">Light mode</span>
+          <button onclick="toggleTheme()" style="width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;background:#e5e4e0;position:relative;transition:background .25s;padding:0" id="theme-btn2">
+            <span id="toggle-knob2" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s;display:block"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function dsnSettingsTab(id, el){
+  ['profile','payout','appearance'].forEach(function(s){ var p=document.getElementById('dsnpanel-'+s); if(p) p.style.display = (s===id?'block':'none'); });
+  if (el) { document.querySelectorAll('#sec-settings .fstab').forEach(function(t){ t.classList.remove('on'); }); el.classList.add('on'); }
+}
+</script>
+
+<!-- ═══════════ CARD MODAL ═══════════ -->
+<div class="modal-overlay" id="card-modal" onclick="if(event.target===this)closeCardModal()">
+  <div style="background:#fff;border-radius:16px;width:860px;max-width:100%;display:flex;flex-direction:column;max-height:88vh;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.18)">
+    <div style="padding:15px 18px;border-bottom:1px solid #e5e4e0;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap">
+          <span id="modal-order-num" style="font-size:12.5px;font-weight:700;color:#9ca3af"></span>
+          <span id="modal-type-badge" class="badge" style="font-size:11.5px"></span>
+          <span id="modal-pri-badge" class="badge" style="font-size:11.5px"></span>
+        </div>
+        <div id="modal-title" style="font-size:16px;font-weight:700;color:#191918"></div>
+        <div id="modal-product" style="font-size:13px;color:#6b7280;margin-top:2px"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span id="modal-status-badge" class="badge" style="font-size:12px;padding:4px 12px"></span>
+        <button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex;align-items:center"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+      </div>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden">
+      <!-- LEFT -->
+      <div style="flex:1;padding:16px 18px;border-right:1px solid #e5e4e0;overflow-y:auto;display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">Reference Image</div>
+          <div style="border-radius:10px;overflow:hidden;border:1px solid #e5e4e0;background:#f4f2ef">
+            <img id="modal-ref-img" src="" alt="" style="width:100%;max-height:220px;object-fit:contain;display:block">
+            <div id="modal-ref-ph" style="display:none;height:120px;flex;align-items:center;justify-content:center;flex-direction:column;gap:5px">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="4" stroke="#9ca3af" stroke-width="1.4"/><circle cx="8.5" cy="8.5" r="2" stroke="#9ca3af" stroke-width="1.2"/><path d="M2 15l6-4 4 3 4-2.5 6 5" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <span style="font-size:13px;color:#9ca3af">No reference</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">Print Specs</div>
+          <div id="modal-specs" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13.5px"></div>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">Upload Deliverables</div>
+          <div id="modal-drop" class="drop-zone" onclick="document.getElementById('modal-file-input').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="dbHandleDrop(event)">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="margin:0 auto 5px"><path d="M10 3v9M7 6l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <div style="font-weight:600;font-size:14px;margin-bottom:2px">Drop files or click to upload</div>
+            <div style="font-size:12.5px">PNG, JPG, PDF, AI, PSD · max 50MB</div>
+          </div>
+          <input type="file" id="modal-file-input" multiple accept="image/*,.pdf,.ai,.psd" style="display:none" onchange="dbHandleFiles(this.files)">
+          <div id="modal-files-list" style="margin-top:7px"></div>
+        </div>
+      </div>
+      <!-- RIGHT -->
+      <div style="width:286px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column">
+        <!-- Payment -->
+        <div style="padding:13px 15px;border-bottom:1px solid #e5e4e0">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">Payment</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="font-size:23px;font-weight:800;color:#191918" id="modal-pay-amount">—</div>
+            <span id="modal-pay-status" class="badge pay-pending">Pending</span>
+          </div>
+          <div id="admin-pay-set" style="display:none;display:flex;gap:5px;margin-bottom:7px">
+            <input type="number" id="pay-input" class="input" placeholder="0.00" style="font-size:14px;padding:6px 9px">
+            <button onclick="dbSetPayment()" class="btn btn-gold" style="font-size:13px;padding:5px 10px;flex-shrink:0">Set</button>
+          </div>
+          <div id="admin-approve" style="display:none">
+            <button onclick="dbApprovePayment()" style="width:100%;padding:7px;border-radius:8px;background:#ecfdf5;color:#15803d;border:1px solid #bbf7d0;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✓ Approve & Add to Balance</button>
+          </div>
+          <div id="admin-release" style="display:none">
+            <button onclick="dbReleasePayment()" style="width:100%;padding:7px;border-radius:8px;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">↑ Release via PayPal</button>
+          </div>
+          <div id="modal-pay-hist" style="margin-top:9px"></div>
+        </div>
+
+        <!-- Notes -->
+        <div style="padding:13px 15px;border-bottom:1px solid #e5e4e0;flex:1">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:9px">Notes</div>
+          <div id="modal-notes" style="display:flex;flex-direction:column;gap:5px;margin-bottom:9px;max-height:180px;overflow-y:auto"></div>
+          <div style="display:flex;gap:5px">
+            <textarea id="modal-note-input" class="input" placeholder="Add a note…" style="font-size:13px;padding:6px 9px;resize:none;height:56px"></textarea>
+            <button onclick="dbAddNote()" style="flex-shrink:0;align-self:flex-end;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 9px;cursor:pointer;font-family:inherit">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 6.5h10M7.5 3l4 3.5-4 3.5" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <!-- Action -->
+        <div style="padding:13px 15px" id="modal-action-area"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW CARD MODAL -->
+<div class="modal-overlay" id="new-card-modal" onclick="if(event.target===this)closeNewCard()">
+  <div style="background:#fff;border-radius:14px;width:460px;padding:22px;box-shadow:0 16px 56px rgba(0,0,0,.16)">
+    <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:16px">New Design Card</div>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Title</label><input id="nc-title" class="input" placeholder="Design name…"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Order #</label><input id="nc-order" class="input" placeholder="FF-0000"></div>
+        <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Print Type</label>
+          <select id="nc-type" class="input" style="padding:8px 10px"><option>DTG</option><option>SUB</option><option>EMB</option><option>SCR</option></select></div>
+      </div>
+      <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Product</label><input id="nc-product" class="input" placeholder="Product name…"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Due Date</label><input id="nc-due" class="input" type="date"></div>
+        <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Priority</label>
+          <select id="nc-pri" class="input" style="padding:8px 10px"><option value="normal">Normal</option><option value="high">High</option></select></div>
+      </div>
+      <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Reference Image URL</label><input id="nc-img" class="input" placeholder="https://… or leave blank"></div>
+      <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Initial Note</label><textarea id="nc-note" class="input" style="height:58px;resize:none" placeholder="Notes for the designer…"></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="closeNewCard()" class="btn btn-out" style="flex:1">Cancel</button>
+      <button onclick="dbCreateCard()" class="btn btn-dk" style="flex:1">Create →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD COLUMN MODAL -->
+<div class="modal-overlay" id="add-col-modal" onclick="if(event.target===this)closeAddCol()">
+  <div style="background:#fff;border-radius:14px;width:320px;padding:20px;box-shadow:0 16px 56px rgba(0,0,0,.16)">
+    <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:12px">Add Column</div>
+    <input id="col-name-input" class="input" placeholder="Column name…" style="margin-bottom:10px" onkeydown="if(event.key==='Enter')dbConfirmAddCol()">
+    <div style="display:flex;gap:7px">
+      <button onclick="closeAddCol()" class="btn btn-out" style="flex:1">Cancel</button>
+      <button onclick="dbConfirmAddCol()" class="btn btn-dk" style="flex:1">Add →</button>
+    </div>
+  </div>
+</div>
+
+<div id="db-toast"></div>
+
+</div><!-- /main -->
+
+<script>
+// ══════════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════════
+let DB_ROLE = 'designer';
+let DB_FILTER = 'all';
+let DB_ACTIVE_CARD = null;
+let _dbNextId = 100;
+// Hydrate from EGStore so the balance survives reloads and stays in sync with
+// the admin page (which is what credits earnings on card approve). The legacy
+// in-memory $340 default is gone — designers start at $0 until admin pays out.
+let _dbBalance = (typeof EGStore !== 'undefined' && EGStore.getDesignerBalance) ? EGStore.getDesignerBalance() : 0;
+function _dbRefreshBalance() {
+  _dbBalance = (typeof EGStore !== 'undefined' && EGStore.getDesignerBalance) ? EGStore.getDesignerBalance() : _dbBalance;
+  var el = document.getElementById('designer-balance');
+  if (el) el.textContent = '$' + _dbBalance.toFixed(2);
+}
+window.addEventListener('storage', function(e){
+  if (!e || e.key === null || e.key === 'eg_designer_balance' || e.key === 'eg_designer_ledger') _dbRefreshBalance();
+});
+window.addEventListener('eg-designer-balance-changed', _dbRefreshBalance);
+
+let DB_COLUMNS = [
+  { id:'incoming',   name:'Incoming',    color:'#9ca3af' },
+  { id:'inprogress', name:'In Progress', color:'#6b7280' },
+  { id:'review',     name:'In Review',   color:'#4b5563' },
+  { id:'approved',   name:'Approved',    color:'#191918' },
+  { id:'paid',       name:'Paid',        color:'#6b7280' },
+];
+// Designer-customizable columns (color + name + order) — persisted per designer.
+const DB_COLS_KEY = 'eg_designer_board_cols';
+(function(){ try { if (localStorage.getItem('eg_designer_board_cols_ver') !== 'scheme1') { localStorage.removeItem(DB_COLS_KEY); localStorage.setItem('eg_designer_board_cols_ver','scheme1'); } var s = JSON.parse(localStorage.getItem(DB_COLS_KEY) || 'null'); if (Array.isArray(s) && s.length) DB_COLUMNS = s; } catch(e){} })();
+function dbSaveCols(){ try { localStorage.setItem(DB_COLS_KEY, JSON.stringify(DB_COLUMNS)); } catch(e){} }
+
+// Preset palette + "+" for any custom color via the OS color wheel.
+const DB_PALETTE = ['#FF4D6D','#FFBD00','#3CFF7F','#33B6FF','#2B2B2B','#FF7847','#B14DFF','#00E5C7','#FF4DC4','#A3FF3C'];
+let _dbMenuCol = null, _dbMenuBtn = null;
+function dbSetColColor(id, color){
+  var col = DB_COLUMNS.find(c => c.id === id); if (!col) return;
+  col.color = color; dbSaveCols(); dbRender();
+  if (_dbMenuBtn) dbOpenColMenu(id, _dbMenuBtn);   // refresh menu (selected swatch)
+}
+function dbOpenColMenu(colId, btn, e){
+  if (e) e.stopPropagation();
+  _dbMenuCol = colId; _dbMenuBtn = btn;
+  var col = DB_COLUMNS.find(c => c.id === colId); if (!col) return;
+  var m = document.getElementById('db-col-menu');
+  if (!m){ m = document.createElement('div'); m.id = 'db-col-menu'; m.style.cssText = 'position:fixed;display:none;background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:14px 16px;width:300px;z-index:500;box-shadow:0 12px 36px rgba(0,0,0,.16);font-family:Inter,sans-serif'; m.addEventListener('click',function(ev){ev.stopPropagation();}); document.body.appendChild(m); }
+  var swatches = DB_PALETTE.map(function(c){
+    var sel = (col.color||'').toLowerCase() === c.toLowerCase();
+    return '<button onclick="dbSetColColor(\''+colId+'\',\''+c+'\')" style="width:26px;height:26px;border-radius:7px;border:'+(sel?'2.5px solid #191918':'1.5px solid rgba(0,0,0,.1)')+';background:'+c+';cursor:pointer;padding:0;flex-shrink:0"></button>';
+  }).join('');
+  var plus = '<label title="Custom color" style="width:26px;height:26px;border-radius:7px;border:1.5px dashed #b8b5b0;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;color:#6b7280;overflow:hidden"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><input type="color" value="'+col.color+'" oninput="dbSetColColor(\''+colId+'\',this.value)" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"></label>';
+  m.innerHTML =
+    '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px">Column color</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">'+swatches+plus+'</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Rename</div>'
+    + '<div style="display:flex;gap:7px;margin-bottom:13px"><input id="db-col-rename" value="'+String(col.name).replace(/"/g,'&quot;')+'" onkeydown="if(event.key===\'Enter\')dbRenameCol()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 11px;font-size:14px;font-family:inherit;outline:none;color:#191918;background:#fff" onfocus="this.style.borderColor=\'#111827\'" onblur="this.style.borderColor=\'#e5e4e0\'"><button onclick="dbRenameCol()" class="btn btn-dk" style="padding:8px 16px">OK</button></div>'
+    + '<button onclick="dbDeleteCol()" style="width:100%;background:#fff5f5;border:1px solid #fbcfe0;color:#dc2626;border-radius:9px;padding:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#fee2e2\'" onmouseout="this.style.background=\'#fff5f5\'">Delete Column</button>';
+  var r = btn.getBoundingClientRect();
+  var left = Math.min(r.left, window.innerWidth - 316);
+  var top = r.bottom + 6;
+  if (top + 230 > window.innerHeight) top = Math.max(8, r.top - 236);
+  m.style.left = Math.max(8,left)+'px'; m.style.top = top+'px'; m.style.display = 'block';
+}
+function dbCloseColMenu(){ var m = document.getElementById('db-col-menu'); if (m) m.style.display = 'none'; _dbMenuBtn = null; }
+function dbRenameCol(){ var col = DB_COLUMNS.find(c => c.id === _dbMenuCol); if (!col) return; var inp = document.getElementById('db-col-rename'); var v = (inp && inp.value || '').trim(); if (v) col.name = v; dbSaveCols(); dbCloseColMenu(); dbRender(); }
+function dbDeleteCol(){
+  if (DB_COLUMNS.length <= 1){ alert('Keep at least one column.'); return; }
+  var idx = DB_COLUMNS.findIndex(c => c.id === _dbMenuCol); if (idx < 0) return;
+  var removed = DB_COLUMNS[idx];
+  var target = DB_COLUMNS.find(c => c.id !== removed.id);
+  if (typeof DB_CARDS !== 'undefined') DB_CARDS.forEach(function(cd){ if (cd.col === removed.id && target) cd.col = target.id; });
+  DB_COLUMNS.splice(idx, 1);
+  dbSaveCols(); if (typeof dbSave === 'function') dbSave(); dbCloseColMenu(); dbRender();
+}
+document.addEventListener('click', function(e){
+  var m = document.getElementById('db-col-menu');
+  if (m && m.style.display === 'block' && !(e.target.closest && e.target.closest('[data-col-gear]'))) dbCloseColMenu();
+});
+
+const DB_DEFAULTS = [];
+
+const DESIGN_STORE_KEY = 'egfulfill_design_cards';
+/* One-time migration: wipe legacy demo cards so the board starts empty. Bump the version string to wipe again. */
+(function(){
+  const VKEY = 'egfulfill_design_board_version', CURRENT = 'v4-dedupe';
+  try {
+    if (localStorage.getItem(VKEY) !== CURRENT) {
+      localStorage.removeItem(DESIGN_STORE_KEY);
+      localStorage.setItem(VKEY, CURRENT);
+    }
+  } catch(e) {}
+})();
+// Resolve a card's effective thumbnail at render time.
+// Cards stored via EGStore.pushToDesignBoard keep a small placeholder thumb + thumb_ref to the image cache —
+// this resolver fetches the real image lazily so localStorage stays lean.
+function _thumbFor(c) {
+  if (!c) return '';
+  // Resolve the real pushed design first (cached by pushToDesignBoard via cacheRawDesign /
+  // cacheImage, keyed by order+sku) — the card itself only stores a placehold.co placeholder.
+  if (c.order && c.sku && typeof EGStore !== 'undefined') {
+    if (EGStore.getRawDesign) {
+      const raw = EGStore.getRawDesign(c.order, c.sku);
+      if (raw && String(raw).startsWith('data:')) return raw;
+    }
+    if (EGStore.getCachedImage) {
+      const comp = EGStore.getCachedImage(c.order, c.sku);
+      if (comp && String(comp).startsWith('data:')) return comp;
+    }
+  }
+  if (c.thumb_ref && typeof EGStore !== 'undefined' && EGStore.getCachedImageByRef) {
+    const cached = EGStore.getCachedImageByRef(c.thumb_ref);
+    if (cached) return cached;
+  }
+  return c.thumb || '';
+}
+function dbLoad() {
+  try {
+    const raw = localStorage.getItem(DESIGN_STORE_KEY);
+    if (raw) {
+      const cards = JSON.parse(raw);
+      cards.forEach(c => { if (!c.notes) c.notes = []; if (!c.history) c.history = []; });
+      _dbNextId = Math.max(_dbNextId, ...cards.map(c => c.id));
+      return cards;
+    }
+  } catch(e) {}
+  return DB_DEFAULTS.map(c => JSON.parse(JSON.stringify(c)));
+}
+function dbSave() { localStorage.setItem(DESIGN_STORE_KEY, JSON.stringify(DB_CARDS)); }
+let DB_CARDS = dbLoad();
+window.addEventListener('storage', e => {
+  if (e.key !== DESIGN_STORE_KEY || !e.newValue) return;
+  try {
+    const cards = JSON.parse(e.newValue);
+    cards.forEach(c => { if (!c.notes) c.notes = []; if (!c.history) c.history = []; });
+    DB_CARDS.length = 0; cards.forEach(c => DB_CARDS.push(c));
+    if (typeof dbRender === 'function') dbRender();
+  } catch(ex) {}
+});
+
+// ══════════════════════════════════════════════════
+// SECTIONS
+// ══════════════════════════════════════════════════
+const SECTION_TITLES = { overview:'Overview', board:'Design Board', wallet:'Wallet', settings:'Settings' };
+
+function showSec(id) {
+  ['overview','board','wallet','settings'].forEach(s => {
+    const el = document.getElementById('sec-' + s);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById('sec-' + id);
+  if (target) target.style.display = id === 'board' ? 'flex' : 'block';
+  document.querySelectorAll('.ni[data-sec]').forEach(n => {
+    n.classList.toggle('on', n.dataset.sec === id);
+  });
+  document.getElementById('hdr-title').textContent = SECTION_TITLES[id] || id;
+  const bsh = document.getElementById('board-subheader');
+  bsh.style.display = id === 'board' ? 'flex' : 'none';
+  if (id === 'board') dbRender();
+  if (id === 'overview') renderOverview();
+  if (id === 'wallet') renderWalletSparks();
+}
+
+// Wallet KPI sparklines — same shape/look as Overview cards
+function renderWalletSparks() {
+  dsnSpark('sp-wal-available', [240,260,280,300,310,320,340],         '#0d9488');
+  dsnSpark('sp-wal-pending',   [80,90,100,110,115,120,125],            '#191918');
+  dsnSpark('sp-wal-earned',    [800,900,1000,1100,1180,1220,1248],     '#9749d4');
+}
+
+// Lightweight inline-SVG sparkline (no Chart.js dependency) — mirrors the admin KPI card look.
+// Single muted theme color for every sparkline — keeps the cards consistent
+// (no more multi-colored, off-theme lines). Lines are drawn as smooth curves.
+const DSN_SPARK_COLOR = '#b0aaa4';
+function _smoothPath(pts) {
+  if (pts.length < 3) return pts.map((p, i) => (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  let d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ' C' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ' ' + c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+  }
+  return d;
+}
+function dsnSpark(id, data, color) {
+  const el = document.getElementById(id);
+  if (!el || !data || !data.length) return;
+  color = DSN_SPARK_COLOR;   // force consistent theme color
+  const w = 240, h = 52, pad = 4;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const range = (mx - mn) || 1;
+  const pts = data.map((v, i) => {
+    const x = pad + (data.length === 1 ? 0 : (i / (data.length - 1)) * (w - pad * 2));
+    const y = h - pad - ((v - mn) / range) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = _smoothPath(pts);
+  const area = line + ` L${pts[pts.length-1][0].toFixed(1)} ${h} L${pts[0][0].toFixed(1)} ${h} Z`;
+  const gid = 'spg-' + id;
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:100%;display:block">`
+    + `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">`
+    + `<stop offset="0" stop-color="${color}" stop-opacity="0.22"/>`
+    + `<stop offset="1" stop-color="${color}" stop-opacity="0"/>`
+    + `</linearGradient></defs>`
+    + `<path d="${area}" fill="url(#${gid})"/>`
+    + `<path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `</svg>`;
+}
+
+function renderOverview() {
+  const mine = DB_CARDS.filter(c => c.assignee === 'Phan');
+  document.getElementById('ov-active').textContent = mine.filter(c => c.col === 'inprogress').length;
+  document.getElementById('ov-review').textContent = mine.filter(c => c.col === 'review').length;
+  document.getElementById('ov-approved').textContent = mine.filter(c => c.col === 'approved').length;
+  const earned = mine.filter(c => c.payStatus !== 'pending').reduce((s,c) => s + c.payment, 0);
+  document.getElementById('ov-earned').textContent = '$' + earned;
+  // KPI sparklines — 7-point weekly trend, accent-colored per card
+  dsnSpark('sp-dsn-active',   [1,2,1,3,2,2,2],               '#111827');
+  dsnSpark('sp-dsn-review',   [0,1,1,0,1,2,1],               '#9749d4');
+  dsnSpark('sp-dsn-approved', [2,3,3,4,4,5,6],               '#0d9488');
+  dsnSpark('sp-dsn-earned',   [120,180,160,240,300,330,364], '#191918');
+  const el = document.getElementById('ov-cards');
+  const active = mine.filter(c => ['inprogress','review'].includes(c.col));
+  el.innerHTML = active.length ? active.map(c => {
+    const typeCls = {DTG:'ds-dtg',SUB:'ds-sub',EMB:'ds-emb',SCR:'ds-scr'}[c.type]||'ds-dtg';
+    const stCls = {inprogress:'b-inprog',review:'b-review'}[c.col]||'b-inprog';
+    const stLbl = {inprogress:'In Progress',review:'In Review'}[c.col]||'';
+    return `<div class="card" style="padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="showSec('board');setTimeout(()=>openCardModal(${c.id}),200)">
+      ${(() => { const t = _thumbFor(c); return t ? `<img src="${t}" style="width:44px;height:44px;border-radius:7px;object-fit:cover;flex-shrink:0">` : `<div style="width:44px;height:44px;border-radius:7px;background:#f4f2ef;flex-shrink:0"></div>`; })()}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.title}</div>
+        <div style="font-size:12.5px;color:#9ca3af;margin-top:2px">${c.order}</div>
+      </div>
+      <span class="badge ${typeCls}" style="font-size:11.5px">${c.type}</span>
+      <span class="badge ${stCls}" style="font-size:11.5px">${stLbl}</span>
+      <span style="font-size:12px;color:#9ca3af">${formatDue(c.due)}</span>
+    </div>`;
+  }).join('') : '<div style="font-size:14px;color:#9ca3af;padding:14px 0">No active cards right now.</div>';
+}
+
+// ══════════════════════════════════════════════════
+// DRAG & DROP (reorder + cross-column)
+// ══════════════════════════════════════════════════
+let _dragId = null;
+let _dragOverId = null;
+let _dragInsertAfter = false;
+
+function dbDragStart(e, id) {
+  _dragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', String(id)); } catch(_){}
+  setTimeout(() => { const el = document.getElementById('kb-card-' + id); if (el) el.classList.add('dragging'); }, 0);
+}
+
+function dbDragEnd(e) {
+  document.querySelectorAll('.kb-card').forEach(c => c.classList.remove('dragging'));
+  dbRemoveGhost();
+  _dragId = null; _dragOverId = null;
+}
+function dbInsertGhost(refId, after) {
+  dbRemoveGhost();
+  const ref = document.getElementById('kb-card-' + refId);
+  if (!ref) return;
+  const ghost = document.createElement('div');
+  ghost.id = 'db-ghost';
+  ghost.className = 'db-drop-ghost';
+  ghost.style.height = (ref.offsetHeight || 80) + 'px';
+  if (after) ref.after(ghost); else ref.before(ghost);
+}
+function dbRemoveGhost() {
+  const g = document.getElementById('db-ghost');
+  if (g) g.remove();
+}
+
+function dbCardDragOver(e, cardId) {
+  if (_dragId === cardId) return;
+  e.preventDefault(); e.stopPropagation();
+  const rect = e.currentTarget.getBoundingClientRect();
+  const after = e.clientY > rect.top + rect.height / 2;
+  if (cardId !== _dragOverId || after !== _dragInsertAfter) {
+    _dragOverId = cardId;
+    _dragInsertAfter = after;
+    dbInsertGhost(cardId, after);
+  }
+}
+
+function dbColDragOver(e, colId) {
+  e.preventDefault();
+  if (_dragOverId) return;
+  document.getElementById('col-body-' + colId)?.classList.add('drag-over');
+}
+
+function dbColDragLeave(e, colId) {
+  if (e.currentTarget && e.currentTarget.contains(e.relatedTarget)) return;
+  document.getElementById('col-body-' + colId)?.classList.remove('drag-over');
+  dbRemoveGhost();
+}
+
+function dbDrop(e, colId) {
+  e.preventDefault();
+  document.querySelectorAll('.kb-col-body').forEach(b => b.classList.remove('drag-over'));
+  dbRemoveGhost();
+  if (!_dragId) return;
+  const dragged = DB_CARDS.find(x => x.id === _dragId);
+  if (!dragged) return;
+  const fromIdx = DB_CARDS.indexOf(dragged);
+  DB_CARDS.splice(fromIdx, 1);
+  dragged.col = colId;
+  if (_dragOverId && _dragOverId !== _dragId) {
+    const targetIdx = DB_CARDS.findIndex(x => x.id === _dragOverId);
+    if (targetIdx >= 0) {
+      DB_CARDS.splice(_dragInsertAfter ? targetIdx + 1 : targetIdx, 0, dragged);
+    } else { DB_CARDS.push(dragged); }
+  } else { DB_CARDS.push(dragged); }
+  _dragId = null; _dragOverId = null;
+  dbRender(); dbSave();
+}
+
+// ══════════════════════════════════════════════════
+// RENDER BOARD
+// ══════════════════════════════════════════════════
+function dbRender() {
+  const filtered = DB_FILTER === 'all' ? DB_CARDS : DB_CARDS.filter(c => c.type.toLowerCase() === DB_FILTER);
+  const board = document.getElementById('db-board');
+  board.innerHTML = '';
+  DB_COLUMNS.forEach(col => {
+    const colCards = filtered.filter(c => c.col === col.id);
+    const div = document.createElement('div');
+    div.className = 'kb-col';
+    div.innerHTML = `
+      <div class="kb-col-header" style="background:${col.color}18;border-top:3px solid ${col.color}">
+        <span style="color:#191918;font-weight:700;flex:1">${col.name}</span>
+        <span style="background:${col.color}22;color:#191918;font-size:12px;font-weight:700;padding:1px 7px;border-radius:999px">${colCards.length}</span>
+        <button data-col-gear onclick="dbOpenColMenu('${col.id}',this,event)" style="background:none;border:none;cursor:pointer;color:${col.color};opacity:.7;padding:1px 2px;margin-left:2px;line-height:0" title="Edit column"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2.1" stroke="currentColor" stroke-width="1.3"/><path d="M7 1.4v1.6M7 11v1.6M1.4 7h1.6M11 7h1.6M2.9 2.9l1.1 1.1M10 10l1.1 1.1M11.1 2.9l-1.1 1.1M4 10l-1.1 1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      </div>
+      <div class="kb-col-body" id="col-body-${col.id}"
+        ondragover="dbColDragOver(event,'${col.id}')"
+        ondragleave="dbColDragLeave(event,'${col.id}')"
+        ondrop="dbDrop(event,'${col.id}')">
+        ${colCards.map(c => cardHTML(c)).join('')}
+        ${colCards.length===0?`<div style="text-align:center;padding:14px 8px;font-size:12.5px;color:#9ca3af;opacity:.6">No cards yet</div>`:''}
+      </div>`;
+    board.appendChild(div);
+  });
+  // + Add Column (admin)
+  if (DB_ROLE === 'admin') {
+    const addDiv = document.createElement('div');
+    addDiv.style.cssText = 'flex-shrink:0;display:flex;align-items:flex-start;padding-top:6px';
+    addDiv.innerHTML = `<button onclick="openAddCol()" style="width:44px;height:44px;border-radius:10px;background:#ece9e4;border:2px dashed #b8b5b0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9ca3af;transition:all .15s" onmouseover="this.style.background='#ddd9d2'" onmouseout="this.style.background='#ece9e4'"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>`;
+    board.appendChild(addDiv);
+  }
+  // Update nav badge
+  const badge = document.getElementById('nav-badge-board');
+  if (badge) badge.textContent = DB_CARDS.filter(c => ['incoming','inprogress','review'].includes(c.col)).length;
+}
+
+function cardHTML(c) {
+  const typeCls = {DTG:'ds-dtg',SUB:'ds-sub',EMB:'ds-emb',SCR:'ds-scr'}[c.type]||'ds-dtg';
+  const dueSoon = isDueSoon(c.due);
+  return `<div class="kb-card" id="kb-card-${c.id}"
+    draggable="true"
+    ondragstart="dbDragStart(event,${c.id})"
+    ondragend="dbDragEnd(event)"
+    ondragover="dbCardDragOver(event,${c.id})"
+    ondrop="event.stopPropagation();dbDrop(event,'${c.col}')"
+    onclick="openCardModal(${c.id})">
+    ${(() => { const t = _thumbFor(c); return t ? `<img class="kb-card-img" src="${t}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''; })()}
+    <div class="kb-card-img-ph" style="${_thumbFor(c)?'display:none':''}">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="2" width="24" height="24" rx="4" stroke="#c4c3be" stroke-width="1.4"/><circle cx="10" cy="10" r="2.5" stroke="#c4c3be" stroke-width="1.2"/><path d="M2 20l8-6 5 4 4-3 9 7" stroke="#c4c3be" stroke-width="1.2" stroke-linecap="round"/></svg>
+    </div>
+    <div class="kb-card-body">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+        <span class="badge ${typeCls}" style="font-size:11px;padding:1px 6px">${c.type}</span>
+        ${c.priority==='high'?'<span class="badge pri-high" style="font-size:11px;padding:1px 6px">HIGH</span>':''}
+        <span style="margin-left:auto;font-size:11.5px;font-weight:600;color:${dueSoon?'#dc2626':'#9ca3af'}">${formatDue(c.due)}</span>
+      </div>
+      ${c.specs && c.specs['Print Size'] ? `<div style="font-size:14px;font-weight:700;color:#191918;line-height:1.3;margin-bottom:2px">${c.specs['Print Size']}</div>` : ''}
+      <div style="font-family:monospace;font-size:12.5px;font-weight:600;color:#374151;letter-spacing:.04em;margin-bottom:4px">${c.designId || c.title || ''}</div>
+      <div style="font-size:11.5px;color:#9ca3af;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.order}${c.product && c.product !== '—' ? ' · '+c.product : ''}</div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;gap:7px">
+          ${c.files.length?`<span style="font-size:11.5px;color:#6b7280">📎 ${c.files.length}</span>`:''}
+          ${c.notes.length?`<span style="font-size:11.5px;color:#6b7280">💬 ${c.notes.length}</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          ${c.payment>0?`<span style="font-size:12px;font-weight:700;color:${c.payStatus==='released'?'#15803d':c.payStatus==='approved'?'#7c3aed':'#374151'}">$${c.payment}</span>`:''}
+          ${c.assignee?`<div style="width:20px;height:20px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">${c.assignee[0]}</div>`:`<div style="width:20px;height:20px;border-radius:50%;border:1.5px dashed #d1d5db;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><circle cx="4.5" cy="3" r="1.6" stroke="#9ca3af" stroke-width="1"/><path d="M1 8.5c0-1.9 1.6-3 3.5-3s3.5 1.1 3.5 3" stroke="#9ca3af" stroke-width="1" stroke-linecap="round"/></svg></div>`}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════
+// CARD MODAL
+// ══════════════════════════════════════════════════
+function openCardModal(id) {
+  const c = DB_CARDS.find(x => x.id === id); if (!c) return;
+  DB_ACTIVE_CARD = id;
+  const typeCls = {DTG:'ds-dtg',SUB:'ds-sub',EMB:'ds-emb',SCR:'ds-scr'}[c.type]||'ds-dtg';
+  const stCls = {incoming:'b-incoming',inprogress:'b-inprog',review:'b-review',approved:'b-approved',paid:'b-paid'}[c.col]||'b-incoming';
+  const stLbl = {incoming:'Incoming',inprogress:'In Progress',review:'In Review',approved:'Approved',paid:'Paid'}[c.col]||'';
+  document.getElementById('modal-order-num').textContent = c.order;
+  document.getElementById('modal-type-badge').className = `badge ${typeCls}`;
+  document.getElementById('modal-type-badge').textContent = c.type;
+  document.getElementById('modal-pri-badge').className = `badge ${c.priority==='high'?'pri-high':''}`;
+  document.getElementById('modal-pri-badge').textContent = c.priority==='high'?'HIGH PRIORITY':'';
+  document.getElementById('modal-title').textContent = c.title;
+  document.getElementById('modal-product').textContent = c.product;
+  document.getElementById('modal-status-badge').className = `badge ${stCls}`;
+  document.getElementById('modal-status-badge').textContent = stLbl;
+  const img = document.getElementById('modal-ref-img'), ph = document.getElementById('modal-ref-ph');
+  { const t = _thumbFor(c); if (t) { img.src = t; img.style.display = 'block'; ph.style.display = 'none'; } else { img.style.display = 'none'; ph.style.display = 'flex'; } }
+  document.getElementById('modal-specs').innerHTML = Object.entries(c.specs||{}).map(([k,v])=>`
+    <div style="background:#f9f8f7;border-radius:7px;padding:6px 8px">
+      <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${k}</div>
+      <input value="${String(v).replace(/"/g,'&quot;')}" onchange="dbUpdateSpec(${c.id},'${k}',this.value)" style="font-size:13.5px;font-weight:600;color:#191918;border:none;background:transparent;width:100%;outline:none;padding:0;font-family:inherit;cursor:text">
+    </div>`).join('');
+  renderModalFiles(c);
+  // Payment
+  document.getElementById('modal-pay-amount').textContent = c.payment>0?'$'+c.payment:'Not set';
+  const ps = document.getElementById('modal-pay-status');
+  const pmap = {pending:'pay-pending',approved:'pay-approved',released:'pay-released'};
+  const plbl = {pending:'Pending',approved:'Approved',released:'Released'};
+  ps.className = `badge ${pmap[c.payStatus]||'pay-pending'}`;
+  ps.textContent = plbl[c.payStatus]||'Pending';
+  document.getElementById('admin-pay-set').style.display = DB_ROLE==='admin'&&c.payStatus==='pending'?'flex':'none';
+  document.getElementById('admin-approve').style.display = DB_ROLE==='admin'&&c.payStatus==='pending'&&c.payment>0&&c.col==='review'?'block':'none';
+  document.getElementById('admin-release').style.display = DB_ROLE==='admin'&&c.payStatus==='approved'?'block':'none';
+  if (DB_ROLE==='admin'&&c.payment>0) document.getElementById('pay-input').value = c.payment;
+  renderPayHist(c); renderNotes(c); renderAction(c);
+  document.getElementById('card-modal').classList.add('open');
+}
+
+function closeCardModal() { document.getElementById('card-modal').classList.remove('open'); DB_ACTIVE_CARD = null; }
+function dbUpdateSpec(id, key, val) {
+  const c = DB_CARDS.find(x => x.id === id); if (!c) return;
+  c.specs[key] = val; dbSave();
+}
+
+function renderModalFiles(c) {
+  const imgExts = /\.(png|jpe?g|gif|webp|svg)$/i;
+  const thumbEl = document.getElementById('modal-design-thumb');
+  if (thumbEl) { const t = _thumbFor(c); if (t) { thumbEl.src = t; thumbEl.style.display = 'block'; } else thumbEl.style.display = 'none'; }
+  document.getElementById('modal-files-list').innerHTML = c.files.map((f,i) => {
+    const isImg = imgExts.test(f.name);
+    const preview = f.previewUrl
+      ? `<img src="${f.previewUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:5px;flex-shrink:0">`
+      : isImg
+        ? `<div style="width:36px;height:36px;border-radius:5px;background:#f0ede9;flex-shrink:0;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" fill="none" stroke="#bbb" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`
+        : `<div style="width:36px;height:36px;border-radius:5px;background:#f0ede9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#9ca3af">${f.name.split('.').pop().toUpperCase()}</div>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:7px;margin-bottom:5px">
+      ${preview}
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div><div style="font-size:12px;color:#9ca3af">${f.size}</div></div>
+      <button onclick="event.stopPropagation();dbRemoveFile(${i})" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:0;line-height:0;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 1.5l6 6M7.5 1.5l-6 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>
+    </div>`;
+  }).join('');
+}
+
+function renderPayHist(c) {
+  const evts = [];
+  if (c.payment>0) evts.push({l:`Set: $${c.payment}`,ts:'2026-05-04'});
+  if (c.payStatus==='approved') evts.push({l:'Approved → balance',ts:'2026-05-05'});
+  if (c.payStatus==='released') evts.push({l:'Released via PayPal',ts:'2026-05-06'});
+  document.getElementById('modal-pay-hist').innerHTML = evts.length?`
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">History</div>
+    ${evts.map(e=>`<div style="font-size:12.5px;color:#6b7280;display:flex;gap:5px;align-items:center;margin-bottom:3px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0"></span>${e.l} <span style="color:#9ca3af;margin-left:auto">${e.ts}</span></div>`).join('')}` : '';
+}
+
+function renderNotes(c) {
+  const el = document.getElementById('modal-notes');
+  el.innerHTML = c.notes.map(n=>`
+    <div class="note-bubble">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <div style="width:19px;height:19px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${n.avatar}</div>
+        <span style="font-size:12.5px;font-weight:600;color:#191918">${n.author}</span>
+        <span style="font-size:11.5px;color:#9ca3af;margin-left:auto">${n.ts}</span>
+      </div>
+      <div style="font-size:13.5px;color:#374151;line-height:1.5">${n.text}</div>
+    </div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function renderAction(c) {
+  const el = document.getElementById('modal-action-area');
+  if (DB_ROLE==='designer') {
+    if (c.col==='incoming'&&!c.assignee) el.innerHTML = `<button onclick="dbClaim()" class="btn btn-dk" style="width:100%;justify-content:center">Claim Card →</button>`;
+    else if (c.col==='inprogress') el.innerHTML = `<button onclick="dbSubmit()" class="btn" style="width:100%;justify-content:center;background:#9749d4;color:#fff">Submit for Review →</button>`;
+    else if (c.col==='review') el.innerHTML = `<div style="font-size:13px;color:#9ca3af;text-align:center;padding:8px;background:#f9f8f7;border-radius:8px">Awaiting admin review…</div>`;
+    else if (c.col==='approved') el.innerHTML = `<div style="font-size:13px;color:#15803d;text-align:center;padding:8px;background:#f0fdf4;border-radius:8px;font-weight:600">✓ $${c.payment} added to balance</div>`;
+    else if (c.col==='paid') el.innerHTML = `<div style="font-size:13px;color:#7c3aed;text-align:center;padding:8px;background:#f5f3ff;border-radius:8px;font-weight:600">💸 Payment released</div>`;
+    else el.innerHTML = '';
+  } else {
+    if (c.col==='review') el.innerHTML = `<button onclick="dbMoveBack()" class="btn btn-out" style="width:100%;justify-content:center;font-size:13px">← Request Changes</button>`;
+    else el.innerHTML = '';
+  }
+}
+
+// ══════════════════════════════════════════════════
+// CARD ACTIONS
+// ══════════════════════════════════════════════════
+function dbClaim() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  c.assignee = 'Phan'; c.col = 'inprogress';
+  c.notes.push({author:'Phan',avatar:'P',text:'Claimed — starting work.',ts:now()});
+  dbSave(); closeCardModal(); dbRender(); toast('Card claimed — In Progress');
+}
+function dbSubmit() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  if (!c.files.length) { toast('Upload at least one deliverable first'); return; }
+  c.col = 'review';
+  c.notes.push({author:'Phan',avatar:'P',text:'Submitted for review — files attached.',ts:now()});
+  dbSave(); closeCardModal(); dbRender(); toast('Submitted for review ✓');
+}
+function dbMoveBack() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  c.col = 'inprogress';
+  c.notes.push({author:'Admin',avatar:'A',text:'Changes requested — moved back to In Progress.',ts:now()});
+  dbSave(); closeCardModal(); dbRender(); toast('Moved back to In Progress');
+}
+function dbSetPayment() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  const amt = parseFloat(document.getElementById('pay-input').value);
+  if (!amt||amt<=0) { toast('Enter valid amount'); return; }
+  c.payment = amt;
+  document.getElementById('modal-pay-amount').textContent = '$'+amt;
+  document.getElementById('admin-approve').style.display = c.col==='review'?'block':'none';
+  renderPayHist(c); dbRender(); dbSave(); toast('Payment set: $'+amt);
+}
+function dbApprovePayment() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  c.payStatus = 'approved'; c.col = 'approved';
+  c.notes.push({author:'Admin',avatar:'A',text:`Approved! $${c.payment} added to your balance.`,ts:now()});
+  if (typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
+    EGStore.addDesignerEarning(c.payment, { cardId: c.id, orderId: c.order || null, label: 'Design approved · ' + (c.title || '') });
+  } else {
+    _dbBalance += c.payment;
+  }
+  _dbRefreshBalance();
+  dbSave(); closeCardModal(); dbRender(); toast('Payment approved — $'+c.payment+' added to balance');
+}
+function dbReleasePayment() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  c.payStatus = 'released'; c.col = 'paid';
+  c.notes.push({author:'System',avatar:'S',text:`PayPal release: $${c.payment}. TX PP-${Math.floor(Math.random()*9e6+1e6)}.`,ts:now()});
+  if (typeof EGStore !== 'undefined' && EGStore.releaseDesignerPayout) {
+    EGStore.releaseDesignerPayout(c.payment, { cardId: c.id, orderId: c.order || null, label: 'PayPal release · ' + (c.title || '') });
+  } else {
+    _dbBalance = Math.max(0, _dbBalance - c.payment);
+  }
+  _dbRefreshBalance();
+  dbSave(); closeCardModal(); dbRender(); toast('💸 Released via PayPal');
+}
+function dbAddNote() {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD);
+  const inp = document.getElementById('modal-note-input');
+  const text = inp.value.trim(); if(!c||!text) return;
+  c.notes.push({author:DB_ROLE==='admin'?'Admin':'Phan',avatar:DB_ROLE==='admin'?'A':'P',text,ts:now()});
+  inp.value = ''; renderNotes(c); dbSave();
+}
+
+function dbRemoveFile(idx) {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  c.files.splice(idx,1); renderModalFiles(c); dbRender(); dbSave();
+}
+function dbHandleDrop(e) { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); dbHandleFiles(e.dataTransfer.files); }
+function dbHandleFiles(fl) {
+  const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
+  const imgExts = /\.(png|jpe?g|gif|webp|svg)$/i;
+  const accepted = [], rejected = [];
+  Array.from(fl).forEach(f => {
+    if (typeof EGStore !== 'undefined' && EGStore.validateUpload) {
+      const chk = EGStore.validateUpload(f);
+      if (!chk.ok) { rejected.push({name:f.name, error:chk.error}); return; }
+    }
+    accepted.push(f);
+  });
+  if (rejected.length && typeof EGStore !== 'undefined' && EGStore.showUploadError) {
+    EGStore.showUploadError(rejected[0].name, rejected[0].error + (rejected.length>1 ? ' (+'+(rejected.length-1)+' more file(s) rejected)' : ''));
+  }
+  accepted.forEach(f => {
+    const sz = f.size>1048576?(f.size/1048576).toFixed(1)+'MB':Math.round(f.size/1024)+'KB';
+    const fobj = {name:f.name, size:sz, previewUrl:null};
+    if (imgExts.test(f.name)) {
+      const reader = new FileReader();
+      reader.onload = e => { fobj.previewUrl = e.target.result; renderModalFiles(c); dbSave(); };
+      reader.readAsDataURL(f);
+    }
+    c.files.push(fobj);
+  });
+  if (accepted.length) { renderModalFiles(c); dbRender(); dbSave(); toast(accepted.length+' file'+(accepted.length>1?'s':'')+' uploaded'); }
+}
+
+// ══════════════════════════════════════════════════
+// NEW CARD / COLUMN
+// ══════════════════════════════════════════════════
+function openNewCard() { document.getElementById('new-card-modal').classList.add('open'); }
+function closeNewCard() { document.getElementById('new-card-modal').classList.remove('open'); window._dbTargetCol = null; }
+function dbCreateCard() {
+  const title = document.getElementById('nc-title').value.trim();
+  if (!title) { toast('Enter a title'); return; }
+  const col = window._dbTargetCol || 'incoming'; window._dbTargetCol = null;
+  const note = document.getElementById('nc-note').value.trim();
+  const card = { id:++_dbNextId, col, title,
+    order: document.getElementById('nc-order').value.trim()||'FF-'+_dbNextId,
+    product: document.getElementById('nc-product').value.trim()||'TBD',
+    type: document.getElementById('nc-type').value,
+    priority: document.getElementById('nc-pri').value,
+    due: document.getElementById('nc-due').value||'',
+    payment:0, payStatus:'pending', assignee:null,
+    thumb: document.getElementById('nc-img').value.trim()||'',
+    specs:{'Print Area':'TBD','DPI':'300','Bleed':'0.25"','Color Mode':'RGB'},
+    files:[], checklist:[],
+    notes: note?[{author:DB_ROLE==='admin'?'Admin':'Phan',avatar:DB_ROLE==='admin'?'A':'P',text:note,ts:now()}]:[]
+  };
+  DB_CARDS.push(card); dbSave(); closeNewCard();
+  ['nc-title','nc-order','nc-product','nc-due','nc-img','nc-note'].forEach(id=>document.getElementById(id).value='');
+  dbRender(); toast('Card created ✓');
+}
+function openAddCol() { document.getElementById('add-col-modal').classList.add('open'); setTimeout(()=>document.getElementById('col-name-input').focus(),80); }
+function closeAddCol() { document.getElementById('add-col-modal').classList.remove('open'); document.getElementById('col-name-input').value=''; }
+function dbConfirmAddCol() {
+  const name = document.getElementById('col-name-input').value.trim(); if(!name) return;
+  const cols = ['#9ca3af','#6b7280','#4b5563','#191918','#33B6FF','#FFBD00'];
+  const icons = ['📋','🖌️','🔍','✅','⭐','🎯'];
+  const i = DB_COLUMNS.length % cols.length;
+  DB_COLUMNS.push({id:'col_'+Date.now(),name,color:cols[i],icon:icons[i]});
+  closeAddCol(); dbRender(); toast('"'+name+'" column added');
+}
+
+// ══════════════════════════════════════════════════
+// FILTER / ROLE
+// ══════════════════════════════════════════════════
+function dbFilter(type, btn) {
+  DB_FILTER = type;
+  document.querySelectorAll('#board-subheader .tab-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); dbRender();
+}
+function setRole(role) {
+  DB_ROLE = role;
+  const d = document.getElementById('role-designer'), a = document.getElementById('role-admin');
+  if (role==='designer') { d.style.background='#111827';d.style.color='#fff';a.style.background='transparent';a.style.color='#6b7280'; }
+  else { a.style.background='#111827';a.style.color='#fff';d.style.background='transparent';d.style.color='#6b7280'; }
+  document.getElementById('btn-add-col').style.display = role==='admin'?'inline-flex':'none';
+  dbRender();
+}
+
+// ══════════════════════════════════════════════════
+// PAYOUT / THEME / UTILS
+// ══════════════════════════════════════════════════
+function dbRequestPayout() { toast('💸 Payout requested — 1–2 business days'); }
+
+let _darkMode = false;
+function toggleTheme() {
+  _darkMode = !_darkMode;
+  document.documentElement.setAttribute('data-theme', _darkMode?'dark':'');
+  ['theme-label','theme-label2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=_darkMode?'Dark mode':'Light mode';});
+  ['toggle-knob','toggle-knob2'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.transform=_darkMode?'translateX(18px)':'';});
+  ['theme-btn','theme-btn2'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.background=_darkMode?'#111827':'#e5e4e0';});
+}
+function togglePref(e) {
+  e.stopPropagation();
+  const p = document.getElementById('pref-panel');
+  p.style.display = p.style.display==='none'?'block':'none';
+}
+
+// ---- Designer header search (operator-style expanding icon) ----
+let _dsnSearchCollapseTimer = null;
+function dsnToggleSearch() {
+  const wrap = document.getElementById('dsn-hdr-search-wrap');
+  const inp  = document.getElementById('dsn-hdr-search-input');
+  const dd   = document.getElementById('dsn-hdr-search-dd');
+  const open = wrap.style.maxWidth && wrap.style.maxWidth !== '0px';
+  if (open) {
+    wrap.style.maxWidth = '0px'; wrap.style.opacity = '0';
+    if (dd) dd.style.display = 'none';
+    if (inp) inp.value = '';
+  } else {
+    wrap.style.maxWidth = '260px'; wrap.style.opacity = '1';
+    setTimeout(() => inp && inp.focus(), 80);
+  }
+}
+function dsnCloseHdrSearch() {
+  const wrap = document.getElementById('dsn-hdr-search-wrap');
+  const inp  = document.getElementById('dsn-hdr-search-input');
+  const dd   = document.getElementById('dsn-hdr-search-dd');
+  if (wrap) { wrap.style.maxWidth = '0px'; wrap.style.opacity = '0'; }
+  if (dd) dd.style.display = 'none';
+  if (inp) inp.value = '';
+}
+function dsnScheduleCollapseSearch() {
+  if (_dsnSearchCollapseTimer) clearTimeout(_dsnSearchCollapseTimer);
+  _dsnSearchCollapseTimer = setTimeout(() => {
+    const dd = document.getElementById('dsn-hdr-search-dd');
+    if (dd && dd.matches(':hover')) return;
+    dsnCloseHdrSearch();
+  }, 220);
+}
+function dsnHdrSearchKey(e) { if (e.key === 'Escape') dsnCloseHdrSearch(); }
+// Search across design cards on the board.
+function dsnRunHdrSearch(q) {
+  const dd = document.getElementById('dsn-hdr-search-dd');
+  if (!dd) return;
+  q = (q || '').trim().toLowerCase();
+  if (!q) { dd.style.display = 'none'; return; }
+  const out = [];
+  try {
+    if (typeof DB_CARDS !== 'undefined' && Array.isArray(DB_CARDS)) {
+      DB_CARDS.forEach(c => {
+        const title = (c.title||'').toLowerCase();
+        const order = (c.order||c.orderNum||'').toString().toLowerCase();
+        const seller = (c.seller||'').toLowerCase();
+        if (title.includes(q) || order.includes(q) || seller.includes(q)) {
+          out.push({
+            kind:(c.type||'DSN').toUpperCase(),
+            label: c.title || ('Card ' + (c.order||c.id||'')),
+            sub: (c.order ? '#'+c.order+' · ' : '') + (c.col||c.column||'In Review'),
+            action: `showSec('board');dsnCloseHdrSearch()`,
+          });
+        }
+      });
+    }
+  } catch(e) {}
+  ['Overview','Design Board','Wallet','Settings'].forEach(label => {
+    if (label.toLowerCase().includes(q)) {
+      const slug = label.toLowerCase().replace(/ +/g,'').replace('designboard','board');
+      out.push({ kind:'Page', label, sub:'Jump to section', action:`showSec('${slug}');dsnCloseHdrSearch()` });
+    }
+  });
+  if (!out.length) {
+    dd.innerHTML = '<div style="padding:14px;font-size:12.75px;color:#9ca3af;text-align:center">No matches for "'+q+'"</div>';
+  } else {
+    dd.innerHTML = out.slice(0,8).map(r => `<div onmousedown="${r.action}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #f3f3f1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
+      <span style="font-size:10px;font-weight:700;color:#6b7280;background:#f3f3f1;padding:2px 6px;border-radius:4px;letter-spacing:.05em;flex-shrink:0">${r.kind}</span>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#191918">${r.label}</div><div style="font-size:11.5px;color:#9ca3af">${r.sub}</div></div>
+    </div>`).join('');
+  }
+  dd.style.display = 'block';
+}
+document.addEventListener('click',()=>{ const p=document.getElementById('pref-panel');if(p)p.style.display='none'; });
+
+function now() {
+  const d=new Date();
+  return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0')+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+function formatDue(date) {
+  if(!date) return '';
+  const d=new Date(date), today=new Date(); today.setHours(0,0,0,0);
+  const diff=Math.round((d-today)/86400000);
+  if(diff<0) return 'Overdue'; if(diff===0) return 'Today'; if(diff===1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function isDueSoon(date) { if(!date) return false; const d=new Date(date),t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/86400000)<=1; }
+
+let _toastT;
+function toast(msg) {
+  const t=document.getElementById('db-toast'); t.textContent=msg; t.style.opacity='1';
+  clearTimeout(_toastT); _toastT=setTimeout(()=>t.style.opacity='0',2800);
+}
+
+// Init — land on Overview first
+showSec('overview');
+</script>
+<script src="nav-drag.js"></script>
+
+
+
+<script src="eg-kb-cards.js"></script>
+<script src="dashboard-drag.js"></script>
+<script>window.XOC_ROLE = "designer";</script>
+<script src="eg-order-chat.js"></script>
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Product Detail – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f4f2ef;margin:0}
+.nav-link{color:#555550;font-size:14px;font-weight:500;cursor:pointer;transition:color .15s;text-decoration:none}
+.nav-link:hover{color:#111827}
+.nav-link.active{color:#111827;font-weight:600}
+/* technique tabs */
+.tech-tab{flex:1;padding:9px 0;border:1.5px solid #e5e4e0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
+.tech-tab.on{background:#fff;border-color:#191918;color:#191918}
+.tech-tab:not(.on):hover{border-color:#9ca3af}
+/* size buttons */
+.sz-btn{min-width:44px;padding:7px 10px;border:1.5px solid #e5e4e0;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
+.sz-btn.on{border-color:#191918;background:#191918;color:#fff}
+.sz-btn:not(.on):hover{border-color:#9ca3af}
+/* color swatches */
+.clr-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s;flex-shrink:0;position:relative}
+.clr-swatch.on{border-color:#191918 !important;box-shadow:0 0 0 2px #fff inset}
+.clr-swatch:hover{transform:scale(1.12)}
+/* thumbnail strip */
+.thumb{width:72px;height:72px;border-radius:8px;border:1.5px solid #e5e4e0;overflow:hidden;cursor:pointer;transition:border-color .15s;background:#f6f5f4;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.thumb.on{border-color:#191918}
+.thumb:hover:not(.on){border-color:#9ca3af}
+/* star rating */
+.star{color:#f59e0b;font-size:16px;line-height:1}
+.pd-layout{display:flex;gap:32px;align-items:flex-start}
+@media(max-width:900px){
+  .pd-layout{flex-direction:column!important}
+  .pd-thumbs{flex-direction:row!important;width:auto!important;gap:8px!important}
+  .pd-hero{width:100%!important}
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+/* breadcrumb back link hover */
+.bc-link{color:#6b7280;text-decoration:none;font-weight:500;transition:color .15s}
+.bc-link:hover{color:#191918}
+</style>
+<style id="eg-outline-btns">
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+</style>
+<style id="eg-input-focus">
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+</head>
+<body>
+
+
+<!-- NAV -->
+<nav style="background:#f4f2ef;border-bottom:1px solid #e5e4e0;position:sticky;top:0;z-index:50">
+  <div style="max-width:1280px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:32px">
+      <a href="index.html" style="text-decoration:none">
+        <span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-weight:800;font-size:15px;letter-spacing:-0.02em;color:#191918;font-size:28px;letter-spacing:0">egfulfill</span>
+      </a>
+      <div style="display:flex;align-items:center;gap:24px">
+        <a href="products.html" class="nav-link active">Products</a>
+        <a href="howitworks.html" class="nav-link">How It Works</a>
+        <a href="about.html" class="nav-link">About</a>
+        <a href="apidocs.html" class="nav-link">Resources</a>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <a href="login.html" class="nav-link">Log in</a>
+      <button style="background:#111827;color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Start for free</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Main content -->
+<div style="max-width:1100px;margin:0 auto;padding:28px 24px 60px">
+
+  <!-- Breadcrumb -->
+  <div style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:28px;flex-wrap:wrap">
+    <a href="products.html" class="bc-link">Products</a>
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <span id="bc-name" style="color:#191918;font-weight:600">Product Detail</span>
+  </div>
+
+  <!-- Product layout -->
+  <div class="pd-layout">
+
+    <!-- Left: thumbnail strip + hero image -->
+    <div style="display:flex;gap:12px;flex-shrink:0">
+      <!-- Thumbnail strip -->
+      <div class="pd-thumbs" style="display:flex;flex-direction:column;gap:8px;width:72px">
+        <div class="thumb on" id="thumb-0" onclick="setHero(0)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>
+        </div>
+        <div class="thumb" id="thumb-1" onclick="setHero(1)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dbeafe"/><circle cx="14" cy="15" r="5" fill="#93c5fd"/></svg>
+        </div>
+        <div class="thumb" id="thumb-2" onclick="setHero(2)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dcfce7"/><path d="M8 20l4-8 4 6 3-4 4 6" stroke="#86efac" stroke-width="1.5" fill="none"/></svg>
+        </div>
+        <div class="thumb" id="thumb-3" onclick="setHero(3)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#fef9c3"/><circle cx="9" cy="13" r="3" fill="#fde047"/><circle cx="18" cy="16" r="4" fill="#facc15"/></svg>
+        </div>
+        <div class="thumb" id="thumb-4" onclick="setHero(4)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f3e8ff"/><rect x="8" y="10" width="12" height="10" rx="2" fill="#d8b4fe"/></svg>
+        </div>
+        <div class="thumb" id="thumb-5" onclick="setHero(5)">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f0fdf4"/><path d="M7 20c0-4 3-7 7-7s7 3 7 7" fill="#bbf7d0"/></svg>
+        </div>
+      </div>
+
+      <!-- Hero image -->
+      <div class="pd-hero" style="width:420px;height:500px;border-radius:14px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center">
+        <div id="hero-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ede9">
+          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+            <rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>
+            <circle cx="40" cy="52" r="12" fill="#d1d0cb"/>
+            <path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>
+            <text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">Front view</text>
+          </svg>
+        </div>
+        <!-- Nav arrows -->
+        <button onclick="heroNav(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <button onclick="heroNav(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: product info panel -->
+    <div style="flex:1;min-width:0;max-width:380px">
+
+      <!-- Product name -->
+      <h1 id="pd-name" style="font-size:1.4rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 6px;line-height:1.3">Product</h1>
+      <p id="pd-sub" style="font-size:13px;color:#6b7280;margin:0 0 10px">Print on demand · multiple techniques</p>
+
+      <!-- Rating -->
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+        <div>
+          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span style="color:#d1d0cb;font-size:16px;line-height:1">★</span>
+        </div>
+        <span id="pd-reviews" style="font-size:12.5px;color:#3b82f6;font-weight:600;cursor:pointer">Reviews</span>
+      </div>
+
+      <div style="border-top:1px solid #f0ede9;padding-top:18px">
+
+        <!-- Technique -->
+        <div style="margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Technique</span>
+            <span style="font-size:12px;color:#3b82f6;font-weight:500;cursor:pointer">File guidelines ↗</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="tech-tab on" id="tech-dtg" onclick="setTech('dtg')">DTG printing</button>
+            <button class="tech-tab" id="tech-emb" onclick="setTech('emb')">Embroidery</button>
+          </div>
+        </div>
+
+        <!-- Color -->
+        <div style="margin-bottom:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Color</span>
+            <span id="pd-color-name" style="font-size:12px;color:#6b7280">Black</span>
+          </div>
+          <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
+        <!-- Size -->
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Size</span>
+            <span style="font-size:12px;color:#3b82f6;font-weight:500;cursor:pointer">Size guide</span>
+          </div>
+          <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
+        <!-- Price + delivery -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
+            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">From</div>
+            <div id="pd-price" style="font-size:1.5rem;font-weight:800;color:#191918;letter-spacing:-0.04em;line-height:1">$10.95</div>
+            <div style="font-size:11.5px;color:#6b7280;margin-top:4px">+ shipping from <strong>$4.99</strong></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
+            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Delivery</div>
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+              <span style="font-size:13px">🌍</span>
+              <span style="font-size:13px;font-weight:600;color:#374151">Worldwide</span>
+            </div>
+            <div style="font-size:1.1rem;font-weight:800;color:#191918;letter-spacing:-0.03em;line-height:1.2">7–17 days</div>
+          </div>
+        </div>
+
+        <!-- Bulk price note -->
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="#d97706" stroke-width="1.3"/><path d="M7.5 5v3.5M7.5 10.5v.5" stroke="#d97706" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <div>
+            <span style="font-size:12px;font-weight:600;color:#92400e">Bulk pricing available</span>
+            <span style="font-size:12px;color:#b45309"> · Save up to 20% on 50+ units</span>
+          </div>
+        </div>
+
+        <!-- Public CTAs -->
+        <button onclick="window.location='login.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          Log in to start designing →
+        </button>
+        <button onclick="window.location='signup.html'" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+          Create free account
+        </button>
+
+        <!-- Trust badge -->
+        <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:16px">
+          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5H11l-2.8 2 1 3.5L6 8.5l-3.2 2.5 1-3.5L1 4.5h3.5L6 1z" fill="#d4a017"/></svg>
+            No minimums
+          </span>
+          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Free to start
+          </span>
+          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="#9ca3af" stroke-width="1.2"/><path d="M4 4V3a2 2 0 014 0v1" stroke="#9ca3af" stroke-width="1.2"/></svg>
+            Secure checkout
+          </span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Product specs section -->
+  <div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:20px 22px">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Product Details</div>
+      <div id="pd-specs" style="display:flex;flex-direction:column;gap:9px"></div>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:20px 22px">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Print Areas</div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:#374151;font-weight:500">Front center</span>
+          <span style="font-size:12.5px;color:#6b7280">12" × 16" max</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:#374151;font-weight:500">Back center</span>
+          <span style="font-size:12.5px;color:#6b7280">12" × 16" max</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:#374151;font-weight:500">Left sleeve</span>
+          <span style="font-size:12.5px;color:#6b7280">3" × 3" max</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;color:#374151;font-weight:500">Right sleeve</span>
+          <span style="font-size:12.5px;color:#6b7280">3" × 3" max</span>
+        </div>
+        <div style="border-top:1px solid #f0ede9;padding-top:9px;margin-top:3px">
+          <div style="font-size:12px;color:#9ca3af">Min resolution: <strong style="color:#374151">150 DPI</strong> · Preferred: <strong style="color:#374151">300 DPI</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign up CTA banner -->
+  <div style="margin-top:48px;background:#111827;border-radius:20px;padding:40px;text-align:center">
+    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:4px 14px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:20px">
+      ✦ No minimums · No upfront cost
+    </div>
+    <h2 style="font-size:1.8rem;font-weight:700;color:#fff;letter-spacing:-0.04em;margin:0 0 10px;line-height:1.2">Ready to sell this product?</h2>
+    <p style="color:rgba(255,255,255,.5);font-size:13.5px;margin:0 0 24px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.6">Create a free account, upload your design, and start selling in minutes. We handle printing, packing, and shipping.</p>
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
+      <button onclick="window.location='signup.html'" style="background:#fff;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        Create free account →
+      </button>
+      <button onclick="window.location='login.html'" style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
+        Log in
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer style="background:#f4f2ef;border-top:1px solid #e5e4e0;padding:48px 0 32px">
+  <div style="max-width:1280px;margin:0 auto;padding:0 24px">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:32px;margin-bottom:40px">
+      <div style="grid-column:span 1">
+        <div style="font-weight:800;font-size:15px;letter-spacing:-0.02em;color:#191918;margin-bottom:10px"><span style="color:#d4a017">EG</span>FULFILL</div>
+        <p style="font-size:12px;color:#9ca3af;line-height:1.6">Print-on-demand fulfillment built for scale. Zero minimums.</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Products</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a href="products.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Apparel</a>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Accessories</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Home & Living</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">New arrivals</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Platform</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a href="howitworks.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">How It Works</a>
+          <a href="apidocs.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">API Docs</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Company</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">About</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Blog</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Careers</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Contact</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Legal</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Privacy</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Terms</span>
+          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Cookies</span>
+        </div>
+      </div>
+    </div>
+    <div style="border-top:1px solid #e5e4e0;padding-top:20px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:12px;color:#9ca3af">© 2026 EGFULFILL. All rights reserved.</span>
+      <span style="font-size:12px;color:#9ca3af">Made with care for sellers worldwide 🌍</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+var PRODUCT_DATA = {
+  101:{name:'Unisex T-Shirt',sub:'Soft cotton · DTG print · 180 GSM',from:10.95,colors:['#1c1917','#292524','#3f3f46','#7c2d12','#1e3a5f','#166534','#831843','#78350f','#c8c7c2','#f3f3f1','#fde68a','#bfdbfe','#bbf7d0','#fecdd3','#e9d5ff','#fed7aa','#67e8f9','#f0abfc'],colorNames:['Black','Dark Charcoal','Zinc','Deep Red','Navy','Forest Green','Berry','Brown','Ash Gray','White','Butter','Light Blue','Mint','Pink','Lavender','Peach','Sky','Orchid'],sizes:['XS','S','M','L','XL','2XL','3XL'],specs:[{k:'Material',v:'100% ring-spun cotton · 180 GSM'},{k:'Fit',v:'Unisex regular fit'},{k:'Print method',v:'DTG (direct-to-garment)'},{k:'Care',v:'Machine wash cold · tumble dry low'},{k:'Origin',v:'Bangladesh / Honduras'}],rating:24},
+  102:{name:'Premium Hoodie',sub:'Heavyweight fleece · embroidery-ready',from:24.50,colors:['#1c1917','#292524','#44403c','#1e3a5f','#166534','#c8c7c2','#f3f3f1','#fde68a','#bfdbfe','#f5f0eb','#7c3aed','#c84b31'],colorNames:['Black','Dark Charcoal','Warm Taupe','Navy','Forest Green','Ash Gray','White','Butter','Light Blue','Cream','Purple','Brick Red'],sizes:['XS','S','M','L','XL','2XL','3XL'],specs:[{k:'Material',v:'80% cotton · 20% polyester · 320 GSM'},{k:'Fit',v:'Unisex relaxed fit'},{k:'Print method',v:'DTG / Embroidery'},{k:'Care',v:'Machine wash cold · tumble dry low'},{k:'Origin',v:'Bangladesh'}],rating:18},
+  103:{name:'Crew Neck Sweatshirt',sub:'80% cotton · 20% polyester',from:19.80,colors:['#1c1917','#292524','#44403c','#1e3a5f','#166534','#c8c7c2','#f3f3f1','#bfdbfe','#e9d5ff','#f5f0eb'],colorNames:['Black','Dark Charcoal','Warm Taupe','Navy','Forest Green','Ash Gray','White','Light Blue','Lavender','Cream'],sizes:['XS','S','M','L','XL','2XL'],specs:[{k:'Material',v:'80% cotton · 20% polyester · 280 GSM'},{k:'Fit',v:'Unisex regular fit'},{k:'Print method',v:'DTG (direct-to-garment)'},{k:'Care',v:'Machine wash cold · lay flat to dry'},{k:'Origin',v:'Bangladesh'}],rating:12},
+  104:{name:'High-Waist Leggings',sub:'All-over print · 4-way stretch',from:22.40,colors:['#1c1917','#292524','#1e3a5f','#166534','#831843','#7c3aed','#c8c7c2'],colorNames:['Black','Dark Charcoal','Navy','Forest Green','Berry','Purple','Ash Gray'],sizes:['XS','S','M','L','XL'],specs:[{k:'Material',v:'82% polyester · 18% spandex'},{k:'Fit',v:'High-waist compression'},{k:'Print method',v:'All-over sublimation'},{k:'Care',v:'Machine wash cold · hang dry'},{k:'Origin',v:'China'}],rating:9},
+  105:{name:'Embroidered Cap',sub:'Structured front · adjustable strap',from:12.60,colors:['#1c1917','#292524','#1e3a5f','#166534','#78350f','#c8c7c2','#f3f3f1','#fde68a','#fed7aa','#c84b31'],colorNames:['Black','Dark Charcoal','Navy','Forest Green','Brown','Ash Gray','White','Butter','Peach','Brick Red'],sizes:['One size'],specs:[{k:'Material',v:'100% cotton twill · structured'},{k:'Fit',v:'Adjustable snapback'},{k:'Print method',v:'Embroidery'},{k:'Care',v:'Spot clean only'},{k:'Origin',v:'Bangladesh'}],rating:31},
+};
+
+var DEFAULT_PRODUCT = {name:'Product',sub:'Print on demand · multiple techniques',from:10.95,colors:['#1c1917','#292524','#1e3a5f','#c8c7c2','#f3f3f1'],colorNames:['Black','Dark Charcoal','Navy','Ash Gray','White'],sizes:['S','M','L','XL'],specs:[{k:'Material',v:'100% cotton'},{k:'Fit',v:'Regular fit'},{k:'Print method',v:'DTG'},{k:'Care',v:'Machine wash cold'},{k:'Origin',v:'Bangladesh'}],rating:10};
+
+var _params = new URLSearchParams(location.search);
+var _pid = parseInt(_params.get('id')) || 0;
+var _pname = _params.get('name') ? decodeURIComponent(_params.get('name')) : '';
+
+// Try exact id, then name match, then fallback
+var _prod = PRODUCT_DATA[_pid];
+if(!_prod && _pname) {
+  var lower = _pname.toLowerCase();
+  var ids = Object.keys(PRODUCT_DATA);
+  for(var i=0;i<ids.length;i++){
+    if(PRODUCT_DATA[ids[i]].name.toLowerCase()===lower){ _prod=PRODUCT_DATA[ids[i]]; break; }
+  }
+}
+if(!_prod) _prod = JSON.parse(JSON.stringify(DEFAULT_PRODUCT));
+if(_pname) _prod.name = _pname;
+
+var _heroIdx = 0;
+var _selColor = 0;
+var _tech = 'dtg';
+
+var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
+
+function init() {
+  document.getElementById('pd-name').textContent = _prod.name;
+  document.getElementById('pd-sub').textContent = _prod.sub;
+  document.getElementById('bc-name').textContent = _prod.name;
+  document.title = _prod.name + ' – EGFULFILL';
+
+  var fromParam = parseFloat(_params.get('from'));
+  document.getElementById('pd-price').textContent = '$' + (fromParam > 0 ? fromParam.toFixed(2) : _prod.from.toFixed(2));
+
+  document.getElementById('pd-reviews').textContent = _prod.rating + ' Reviews';
+
+  // Colors
+  var cEl = document.getElementById('pd-colors');
+  cEl.innerHTML = _prod.colors.map(function(c,i){
+    return '<div class="clr-swatch'+(i===0?' on':'')+'" style="background:'+c+';border-color:'+(i===0?'#191918':'#e5e4e0')+'" title="'+_prod.colorNames[i]+'" onclick="selectColor('+i+')"></div>';
+  }).join('');
+  document.getElementById('pd-color-name').textContent = _prod.colorNames[0];
+
+  // Sizes
+  var sEl = document.getElementById('pd-sizes');
+  sEl.innerHTML = _prod.sizes.map(function(s){
+    var on = s === (_prod.sizes.indexOf('M') > -1 ? 'M' : _prod.sizes[0]);
+    return '<button class="sz-btn'+(on?' on':'')+'" onclick="selectSize(this)">'+s+'</button>';
+  }).join('');
+
+  // Specs
+  var spEl = document.getElementById('pd-specs');
+  spEl.innerHTML = _prod.specs.map(function(sp){
+    return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px"><span style="font-size:13px;color:#6b7280;white-space:nowrap">'+sp.k+'</span><span style="font-size:13px;color:#374151;font-weight:500;text-align:right">'+sp.v+'</span></div>';
+  }).join('');
+}
+
+function selectColor(idx) {
+  _selColor = idx;
+  document.querySelectorAll('.clr-swatch').forEach(function(el,i){
+    el.classList.toggle('on', i===idx);
+    el.style.borderColor = i===idx ? '#191918' : '#e5e4e0';
+  });
+  document.getElementById('pd-color-name').textContent = _prod.colorNames[idx];
+  document.getElementById('hero-inner').style.background = HERO_BKGS[idx % HERO_BKGS.length];
+}
+
+function selectSize(btn) {
+  document.querySelectorAll('.sz-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+function setTech(t) {
+  _tech = t;
+  document.getElementById('tech-dtg').classList.toggle('on', t==='dtg');
+  document.getElementById('tech-emb').classList.toggle('on', t==='emb');
+}
+
+function setHero(idx) {
+  _heroIdx = idx;
+  document.querySelectorAll('.thumb').forEach(function(t,i){ t.classList.toggle('on', i===idx); });
+  document.getElementById('hero-inner').style.background = HERO_BKGS[idx];
+}
+
+function heroNav(dir) {
+  var next = (_heroIdx + dir + 6) % 6;
+  setHero(next);
+}
+
+init();
+</script>
+</body>
+</html>

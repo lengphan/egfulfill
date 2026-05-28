@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Product Templates – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
+.sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:rgba(0,0,0,.04);color:#111827}.ni:active{background:rgba(0,0,0,.06);color:#111827}.ni.on{background:#e8e7e3;border:none;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.55}.ni.on svg{opacity:.85;filter:none}
+.ibtn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;font-size:14px;color:#6b7280;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4}
+.btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
+.btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
+.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+.tpl-card{background:#fff;border:1.5px solid #e5e4e0;border-radius:12px;overflow:hidden;transition:box-shadow .2s,border-color .2s;position:relative}
+.tpl-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.09);border-color:#d1d0cb}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+#mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
+#mob-ham:hover{background:#f6f5f4}
+#mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
+#mob-ov.on{display:block}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-220px);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50!important}
+  .sidebar.mob-open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.18)}
+  .sidebar+div{margin-left:0!important;width:100vw;max-width:100vw;overflow-x:hidden}
+  #mob-ham{display:flex!important}
+  header{padding-left:12px!important;padding-right:12px!important}
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+
+/* delete overlay on card hover */
+.tpl-card:hover .tpl-del{opacity:1}
+.tpl-del{opacity:0;transition:opacity .15s}
+
+/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+</style>
+<style id="eg-outline-btns">
+/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
+
+.ni:focus{box-shadow:none!important;outline:none!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
+<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
+.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
+.eg-sel-btn svg{color:#191918!important}
+.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
+.eg-sel.open{z-index:6000!important}
+.eg-sel-menu{z-index:6001!important}
+.fb:not(.filter-btn){color:#191918!important}
+.fb:not(.filter-btn) svg{color:#191918!important}
+html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
+html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
+</style>
+<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
+.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
+</style>
+</head>
+<body>
+
+<div id="mob-ov" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar">
+  <div style="height:54px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0"><a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a></div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
+    <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
+    <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
+    <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div style="background:transparent;border:1px solid #d8d4cf;border-radius:10px;padding:12px 14px;margin:8px;flex-shrink:0">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em">Starter Plan</span><span style="font-size:11px;color:#9ca3af">847/1k</span></div>
+    <div style="background:#e8e3dd;border-radius:999px;height:4px;margin-bottom:8px;overflow:hidden"><div style="width:84.7%;height:100%;background:linear-gradient(90deg,#191918,#7a92c4);border-radius:999px"></div></div>
+    <button onclick="window.location='settings.html#billing'" style="width:100%;background:transparent;border:1px solid #191918;color:#191918;font-size:12.5px;font-weight:600;padding:6px;border-radius:7px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s" onmouseover="this.style.background='#191918';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#191918'">Upgrade to Pro ↑</button>
+  </div>
+</aside>
+
+<div style="margin-left:220px;min-height:100vh">
+  <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
+    <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <nav aria-label="Breadcrumb" style="display:flex;align-items:center;gap:8px;font-size:14px;margin-right:auto">
+      <a href="design-lab.html" style="color:#6b7280;text-decoration:none;font-weight:500;transition:color .15s" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Design Lab</a>
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style="opacity:.55"><path d="M4.5 3l3 3-3 3" stroke="#191918" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span style="font-size:15px;font-weight:700;color:#191918;letter-spacing:-.01em">Product Templates</span>
+    </nav><div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <div style="display:flex;align-items:center;gap:4px;position:relative">
+        <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+          <div style="position:relative;margin-right:4px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="hdr-search" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search orders, products…" autocomplete="off"/>
+          </div>
+        </div>
+        <button class="ibtn" id="hdr-search-btn" onclick="(function(){var w=document.getElementById('hdr-search-wrap'),i=document.getElementById('hdr-search');if(w.style.maxWidth==='240px'){w.style.maxWidth='0';w.style.opacity='0';}else{w.style.maxWidth='240px';w.style.opacity='1';setTimeout(function(){i&&i.focus();},120);}})()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      </div>
+      <button class="ibtn" id="pref-btn" title="Toggle light/dark mode"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><rect x="0.65" y="0.65" width="26.7" height="14.7" rx="7.35" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="4.5" fill="currentColor" opacity=".7"/></svg></button>
+      <button class="ibtn" style="position:relative" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">8</span></button>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <a href="orders.html" class="btn btn-dk" style="gap:6px;text-decoration:none"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>New</a>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Phan</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">phanmylinh04…</div></div></div>
+      <button id="lang-btn" style="font-size:12.5px;font-weight:700;color:#6b7280;background:none;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor='#374151';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">EN</button>
+    </div>
+  </header>
+
+  <div style="padding:24px 32px">
+
+    <!-- Page heading -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px">
+      <div>
+        
+      </div>
+      <a href="products-dash.html" class="btn btn-dk" style="text-decoration:none">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>
+        Browse catalog
+      </a>
+    </div>
+
+    <!-- Empty state (shown when no templates) -->
+    <div id="tpl-empty" style="display:none">
+      <div style="text-align:center;padding:72px 24px;max-width:400px;margin:0 auto">
+        <div style="width:64px;height:64px;background:#f3f3f1;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="5" width="22" height="18" rx="2.5" stroke="#9ca3af" stroke-width="1.6"/><path d="M8 11h12M8 15h8" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">No templates yet</div>
+        <div style="font-size:14px;color:#6b7280;margin-bottom:20px;line-height:1.6">Browse the product catalog, open a product, and click <strong>Save to Product Templates</strong> to save it here.</div>
+        <a href="products-dash.html" class="btn btn-dk" style="text-decoration:none">Browse product catalog</a>
+      </div>
+    </div>
+
+    <!-- Templates grid -->
+    <div id="tpl-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px"></div>
+
+    <!-- Stats row (shown with templates) -->
+    <div id="tpl-footer" style="margin-top:20px;display:flex;align-items:center;gap:16px">
+      <span id="tpl-count" style="font-size:14px;color:#9ca3af"></span>
+      <a href="products-dash.html" style="font-size:14px;font-weight:600;color:#111827;text-decoration:none;margin-left:auto" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">+ Add more from catalog</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var CAT_COLORS={apparel:'#ede9fe',drinkware:'#dbeafe',accessories:'#dcfce7',stationery:'#fef9c3',home:'#ffedd5',kids:'#fce7f3',eco:'#d1fae5'};
+var CAT_ICONS={
+  apparel:'<path d="M6 3L4 5v3l2 1v4h4v-4l2-1V5L10 3H6z" fill="#a78bfa" stroke="#7c3aed" stroke-width=".5"/>',
+  drinkware:'<rect x="4" y="2" width="8" height="12" rx="2" fill="#93c5fd" stroke="#3b82f6" stroke-width=".5"/><rect x="4" y="5" width="8" height="1.5" fill="#60a5fa"/>',
+  accessories:'<path d="M3 9a4 4 0 018 0" stroke="#34d399" stroke-width="1.2" fill="none"/><rect x="5" y="9" width="6" height="5" rx="1" fill="#6ee7b7" stroke="#10b981" stroke-width=".5"/>',
+  stationery:'<rect x="3" y="2" width="10" height="12" rx="1" fill="#fde047" stroke="#ca8a04" stroke-width=".5"/><path d="M5 5h6M5 7h6M5 9h4" stroke="#a16207" stroke-width=".8" stroke-linecap="round"/>',
+  home:'<rect x="2" y="8" width="12" height="7" rx="1" fill="#fb923c" stroke="#ea580c" stroke-width=".5"/><path d="M1 8l7-5 7 5" stroke="#ea580c" stroke-width="1.2" fill="none"/>',
+  kids:'<circle cx="8" cy="7" r="4" fill="#f9a8d4" stroke="#ec4899" stroke-width=".5"/><path d="M4 11c0 2 1.5 4 4 4s4-2 4-4" fill="#fce7f3" stroke="#ec4899" stroke-width=".5"/>',
+  eco:'<path d="M8 14V8M8 8C8 5 10 2 13 2c0 3-2 6-5 6z" stroke="#059669" stroke-width="1.2" stroke-linecap="round" fill="none"/><path d="M8 8C8 5 6 2 3 2c0 3 2 6 5 6z" stroke="#059669" stroke-width="1.2" stroke-linecap="round" fill="none"/>',
+};
+var CAT_LABELS={apparel:'Apparel',drinkware:'Drinkware',accessories:'Accessories',stationery:'Stationery',home:'Home & Living',kids:'Kids & Baby',eco:'Eco'};
+
+// Templates are user-created drafts, persisted in localStorage. Starts empty.
+var TPL_KEY = 'eg_templates';
+var TPL_BLOB_KEY = 'eg_templates_blob';
+/* Templates use a split-storage scheme: slim metadata in TPL_KEY (always
+   survives), heavy composite/layers in TPL_BLOB_KEY (best-effort). We hydrate
+   them together at load so render code can pretend it's one record. */
+var TEMPLATES = (function(){
+  try {
+    var meta = JSON.parse(localStorage.getItem(TPL_KEY) || '[]');
+    var blobs = {};
+    try { blobs = JSON.parse(localStorage.getItem(TPL_BLOB_KEY) || '{}'); } catch(e){}
+    return meta.map(function(t){
+      var b = blobs[t.id] || {};
+      // Don't overwrite anything the metadata already has — blob is just for
+      // the heavy bits that were stored separately.
+      if (b.compositeImg && !t.compositeImg) t.compositeImg = b.compositeImg;
+      if (b.layers && !t.layers) t.layers = b.layers;
+      return t;
+    });
+  } catch(e){ return []; }
+})();
+function saveTemplates(){ try { localStorage.setItem(TPL_KEY, JSON.stringify(TEMPLATES)); } catch(e){} }
+
+function catThumb(cat, big) {
+  var bg=CAT_COLORS[cat]||'#f3f3f1';
+  var ic=CAT_ICONS[cat]||'<rect x="3" y="3" width="10" height="10" rx="1.5" fill="#e5e4e0"/>';
+  var sz=big?52:36;
+  return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:9px;background:'+bg+';border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="22" height="22" viewBox="0 0 16 16" fill="none">'+ic+'</svg></div>';
+}
+
+function deleteTemplate(id) {
+  TEMPLATES = TEMPLATES.filter(function(t){ return t.id !== id; });
+  saveTemplates();
+  // Also drop the blob entry so we don't leak composite/layers data.
+  try {
+    var blobs = JSON.parse(localStorage.getItem(TPL_BLOB_KEY) || '{}');
+    if (blobs[id]) { delete blobs[id]; localStorage.setItem(TPL_BLOB_KEY, JSON.stringify(blobs)); }
+  } catch(e){}
+  renderTemplates();
+}
+/* Edit: load the template's saved layers + product into design-maker via
+   sessionStorage. Design-maker reads `eg_dm_resume` on init and restores. */
+function editTemplate(id) {
+  var t = TEMPLATES.find(function(x){ return x.id === id; });
+  if (!t) return;
+  try {
+    sessionStorage.setItem('eg_dm_resume', JSON.stringify({
+      tplId: id,
+      layers: t.layers || [],
+      productImg: t.productImg || '',
+      productId: t.productId || null,
+      productName: t.name || ''
+    }));
+  } catch(e){}
+  window.location.href = 'design-maker.html?resume=' + encodeURIComponent(id);
+}
+/* Publish: route to the publish-to-store flow. Stash template ref so the
+   target page knows which template the seller is publishing. */
+function publishTemplate(id) {
+  var t = TEMPLATES.find(function(x){ return x.id === id; });
+  if (!t) return;
+  try { sessionStorage.setItem('eg_publish_tpl', JSON.stringify({ id: id, name: t.name, compositeImg: t.compositeImg || '' })); } catch(e){}
+  // No dedicated publish page yet — settings#stores is where store connections
+  // live; we land there so the seller can pick which store to push to.
+  window.location.href = 'settings.html#stores';
+}
+window.editTemplate = editTemplate;
+window.publishTemplate = publishTemplate;
+
+/* Click-to-rename on the template name. Replaces the <div> with an <input>
+   for direct editing — commits on Enter or blur, cancels on Escape. */
+function renameTemplateStart(id, el) {
+  event && event.stopPropagation && event.stopPropagation();
+  if (!el || el.dataset.editing === '1') return;
+  el.dataset.editing = '1';
+  const original = el.textContent;
+  const inputStyle = 'box-sizing:border-box;width:100%;padding:2px 4px;border:1.5px solid #191918;border-radius:5px;font:inherit;font-size:14.5px;font-weight:700;color:#191918;background:#fff;outline:none;margin-left:-4px';
+  el.innerHTML = '<input type="text" id="rename-input-' + id + '" value="' + original.replace(/"/g,'&quot;') + '" style="' + inputStyle + '" onclick="event.stopPropagation()"/>';
+  const input = el.firstChild;
+  input.focus();
+  input.select();
+  const commit = function(save){
+    if (el.dataset.editing !== '1') return;
+    el.dataset.editing = '';
+    const newName = save ? input.value.trim() : '';
+    if (save && newName && newName !== original) {
+      const t = TEMPLATES.find(function(x){ return x.id === id; });
+      if (t) { t.name = newName; saveTemplates(); }
+      el.textContent = newName;
+    } else {
+      el.textContent = original;
+    }
+  };
+  input.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+  input.addEventListener('blur', function(){ commit(true); });
+}
+window.renameTemplateStart = renameTemplateStart;
+
+function createTemplateTile() {
+  return '<a href="design-maker.html" class="tpl-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:440px;border:1.5px dashed #c9c4bc;background:#fbfaf8;text-decoration:none;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#191918\';this.style.background=\'#f6f4f0\'" onmouseout="this.style.borderColor=\'#c9c4bc\';this.style.background=\'#fbfaf8\'">' +
+    '<div style="width:52px;height:52px;border-radius:14px;background:#111827;display:flex;align-items:center;justify-content:center;margin-bottom:14px">' +
+      '<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 4v14M4 11h14" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '</div>' +
+    '<div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">Create new template</div>' +
+    '<div style="font-size:13px;color:#9ca3af;max-width:180px;line-height:1.5">Open the design maker and save it as a reusable template</div>' +
+  '</a>';
+}
+
+function renderTemplates() {
+  var grid = document.getElementById('tpl-grid');
+  var empty = document.getElementById('tpl-empty');
+  var footer = document.getElementById('tpl-footer');
+  var countEl = document.getElementById('tpl-count');
+
+  if (empty) empty.style.display = 'none';
+  grid.style.display = 'grid';
+  if (footer) footer.style.display = TEMPLATES.length ? 'flex' : 'none';
+  if (countEl) countEl.textContent = TEMPLATES.length + ' template' + (TEMPLATES.length !== 1 ? 's' : '') + ' saved';
+
+  // The "Create new template" tile is always first, followed by any saved templates.
+  grid.innerHTML = createTemplateTile() + TEMPLATES.map(function(t) {
+    return '<div class="tpl-card">' +
+      // Delete button
+      '<button class="tpl-del" onclick="deleteTemplate('+t.id+')" title="Remove template" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:all .15s" onmouseover="this.style.background=\'#fee2e2\';this.style.borderColor=\'#fca5a5\'" onmouseout="this.style.background=\'#fff\';this.style.borderColor=\'#e5e4e0\'">' +
+        '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="#dc2626" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+      '</button>' +
+      // Image area — composite preview (mockup + design overlay) if saved,
+      // otherwise the bare product mockup if available, else cat-coloured tile.
+      // We try BOTH t.compositeImg AND t.productImg before falling back to the
+      // SVG placeholder so old templates (saved before composite was wired) at
+      // least show the product they were built from.
+      // Image is purely informational — clicking the artwork no longer
+      // navigates anywhere. The "Edit" button at the bottom is the only path
+      // back into the design-maker, which avoids accidental nav on tap.
+      ((t.compositeImg || t.productImg)
+        ? '<div style="height:280px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden">'+
+            '<img src="'+(t.compositeImg || t.productImg)+'" alt="" style="width:100%;height:100%;object-fit:contain;object-position:center;display:block" onerror="this.parentElement.style.background=\''+(CAT_COLORS[t.cat]||'#f3f3f1')+'\';this.outerHTML=\'<svg width=&quot;52&quot; height=&quot;52&quot; viewBox=&quot;0 0 16 16&quot; fill=&quot;none&quot;>'+(CAT_ICONS[t.cat]||'').replace(/"/g,'&quot;').replace(/'/g,"\\'")+'</svg>\'"/>'+
+          '</div>'
+        : '<div style="height:280px;background:'+(CAT_COLORS[t.cat]||'#f3f3f1')+';display:flex;align-items:center;justify-content:center">'+
+            '<svg width="52" height="52" viewBox="0 0 16 16" fill="none">'+(CAT_ICONS[t.cat]||'')+'</svg>'+
+          '</div>') +
+      // Info
+      '<div style="padding:12px 14px">' +
+        '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'+(CAT_LABELS[t.cat]||t.cat)+'</div>' +
+        /* Click name to rename inline — turns into an input on click, commits
+           on Enter / blur, restores original on Escape. */
+        '<div onclick="renameTemplateStart('+t.id+',this)" title="Click to rename" style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:3px;line-height:1.3;cursor:text;padding:2px 4px;margin-left:-4px;border-radius:5px;transition:background .15s" onmouseover="this.style.background=\'#f0ede9\'" onmouseout="this.style.background=\'transparent\'">'+t.name+'</div>' +
+        '<div style="font-size:12.5px;color:#9ca3af;margin-bottom:10px">'+t.sub+'</div>' +
+        // Saved config
+        '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">' +
+          '<span style="font-size:12px;font-weight:500;color:#374151;background:#f3f3f1;border:1px solid #e5e4e0;padding:2px 7px;border-radius:5px">'+t.tech+'</span>' +
+          '<span style="font-size:12px;font-weight:500;color:#374151;background:#f3f3f1;border:1px solid #e5e4e0;padding:2px 7px;border-radius:5px">'+t.color+'</span>' +
+          '<span style="font-size:12px;font-weight:500;color:#374151;background:#f3f3f1;border:1px solid #e5e4e0;padding:2px 7px;border-radius:5px">'+t.size+'</span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+          '<span style="font-size:14px;color:#6b7280">From <strong style="color:#191918">$'+t.from.toFixed(2)+'</strong></span>' +
+          '<span style="font-size:12px;color:#9ca3af">Saved '+t.savedAt+'</span>' +
+        '</div>' +
+        /* Two actions: Edit reloads the design in design-maker (layers cached
+           into sessionStorage so position/text/image restore on open); Publish
+           routes to the store-publish flow with the template referenced. */
+        '<div style="display:flex;gap:6px">' +
+          '<button onclick="editTemplate('+t.id+')" style="flex:1;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px;font-size:13.25px;font-weight:600;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">Edit</button>' +
+          '<button onclick="publishTemplate('+t.id+')" style="flex:1;background:#111827;color:#fff;border:none;border-radius:8px;padding:8px;font-size:13.25px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">Publish to store</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleSidebar() {
+  var s = document.querySelector('.sidebar'), o = document.getElementById('mob-ov');
+  if(s) s.classList.toggle('mob-open');
+  if(o) o.classList.toggle('on');
+}
+
+renderTemplates();
+</script>
+<script>
+(function(){
+  var a=document.querySelector('a.ni[href="products-dash.html"]');
+  if(!a)return;
+  var sub=a.nextElementSibling;
+  if(!sub||typeof sub.getAttribute!=='function'||!sub.getAttribute('href')||sub.getAttribute('href').indexOf('product-templates')<0)return;
+  var chev=a.querySelectorAll('svg');chev=chev[chev.length-1];
+  var open=a.classList.contains('on')||sub.classList.contains('on');
+  if(!open)sub.style.display='none';
+  if(chev){
+    chev.style.transition='transform .22s ease';
+    chev.style.cursor='pointer';
+    chev.style.opacity='.45';
+    if(open)chev.style.transform='rotate(180deg)';
+    chev.addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();
+      open=!open;
+      sub.style.display=open?'flex':'none';
+      chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+    });
+  }
+})();
+</script>
+<script src="nav-drag.js"></script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+- [Content width convention](content-width-convention.md) — seller pages center at 1400px, settings at 1040px
+- [Purchases sync architecture](purchases-sync-architecture.md) — design upload → out-of-stock → backorder/PO synced across factory boards via EGStore
+- [Factory UI preferences](factory-ui-preferences.md) — flat-beige one-word action buttons, subtle row highlight, operator as canonical header

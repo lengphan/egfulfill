@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+  <style>
+    /* Page/section headlines in the Fraunces brand font (heavy, even spacing) */
+    h1, h2[class*="text-3xl"], h2[class*="text-4xl"], h2[class*="text-5xl"] { font-family:'Fraunces', serif !important; font-weight:900 !important; font-optical-sizing:none; font-variation-settings:'opsz' 30, 'wght' 900 !important; letter-spacing:-0.01em !important; }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="egfulfill-store.js"></script>
+  <style>
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #f7f5f0;
+      color: #191918;
+    }
+    /* Retro sticker cards (shared across public pages) */
+    .card,.eg-card{background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:3px 3px 0 #40403d;position:relative;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);top:0}
+    .card.is-hoverable:hover,a.card:hover,button.card:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+    .btn-retro{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+    .btn-retro:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+    .btn-retro:active{top:3px;box-shadow:1px 1px 0 #40403d}
+    .nav-link {
+      color: #555550;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .nav-link:hover { color: #111827; }
+    .nav-link.active { color: #111827; font-weight: 600; }
+
+    /* Fade-up on scroll */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s cubic-bezier(0.22,1,0.36,1), transform 0.6s cubic-bezier(0.22,1,0.36,1);
+    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
+    .fade-up.delay-1 { transition-delay: 0.08s; }
+    .fade-up.delay-2 { transition-delay: 0.16s; }
+    .fade-up.delay-3 { transition-delay: 0.24s; }
+    .fade-up.delay-4 { transition-delay: 0.32s; }
+    .fade-up.delay-5 { transition-delay: 0.40s; }
+    .fade-up.delay-6 { transition-delay: 0.48s; }
+
+    /* Category pill */
+    .cat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #e5e4e0;
+      background: white;
+      color: #555550;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .cat-pill:hover { background: #f0ede9; color: #111827; }
+    .cat-pill.active { background: #111827; color: white; border-color: #111827; }
+
+    /* Product card */
+    .product-card {
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 14px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s cubic-bezier(0.22,1,0.36,1);
+    }
+    .product-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.09);
+    }
+    .product-card:hover .card-cta { opacity: 1; transform: translateY(0); }
+    .card-cta {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.18s, transform 0.18s;
+    }
+
+    /* Badge */
+    .badge-new {
+      background: #111827;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+    }
+    .badge-popular {
+      background: #d4a017;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .badge-sale {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    /* Search box */
+    .search-box {
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      height: 40px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .search-box:focus-within {
+      border-color: #9ca3af;
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.05);
+    }
+    .search-box input {
+      border: none;
+      outline: none;
+      font-size: 13px;
+      color: #374151;
+      background: transparent;
+      flex: 1;
+      min-width: 0;
+    }
+    .search-box input::placeholder { color: #9ca3af; }
+
+    /* Sort dropdown */
+    .sort-select {
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 10px;
+      padding: 0 12px;
+      height: 40px;
+      font-size: 13px;
+      color: #374151;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      padding-right: 32px;
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+
+    /* Filter sidebar */
+    .filter-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ca3af;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .filter-section-title:hover { color: #6b7280; }
+    .filter-body { overflow: hidden; transition: max-height 0.25s ease; }
+    .filter-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      cursor: pointer;
+      font-size: 12px;
+      color: #555550;
+    }
+    .filter-label:hover { color: #111827; }
+    .filter-label input { accent-color: #111827; width: 12px; height: 12px; flex-shrink: 0; }
+
+    /* Mobile filter drawer */
+    .filter-overlay {
+      display: none;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 80;
+    }
+    .filter-drawer {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+      background: white; border-radius: 20px 20px 0 0;
+      padding: 20px 20px 32px;
+      max-height: 80vh; overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.22,1,0.36,1);
+    }
+    .filter-drawer.open { transform: translateY(0); }
+    .filter-overlay.open { display: block; }
+
+    @media (max-width: 767px) {
+      .sidebar-aside { display: none !important; }
+      .mobile-filter-btn { display: flex !important; }
+    }
+    @media (min-width: 768px) {
+      .mobile-filter-btn { display: none !important; }
+    }
+
+    /* Color swatch */
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    /* Shimmer skeleton */
+    @keyframes shimmer {
+      0% { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+
+    /* Product image area */
+    .product-img {
+      background: #f6f5f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* All-mode: merge all sections into one flat 4-column grid */
+    #sections-container.all-mode {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    @media (min-width: 1024px) {
+      #sections-container.all-mode { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (min-width: 768px) and (max-width: 1023px) {
+      #sections-container.all-mode { grid-template-columns: repeat(3, 1fr); }
+    }
+    #sections-container.all-mode .product-section { display: contents; }
+    #sections-container.all-mode .section-header { display: none; }
+    #sections-container.all-mode .section-grid { display: contents; }
+
+    /* CTA section */
+    .cta-section {
+      background: #111827;
+      border-radius: 20px;
+    }
+  </style>
+<style id="eg-outline-btns">
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+</style>
+<style id="eg-input-focus">
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-retro-override">
+.feat-card,.bento-card,.floating-card,.testimonial-card,.mock-ui,.step-card,.faq-item,.feature-card,.benefit-card,.value-card,.pricing-card,.case-card,.product-card{background:#fdfcfa!important;border:1.5px solid #40403d!important;border-radius:14px!important;box-shadow:3px 3px 0 #40403d!important;overflow:visible!important}
+/* Product card image area needs its own clip so the image doesn't bleed past rounded corners, but the OUTER card stays unclipped */
+.product-card{overflow:visible!important}
+.product-card > img,.product-card .card-img,.product-card .product-img{border-top-left-radius:13px;border-top-right-radius:13px;overflow:hidden;display:block}
+/* Give product grids breathing room on the right so the 3px offset shadow on the rightmost column isn't clipped by a parent scroll container */
+#live-grid,#product-grid,#sections-container{overflow:visible!important;padding-right:6px}
+.feat-card{padding:24px!important}.faq-item{padding:18px 22px!important;margin-bottom:10px}
+.mock-header{background:#f3eee2!important;border-bottom:1.5px solid #40403d!important}
+.section-tag{background:#fdfcfa!important;border:1.5px solid #40403d!important;color:#191918!important;box-shadow:2px 2px 0 #40403d!important}
+section[style*="background:white"],section[style*="background: white"],section[style*="background:#fff"],section[style*="background: #fff"],section[style*="background:#f6f5f4"],section[style*="background:#f4f2ef"],section[style*="background:#f9f8f7"]{background:#f7f5f0!important}
+section [style*="background:#fff"][style*="border-radius:1"],section [style*="background: #fff"][style*="border-radius:1"],section [style*="background:white"][style*="border-radius:1"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+</style>
+</head>
+<body>
+
+  <!-- NAV (shared canonical) -->
+  <nav style="background:#f7f5f0;position:sticky;top:0;z-index:50">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+        <div class="hidden md:flex items-center gap-6">
+          <a href="products.html" class="nav-link active" style="text-decoration:none">Products</a>
+          <a href="howitworks.html" class="nav-link" style="text-decoration:none">How It Works</a>
+          <a href="about.html" class="nav-link" style="text-decoration:none">About</a>
+          <a href="apidocs.html" class="nav-link" style="text-decoration:none">API Documentation</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="seller-login.html" class="nav-link hidden md:block" style="text-decoration:none">Log in</a>
+        <a href="seller-login.html" class="btn-retro">Start for free</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section style="background:#f7f5f0" class="pt-16 pb-10">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto fade-up">
+        <h1 class="text-5xl font-bold text-gray-900 mb-4" style="letter-spacing:-0.08rem;line-height:1.1">
+          Everything you need.<br/>Print-ready.
+        </h1>
+        <p class="text-lg text-gray-500 mb-8">Browse our full catalog of high-quality products. Upload your design, set your price, and we handle the rest.</p>
+      </div>
+
+      <!-- Search + sort row — full width -->
+      <div class="flex items-center gap-3 mt-4 mb-10 fade-up delay-1">
+        <div class="search-box" style="flex:1">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="6" stroke="#9ca3af" stroke-width="1.5"/><path d="M13 13l4 4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input type="text" placeholder="Search products..." style="width:100%" />
+        </div>
+        <select class="sort-select">
+          <option>Sort: Most popular</option>
+          <option>Sort: Lowest price</option>
+          <option>Sort: Newest</option>
+          <option>Sort: Best margin</option>
+        </select>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CATEGORY FILTERS + PRODUCT GRID -->
+  <section style="background:#f7f5f0" class="pb-24">
+    <div class="max-w-7xl mx-auto px-6">
+
+      <!-- Sticky category bar -->
+      <div style="position:sticky;top:56px;z-index:40;background:#f7f5f0;padding:16px 0;margin-bottom:8px">
+        <div id="cat-pills" class="flex items-center gap-2 overflow-x-auto pb-1" style="scrollbar-width:none">
+          <!-- Category pills are built dynamically from the live catalog's product types. -->
+        </div>
+      </div>
+
+      <!-- Main layout: sidebar + grid -->
+      <div class="flex gap-6 items-start">
+
+      <!-- ── SIDEBAR FILTER (desktop) ── -->
+      <aside class="sidebar-aside" style="width:180px;flex-shrink:0;position:sticky;top:120px">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <span style="font-size:13px;font-weight:600;color:#191918">Filter</span>
+          <button onclick="clearFilters()" style="font-size:11px;color:#9ca3af;background:none;border:none;cursor:pointer;padding:0;font-weight:500" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">Clear</button>
+        </div>
+
+        <!-- Price -->
+        <div style="margin-bottom:20px">
+          <div class="filter-section-title" onclick="toggleSection(this)">
+            Price
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="filter-body" style="max-height:80px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+              <input type="number" value="0" style="width:100%;border:1px solid #e5e4e0;border-radius:7px;padding:5px 8px;font-size:11px;color:#374151;outline:none;background:white" placeholder="$0"/>
+              <span style="color:#d1d5db;font-size:11px;flex-shrink:0">–</span>
+              <input type="number" value="50" style="width:100%;border:1px solid #e5e4e0;border-radius:7px;padding:5px 8px;font-size:11px;color:#374151;outline:none;background:white" placeholder="$50"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- Print type -->
+        <div style="margin-bottom:20px">
+          <div class="filter-section-title" onclick="toggleSection(this)">
+            Print type
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="filter-body" style="max-height:200px">
+            <label class="filter-label"><input type="checkbox" checked/>DTG</label>
+            <label class="filter-label"><input type="checkbox" checked/>Sublimation</label>
+            <label class="filter-label"><input type="checkbox"/>Embroidery</label>
+            <label class="filter-label"><input type="checkbox"/>Screen print</label>
+            <label class="filter-label"><input type="checkbox"/>UV print</label>
+          </div>
+        </div>
+
+        <!-- Color -->
+        <div style="margin-bottom:20px">
+          <div class="filter-section-title" onclick="toggleSection(this)">
+            Color
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="filter-body" style="max-height:60px">
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <button onclick="toggleColor(this)" title="Black" style="width:18px;height:18px;border-radius:50%;background:#111827;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="White" style="width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #e5e4e0;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='#e5e4e0'"></button>
+              <button onclick="toggleColor(this)" title="Gray" style="width:18px;height:18px;border-radius:50%;background:#6b7280;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Red" style="width:18px;height:18px;border-radius:50%;background:#dc2626;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Blue" style="width:18px;height:18px;border-radius:50%;background:#2563eb;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Green" style="width:18px;height:18px;border-radius:50%;background:#16a34a;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Yellow" style="width:18px;height:18px;border-radius:50%;background:#d4a017;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Purple" style="width:18px;height:18px;border-radius:50%;background:#7c3aed;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+              <button onclick="toggleColor(this)" title="Tan" style="width:18px;height:18px;border-radius:50%;background:#78716c;border:2px solid transparent;cursor:pointer;transition:border-color .15s;outline:none" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='transparent'"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Production time -->
+        <div style="margin-bottom:20px">
+          <div class="filter-section-title" onclick="toggleSection(this)">
+            Ships in
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="filter-body" style="max-height:120px">
+            <label class="filter-label"><input type="radio" name="prodtime" checked/>Any</label>
+            <label class="filter-label"><input type="radio" name="prodtime"/>1–2 days</label>
+            <label class="filter-label"><input type="radio" name="prodtime"/>2–5 days</label>
+            <label class="filter-label"><input type="radio" name="prodtime"/>5–7 days</label>
+          </div>
+        </div>
+
+        <!-- Availability -->
+        <div>
+          <div class="filter-section-title" onclick="toggleSection(this)">
+            Tags
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="filter-body" style="max-height:100px">
+            <label class="filter-label"><input type="checkbox"/>New arrivals</label>
+            <label class="filter-label"><input type="checkbox"/>On sale</label>
+            <label class="filter-label"><input type="checkbox"/>Eco-friendly</label>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Mobile filter button -->
+      <div class="mobile-filter-btn" style="display:none;align-items:center;gap:2px;margin-bottom:12px">
+        <button onclick="openFilterDrawer()" style="display:flex;align-items:center;gap:6px;background:white;border:1px solid #e5e4e0;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:500;color:#374151;cursor:pointer">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M4 8h8M6 12h4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Filters
+        </button>
+      </div>
+
+      <!-- ── PRODUCT GRID (right column) ── -->
+      <div id="product-grid" style="flex:1;min-width:0">
+
+      <!-- Results bar -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="text-sm font-semibold text-gray-500">Showing <span class="text-gray-900">491 products</span></div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-400">View:</span>
+          <button style="background:white;border:1px solid #e5e4e0;border-radius:6px;padding:5px 7px;cursor:pointer" title="Grid">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="#374151"/><rect x="9" y="1" width="6" height="6" rx="1" fill="#374151"/><rect x="1" y="9" width="6" height="6" rx="1" fill="#374151"/><rect x="9" y="9" width="6" height="6" rx="1" fill="#374151"/></svg>
+          </button>
+          <button style="background:transparent;border:1px solid transparent;border-radius:6px;padding:5px 7px;cursor:pointer" title="List">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="2" rx="1" fill="#9ca3af"/><rect x="1" y="7" width="14" height="2" rx="1" fill="#9ca3af"/><rect x="1" y="12" width="14" height="2" rx="1" fill="#9ca3af"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="sections-container">
+      <!-- Live catalog only: factory-published products render here (renderLiveCatalog). -->
+      <div id="live-empty" style="display:none;text-align:center;padding:80px 20px;color:#9ca3af">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style="margin:0 auto 14px;opacity:.5"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#9ca3af" stroke-width="1.4"/><path d="M3 9h18M9 21V9" stroke="#9ca3af" stroke-width="1.4"/></svg>
+        <div style="font-size:15px;font-weight:600;color:#6b7280;margin-bottom:4px">No products yet</div>
+        <div style="font-size:13px">Products published from the factory will appear here.</div>
+      </div>
+      </div><!-- close sections-container -->
+      </div><!-- close flex:1 product column -->
+      </div><!-- close flex gap-6 sidebar+grid row -->
+
+      <!-- CTA BANNER -->
+      <div class="cta-section p-10 md:p-14 fade-up" style="text-align:center;margin-top:64px">
+        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4" style="letter-spacing:-0.06rem">
+          Ready to start selling?
+        </h2>
+        <p class="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed">
+          Create your free account, upload your design, and launch your store in minutes. We print, pack, and ship every order.
+        </p>
+        <div class="flex items-center justify-center gap-3 flex-wrap">
+          <button style="background:white;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+            Start for free →
+          </button>
+          <button style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
+            Browse all 491 products
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FOOTER (shared canonical) -->
+  <footer style="background:#f7f5f0;border-top:1.5px solid #40403d;padding:56px 0 40px">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div class="col-span-2 md:col-span-1">
+          <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+          <p style="font-size:12.5px;color:#9ca3af;margin-top:10px">Print-on-demand fulfillment for creators &amp; brands.</p>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Product</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="products.html" style="text-decoration:none;color:inherit">Browse catalog</a></li>
+            <li><a href="design-maker.html" style="text-decoration:none;color:inherit">Design Maker</a></li>
+            <li><a href="howitworks.html" style="text-decoration:none;color:inherit">How it works</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Company</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="about.html" style="text-decoration:none;color:inherit">About us</a></li>
+            <li><a href="seller-login.html" style="text-decoration:none;color:inherit">Log in</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">API Documentation</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="apidocs.html" style="text-decoration:none;color:inherit">API docs</a></li>
+            <li><a href="help.html" style="text-decoration:none;color:inherit">Help center</a></li>
+            <li><a href="security.html" style="text-decoration:none;color:inherit">Security</a></li>
+          </ul>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e5e4e0;padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:12px;color:#9ca3af;margin:0">© 2024 EGFULFILL, Inc. All rights reserved.</p>
+        <div style="display:flex;gap:18px;font-size:12px;color:#9ca3af">
+          <a href="privacy.html" style="text-decoration:none;color:inherit">Privacy</a>
+          <a href="terms.html" style="text-decoration:none;color:inherit">Terms</a>
+          <a href="ip-policy.html" style="text-decoration:none;color:inherit">IP Policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Mobile filter overlay + drawer -->
+  <div id="filter-overlay" class="filter-overlay" onclick="closeFilterDrawer()"></div>
+  <div id="filter-drawer" class="filter-drawer">
+    <div style="width:36px;height:4px;background:#e5e4e0;border-radius:99px;margin:0 auto 20px"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <span style="font-size:14px;font-weight:600;color:#191918">Filters</span>
+      <button onclick="closeFilterDrawer()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:18px;line-height:1;padding:4px">✕</button>
+    </div>
+    <!-- Price -->
+    <div style="margin-bottom:18px;border-bottom:1px solid #f0ede9;padding-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Price</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input type="number" value="0" style="flex:1;border:1px solid #e5e4e0;border-radius:7px;padding:6px 10px;font-size:12px;color:#374151;outline:none" placeholder="$0"/>
+        <span style="color:#d1d5db;font-size:12px">–</span>
+        <input type="number" value="50" style="flex:1;border:1px solid #e5e4e0;border-radius:7px;padding:6px 10px;font-size:12px;color:#374151;outline:none" placeholder="$50"/>
+      </div>
+    </div>
+    <!-- Print type -->
+    <div style="margin-bottom:18px;border-bottom:1px solid #f0ede9;padding-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Print type</div>
+      <label class="filter-label"><input type="checkbox" checked/>DTG</label>
+      <label class="filter-label"><input type="checkbox" checked/>Sublimation</label>
+      <label class="filter-label"><input type="checkbox"/>Embroidery</label>
+      <label class="filter-label"><input type="checkbox"/>Screen print</label>
+    </div>
+    <!-- Color -->
+    <div style="margin-bottom:18px;border-bottom:1px solid #f0ede9;padding-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Color</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button onclick="toggleColor(this)" title="Black" style="width:22px;height:22px;border-radius:50%;background:#111827;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="White" style="width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid #e5e4e0;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Gray" style="width:22px;height:22px;border-radius:50%;background:#6b7280;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Red" style="width:22px;height:22px;border-radius:50%;background:#dc2626;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Blue" style="width:22px;height:22px;border-radius:50%;background:#2563eb;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Green" style="width:22px;height:22px;border-radius:50%;background:#16a34a;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Yellow" style="width:22px;height:22px;border-radius:50%;background:#d4a017;border:2px solid transparent;cursor:pointer;outline:none"></button>
+        <button onclick="toggleColor(this)" title="Purple" style="width:22px;height:22px;border-radius:50%;background:#7c3aed;border:2px solid transparent;cursor:pointer;outline:none"></button>
+      </div>
+    </div>
+    <!-- Ships in -->
+    <div style="margin-bottom:18px;border-bottom:1px solid #f0ede9;padding-bottom:18px">
+      <div style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px">Ships in</div>
+      <label class="filter-label"><input type="radio" name="prodtime-m" checked/>Any</label>
+      <label class="filter-label"><input type="radio" name="prodtime-m"/>1–2 days</label>
+      <label class="filter-label"><input type="radio" name="prodtime-m"/>2–5 days</label>
+      <label class="filter-label"><input type="radio" name="prodtime-m"/>5–7 days</label>
+    </div>
+    <button onclick="closeFilterDrawer()" style="width:100%;background:#111827;color:white;font-size:13px;font-weight:600;padding:12px;border-radius:10px;border:none;cursor:pointer">Apply filters</button>
+  </div>
+
+  <script>
+    var _liveCat = 'All';
+    function setCategory(el, cat) {
+      _liveCat = cat || 'All';
+      renderLiveCatalog();
+    }
+
+    function clearFilters() {
+      document.querySelectorAll('.filter-label input[type=checkbox]').forEach(c => c.checked = false);
+      document.querySelectorAll('.filter-label input[type=radio][value=""]').forEach(r => r.checked = true);
+    }
+
+    function toggleColor(btn) {
+      btn.classList.toggle('sel');
+      btn.style.borderColor = btn.classList.contains('sel') ? '#111827' : (btn.title === 'White' ? '#e5e4e0' : 'transparent');
+    }
+
+    function toggleSection(titleEl) {
+      const body = titleEl.nextElementSibling;
+      const isOpen = body.style.maxHeight && body.style.maxHeight !== '0px';
+      body.style.maxHeight = isOpen ? '0px' : body.scrollHeight + 'px';
+      titleEl.querySelector('svg').style.transform = isOpen ? '' : 'rotate(180deg)';
+    }
+
+    function openFilterDrawer() {
+      document.getElementById('filter-overlay').classList.add('open');
+      document.getElementById('filter-drawer').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeFilterDrawer() {
+      document.getElementById('filter-overlay').classList.remove('open');
+      document.getElementById('filter-drawer').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.05, rootMargin: '0px 0px -20px 0px' });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+    setTimeout(() => {
+      document.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible'));
+    }, 100);
+
+    // Wire a product card to its public detail page (used for static + live cards).
+    function wireProductCard(card) {
+      card.addEventListener('click', function(e) {
+        if (e.target.closest('button')) return; // let "+ Add" button be separate
+        var nameEl = card.querySelector('.text-sm.font-semibold, [class*="font-semibold"]');
+        var name = nameEl ? nameEl.textContent.trim() : 'Product';
+        var priceEl = card.querySelector('.text-sm.font-bold');
+        var price = priceEl ? priceEl.textContent.trim().replace('$','') : '';
+        window.location = 'product-detail-public.html?name=' + encodeURIComponent(name) + (price ? '&from=' + encodeURIComponent(price) : '');
+      });
+    }
+    document.querySelectorAll('.product-card').forEach(wireProductCard);
+
+    /* ─── Live catalog: the catalog IS the factory's published products ─────────
+       operator.html writes Active products into EGStore (eg_catalog_products) on
+       every publish/edit. This page renders only those — no mock demo grid.
+       Category pills are built from the products' own types. Re-renders on the
+       storage event when another tab publishes. */
+    var LIVE_COLOR_HEX = {
+      white:'#ffffff', black:'#111827', navy:'#1e3a5f', red:'#dc2626', blue:'#2563eb',
+      royal:'#2563eb', green:'#16a34a', forest:'#14532d', gray:'#9ca3af', grey:'#9ca3af',
+      'heather gray':'#cbd5e1', 'heather grey':'#cbd5e1', charcoal:'#374151', purple:'#7c3aed',
+      orange:'#fb923c', pink:'#ec4899', yellow:'#eab308', gold:'#d4a017', brown:'#92400e',
+      maroon:'#7f1d1d', sand:'#d2b48c', tan:'#d2b48c', cream:'#f5f5dc', beige:'#c9c3ba',
+      teal:'#0d9488', sky:'#38bdf8'
+    };
+    function liveColorDot(name) {
+      var key = (name || '').trim().toLowerCase();
+      var hex = LIVE_COLOR_HEX[key] || '#9ca3af';
+      var border = (hex.toLowerCase() === '#ffffff' || key === 'white') ? '#d1d5db' : 'transparent';
+      return '<div class="color-dot" style="background:' + hex + ';border-color:' + border + '"></div>';
+    }
+    function liveProductColors(p) {
+      var seen = {}, out = [];
+      if (p.colorImages && typeof p.colorImages === 'object') Object.keys(p.colorImages).forEach(function(c){ var k=c.toLowerCase(); if(c&&!seen[k]){seen[k]=1;out.push(c);} });
+      if (Array.isArray(p.variantSkus)) p.variantSkus.forEach(function(v){ var c=v&&v.color?v.color.trim():''; var k=c.toLowerCase(); if(c&&!seen[k]){seen[k]=1;out.push(c);} });
+      return out;
+    }
+    function liveProductCard(p) {
+      var colors = liveProductColors(p);
+      var dots = colors.slice(0,5).map(liveColorDot).join('');
+      if (colors.length > 5) dots += '<span class="text-xs text-gray-400 ml-1">+' + (colors.length - 5) + '</span>';
+      var fallback = encodeURIComponent(p.fallback || (p.name || 'Item').split(/\s+/)[0]);
+      var img = p.img || ('https://placehold.co/400x400/f0ede9/6b7280?text=' + fallback);
+      var priceNum = (typeof p.price === 'number' ? p.price : parseFloat(p.price)) || 0;
+      var price = priceNum ? priceNum.toFixed(2) : '—';
+      var sub = [p.type || 'Apparel', p.method].filter(Boolean).join(' · ');
+      var card = document.createElement('div');
+      card.className = 'product-card fade-up visible';
+      card.style.cursor = 'pointer';
+      card.innerHTML =
+        '<div style="position:absolute;top:12px;left:12px;z-index:5"><span class="badge-new">NEW</span></div>' +
+        '<div class="product-img" style="height:260px;padding:0">' +
+          '<img src="' + img + '" alt="' + (p.name||'') + '" style="width:100%;height:100%;object-fit:cover" onerror="this.src=\'https://placehold.co/400x400/f0ede9/6b7280?text=' + fallback + '\'"/>' +
+        '</div>' +
+        '<div class="p-4">' +
+          '<div class="text-sm font-semibold text-gray-900 mb-1">' + (p.name || 'Untitled') + '</div>' +
+          '<div class="text-xs text-gray-400 mb-3">' + (sub || '&nbsp;') + '</div>' +
+          (dots ? '<div class="flex items-center gap-1.5 mb-3">' + dots + '</div>' : '') +
+          '<div class="flex items-center justify-between">' +
+            '<div><span class="text-xs text-gray-400">From </span><span class="text-sm font-bold text-gray-900">' + (price === '—' ? '—' : '$' + price) + '</span></div>' +
+            '<button class="card-cta" style="background:#111827;color:white;font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;border:none;cursor:pointer">+ Add</button>' +
+          '</div>' +
+        '</div>';
+      wireProductCard(card);
+      return card;
+    }
+    function liveAllProducts() {
+      if (typeof EGStore === 'undefined' || !EGStore.getCatalogProducts) return [];
+      return (EGStore.getCatalogProducts() || []).filter(function(p){ return p && (p.status === 'Active' || !p.status); });
+    }
+    // Rebuild the category pills from the distinct product types currently listed.
+    function renderCatPills(all) {
+      var wrap = document.getElementById('cat-pills');
+      if (!wrap) return;
+      var types = [], seen = {};
+      all.forEach(function(p){ var t=(p.type||'').trim(); if(t&&!seen[t]){seen[t]=1;types.push(t);} });
+      if (_liveCat !== 'All' && types.indexOf(_liveCat) === -1) _liveCat = 'All';
+      var pills = ['All'].concat(types);
+      wrap.innerHTML = pills.map(function(c){
+        var count = (c === 'All') ? all.length : all.filter(function(p){return (p.type||'')===c;}).length;
+        var active = (c === _liveCat) ? ' active' : '';
+        var badge = (c === 'All') ? ' <span style="font-size:11px;opacity:0.6">'+count+'</span>' : '';
+        return '<button class="cat-pill'+active+'" onclick="setCategory(this,\''+c.replace(/'/g,"\\'")+'\')">'+c+badge+'</button>';
+      }).join('');
+    }
+    function renderLiveCatalog() {
+      var sc = document.getElementById('sections-container');
+      if (!sc) return;
+      var all = liveAllProducts();
+      renderCatPills(all);
+      var live = (_liveCat === 'All') ? all : all.filter(function(p){ return (p.type||'') === _liveCat; });
+      var oldGrid = document.getElementById('live-grid');
+      if (oldGrid) oldGrid.remove();
+      var empty = document.getElementById('live-empty');
+      if (!live.length) { if (empty) empty.style.display = 'block'; updateLiveCount(0); return; }
+      if (empty) empty.style.display = 'none';
+      var grid = document.createElement('div');
+      grid.id = 'live-grid';
+      grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
+      live.forEach(function(p){ grid.appendChild(liveProductCard(p)); });
+      sc.appendChild(grid);
+      updateLiveCount(live.length);
+    }
+    function updateLiveCount(n) {
+      var el = document.querySelector('#product-grid .text-gray-900');
+      if (el) el.textContent = n + (n === 1 ? ' product' : ' products');
+    }
+    renderLiveCatalog();
+    window.addEventListener('storage', function(e){ if (!e || e.key === 'eg_catalog_products') renderLiveCatalog(); });
+  </script>
+</body>
+</html>

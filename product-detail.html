@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Product Detail – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
+.sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:rgba(0,0,0,.04);color:#111827}.ni:active{background:rgba(0,0,0,.06);color:#111827}.ni.on{background:#e8e7e3;border:none;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.55}.ni.on svg{opacity:.85;filter:none}
+.ibtn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;font-size:14px;color:#6b7280;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4}
+.btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
+.btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
+.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+/* Match dashboard cards: lighter bg + dark 2px borderline (offset shadow) */
+html:not([data-theme=dark]) .card{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+/* technique tabs */
+.tech-tab{flex:1;padding:9px 0;border:1.5px solid #e5e4e0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
+.tech-tab.on{background:#fff;border-color:#191918;color:#191918}
+.tech-tab:not(.on):hover{border-color:#9ca3af}
+/* size buttons */
+.sz-btn{min-width:44px;padding:7px 10px;border:1.5px solid #e5e4e0;border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
+.sz-btn.on{border-color:#191918;background:#191918;color:#fff}
+.sz-btn:not(.on):hover{border-color:#9ca3af}
+/* color swatches */
+.clr-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s;flex-shrink:0;position:relative}
+.clr-swatch.on{border-color:#191918 !important;box-shadow:0 0 0 2px #fff inset}
+.clr-swatch:hover{transform:scale(1.12)}
+/* thumbnail strip */
+.thumb{width:84px;height:84px;border-radius:9px;border:1.5px solid #e5e4e0;overflow:hidden;cursor:pointer;transition:border-color .15s;background:#f6f5f4;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.thumb.on{border-color:#191918}
+.thumb:hover:not(.on){border-color:#9ca3af}
+/* star rating */
+.star{color:#f59e0b;font-size:17px;line-height:1}
+#mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
+#mob-ham:hover{background:#f6f5f4}
+#mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
+#mob-ov.on{display:block}
+@media(max-width:900px){
+  .sidebar{transform:translateX(-220px);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50!important}
+  .sidebar.mob-open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.18)}
+  .sidebar+div{margin-left:0!important;width:100vw;max-width:100vw;overflow-x:hidden}
+  #mob-ham{display:flex!important}
+  .pd-layout{flex-direction:column!important}
+  .pd-thumbs{flex-direction:row!important;width:auto!important;gap:8px!important}
+  .pd-hero{width:100%!important}
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+
+/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+</style>
+<script src="egfulfill-store.js"></script>
+<style id="eg-outline-btns">
+/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
+
+.ni:focus{box-shadow:none!important;outline:none!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
+<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
+.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
+.eg-sel-btn svg{color:#191918!important}
+.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
+.eg-sel.open{z-index:6000!important}
+.eg-sel-menu{z-index:6001!important}
+.fb:not(.filter-btn){color:#191918!important}
+.fb:not(.filter-btn) svg{color:#191918!important}
+html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
+html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
+</style>
+<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
+.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
+</style>
+</head>
+<body>
+
+<div id="mob-ov" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar">
+  <div style="height:54px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0"><a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a></div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni on" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
+    <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
+    <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
+    <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div style="background:transparent;border:1px solid #d8d4cf;border-radius:10px;padding:12px 14px;margin:8px;flex-shrink:0">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em">Starter Plan</span><span style="font-size:11px;color:#9ca3af">847/1k</span></div>
+    <div style="background:#e8e3dd;border-radius:999px;height:4px;margin-bottom:8px;overflow:hidden"><div style="width:84.7%;height:100%;background:linear-gradient(90deg,#191918,#7a92c4);border-radius:999px"></div></div>
+    <button onclick="window.location='settings.html#billing'" style="width:100%;background:transparent;border:1px solid #191918;color:#191918;font-size:12.5px;font-weight:600;padding:6px;border-radius:7px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s" onmouseover="this.style.background='#191918';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#191918'">Upgrade to Pro ↑</button>
+  </div>
+</aside>
+
+<div style="margin-left:220px;min-height:100vh">
+  <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
+    <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <div style="display:flex;align-items:center;gap:6px;font-size:14px;flex-wrap:wrap">
+      <a href="design-lab.html" style="color:#6b7280;text-decoration:none;font-weight:500" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Design Lab</a>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <a href="products-dash.html" style="color:#6b7280;text-decoration:none;font-weight:500" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Browse Catalog</a>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span id="bc-name" style="color:#191918;font-weight:600">Product Detail</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <div style="display:flex;align-items:center;gap:4px;position:relative">
+        <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+          <div style="position:relative;margin-right:4px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="hdr-search" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search orders, products…" autocomplete="off"/>
+          </div>
+        </div>
+        <button class="ibtn" id="hdr-search-btn" onclick="(function(){var w=document.getElementById('hdr-search-wrap'),i=document.getElementById('hdr-search');if(w.style.maxWidth==='240px'){w.style.maxWidth='0';w.style.opacity='0';}else{w.style.maxWidth='240px';w.style.opacity='1';setTimeout(function(){i&&i.focus();},120);}})()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      </div>
+      <button class="ibtn" id="pref-btn" title="Toggle light/dark mode"><svg width="28" height="16" viewBox="0 0 28 16" fill="none"><rect x="0.65" y="0.65" width="26.7" height="14.7" rx="7.35" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="4.5" fill="currentColor" opacity=".7"/></svg></button>
+      <button class="ibtn" style="position:relative" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">8</span></button>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <a href="orders.html" class="btn btn-dk" style="gap:6px;text-decoration:none"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>New</a>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Phan</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">phanmylinh04…</div></div></div>
+      <button id="lang-btn" style="font-size:12.5px;font-weight:700;color:#6b7280;background:none;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor='#374151';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">EN</button>
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <div style="padding:24px 32px;max-width:1500px;margin:0 auto">
+
+    <!-- Product layout -->
+    <div class="pd-layout" style="display:flex;gap:36px;align-items:flex-start">
+
+      <!-- Left: thumbnail strip + hero image -->
+      <div style="display:flex;gap:14px;flex:1.4;min-width:0">
+        <!-- Thumbnail strip -->
+        <div class="pd-thumbs" style="display:flex;flex-direction:column;gap:10px;width:84px;flex-shrink:0">
+          <div class="thumb on" id="thumb-0" onclick="setHero(0)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>
+          </div>
+          <div class="thumb" id="thumb-1" onclick="setHero(1)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dbeafe"/><circle cx="14" cy="15" r="5" fill="#93c5fd"/></svg>
+          </div>
+          <div class="thumb" id="thumb-2" onclick="setHero(2)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dcfce7"/><path d="M8 20l4-8 4 6 3-4 4 6" stroke="#86efac" stroke-width="1.5" fill="none"/></svg>
+          </div>
+          <div class="thumb" id="thumb-3" onclick="setHero(3)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#fef9c3"/><circle cx="9" cy="13" r="3" fill="#fde047"/><circle cx="18" cy="16" r="4" fill="#facc15"/></svg>
+          </div>
+          <div class="thumb" id="thumb-4" onclick="setHero(4)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f3e8ff"/><rect x="8" y="10" width="12" height="10" rx="2" fill="#d8b4fe"/></svg>
+          </div>
+          <div class="thumb" id="thumb-5" onclick="setHero(5)">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f0fdf4"/><path d="M7 20c0-4 3-7 7-7s7 3 7 7" fill="#bbf7d0"/></svg>
+          </div>
+        </div>
+
+        <!-- Hero image — fixed height so its bottom lines up with the
+             right column's "Save to Product Templates" button. Image inside
+             scales via object-fit so different aspect ratios still look
+             centered. -->
+        <div style="flex:1;height:700px;border-radius:14px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center" id="pd-hero">
+          <!-- Hero placeholder – updated by setHero() -->
+          <div id="hero-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ede9">
+            <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+              <rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>
+              <circle cx="40" cy="52" r="12" fill="#d1d0cb"/>
+              <path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>
+              <text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">Front view</text>
+            </svg>
+          </div>
+          <!-- Nav arrows -->
+          <button onclick="heroNav(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <button onclick="heroNav(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: product info panel -->
+      <div style="flex:1;min-width:340px;max-width:480px">
+
+        <!-- Product name -->
+        <h1 id="pd-name" style="font-size:1.4rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 6px;line-height:1.3">Unisex T-Shirt</h1>
+        <p id="pd-sub" style="font-size:14px;color:#6b7280;margin:0 0 10px">Soft cotton · DTG print · 180 GSM</p>
+
+        <!-- Rating -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+          <div>
+            <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span style="color:#d1d0cb;font-size:17px;line-height:1">★</span>
+          </div>
+          <span style="font-size:13.5px;color:#3b82f6;font-weight:600;cursor:pointer">24 Reviews</span>
+        </div>
+
+        <div style="border-top:1px solid #f0ede9;padding-top:18px">
+
+          <!-- Technique -->
+          <div style="margin-bottom:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Technique</span>
+              <span style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">File guidelines ↗</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="tech-tab on" id="tech-dtg" onclick="setTech('dtg')">DTG printing</button>
+              <button class="tech-tab" id="tech-emb" onclick="setTech('emb')">Embroidery</button>
+            </div>
+          </div>
+
+          <!-- Color -->
+          <div style="margin-bottom:18px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Color</span>
+              <span id="pd-color-name" style="font-size:13px;color:#6b7280">Dark Gray</span>
+            </div>
+            <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+
+          <!-- Size -->
+          <div style="margin-bottom:20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Size</span>
+              <span style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">Size guide</span>
+            </div>
+            <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+
+          <!-- Price + delivery -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
+              <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Price <span style="color:#ef4444">*</span></div>
+              <div id="pd-price" style="font-size:1.5rem;font-weight:800;color:#191918;letter-spacing:-0.04em;line-height:1">$10.95</div>
+              <div style="font-size:12.5px;color:#6b7280;margin-top:4px">+ shipping from <strong>$4.99</strong></div>
+            </div>
+            <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
+              <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estimated delivery</div>
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+                <span style="font-size:14px">🇻🇳</span>
+                <span style="font-size:14px;font-weight:600;color:#374151">Vietnam</span>
+              </div>
+              <div style="font-size:1.1rem;font-weight:800;color:#191918;letter-spacing:-0.03em;line-height:1.2">12–17 days</div>
+            </div>
+          </div>
+
+          <!-- Bulk price note -->
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="#d97706" stroke-width="1.3"/><path d="M7.5 5v3.5M7.5 10.5v.5" stroke="#d97706" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <div>
+              <span style="font-size:13px;font-weight:600;color:#92400e">Bulk pricing available</span>
+              <span style="font-size:13px;color:#b45309"> · Save up to 20% on 50+ units</span>
+            </div>
+          </div>
+
+          <!-- CTA buttons -->
+          <button onclick="startDesigning()" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+            Start designing →
+          </button>
+          <button onclick="addToProducts()" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+            <span>Save to Product Templates</span>
+          </button>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Product specs section -->
+    <div style="margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card" style="padding:20px 22px">
+        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Product Details</div>
+        <div id="pd-specs" style="display:flex;flex-direction:column;gap:9px"></div>
+      </div>
+      <div class="card" style="padding:20px 22px">
+        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Print Areas</div>
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;color:#374151;font-weight:500">Front center</span>
+            <span style="font-size:13.5px;color:#6b7280">12" × 16" max</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;color:#374151;font-weight:500">Back center</span>
+            <span style="font-size:13.5px;color:#6b7280">12" × 16" max</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;color:#374151;font-weight:500">Left sleeve</span>
+            <span style="font-size:13.5px;color:#6b7280">3" × 3" max</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:14px;color:#374151;font-weight:500">Right sleeve</span>
+            <span style="font-size:13.5px;color:#6b7280">3" × 3" max</span>
+          </div>
+          <div style="border-top:1px solid #f0ede9;padding-top:9px;margin-top:3px">
+            <div style="font-size:13px;color:#9ca3af">Min resolution: <strong style="color:#374151">150 DPI</strong> · Preferred: <strong style="color:#374151">300 DPI</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customization (left) + File Guidelines (right) -->
+    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch">
+
+      <!-- Customizable positions + sizes + design tips. Mirrors the
+           right-side "File Guidelines" card's two-subsection rhythm so the
+           heights line up; chips on top, bullets on bottom. -->
+      <div class="card" style="padding:20px 22px">
+        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Customization</div>
+
+        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:9px">Positions you can customize</div>
+        <div id="pd-positions" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px"></div>
+
+        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:9px">Available sizes</div>
+        <div id="pd-cust-sizes" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px"></div>
+
+        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Design tips</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Upload artwork or add custom text per side</span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Preview every side before you check out</span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Bulk-order ready — pricing scales with volume</span></div>
+        </div>
+      </div>
+
+      <!-- File Guidelines — simple print + embroidery requirements -->
+      <div class="card" style="padding:20px 22px">
+        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">File Guidelines</div>
+
+        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Print · DTG / DTF</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">PNG or PDF, <strong>150 DPI minimum</strong> (300 preferred)</span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Transparent background</span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Design true-to-size to the print area</span></div>
+        </div>
+
+        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Embroidery</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Vector PDF, or PNG at <strong>150 DPI+</strong></span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Solid shapes &amp; colors only — no gradients</span></div>
+          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Max <strong>15K stitches</strong> (25K for large designs)</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var PRODUCT_DATA = {
+  101:{name:'Unisex T-Shirt',sub:'Soft cotton · DTG print · 180 GSM',from:10.95,colors:['#1c1917','#292524','#3f3f46','#7c2d12','#1e3a5f','#166534','#831843','#78350f','#c8c7c2','#f3f3f1','#fde68a','#bfdbfe','#bbf7d0','#fecdd3','#e9d5ff','#fed7aa','#67e8f9','#f0abfc'],colorNames:['Black','Dark Charcoal','Zinc','Deep Red','Navy','Forest Green','Berry','Brown','Ash Gray','White','Butter','Light Blue','Mint','Pink','Lavender','Peach','Sky','Orchid'],sizes:['XS','S','M','L','XL','2XL','3XL'],specs:[{k:'Material',v:'100% ring-spun cotton · 180 GSM'},{k:'Fit',v:'Unisex regular fit'},{k:'Print method',v:'DTG (direct-to-garment)'},{k:'Care',v:'Machine wash cold · tumble dry low'},{k:'Origin',v:'Bangladesh / Honduras'}],rating:24},
+  102:{name:'Premium Hoodie',sub:'Heavyweight fleece · embroidery-ready',from:24.50,colors:['#1c1917','#292524','#44403c','#1e3a5f','#166534','#c8c7c2','#f3f3f1','#fde68a','#bfdbfe','#f5f0eb','#7c3aed','#c84b31'],colorNames:['Black','Dark Charcoal','Warm Taupe','Navy','Forest Green','Ash Gray','White','Butter','Light Blue','Cream','Purple','Brick Red'],sizes:['XS','S','M','L','XL','2XL','3XL'],specs:[{k:'Material',v:'80% cotton · 20% polyester · 320 GSM'},{k:'Fit',v:'Unisex relaxed fit'},{k:'Print method',v:'DTG / Embroidery'},{k:'Care',v:'Machine wash cold · tumble dry low'},{k:'Origin',v:'Bangladesh'}],rating:18},
+  103:{name:'Crew Neck Sweatshirt',sub:'80% cotton · 20% polyester',from:19.80,colors:['#1c1917','#292524','#44403c','#1e3a5f','#166534','#c8c7c2','#f3f3f1','#bfdbfe','#e9d5ff','#f5f0eb'],colorNames:['Black','Dark Charcoal','Warm Taupe','Navy','Forest Green','Ash Gray','White','Light Blue','Lavender','Cream'],sizes:['XS','S','M','L','XL','2XL'],specs:[{k:'Material',v:'80% cotton · 20% polyester · 280 GSM'},{k:'Fit',v:'Unisex regular fit'},{k:'Print method',v:'DTG (direct-to-garment)'},{k:'Care',v:'Machine wash cold · lay flat to dry'},{k:'Origin',v:'Bangladesh'}],rating:12},
+  104:{name:'High-Waist Leggings',sub:'All-over print · 4-way stretch',from:22.40,colors:['#1c1917','#292524','#1e3a5f','#166534','#831843','#7c3aed','#c8c7c2'],colorNames:['Black','Dark Charcoal','Navy','Forest Green','Berry','Purple','Ash Gray'],sizes:['XS','S','M','L','XL'],specs:[{k:'Material',v:'82% polyester · 18% spandex'},{k:'Fit',v:'High-waist compression'},{k:'Print method',v:'All-over sublimation'},{k:'Care',v:'Machine wash cold · hang dry'},{k:'Origin',v:'China'}],rating:9},
+  105:{name:'Embroidered Cap',sub:'Structured front · adjustable strap',from:12.60,colors:['#1c1917','#292524','#1e3a5f','#166534','#78350f','#c8c7c2','#f3f3f1','#fde68a','#fed7aa','#c84b31'],colorNames:['Black','Dark Charcoal','Navy','Forest Green','Brown','Ash Gray','White','Butter','Peach','Brick Red'],sizes:['One size'],specs:[{k:'Material',v:'100% cotton twill · structured'},{k:'Fit',v:'Adjustable snapback'},{k:'Print method',v:'Embroidery'},{k:'Care',v:'Spot clean only'},{k:'Origin',v:'Bangladesh'}],rating:31},
+};
+
+// Fallback product
+var DEFAULT_PRODUCT = {name:'Product',sub:'Print on demand · multiple techniques',from:10.95,colors:['#1c1917','#292524','#1e3a5f','#c8c7c2','#f3f3f1'],colorNames:['Black','Dark Charcoal','Navy','Ash Gray','White'],sizes:['S','M','L','XL'],specs:[{k:'Material',v:'100% cotton'},{k:'Fit',v:'Regular fit'},{k:'Print method',v:'DTG'},{k:'Care',v:'Machine wash cold'},{k:'Origin',v:'Bangladesh'}],rating:10};
+
+var _params = new URLSearchParams(location.search);
+var _pid = parseInt(_params.get('id')) || 0;
+var _pname = _params.get('name') || '';
+
+// Prefer the EGStore catalog (what the factory actually published) over the legacy
+// hardcoded PRODUCT_DATA. This lets sellers see the operator's real product image,
+// price, and category instead of mock placeholders.
+// Map common apparel color names to a swatch hex (falls back to a neutral gray).
+var PD_NAME2HEX = { white:'#ffffff', black:'#1c1917', navy:'#1e3a5f','navy blue':'#1e3a5f', red:'#b91c1c','deep red':'#7c2d12','brick red':'#c84b31',
+  grey:'#9ca3af', gray:'#9ca3af', 'light grey':'#d8d6d2','light gray':'#d8d6d2',
+  'heather grey':'#b8bcc2','heather gray':'#b8bcc2', charcoal:'#3f3f46','dark charcoal':'#292524', 'forest green':'#166534', green:'#166534','mint':'#bbf7d0',
+  'royal blue':'#1d4ed8', blue:'#1d4ed8', 'light blue':'#bfdbfe','sky':'#7dd3fc','sky blue':'#7dd3fc','baby blue':'#bfdbfe',
+  maroon:'#7f1d1d', burgundy:'#7f1d1d', sand:'#d8c9a3', cream:'#f5f0eb', natural:'#e7ddc9',
+  ivory:'#f6f0e0', pink:'#ec4899','light pink':'#fbcfe8','baby pink':'#fbcfe8','hot pink':'#db2777','blush':'#fecdd3','peach':'#fed7aa',
+  yellow:'#facc15', butter:'#fde68a','gold':'#d4a017','mustard':'#ca8a04', orange:'#ea580c',
+  purple:'#7c3aed','light purple':'#c4b5fd','lavender':'#e9d5ff','lilac':'#c4b5fd','orchid':'#f0abfc',
+  brown:'#78350f','warm taupe':'#44403c','dark brown':'#451a03','khaki':'#a8a155',
+  'ash gray':'#c8c7c2','ash grey':'#c8c7c2','zinc':'#3f3f46',
+  olive:'#4d5320','olive green':'#4d5320', tan:'#d2b48c','dusty rose':'#d8a8a8',
+  'dark grey':'#3f3f46','dark gray':'#3f3f46','off white':'#faf9f7','off-white':'#faf9f7','bone':'#e8e1d4',
+  teal:'#0d9488','aqua':'#06b6d4','turquoise':'#14b8a6','coral':'#fb7185','rust':'#9c4221','wine':'#591417',
+  'berry':'#831843' };
+function pdHex(name){ return PD_NAME2HEX[String(name||'').trim().toLowerCase()] || '#c8c7c2'; }
+
+var _prod = (function(){
+  if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
+    var stored = EGStore.getCatalogProducts().find(function(p){ return String(p.id) === String(_pid); });
+    if (stored) {
+      // Adapt the factory schema (name/sku/type/method/variants/price/img) to the
+      // shape this page expects (sub/from/colors/colorNames/sizes/specs/img/rating).
+      var sizes = (stored.variants && /([A-Z0-9]+(?:\s*[-–]\s*[A-Z0-9]+)?)/.test(stored.variants))
+        ? (stored.variants.match(/\b(?:XS|S|M|L|XL|2XL|3XL|4XL|One Size|11oz|15oz|350 ?ml|500 ?ml)\b/gi) || ['S','M','L','XL'])
+        : ['S','M','L','XL'];
+      // Distinct variant colors (in entry order) → real swatches + names.
+      var _vc = [], _seenc = {};
+      (stored.variantSkus || []).forEach(function(v){ var c = v && v.color; if (c && !_seenc[c.toLowerCase()]) { _seenc[c.toLowerCase()] = 1; _vc.push(c); } });
+      var _names = _vc.length ? _vc : ['Black','Dark Charcoal','Navy','Ash Gray','White'];
+      return {
+        name: stored.name,
+        sub: 'Print on demand · ' + (stored.method || 'multiple techniques'),
+        from: typeof stored.price === 'number' ? stored.price : 10.95,
+        colors: _names.map(pdHex),
+        colorNames: _names,
+        colorImages: stored.colorImages || {},
+        sizes: sizes,
+        specs: [
+          {k:'Material', v:'Print-ready blank · sourced from supplier'},
+          {k:'Print method', v: stored.method || 'DTG'},
+          {k:'Category', v: stored.type || 'Apparel'},
+          {k:'Stock', v: stored.variants || '—'},
+          {k:'SKU', v: stored.sku || '—'},
+        ],
+        rating: 24,
+        img: stored.img,
+        extraImages: stored.images || [], // operator-uploaded extra mockup angles
+        _storeRecord: stored,
+      };
+    }
+  }
+  // Fallback: legacy PRODUCT_DATA hardcoded above
+  var p = PRODUCT_DATA[_pid] || DEFAULT_PRODUCT;
+  if(_pname) p.name = decodeURIComponent(_pname);
+  return p;
+})();
+if(_pname && !_prod._storeRecord) _prod.name = decodeURIComponent(_pname);
+
+var _heroIdx = 0;
+var _selColor = 0;
+var _selSize = 'M';
+var _tech = 'dtg';
+
+var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
+
+// All images available for this product (primary + any extras). Used by the hero
+// carousel and the thumbnail strip. Falls back to a single placeholder when the
+// operator hasn't published an image yet.
+var _images = [];
+
+function init() {
+  document.getElementById('pd-name').textContent = _prod.name;
+  document.getElementById('pd-sub').textContent = _prod.sub;
+  var fromParam = parseFloat(_params.get('from'));
+  document.getElementById('pd-price').textContent = '$' + (fromParam > 0 ? fromParam.toFixed(2) : _prod.from.toFixed(2));
+  document.getElementById('bc-name').textContent = _prod.name;
+  document.title = _prod.name + ' – EGFULFILL';
+
+  document.querySelector('[style*="24 Reviews"]') && (document.querySelector('[style*="24 Reviews"]').textContent = _prod.rating + ' Reviews');
+
+  // Build the image list — primary first, then any extras stored on the catalog record.
+  _images = [];
+  if (_prod.img) _images.push(_prod.img);
+  if (Array.isArray(_prod.extraImages)) _prod.extraImages.forEach(function(im){ if (im && _images.indexOf(im) < 0) _images.push(im); });
+  pdRenderThumbs();
+  setHero(0);
+
+  // Colors
+  var cEl = document.getElementById('pd-colors');
+  cEl.innerHTML = _prod.colors.map(function(c,i){
+    return '<div class="clr-swatch'+(i===0?' on':'')+'" style="background:'+c+';border-color:'+(i===0?'#191918':'#e5e4e0')+'" title="'+_prod.colorNames[i]+'" onclick="selectColor('+i+')"></div>';
+  }).join('');
+  document.getElementById('pd-color-name').textContent = _prod.colorNames[0];
+
+  // Sizes
+  var sEl = document.getElementById('pd-sizes');
+  sEl.innerHTML = _prod.sizes.map(function(s){
+    var on = s === (_prod.sizes.indexOf('M') > -1 ? 'M' : _prod.sizes[0]);
+    return '<button class="sz-btn'+(on?' on':'')+'" onclick="selectSize(this,\''+s+'\')">'+s+'</button>';
+  }).join('');
+
+  // Specs
+  var spEl = document.getElementById('pd-specs');
+  spEl.innerHTML = _prod.specs.map(function(sp){
+    return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px"><span style="font-size:14px;color:#6b7280;white-space:nowrap">'+sp.k+'</span><span style="font-size:14px;color:#374151;font-weight:500;text-align:right">'+sp.v+'</span></div>';
+  }).join('');
+
+  // Customization: thread colors + positions
+  pdRenderCustomization();
+}
+
+// Positions the buyer can place a design on — from the product's defined print
+// areas when available, otherwise the standard apparel placements.
+function pdCustomPositions() {
+  var rec = _prod._storeRecord;
+  var LABELS = { front:'Front', back:'Back', 'left-sleeve':'Left sleeve', 'right-sleeve':'Right sleeve', leftsleeve:'Left sleeve', rightsleeve:'Right sleeve', left:'Left sleeve', right:'Right sleeve' };
+  if (rec && rec.printAreas && Object.keys(rec.printAreas).length) {
+    return Object.keys(rec.printAreas).map(function(k){ return LABELS[k] || (k.charAt(0).toUpperCase()+k.slice(1)); });
+  }
+  return ['Front','Back','Left sleeve','Right sleeve'];
+}
+function pdRenderCustomization() {
+  var chip = function(label){
+    return '<span style="font-size:12.5px;color:#374151;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:7px;padding:5px 11px">'+label+'</span>';
+  };
+  var pos = document.getElementById('pd-positions');
+  if (pos) pos.innerHTML = pdCustomPositions().map(chip).join('');
+  var sz = document.getElementById('pd-cust-sizes');
+  if (sz && Array.isArray(_prod.sizes)) sz.innerHTML = _prod.sizes.map(chip).join('');
+}
+
+// Render the thumbnail strip on the left. If the operator only published one image we
+// still show all six tile slots (with placeholders) so the layout stays consistent —
+// the first slot is the real product photo, the rest are decorative until more images
+// are added from the factory side.
+function pdRenderThumbs() {
+  var strip = document.querySelector('.pd-thumbs');
+  if (!strip) return;
+  var html = '';
+  for (var i = 0; i < 6; i++) {
+    var src = _images[i];
+    if (src) {
+      html += '<div class="thumb' + (i === 0 ? ' on' : '') + '" id="thumb-' + i + '" onclick="setHero(' + i + ')" style="cursor:pointer">'
+        + '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'"/>'
+      + '</div>';
+    } else {
+      html += '<div class="thumb" id="thumb-' + i + '" style="cursor:default;opacity:.5">'
+        + '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>'
+      + '</div>';
+    }
+  }
+  strip.innerHTML = html;
+}
+
+function selectColor(idx) {
+  _selColor = idx;
+  document.querySelectorAll('.clr-swatch').forEach(function(el,i){
+    el.classList.toggle('on', i===idx);
+    el.style.borderColor = i===idx ? '#191918' : '#e5e4e0';
+  });
+  var name = _prod.colorNames[idx];
+  document.getElementById('pd-color-name').textContent = name;
+  // If the operator assigned a photo to this color, show it in the hero.
+  var ci = _prod.colorImages && _prod.colorImages[name];
+  var heroEl = document.getElementById('hero-inner');
+  if (ci) {
+    heroEl.style.background = '#f6f5f4';
+    heroEl.innerHTML = '<img src="' + ci + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'\'"/>';
+    document.querySelectorAll('.thumb').forEach(function(t){ t.classList.remove('on'); });
+  } else if (heroEl) {
+    heroEl.style.background = HERO_BKGS[idx % HERO_BKGS.length];
+  }
+}
+
+function selectSize(btn, sz) {
+  _selSize = sz;
+  document.querySelectorAll('.sz-btn').forEach(function(b){ b.classList.remove('on'); });
+  btn.classList.add('on');
+}
+
+function setTech(t) {
+  _tech = t;
+  document.getElementById('tech-dtg').classList.toggle('on', t==='dtg');
+  document.getElementById('tech-emb').classList.toggle('on', t==='emb');
+}
+
+function setHero(idx) {
+  _heroIdx = idx;
+  document.querySelectorAll('.thumb').forEach(function(t,i){ t.classList.toggle('on', i===idx); });
+  var heroEl = document.getElementById('hero-inner');
+  if (!heroEl) return;
+  var src = _images[idx];
+  if (src) {
+    // Real image — replace the placeholder SVG with the product photo. Keep object-contain
+    // so the full mockup is visible without cropping the model/garment.
+    heroEl.style.background = '#f6f5f4';
+    heroEl.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'<div style=&quot;color:#9ca3af;font-size:13px&quot;>Image failed to load</div>\'"/>';
+  } else {
+    // Placeholder slot — pastel background + camera SVG so it still feels like a gallery
+    heroEl.style.background = HERO_BKGS[idx % HERO_BKGS.length];
+    heroEl.innerHTML = '<svg width="120" height="120" viewBox="0 0 120 120" fill="none">'
+      + '<rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>'
+      + '<circle cx="40" cy="52" r="12" fill="#d1d0cb"/>'
+      + '<path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>'
+      + '<text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">View ' + (idx + 1) + '</text>'
+    + '</svg>';
+  }
+}
+
+function heroNav(dir) {
+  var len = Math.max(1, _images.length || 6);
+  var next = (_heroIdx + dir + len) % len;
+  setHero(next);
+}
+
+function startDesigning() {
+  var params = 'id='+_pid+'&name='+encodeURIComponent(_prod.name)+'&color='+encodeURIComponent(_prod.colorNames[_selColor])+'&size='+encodeURIComponent(_selSize)+'&tech='+_tech;
+  window.location = 'design-maker.html?' + params;
+}
+
+function addToProducts() {
+  var btn = event.currentTarget;
+  btn.textContent = '✓ Saved to Product Templates';
+  btn.style.background = '#dcfce7';
+  btn.style.borderColor = '#86efac';
+  btn.style.color = '#15803d';
+  setTimeout(function(){
+    btn.innerHTML = '<span>Save to Product Templates</span>';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  }, 2200);
+}
+
+function toggleSidebar() {
+  var s = document.querySelector('.sidebar'), o = document.getElementById('mob-ov');
+  if(s) s.classList.toggle('mob-open');
+  if(o) o.classList.toggle('on');
+}
+
+init();
+</script>
+<script>
+(function(){
+  var a=document.querySelector('a.ni[href="products-dash.html"]');
+  if(!a)return;
+  var sub=a.nextElementSibling;
+  if(!sub||typeof sub.getAttribute!=='function'||!sub.getAttribute('href')||sub.getAttribute('href').indexOf('product-templates')<0)return;
+  var chev=a.querySelectorAll('svg');chev=chev[chev.length-1];
+  var open=a.classList.contains('on')||sub.classList.contains('on');
+  if(!open)sub.style.display='none';
+  if(chev){
+    chev.style.transition='transform .22s ease';
+    chev.style.cursor='pointer';
+    chev.style.opacity='.45';
+    if(open)chev.style.transform='rotate(180deg)';
+    chev.addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();
+      open=!open;
+      sub.style.display=open?'flex':'none';
+      chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+    });
+  }
+})();
+</script>
+<script src="nav-drag.js"></script>
+</body>
+</html>

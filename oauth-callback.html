@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Connecting…</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;color:#191918;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.brand{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;margin-bottom:24px}
+.card{background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;padding:32px 28px;width:100%;max-width:380px}
+.spin{width:32px;height:32px;border:3px solid #d8d4cd;border-top-color:#191918;border-radius:50%;display:inline-block;animation:eg-cb-spin .8s linear infinite;margin-bottom:14px}
+@keyframes eg-cb-spin{to{transform:rotate(360deg)}}
+.title{font-size:17px;font-weight:700;color:#191918;margin-bottom:6px}
+.sub{font-size:13.5px;color:#6b7280;line-height:1.55}
+.ok-mark{width:44px;height:44px;border-radius:50%;background:#0d6e2e;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
+.err-mark{width:44px;height:44px;border-radius:50%;background:#b83c3c;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:2px 2px 0 #40403d;transition:box-shadow .14s, top .14s;position:relative;top:0;margin-top:16px}
+.btn:hover{top:-1px;box-shadow:4px 4px 0 #40403d}
+.btn.ghost{background:transparent;color:#191918}
+.toggle{font-size:12px;color:#9ca3af;margin-top:24px}
+.toggle a{color:#9ca3af;text-decoration:underline}
+.toggle a:hover{color:#374151}
+.row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="brand">egfulfill</div>
+
+<div class="card" id="card">
+  <div class="spin"></div>
+  <div class="title" id="title">Connecting…</div>
+  <div class="sub" id="sub">This should only take a moment.</div>
+</div>
+
+<!-- Demo helper: lets you preview the failure state without backend -->
+<div class="toggle">
+  Test mode: <a href="?platform=shopify&force=fail">force failure</a> · <a href="?platform=shopify">try again</a>
+</div>
+
+<script>
+(function () {
+  var qs = new URLSearchParams(location.search);
+  var platform = (qs.get('platform') || 'shopify').toLowerCase().replace(/[^a-z]/g, '');
+  var force = qs.get('force'); // 'fail' to simulate decline; otherwise success
+  var names = {
+    shopify: 'Shopify', etsy: 'Etsy', tiktok: 'TikTok Shop', tiktokshop: 'TikTok Shop',
+    woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay', bigcommerce: 'BigCommerce'
+  };
+  var name = names[platform] || 'this platform';
+  document.title = 'Connecting to ' + name + '…';
+  document.getElementById('title').textContent = 'Connecting to ' + name + '…';
+  document.getElementById('sub').textContent = "We're getting your store linked up.";
+
+  setTimeout(function () { finish(force !== 'fail'); }, 1500);
+
+  function finish(success) {
+    var card = document.getElementById('card');
+    if (success) {
+      var shopName = name + ' · my-store.example';
+      card.innerHTML =
+        '<span class="ok-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
+        '<div class="title">Connected!</div>' +
+        '<div class="sub">Your ' + name + ' store is now linked. This window will close.</div>';
+      try {
+        window.opener && window.opener.postMessage(
+          { kind: 'eg-connect-result', ok: true, platform: platform, shop: shopName }, '*'
+        );
+      } catch (_) {}
+      setTimeout(function () { window.close(); }, 1100);
+    } else {
+      card.innerHTML =
+        '<span class="err-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7L7 17" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span>' +
+        '<div class="title">Could not connect</div>' +
+        '<div class="sub">Permission was declined or the request timed out.</div>' +
+        '<div class="row"><a class="btn" href="?platform=' + platform + '">Try again</a><a class="btn ghost" href="javascript:void(0)" onclick="closeNow()">Close</a></div>';
+      try {
+        window.opener && window.opener.postMessage(
+          { kind: 'eg-connect-result', ok: false, platform: platform, reason: 'declined' }, '*'
+        );
+      } catch (_) {}
+    }
+  }
+
+  window.closeNow = function () { window.close(); };
+})();
+</script>
+</body>
+</html>

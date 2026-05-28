@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Choose a Product – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
+.sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:rgba(0,0,0,.04);color:#111827}.ni:active{background:rgba(0,0,0,.06);color:#111827}.ni.on{background:#e8e7e3;border:none;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.55}.ni.on svg{opacity:.85;filter:none}
+.ibtn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;font-size:14px;color:#6b7280;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4}
+.btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
+.btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
+.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+.dtable{width:100%;border-collapse:collapse}
+.dtable th{font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;white-space:nowrap;background:#fafaf9}
+.dtable td{padding:14px;border-bottom:1px solid #f0ede9;vertical-align:middle}
+.dtable tbody tr{cursor:pointer;transition:background .12s}
+.dtable tbody tr:hover td{background:#f6f5f4}
+.dtable tbody tr:last-child td{border-bottom:none}
+.input{border:1px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14px;color:#191918;outline:none;font-family:inherit;background:#fff;transition:border-color .15s;width:100%;box-sizing:border-box}
+.input:focus{border-color:#9ca3af}
+.select{border:1px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;color:#374151;outline:none;font-family:inherit;background:#fff;cursor:pointer;appearance:none;-webkit-appearance:none;padding-right:28px}
+.cat-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-radius:7px;cursor:pointer;font-size:14.5px;font-weight:500;color:#555550;transition:background .12s;user-select:none;text-decoration:none}
+.cat-row:hover{background:#f6f5f4;color:#191918}
+.cat-row.on{background:#111827;color:#fff;font-weight:600}
+.cat-row.on .cat-count{background:rgba(255,255,255,.18);color:#fff}
+.cat-count{font-size:12px;font-weight:600;color:#9ca3af;background:#f3f3f1;padding:2px 7px;border-radius:999px}
+#mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
+#mob-ham:hover{background:#f6f5f4}
+#mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
+#mob-ov.on{display:block}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-220px);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50!important}
+  .sidebar.mob-open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.18)}
+  .sidebar+div{margin-left:0!important;width:100vw;max-width:100vw;overflow-x:hidden}
+  #mob-ham{display:flex!important}
+  header{padding-left:12px!important;padding-right:12px!important}
+  .dtable{min-width:520px}
+  .mob-hide{display:none!important}
+}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+
+/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+</style>
+<style id="eg-outline-btns">
+/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
+
+.ni:focus{box-shadow:none!important;outline:none!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+</head>
+<body>
+
+<div id="mob-ov" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar">
+  <div style="padding:16px 20px 10px;border-bottom:1px solid #f0ede9;flex-shrink:0"><a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a></div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni on" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
+    <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
+    <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
+    <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div style="background:transparent;border:1px solid #d8d4cf;border-radius:10px;padding:12px 14px;margin:8px;flex-shrink:0"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em">Starter Plan</span><span style="font-size:11px;color:#9ca3af">847/1k</span></div><div style="background:#e8e3dd;border-radius:999px;height:4px;margin-bottom:8px;overflow:hidden"><div style="width:84.7%;height:100%;background:linear-gradient(90deg,#191918,#7a92c4);border-radius:999px"></div></div><button onclick="window.location='settings.html#billing'" style="width:100%;background:transparent;border:1px solid #191918;color:#191918;font-size:12.5px;font-weight:600;padding:6px;border-radius:7px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s" onmouseover="this.style.background='#191918';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#191918'">Upgrade to Pro ↑</button></div>
+</aside>
+
+<div style="margin-left:220px;min-height:100vh">
+  <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:10px;flex-shrink:0">
+    <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <!-- Breadcrumb -->
+    <div style="display:flex;align-items:center;gap:6px;font-size:14px">
+      <a href="products-dash.html" style="color:#6b7280;text-decoration:none;font-weight:500" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Products</a>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <span style="color:#191918;font-weight:600">Choose a product</span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:5px">
+      <button class="ibtn" style="position:relative"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span style="position:absolute;top:4px;right:4px;width:7px;height:7px;background:#ef4444;border-radius:50%;border:1.5px solid #fff"></span>Notifications</button>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 2px"></div>
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Phan</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">phanmylinh04…</div></div></div>
+    </div>
+  </header>
+
+  <div style="padding:24px 28px">
+    <!-- Page heading -->
+    <div style="margin-bottom:20px">
+      <h1 style="font-size:1.25rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 3px">Choose a product to design</h1>
+      <p style="font-size:14px;color:#6b7280;margin:0">Select a blank product, then add your artwork in the Design Maker.</p>
+    </div>
+
+    <!-- Main layout: categories sidebar + product table -->
+    <div style="display:flex;gap:16px;align-items:flex-start">
+
+      <!-- Categories panel -->
+      <div style="width:210px;flex-shrink:0">
+        <div class="card" style="overflow:hidden">
+          <div style="padding:12px 14px 8px;border-bottom:1px solid #f0ede9">
+            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em">Categories</div>
+          </div>
+          <div style="padding:6px">
+            <a class="cat-row on" href="#" onclick="filterCategory(event,'all')">
+              <span>All products</span>
+              <span class="cat-count">491</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'apparel')">
+              <span>Apparel</span>
+              <span class="cat-count">182</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'drinkware')">
+              <span>Drinkware</span>
+              <span class="cat-count">38</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'accessories')">
+              <span>Accessories</span>
+              <span class="cat-count">74</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'stationery')">
+              <span>Print &amp; Stationery</span>
+              <span class="cat-count">61</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'home')">
+              <span>Home &amp; Living</span>
+              <span class="cat-count">56</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'kids')">
+              <span>Kids &amp; Baby</span>
+              <span class="cat-count">44</span>
+            </a>
+            <a class="cat-row" href="#" onclick="filterCategory(event,'eco')">
+              <span>Eco &amp; Sustainable</span>
+              <span class="cat-count">36</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: search + table -->
+      <div style="flex:1;min-width:0">
+        <!-- Search + sort bar -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="position:relative;flex:1;max-width:360px">
+            <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%)" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="pp-search" class="input" placeholder="Search products…" style="padding-left:34px" oninput="renderTable()"/>
+          </div>
+          <div style="position:relative">
+            <select id="pp-sort" class="select" onchange="renderTable()">
+              <option value="popular">Sort by: Popular</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="name">Name A–Z</option>
+            </select>
+            <svg style="position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="#6b7280" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+
+        <!-- Product table -->
+        <div class="card" style="overflow:hidden">
+          <div style="overflow-x:auto">
+            <table class="dtable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th class="mob-hide">Colors</th>
+                  <th class="mob-hide">Sizes</th>
+                  <th style="text-align:right">From</th>
+                </tr>
+              </thead>
+              <tbody id="pp-tbody"></tbody>
+            </table>
+          </div>
+          <!-- Footer -->
+          <div style="padding:12px 16px;border-top:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
+            <span id="pp-count-label" style="font-size:13.5px;color:#9ca3af">Showing 20 of 491 products</span>
+            <a href="#" style="font-size:13.5px;font-weight:600;color:#111827;text-decoration:none;display:inline-flex;align-items:center;gap:4px" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">Browse full catalog <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var ALL_PRODUCTS = [
+  // Apparel
+  {id:1,cat:'apparel',name:'Unisex T-Shirt',sub:'Soft cotton · DTG print · 180 GSM',colors:18,sizes:'XS – 3XL',from:10.95},
+  {id:2,cat:'apparel',name:'Premium Hoodie',sub:'Heavyweight fleece · embroidery-ready',colors:14,sizes:'XS – 3XL',from:24.50},
+  {id:3,cat:'apparel',name:'Crew Neck Sweatshirt',sub:'80% cotton · 20% polyester',colors:12,sizes:'XS – 2XL',from:19.80},
+  {id:4,cat:'apparel',name:'High-Waist Leggings',sub:'All-over print · 4-way stretch',colors:8,sizes:'XS – XL',from:22.40},
+  {id:5,cat:'apparel',name:'Embroidered Cap',sub:'Structured front · adjustable strap',colors:10,sizes:'One size',from:12.60},
+  {id:6,cat:'apparel',name:'Women\'s Fitted Tee',sub:'Ring-spun cotton · slim cut',colors:16,sizes:'XS – 2XL',from:11.20},
+  {id:7,cat:'apparel',name:'Unisex Tank Top',sub:'Jersey knit · relaxed fit',colors:12,sizes:'XS – 3XL',from:9.40},
+  {id:8,cat:'apparel',name:'Zip-Up Hoodie',sub:'Mid-weight fleece · front zip',colors:8,sizes:'XS – 2XL',from:26.90},
+  {id:9,cat:'apparel',name:'Long Sleeve Tee',sub:'100% combed cotton · DTG',colors:14,sizes:'XS – 3XL',from:13.80},
+  {id:10,cat:'apparel',name:'Jogger Pants',sub:'French terry · elastic waist',colors:6,sizes:'XS – 2XL',from:21.50},
+  {id:11,cat:'apparel',name:'Muscle Tank',sub:'Jersey knit · open side seams',colors:10,sizes:'S – 3XL',from:8.90},
+  {id:12,cat:'apparel',name:'Bomber Jacket',sub:'Satin shell · embroidery-ready',colors:5,sizes:'XS – 2XL',from:38.00},
+  // Drinkware
+  {id:13,cat:'drinkware',name:'Classic Mug (11 oz)',sub:'Ceramic · dishwasher safe · sublimation',colors:4,sizes:'11 oz',from:7.50},
+  {id:14,cat:'drinkware',name:'Latte Mug (15 oz)',sub:'Ceramic · large handle · wrap print',colors:4,sizes:'15 oz',from:8.90},
+  {id:15,cat:'drinkware',name:'Insulated Tumbler (20 oz)',sub:'Stainless steel · double-wall · sublimation',colors:8,sizes:'20 oz',from:14.20},
+  {id:16,cat:'drinkware',name:'Travel Bottle (500 ml)',sub:'BPA-free plastic · leak-proof lid',colors:6,sizes:'500 ml',from:11.40},
+  {id:17,cat:'drinkware',name:'Enamel Camping Mug',sub:'Speckled enamel · vintage feel',colors:5,sizes:'350 ml',from:10.80},
+  // Accessories
+  {id:18,cat:'accessories',name:'Canvas Tote Bag',sub:'Heavy cotton · long handles · DTG',colors:6,sizes:'One size',from:8.20},
+  {id:19,cat:'accessories',name:'Drawstring Backpack',sub:'Lightweight polyester · all-over print',colors:4,sizes:'One size',from:10.60},
+  {id:20,cat:'accessories',name:'Fanny Pack',sub:'Water-resistant · adjustable strap',colors:8,sizes:'One size',from:13.90},
+  {id:21,cat:'accessories',name:'Beanie Hat',sub:'Knit acrylic · fold-up cuff',colors:10,sizes:'One size',from:9.70},
+  {id:22,cat:'accessories',name:'Snapback Cap',sub:'Flat brim · adjustable snap closure',colors:8,sizes:'One size',from:13.50},
+  {id:23,cat:'accessories',name:'Laptop Sleeve 15"',sub:'Neoprene · padded interior',colors:3,sizes:'15"',from:16.40},
+  {id:24,cat:'accessories',name:'Phone Case (iPhone)',sub:'Slim hard case · full-wrap print',colors:1,sizes:'Multiple',from:11.80},
+  // Stationery
+  {id:25,cat:'stationery',name:'Hardcover Journal',sub:'A5 · 192 pages · lay-flat binding',colors:3,sizes:'A5',from:12.00},
+  {id:26,cat:'stationery',name:'Greeting Cards (Pack 10)',sub:'350 gsm matte · full-color both sides',colors:1,sizes:'A6',from:6.80},
+  {id:27,cat:'stationery',name:'Poster Print',sub:'250 gsm silk paper · vivid colors',colors:1,sizes:'A3 / A2',from:8.50},
+  {id:28,cat:'stationery',name:'Sticker Sheet',sub:'Vinyl · waterproof · kiss-cut',colors:1,sizes:'A5 sheet',from:4.20},
+  {id:29,cat:'stationery',name:'Art Print (Framed)',sub:'Giclée · solid wood frame · ready to hang',colors:2,sizes:'20×28 cm',from:22.90},
+  // Home
+  {id:30,cat:'home',name:'Fleece Blanket (50×60")',sub:'Plush micro-fleece · all-over print',colors:1,sizes:'50×60"',from:22.80},
+  {id:31,cat:'home',name:'Throw Pillow Cover',sub:'Faux linen · 45×45 cm · DTG',colors:4,sizes:'45 cm',from:14.60},
+  {id:32,cat:'home',name:'Canvas Wall Art',sub:'Stretched canvas · 1.5" frame · ready-to-hang',colors:1,sizes:'30×40 cm',from:18.90},
+  {id:33,cat:'home',name:'Apron (Adjustable)',sub:'Cotton canvas · 65 × 90 cm',colors:4,sizes:'One size',from:16.20},
+  // Kids
+  {id:34,cat:'kids',name:'Kids Tee (2–14 yrs)',sub:'Soft cotton · DTG · pre-shrunk',colors:14,sizes:'2T – 14',from:8.90},
+  {id:35,cat:'kids',name:'Baby Bodysuit',sub:'100% cotton · snap closure',colors:8,sizes:'0–24 M',from:9.40},
+  {id:36,cat:'kids',name:'Kids Hoodie',sub:'Soft fleece · kangaroo pocket',colors:10,sizes:'2T – 14',from:18.50},
+  // Eco
+  {id:37,cat:'eco',name:'Organic Cotton Tee',sub:'GOTS certified · natural dye · DTG',colors:8,sizes:'XS – 2XL',from:14.90},
+  {id:38,cat:'eco',name:'Recycled Tote',sub:'RPET fabric · recycled bottles',colors:4,sizes:'One size',from:9.80},
+  {id:39,cat:'eco',name:'Bamboo Mug (350 ml)',sub:'Bamboo fibre · biodegradable · sublimation',colors:3,sizes:'350 ml',from:11.20},
+  {id:40,cat:'eco',name:'Cork Notebook',sub:'A5 · FSC cork cover · recycled pages',colors:2,sizes:'A5',from:13.60},
+];
+
+var _activeCat = 'all';
+
+function filterCategory(e, cat) {
+  e.preventDefault();
+  _activeCat = cat;
+  document.querySelectorAll('.cat-row').forEach(function(r) { r.classList.remove('on'); });
+  e.currentTarget.classList.add('on');
+  renderTable();
+}
+
+function getFiltered() {
+  var q = document.getElementById('pp-search').value.trim().toLowerCase();
+  var prods = _activeCat === 'all' ? ALL_PRODUCTS : ALL_PRODUCTS.filter(function(p){ return p.cat === _activeCat; });
+  if (q) prods = prods.filter(function(p){ return p.name.toLowerCase().indexOf(q) > -1 || p.sub.toLowerCase().indexOf(q) > -1; });
+  var sort = document.getElementById('pp-sort').value;
+  prods = prods.slice();
+  if (sort === 'price-asc') prods.sort(function(a,b){ return a.from - b.from; });
+  else if (sort === 'price-desc') prods.sort(function(a,b){ return b.from - a.from; });
+  else if (sort === 'name') prods.sort(function(a,b){ return a.name.localeCompare(b.name); });
+  return prods;
+}
+
+function renderTable() {
+  var prods = getFiltered();
+  var tbody = document.getElementById('pp-tbody');
+  var label = document.getElementById('pp-count-label');
+  if (!prods.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">No products found</td></tr>';
+    label.textContent = 'No products found';
+    return;
+  }
+  label.textContent = 'Showing ' + prods.length + ' of 491 products';
+  tbody.innerHTML = prods.map(function(p) {
+    return '<tr onclick="pickProduct(' + p.id + ',\'' + p.name.replace(/'/g,"\\'") + '\')">' +
+      '<td>' +
+        '<div style="font-size:14.5px;font-weight:600;color:#191918;margin-bottom:2px">' + p.name + '</div>' +
+        '<div style="font-size:13px;color:#9ca3af">' + p.sub + '</div>' +
+      '</td>' +
+      '<td class="mob-hide" style="font-size:14px;color:#374151;white-space:nowrap">' + p.colors + ' colors</td>' +
+      '<td class="mob-hide" style="font-size:14px;color:#374151;white-space:nowrap">' + p.sizes + '</td>' +
+      '<td style="text-align:right;font-size:14.5px;font-weight:600;color:#191918;white-space:nowrap">$' + p.from.toFixed(2) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function pickProduct(id, name) {
+  window.location = 'design-maker.html?product=' + id + '&name=' + encodeURIComponent(name);
+}
+
+function toggleSidebar() {
+  var s = document.querySelector('.sidebar'), o = document.getElementById('mob-ov');
+  if (s) s.classList.toggle('mob-open');
+  if (o) o.classList.toggle('on');
+}
+
+renderTable();
+</script>
+<script src="nav-drag.js"></script>
+</body>
+</html>

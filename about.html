@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>About – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;color:#191918}
+  .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none}
+  h1,h2{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:none;font-variation-settings:'opsz' 30,'wght' 900;letter-spacing:-0.01em;color:#191918}
+  .nav-link{color:#555550;font-size:14px;font-weight:500;text-decoration:none;transition:color .15s}
+  .nav-link:hover{color:#111827}
+  .nav-link.active{color:#111827;font-weight:600}
+  .btn-dk{display:inline-flex;align-items:center;gap:6px;background:#191918;color:#f3eee2;border:none;border-radius:9px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:background .15s}
+  .btn-dk:hover{background:#2c2a27}
+  /* Retro sticker cards (shared across public pages) */
+  .card,.eg-card{background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:3px 3px 0 #40403d;position:relative;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);top:0}
+  .card.is-hoverable:hover,a.card:hover,button.card:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+  .btn-retro{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+  .btn-retro:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+  .btn-retro:active{top:3px;box-shadow:1px 1px 0 #40403d}
+  .btn-retro-ghost{display:inline-flex;align-items:center;justify-content:center;background:transparent;color:#191918;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+  .btn-retro-ghost:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+  /* Legacy .btn-dk maps to retro CTA */
+  .btn-dk{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+  .btn-dk:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+</style>
+<style id="eg-retro-override">
+.feat-card,.bento-card,.floating-card,.testimonial-card,.mock-ui,.step-card,.faq-item,.feature-card,.benefit-card,.value-card,.pricing-card,.case-card,.product-card{background:#fdfcfa!important;border:1.5px solid #40403d!important;border-radius:14px!important;box-shadow:3px 3px 0 #40403d!important;overflow:visible!important}
+.feat-card{padding:24px!important}.faq-item{padding:18px 22px!important;margin-bottom:10px}
+.mock-header{background:#f3eee2!important;border-bottom:1.5px solid #40403d!important}
+.section-tag{background:#fdfcfa!important;border:1.5px solid #40403d!important;color:#191918!important;box-shadow:2px 2px 0 #40403d!important}
+section[style*="background:white"],section[style*="background: white"],section[style*="background:#fff"],section[style*="background: #fff"],section[style*="background:#f6f5f4"],section[style*="background:#f4f2ef"],section[style*="background:#f9f8f7"]{background:#f7f5f0!important}
+section [style*="background:#fff"][style*="border-radius:1"],section [style*="background: #fff"][style*="border-radius:1"],section [style*="background:white"][style*="border-radius:1"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+</style>
+</head>
+<body>
+
+  <!-- NAV (shared canonical) -->
+  <nav style="background:#f7f5f0;position:sticky;top:0;z-index:50">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+        <div class="hidden md:flex items-center gap-6">
+          <a href="products.html" class="nav-link">Products</a>
+          <a href="howitworks.html" class="nav-link">How It Works</a>
+          <a href="about.html" class="nav-link active">About</a>
+          <a href="apidocs.html" class="nav-link">API Documentation</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="seller-login.html" class="nav-link hidden md:block">Log in</a>
+        <a href="seller-login.html" class="btn-retro">Start for free</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="max-w-3xl mx-auto px-6 pt-20 pb-14 text-center">
+    <h1 class="text-5xl md:text-6xl mb-5" style="line-height:1.12">Print-on-demand,<br/>without the headaches.</h1>
+    <p class="text-lg text-gray-500" style="line-height:1.7">EGFULFILL helps creators and brands turn designs into shipped products — no inventory, no upfront cost. We handle printing, packing, and delivery so you can focus on building your brand.</p>
+  </section>
+
+  <!-- STATS -->
+  <section class="max-w-4xl mx-auto px-6 pb-16">
+    <div class="grid grid-cols-3 gap-4">
+      <div class="card p-6 text-center">
+        <div class="text-3xl font-extrabold" style="color:#191918">491+</div>
+        <div class="text-sm text-gray-500 mt-1">Print-ready products</div>
+      </div>
+      <div class="card p-6 text-center">
+        <div class="text-3xl font-extrabold" style="color:#191918">160+</div>
+        <div class="text-sm text-gray-500 mt-1">Countries shipped to</div>
+      </div>
+      <div class="card p-6 text-center">
+        <div class="text-3xl font-extrabold" style="color:#191918">24–48h</div>
+        <div class="text-sm text-gray-500 mt-1">Avg. production time</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOUNDER -->
+  <section class="max-w-5xl mx-auto px-6 pb-20">
+    <div class="card p-8 md:p-10">
+      <div class="flex flex-col md:flex-row items-center gap-8">
+        <img src="https://placehold.co/220x220/e8e4dd/9ca3af?text=Founder" alt="Founder" style="width:180px;height:180px;border-radius:18px;object-fit:cover;flex-shrink:0;border:1px solid rgba(0,0,0,.06)"/>
+        <div>
+          <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">From our founder</div>
+          <p class="text-xl mb-4" style="font-family:'Fraunces',serif;font-weight:600;color:#191918;line-height:1.5">"We started EGFULFILL because launching a product brand shouldn't require a warehouse or a big cheque. Upload a design, connect your store, and we take it from there."</p>
+          <div class="text-sm font-semibold text-gray-900">Linh Phan</div>
+          <div class="text-sm text-gray-500">Founder &amp; CEO</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VALUES -->
+  <section class="max-w-5xl mx-auto px-6 pb-24">
+    <h2 class="text-3xl md:text-4xl mb-8 text-center">What we believe</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="card p-6">
+        <div class="text-base font-bold text-gray-900 mb-1">No upfront risk</div>
+        <div class="text-sm text-gray-500" style="line-height:1.65">You only pay when you sell. No minimums, no stock to hold.</div>
+      </div>
+      <div class="card p-6">
+        <div class="text-base font-bold text-gray-900 mb-1">Quality, every order</div>
+        <div class="text-sm text-gray-500" style="line-height:1.65">Every item is quality-checked before it ships under your brand.</div>
+      </div>
+      <div class="card p-6">
+        <div class="text-base font-bold text-gray-900 mb-1">Built for scale</div>
+        <div class="text-sm text-gray-500" style="line-height:1.65">From your first order to thousands a day — the platform grows with you.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="max-w-3xl mx-auto px-6 pb-24 text-center">
+    <h2 class="text-3xl md:text-4xl mb-5">Ready to start?</h2>
+    <a href="seller-login.html" class="btn-dk" style="padding:12px 22px;font-size:15px">Start for free →</a>
+  </section>
+
+  <!-- FOOTER (shared canonical) -->
+  <footer style="background:#f7f5f0;border-top:1.5px solid #40403d" class="pt-14 pb-10">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div class="col-span-2 md:col-span-1">
+          <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+          <p style="font-size:12.5px;color:#9ca3af;margin-top:10px">Print-on-demand fulfillment for creators &amp; brands.</p>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Product</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="products.html" style="text-decoration:none;color:inherit">Browse catalog</a></li>
+            <li><a href="design-maker.html" style="text-decoration:none;color:inherit">Design Maker</a></li>
+            <li><a href="howitworks.html" style="text-decoration:none;color:inherit">How it works</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Company</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="about.html" style="text-decoration:none;color:inherit">About us</a></li>
+            <li><a href="seller-login.html" style="text-decoration:none;color:inherit">Log in</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">API Documentation</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="apidocs.html" style="text-decoration:none;color:inherit">API docs</a></li>
+            <li><a href="help.html" style="text-decoration:none;color:inherit">Help center</a></li>
+            <li><a href="security.html" style="text-decoration:none;color:inherit">Security</a></li>
+          </ul>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e5e4e0;padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:12px;color:#9ca3af;margin:0">© 2024 EGFULFILL, Inc. All rights reserved.</p>
+        <div style="display:flex;gap:18px;font-size:12px;color:#9ca3af">
+          <a href="privacy.html" style="text-decoration:none;color:inherit">Privacy</a>
+          <a href="terms.html" style="text-decoration:none;color:inherit">Terms</a>
+          <a href="ip-policy.html" style="text-decoration:none;color:inherit">IP Policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

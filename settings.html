@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Settings – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
+.sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:rgba(0,0,0,.04);color:#111827}.ni:active{background:rgba(0,0,0,.06);color:#111827}.ni.on{background:#e8e7e3;border:none;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.65}.ni.on svg{opacity:1;filter:none}
+.btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
+.btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
+.btn-red{background:#fee2e2;color:#dc2626;border:1.5px solid #fecaca}.btn-red:hover{background:#fecaca}
+.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+.stab{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid transparent;border-radius:8px;font-size:14px;font-weight:500;color:#6b7280;cursor:pointer;transition:all .15s;text-decoration:none;white-space:nowrap}
+.stab:hover{background:#f6f5f4;color:#191918}.stab.on{background:transparent;border:1px solid #191918;color:#191918;font-weight:600}.stab.stab-red{color:#dc2626}.stab.stab-red:hover{background:#fff5f5;color:#b91c1c}
+/* Each settings box → retro card: brighter beige + 2px borderline shadow */
+html:not([data-theme=dark]) [id^="panel-"] .card{background:#fdfcfa!important;border:1px solid #40403d!important;border-radius:12px!important;box-shadow:2px 2px 0 #40403d!important}
+.finput{width:100%;background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14.5px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box;transition:border-color .15s}
+.finput:focus{border-color:#111827;background:#fff}
+.tog{position:relative;width:36px;height:20px;background:#e5e4e0;border-radius:999px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.tog.on{background:#111827}.tog::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s}.tog.on::after{transform:translateX(16px)}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fi{animation:fadeUp .35s cubic-bezier(.22,1,.36,1) both}
+
+/* ── Mobile Responsive ── */
+#mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
+#mob-ham:hover{background:#f6f5f4}
+#mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
+#mob-ov.on{display:block}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-220px);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50!important}
+  .sidebar.mob-open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.18)}
+  .sidebar+div{margin-left:0!important;width:100vw;max-width:100vw;overflow-x:hidden}
+  #mob-ham{display:flex!important}
+  [style*="grid-template-columns:repeat("],[style*="grid-template-columns:1fr 1fr"],[style*="grid-template-columns:2fr "],[style*="grid-template-columns:3fr "],[style*="grid-template-columns:repeat(5"],[style*="grid-template-columns:repeat(4"],[style*="grid-template-columns:repeat(3"],[style*="grid-template-columns:repeat(2"]{grid-template-columns:1fr!important}
+  header{padding-left:12px!important;padding-right:12px!important}
+  .dtable{min-width:560px}
+  [style*="overflow-x"]{overflow-x:auto}
+  .mob-hide-sm{display:none!important}
+}
+
+
+
+
+/* ── Dark mode ── */
+html[data-theme=dark]{color-scheme:dark}
+html[data-theme=dark] body{background:#1a1917!important}
+html[data-theme=dark] .sidebar{background:#1f1d1b!important;border-right-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] header{background:#1a1917!important;border-bottom-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .card{background:#252220!important;border-color:#302e2c!important}
+html[data-theme=dark] .ni{color:#7a7874!important}
+html[data-theme=dark] .ni.on{background:#2a2826!important;color:#e8e4e0!important;border:none!important}
+html[data-theme=dark] .ni:hover:not(.on){background:#252220!important}
+.ibtn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;font-size:14px;color:#6b7280;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4;color:#191918}
+html[data-theme=dark] .ibtn{color:#7a7874!important}
+html[data-theme=dark] .ibtn:hover{background:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] .dtable th{background:#1f1d1b!important;color:#4a4846!important;border-color:#302e2c!important}
+html[data-theme=dark] .dtable td{border-color:#282624!important;color:#a8a29e!important}
+html[data-theme=dark] .dtable tbody tr:hover td{background:#252220!important}
+html[data-theme=dark] input:not([type=checkbox]):not([type=radio]),html[data-theme=dark] select,html[data-theme=dark] textarea{background:#252220!important;border-color:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] #pref-panel,html[data-theme=dark] #new-menu-dd{background:#252220!important;border-color:#302e2c!important;box-shadow:0 8px 28px rgba(0,0,0,.5)!important}
+html[data-theme=dark] [style*="background:#fff;"]{background:#252220!important}
+html[data-theme=dark] [style*="background: #fff"]{background:#252220!important}
+html[data-theme=dark] [style*="background:#f4f2ef"]{background:#1a1917!important}
+html[data-theme=dark] [style*="background:#f6f5f4"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f9f8f7"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f3f3f1"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f0ede9"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#fafaf9"]{background:#1f1d1b!important}
+html[data-theme=dark] [style*="background:#e5e4e0"]{background:#302e2c!important}
+html[data-theme=dark] [style*="background:#f0ede9"]{background:#211900!important}
+html[data-theme=dark] [style*="background:#fff5f5"]{background:#251210!important}
+html[data-theme=dark] [style*="background:#fee2e2"]{background:#2a0e0c!important}
+html[data-theme=dark] [style*="color:#191918"]{color:#d8d4d0!important}
+html[data-theme=dark] [style*="color:#111827"]{color:#e0deda!important}
+html[data-theme=dark] [style*="color:#374151"]{color:#a8a29e!important}
+html[data-theme=dark] [style*="color:#1f2937"]{color:#bcb8b4!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#565452!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #f0ede9"]{border-bottom-color:#282624!important}
+html[data-theme=dark] [style*="border-top:1px solid #f0ede9"]{border-top-color:#282624!important}
+html[data-theme=dark] [style*="border:1px solid #e5e4e0"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border:1.5px solid #e5e4e0"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #e5e4e0"]{border-bottom-color:#302e2c!important}
+html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#302e2c!important}
+html[data-theme=dark] [style*="border-right:1px solid #e5e4e0"]{border-right-color:#302e2c!important}
+html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
+html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
+html[data-theme=dark] .prog-bar{background:#302e2c!important}
+html[data-theme=dark] #_qtm>div{background:#252220!important;border:1.5px solid #302e2c}
+html[data-theme=dark] .seg{color:#7a7874!important}
+html[data-theme=dark] .seg.on{background:#302e2c!important;color:#e0deda!important}
+/* ── Dark mode filter pills ── */
+html[data-theme=dark] .tab-btn{color:#7a7874!important}
+html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
+html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
+/* "via API" source badge */
+html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+/* Action buttons: Resolve / Escalate */
+html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
+html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
+html[data-theme=dark] [style*="background:#fff5f5;color:#dc2626"]{background:rgba(230,53,97,0.12)!important;color:#e63561!important;border-color:rgba(230,53,97,0.28)!important}
+html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
+/* Start / action dark buttons — add visible border in dark mode */
+html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
+/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#9749d4/#2eeeca/#e63561 ── */
+/* Blue family → incoming, transit, ready, queue */
+html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-queue{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-lowstock{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-disc{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-incoming{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-transit{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-ready{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-pendingpo{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-cancel{background:#6a99d6!important;color:#fff!important;border:none!important}
+/* Cyan family → working, qc, labelled */
+html[data-theme=dark] .b-qc{background:#2dcaf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-working{background:#2dcaf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-labelled{background:#4ed2f2!important;color:#fff!important;border:none!important}
+/* Purple family → design, pre-scan, outdeliv, prod */
+html[data-theme=dark] .b-prod{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-outdeliv{background:#a866db!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-prescan{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-design{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-approved{background:#a866db!important;color:#fff!important;border:none!important}
+/* Mint family → shipped, finished, delivered, ok, packed */
+html[data-theme=dark] .b-packed{background:#41f1d3!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-shipped{background:#2eeeca!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-ok{background:#2eeeca!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-finished{background:#41f1d3!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-delivered{background:#2eeeca!important;color:#fff!important;border:none!important}
+/* Pink/Red family → exception, backorder, flagged */
+html[data-theme=dark] .b-flagged{background:#e63561!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-exception{background:#e63561!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-backorder{background:#ec557a!important;color:#fff!important;border:none!important}
+/* Type badge classes (ds-type-*) */
+html[data-theme=dark] .ds-type-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-type-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] .ds-type-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
+html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!important;border-color:#4e65ce!important}
+/* Inline inv/dsn pills — attribute overrides */
+html[data-theme=dark] [style*="color:#286038;background:#e4f4ea"]{color:#fff!important;background:#2eeeca!important;border-color:#1ab8a0!important}
+html[data-theme=dark] [style*="color:#7a5018;background:#f8f4e0"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important;cursor:pointer}
+html[data-theme=dark] [style*="color:#3a5a96;background:#edf2f8"]{color:#fff!important;background:#4e65ce!important;border-color:#3a52b8!important}
+html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#9749d4!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="color:#904a18;background:#f8f0e4"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#f3f4f6;border:1px solid #e5e4e0"]{background:#2a2826!important;border-color:#3a3835!important}
+html[data-theme=dark] [style*="color:#6b7280;background:#f3f4f6"]{color:#9ca3af!important;background:#2a2826!important;border-color:#3a3835!important}
+html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="background:#f8f0e4;color:#904a18"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#e4f4ea;color:#286038"]{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
+html[data-theme=dark] [style*="background:#edf2f8;color:#3a5a96"]{background:#4e65ce!important;color:#fff!important;border-color:#3a52b8!important}
+html[data-theme=dark] [style*="background:#f8f4e0;color:#7a5018"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#e4f6f2;color:#1a7060"]{background:#2dcaf0!important;color:#fff!important;border-color:#18a8cc!important}
+/* ── Dark mode: pill-btn (dashboard / wallet store filter) ── */
+html[data-theme=dark] .pill-btn{background:rgba(255,255,255,0.04)!important;color:#7a7874!important;border-color:#302e2c!important}
+html[data-theme=dark] .pill-btn:hover{border-color:#4a4846!important;color:#a8a29e!important}
+html[data-theme=dark] .pill-btn.active{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important}
+/* ── Dark mode: cat-pill (products category filter) ── */
+html[data-theme=dark] .cat-pill{color:#7a7874!important}
+html[data-theme=dark] .cat-pill:hover{background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
+html[data-theme=dark] .cat-pill.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
+/* ── Dark mode: fb / filter-btn (orders filter row) ── */
+html[data-theme=dark] .fb{background:rgba(255,255,255,0.04)!important;border-color:#302e2c!important;color:#a8a29e!important}
+html[data-theme=dark] .fb:hover{border-color:#4a4846!important;color:#c8c4c0!important}
+
+/* ── EG uniform dark separators + readable accent numbers (auto) ── */
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="dashed #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #eee"],html[data-theme=dark] [style*="solid #ececec"],html[data-theme=dark] [style*="solid #fafaf9"],html[data-theme=dark] [style*="solid #f3f4f6"],html[data-theme=dark] [style*="solid #d1d5db"]{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .dtable th,html[data-theme=dark] .dtable td,html[data-theme=dark] .dtable tr.exp-row td{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] [style*="color:#191918"],html[data-theme=dark] [style*="color:#374151"],html[data-theme=dark] [style*="color:#191918"]{color:#c9c3ba!important}
+html[data-theme=dark] [style*="background:#f7f5f0"],html[data-theme=dark] [style*="background:#f7f6f4"]{background:#1a1917!important}
+
+/* ── EG dark readability: lighter text + softer light-grey separators ── */
+html[data-theme=dark] .dtable th{color:#9c968e!important;border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .dtable td{border-color:rgba(255,255,255,.08)!important;color:#bdb8b1!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#9c968e!important}
+html[data-theme=dark] [style*="color:#6b7280"]{color:#a8a29b!important}
+html[data-theme=dark] [style*="color:#c4c3be"],html[data-theme=dark] [style*="color:#c4c2be"],html[data-theme=dark] [style*="color:#d1d5db"]{color:#8f8a83!important}
+html[data-theme=dark] [style*="color:#b0aaa4"],html[data-theme=dark] [style*="color:#b8b3ad"]{color:#a39d96!important}
+html[data-theme=dark] .tab-btn{color:#9c968e!important}
+html[data-theme=dark] .ni{color:#9c968e!important}
+html[data-theme=dark] .seg{color:#9c968e!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #f3f4f6"]{border-color:rgba(255,255,255,.1)!important}
+
+/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+
+/* === Topbar header polish (ported from dashboard) === */
+/* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
+   with a press animation: on :active the chip slides into its shadow so the
+   shadow collapses to zero, mimicking a physical button being pushed. */
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
+html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:2px 2px 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip:hover{background:rgba(201,195,186,.10)!important;color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:hover #balance-val{color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip #balance-val{color:#d8d4cc!important}
+#hdr-theme-knob{transform:translateX(0);transition:transform .25s}
+html[data-theme=dark] #hdr-theme-knob{transform:translateX(16px)}
+#hdr-theme-track{background:#e5e4e0}
+html[data-theme=dark] #hdr-theme-track{background:#374151}
+header [style*="width:1px"][style*="background:#e5e4e0"]{background:#f0ede9!important}
+html[data-theme=dark] header [style*="width:1px"][style*="background:#e5e4e0"]{background:rgba(201,195,186,.14)!important}
+</style>
+<style id="eg-outline-btns">
+/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
+
+.ni:focus{box-shadow:none!important;outline:none!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+<style id="eg-dark-settings">
+/* Minimal dark settings: drop the panel fills, keep only faint beige hairline outlines. */
+html[data-theme=dark] #panel-profile > .card,
+html[data-theme=dark] #panel-billing > .card,
+html[data-theme=dark] #panel-team > .card,
+html[data-theme=dark] #panel-notif > .card,
+html[data-theme=dark] #panel-api > .card,
+html[data-theme=dark] #panel-security > .card,
+html[data-theme=dark] #panel-fulfillment > .card,
+html[data-theme=dark] #panel-stores > .card{
+  background:transparent!important;border:none!important;box-shadow:none!important;
+}
+/* Inner sub-panels (e.g. billing plan boxes) were a bright off-white — make them faint */
+html[data-theme=dark] [style*="background:#f9f9f8"],
+html[data-theme=dark] [style*="background:#fafafa"]{background:rgba(201,195,186,.035)!important;border-color:rgba(201,195,186,.18)!important}
+/* Plan/status chips: faint beige instead of bright */
+html[data-theme=dark] [style*="background:#f0ede9;color:#374151"]{background:rgba(201,195,186,.1)!important;color:#cbc5bc!important}
+/* Inactive settings nav: warm beige (was reading cool/bluish) */
+html[data-theme=dark] .stab{color:#948f86!important}
+html[data-theme=dark] .stab:hover{color:#d8d4cc!important;background:rgba(201,195,186,.06)!important}
+/* Team members: drop the boxed outlines → thin beige separators between rows */
+html[data-theme=dark] #panel-team [style*="background:#f9f9f8"],
+html[data-theme=dark] #panel-team [style*="background:#fff7ed"]{
+  background:transparent!important;border:none!important;border-bottom:1px solid rgba(201,195,186,.13)!important;border-radius:0!important;
+}
+html[data-theme=dark] #panel-team [style*="background:#fff7ed"]{border-bottom:none!important}
+/* Role pills + Live status → muted, within the beige / soft scheme (no bright blue/neon) */
+html[data-theme=dark] [style*="background:#dbeafe;color:#1d4ed8"]{background:rgba(201,195,186,.1)!important;color:#cbc5bc!important}
+html[data-theme=dark] [style*="background:#dcfce7;color:#15803d"]{background:rgba(127,176,138,.15)!important;color:#8cbf9a!important}
+/* Active-session "current" row: use the same shaded + beige-outline selected look (no green wash) */
+html[data-theme=dark] [style*="background:#f0fdf4"]{background:rgba(201,195,186,.07)!important;border-color:rgba(201,195,186,.3)!important}
+/* Toggles: beige only — no fill, just a beige outline + beige knob */
+html[data-theme=dark] .tog{background:transparent!important;border:1.5px solid rgba(201,195,186,.4)!important}
+html[data-theme=dark] .tog.on{background:transparent!important;border-color:rgba(201,195,186,.78)!important}
+html[data-theme=dark] .tog::after{background:#b8b2a8!important}
+html[data-theme=dark] .tog.on::after{background:#d6d2ca!important}
+</style>
+<style id="eg-card-soft">/* eg-card-soft */
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+</style>
+<style id="eg-card-dark-retro">/* eg-card-dark-retro */
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
+</style>
+<style id="eg-sel-outline">/* eg-sel-outline */
+html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
+</style>
+<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
+<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
+.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
+.eg-sel-btn svg{color:#191918!important}
+.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
+.eg-sel.open{z-index:6000!important}
+.eg-sel-menu{z-index:6001!important}
+.fb:not(.filter-btn){color:#191918!important}
+.fb:not(.filter-btn) svg{color:#191918!important}
+html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
+html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
+</style>
+<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
+.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div style="height:54px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0"><a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a></div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
+    <a class="ni" href="product-templates.html" style="margin-left:24px;display:none">Product Templates</a>
+    <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
+    <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
+
+    <a class="ni on" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div style="padding:10px 12px;border-top:1px solid #f0ede9;flex-shrink:0">
+    <div style="display:flex;align-items:center;gap:9px">
+      <div id="sb-avatar" style="width:30px;height:30px;background:#111827;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">EG</div>
+      <div style="min-width:0;flex:1">
+        <div id="sb-store-name" style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">My Store</div>
+        <div style="font-size:12px;color:#9ca3af">Starter Plan</div>
+      </div>
+      <button title="Log out" onclick="doLogout()" style="background:none;border:none;cursor:pointer;padding:5px;border-radius:7px;color:#9ca3af;line-height:0;flex-shrink:0;transition:background .15s,color .15s" onmouseover="this.style.background='#fff5f5';this.style.color='#dc2626'" onmouseout="this.style.background='none';this.style.color='#9ca3af'">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 7.5H2M5.5 4.5l-3 3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 2.5H12a1 1 0 011 1v8a1 1 0 01-1 1H5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div style="margin-left:220px;min-height:100vh;display:flex;flex-direction:column">
+
+  <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
+    <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <div style="font-size:18px;font-weight:700;color:#191918;letter-spacing:-.01em;margin-right:auto">Settings</div><div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <div style="display:flex;align-items:center;gap:4px;position:relative">
+        <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+          <div style="position:relative;margin-right:4px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="hdr-search" oninput="runHdrSearch(this.value)" onblur="scheduleCollapseSearch()" onkeydown="hdrSearchKey(event)" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search orders, products…" autocomplete="off"/>
+          </div>
+        </div>
+        <button class="ibtn" id="hdr-search-btn" onclick="toggleHdrSearch()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        <div id="hdr-search-dd" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);z-index:300;overflow:hidden"></div>
+      </div>
+      <button class="ibtn" id="hdr-lang-btn" onclick="toggleLang()" title="Toggle language"><span id="hdr-lang-code" style="font-size:12.5px;font-weight:700;letter-spacing:.04em">EN</span></button><button class="ibtn" onclick="toggleTheme()" id="pref-btn" title="Toggle light / dark mode" style="padding:6px 8px"><span id="hdr-theme-track" style="display:inline-block;position:relative;width:34px;height:18px;border-radius:11px;background:#e5e4e0;transition:background .25s;flex-shrink:0"><span id="hdr-theme-knob" style="position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s"></span></span></button>
+      <button class="ibtn" style="position:relative" onclick="typeof toggleNotifPanel==='function'&&toggleNotifPanel(event)" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">8</span></button><div style="width:1px;height:20px;background:#f0ede9;margin:0 3px"></div><button class="bal-chip" type="button" onclick="openQuickTopUp()" title="Add funds" style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:inherit"><span id="balance-val" style="font-variant-numeric:tabular-nums">$0.00</span></button>
+      <div style="position:relative">
+        <button class="btn btn-dk" onclick="toggleNewMenu(event)" id="new-menu-btn" style="gap:6px"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>New<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5 8 3.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        <div id="new-menu-dd" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:6px;min-width:210px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.12)">
+          <div onclick="typeof goManualOrder!=='undefined'?goManualOrder():window.location='orders.html'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 7h6M4 4.5h6M4 9.5h3" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">Manual order</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Create from scratch</div></div></div>
+          <div onclick="window.location='settings.html#stores'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z" stroke="#374151" stroke-width="1.3"/><path d="M1.5 7h11M7 1.5S5 4 5 7s2 5.5 2 5.5" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">Sync from platforms</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Shopify, Etsy, WooCommerce…</div></div></div>
+        </div>
+      </div>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Phan</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">phanmylinh04…</div></div></div>
+    </div>
+  </header>
+
+  <div style="padding:24px 32px;display:flex;gap:24px;align-items:flex-start;max-width:1040px;margin:0 auto;width:100%">
+
+    <!-- Settings Sidebar -->
+    <div style="width:200px;flex-shrink:0">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <a class="stab on" id="tab-profile" href="#" onclick="showTab('profile');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 12c0-2.8 2.24-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
+        <a class="stab" id="tab-billing" href="#" onclick="showTab('billing');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1 6h12" stroke="currentColor" stroke-width="1.3"/></svg>Billing & Plan</a>
+        <a class="stab" id="tab-team" href="#" onclick="showTab('team');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><circle cx="10" cy="5" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 12c0-2 1.8-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 8.5c1.1.6 2 1.8 2 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Team</a>
+        <a class="stab" id="tab-notif" href="#" onclick="showTab('notif');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5A4 4 0 003 5.5v4l-1.5 2h11L11 9.5v-4A4 4 0 007 1.5z" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 11.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3"/></svg>Notifications</a>
+        <a class="stab" id="tab-api" href="#" onclick="showTab('api');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 5l-2 2 2 2M10 5l2 2-2 2M8 3l-2 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>API Keys</a>
+        <a class="stab" id="tab-security" href="#" onclick="showTab('security');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L2 3.5v4C2 10 4.3 12.6 7 13c2.7-.4 5-3 5-5.5v-4L7 1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Security</a>
+        <a class="stab" id="tab-fulfillment" href="#" onclick="showTab('fulfillment');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 9.5L3 5h8l1.5 4.5H1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4.5" cy="11.5" r="1" stroke="currentColor" stroke-width="1.3"/><circle cx="9.5" cy="11.5" r="1" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 5V3h5v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Fulfillment</a>
+        <a class="stab" id="tab-stores" href="#" onclick="showTab('stores');return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 5.5L3 2.5h8l1.5 3v.4a1.6 1.6 0 01-3.2 0 1.6 1.6 0 01-3.2 0 1.6 1.6 0 01-3.1 0v-.4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.2 8v4.5h9.6V8" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Stores</a>
+        <div style="height:1px;background:#e5e4e0;margin:10px 0"></div>
+        <a class="stab stab-red" href="seller-login.html" onclick="doLogout();return false"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 7H2M6 4l-3 3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 2h6a1 1 0 011 1v8a1 1 0 01-1 1H5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Log out</a>
+      </div>
+    </div>
+
+    <!-- Panel content -->
+    <div style="flex:1;min-width:0">
+
+      <!-- Profile -->
+      <div id="panel-profile" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:18px">Profile Information</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
+            <div style="width:56px;height:56px;background:#111827;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:800;color:#fff;flex-shrink:0">EG</div>
+            <div>
+              <button class="btn btn-out" style="font-size:13px;padding:5px 12px">Change avatar</button>
+              <div style="font-size:12.5px;color:#9ca3af;margin-top:4px">JPG, PNG up to 1MB</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">First Name</label><input id="prof-fname" class="finput" value="Alex"/></div>
+            <div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Last Name</label><input id="prof-lname" class="finput" value="Chen"/></div>
+          </div>
+          <div style="margin-bottom:14px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Email Address</label><input id="prof-email" class="finput" value="demo@egfulfill.com"/></div>
+          <div style="margin-bottom:14px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Business Name</label><input id="prof-biz" class="finput" value="My Print Store"/></div>
+          <div style="margin-bottom:20px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Timezone</label>
+            <select id="prof-tz" class="finput" style="cursor:pointer"><option>America/New_York (UTC-5)</option><option>America/Los_Angeles (UTC-8)</option><option>Europe/London (UTC+0)</option><option>Asia/Tokyo (UTC+9)</option><option>Asia/Singapore (UTC+8)</option><option>Australia/Sydney (UTC+11)</option></select>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px">
+            <div id="prof-saved" style="display:none;font-size:13.5px;color:#059669;display:none;align-items:center;gap:5px">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3.5 3.5L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Saved
+            </div>
+            <button class="btn btn-dk" onclick="saveProfile()">Save Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing -->
+      <div id="panel-billing" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+            <div style="font-size:15px;font-weight:700;color:#191918">Current Plan</div>
+            <span style="background:#f0ede9;color:#374151;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">Starter</span>
+          </div>
+          <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:12px;padding:22px;color:#191918;margin-bottom:20px">
+            <div style="font-size:14px;color:#6b7280;margin-bottom:6px">Starter Plan · Billed monthly</div>
+            <div style="font-size:33px;font-weight:800;letter-spacing:-0.02em;color:#191918">$0<span style="font-size:15px;font-weight:400;color:#9ca3af">/mo</span></div>
+            <div style="font-size:13.5px;color:#6b7280;margin-top:10px">500 orders/month · 1 store · Basic analytics</div>
+            <div style="margin-top:16px;background:#e5e4e0;border-radius:6px;height:6px"><div style="background:#191918;height:6px;border-radius:6px;width:84.7%"></div></div>
+            <div style="font-size:12.5px;color:#9ca3af;margin-top:5px">424 / 500 orders used this month</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px">
+              <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Pro Plan</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$29<span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div style="font-size:13px;color:#6b7280;margin-bottom:12px">2,000 orders · 5 stores · Full analytics · Priority support</div>
+              <button class="btn btn-dk" style="width:100%;justify-content:center" onclick="openUpgradeModal()">Upgrade to Pro</button>
+            </div>
+            <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px">
+              <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Enterprise</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$99<span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div style="font-size:13px;color:#6b7280;margin-bottom:12px">Unlimited orders · Unlimited stores · Dedicated manager</div>
+              <button class="btn btn-out" style="width:100%;justify-content:center">Contact Sales</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:22px 24px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:14px">Payment Method</div>
+          <div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;display:flex;align-items:center;gap:12px;background:#fafaf9">
+            <div style="width:38px;height:24px;background:#1a1f71;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">VISA</div>
+            <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">•••• •••• •••• 4242</div><div style="font-size:12.5px;color:#9ca3af">Expires 08/27</div></div>
+            <button class="btn btn-out" style="font-size:13px;padding:5px 11px">Update</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team -->
+      <div id="panel-team" style="display:none" class="fi">
+        <div class="card" style="overflow:hidden">
+          <div style="padding:18px 22px 12px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:15px;font-weight:700;color:#191918">Team Members</div>
+            <button class="btn btn-dk" style="font-size:13.5px">+ Invite Member</button>
+          </div>
+          <div style="padding:16px 22px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f9f9f8;border-radius:10px;border:1px solid #eeede9">
+              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#111827;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">AC</div><div><div style="font-size:14px;font-weight:600;color:#191918">Alex Chen</div><div style="font-size:12.5px;color:#9ca3af">demo@egfulfill.com</div></div></div>
+              <div style="display:flex;align-items:center;gap:10px"><span style="background:#f0ede9;color:#374151;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Owner</span></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f9f9f8;border-radius:10px;border:1px solid #eeede9">
+              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#6366f1;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">SK</div><div><div style="font-size:14px;font-weight:600;color:#191918">Sarah Kim</div><div style="font-size:12.5px;color:#9ca3af">sarah@mystore.com</div></div></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="background:#dbeafe;color:#1d4ed8;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Admin</span><button style="background:none;border:none;font-size:13px;color:#dc2626;cursor:pointer;padding:4px 8px">Remove</button></div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff7ed;border-radius:10px;border:1px dashed #fed7aa">
+              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#f0ede9;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af">?</div><div><div style="font-size:14px;font-weight:500;color:#374151">mike@agency.com</div><div style="font-size:12.5px;color:#191918">Invite pending · sent Apr 22</div></div></div>
+              <div style="display:flex;align-items:center;gap:8px"><span style="background:#f0ede9;color:#374151;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Editor</span><button style="background:none;border:none;font-size:13px;color:#6b7280;cursor:pointer;padding:4px 8px">Resend</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div id="panel-notif" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:18px">Notification Preferences</div>
+          <div style="display:flex;flex-direction:column;gap:0">
+            <div style="font-size:12px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:4px">Orders</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ede9"><div><div style="font-size:14px;font-weight:500;color:#191918">New order received</div><div style="font-size:13px;color:#9ca3af">Get notified for every new order</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ede9"><div><div style="font-size:14px;font-weight:500;color:#191918">Order shipped</div><div style="font-size:13px;color:#9ca3af">When tracking is assigned</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ede9"><div><div style="font-size:14px;font-weight:500;color:#191918">Production issues</div><div style="font-size:13px;color:#9ca3af">Reprints, delays, defects</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+            <div style="font-size:12px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;margin-top:16px">Account</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ede9"><div><div style="font-size:14px;font-weight:500;color:#191918">Billing alerts</div><div style="font-size:13px;color:#9ca3af">Payment failures, plan limits</div></div><div class="tog on" onclick="this.classList.toggle('on')"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0ede9"><div><div style="font-size:14px;font-weight:500;color:#191918">Weekly summary</div><div style="font-size:13px;color:#9ca3af">Revenue & orders digest every Monday</div></div><div class="tog" onclick="this.classList.toggle('on')"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0"><div><div style="font-size:14px;font-weight:500;color:#191918">Product updates & news</div><div style="font-size:13px;color:#9ca3af">New features, tips, announcements</div></div><div class="tog" onclick="this.classList.toggle('on')"></div></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn btn-dk">Save Preferences</button></div>
+        </div>
+      </div>
+
+      <!-- API Keys -->
+      <div id="panel-api" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+            <div style="font-size:15px;font-weight:700;color:#191918">API Keys</div>
+            <button class="btn btn-dk" style="font-size:13.5px">+ Generate Key</button>
+          </div>
+          <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:14px;font-weight:600;color:#191918">Production Key</div>
+              <span style="background:#dcfce7;color:#15803d;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px">Live</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:8px 12px">
+              <code style="font-size:13.5px;color:#374151;flex:1;font-family:monospace">egf_live_sk_••••••••••••••••••••••••x7Kp</code>
+              <button style="background:#f0ede9;border:none;border-radius:5px;padding:3px 9px;font-size:12.5px;color:#374151;cursor:pointer;font-family:inherit">Reveal</button>
+              <button style="background:#f0ede9;border:none;border-radius:5px;padding:3px 9px;font-size:12.5px;color:#374151;cursor:pointer;font-family:inherit">Copy</button>
+            </div>
+            <div style="font-size:12px;color:#9ca3af;margin-top:6px">Created Apr 1, 2026 · Last used 2 hours ago</div>
+          </div>
+          <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <div style="font-size:14px;font-weight:600;color:#191918">Test Key</div>
+              <span style="background:#f0ede9;color:#374151;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px">Test</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:8px 12px">
+              <code style="font-size:13.5px;color:#374151;flex:1;font-family:monospace">egf_test_sk_••••••••••••••••••••••••m3Qr</code>
+              <button style="background:#f0ede9;border:none;border-radius:5px;padding:3px 9px;font-size:12.5px;color:#374151;cursor:pointer;font-family:inherit">Reveal</button>
+              <button style="background:#f0ede9;border:none;border-radius:5px;padding:3px 9px;font-size:12.5px;color:#374151;cursor:pointer;font-family:inherit">Copy</button>
+            </div>
+            <div style="font-size:12px;color:#9ca3af;margin-top:6px">Created Mar 15, 2026 · Last used 3 days ago</div>
+          </div>
+        </div>
+        <div class="card" style="padding:18px 22px">
+          <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Webhook Endpoint</div>
+          <div style="font-size:13px;color:#9ca3af;margin-bottom:12px">Receive real-time events to your server</div>
+          <div style="display:flex;gap:8px"><input class="finput" value="https://yoursite.com/webhooks/egfulfill" style="flex:1"/><button class="btn btn-dk">Save</button></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;background:#fff;border:1.5px solid #e5e4e0;border-radius:10px;margin-top:12px">
+          <div style="width:32px;height:32px;background:#f3f4f6;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l-2 2 2 2M12 6l2 2-2 2M9 4l-2 8" stroke="#374151" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:#191918">API Documentation</div>
+            <div style="font-size:13px;color:#9ca3af;margin-top:1px">Reference guide for integrating with the EGFULFILL API</div>
+          </div>
+          <a href="apidocs.html" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:7px;font-size:13.5px;font-weight:600;color:#374151;background:#f3f4f6;border:1.5px solid #e5e4e0;text-decoration:none;white-space:nowrap" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">View Docs <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 1h3v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 1L5.5 6.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></a>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div id="panel-security" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:18px">Change Password</div>
+          <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:20px">
+            <div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Current Password</label><input class="finput" type="password" value="••••••••"/></div>
+            <div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">New Password</label><input class="finput" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number"/></div>
+            <div><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Confirm New Password</label><input class="finput" type="password" placeholder="Re-enter new password"/></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end"><button class="btn btn-dk">Update Password</button></div>
+        </div>
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div><div style="font-size:15px;font-weight:700;color:#191918">Two-Factor Authentication</div><div style="font-size:13px;color:#9ca3af;margin-top:2px">Add an extra layer of security to your account</div></div>
+            <span style="background:#fee2e2;color:#dc2626;font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:999px">Disabled</span>
+          </div>
+          <button class="btn btn-dk">Enable 2FA</button>
+        </div>
+        <div class="card" style="padding:22px 24px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:14px">Active Sessions</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px">
+              <div><div style="font-size:14px;font-weight:600;color:#191918">Chrome · macOS</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">San Francisco, CA · Current session</div></div>
+              <span style="background:#dcfce7;color:#15803d;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px">Active</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:#f9f9f8;border:1px solid #eeede9;border-radius:9px">
+              <div><div style="font-size:14px;font-weight:600;color:#191918">Safari · iPhone</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">New York, NY · 2 days ago</div></div>
+              <button style="background:none;border:none;font-size:13px;color:#dc2626;cursor:pointer">Revoke</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fulfillment Automation -->
+      <div id="panel-fulfillment" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">Auto-Fulfillment</div>
+          <div style="font-size:13.5px;color:#9ca3af;margin-bottom:20px">Automatically push orders to production as they arrive — no manual review needed.</div>
+
+          <!-- Main toggle -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f6f5f4;border-radius:10px;margin-bottom:14px">
+            <div>
+              <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:2px">Enable auto-fulfillment for this account</div>
+              <div style="font-size:13px;color:#9ca3af">New orders will be queued for production immediately upon receipt</div>
+            </div>
+            <label style="display:flex;align-items:center;cursor:pointer;flex-shrink:0;margin-left:16px">
+              <input type="checkbox" id="af-main-cb" onchange="toggleAfFields(this)" style="display:none"/>
+              <div id="af-main-track" onclick="document.getElementById('af-main-cb').click()" style="width:42px;height:24px;border-radius:999px;background:#e5e7eb;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0">
+                <div id="af-main-thumb" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+              </div>
+            </label>
+          </div>
+
+          <!-- Sub-options (enabled when toggle on) -->
+          <div id="af-fields" style="display:flex;flex-direction:column;gap:0;opacity:.45;pointer-events:none;transition:opacity .2s;border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden">
+            <label style="display:flex;align-items:flex-start;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;gap:16px">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Skip design review</div>
+                <div style="font-size:13px;color:#9ca3af">Push items with existing designs directly — don't wait for manual confirmation</div>
+              </div>
+              <input id="af-skip-review" type="checkbox" checked style="width:14px;height:14px;accent-color:#111827;cursor:pointer;flex-shrink:0;margin-top:2px"/>
+            </label>
+            <label style="display:flex;align-items:flex-start;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;gap:16px">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Only auto-fulfill if balance is sufficient</div>
+                <div style="font-size:13px;color:#9ca3af">Pause auto-fulfillment and alert you if wallet balance is too low</div>
+              </div>
+              <input id="af-balance-gate" type="checkbox" checked style="width:14px;height:14px;accent-color:#111827;cursor:pointer;flex-shrink:0;margin-top:2px"/>
+            </label>
+            <label style="display:flex;align-items:flex-start;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;gap:16px">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Auto-fulfill new platform orders only</div>
+                <div style="font-size:13px;color:#9ca3af">Limit to Shopify, Etsy, WooCommerce etc. — manual orders still require review</div>
+              </div>
+              <input id="af-platform-only" type="checkbox" style="width:14px;height:14px;accent-color:#111827;cursor:pointer;flex-shrink:0;margin-top:2px"/>
+            </label>
+            <div style="padding:13px 16px">
+              <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:6px">Delay before auto-fulfilling</div>
+              <div style="font-size:13px;color:#9ca3af;margin-bottom:10px">Give yourself a window to cancel or edit before production starts</div>
+              <div style="display:flex;gap:8px">
+                <select id="af-delay" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#374151">
+                  <option value="0">No delay — immediately</option>
+                  <option value="15" selected>15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="120">2 hours</option>
+                  <option value="1440">Until next business day</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Default blank & print settings -->
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">Default Production Settings</div>
+          <div style="font-size:13.5px;color:#9ca3af;margin-bottom:18px">Applied when auto-fulfilling orders that don't already have a blank or print method selected.</div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;align-items:center;gap:14px">
+              <label style="font-size:13.5px;font-weight:600;color:#374151;flex:0 0 120px">Default blank</label>
+              <select id="af-default-blank" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#374151">
+                <option>Unisex Tee · Gildan 5000</option>
+                <option>Unisex Tee · Bella+Canvas 3001</option>
+                <option>Unisex Hoodie · Gildan 18500</option>
+                <option>Let seller choose</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <label style="font-size:13.5px;font-weight:600;color:#374151;flex:0 0 120px">Default print method</label>
+              <select id="af-default-print" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#374151">
+                <option value="DTG" selected>DTG – Direct to Garment</option>
+                <option value="EMB">EMB – Embroidery</option>
+                <option value="SUB">SUB – Sublimation</option>
+                <option value="SCR">SCR – Screen Print</option>
+                <option value="">Let seller choose</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-out">Reset to defaults</button>
+          <button class="btn btn-dk" onclick="saveAfSettings()">Save Fulfillment Settings</button>
+        </div>
+      </div>
+
+      <!-- Connected Stores -->
+      <div id="panel-stores" style="display:none" class="fi">
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">Connected Stores</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Link a sales channel so its orders sync into EGFULFILL automatically.</div>
+          <div id="stores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Available platforms</div>
+          <div id="connect-tiles" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:10px"></div>
+        </div>
+      </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── CONNECT STORE MODAL ── -->
+<div id="connect-store-overlay" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:500;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeConnectStore()">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:420px;box-shadow:0 32px 80px rgba(17,24,39,.22);overflow:hidden;animation:fadeUp .26s cubic-bezier(.22,1,.36,1)" onclick="event.stopPropagation()">
+    <div style="padding:20px 22px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700;color:#191918">Connect a store</div>
+      <button onclick="closeConnectStore()" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;line-height:0;border-radius:6px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    </div>
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="display:block;font-size:12.5px;font-weight:600;color:#6b7280;margin-bottom:5px">Platform</label>
+        <select id="cs-platform" class="input"><option>Shopify</option><option>Etsy</option><option>WooCommerce</option><option>Amazon</option><option>eBay</option><option>TikTok Shop</option><option>BigCommerce</option></select>
+      </div>
+      <div>
+        <label style="display:block;font-size:12.5px;font-weight:600;color:#6b7280;margin-bottom:5px">Store name</label>
+        <input id="cs-name" class="input" placeholder="e.g. My Shopify Store"/>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:2px">
+        <button class="btn btn-out" style="font-size:13px" onclick="closeConnectStore()">Cancel</button>
+        <button class="btn btn-dk" style="font-size:13px" onclick="confirmConnectStore()">Connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── UPGRADE TO PRO MODAL ── -->
+<div id="upgrade-overlay" style="display:none;position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:500;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeUpgradeModal()">
+  <div style="background:#fff;border-radius:18px;width:100%;max-width:460px;box-shadow:0 32px 80px rgba(17,24,39,.22);overflow:hidden;animation:fadeUp .28s cubic-bezier(.22,1,.36,1)" onclick="event.stopPropagation()">
+
+    <div style="padding:22px 24px 0;display:flex;align-items:flex-start;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:700;color:#191918">Upgrade to Pro</div>
+        <div style="font-size:13.5px;color:#9ca3af;margin-top:2px">$29 / month · billed monthly</div>
+      </div>
+      <button onclick="closeUpgradeModal()" style="background:none;border:none;cursor:pointer;padding:4px;color:#9ca3af;line-height:0;border-radius:6px;transition:background .15s" onmouseover="this.style.background='#f4f2ef'" onmouseout="this.style.background='none'">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div style="margin:16px 24px 0;background:#f9f8f7;border-radius:12px;padding:14px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>2,000 orders/month</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>5 connected stores</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Full analytics</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Priority support</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Custom branding</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:13.5px;color:#374151"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3L11 3" stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>API access</div>
+      </div>
+    </div>
+
+    <div id="upg-balance-row" style="margin:14px 24px 0;border-radius:10px;padding:12px 16px;background:#f0ede9;border:1.5px solid #d8d4cd;display:flex;align-items:center;gap:9px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M8 6v4M8 11.5v.5" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="6.5" stroke="#374151" stroke-width="1.3"/></svg>
+      <div>
+        <div style="font-size:13.5px;font-weight:600;color:#191918">Wallet balance: <span id="upg-current-bal">$0.00</span></div>
+        <div id="upg-balance-msg" style="font-size:12.5px;color:#374151;margin-top:1px">Balance insufficient — top up or pay by card</div>
+      </div>
+    </div>
+
+    <div style="margin:14px 24px 0">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Pay with</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <label id="pay-card-lbl" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1.5px solid #111827;border-radius:10px;cursor:pointer;background:#fafaf9">
+          <input type="radio" name="pay-method" value="card" checked onchange="updatePayMethod()" style="accent-color:#111827"/>
+          <div style="width:36px;height:22px;background:#1a1f71;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0">VISA</div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">•••• •••• •••• 4242</div><div style="font-size:12px;color:#9ca3af">Expires 08/27</div></div>
+        </label>
+        <label id="pay-wallet-lbl" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1.5px solid #e5e4e0;border-radius:10px;cursor:pointer">
+          <input type="radio" name="pay-method" value="wallet" onchange="updatePayMethod()" style="accent-color:#111827"/>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><rect x="1.5" y="4.5" width="15" height="11" rx="2" stroke="#374151" stroke-width="1.3"/><path d="M1.5 8h15" stroke="#374151" stroke-width="1.3"/><circle cx="13.5" cy="11.5" r="1.2" fill="#374151"/></svg>
+          <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">Wallet balance</div><div id="pay-wallet-sub" style="font-size:12px;color:#9ca3af">$0.00 available</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div id="topup-section" style="display:none;margin:14px 24px 0">
+      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Top up wallet first</div>
+      <div style="display:flex;gap:7px;margin-bottom:10px">
+        <button onclick="setTopUp(20)" class="topup-btn" data-val="20" style="flex:1;padding:8px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:14px;font-weight:600;color:#374151;background:#fff;cursor:pointer;transition:all .15s;font-family:inherit">$20</button>
+        <button onclick="setTopUp(50)" class="topup-btn" data-val="50" style="flex:1;padding:8px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:14px;font-weight:600;color:#374151;background:#fff;cursor:pointer;transition:all .15s;font-family:inherit">$50</button>
+        <button onclick="setTopUp(100)" class="topup-btn" data-val="100" style="flex:1;padding:8px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:14px;font-weight:600;color:#374151;background:#fff;cursor:pointer;transition:all .15s;font-family:inherit">$100</button>
+      </div>
+      <div style="display:flex;align-items:center;border:1.5px solid #e5e4e0;border-radius:9px;overflow:hidden;background:#fff">
+        <span style="padding:0 12px;font-size:15px;color:#9ca3af;border-right:1.5px solid #e5e4e0;align-self:stretch;display:flex;align-items:center">$</span>
+        <input id="topup-custom" type="number" min="1" max="5000" placeholder="Custom amount" style="flex:1;border:none;outline:none;padding:10px 12px;font-size:14.5px;color:#191918;font-family:inherit;background:transparent" oninput="setTopUpCustom(parseFloat(this.value)||0)"/>
+      </div>
+      <div id="topup-note" style="font-size:12.5px;color:#9ca3af;margin-top:6px"></div>
+    </div>
+
+    <div style="margin:16px 24px 22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:11px 14px;background:#f9f8f7;border-radius:10px">
+        <div style="font-size:14px;color:#374151" id="upg-due-label">Due today (card)</div>
+        <div id="upg-due" style="font-size:16px;font-weight:700;color:#191918">$29.00</div>
+      </div>
+      <button id="upg-confirm-btn" class="btn btn-dk" style="width:100%;justify-content:center;font-size:15px;padding:12px" onclick="confirmUpgrade()">Confirm upgrade — $29/mo</button>
+      <div style="text-align:center;margin-top:10px;font-size:12.5px;color:#9ca3af">Cancel any time. Next billing: Jun 8, 2026.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggleAfFields(cb) {
+  const track = document.getElementById('af-main-track');
+  const thumb = document.getElementById('af-main-thumb');
+  const fields = document.getElementById('af-fields');
+  if (cb.checked) {
+    track.style.background = '#111827'; thumb.style.left = '20px';
+    fields.style.opacity = '1'; fields.style.pointerEvents = 'auto';
+  } else {
+    track.style.background = '#e5e7eb'; thumb.style.left = '2px';
+    fields.style.opacity = '.45'; fields.style.pointerEvents = 'none';
+  }
+}
+/* Persist auto-fulfillment config to EGStore so the simulator (and any future
+   webhook handler) can read the same rules the seller configured here. */
+function saveAfSettings() {
+  const cfg = {
+    enabled: !!document.getElementById('af-main-cb').checked,
+    skipReview: !!document.getElementById('af-skip-review').checked,
+    balanceGate: !!document.getElementById('af-balance-gate').checked,
+    platformOnly: !!document.getElementById('af-platform-only').checked,
+    delayMin: parseInt(document.getElementById('af-delay').value || '0', 10) || 0,
+    defaultBlank: document.getElementById('af-default-blank').value || '',
+    defaultPrint: document.getElementById('af-default-print').value || ''
+  };
+  try { if (typeof EGStore !== 'undefined' && EGStore.setAutoFulfillConfig) EGStore.setAutoFulfillConfig(cfg); } catch(e){}
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.textContent = '✓ Saved'; btn.style.background = '#16a34a';
+  setTimeout(() => { btn.textContent = orig; btn.style.background = '#111827'; }, 1800);
+}
+/* Hydrate the Fulfillment panel inputs from EGStore on page load so the seller
+   sees their last saved values, not the static HTML defaults. */
+function _afHydrate() {
+  if (typeof EGStore === 'undefined' || !EGStore.getAutoFulfillConfig) return;
+  const cfg = EGStore.getAutoFulfillConfig();
+  const main = document.getElementById('af-main-cb');
+  if (main) { main.checked = !!cfg.enabled; toggleAfFields(main); }
+  const sr = document.getElementById('af-skip-review'); if (sr) sr.checked = cfg.skipReview !== false;
+  const bg = document.getElementById('af-balance-gate'); if (bg) bg.checked = cfg.balanceGate !== false;
+  const po = document.getElementById('af-platform-only'); if (po) po.checked = !!cfg.platformOnly;
+  const dl = document.getElementById('af-delay'); if (dl) dl.value = String(cfg.delayMin || 0);
+  const db = document.getElementById('af-default-blank'); if (db && cfg.defaultBlank) db.value = cfg.defaultBlank;
+  const dp = document.getElementById('af-default-print'); if (dp && cfg.defaultPrint) dp.value = cfg.defaultPrint;
+}
+document.addEventListener('DOMContentLoaded', _afHydrate);
+
+/* ── Simulate incoming platform order ──────────────────────────────────────
+   Mimics the lifecycle of a webhook from Shopify/Etsy/etc:
+     1. Pick a real catalog product (or fall back to a generic Gildan Tee).
+     2. Compute a believable total + line item.
+     3. Submit via EGStore.submitOrder so factory boards see it.
+     4. Apply the saved Auto-Fulfillment rules — push to production
+        immediately, schedule a delayed push, or leave for manual review.
+   All of this runs client-side so you can validate the end-to-end flow
+   without a backend. Replace simulateIncomingOrder with a real webhook
+   handler when the backend lands. */
+function simulateIncomingOrder() {
+  var resultBox = document.getElementById('sim-result');
+  var platform = document.getElementById('sim-platform').value || 'Shopify';
+
+  // Pick a real product from the operator's catalog when available.
+  var catalog = (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+  var product = catalog.find(function(p){ return (p.status||'Active') === 'Active'; }) || null;
+  var color = '', size = '', sku = '';
+  if (product) {
+    var firstVariant = (Array.isArray(product.variantSkus) && product.variantSkus[0]) || null;
+    if (firstVariant) { sku = firstVariant.sku; color = firstVariant.color || ''; size = firstVariant.size || ''; }
+    else { sku = product.sku || 'G5000-WHI-S'; }
+  } else {
+    sku = 'G5000-WHI-S'; color = 'White'; size = 'S';
+  }
+
+  // Honor the saved Default print method from the Fulfillment tab.
+  var cfg = (typeof EGStore !== 'undefined' && EGStore.getAutoFulfillConfig) ? EGStore.getAutoFulfillConfig() : { enabled:false, platformOnly:false, delayMin:0, defaultPrint:'DTG' };
+  var tech = cfg.defaultPrint || 'DTG';
+  // Append the tech code so the item gets its own unique SKU (matches the
+  // manual-order generator — keeps UP_STATE entries from colliding later).
+  var sellerSku = sku + (tech ? '-' + tech : '');
+
+  var unitPrice = (product && parseFloat(product.price)) || 22;
+  var ship = (product && parseFloat(product.shippingFee)) || 4.99;
+  var qty = 1;
+  var total = +(unitPrice * qty + ship).toFixed(2);
+
+  // Fake customer info — names rotate so every simulated order looks distinct.
+  var FAKES = [
+    ['Lena Ortiz','Austin','TX','78704'],
+    ['Marcus Wright','Brooklyn','NY','11201'],
+    ['Priya Shah','Seattle','WA','98101'],
+    ['Diego Romero','Miami','FL','33101'],
+    ['Hannah Liu','Portland','OR','97201']
+  ];
+  var f = FAKES[Math.floor(Math.random() * FAKES.length)];
+  var orderId = 'FF-' + Math.floor(70000 + Math.random() * 9999);
+  var item = {
+    name: (product && product.name) || 'Gildan Unisex Tee',
+    sku: sellerSku,
+    qty: qty,
+    printType: tech.toLowerCase(),
+    color: color, size: size,
+    listing: ((product && product.name) || 'Gildan Unisex Tee') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : '')
+  };
+
+  // Submit to EGStore as a fresh order. We mark it `new` so it shows up on
+  // factory boards immediately (rather than `draft` which would hide it).
+  if (typeof EGStore !== 'undefined' && EGStore.submitOrder) {
+    EGStore.submitOrder({
+      id: orderId,
+      seller: 'My Store',
+      salesChannel: platform,
+      customer: { name: f[0], email: f[0].toLowerCase().replace(' ','.') + '@example.com',
+        shipTo: { line1: '123 Main St', city: f[1], state: f[2], zip: f[3], country: 'US' } },
+      items: [item],
+      total: total
+    });
+  }
+
+  // Now apply the auto-fulfillment policy. `platformOnly` is moot here because
+  // every simulated order is a platform order — but the gate still proves the
+  // setting is being read. Balance check uses the real `eg_balance` value.
+  var bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
+  var hasEnoughBalance = bal >= total;
+  var lines = ['<strong>Incoming ' + platform + ' order</strong> ' + orderId + ' · ' + f[0] + ' · $' + total.toFixed(2)];
+  lines.push('<span style="color:#6b7280">' + item.listing + ' × ' + qty + ' · ' + tech + '</span>');
+
+  if (!cfg.enabled) {
+    lines.push('<span style="color:#92400e">Auto-fulfillment is <strong>off</strong> — order parked for manual review on the Orders page.</span>');
+  } else if (!hasEnoughBalance) {
+    lines.push('<span style="color:#dc2626">Wallet short $' + (total - bal).toFixed(2) + ' — auto-push <strong>blocked</strong> until you top up.</span>');
+  } else if (!cfg.delayMin || cfg.delayMin === 0) {
+    lines.push('<span style="color:#15803d">No delay — pushing to production now.</span>');
+    _simAutoPush(orderId, total);
+  } else {
+    var when = cfg.delayMin >= 60 ? (cfg.delayMin/60).toFixed(cfg.delayMin%60?1:0) + ' hour' + (cfg.delayMin>=120?'s':'') : cfg.delayMin + ' min';
+    lines.push('<span style="color:#374151">Queued — will auto-push in <strong>' + when + '</strong>. Stay on this page or it cancels.</span>');
+    setTimeout(function(){ _simAutoPush(orderId, total); }, cfg.delayMin * 60000);
+  }
+
+  resultBox.innerHTML = lines.join('<br>');
+  resultBox.style.display = 'block';
+}
+
+/* Actually do the push: bump status to in-production via EGStore.update and
+   debit the wallet — same shape as orders.html's pushOrderToProduction so
+   factory boards behave identically whether the push came from the simulator
+   or from the seller clicking Push manually. */
+function _simAutoPush(orderId, total) {
+  try {
+    if (typeof EGStore !== 'undefined' && EGStore.update) {
+      EGStore.update(orderId, { factoryStatus: 'in_review' });
+    }
+    // Debit wallet — write-and-verify like pushOrderToProduction.
+    var before = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
+    var after = +(before - total).toFixed(2);
+    localStorage.setItem('eg_balance', after.toFixed(2));
+    document.querySelectorAll('#balance-val').forEach(function(el){ el.textContent = '$' + after.toFixed(2); });
+    // Log the push on the order timeline so it surfaces in factory History.
+    if (typeof EGStore !== 'undefined' && EGStore.appendOrderTimeline) {
+      EGStore.appendOrderTimeline(orderId, {
+        label: 'Auto-pushed to production',
+        sub: 'Triggered by auto-fulfillment rules · charged $' + total.toFixed(2),
+        role: 'system'
+      });
+    }
+  } catch(e) {}
+}
+window.simulateIncomingOrder = simulateIncomingOrder;
+function showTab(name){
+  ['profile','billing','team','notif','api','security','fulfillment','stores'].forEach(t=>{
+    document.getElementById('panel-'+t).style.display = t===name ? '' : 'none';
+    document.getElementById('tab-'+t).classList.toggle('on', t===name);
+  });
+}
+// Deep-link from anywhere (e.g. sidebar "Upgrade to Pro" → settings.html#billing).
+(function(){
+  var openFromHash = function() {
+    var h = (location.hash || '').replace(/^#/, '');
+    if (h && ['profile','billing','team','notif','api','security','fulfillment','stores'].indexOf(h) !== -1) showTab(h);
+  };
+  window.addEventListener('hashchange', openFromHash);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', openFromHash);
+  else openFromHash();
+})();
+
+/* ── Connected Stores (powered by EGConnect — confirm modal → popup → return) ── */
+// Only the two platforms we actively support get their own tile. Everything
+// else is collapsed under the dotted "Other platform" placeholder so the
+// grid doesn't promise integrations that don't exist yet.
+var PLATFORM_TILES = ['etsy','tiktok'];
+function storeMonogram(p){ return String(p||'?').trim().charAt(0).toUpperCase(); }
+function fmtAgo(ts){
+  if(!ts) return 'just now';
+  var s = Math.round((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.round(s/60) + 'm ago';
+  if (s < 86400) return Math.round(s/3600) + 'h ago';
+  return Math.round(s/86400) + 'd ago';
+}
+function renderStores(){
+  var list = document.getElementById('stores-list'); if(!list) return;
+  var conns = (window.EGConnect && EGConnect.getAll) ? EGConnect.getAll() : {};
+  var keys = Object.keys(conns);
+  if (!keys.length) {
+    list.innerHTML = '<div style="font-size:13.5px;color:#9ca3af;padding:20px;text-align:center;border:1.5px dashed #d8d4cd;border-radius:10px">No stores connected yet. Pick a platform below to connect.</div>';
+  } else {
+    list.innerHTML = keys.map(function(k){
+      var c = conns[k];
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:10px;box-shadow:2px 2px 0 #40403d">'
+        + '<div style="width:34px;height:34px;border-radius:8px;background:#f3eee2;color:#191918;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;border:1px solid #40403d">'+storeMonogram(c.name)+'</div>'
+        + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">'+(c.shop || c.name)+'</div><div style="font-size:12.5px;color:#9ca3af">'+c.name+' · Connected '+fmtAgo(c.connectedAt)+'</div></div>'
+        + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#0d6e2e;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#0d6e2e"></span>Connected</span>'
+        + '<button onclick="disconnectStore(\''+k+'\')" style="font-size:12.5px;font-weight:600;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:6px" onmouseover="this.style.color=\'#b83c3c\'" onmouseout="this.style.color=\'#6b7280\'">Disconnect</button>'
+        + '</div>';
+    }).join('');
+  }
+  renderTiles();
+}
+function renderTiles(){
+  var wrap = document.getElementById('connect-tiles'); if(!wrap) return;
+  var conns = (window.EGConnect && EGConnect.getAll) ? EGConnect.getAll() : {};
+  // Real-integration tiles (Etsy + TikTok) — flat outline, no drop shadow.
+  var tiles = PLATFORM_TILES.map(function(p){
+    var meta = (window.EGConnect && EGConnect._platforms && EGConnect._platforms[p]) || { name: p };
+    var already = !!conns[p];
+    var btn = already
+      ? '<span style="font-size:11.5px;color:#0d6e2e;font-weight:600;display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="#0d6e2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Connected</span>'
+      : '<span style="font-size:12.5px;color:#191918;font-weight:600">Connect →</span>';
+    return '<button '+(already?'disabled':'onclick="EGConnect.start(\''+p+'\',{onComplete:renderStores})"')+' style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;background:#fff;border:1.5px solid #e5e4e0;border-radius:10px;cursor:'+(already?'default':'pointer')+';font-family:inherit;text-align:left;'+(already?'opacity:.65;':'')+'transition:border-color .14s" '+(already?'':'onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'"')+'>'
+      + '<span style="display:flex;align-items:center;gap:9px"><span style="width:28px;height:28px;border-radius:7px;background:#f3eee2;color:#191918;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:1px solid #c9c3ba;flex-shrink:0">'+storeMonogram(meta.name)+'</span><span style="font-size:13.5px;font-weight:600;color:#191918">'+meta.name+'</span></span>'
+      + btn
+      + '</button>';
+  });
+  // Dotted "Other platform" placeholder — request access for anything not in
+  // the supported list. Clicking opens a generic connect modal with a freeform
+  // platform name field via EGConnect.start('other').
+  tiles.push(
+    '<button onclick="EGConnect.start(\'other\',{onComplete:renderStores})" '
+    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;background:transparent;border:1.5px dashed #c9c3ba;border-radius:10px;cursor:pointer;font-family:inherit;color:#6b7280;font-size:13px;font-weight:600;transition:border-color .14s,color .14s,background .14s" '
+    + 'onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\';this.style.background=\'#fafaf9\'" '
+    + 'onmouseout="this.style.borderColor=\'#c9c3ba\';this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
+      + '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
+      + 'Other platform'
+    + '</button>'
+  );
+  wrap.innerHTML = tiles.join('');
+}
+function disconnectStore(key){
+  if(!window.EGConnect) return;
+  var c = EGConnect.getConnection(key); if(!c) return;
+  if(!confirm('Disconnect '+(c.shop || c.name)+'?')) return;
+  EGConnect.disconnect(key);
+  renderStores();
+}
+document.addEventListener('eg-connections-changed', renderStores);
+renderStores();
+
+function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
+
+// ── Header shared JS ──
+const _I18N={en:{preferences:'Preferences',notifications:'Notifications',new_btn:'New',manual_order:'Manual order',manual_order_sub:'Create from scratch',sync_platforms:'Sync from platforms',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Appearance',light_mode:'Light mode',dark_mode:'Dark mode'},vi:{preferences:'Tùy chọn',notifications:'Thông báo',new_btn:'Tạo mới',manual_order:'Tạo đơn thủ công',manual_order_sub:'Nhập từ đầu',sync_platforms:'Kết nối sàn',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Giao diện',light_mode:'Chế độ sáng',dark_mode:'Chế độ tối'}};
+const _NAV={en:{'seller.html':'Dashboard','orders.html':'Orders','products-dash.html':'Products','settings.html#stores':'Stores','fulfillment.html':'Fulfillment','analytics.html':'Reports','wallet.html':'Wallet','design-lab.html':'Design Lab','chat.html':'Chat','settings.html':'Settings'},vi:{'seller.html':'Tổng quan','orders.html':'Đơn hàng','products-dash.html':'Sản phẩm','settings.html#stores':'Cửa hàng','fulfillment.html':'Sản xuất','analytics.html':'Báo cáo','wallet.html':'Ví tiền','design-lab.html':'Thiết kế','chat.html':'Tin nhắn','settings.html':'Cài đặt'}};
+let _lang=localStorage.getItem('eg_lang')||'en';
+function _t(k){return(_I18N[_lang]||_I18N.en)[k]||k}
+function applyLang(lang){
+  _lang=lang;localStorage.setItem('eg_lang',lang);const _hlc=document.getElementById('hdr-lang-code');if(_hlc)_hlc.textContent=lang.toUpperCase();
+  const btn=document.getElementById('lang-btn');if(btn)btn.textContent=lang.toUpperCase();
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=_t(el.dataset.i18n);if(v)el.textContent=v;});
+  const nm=_NAV[lang]||_NAV.en;
+  document.querySelectorAll('a.ni[href]').forEach(el=>{
+    const href=el.getAttribute('href');const label=nm[href];if(!label)return;
+    const nodes=[...el.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim());
+    if(nodes.length){nodes[nodes.length-1].textContent=label;}
+  });
+  const acc=document.querySelector('[data-section-label=account]');if(acc)acc.textContent=lang==='vi'?'TÀI KHOẢN':'ACCOUNT';
+}
+function toggleLang(){applyLang(_lang==='en'?'vi':'en');}
+function applyTheme(dark){
+  document.documentElement.setAttribute('data-theme',dark?'dark':'light');var _hk=document.getElementById('hdr-theme-knob');if(_hk)_hk.style.transform=dark?'translateX(16px)':'translateX(0)';var _ht=document.getElementById('hdr-theme-track');if(_ht)_ht.style.background=dark?'#374151':'#e5e4e0';
+  const lbl=document.getElementById('theme-label');
+  const knob=document.getElementById('toggle-knob');
+  const tgl=document.getElementById('theme-toggle-btn');
+  if(lbl)lbl.textContent=_t(dark?'dark_mode':'light_mode');
+  if(knob)knob.style.transform=dark?'translateX(18px)':'translateX(0)';
+  if(tgl)tgl.style.background=dark?'#374151':'#e5e4e0';
+  localStorage.setItem('eg_theme',dark?'dark':'light');
+}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')!=='dark');}
+function togglePrefPanel(e){if(e)e.stopPropagation();const p=document.getElementById('pref-panel');if(p)p.style.display=p.style.display==='none'?'block':'none';}
+function toggleNewMenu(e){if(e)e.stopPropagation();const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display=dd.style.display==='none'?'block':'none';}
+function closeNewMenu(){const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display='none';}
+function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'){openNewOrderModal();}else{window.location='orders.html';}}
+function openQuickTopUp(){
+  if(typeof openDepositModal==='function'){openDepositModal();return;}
+  let m=document.getElementById('_qtm');
+  if(!m){
+    m=document.createElement('div');m.id='_qtm';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;width:360px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2);font-family:inherit"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div style="font-size:17px;font-weight:700;color:#191918">Add Funds</div><button onclick="document.getElementById(\'_qtm\').style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:19px;color:#9ca3af;padding:2px 6px;line-height:1">×</button></div><div style="background:#f0ede9;border:1.5px solid #d8d4cd;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center"><div style="font-size:13px;color:#6b7280">Current Balance</div><div style="font-size:21px;font-weight:800;color:#191918" id="qtm-current-bal">$0.00</div></div><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Quick add</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px"><button onclick="document.getElementById(\'_qa\').value=50" style="padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'#374151\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">$50</button><button onclick="document.getElementById(\'_qa\').value=100" style="padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'#374151\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">$100</button><button onclick="document.getElementById(\'_qa\').value=200" style="padding:8px;border-radius:8px;border:1.5px solid #111827;background:#111827;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">$200</button></div><input id="_qa" type="number" value="200" placeholder="Custom amount" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #e5e4e0;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px" onfocus="this.style.borderColor=\'#111827\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button onclick="applyQuickFunds()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px"onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">Add Funds →</button><div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#9ca3af;text-decoration:none">Go to Wallet →</a></div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',function(ev){if(ev.target===m)m.style.display='none';});
+  }
+  var _cb=document.getElementById('qtm-current-bal');if(_cb)_cb.textContent='$'+parseFloat(localStorage.getItem('eg_balance')||'0').toFixed(2);/*qtm-cb-sync*/m.style.display='flex';
+}
+function applyQuickFunds(){
+  const amt=parseFloat(document.getElementById('_qa').value);
+  if(!amt||amt<=0)return;
+  let bal=parseFloat(localStorage.getItem('eg_balance')||'0');
+  bal=parseFloat((bal+amt).toFixed(2));
+  localStorage.setItem('eg_balance',bal.toFixed(2));
+  document.querySelectorAll('#balance-val').forEach(el=>el.textContent='$'+bal.toFixed(2));
+  const bd=document.querySelector('#_qtm [style*="font-weight:800"]');
+  if(bd)bd.textContent='$'+bal.toFixed(2);
+  document.getElementById('_qtm').style.display='none';
+}
+document.addEventListener('click',function(e){
+  if(!document.getElementById('new-menu-btn')?.contains(e.target))closeNewMenu();
+  if(!document.getElementById('pref-btn')?.contains(e.target)){const p=document.getElementById('pref-panel');if(p)p.style.display='none';}
+});
+document.getElementById('balance-val').textContent='$'+parseFloat(localStorage.getItem('eg_balance')||'0').toFixed(2);
+(function(){applyTheme(localStorage.getItem('eg_theme')==='dark');applyLang(localStorage.getItem('eg_lang')||'en');})();
+
+/* ── Profile save ── */
+function saveProfile(){
+  const fn = document.getElementById('prof-fname').value.trim();
+  const ln = document.getElementById('prof-lname').value.trim();
+  const email = document.getElementById('prof-email').value.trim();
+  const biz = document.getElementById('prof-biz').value.trim();
+
+  // Avatar initials (up to 2 chars)
+  const initials = ((fn[0]||'') + (ln[0]||'')).toUpperCase() || 'EG';
+
+  // Update profile card avatar
+  const profAvatar = document.querySelector('#panel-profile .card div[style*="56px"]');
+  if(profAvatar) profAvatar.textContent = initials;
+
+  // Update topbar name + avatar
+  const tbName = document.querySelector('header .ibtn div div:first-child');
+  if(tbName) tbName.textContent = fn || 'User';
+  const tbEmail = document.querySelector('header .ibtn div div:last-child');
+  if(tbEmail) tbEmail.textContent = (email || '').substring(0,14) + (email.length > 14 ? '…' : '');
+  const tbAvatar = document.querySelector('header .ibtn > div:first-child');
+  if(tbAvatar && tbAvatar.style && tbAvatar.style.borderRadius === '50%') tbAvatar.textContent = initials.charAt(0);
+
+  // Update sidebar store name + avatar
+  const sbStoreName = document.getElementById('sb-store-name');
+  if(sbStoreName) sbStoreName.textContent = biz || fn + "'s Store";
+  const sbAvatar = document.getElementById('sb-avatar');
+  if(sbAvatar) sbAvatar.textContent = initials;
+
+  // Update team card user row if visible
+  const teamName = document.querySelector('[id="panel-team"] .card div[style*="font-weight:600"][style*="color:#191918"]');
+  if(teamName && teamName.textContent.includes('Alex')) teamName.textContent = (fn + ' ' + ln).trim();
+
+  // Show "Saved" indicator
+  const savedEl = document.getElementById('prof-saved');
+  if(savedEl){ savedEl.style.display='flex'; clearTimeout(savedEl._t); savedEl._t=setTimeout(()=>savedEl.style.display='none', 2500); }
+}
+
+/* ── Upgrade to Pro modal ── */
+var _walletBal = parseFloat(localStorage.getItem('eg_balance')||'0');
+var _topUpAmt = 0;
+var PRO_PRICE = 29;
+
+function openUpgradeModal(){
+  _walletBal = parseFloat(localStorage.getItem('eg_balance')||'0');
+  _topUpAmt = 0;
+  document.getElementById('upg-current-bal').textContent = '$' + _walletBal.toFixed(2);
+  document.getElementById('pay-wallet-sub').textContent = '$' + _walletBal.toFixed(2) + ' available';
+  document.querySelectorAll('input[name="pay-method"]')[0].checked = true;
+  document.getElementById('topup-section').style.display = 'none';
+  document.getElementById('topup-custom').value = '';
+  document.querySelectorAll('.topup-btn').forEach(b=>{ b.style.background='#fff'; b.style.borderColor='#e5e4e0'; b.style.color='#374151'; });
+  updateBalanceBanner();
+  updateDueSummary();
+  var ov = document.getElementById('upgrade-overlay');
+  ov.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeUpgradeModal(){
+  document.getElementById('upgrade-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+function updateBalanceBanner(){
+  var shortfall = PRO_PRICE - _walletBal;
+  var row = document.getElementById('upg-balance-row');
+  var msg = document.getElementById('upg-balance-msg');
+  if(shortfall > 0){
+    row.style.background='#f0ede9'; row.style.borderColor='#d8d4cd';
+    msg.textContent = 'Balance $' + _walletBal.toFixed(2) + ' — top up $' + shortfall.toFixed(2) + ' more or pay by card';
+    msg.style.color='#374151';
+  } else {
+    row.style.background='#f0fdf4'; row.style.borderColor='#86efac';
+    msg.textContent = 'Balance sufficient — can pay fully from wallet ✓';
+    msg.style.color='#059669';
+    document.getElementById('upg-current-bal').parentElement.previousElementSibling && (document.getElementById('upg-current-bal').closest('[style]').querySelector('svg path').setAttribute('stroke','#059669'));
+  }
+}
+function updatePayMethod(){
+  var method = document.querySelector('input[name="pay-method"]:checked').value;
+  var cardLbl = document.getElementById('pay-card-lbl');
+  var walletLbl = document.getElementById('pay-wallet-lbl');
+  cardLbl.style.borderColor = method==='card' ? '#111827' : '#e5e4e0';
+  walletLbl.style.borderColor = method==='wallet' ? '#111827' : '#e5e4e0';
+  if(method==='wallet'){
+    var shortfall = PRO_PRICE - _walletBal;
+    document.getElementById('topup-section').style.display = shortfall > 0 ? '' : 'none';
+    if(shortfall <= 0) document.getElementById('topup-note').textContent = '';
+  } else {
+    document.getElementById('topup-section').style.display = 'none';
+  }
+  updateDueSummary();
+}
+function setTopUp(amt){
+  _topUpAmt = amt;
+  document.getElementById('topup-custom').value = amt;
+  document.querySelectorAll('.topup-btn').forEach(b=>{
+    var active = parseInt(b.getAttribute('data-val'))===amt;
+    b.style.background = active ? '#111827' : '#fff';
+    b.style.color = active ? '#fff' : '#374151';
+    b.style.borderColor = active ? '#111827' : '#e5e4e0';
+  });
+  updateDueSummary();
+}
+function setTopUpCustom(val){
+  _topUpAmt = Math.max(0, val);
+  document.querySelectorAll('.topup-btn').forEach(b=>{ b.style.background='#fff'; b.style.borderColor='#e5e4e0'; b.style.color='#374151'; });
+  updateDueSummary();
+}
+function updateDueSummary(){
+  var method = document.querySelector('input[name="pay-method"]:checked').value;
+  var dueLabel = document.getElementById('upg-due-label');
+  var dueAmt = document.getElementById('upg-due');
+  var note = document.getElementById('topup-note');
+  if(method==='card'){
+    dueLabel.textContent = 'Due today (card)';
+    dueAmt.textContent = '$' + PRO_PRICE.toFixed(2);
+  } else {
+    var newBal = _walletBal + _topUpAmt;
+    if(newBal >= PRO_PRICE){
+      var remaining = newBal - PRO_PRICE;
+      dueLabel.textContent = 'Deducted from wallet';
+      dueAmt.textContent = '$' + PRO_PRICE.toFixed(2);
+      if(note) note.textContent = 'After top-up: $' + newBal.toFixed(2) + ' → remaining balance $' + remaining.toFixed(2);
+    } else {
+      var still = PRO_PRICE - newBal;
+      dueLabel.textContent = 'Due today (wallet)';
+      dueAmt.textContent = '$' + PRO_PRICE.toFixed(2);
+      if(note) note.textContent = 'Still $' + still.toFixed(2) + ' short after top-up';
+    }
+  }
+}
+function confirmUpgrade(){
+  var method = document.querySelector('input[name="pay-method"]:checked').value;
+  if(method==='wallet'){
+    var newBal = _walletBal + _topUpAmt;
+    if(newBal < PRO_PRICE){ alert('Insufficient balance. Please top up more or choose card payment.'); return; }
+    var remaining = newBal - PRO_PRICE;
+    localStorage.setItem('eg_balance', remaining.toFixed(2));
+    document.getElementById('balance-val').textContent = '$' + remaining.toFixed(2);
+  }
+  var btn = document.getElementById('upg-confirm-btn');
+  btn.textContent = '✓ Upgraded!'; btn.style.background='#059669';
+  setTimeout(()=>{ closeUpgradeModal(); location.reload(); }, 1200);
+}
+
+/* ── Logout ── */
+function doLogout(){ window.location.href = 'seller-login.html'; }
+</script>
+<div id="mob-ov" onclick="toggleSidebar()"></div>
+<script>
+(function(){
+  var a=document.querySelector('a.ni[href="products-dash.html"]');
+  if(!a)return;
+  var sub=a.nextElementSibling;
+  if(!sub||typeof sub.getAttribute!=='function'||!sub.getAttribute('href')||sub.getAttribute('href').indexOf('product-templates')<0)return;
+  var chev=a.querySelectorAll('svg');chev=chev[chev.length-1];
+  var open=a.classList.contains('on')||sub.classList.contains('on');
+  if(!open)sub.style.display='none';
+  if(chev){
+    chev.style.transition='transform .22s ease';
+    chev.style.cursor='pointer';
+    chev.style.opacity='.45';
+    if(open)chev.style.transform='rotate(180deg)';
+    chev.addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();
+      open=!open;
+      sub.style.display=open?'flex':'none';
+      chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+    });
+  }
+})();
+</script>
+
+<!-- Floating chat button -->
+<script>
+var HDR_DATA=[
+  {type:'Order',label:'#FF-7001 · Jane Smith',sub:'Shopify · $62 · New',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7002 · Mike Chen',sub:'Etsy · $88 · In Production',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7003 · Sara Lee',sub:'Manual · $45 · Shipped',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7004 · Tom Park',sub:'WooCommerce · $112 · QC',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7005 · Anna White',sub:'Shopify · $73 · Packed',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7006 · Luis Rivera',sub:'Etsy · $34 · New',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7007 · Rachel Kim',sub:'Amazon · $120 · Shipped',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7008 · Tom Wright',sub:'Etsy · $29 · In Review',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7009 · Aisha Okafor',sub:'Shopify · $78 · In Production',url:'order-detail.html'},
+  {type:'Product',label:'Classic Tee — White/Black',sub:'SKU: CT-001 · 12 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Hoodie — Navy',sub:'SKU: HD-002 · 8 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Mug — 11oz White',sub:'SKU: MG-003 · 3 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Tote Bag — Natural',sub:'SKU: TB-004 · 2 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Poster — A3 Matte',sub:'SKU: PS-005 · 5 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Phone Case — Clear',sub:'SKU: PC-006 · 20 variants · Draft',url:'products-dash.html'},
+  {type:'Product',label:'Canvas Print — 12x16',sub:'SKU: CP-007 · 4 variants · Active',url:'products-dash.html'},
+  {type:'Store',label:'My Shopify Store',sub:'Shopify · 523 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'Artisan Prints — Etsy',sub:'Etsy · 218 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'Sofia Studio — WooCommerce',sub:'WooCommerce · 91 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'RK Goods — Amazon',sub:'Amazon · 15 orders · Connected',url:'settings.html#stores'},
+  {type:'Page',label:'Dashboard',sub:'Overview & analytics',url:'seller.html'},
+  {type:'Page',label:'Orders',sub:'All orders & management',url:'orders.html'},
+  {type:'Page',label:'Products',sub:'Product catalog',url:'products-dash.html'},
+  {type:'Page',label:'Stores',sub:'Connected store management',url:'settings.html#stores'},
+  {type:'Page',label:'Reports',sub:'Revenue & order charts',url:'analytics.html'},
+  {type:'Page',label:'Wallet',sub:'Balance, payouts & top-up',url:'wallet.html'},
+  {type:'Page',label:'Design Lab',sub:'Upload & mockup generator',url:'design-lab.html'},
+  {type:'Page',label:'Chat',sub:'Seller ↔ factory messaging',url:'chat.html'},
+  {type:'Page',label:'Settings',sub:'Account, billing & integrations',url:'settings.html'},
+  {type:'Page',label:'API Docs',sub:'API reference & keys',url:'apidocs.html'},
+  {type:'Page',label:'Fulfillment',sub:'Fulfillment status tracker',url:'fulfillment.html'}
+];
+function toggleHdrSearch(){var wrap=document.getElementById('hdr-search-wrap');var inp=document.getElementById('hdr-search');if(!wrap)return;var open=wrap.style.maxWidth&&wrap.style.maxWidth!=='0px'&&wrap.style.maxWidth!=='0';if(open){closeHdrSearch();}else{wrap.style.maxWidth='260px';wrap.style.opacity='1';setTimeout(function(){if(inp)inp.focus();},220);}}
+window.toggleHdrSearch=toggleHdrSearch;
+function closeHdrSearch(){var wrap=document.getElementById('hdr-search-wrap');var inp=document.getElementById('hdr-search');var dd=document.getElementById('hdr-search-dd');if(wrap){wrap.style.maxWidth='0';wrap.style.opacity='0';}if(inp)inp.value='';if(dd)dd.style.display='none';}
+function scheduleCollapseSearch(){setTimeout(function(){var dd=document.getElementById('hdr-search-dd');if(dd&&!dd.matches(':hover'))closeHdrSearch();},200);}
+function hdrSearchKey(e){if(e.key==='Escape')closeHdrSearch();}
+function runHdrSearch(q){
+  var dd=document.getElementById('hdr-search-dd');
+  if(!dd)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){dd.style.display='none';return;}
+  var pool=HDR_DATA.slice();try{if(typeof EGStore!=='undefined'&&EGStore.getOrders){(EGStore.getOrders()||[]).forEach(function(o){if(!o||!o.id)return;var cust=(o.customer&&o.customer.name)||'Customer';var src=o.source||'Manual';var stat=String(o.factoryStatus||o.status||'new').replace(/_/g,' ');pool.unshift({type:'Order',label:'#'+o.id+' · '+cust,sub:src+' · $'+(o.total||0)+' · '+stat,url:'order-detail.html?id='+o.id});});}}catch(e){}var results=pool.filter(function(d){return(d.label+' '+d.sub+' '+d.type).toLowerCase().indexOf(q)>=0;}).slice(0,8);
+  if(!results.length){dd.innerHTML='<div style="padding:14px 16px;font-size:14px;color:#9ca3af">No results for "'+q+'"</div>';dd.style.display='block';return;}
+  var groups={};results.forEach(function(r){if(!groups[r.type])groups[r.type]=[];groups[r.type].push(r);});
+  var typeIcon={Order:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',Product:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><path d="M8 2l5 3v6l-5 3-5-3V5z" stroke="currentColor" stroke-width="1.4"/></svg>',Store:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><path d="M1.5 6.5L4 3h8l2.5 3.5v.5a2 2 0 01-4 0 2 2 0 01-4 0 2 2 0 01-4 0v-.5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 10v4h12v-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',Page:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'};
+  var html='';
+  Object.keys(groups).forEach(function(type){
+    html+='<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">'+type+'s</div>';
+    groups[type].forEach(function(r){
+      html+='<a href="'+r.url+'" style="display:flex;align-items:center;gap:10px;padding:8px 14px;text-decoration:none;color:#191918;transition:background .1s" onmouseover="this.style.background=\'#f4f2ef\'" onmouseout="this.style.background=\'\'">'+'<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:#f4f2ef;border-radius:7px;flex-shrink:0">'+(typeIcon[type]||'')+'</span>'+'<div><div style="font-size:14px;font-weight:500;line-height:1.3">'+r.label+'</div><div style="font-size:12px;color:#9ca3af;line-height:1.3">'+r.sub+'</div></div></a>';
+    });
+  });
+  dd.innerHTML=html;dd.style.display='block';
+}
+document.addEventListener('click',function(e){
+  var sw=document.getElementById('hdr-search-wrap');var sb=document.getElementById('hdr-search-btn');var sdd=document.getElementById('hdr-search-dd');
+  if(sw&&sb&&sdd&&!sw.contains(e.target)&&!sb.contains(e.target)&&!sdd.contains(e.target)){closeHdrSearch();}
+});
+</script>
+<script src="nav-drag.js"></script>
+<script src="egfulfill-store.js"></script>
+<script src="egfulfill-connect.js"></script>
+<script src="eg-new-order.js"></script>
+<script>window.XOC_ROLE = "seller";</script>
+<script src="eg-order-chat.js"></script>
+</body>
+</html>

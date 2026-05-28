@@ -1,0 +1,2389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{var _q=location.search;var _d=/theme=dark/.test(_q)?true:(/theme=light/.test(_q)?false:localStorage.getItem('eg_theme')==='dark');if(_d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Dashboard – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
+.sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);box-shadow:none;position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid transparent;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
+.ni:hover{background:rgba(0,0,0,.04);color:#111827}.ni:active{background:rgba(0,0,0,.06);color:#111827}.ni.on{background:#e8e7e3;border:1px solid #191918;color:#111827;font-weight:600;margin:0 8px;padding:8px 12px}
+.ni svg{width:16px;height:16px;flex-shrink:0;opacity:.55}.ni.on svg{opacity:.85;filter:none}
+.ibtn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:7px;font-size:14px;color:#6b7280;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s;white-space:nowrap}
+.ibtn:hover{background:#f6f5f4;color:#374151}
+.btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+.btn-dk{background:#1c1512;color:#fff}.btn-dk:hover{opacity:.85}
+.btn-out{background:transparent;color:#6b7280;border:1px solid rgba(0,0,0,.2)}.btn-out:hover{background:rgba(0,0,0,.04);color:#374151;border-color:rgba(0,0,0,.3)}
+.btn-gold{background:#7a5c3a;color:#fff}.btn-gold:hover{opacity:.9}
+.btn-clay{background:#b5654a;color:#fff}.btn-clay:hover{opacity:.9}
+.btn-olive{background:#5c6e4a;color:#fff}.btn-olive:hover{opacity:.9}
+.btn-sienna{background:#a0522d;color:#fff}.btn-sienna:hover{opacity:.9}
+.btn-danger{background:#b83c3c;color:#fff}.btn-danger:hover{opacity:.9}
+.card{background:#fff;border:1px solid transparent;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
+.trend-up{color:#374151;font-size:12.5px;font-weight:700;background:#eeede9;padding:2px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:2px}.trend-dn{color:#374151;font-size:12.5px;font-weight:700;background:#eeede9;padding:2px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:2px}
+.dtable{width:100%;border-collapse:collapse;font-size:14px}
+.dtable th{padding:9px 12px;text-align:left;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e5e4e0;white-space:nowrap;background:#fafaf9}
+.dtable td{padding:11px 12px;border-bottom:1px solid #f3f3f1;color:#374151;vertical-align:middle;white-space:nowrap}
+.dtable tr:hover td{background:#fafaf9}.dtable tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:999px;font-size:12.5px;font-weight:600}
+.bs{background:#e8e7e3;color:#374151}.bq{background:#e8e7e3;color:#374151}.bp{background:#e8e7e3;color:#374151}.bqc{background:#e8e7e3;color:#374151}
+.b-s-new,.b-s-review,.b-s-action,.b-s-prod,.b-s-ship{background:#e5e4e0;color:#191918}.b-s-action{font-weight:700}
+.dtable tr.main-row:hover td{background:#fafaf9}.dtable tr.exp-row td{border-bottom:1px solid #f3f3f1;padding:0}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fi{animation:fadeUp .4s cubic-bezier(.22,1,.36,1) both}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
+@keyframes modalFadeOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-8px) scale(.97)}}
+.modal-fade-out{animation:modalFadeOut .4s cubic-bezier(.22,1,.36,1) forwards!important}
+@keyframes tickerIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.alert-row{display:flex;align-items:flex-start;gap:10px;padding:11px 18px;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .15s}
+.alert-row:hover{background:#fafaf9}.alert-row:last-child{border-bottom:none}
+.alert-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.prod-rec-card{border:1px solid rgba(0,0,0,.08);border-radius:14px;overflow:hidden;background:#f7f6f4;transition:box-shadow .2s,transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.prod-rec-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.1);transform:translateY(-2px)}
+/* Section-level drag-drop */
+.sec-block{position:relative;transition:opacity .2s}
+.sec-handle{display:none;position:absolute;top:10px;right:10px;z-index:20;cursor:grab;background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:5px 6px;color:#c4c3be;transition:color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.sec-handle:hover{color:#6b7280;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.edit-mode-sec .sec-handle{display:flex;align-items:center}
+.edit-mode-sec .sec-block{cursor:default}
+.sec-block.sec-dragging{opacity:.45}
+.sec-block.sec-drag-over::before{content:'';position:absolute;inset:-4px;border:2px dashed #191918;border-radius:16px;pointer-events:none;z-index:10}
+/* Content card drag-drop */
+.ccard{position:relative;transition:opacity .2s,outline .15s}
+.ccard-handle{display:none;position:absolute;top:8px;right:8px;z-index:20;cursor:grab;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:4px 5px;color:#c4c3be;transition:color .15s,box-shadow .15s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ccard-handle:hover{color:#6b7280;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.ccard-handle:active{cursor:grabbing}
+.edit-mode-sec .ccard-handle{display:flex;align-items:center}
+.ccard.cc-dragging{opacity:.4}
+.ccard.cc-drag-over{outline:2px dashed #191918;outline-offset:-2px}
+
+/* Widget drag-drop */
+.wcard{background:#fff;border:1px solid transparent;border-radius:14px;position:relative;transition:box-shadow .15s,background .15s;box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 16px rgba(0,0,0,.10)}
+.wcard .drag-handle{display:none;position:absolute;top:10px;right:12px;color:#c4c3be;cursor:grab;padding:3px;border-radius:5px;transition:color .15s;align-items:center;z-index:3}
+.wcard .drag-handle:hover{color:#6b7280;background:#f6f5f4}
+.wcard:hover .drag-handle{display:flex}
+.wcard.dragging{cursor:grabbing;opacity:.6}
+.edit-mode .wcard{cursor:grab;outline:2px dashed #191918;outline-offset:-2px}
+.edit-mode .wcard .drag-handle{display:flex}
+.edit-mode .wcard:hover{box-shadow:0 4px 18px rgba(84,107,171,.2)}
+.wcard.drag-over{outline:2px solid #191918 !important;box-shadow:0 0 0 4px rgba(84,107,171,.18) !important}
+.wcard.dragging{opacity:.45;transform:scale(.97)}
+
+/* Mobile */
+#mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
+#mob-ham:hover{background:#f6f5f4}
+#mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
+#mob-ov.on{display:block}
+.pill-btn{padding:5px 13px;border-radius:999px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid #e5e4e0;background:#fff;color:#6b7280;transition:all .15s;white-space:nowrap}
+.pill-btn:hover{border-color:#9ca3af;color:#374151}
+.pill-btn.active{background:#111827;color:#fff;border-color:#111827}
+.tab-sm{padding:5px 12px;border-radius:6px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent;transition:all .15s;background:transparent;color:#6b7280}
+.tab-sm.on{background:#fff;color:#191918;border:1px solid #191918;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.notif-panel{position:fixed;top:0;right:-400px;width:380px;height:100vh;background:#fff;border-left:1px solid #e5e4e0;z-index:200;transition:right .3s cubic-bezier(.22,1,.36,1);box-shadow:-4px 0 20px rgba(0,0,0,.08);display:flex;flex-direction:column}
+.notif-panel.open{right:0}
+.notif-overlay{position:fixed;inset:0;background:rgba(0,0,0,.2);z-index:199;display:none}
+.notif-overlay.show{display:block}
+.notif-row{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-left:3px solid transparent;cursor:pointer;transition:background .15s;text-decoration:none;border-bottom:1px solid #f6f5f4}
+.notif-row:hover{background:#fafaf9}.notif-row.unread{background:#fafaf9}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-220px);transition:transform .26s cubic-bezier(.4,0,.2,1);z-index:50!important}
+  .sidebar.mob-open{transform:translateX(0);box-shadow:6px 0 32px rgba(0,0,0,.18)}
+  .sidebar+div{margin-left:0!important;width:100vw;max-width:100vw;overflow-x:hidden}
+  #mob-ham{display:flex!important}
+  [style*="grid-template-columns:repeat("],[style*="grid-template-columns:1fr 1fr"],[style*="grid-template-columns:2fr "],[style*="grid-template-columns:3fr "]{grid-template-columns:1fr!important}
+  header{padding-left:12px!important;padding-right:12px!important}
+  .dtable{min-width:480px}
+  [style*="overflow-x"]{overflow-x:auto}
+}
+
+
+
+
+/* ── Dark mode ── */
+html[data-theme=dark]{color-scheme:dark}
+html[data-theme=dark] body{background:#1a1917!important}
+html[data-theme=dark] .sidebar{background:#1f1d1b!important;border-right-color:rgba(255,255,255,.07)!important;box-shadow:none!important}
+html[data-theme=dark] header{background:#1a1917!important;border-bottom-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .card{background:#252220!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 1px 3px rgba(0,0,0,.3)!important}
+html[data-theme=dark] .ni{color:#7a7874!important}
+html[data-theme=dark] .ni.on{background:#302e2c!important;color:#e8e4e0!important}
+html[data-theme=dark] .ni:hover:not(.on){background:#252220!important}
+html[data-theme=dark] .ibtn{color:#7a7874!important}
+html[data-theme=dark] .ibtn:hover{background:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] .dtable th{background:#1f1d1b!important;color:#4a4846!important;border-color:#302e2c!important}
+html[data-theme=dark] .dtable td{border-color:#282624!important;color:#a8a29e!important}
+html[data-theme=dark] .dtable tbody tr:hover td{background:#252220!important}
+html[data-theme=dark] input:not([type=checkbox]):not([type=radio]),html[data-theme=dark] select,html[data-theme=dark] textarea{background:#252220!important;border-color:#302e2c!important;color:#d8d4d0!important}
+html[data-theme=dark] #pref-panel,html[data-theme=dark] #new-menu-dd{background:#252220!important;border-color:#302e2c!important;box-shadow:0 8px 28px rgba(0,0,0,.5)!important}
+html[data-theme=dark] [style*="background:#fff;"]{background:#252220!important}
+html[data-theme=dark] [style*="background: #fff"]{background:#252220!important}
+html[data-theme=dark] [style*="background:#f4f2ef"],html[data-theme=dark] [style*="background:#f7f5f0"]{background:#1a1917!important}
+html[data-theme=dark] [style*="background:#f6f5f4"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f9f8f7"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f3f3f1"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#f0ede9"]{background:#211f1d!important}
+html[data-theme=dark] [style*="background:#fafaf9"]{background:#1f1d1b!important}
+html[data-theme=dark] [style*="background:#e5e4e0"]{background:#302e2c!important}
+html[data-theme=dark] [style*="background:#f0ede9"]{background:#211900!important}
+html[data-theme=dark] [style*="background:#fff5f5"]{background:#251210!important}
+html[data-theme=dark] [style*="background:#fee2e2"]{background:#2a0e0c!important}
+html[data-theme=dark] [style*="color:#191918"]{color:#d8d4d0!important}
+html[data-theme=dark] [style*="color:#111827"]{color:#e0deda!important}
+html[data-theme=dark] [style*="color:#374151"]{color:#a8a29e!important}
+html[data-theme=dark] [style*="color:#1f2937"]{color:#bcb8b4!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#565452!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #f0ede9"]{border-bottom-color:#282624!important}
+html[data-theme=dark] [style*="border-top:1px solid #f0ede9"]{border-top-color:#282624!important}
+html[data-theme=dark] [style*="border:1px solid #e5e4e0"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border:1.5px solid #e5e4e0"]{border-color:#302e2c!important}
+html[data-theme=dark] [style*="border-bottom:1px solid #e5e4e0"]{border-bottom-color:#302e2c!important}
+html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#302e2c!important}
+html[data-theme=dark] [style*="border-right:1px solid #e5e4e0"]{border-right-color:#302e2c!important}
+html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
+html[data-theme=dark] .wcard{background:#252220!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 1px 3px rgba(0,0,0,.3)!important}
+html[data-theme=dark] .stat-card{background:#252220!important;box-shadow:0 2px 14px rgba(0,0,0,.28)!important}
+html[data-theme=dark] .prog-bar{background:#302e2c!important}
+html[data-theme=dark] #_qtm>div{background:#252220!important;border:1.5px solid #302e2c}
+html[data-theme=dark] .seg{color:#7a7874!important}
+html[data-theme=dark] .seg.on{background:#302e2c!important;color:#e0deda!important}
+/* ── Dark mode filter pills ── */
+html[data-theme=dark] .tab-btn{color:#7a7874!important}
+html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
+html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
+/* "via API" source badge */
+html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+/* Action buttons: Resolve / Escalate */
+html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
+html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
+html[data-theme=dark] [style*="background:#fff5f5;color:#dc2626"]{background:rgba(230,53,97,0.12)!important;color:#e63561!important;border-color:rgba(230,53,97,0.28)!important}
+html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
+/* Start / action dark buttons — add visible border in dark mode */
+html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
+/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#9749d4/#2eeeca/#e63561 ── */
+/* Blue family → incoming, transit, ready, queue */
+html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-queue{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-lowstock{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-disc{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-incoming{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-transit{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-ready{background:#4e65ce!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-pendingpo{background:#6a99d6!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-cancel{background:#6a99d6!important;color:#fff!important;border:none!important}
+/* Cyan family → working, qc, labelled */
+html[data-theme=dark] .b-qc{background:#2dcaf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-working{background:#2dcaf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-labelled{background:#4ed2f2!important;color:#fff!important;border:none!important}
+/* Purple family → design, pre-scan, outdeliv, prod */
+html[data-theme=dark] .b-prod{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-outdeliv{background:#a866db!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-prescan{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-design{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-approved{background:#a866db!important;color:#fff!important;border:none!important}
+/* Mint family → shipped, finished, delivered, ok, packed */
+html[data-theme=dark] .b-packed{background:#41f1d3!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-shipped{background:#2eeeca!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-ok{background:#2eeeca!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-finished{background:#41f1d3!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-delivered{background:#2eeeca!important;color:#fff!important;border:none!important}
+/* Pink/Red family → exception, backorder, flagged */
+html[data-theme=dark] .b-flagged{background:#e63561!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-exception{background:#e63561!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-backorder{background:#ec557a!important;color:#fff!important;border:none!important}
+/* Type badge classes (ds-type-*) */
+html[data-theme=dark] .ds-type-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-type-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] .ds-type-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
+html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!important;border-color:#4e65ce!important}
+/* Inline inv/dsn pills — attribute overrides */
+html[data-theme=dark] [style*="color:#286038;background:#e4f4ea"]{color:#fff!important;background:#2eeeca!important;border-color:#1ab8a0!important}
+html[data-theme=dark] [style*="color:#7a5018;background:#f8f4e0"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important;cursor:pointer}
+html[data-theme=dark] [style*="color:#3a5a96;background:#edf2f8"]{color:#fff!important;background:#4e65ce!important;border-color:#3a52b8!important}
+html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#9749d4!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="color:#904a18;background:#f8f0e4"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#f3f4f6;border:1px solid #e5e4e0"]{background:#2a2826!important;border-color:#3a3835!important}
+html[data-theme=dark] [style*="color:#6b7280;background:#f3f4f6"]{color:#9ca3af!important;background:#2a2826!important;border-color:#3a3835!important}
+html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="background:#f8f0e4;color:#904a18"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#e4f4ea;color:#286038"]{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
+html[data-theme=dark] [style*="background:#edf2f8;color:#3a5a96"]{background:#4e65ce!important;color:#fff!important;border-color:#3a52b8!important}
+html[data-theme=dark] [style*="background:#f8f4e0;color:#7a5018"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
+html[data-theme=dark] [style*="background:#e4f6f2;color:#1a7060"]{background:#2dcaf0!important;color:#fff!important;border-color:#18a8cc!important}
+/* ── Dark mode: pill-btn (dashboard / wallet store filter) ── */
+html[data-theme=dark] .pill-btn{background:rgba(255,255,255,0.04)!important;color:#7a7874!important;border-color:#302e2c!important}
+html[data-theme=dark] .pill-btn:hover{border-color:#4a4846!important;color:#a8a29e!important}
+html[data-theme=dark] .pill-btn.active{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important}
+/* ── Dark mode: cat-pill (products category filter) ── */
+html[data-theme=dark] .cat-pill{color:#7a7874!important}
+html[data-theme=dark] .cat-pill:hover{background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
+html[data-theme=dark] .cat-pill.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
+/* ── Dark mode: fb / filter-btn (orders filter row) ── */
+html[data-theme=dark] .fb{background:rgba(255,255,255,0.04)!important;border-color:#302e2c!important;color:#a8a29e!important}
+html[data-theme=dark] .fb:hover{border-color:#4a4846!important;color:#c8c4c0!important}
+
+/* ── EG custom select (smooth dropdown, warm bg, light-grey highlight) ── */
+.eg-sel{position:relative;display:inline-flex}
+.eg-sel.open{z-index:1000}
+.eg-sel-btn{display:inline-flex;align-items:center;gap:7px;border:1.5px solid #c9c4bc;background:transparent;border-radius:8px;padding:6px 11px;font-size:13px;font-weight:500;font-family:inherit;color:#4b5563;cursor:pointer;transition:border-color .15s,background .15s;white-space:nowrap}
+.eg-sel-btn:hover{border-color:#374151;background:rgba(0,0,0,.045)}
+.eg-sel-btn svg{transition:transform .2s;flex-shrink:0;color:#6b7280}
+.eg-sel.open .eg-sel-btn svg{transform:rotate(180deg)}
+.eg-sel-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:100%;background:#fbfaf8;border:1px solid rgba(0,0,0,.08);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);padding:5px;z-index:1001;opacity:0;transform:translateY(-6px) scale(.98);transform-origin:top;pointer-events:none;transition:opacity .16s ease,transform .18s cubic-bezier(.22,1,.36,1)}
+.eg-sel.open .eg-sel-menu{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.eg-sel-opt{display:flex;align-items:center;gap:8px;padding:7px 11px 7px 8px;border-radius:7px;font-size:13.5px;color:#374151;cursor:pointer;white-space:nowrap;transition:background .12s}
+.eg-sel-opt:hover{background:rgba(0,0,0,.05)}
+.eg-sel-opt.sel{background:rgba(0,0,0,.05);font-weight:600;color:#191918}
+.eg-sel-opt .eg-check{width:14px;height:14px;flex-shrink:0;opacity:0;color:#374151}
+.eg-sel-opt.sel .eg-check{opacity:1}
+html[data-theme=dark] .eg-sel-btn{background:#252220!important;border-color:rgba(255,255,255,.1)!important;color:#cfcbc6!important}
+html[data-theme=dark] .eg-sel-btn:hover{background:#2a2826!important;border-color:rgba(255,255,255,.18)!important}
+html[data-theme=dark] .eg-sel-btn svg{color:#8a8682!important}
+html[data-theme=dark] .eg-sel-menu{background:#252220!important;border-color:rgba(255,255,255,.08)!important;box-shadow:0 10px 30px rgba(0,0,0,.5)!important}
+html[data-theme=dark] .eg-sel-opt{color:#a8a29e!important}
+html[data-theme=dark] .eg-sel-opt:hover{background:rgba(255,255,255,.06)!important}
+html[data-theme=dark] .eg-sel-opt.sel{background:rgba(255,255,255,.08)!important;color:#e8e4e0!important}
+html[data-theme=dark] .eg-sel-opt .eg-check{color:#c9c3ba!important}
+
+/* ── EG uniform dark separators + readable accent numbers (auto) ── */
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="dashed #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #eee"],html[data-theme=dark] [style*="solid #ececec"],html[data-theme=dark] [style*="solid #fafaf9"],html[data-theme=dark] [style*="solid #f3f4f6"],html[data-theme=dark] [style*="solid #d1d5db"]{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .dtable th,html[data-theme=dark] .dtable td,html[data-theme=dark] .dtable tr.exp-row td{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.07)!important}
+html[data-theme=dark] [style*="color:#191918"],html[data-theme=dark] [style*="color:#374151"],html[data-theme=dark] [style*="color:#191918"]{color:#c9c3ba!important}
+html[data-theme=dark] [style*="background:#f7f5f0"],html[data-theme=dark] [style*="background:#f7f6f4"]{background:#1a1917!important}
+
+/* ── EG dark readability: lighter text + softer light-grey separators ── */
+html[data-theme=dark] .dtable th{color:#9c968e!important;border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .dtable td{border-color:rgba(255,255,255,.08)!important;color:#bdb8b1!important}
+html[data-theme=dark] [style*="color:#9ca3af"]{color:#9c968e!important}
+html[data-theme=dark] [style*="color:#6b7280"]{color:#a8a29b!important}
+html[data-theme=dark] [style*="color:#c4c3be"],html[data-theme=dark] [style*="color:#c4c2be"],html[data-theme=dark] [style*="color:#d1d5db"]{color:#8f8a83!important}
+html[data-theme=dark] [style*="color:#b0aaa4"],html[data-theme=dark] [style*="color:#b8b3ad"]{color:#a39d96!important}
+html[data-theme=dark] .tab-btn{color:#9c968e!important}
+html[data-theme=dark] .ni{color:#9c968e!important}
+html[data-theme=dark] .seg{color:#9c968e!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.1)!important}
+html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #f3f4f6"]{border-color:rgba(255,255,255,.1)!important}
+
+/* eg-navsel-light */
+/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
+html:not([data-theme=dark]) .ni{border:1px solid transparent}
+html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+</style>
+<style id="eg-outline-btns">
+/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
+
+.ni:focus{box-shadow:none!important;outline:none!important}
+</style>
+<style id="eg-input-focus">
+/* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard,.stat-card{transition:box-shadow .16s ease,top .14s cubic-bezier(.4,0,.2,1)}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}
+/* Overview cards: the offset "sticker" shadow IS the height.
+   Hover = raised (shadow grows + 1px up); click/drag = pressed in (shadow shrinks + 3px down).
+   Uses top (not transform — the .fi fadeUp animation locks transform). */
+.wcard,.stat-card{position:relative}
+html:not([data-theme=dark]) .wcard:hover,html:not([data-theme=dark]) .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #40403d!important}
+html[data-theme=dark] .wcard:hover,html[data-theme=dark] .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #c9c3ba!important}
+html:not([data-theme=dark]) .wcard:active,html:not([data-theme=dark]) .stat-card:active{top:3px;box-shadow:1px 1px 0 #40403d!important}
+html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:3px;box-shadow:1px 1px 0 #c9c3ba!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Selected sidebar menu item (dark): no fill, only the beige #c9c3ba borderline */
+html[data-theme=dark] .ni.on{background:transparent!important;border:1px solid rgba(201,195,186,.5)!important}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+<style id="eg-dark-seller">
+/* Dark-mode reading hierarchy: bright metric numbers · calm beige titles · darker pills */
+html[data-theme=dark] .wcard [style*="font-weight:800"],
+html[data-theme=dark] .card [style*="font-weight:800"],
+html[data-theme=dark] .stat-card [style*="font-weight:800"]{color:#f4efe3!important}
+html[data-theme=dark] .wcard [style*="color:#9ca3af"],
+html[data-theme=dark] .card [style*="color:#9ca3af"],
+html[data-theme=dark] .stat-card [style*="color:#9ca3af"]{color:#9a948a!important}
+html[data-theme=dark] .wcard [style*="color:#6b7280"],
+html[data-theme=dark] .card [style*="color:#6b7280"],
+html[data-theme=dark] .stat-card [style*="color:#6b7280"]{color:#a59f96!important}
+/* Beige separators connecting the header rule through to the main content / sidebar */
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.16)!important}
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.12)!important}
+/* Header light/dark toggle dot animates to the opposite side */
+#pref-btn circle{transition:cx .25s ease,opacity .25s ease}
+/* Sidebar plan box: no fill, beige outline; upgrade button dark-gray with beige outline (mirrors light mode) */
+html[data-theme=dark] .plan-box{background:transparent!important;border-color:rgba(201,195,186,.35)!important}
+html[data-theme=dark] .plan-upgrade{background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.45)!important;color:#f3eee2!important}
+html[data-theme=dark] .plan-upgrade:hover{background:#36332e!important}
+/* Small pills/chips → darker beige so the big metric numbers stay the emphasis */
+html[data-theme=dark] .trend-up,
+html[data-theme=dark] .trend-dn{background:transparent!important;border:1px solid rgba(216,212,204,.22)!important;color:#d8d4cc!important;padding:1px 7px!important;font-weight:600!important}
+html[data-theme=dark] [style*="background:#e8e7e3"]{background:#2b2926!important;color:#a8a29b!important}
+/* Logo↔panel separator: beige in dark (the rgba(0,0,0,…) line is invisible on dark) */
+html[data-theme=dark] .sidebar-logo{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Add-Funds "Current Balance" box is now outline-only — keep its text readable on dark */
+html[data-theme=dark] .qtm-beige{border-color:rgba(201,195,186,.4)!important}
+html[data-theme=dark] .qtm-beige [style*="color:#475569"]{color:#a8a29b!important}
+html[data-theme=dark] .qtm-beige [style*="color:#1e293b"]{color:#e8e4dd!important}
+/* Add Funds CTA: darker grey-beige (matches Confirm Deposit / Connect bank), lighter on hover */
+html[data-theme=dark] .qtm-beige-btn{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
+html[data-theme=dark] .qtm-beige-btn:hover{background:#454039!important}
+/* ── Topbar polish ─────────────────────────────────────────────────────────
+   Goal: every interactive thing in the header (icon button, pill, switcher,
+   profile) uses the SAME hover vocabulary — subtle #f6f5f4 lift, no aggressive
+   colour inversions, no surprise borders. Dividers softened so the cluster
+   reads as one group rather than fragmented segments. */
+/* Wallet pill — same hover language as .ibtn (no full dark-fill flip). */
+/* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
+   with a press animation: on :active the chip slides into its shadow so the
+   shadow collapses to zero, mimicking a physical button being pushed.
+   Hover uses a soft gray wash so the dark balance text stays readable. */
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
+html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
+html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:2px 2px 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip:hover{background:rgba(201,195,186,.10)!important;color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:hover #balance-val{color:#f3eee2!important}
+html[data-theme=dark] .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip #balance-val{color:#d8d4cc!important}
+
+/* Dashboard filter dropdowns (All Stores, This Month) — make sure the open
+   menu paints above the stat cards below. Bumping z-index on the open .eg-sel
+   alone isn't enough because the cards live in adjacent stacking contexts; we
+   also lift the welcome row (.fi:has(.eg-sel.open)) so the menu escapes. */
+.eg-sel.open{z-index:9999!important}
+.eg-sel.open .eg-sel-menu{z-index:10000!important}
+.fi:has(.eg-sel.open){position:relative;z-index:9999}
+/* Language switcher — wrap with hover background so the click target is
+   obvious, give the inactive option a clear hover preview. */
+.hdr-lang{padding:5px 10px;border-radius:7px;transition:background .15s}
+.hdr-lang:hover{background:#f6f5f4}
+.hdr-lang .lang-opt{padding:2px 4px;border-radius:4px;transition:color .15s,background .15s}
+.hdr-lang .lang-opt:not(.on):hover{color:#374151}
+html[data-theme=dark] .hdr-lang:hover{background:rgba(201,195,186,.10)!important}
+html[data-theme=dark] .hdr-lang .lang-opt:not(.on):hover{color:#c9c3ba!important}
+/* Topbar dividers — softer beige so the header reads as one cluster. */
+header [style*="width:1px"][style*="background:#e5e4e0"]{background:#f0ede9!important}
+html[data-theme=dark] header [style*="width:1px"][style*="background:#e5e4e0"]{background:rgba(201,195,186,.14)!important}
+/* Notification bell hover — keep the badge crisp during the hover lift. */
+.ibtn:hover #notif-dot{border-color:#f6f5f4}
+html[data-theme=dark] .ibtn:hover #notif-dot{border-color:#302e2c!important}
+/* Theme toggle: beige, minimal — no grey track fill */
+#pref-btn rect{stroke:rgba(0,0,0,.25)}
+#pref-btn circle{fill:#6b7280}
+html[data-theme=dark] #pref-btn rect{stroke:rgba(201,195,186,.45)!important}
+html[data-theme=dark] #pref-btn circle{fill:#c9c3ba!important}
+html[data-theme=dark] #pref-btn:hover{background:transparent!important}
+/* Theme toggle pills — knob positions pegged by [data-theme] so the initial
+   paint is correct even before applyTheme() runs. Two pills: the one in the
+   Appearance dropdown (#toggle-knob/#theme-toggle-btn, 40×22) and the one
+   in the topbar itself (#hdr-theme-knob/#hdr-theme-track, 34×18). Light =
+   LEFT (0), Dark = RIGHT (translateX). JS still toggles data-theme on click. */
+#toggle-knob{transform:translateX(0);transition:transform .25s}
+html[data-theme=dark] #toggle-knob{transform:translateX(18px)}
+#theme-toggle-btn{background:#e5e4e0}
+html[data-theme=dark] #theme-toggle-btn{background:#374151}
+#hdr-theme-knob{transform:translateX(0);transition:transform .25s}
+html[data-theme=dark] #hdr-theme-knob{transform:translateX(16px)}
+#hdr-theme-track{background:#e5e4e0}
+html[data-theme=dark] #hdr-theme-track{background:#374151}
+/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals */
+html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
+/* Dark mode: activity-feed icon chips → no fill, beige glyph (scoped to the 8px-radius chips so trend pills keep their fill) */
+html[data-theme=dark] [style*="background:#eeede9"][style*="border-radius:8px"]{background:transparent!important}
+html[data-theme=dark] [style*="background:#eeede9"][style*="border-radius:8px"] svg [stroke]{stroke:#c9c3ba!important}
+html[data-theme=dark] [style*="background:#eeede9"][style*="border-radius:8px"] svg [fill]:not([fill="none"]){fill:#c9c3ba!important}
+/* Smooth light↔dark transition on the main surfaces */
+body,.sidebar,header,.card,.wcard,.stat-card,.bal-chip,.plan-box,.plan-upgrade,.trend-up,.trend-dn,.ni,.input,.select,.btn{transition:background-color .3s ease,border-color .3s ease,color .3s ease,box-shadow .3s ease}
+</style>
+<style id="eg-topbar-tweaks">/* eg-topbar-tweaks */
+/* Light-mode wallet pill — base styles come from the .bal-chip block above. */
+html[data-theme=dark] #new-menu-btn{background:#c9c3ba!important;border-color:#c9c3ba!important;color:#191918!important}
+html[data-theme=dark] #new-menu-btn svg [stroke="white"],html[data-theme=dark] #new-menu-btn svg [stroke="#fff"]{stroke:#191918!important}
+</style>
+<style id="eg-card-outline">/* eg-card-outline */
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+</style>
+<style id="eg-notif-iconbg">/* eg-notif-iconbg */
+html:not([data-theme=dark]) .notif-row [style*="background:#eeede9"]{background:transparent!important}
+</style>
+<style id="eg-card-dark-retro">/* eg-card-dark-retro */
+html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
+</style>
+<style id="eg-sel-outline">/* eg-sel-outline */
+html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
+</style>
+<style id="eg-dash-filters">/* Dashboard filter row → borderless, #191918 lettering */
+#dash-filter-row .eg-sel-btn,#dash-filter-row .btn{border:none!important;background:transparent!important;color:#191918!important;box-shadow:none!important}
+#dash-filter-row .eg-sel-btn:hover,#dash-filter-row .btn:hover{background:rgba(0,0,0,.045)!important;border:none!important}
+</style>
+<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
+<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
+.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
+.eg-sel-btn svg{color:#191918!important}
+.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
+.eg-sel.open{z-index:6000!important}
+.eg-sel-menu{z-index:6001!important}
+.fb:not(.filter-btn){color:#191918!important}
+.fb:not(.filter-btn) svg{color:#191918!important}
+html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
+html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
+</style>
+<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
+.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo" style="height:54px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0">
+    <a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a>
+  </div>
+  <nav style="flex:1;padding:8px 0">
+    <a class="ni on" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
+    <a class="ni" href="product-templates.html" style="margin-left:24px;display:none">Product Templates</a>
+    <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
+    <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
+    <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <div style="font-size:11px;font-weight:600;color:rgba(0,0,0,.3);text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
+
+    <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
+  </nav>
+  <div class="plan-box" style="border:1px solid rgba(0,0,0,.09);border-radius:10px;padding:14px;margin:8px;flex-shrink:0;background:rgba(0,0,0,.03)">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em">Starter Plan</span><span style="font-size:11px;color:#9ca3af">847/1k</span></div>
+    <div style="background:rgba(0,0,0,.08);border-radius:999px;height:4px;margin-bottom:8px;overflow:hidden"><div style="width:84.7%;height:100%;background:#6b7280;border-radius:999px"></div></div>
+    <button class="plan-upgrade" onclick="window.location='settings.html?tab=billing'" style="width:100%;background:#111827;border:none;color:#fff;font-size:12.5px;font-weight:600;padding:6px;border-radius:7px;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Upgrade to Pro ↑</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div style="margin-left:220px;min-height:100vh">
+
+  <!-- TOPBAR -->
+  <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
+    <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <!-- Page title -->
+    <span style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em;flex-shrink:0">Overview</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <!-- Expanding search -->
+      <div style="display:flex;align-items:center;gap:4px;position:relative">
+        <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+          <div style="position:relative;margin-right:4px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="hdr-search" oninput="runHdrSearch(this.value)" onblur="scheduleCollapseSearch()" onkeydown="hdrSearchKey(event)" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search orders, products…" autocomplete="off"/>
+          </div>
+        </div>
+        <button class="ibtn" id="hdr-search-btn" onclick="toggleHdrSearch()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        <div id="hdr-search-dd" style="display:none;position:absolute;top:calc(100% + 8px);right:0;width:320px;background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);z-index:300;overflow:hidden"></div>
+      </div>
+      <!-- Language: simple EN/VI text toggle, no icons. Click flips between
+           English and Vietnamese; the visible label shows the CURRENT language. -->
+      <button class="ibtn" id="hdr-lang-btn" onclick="toggleLang()" title="Toggle language">
+        <span id="hdr-lang-code" style="font-size:12.5px;font-weight:700;letter-spacing:.04em">EN</span>
+      </button>
+      <!-- Theme toggle: pill slider — knob on LEFT for light, RIGHT for dark.
+           Position is driven by the [data-theme] CSS rule so the initial
+           paint is right even before applyTheme() runs. -->
+      <button class="ibtn" onclick="toggleTheme()" id="pref-btn" title="Toggle light / dark mode" style="padding:6px 8px">
+        <span id="hdr-theme-track" style="display:inline-block;position:relative;width:34px;height:18px;border-radius:11px;background:#e5e4e0;transition:background .25s;flex-shrink:0">
+          <span id="hdr-theme-knob" style="position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s"></span>
+        </span>
+      </button>
+      <!-- Notifications -->
+      <button class="ibtn" style="position:relative" onclick="typeof toggleNotifPanel==='function'&&toggleNotifPanel(event)" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">8</span></button>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <!-- Wallet pill — current balance. Click opens the Add Funds modal
+           on the current page (no navigation). The modal itself has the
+           "Go to Wallet" link for the full wallet view. -->
+      <button class="bal-chip" type="button" onclick="openQuickTopUp()" title="Add funds" style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:inherit">
+        <span id="balance-val" style="font-variant-numeric:tabular-nums">$0.00</span>
+      </button>
+      <!-- + New dropdown -->
+      <div style="position:relative">
+        <button class="btn btn-dk" onclick="toggleNewMenu(event)" id="new-menu-btn" style="gap:6px"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="new_btn">New</span><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5 8 3.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        <div id="new-menu-dd" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:6px;min-width:210px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.12)">
+          <div onclick="goManualOrder()" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 7h6M4 4.5h6M4 9.5h3" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918" data-i18n="manual_order">Manual order</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px" data-i18n="manual_order_sub">Create from scratch</div></div></div>
+          <div onclick="window.location='settings.html#stores'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z" stroke="#374151" stroke-width="1.3"/><path d="M1.5 7h11M7 1.5S5 4 5 7s2 5.5 2 5.5" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918" data-i18n="sync_platforms">Sync from platforms</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px" data-i18n="sync_platforms_sub">Shopify, Etsy, WooCommerce…</div></div></div>
+        </div>
+      </div>
+      <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
+      <!-- Profile -->
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Phan</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">phanmylinh04…</div></div></div>
+      <!-- Language toggle -->
+    </div>
+  </header>
+
+  <!-- NOTIFICATION OVERLAY + PANEL -->
+  <div class="notif-overlay" id="notif-overlay" onclick="closeNotifPanel()"></div>
+  <div id="notif-panel" class="notif-panel">
+    <div style="padding:14px 16px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:14.5px;font-weight:700;color:#191918">Notifications</span>
+        <span id="notif-count" style="background:#fee2e2;color:#dc2626;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:999px">8</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="markAllRead()" style="font-size:13px;color:#9ca3af;background:none;border:none;cursor:pointer;font-family:inherit;transition:color .15s" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">Mark all read</button>
+        <button onclick="closeNotifPanel()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:2px 4px;font-size:17px;line-height:1;transition:color .15s" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">✕</button>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto" id="notif-list">
+      <a href="orders.html" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 3v3.5M6.5 9.5v.5" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="5.5" stroke="#374151" stroke-width="1.3"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">Order #FF-8810 delayed in queue</div>
+          <div style="font-size:12.5px;color:#9ca3af">In Queue for 48+ hours · Tyler Brooks</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">48h ago</span>
+      </a>
+      <a href="wallet.html" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="4" width="10" height="7" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M1.5 6h10" stroke="#374151" stroke-width="1.3"/><circle cx="9" cy="8.5" r=".9" fill="#374151"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">Balance low — $0.00 remaining</div>
+          <div style="font-size:12.5px;color:#9ca3af">Top up to keep fulfillment running</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">Now</span>
+      </a>
+      <a href="products-dash.html" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 3v3.5M6.5 9.5v.5" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="5.5" stroke="#374151" stroke-width="1.3"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">Low stock: Ceramic Mug 11oz — White</div>
+          <div style="font-size:12.5px;color:#9ca3af">Only 3 units remaining · MUG-11OZ-W</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">3 left</span>
+      </a>
+      <a href="orders.html" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="#374151" stroke-width="1.3"/><path d="M6.5 3.5v3.2l2 2" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">Delivery est. missed — 2 orders</div>
+          <div style="font-size:12.5px;color:#9ca3af">Est. Apr 18 passed · customers may follow up</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">Review</span>
+      </a>
+      <a href="orders.html" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">3 new orders awaiting confirmation</div>
+          <div style="font-size:12.5px;color:#9ca3af">From Shopify, Etsy, WooCommerce</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">Just now</span>
+      </a>
+      <a href="#" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5h9M8 4l3 2.5L8 9" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">28 orders shipped successfully today</div>
+          <div style="font-size:12.5px;color:#9ca3af">Great fulfillment pace today!</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">3h ago</span>
+      </a>
+      <a href="#" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 9.5l3-4 2.5 2.5 4-5" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">Comfort Colors Tee 1717 trending</div>
+          <div style="font-size:12.5px;color:#9ca3af">+32% search volume this week</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">1d ago</span>
+      </a>
+      <a href="#" class="notif-row">
+        <div style="width:30px;height:30px;border-radius:8px;background:#eeede9;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5l1.4 3.6H12L8.9 7.6l1.1 3.5L6.5 9.2l-3.5 1.9 1.1-3.5L1 5.1h4.1L6.5 1.5z" stroke="#374151" stroke-width="1.2" stroke-linejoin="round"/></svg></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13.5px;font-weight:600;color:#191918;margin-bottom:1px">New 5-star review received</div>
+          <div style="font-size:12.5px;color:#9ca3af">"Amazing quality & fast shipping!"</div>
+        </div>
+        <span style="font-size:11.5px;color:#6b7280;font-weight:600;white-space:nowrap;flex-shrink:0">5h ago</span>
+      </a>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid #f3f3f1;text-align:center;background:#fafaf9">
+      <a href="#" style="font-size:13.5px;color:#191918;font-weight:600;text-decoration:none">View all notifications →</a>
+    </div>
+  </div>
+
+  <div style="padding:24px 32px;max-width:1600px;margin:0 auto;width:100%">
+
+    <!-- Welcome row -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px" class="fi">
+      <div>
+        <h1 style="font-size:1.3rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0">Welcome back, Phan <svg width="16" height="16" viewBox="0 0 18 18" fill="none" style="display:inline-block;vertical-align:-2px;margin-left:1px"><path d="M9 2l1.3 4.2a2 2 0 001.5 1.5L16 9l-4.2 1.3a2 2 0 00-1.5 1.5L9 16l-1.3-4.2a2 2 0 00-1.5-1.5L2 9l4.2-1.3a2 2 0 001.5-1.5z" fill="#191918"/></svg></h1>
+      </div>
+      <div id="dash-filter-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+        <select id="dash-platform" data-eg-select onchange="setDashPlatform(this.value)" style="border:1.5px solid #c9c4bc;border-radius:8px;padding:6px 24px 6px 11px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 7px center;color:#4b5563;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none">
+          <option value="all">All Stores</option>
+          <option value="shopify">Shopify</option>
+          <option value="etsy">Etsy</option>
+          <option value="woo">WooCommerce</option>
+          <option value="amazon">Amazon</option>
+          <option value="manual">Manual</option>
+        </select>
+        <select id="dash-period" data-eg-select onchange="setDashPeriod(this.value)" style="border:1.5px solid #c9c4bc;border-radius:8px;padding:6px 24px 6px 11px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 7px center;color:#4b5563;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none">
+          <option value="month">This Month</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+          <option value="lastmonth">Last Month</option>
+          <option value="quarter">This Quarter</option>
+        </select>
+        <button id="edit-btn" class="btn btn-out" style="font-size:13px;padding:6px 12px" onclick="toggleEdit()">Edit Dashboard</button>
+        <button class="btn btn-out" style="font-size:13px;padding:6px 12px" onclick="window.location='orders.html'">View all orders</button>
+      </div>
+    </div>
+
+
+    <!-- Edit mode notice -->
+    <div id="edit-notice" style="display:none;background:#fef9c3;border:1px solid #ddd9d2;border-radius:9px;padding:10px 16px;margin-bottom:16px;font-size:14px;color:#191918;align-items:center;gap:8px">
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="flex-shrink:0"><circle cx="7.5" cy="7.5" r="6.5" stroke="#374151" stroke-width="1.3"/><path d="M7.5 4.5v4M7.5 10v1" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Drag cards to rearrange your dashboard. Click <strong>Done</strong> when finished.
+    </div>
+
+    <!-- WIDGET GRID (drag-drop) -->
+    <div id="wgrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px" class="fi" style="animation-delay:.05s">
+
+      <!-- 1: Total Orders -->
+      <div class="wcard fi" id="w-orders" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:20px 20px 16px;animation-delay:.04s;overflow:hidden">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Total Orders</div>
+          <div id="sv-orders" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:8px">0</div>
+          <div style="display:flex;align-items:center;gap:6px"><span id="sv-orders-trend" class="trend-up">0%</span><span style="font-size:12.5px;color:#9ca3af">vs last month</span></div>
+        </div>
+        <div style="height:52px;position:relative;margin-top:4px"><canvas id="sp-orders"></canvas></div>
+      </div>
+
+      <!-- 2: Revenue -->
+      <div class="wcard fi" id="w-revenue" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:20px 20px 16px;animation-delay:.08s;overflow:hidden">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Revenue</div>
+          <div id="sv-revenue" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:8px">$0</div>
+          <div style="display:flex;align-items:center;gap:6px"><span id="sv-revenue-trend" class="trend-up">0%</span><span style="font-size:12.5px;color:#9ca3af">vs last month</span></div>
+        </div>
+        <div style="height:52px;position:relative;margin-top:4px"><canvas id="sp-rev"></canvas></div>
+      </div>
+
+      <!-- 3: Net Profit -->
+      <div class="wcard fi" id="w-profit" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:20px 20px 16px;animation-delay:.12s;overflow:hidden">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Net Profit</div>
+          <div id="sv-profit" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:8px">$0</div>
+          <div style="display:flex;align-items:center;gap:6px"><span id="sv-profit-trend" class="trend-up">0%</span><span style="font-size:12.5px;color:#9ca3af">vs last month</span></div>
+        </div>
+        <div style="height:52px;position:relative;margin-top:4px"><canvas id="sp-profit"></canvas></div>
+      </div>
+
+      <!-- 4: Current Balance (clickable → unfunded orders modal) -->
+      <div class="wcard fi" id="w-balance" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:22px 22px 18px;animation-delay:.16s;cursor:pointer;border-color:#d8d4cd" onclick="if(!editMode)openBalanceModal()">
+        <div class="drag-handle" onclick="event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Current Balance</div>
+          <span style="width:7px;height:7px;background:#a0522d;border-radius:50%;animation:pulse 1.5s ease-in-out infinite;display:inline-block"></span>
+        </div>
+        <div id="sv-balance" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:8px">$0</div>
+        <div id="sv-balance-note" style="font-size:12.5px;color:#9ca3af;font-weight:500;margin-bottom:14px">No funds yet</div>
+        <button onclick="event.stopPropagation();openBalanceModal()" style="background:#191918;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;display:inline-flex;align-items:center;gap:5px;width:100%;justify-content:center" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>
+          Add Funds
+        </button>
+      </div>
+
+      <!-- 5: Fulfillment Rate -->
+      <div class="wcard fi" id="w-fulfill" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:22px 22px 18px;animation-delay:.20s">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <div>
+            <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Fulfillment Rate</div>
+            <div id="sv-fulfill" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:10px">0%</div>
+            <div style="display:flex;align-items:center;gap:6px"><span id="sv-fulfill-trend" class="trend-up">0%</span><span style="font-size:12.5px;color:#9ca3af">on-time delivery</span></div>
+          </div>
+          <div style="width:52px;height:52px;position:relative;flex-shrink:0;margin-top:4px">
+            <svg width="52" height="52" viewBox="0 0 52 52">
+              <circle cx="26" cy="26" r="22" fill="none" stroke="#ece9e3" stroke-width="5"/>
+              <circle id="ful-ring" cx="26" cy="26" r="22" fill="none" stroke="#8f897e" stroke-width="5" stroke-dasharray="138.23" stroke-dashoffset="138.23" stroke-linecap="round" transform="rotate(-90 26 26)"/>
+            </svg>
+            <div id="ful-ring-text" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#374151">0%</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;height:5px;background:#ece9e3;border-radius:999px;overflow:hidden"><div id="ful-bar" style="width:0%;height:100%;background:#8f897e;border-radius:999px"></div></div>
+      </div>
+
+      <!-- 6: Avg Order Value -->
+      <div class="wcard fi" id="w-aov" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:22px 22px 18px;animation-delay:.24s">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Avg Order Value</div>
+            <div id="sv-aov" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:10px">$0</div>
+            <div style="display:flex;align-items:center;gap:6px"><span id="sv-aov-trend" class="trend-up">0%</span><span style="font-size:12.5px;color:#9ca3af">vs last month</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-top:6px">
+            <div style="background:#f6f5f4;border-radius:6px;padding:5px 10px;text-align:center">
+              <div style="font-size:10.5px;color:#9ca3af;font-weight:600;margin-bottom:1px">ITEMS/ORDER</div>
+              <div id="sv-items-per" style="font-size:14px;font-weight:700;color:#374151">0</div>
+            </div>
+            <div style="background:#f6f5f4;border-radius:6px;padding:5px 10px;text-align:center">
+              <div style="font-size:10.5px;color:#9ca3af;font-weight:600;margin-bottom:1px">RETURN RATE</div>
+              <div id="sv-aov-return" style="font-size:14px;font-weight:700;color:#374151">0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7: Active Stores -->
+      <div class="wcard fi" id="w-stores" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:22px 22px 18px;animation-delay:.28s">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Active Stores</div>
+        <div id="sv-stores" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:10px">0</div>
+        <div id="sv-stores-list" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+        <a href="settings.html#stores" style="font-size:13px;color:#191918;font-weight:600;text-decoration:none">Manage stores →</a>
+      </div>
+
+      <!-- 8: Return Rate -->
+      <div class="wcard fi" id="w-return" draggable="false" ondragstart="ds(event)" ondragover="do_(event)" ondragleave="dl(event)" ondrop="dp(event)" ondragend="de(event)" style="padding:22px 22px 18px;animation-delay:.32s">
+        <div class="drag-handle"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="3.5" r="1.2" fill="currentColor"/><circle cx="9" cy="3.5" r="1.2" fill="currentColor"/><circle cx="5" cy="7" r="1.2" fill="currentColor"/><circle cx="9" cy="7" r="1.2" fill="currentColor"/><circle cx="5" cy="10.5" r="1.2" fill="currentColor"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/></svg></div>
+        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Return Rate</div>
+        <div id="sv-return" style="font-size:2.6rem;font-weight:800;color:#191918;letter-spacing:-0.06rem;line-height:1;margin-bottom:10px">0%</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span id="sv-return-trend" style="color:#374151;font-size:12.5px;font-weight:600">0%</span><span style="font-size:12.5px;color:#9ca3af">improvement this month</span></div>
+        <div style="height:5px;background:#ece9e3;border-radius:999px;overflow:hidden"><div id="sv-return-bar" style="width:0%;height:100%;background:#9ca3af;border-radius:999px"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:5px"><span style="font-size:11px;color:#9ca3af">0%</span><span style="font-size:11px;color:#9ca3af">Industry avg: —</span></div>
+      </div>
+
+    </div>
+
+    <!-- DRAGGABLE SECTIONS CONTAINER -->
+    <div id="sec-container">
+
+    <!-- CONTENT CARDS (individually draggable) -->
+    <div class="sec-block fi" id="sec-1" draggable="false" ondragstart="secDs(event)" ondragover="secDo(event)" ondragleave="secDl(event)" ondrop="secDp(event)" ondragend="secDe(event)" style="animation-delay:.28s;margin-bottom:20px">
+    <div class="sec-handle" title="Drag section"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="4" r="1.3" fill="currentColor"/><circle cx="10" cy="4" r="1.3" fill="currentColor"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/><circle cx="10" cy="8" r="1.3" fill="currentColor"/><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="10" cy="12" r="1.3" fill="currentColor"/></svg></div>
+    <div id="card-grid" style="display:grid;grid-template-columns:3fr 2fr;gap:16px;align-items:stretch">
+
+      <!-- LEFT: Revenue Trend with big summary + chart + order breakdown -->
+      <div class="card" id="cc-trend" style="padding:20px 22px">
+        <!-- Summary header -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px" id="trend-subtitle">This month · All platforms</div>
+            <div style="font-size:2.4rem;font-weight:800;color:#191918;letter-spacing:-0.05em;line-height:1;margin-bottom:9px" id="trend-big-val">$0</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="trend-up" id="trend-big-pct">0%</span>
+              <span style="font-size:13px;color:#9ca3af">this month · <strong style="color:#374151;font-weight:600" id="trend-prev-val">$0</strong> last month</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;padding-top:2px">
+            <div style="background:#f6f5f4;border-radius:7px;padding:2px;display:flex;gap:1px">
+              <button class="tab-sm on" id="trend-rev-btn" onclick="setTrendMode('revenue')">Revenue</button>
+              <button class="tab-sm" id="trend-ord-btn" onclick="setTrendMode('orders')">Orders</button>
+            </div>
+            <select id="trend-period" onchange="setTrendPeriod(this.value)" style="border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 22px 4px 9px;font-size:13px;font-family:inherit;background:#fff;color:#374151;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%239ca3af%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 6px center">
+              <option value="today">Today</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="3m">Last 3 months</option>
+              <option value="6m" selected>Last 6 months</option>
+              <option value="custom">Custom range…</option>
+            </select>
+            <a href="analytics.html" style="font-size:13px;color:#191918;text-decoration:none;font-weight:600;white-space:nowrap">Full analytics →</a>
+          </div>
+        </div>
+        <div id="trend-custom" style="display:none;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <input type="date" id="trend-from" style="border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;color:#374151;outline:none" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+          <span style="font-size:13px;color:#9ca3af">—</span>
+          <input type="date" id="trend-to" style="border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 8px;font-size:13px;font-family:inherit;color:#374151;outline:none" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+          <button onclick="applyCustomRange()" style="padding:4px 12px;border-radius:7px;font-size:13px;font-weight:600;background:#111827;color:#fff;border:none;cursor:pointer;font-family:inherit">Apply</button>
+        </div>
+        <canvas id="rchart" height="85"></canvas>
+        <!-- Order status breakdown (like reference's customer type breakdown) -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #f3f3f1">
+          <div style="border-left:3px solid #111827;padding-left:10px">
+            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">In Queue</div>
+            <div id="bd-inqueue" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div style="font-size:12px;color:#111827;font-weight:600">Orders</div>
+          </div>
+          <div style="border-left:3px solid #4b5563;padding-left:10px">
+            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Printing</div>
+            <div id="bd-printing" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div style="font-size:12px;color:#4b5563;font-weight:600">Active</div>
+          </div>
+          <div style="border-left:3px solid #9ca3af;padding-left:10px">
+            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Quality Check</div>
+            <div id="bd-qc" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div style="font-size:12px;color:#6b7280;font-weight:600">In review</div>
+          </div>
+          <div style="border-left:3px solid #d1d5db;padding-left:10px">
+            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Shipped</div>
+            <div id="bd-shipped" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div style="font-size:12px;color:#9ca3af;font-weight:600">Fulfilled</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Order Pipeline — stretches to match left card height -->
+      <div class="card" id="cc-pipeline" style="padding:22px 24px;display:flex;flex-direction:column">
+        <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Order Pipeline</div>
+        <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px">Current fulfillment status</div>
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+          <div style="max-width:220px;margin:0 auto;width:100%">
+            <canvas id="pchart"></canvas>
+          </div>
+          <div id="pleg" style="margin-top:16px;display:flex;flex-direction:column;gap:7px"></div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /sec-1 -->
+
+
+    <!-- RECENT ORDERS -->
+    <div class="sec-block fi" id="sec-3" draggable="false" ondragstart="secDs(event)" ondragover="secDo(event)" ondragleave="secDl(event)" ondrop="secDp(event)" ondragend="secDe(event)" style="animation-delay:.38s;margin-bottom:20px">
+    <div class="sec-handle" title="Drag to reorder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="4" r="1.3" fill="currentColor"/><circle cx="10" cy="4" r="1.3" fill="currentColor"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/><circle cx="10" cy="8" r="1.3" fill="currentColor"/><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="10" cy="12" r="1.3" fill="currentColor"/></svg></div>
+    <div class="card" style="overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:1px">Recent Orders</div>
+          <div style="font-size:13px;color:#9ca3af">Latest 5 orders across all stores</div>
+        </div>
+        <a href="orders.html" style="font-size:13.5px;color:#191918;text-decoration:none;font-weight:600">View all orders →</a>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th data-col="order">ORDER ID</th><th data-col="customer">CUSTOMER</th><th data-col="store">STORE</th><th data-col="status">STATUS</th><th data-col="items">ITEMS</th><th data-col="total">TOTAL</th><th data-col="profit">PROFIT</th><th data-col="created">CREATED</th>
+            </tr>
+          </thead>
+          <tbody id="recent-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    </div><!-- /sec-3 -->
+
+    <!-- RECOMMENDED PRODUCTS -->
+    <div class="sec-block fi" id="sec-4" draggable="false" ondragstart="secDs(event)" ondragover="secDo(event)" ondragleave="secDl(event)" ondrop="secDp(event)" ondragend="secDe(event)" style="animation-delay:.44s;margin-bottom:20px">
+    <div class="sec-handle" title="Drag to reorder"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="4" r="1.3" fill="currentColor"/><circle cx="10" cy="4" r="1.3" fill="currentColor"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/><circle cx="10" cy="8" r="1.3" fill="currentColor"/><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="10" cy="12" r="1.3" fill="currentColor"/></svg></div>
+      <div class="card" style="overflow:hidden">
+        <div style="padding:16px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:2px">Recommended for Your Store</div>
+            <div style="font-size:13px;color:#9ca3af">Based on your top sellers and current market trends</div>
+          </div>
+          <a href="products-dash.html" style="font-size:13.5px;color:#191918;text-decoration:none;font-weight:600;white-space:nowrap">Browse full catalog →</a>
+        </div>
+        <div style="padding:18px 20px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+
+          <!-- Hoodie -->
+          <div class="prod-rec-card">
+            <div style="height:200px;background:#f0ede9;overflow:hidden;position:relative">
+              <img src="images/395_fm.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#f3f4f6'"/>
+              <span style="position:absolute;top:10px;left:10px;background:#b5654a;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px">↑ Trending</span>
+            </div>
+            <div style="padding:13px">
+              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:3px">Apparel</div>
+              <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:5px">Gildan Hoodie 18500</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:13.5px;color:#374151">from <strong>$18.50</strong></span>
+                <span style="font-size:12px;color:#7c3aed;font-weight:600">+28% sales</span>
+              </div>
+              <button onclick="window.location='products-dash.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add to store</button>
+            </div>
+          </div>
+
+          <!-- Comfort Colors Tee -->
+          <div class="prod-rec-card">
+            <div style="height:200px;background:#f0ede9;overflow:hidden;position:relative">
+              <img src="images/1822_fm.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#f3f4f6'"/>
+              <span style="position:absolute;top:10px;left:10px;background:#b83c3c;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px">🔥 Hot</span>
+            </div>
+            <div style="padding:13px">
+              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:3px">Apparel</div>
+              <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:5px">Comfort Colors Tee 1717</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:13.5px;color:#374151">from <strong>$9.00</strong></span>
+                <span style="font-size:12px;background:#fef9c3;color:#374151;padding:2px 6px;border-radius:5px;font-weight:600">Bestseller</span>
+              </div>
+              <button onclick="window.location='products-dash.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add to store</button>
+            </div>
+          </div>
+
+          <!-- Dad Cap -->
+          <div class="prod-rec-card">
+            <div style="height:200px;background:#f0ede9;overflow:hidden;position:relative">
+              <img src="images/71413_f_fm.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#f3f4f6'"/>
+              <span style="position:absolute;top:10px;left:10px;background:#7a5c3a;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px">New</span>
+            </div>
+            <div style="padding:13px">
+              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:3px">Accessories</div>
+              <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:5px">Washed Dad Cap</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:13.5px;color:#374151">from <strong>$12.00</strong></span>
+                <span style="font-size:12px;background:#fdf4ff;color:#9333ea;padding:2px 6px;border-radius:5px;font-weight:600">Trending</span>
+              </div>
+              <button onclick="window.location='products-dash.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add to store</button>
+            </div>
+          </div>
+
+          <!-- Crewneck -->
+          <div class="prod-rec-card">
+            <div style="height:200px;background:#f0ede9;overflow:hidden;position:relative">
+              <img src="images/372_fm.jpg" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.style.background='#f3f4f6'"/>
+              <span style="position:absolute;top:10px;left:10px;background:#5c6e4a;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px">Popular</span>
+            </div>
+            <div style="padding:13px">
+              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:3px">Apparel</div>
+              <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:5px">Gildan Crewneck 18000</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span style="font-size:13.5px;color:#374151">from <strong>$15.00</strong></span>
+                <span style="font-size:12px;background:#f0fdf4;color:#16a34a;padding:2px 6px;border-radius:5px;font-weight:600">S–2XL</span>
+              </div>
+              <button onclick="window.location='products-dash.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add to store</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /sec-4 -->
+
+    </div><!-- /sec-container -->
+
+  </div>
+</div>
+
+<!-- DESIGN STUDIO OVERLAY (full-screen iframe) -->
+<div id="design-studio-overlay" style="display:none;position:fixed;inset:0;z-index:400;flex-direction:column">
+  <!-- Thin context bar at top -->
+  <div style="background:#fff;border-bottom:1px solid #e5e4e0;height:44px;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:10">
+    <button onclick="closeDesignStudio()" style="display:flex;align-items:center;gap:6px;background:none;border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 12px;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back to Order
+    </button>
+    <div style="width:1px;height:20px;background:#e5e4e0"></div>
+    <span style="font-size:13.5px;color:#9ca3af">Designing for</span>
+    <span id="studio-customer-label" style="font-size:13.5px;font-weight:700;color:#191918"></span>
+    <div style="flex:1"></div>
+    <span style="font-size:12.5px;color:#9ca3af">Push to Production in the editor when ready</span>
+  </div>
+  <iframe id="design-studio-frame" src="" style="flex:1;border:none;width:100%;display:block"></iframe>
+</div>
+
+<!-- BALANCE / UNFUNDED ORDERS MODAL -->
+<div id="balance-modal" style="display:none;position:fixed;inset:0;z-index:300;align-items:flex-start;justify-content:flex-end;padding:70px 24px 0">
+  <div id="balance-modal-backdrop" onclick="closeBalanceModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:-1"></div>
+  <div id="balance-modal-card" style="background:#fff;border-radius:14px;width:440px;max-width:calc(100vw-48px);box-shadow:0 20px 60px rgba(0,0,0,.22);animation:fadeUp .25s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;max-height:82vh">
+
+    <!-- Default state (low balance) -->
+    <div id="bal-state-default" style="display:flex;flex-direction:column;overflow:hidden;border-radius:14px">
+      <!-- Header -->
+      <div style="padding:16px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:1px">Wallet Balance</div>
+          <div id="bal-hdr-sub" style="font-size:13px;color:#191918;font-weight:600">$0.00 remaining — add funds to keep fulfilling</div>
+        </div>
+        <button onclick="closeBalanceModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <!-- Alert bar -->
+      <div id="bal-alert-bar" style="padding:10px 20px;background:#f0ede9;border-bottom:1px solid #d8d4cd;font-size:13.5px;color:#191918;display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="width:7px;height:7px;background:#a0522d;border-radius:50%;animation:pulse 1.5s ease-in-out infinite;flex-shrink:0;display:inline-block"></span>
+        Balance is low — orders will pause if funds run out. Consider enabling auto-reload.
+      </div>
+      <!-- Scrollable orders list (hidden when balance positive) -->
+      <div id="bal-orders-wrap" style="display:none;overflow-y:auto;max-height:280px;flex-shrink:1">
+        <div style="padding:6px 20px 6px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between">
+          <span id="bal-order-count">10 orders</span>
+          <button onclick="toggleSelectAll()" id="sel-all-btn" style="font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;padding:0;text-decoration:underline">Select all</button>
+        </div>
+        <div id="bal-order-list">
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="280" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8822 · Marco Rossi</div><div style="font-size:12.5px;color:#9ca3af">Etsy · 4 items · In Queue since Apr 15</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$280.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="350" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8825 · Tyler Brooks</div><div style="font-size:12.5px;color:#9ca3af">WooCommerce · 5 items · In Queue since Apr 16</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$350.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="210" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8821 · James Liu</div><div style="font-size:12.5px;color:#9ca3af">Shopify · 3 items · In Queue since Apr 16</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$210.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="195" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8829 · Nina Johansson</div><div style="font-size:12.5px;color:#9ca3af">Etsy · 2 items · In Queue since Apr 17</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$195.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="420" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8831 · David Kim</div><div style="font-size:12.5px;color:#9ca3af">Shopify · 6 items · In Queue since Apr 17</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$420.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="165" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8833 · Priya Nair</div><div style="font-size:12.5px;color:#9ca3af">Amazon · 2 items · In Queue since Apr 18</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$165.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="310" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8836 · Carlos Mena</div><div style="font-size:12.5px;color:#9ca3af">WooCommerce · 4 items · In Queue since Apr 18</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$310.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="245" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8839 · Yui Tanaka</div><div style="font-size:12.5px;color:#9ca3af">Etsy · 3 items · In Queue since Apr 19</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$245.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="390" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8842 · Emma Watson</div><div style="font-size:12.5px;color:#9ca3af">Shopify · 5 items · In Queue since Apr 20</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$390.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+          <div class="bal-order-row" style="padding:10px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+            <input type="checkbox" class="bal-chk" data-amt="175" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:1px">#FF-8845 · Lena Fischer</div><div style="font-size:12.5px;color:#9ca3af">WooCommerce · 2 items · In Queue since Apr 20</div></div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:14px;font-weight:700;color:#dc2626">$175.00</div><div style="font-size:11.5px;color:#9ca3af">fulfillment cost</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Add Funds panel -->
+      <div style="padding:18px 20px 20px;flex-shrink:0">
+        <!-- Balance row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding:12px 14px;background:#f0ede9;border:1.5px solid #d8d4cd;border-radius:10px">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Current Balance</div>
+            <div id="bal-modal-amt" style="font-size:23px;font-weight:800;color:#191918;letter-spacing:-.03em;line-height:1">$0.00</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:12px;color:#191918;font-weight:600;margin-bottom:3px">Low balance</div>
+            <div style="font-size:12px;color:#9ca3af">Add funds to keep orders flowing</div>
+          </div>
+        </div>
+        <!-- Quick add chips -->
+        <div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:7px">Quick add</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px">
+          <button onclick="setAddAmt(50)" style="padding:8px 4px;border-radius:7px;font-size:14px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'">$50</button>
+          <button onclick="setAddAmt(100)" style="padding:8px 4px;border-radius:7px;font-size:14px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'">$100</button>
+          <button onclick="setAddAmt(200)" style="padding:8px 4px;border-radius:7px;font-size:14px;font-weight:600;border:1.5px solid #111827;background:#111827;color:#fff;cursor:pointer;font-family:inherit">$200</button>
+          <button onclick="setAddAmt(500)" style="padding:8px 4px;border-radius:7px;font-size:14px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'">$500</button>
+        </div>
+        <!-- Custom amount -->
+        <div style="position:relative;margin-bottom:12px">
+          <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;color:#9ca3af;pointer-events:none">$</span>
+          <input id="add-amt" type="number" min="1" step="1" value="200" placeholder="Custom amount" style="width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px 10px 26px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:600;transition:border-color .15s" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+        </div>
+        <!-- Add Funds CTA -->
+        <button onclick="doTopUp()" style="width:100%;background:#111827;color:#fff;border:none;border-radius:9px;padding:11px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Add Funds
+        </button>
+        <!-- Auto-reload hint + Manage link -->
+        <div id="ar-hint-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6A4 4 0 016 2M10 6a4 4 0 01-4 4" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round"/><path d="M9.5 3.5L10 2l1.5 1.5" stroke="#9ca3af" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 8.5L2 10 .5 8.5" stroke="#9ca3af" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span style="font-size:12.5px;color:#9ca3af">Enable <a href="#" onclick="showAutoReload(event)" style="color:#191918;font-weight:600;text-decoration:none">auto-reload</a> so you never run low</span>
+          </div>
+          <button onclick="closeBalanceModal();window.location='wallet.html'" style="background:none;border:none;font-size:12.5px;color:#6b7280;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">Manage Wallet →</button>
+        </div>
+
+        <!-- Inline Auto-Reload Settings panel (hidden by default) -->
+        <div id="ar-panel" style="display:none;margin-top:14px;border:1.5px solid #d8d4cd;border-radius:10px;overflow:hidden">
+          <!-- Panel header -->
+          <div style="background:#f0ede9;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd9d2">
+            <div style="display:flex;align-items:center;gap:7px">
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2 6A4 4 0 016 2M10 6a4 4 0 01-4 4" stroke="#191918" stroke-width="1.2" stroke-linecap="round"/><path d="M9.5 3.5L10 2l1.5 1.5" stroke="#191918" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 8.5L2 10 .5 8.5" stroke="#191918" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span style="font-size:13.5px;font-weight:700;color:#191918">Auto-Reload Settings</span>
+            </div>
+            <button onclick="hideAutoReload()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:2px;border-radius:4px;display:flex;line-height:1" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <!-- Panel body -->
+          <div style="padding:12px 14px;background:#fff;display:flex;flex-direction:column;gap:10px">
+            <!-- Enable toggle -->
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px">
+              <span style="font-size:13.5px;color:#374151;font-weight:600">Reload balance automatically when low</span>
+              <input type="checkbox" id="ar-toggle" onchange="toggleArToggle(this)" style="display:none"/>
+              <div id="ar-toggle-track" style="width:36px;height:20px;border-radius:999px;background:#e5e7eb;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0">
+                <div id="ar-toggle-thumb" style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+              </div>
+            </label>
+            <!-- Fields (enabled when toggle is on) -->
+            <div id="ar-fields" style="display:flex;flex-direction:column;gap:8px;opacity:.45;pointer-events:none;transition:opacity .2s">
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">When balance drops below</div>
+                <div style="position:relative">
+                  <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;color:#9ca3af;pointer-events:none">$</span>
+                  <input id="ar-threshold" type="number" min="1" value="50" style="width:100%;border:1.5px solid #e5e4e0;border-radius:7px;padding:8px 10px 8px 22px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'"/>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Reload amount</div>
+                <div style="position:relative">
+                  <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:14px;color:#9ca3af;pointer-events:none">$</span>
+                  <input id="ar-amount" type="number" min="1" value="200" style="width:100%;border:1.5px solid #e5e4e0;border-radius:7px;padding:8px 10px 8px 22px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .15s" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'"/>
+                </div>
+              </div>
+            </div>
+            <!-- Save button -->
+            <button id="ar-save-btn" onclick="saveAutoReload()" style="width:100%;background:#111827;color:#fff;border:none;border-radius:8px;padding:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Save Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success state (all funded) -->
+    <div id="bal-state-success" style="display:none;padding:32px 24px;text-align:center">
+      <div style="width:56px;height:56px;background:#f0fdf4;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 14l7 7L24 7" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:#191918;margin-bottom:6px">All orders funded!</div>
+      <div style="font-size:14px;color:#6b7280;margin-bottom:4px">Fulfillment has been resumed for all orders.</div>
+      <div style="font-size:13px;color:#9ca3af">Closing in a moment…</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Sparklines ── */
+function mkSparkline(id, data, color) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const g = ctx.getContext('2d').createLinearGradient(0,0,0,58);
+  g.addColorStop(0, color+'40');
+  g.addColorStop(1, color+'00');
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: ['N','D','J','F','M','A'], datasets: [{ data, borderColor: color, backgroundColor: 'transparent', borderWidth: 1.4, tension: 0.4, fill: false, pointRadius: 0, pointHoverRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend:{display:false}, tooltip:{enabled:false} }, scales: { x:{display:false}, y:{display:false, min:(ctx)=>{ const v=ctx.chart.data.datasets[0].data; return Math.min(...v)*0.92; }} } }
+  });
+}
+function mkBarSparkline(id, data, color) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: { labels: ['N','D','J','F','M','A'], datasets: [{ data, backgroundColor: data.map((v,i) => i === data.length-1 ? color : color+'70'), borderRadius: 3, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend:{display:false}, tooltip:{enabled:false} }, scales: { x:{display:false}, y:{display:false, min:0} } }
+  });
+}
+function mkStepSparkline(id, data, color) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'line',
+    data: { labels: ['N','D','J','F','M','A'], datasets: [{ data, borderColor: color, backgroundColor: 'transparent', borderWidth: 1.5, stepped: true, fill: false, pointRadius: 0, pointHoverRadius: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend:{display:false}, tooltip:{enabled:false} }, scales: { x:{display:false}, y:{display:false, min:(ctx)=>{ const v=ctx.chart.data.datasets[0].data; return Math.min(...v)*0.9; }} } }
+  });
+}
+
+/* ── Platform + Period stat data ──
+   IS_DEMO gating: the dashboard's hardcoded "busy account" numbers and
+   count-up animation are intended for the landing-page preview only
+   (index.html iframes seller.html?demo=1). The real seller dashboard starts
+   at zero and waits for actual orders/revenue to come in via the wired data
+   sources. When ?demo=1 is absent, every DASH_STATS / TREND_DATA bucket gets
+   zeroed at module load so the operator sees a clean slate. */
+const IS_DEMO = (function(){
+  try { return new URLSearchParams(location.search).get('demo') === '1'; }
+  catch(e) { return false; }
+})();
+const DASH_STATS = {
+  all:{
+    month:    {orders:12847,revenue:384200,profit:128450,fulfillRate:97.2,aov:29.91,returnRate:1.8},
+    '7d':     {orders:3120,revenue:94800,profit:31600,fulfillRate:96.8,aov:30.38,returnRate:2.1},
+    '30d':    {orders:12847,revenue:384200,profit:128450,fulfillRate:97.2,aov:29.91,returnRate:1.8},
+    lastmonth:{orders:11340,revenue:341500,profit:112000,fulfillRate:96.5,aov:30.12,returnRate:2.1},
+    quarter:  {orders:34620,revenue:1042800,profit:348900,fulfillRate:97.0,aov:30.12,returnRate:1.9},
+  },
+  shopify:{
+    month:    {orders:312,revenue:14240,profit:4560,fulfillRate:98.1,aov:45.64,returnRate:1.6},
+    '7d':     {orders:72,revenue:3300,profit:1060,fulfillRate:98.4,aov:45.83,returnRate:1.4},
+    '30d':    {orders:312,revenue:14240,profit:4560,fulfillRate:98.1,aov:45.64,returnRate:1.6},
+    lastmonth:{orders:284,revenue:13100,profit:4100,fulfillRate:97.8,aov:46.13,returnRate:1.8},
+    quarter:  {orders:842,revenue:38600,profit:12200,fulfillRate:98.0,aov:45.84,returnRate:1.7},
+  },
+  etsy:{
+    month:    {orders:228,revenue:10900,profit:3600,fulfillRate:96.8,aov:47.81,returnRate:1.4},
+    '7d':     {orders:54,revenue:2600,profit:840,fulfillRate:96.5,aov:48.15,returnRate:1.8},
+    '30d':    {orders:228,revenue:10900,profit:3600,fulfillRate:96.8,aov:47.81,returnRate:1.4},
+    lastmonth:{orders:206,revenue:9840,profit:3240,fulfillRate:96.2,aov:47.77,returnRate:1.6},
+    quarter:  {orders:614,revenue:29300,profit:9400,fulfillRate:96.9,aov:47.72,returnRate:1.5},
+  },
+  woo:{
+    month:    {orders:184,revenue:8280,profit:2640,fulfillRate:96.4,aov:45.00,returnRate:2.2},
+    '7d':     {orders:42,revenue:1940,profit:620,fulfillRate:95.9,aov:46.19,returnRate:2.4},
+    '30d':    {orders:184,revenue:8280,profit:2640,fulfillRate:96.4,aov:45.00,returnRate:2.2},
+    lastmonth:{orders:170,revenue:7640,profit:2400,fulfillRate:96.0,aov:44.94,returnRate:2.5},
+    quarter:  {orders:490,revenue:22000,profit:6900,fulfillRate:96.5,aov:44.90,returnRate:2.3},
+  },
+  amazon:{
+    month:    {orders:88,revenue:3960,profit:1160,fulfillRate:98.6,aov:45.00,returnRate:2.8},
+    '7d':     {orders:20,revenue:920,profit:280,fulfillRate:98.2,aov:46.00,returnRate:2.6},
+    '30d':    {orders:88,revenue:3960,profit:1160,fulfillRate:98.6,aov:45.00,returnRate:2.8},
+    lastmonth:{orders:80,revenue:3640,profit:1040,fulfillRate:98.3,aov:45.50,returnRate:3.0},
+    quarter:  {orders:238,revenue:10700,profit:3200,fulfillRate:98.5,aov:44.96,returnRate:2.9},
+  },
+  manual:{
+    month:    {orders:35,revenue:1040,profit:320,fulfillRate:95.0,aov:29.71,returnRate:0.8},
+    '7d':     {orders:10,revenue:440,profit:140,fulfillRate:94.5,aov:44.00,returnRate:0.5},
+    '30d':    {orders:35,revenue:1040,profit:320,fulfillRate:95.0,aov:29.71,returnRate:0.8},
+    lastmonth:{orders:22,revenue:820,profit:220,fulfillRate:94.8,aov:37.27,returnRate:1.0},
+    quarter:  {orders:126,revenue:7800,profit:3100,fulfillRate:95.1,aov:61.90,returnRate:0.9},
+  },
+};
+// Non-demo: replace every bucket with zeros so the real dashboard starts clean.
+if (!IS_DEMO) {
+  const _z = {orders:0,revenue:0,profit:0,fulfillRate:0,aov:0,returnRate:0};
+  Object.keys(DASH_STATS).forEach(function(plat){
+    Object.keys(DASH_STATS[plat]).forEach(function(per){ DASH_STATS[plat][per] = Object.assign({}, _z); });
+  });
+}
+
+let dashPlatform = 'all', dashPeriod = 'month';
+
+function setDashPlatform(p) {
+  dashPlatform = p;
+  updateDashStats();
+}
+function setDashPeriod(v) { dashPeriod = v; updateDashStats(); }
+
+// Speedometer-style count-up: ramps from 0 → target with cubic ease-out.
+// Reads the current el.dataset.target to dedupe consecutive identical calls
+// (so resizing or theme flips don't re-trigger the animation).
+function animateCounter(el, target, opts){
+  if (!el) return;
+  opts = opts || {};
+  const fmt = opts.format || ((v) => Math.round(v).toLocaleString());
+  const dur = opts.duration || 1200;
+  const start = parseFloat(el.dataset.cur || '0') || 0;
+  el.dataset.cur = target;
+  const t0 = performance.now();
+  function tick(now){
+    const t = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - t, 3);
+    const cur = start + (target - start) * e;
+    el.textContent = fmt(cur);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = fmt(target);
+  }
+  requestAnimationFrame(tick);
+}
+function updateDashStats(animate) {
+  const d = (DASH_STATS[dashPlatform] || DASH_STATS.all)[dashPeriod] || DASH_STATS.all.month;
+  const prev = (DASH_STATS[dashPlatform] || DASH_STATS.all).lastmonth || DASH_STATS.all.lastmonth;
+  const pct = (val, prevVal) => prevVal ? (((val-prevVal)/prevVal)*100).toFixed(1) : '0.0';
+  const up = (v) => parseFloat(v) >= 0;
+  const setVal = (el, target, fmt) => {
+    if (!el) return;
+    if (animate) animateCounter(el, target, { format: fmt });
+    else el.textContent = fmt(target);
+  };
+  const intFmt = (v) => Math.round(v).toLocaleString();
+  const dollarFmt = (v) => '$'+Math.round(v).toLocaleString();
+  const dollar2Fmt = (v) => '$'+v.toFixed(2);
+  const pctFmt = (v) => v.toFixed(1)+'%';
+
+  setVal(document.querySelector('#w-orders [style*="2.6rem"]'), d.orders, intFmt);
+  const oTr = document.querySelector('#w-orders .trend-up, #w-orders .trend-dn');
+  if (oTr) { const v = pct(d.orders, prev.orders); oTr.className = up(v)?'trend-up':'trend-dn'; oTr.textContent=(up(v)?'↑ ':'↓ ')+Math.abs(v)+'%'; }
+
+  setVal(document.querySelector('#w-revenue [style*="2.6rem"]'), d.revenue, dollarFmt);
+  const rTr = document.querySelector('#w-revenue .trend-up, #w-revenue .trend-dn');
+  if (rTr) { const v = pct(d.revenue, prev.revenue); rTr.className = up(v)?'trend-up':'trend-dn'; rTr.textContent=(up(v)?'↑ ':'↓ ')+Math.abs(v)+'%'; }
+
+  setVal(document.querySelector('#w-profit [style*="2.6rem"]'), d.profit, dollarFmt);
+  const pTr = document.querySelector('#w-profit .trend-up, #w-profit .trend-dn');
+  if (pTr) { const v = pct(d.profit, prev.profit); pTr.className = up(v)?'trend-up':'trend-dn'; pTr.textContent=(up(v)?'↑ ':'↓ ')+Math.abs(v)+'%'; }
+
+  setVal(document.querySelector('#w-fulfill [style*="2.6rem"]'), d.fulfillRate, pctFmt);
+  // Fulfillment progress ring + bar
+  const ring = document.getElementById('ful-ring');
+  const ringTxt = document.getElementById('ful-ring-text');
+  const ringBar = document.getElementById('ful-bar');
+  if (ring) ring.setAttribute('stroke-dashoffset', (138.23 * (1 - d.fulfillRate/100)).toFixed(2));
+  if (ringTxt) ringTxt.textContent = d.fulfillRate.toFixed(0)+'%';
+  if (ringBar) ringBar.style.width = d.fulfillRate.toFixed(0)+'%';
+
+  setVal(document.querySelector('#w-aov [style*="2.6rem"]'), d.aov, dollar2Fmt);
+  const aTr = document.querySelector('#w-aov .trend-up, #w-aov .trend-dn');
+  if (aTr) { const v = pct(d.aov, prev.aov); aTr.className = up(v)?'trend-up':'trend-dn'; aTr.textContent=(up(v)?'↑ ':'↓ ')+Math.abs(v)+'%'; }
+  const ipo = document.getElementById('sv-items-per'); if (ipo) setVal(ipo, IS_DEMO ? 1.8 : 0, (v)=>v.toFixed(1));
+  const ovrRet = document.getElementById('sv-aov-return'); if (ovrRet) ovrRet.textContent = d.returnRate.toFixed(1)+'%';
+
+  setVal(document.querySelector('#w-return [style*="2.6rem"]'), d.returnRate, pctFmt);
+  // Pipeline breakdown stats — demo shows a busy distribution, real dashboard
+  // starts at zero and will fill in as actual orders flow.
+  const bd = (id, v) => { const el = document.getElementById(id); if (el) setVal(el, v, intFmt); };
+  if (IS_DEMO) { bd('bd-inqueue', 47); bd('bd-printing', 124); bd('bd-qc', 86); bd('bd-shipped', 873); }
+  else        { bd('bd-inqueue', 0);  bd('bd-printing', 0);   bd('bd-qc', 0);  bd('bd-shipped', 0);   }
+  // Active stores card (#w-stores) — count platforms with month orders > 0
+  const storeCount = Object.keys(DASH_STATS).filter(k => k!=='all' && (DASH_STATS[k]?.month?.orders||0) > 0).length;
+  setVal(document.querySelector('#w-stores [style*="2.6rem"]'), storeCount, intFmt);
+  // Balance card (#w-balance) — demo shows a healthy starter; real dashboard
+  // reflects the actual eg_balance value (0 by default).
+  const balEl = document.querySelector('#w-balance #sv-balance');
+  if (balEl) setVal(balEl, IS_DEMO ? 0 : 0, dollar2Fmt);
+  const balNote = document.getElementById('sv-balance-note');
+  if (balNote) balNote.textContent = IS_DEMO ? 'Available for fulfillment' : 'No funds yet';
+
+  // update sparklines by recreating them
+  if (dashPlatform !== 'all') {
+    const revData = ['7d','month','quarter'].map(p2 => (DASH_STATS[dashPlatform]?.[p2]?.revenue || 0));
+    const ordData = ['7d','month','quarter'].map(p2 => (DASH_STATS[dashPlatform]?.[p2]?.orders || 0));
+    const prtData = ['7d','month','quarter'].map(p2 => (DASH_STATS[dashPlatform]?.[p2]?.profit || 0));
+    Chart.getChart('sp-orders')?.destroy(); mkSparkline('sp-orders', ordData, dashPal().o);
+    Chart.getChart('sp-rev')?.destroy(); mkBarSparkline('sp-rev', revData, dashPal().r);
+    Chart.getChart('sp-profit')?.destroy(); mkSparkline('sp-profit', prtData, dashPal().p);
+  }
+
+  updateTrendChart();
+}
+
+/* ── Trend chart data ── */
+// Demo trend data — climbing curves so the chart looks like a healthy growing
+// account. Revenue tops out around $80k/mo, orders ~2.6k/mo at the latest
+// point, both with realistic month-over-month variance.
+const TREND_DATA = {
+  revenue: {
+    'today': {labels:['8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm'], data:[820,1240,1900,2480,3260,3880,4920,5640,6380,7120,7820,8640]},
+    '7d':   {labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[9800,10600,12400,11900,14200,16800,18900]},
+    '30d':  {labels:['Apr 1','Apr 5','Apr 10','Apr 15','Apr 20','Apr 25','Apr 28'], data:[42000,48000,55000,61000,68000,73000,84000]},
+    '3m':   {labels:['Feb','Mar','Apr'], data:[298000,341500,384200]},
+    '6m':   {labels:['Nov','Dec','Jan','Feb','Mar','Apr'], data:[182000,224000,268000,298000,341500,384200]},
+  },
+  orders: {
+    'today': {labels:['8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm'], data:[32,48,76,98,128,154,182,212,234,256,278,302]},
+    '7d':   {labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'], data:[324,362,418,402,476,562,628]},
+    '30d':  {labels:['Apr 1','Apr 5','Apr 10','Apr 15','Apr 20','Apr 25','Apr 28'], data:[1400,1620,1850,2040,2280,2440,2820]},
+    '3m':   {labels:['Feb','Mar','Apr'], data:[9920,11340,12847]},
+    '6m':   {labels:['Nov','Dec','Jan','Feb','Mar','Apr'], data:[6100,7480,8920,9920,11340,12847]},
+  },
+};
+// Non-demo: flatten the trend curves to zero so the real chart starts flat.
+if (!IS_DEMO) {
+  Object.keys(TREND_DATA).forEach(function(mode){
+    Object.keys(TREND_DATA[mode]).forEach(function(per){
+      TREND_DATA[mode][per].data = TREND_DATA[mode][per].data.map(function(){ return 0; });
+    });
+  });
+}
+const PERIOD_LABELS = {today:'Today','7d':'Last 7 days','30d':'Last 30 days','3m':'Last 3 months','6m':'Last 6 months'};
+let currentTrendMode = 'revenue', currentTrendPeriod = '6m', trendChart = null;
+
+function setTrendMode(mode) {
+  currentTrendMode = mode;
+  document.getElementById('trend-rev-btn').classList.toggle('on', mode==='revenue');
+  document.getElementById('trend-ord-btn').classList.toggle('on', mode==='orders');
+  const bigVal = document.getElementById('trend-big-val');
+  const bigPct = document.getElementById('trend-big-pct');
+  if (bigVal) bigVal.textContent = mode==='revenue' ? '$0' : '0';
+  if (bigPct) { bigPct.className = 'trend-up'; bigPct.textContent = '0%'; }
+  updateTrendChart();
+}
+function setTrendPeriod(v) {
+  const custom = document.getElementById('trend-custom');
+  custom.style.display = v === 'custom' ? 'flex' : 'none';
+  if (v !== 'custom') { currentTrendPeriod = v; updateTrendChart(); }
+}
+function applyCustomRange() {
+  const from = document.getElementById('trend-from').value;
+  const to   = document.getElementById('trend-to').value;
+  if (!from || !to || from > to) return;
+  const days = Math.round((new Date(to)-new Date(new Date(from)))/(864e5))+1;
+  const pts = Math.min(days, 12);
+  const labels = Array.from({length:pts},(_,i)=>{
+    const d = new Date(from); d.setDate(d.getDate()+Math.round(i*(days-1)/(pts-1||1)));
+    return (d.getMonth()+1)+'/'+(d.getDate());
+  });
+  const base = currentTrendMode==='revenue' ? 8000 : 60;
+  const data = labels.map((_,i) => Math.round(base*(1+i*0.08) + (Math.random()-0.4)*base*0.15));
+  if (!trendChart) return;
+  trendChart.data.labels = labels;
+  trendChart.data.datasets[0].data = data;
+  trendChart.update({duration:600,easing:'easeInOutCubic'});
+  document.getElementById('trend-subtitle').textContent = from.slice(5).replace('-','/')+' – '+to.slice(5).replace('-','/') + ' · custom';
+}
+
+/* ── Revenue chart ── */
+function initRC() {
+  const ctx = document.getElementById('rchart').getContext('2d');
+  const g = ctx.createLinearGradient(0,0,0,150);
+  g.addColorStop(0,'rgba(17,24,39,.12)');
+  g.addColorStop(1,'rgba(17,24,39,0)');
+  const d = TREND_DATA[currentTrendMode][currentTrendPeriod];
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.labels,
+      datasets: [{
+        data: d.data,
+        borderColor:'#111827',
+        backgroundColor:g,
+        borderWidth:2,
+        tension:.4,
+        fill:true,
+        pointRadius:3,
+        pointBackgroundColor:'#111827',
+        pointHoverRadius:5
+      }]
+    },
+    options: {
+      responsive:true,
+      animation:{duration:700,easing:'easeInOutCubic'},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=> currentTrendMode==='revenue' ? ' $'+c.parsed.y.toLocaleString() : ' '+c.parsed.y+' orders'}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:11},color:'#9ca3af'}},
+        y:{grid:{color:'rgba(140,140,140,0.16)'},border:{dash:[4,4],display:false},ticks:{font:{size:11},color:'#9ca3af',callback:v=> currentTrendMode==='revenue' ? '$'+(v/1000).toFixed(0)+'k' : v}}
+      }
+    }
+  });
+}
+function updateTrendChart() {
+  if (!trendChart) return;
+  const d = TREND_DATA[currentTrendMode][currentTrendPeriod];
+  if (!d) return;
+  trendChart.data.labels = d.labels;
+  trendChart.data.datasets[0].data = d.data;
+  trendChart.options.plugins.tooltip.callbacks.label = c => currentTrendMode==='revenue' ? ' $'+c.parsed.y.toLocaleString() : ' '+c.parsed.y+' orders';
+  trendChart.options.scales.y.ticks.callback = v => currentTrendMode==='revenue' ? '$'+(v/1000).toFixed(0)+'k' : v;
+  trendChart.update({duration:600,easing:'easeInOutCubic'});
+  const pl = dashPlatform === 'all' ? 'All platforms' : ({shopify:'Shopify',etsy:'Etsy',woo:'WooCommerce',amazon:'Amazon',manual:'Manual'}[dashPlatform]);
+  document.getElementById('trend-subtitle').textContent = (PERIOD_LABELS[currentTrendPeriod]||'Custom') + ' · ' + pl;
+  // Update big summary (latest point) + % vs first point. Counter-animate so
+  // the trend panel matches the cards above.
+  const bigVal = document.getElementById('trend-big-val');
+  const bigPct = document.getElementById('trend-big-pct');
+  const arr = d.data || [];
+  const last = arr.length ? arr[arr.length-1] : 0;
+  const first = arr.length ? arr[0] : 0;
+  const pct = first ? (((last - first) / first) * 100).toFixed(1) : '0.0';
+  const up = parseFloat(pct) >= 0;
+  if (bigVal) animateCounter(bigVal, last, { format: currentTrendMode==='revenue' ? (v)=>'$'+Math.round(v).toLocaleString() : (v)=>Math.round(v).toLocaleString() });
+  if (bigPct) { bigPct.className = up?'trend-up':'trend-dn'; bigPct.textContent = (up?'↑ ':'↓ ')+Math.abs(pct)+'%'; }
+}
+
+/* ── Pipeline donut ── */
+function initPC() {
+  const ctx = document.getElementById('pchart').getContext('2d');
+  const labs = ['In Queue','Printing','Quality Check','Shipped'];
+  // Demo distribution — busy account with most orders already shipped.
+  // Non-demo: pipeline starts empty until real orders flow through.
+  const vals = IS_DEMO ? [47, 124, 86, 873] : [0, 0, 0, 0];
+  const cols = dashPal().donut;
+  new Chart(ctx, {
+    type:'doughnut',
+    data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed}`}}}}
+  });
+  const total = vals.reduce((a,b)=>a+b,0);
+  document.getElementById('pleg').innerHTML = labs.map((l,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span data-sw style="width:8px;height:8px;border-radius:50%;background:${cols[i]};display:inline-block;flex-shrink:0"></span>
+        <span style="color:#6b7280">${l}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-weight:700;color:#374151">${vals[i]}</span>
+        <span style="color:#d1d5db">${total ? Math.round(vals[i]/total*100) : 0}%</span>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Recent orders ── */
+const RECENT = [
+  {id:'d5b2837ef91c',num:'FF-7001',platId:'SP-70001',cust:'James Liu',store:'Main Store',total:45,profit:17.80,created:'4/16/2026',
+   items:[{name:'Gildan Tee 5000',qty:2,sku:'GT5K-BLK-M',status:'new'},{name:'Comfort Colors 1717',qty:1,sku:'CC1717-WHT-L',status:'new'}]},
+];
+const SC={
+  new:    {cls:'b-s-new',   label:'New',            dot:'#1d4ed8'},
+  review: {cls:'b-s-review',label:'In Review',      dot:'#374151'},
+  action: {cls:'b-s-action',label:'Action Needed',  dot:'#dc2626'},
+  prod:   {cls:'b-s-prod',  label:'In Production',  dot:'#6d28d9'},
+  shipped:{cls:'b-s-ship',  label:'Shipped',         dot:'#15803d'},
+};
+const STATUS_PRIORITY = ['action','review','new','prod','shipped'];
+let rExpanded = new Set();
+
+function getOrderStatus(o) {
+  const statuses = o.items.map(i => i.status);
+  for (const s of STATUS_PRIORITY) { if (statuses.includes(s)) return s; }
+  return statuses[0] || 'new';
+}
+
+function toggleRExp(id) {
+  const row = document.getElementById('rexp-'+id);
+  const chev = document.getElementById('dash-chev-'+id);
+  if (!row) return;
+  if (rExpanded.has(id)) {
+    rExpanded.delete(id);
+    row.style.display = 'none';
+    if (chev) chev.style.transform = '';
+  } else {
+    rExpanded.add(id);
+    row.style.display = 'table-row';
+    if (chev) chev.style.transform = 'rotate(180deg)';
+  }
+}
+
+function renderRecent(){
+  const rows = [];
+  RECENT.forEach(o => {
+    const effStatus = getOrderStatus(o);
+    const sc = SC[effStatus] || SC.new;
+    const pc = o.profit>20?'#16a34a':o.profit>10?'#374151':'#9ca3af';
+    const initials = o.cust.split(' ').map(w=>w[0]).join('');
+    const rowBg = effStatus==='action' ? 'background:#fff7f7;' : '';
+    const totalQty = o.items.reduce((s,i)=>s+i.qty,0);
+    const isExp = rExpanded.has(o.id);
+
+    rows.push(`<tr class="main-row" onclick="toggleRExp('${o.id}')" style="${rowBg}cursor:pointer">
+      <td data-col="order">
+        <div style="font-size:14px;font-weight:700;color:#191918"><a href="order-detail.html?id=${o.id}" style="color:inherit;text-decoration:none" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#191918'" onclick="event.stopPropagation()">#${o.num||o.id}</a></div>
+        ${o.platId?`<div style="font-size:12px;color:#9ca3af;margin-top:2px">${o.platId}</div>`:''}
+      </td>
+      <td data-col="customer"><div style="display:flex;align-items:center;gap:7px"><div style="width:24px;height:24px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#374151;flex-shrink:0">${initials}</div><span style="font-weight:500;color:#191918">${o.cust}</span></div></td>
+      <td data-col="store" style="font-size:13.5px;color:#6b7280">${o.store}</td>
+      <td data-col="status">
+        <span class="badge ${sc.cls}" style="display:inline-flex;align-items:center;gap:4px"><span style="width:5px;height:5px;border-radius:50%;background:${sc.dot};display:inline-block;flex-shrink:0"></span>${sc.label}</span>
+      </td>
+      <td data-col="items">
+        <div style="display:flex;align-items:center;gap:5px">
+          <span style="font-size:13.5px;font-weight:600;color:#374151">${totalQty}</span>
+          <span style="font-size:12.5px;color:#9ca3af">${totalQty===1?'item':'items'}</span>
+          <svg id="dash-chev-${o.id}" width="10" height="10" viewBox="0 0 10 10" fill="none" style="margin-left:2px;opacity:.3;flex-shrink:0;transition:transform .2s;transform:${isExp?'rotate(180deg)':'none'}"><path d="M2.5 3.5l2.5 2.5 2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </td>
+      <td data-col="total" style="font-weight:600;color:#191918">$${o.total}</td>
+      <td data-col="profit" style="font-weight:600;color:${pc}">$${o.profit.toFixed(2)}</td>
+      <td data-col="created" style="font-size:13px;color:#6b7280">${o.created}</td>
+    </tr>`);
+
+    rows.push(`<tr class="exp-row" id="rexp-${o.id}" style="display:${isExp?'table-row':'none'}">
+      <td colspan="8" style="padding:0">
+        <div style="background:#fafaf9;border-top:1px dashed #e5e4e0;padding:8px 16px 10px 40px">
+          ${o.items.map(item => {
+            const isc = SC[item.status] || SC.new;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f3f3f1">
+              <span style="font-size:14px;font-weight:500;color:#191918;flex:1">${item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></span>
+              <span style="font-size:12px;color:#9ca3af">${item.sku}</span>
+              <span class="badge ${isc.cls}" style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0"><span style="width:5px;height:5px;border-radius:50%;background:${isc.dot};display:inline-block;flex-shrink:0"></span>${isc.label}</span>
+              ${item.reason ? `<span style="font-size:12px;color:#dc2626">⚠ ${item.reason}</span>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </td>
+    </tr>`);
+  });
+  document.getElementById('recent-tbody').innerHTML = rows.join('');
+  dashApplyColOrder();
+}
+
+let dashColOrder = ['order','customer','store','status','items','total','profit','created'];
+let dashDragColIdx = null;
+function dashDragColStart(e, col) { dashDragColIdx = dashColOrder.indexOf(col); e.dataTransfer.effectAllowed = 'move'; e.target.style.opacity = '.45'; }
+function dashDragColOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const th = e.target.closest('th[data-col]'); if (th) { document.querySelectorAll('#recent-tbody').closest && document.querySelectorAll('th[data-col]').forEach(t => t.style.borderLeft = ''); th.style.borderLeft = '2px solid #111827'; } }
+function dashDragColLeave(e) { const th = e.target.closest('th[data-col]'); if (th) th.style.borderLeft = ''; }
+function dashDragColEnd(e) { e.target.style.opacity = ''; document.querySelectorAll('th[data-col]').forEach(t => t.style.borderLeft = ''); }
+function dashDragColDrop(e, col) { e.preventDefault(); const toIdx = dashColOrder.indexOf(col); if (dashDragColIdx === null || dashDragColIdx === toIdx) { dashDragColEnd(e); return; } const [c] = dashColOrder.splice(dashDragColIdx, 1); dashColOrder.splice(toIdx, 0, c); dashDragColIdx = null; renderRecent(); }
+function dashApplyColOrder() {
+  const tbody = document.getElementById('recent-tbody');
+  if (!tbody) return;
+  const table = tbody.closest('table');
+  if (!table) return;
+  table.querySelectorAll('tr').forEach(row => {
+    const cells = Array.from(row.querySelectorAll('th[data-col],td[data-col]'));
+    if (!cells.length) return;
+    const map = {}; cells.forEach(c => { map[c.dataset.col] = c; });
+    dashColOrder.forEach(n => { if (map[n]) row.appendChild(map[n]); });
+  });
+  table.querySelectorAll('th[data-col]').forEach(th => {
+    th.setAttribute('draggable', 'true'); th.style.cursor = 'grab';
+    th.ondragstart = e => dashDragColStart(e, th.dataset.col);
+    th.ondragover  = dashDragColOver; th.ondragleave = dashDragColLeave;
+    th.ondrop      = e => dashDragColDrop(e, th.dataset.col);
+    th.ondragend   = dashDragColEnd;
+  });
+}
+
+/* ── New Order modal ── */
+/* ── Design Studio overlay ── */
+function openDesignStudio() {
+  const customer = document.getElementById('no-customer').value.trim() || 'New Order';
+  document.getElementById('studio-customer-label').textContent = customer;
+  const frame = document.getElementById('design-studio-frame');
+  if (!frame.src || frame.src === window.location.href) {
+    frame.src = 'design-maker.html';
+  }
+  document.getElementById('design-studio-overlay').style.display = 'flex';
+  document.getElementById('new-order-modal').style.display = 'none';
+  document.body.style.overflow = 'hidden';
+}
+function closeDesignStudio() {
+  document.getElementById('design-studio-overlay').style.display = 'none';
+  document.getElementById('new-order-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+/* ── Balance modal ── */
+function openBalanceModal() {
+  const m = document.getElementById('balance-modal');
+  // Reset to default state
+  document.getElementById('bal-state-default').style.display = 'flex';
+  document.getElementById('bal-state-success').style.display = 'none';
+  document.getElementById('balance-modal-card').classList.remove('modal-fade-out');
+  m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  updateBalTotal();
+}
+function closeBalanceModal() {
+  const card = document.getElementById('balance-modal-card');
+  card.classList.add('modal-fade-out');
+  setTimeout(() => {
+    document.getElementById('balance-modal').style.display = 'none';
+    card.classList.remove('modal-fade-out');
+    document.body.style.overflow = '';
+  }, 420);
+}
+function switchTab(tab) {
+  const isAll = tab === 'all';
+  document.getElementById('tab-all').style.background = isAll ? '#111827' : '#fff';
+  document.getElementById('tab-all').style.color = isAll ? '#fff' : '#374151';
+  document.getElementById('tab-all').style.borderColor = isAll ? '#111827' : '#e5e4e0';
+  document.getElementById('tab-custom').style.background = !isAll ? '#111827' : '#fff';
+  document.getElementById('tab-custom').style.color = !isAll ? '#fff' : '#374151';
+  document.getElementById('tab-custom').style.borderColor = !isAll ? '#111827' : '#e5e4e0';
+  document.getElementById('panel-all').style.display = isAll ? '' : 'none';
+  document.getElementById('panel-custom').style.display = !isAll ? '' : 'none';
+}
+function updateBalTotal() {
+  const chks = document.querySelectorAll('.bal-chk');
+  let total = 0, count = 0;
+  chks.forEach(c => { if (c.checked) { total += parseFloat(c.dataset.amt) || 0; count++; } });
+  const totalEl = document.getElementById('bal-total');
+  if (totalEl) totalEl.textContent = '$' + total.toFixed(2);
+  const btn = document.getElementById('topup-all-btn');
+  if (btn) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg> Top Up $${total.toFixed(2)} — Resume ${count} Order${count !== 1 ? 's' : ''}`;
+    btn.disabled = total === 0;
+    btn.style.opacity = total === 0 ? '.45' : '1';
+    btn.style.cursor = total === 0 ? 'not-allowed' : 'pointer';
+  }
+  const selBtn = document.getElementById('sel-all-btn');
+  if (selBtn) selBtn.textContent = count === chks.length ? 'Deselect all' : 'Select all';
+}
+function toggleSelectAll() {
+  const chks = document.querySelectorAll('.bal-chk');
+  const allChecked = [...chks].every(c => c.checked);
+  chks.forEach(c => c.checked = !allChecked);
+  updateBalTotal();
+}
+function setAddAmt(v) {
+  const el = document.getElementById('add-amt');
+  if (el) el.value = v;
+}
+function showAutoReload(e) {
+  if (e) e.preventDefault();
+  const panel = document.getElementById('ar-panel');
+  const hint = document.getElementById('ar-hint-row');
+  if (!panel) return;
+  panel.style.display = 'block';
+  hint.style.display = 'none';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function hideAutoReload() {
+  document.getElementById('ar-panel').style.display = 'none';
+  document.getElementById('ar-hint-row').style.display = 'flex';
+}
+function toggleArToggle(cb) {
+  const track = document.getElementById('ar-toggle-track');
+  const thumb = document.getElementById('ar-toggle-thumb');
+  const fields = document.getElementById('ar-fields');
+  if (cb.checked) {
+    track.style.background = '#191918';
+    thumb.style.left = '18px';
+    fields.style.opacity = '1';
+    fields.style.pointerEvents = 'auto';
+  } else {
+    track.style.background = '#e5e7eb';
+    thumb.style.left = '2px';
+    fields.style.opacity = '.45';
+    fields.style.pointerEvents = 'none';
+  }
+}
+// ── Auto-reload state (persists within session) ──
+let AR_ENABLED = false, AR_THRESHOLD = 50, AR_AMOUNT = 200;
+let LIVE_BALANCE = parseFloat(localStorage.getItem('eg_balance') || '0');
+
+function saveAutoReload() {
+  const btn = document.getElementById('ar-save-btn');
+  const enabled = document.getElementById('ar-toggle').checked;
+  const threshold = parseFloat(document.getElementById('ar-threshold').value) || 50;
+  const amount = parseFloat(document.getElementById('ar-amount').value) || 200;
+  AR_ENABLED = enabled;
+  AR_THRESHOLD = threshold;
+  AR_AMOUNT = amount;
+
+  btn.textContent = '✓ Saved';
+  btn.style.background = '#16a34a';
+  setTimeout(() => {
+    btn.textContent = 'Save Settings';
+    btn.style.background = '#111827';
+    hideAutoReload();
+    // Immediately check if a reload is needed
+    if (AR_ENABLED && LIVE_BALANCE < AR_THRESHOLD) {
+      setTimeout(() => showAutoReloadPrompt(), 300);
+    }
+  }, 900);
+}
+
+function showAutoReloadPrompt() {
+  // Remove any existing prompt
+  const existing = document.getElementById('ar-prompt');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'ar-prompt';
+  panel.style.cssText = 'margin-top:14px;border:1.5px solid #d8d4cd;border-radius:10px;overflow:hidden;animation:fadeUp .2s cubic-bezier(.22,1,.36,1)';
+  panel.innerHTML = `
+    <div style="background:#f0ede9;padding:11px 14px;display:flex;align-items:flex-start;gap:10px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 3.5v3m0 2v.5" stroke="#191918" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13.5px;font-weight:700;color:#191918;margin-bottom:2px">Auto-reload triggered</div>
+        <div style="font-size:13px;color:#374151;line-height:1.5">Balance ($${LIVE_BALANCE.toFixed(2)}) is below your $${AR_THRESHOLD} threshold. Add $${AR_AMOUNT} now?</div>
+      </div>
+    </div>
+    <div style="padding:10px 14px;background:#fff;display:flex;gap:8px">
+      <button onclick="confirmAutoReload()" style="flex:1;background:#111827;color:#fff;border:none;border-radius:8px;padding:9px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add $${AR_AMOUNT} now</button>
+      <button onclick="document.getElementById('ar-prompt').remove()" style="background:none;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 14px;font-size:13.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit;white-space:nowrap">Dismiss</button>
+    </div>`;
+
+  // Insert after the hint row
+  const hint = document.getElementById('ar-hint-row');
+  if (hint) hint.parentNode.insertBefore(panel, hint.nextSibling);
+}
+
+function confirmAutoReload() {
+  const prompt = document.getElementById('ar-prompt');
+  if (prompt) prompt.remove();
+  // Apply the auto-reload amount
+  applyBalance(AR_AMOUNT, true);
+}
+
+function applyBalance(amt, isAutoReload) {
+  LIVE_BALANCE = parseFloat((LIVE_BALANCE + amt).toFixed(2));
+  localStorage.setItem('eg_balance', LIVE_BALANCE.toFixed(2));
+  const fmt = '$' + LIVE_BALANCE.toFixed(2);
+
+  const modalAmt = document.getElementById('bal-modal-amt');
+  if (modalAmt) modalAmt.textContent = fmt;
+  const hdrVal = document.getElementById('balance-val');
+  if (hdrVal) hdrVal.textContent = fmt;
+  const hdrSub = document.getElementById('bal-hdr-sub');
+  if (hdrSub) hdrSub.textContent = fmt + ' remaining — add funds to keep fulfilling';
+
+  const btn = document.querySelector('#balance-modal button[onclick="doTopUp()"]');
+  if (btn) {
+    const orig = btn.innerHTML;
+    const label = isAutoReload ? `✓ Auto-reloaded — ${fmt}` : `✓ Funds Added — ${fmt}`;
+    btn.innerHTML = label;
+    btn.style.background = '#16a34a';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = '#111827'; }, 2200);
+  }
+}
+
+function doTopUp() {
+  const amt = parseFloat(document.getElementById('add-amt')?.value) || 0;
+  if (amt <= 0) return;
+  applyBalance(amt, false);
+  return;
+  const checkedChks = [...document.querySelectorAll('.bal-chk')].filter(c => c.checked);
+  if (checkedChks.length === 0) { return; }
+
+  // Remove funded order rows with a fade
+  checkedChks.forEach(c => {
+    const row = c.closest('.bal-order-row');
+    if (row) {
+      row.style.transition = 'opacity .35s, max-height .4s, padding .4s';
+      row.style.overflow = 'hidden';
+      row.style.maxHeight = row.offsetHeight + 'px';
+      requestAnimationFrame(() => {
+        row.style.opacity = '0';
+        row.style.maxHeight = '0';
+        row.style.padding = '0 20px';
+        row.style.borderBottomWidth = '0';
+      });
+      setTimeout(() => row.remove(), 420);
+    }
+  });
+
+  const totalRows = document.querySelectorAll('.bal-chk').length;
+  const allFunded = checkedChks.length === totalRows;
+
+  setTimeout(() => {
+    if (allFunded) {
+      // Switch to success state
+      document.getElementById('bal-state-default').style.display = 'none';
+      document.getElementById('bal-state-success').style.display = 'block';
+      // Fade out and close after 2.2s
+      setTimeout(() => closeBalanceModal(), 2200);
+    } else {
+      // Partial: update remaining count, downgrade urgency to amber, close modal
+      const remaining = document.querySelectorAll('.bal-chk').length;
+      const countEl = document.getElementById('bal-order-count');
+      if (countEl) countEl.textContent = remaining + (remaining === 1 ? ' order' : ' orders');
+      const hdrSub = document.getElementById('bal-hdr-sub');
+      if (hdrSub) { hdrSub.textContent = remaining + ' order' + (remaining !== 1 ? 's' : '') + ' still awaiting funding'; hdrSub.style.color = '#374151'; }
+      const alertBar = document.getElementById('bal-alert-bar');
+      if (alertBar) { alertBar.style.background = '#f0ede9'; alertBar.style.borderBottomColor = '#ddd9d2'; alertBar.style.color = '#374151'; alertBar.querySelector('span').style.background = '#191918'; }
+      updateBalTotal();
+      closeBalanceModal();
+    }
+  }, 450);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.bal-chk').forEach(c => c.addEventListener('change', updateBalTotal));
+  // Speedometer-style count-up only fires on the landing-page demo
+  // (?demo=1). The real seller dashboard stays at zero until wired data
+  // arrives — no fake animation.
+  if (IS_DEMO) {
+    setTimeout(() => { try { updateDashStats(true); } catch(e){} }, 80);
+    // Demo: also push the header wallet pill to the same healthy balance.
+    const hv = document.getElementById('balance-val');
+    if (hv) setTimeout(() => { try { animateCounter(hv, 0, { format: (v)=>'$'+v.toFixed(2) }); } catch(e){} }, 120);
+  } else {
+    setTimeout(() => { try { updateDashStats(false); } catch(e){} }, 50);
+  }
+});
+
+/* ── Drag-Drop ── */
+let dragging = null, editMode = false;
+function toggleEdit() {
+  editMode = !editMode;
+  const grid = document.getElementById('wgrid');
+  const secContainer = document.getElementById('sec-container');
+  const btn = document.getElementById('edit-btn');
+  const notice = document.getElementById('edit-notice');
+  grid.classList.toggle('edit-mode', editMode);
+  secContainer.classList.toggle('edit-mode-sec', editMode);
+  btn.textContent = editMode ? '✓ Done' : '';
+  if (editMode) {
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Done';
+    btn.style.background='#111827'; btn.style.color='#fff'; btn.style.borderColor='#111827';
+    notice.style.display='flex';
+  } else {
+    btn.innerHTML = ' Edit Dashboard';
+    btn.style.background=''; btn.style.color=''; btn.style.borderColor='';
+    notice.style.display='none';
+  }
+  grid.querySelectorAll('.wcard').forEach(c => c.draggable = editMode);
+  document.querySelectorAll('.sec-block').forEach(s => s.draggable = editMode);
+  document.querySelectorAll('.ccard').forEach(c => c.draggable = editMode);
+}
+function ds(e) {
+  dragging = e.currentTarget;
+  setTimeout(()=>dragging.classList.add('dragging'),0);
+  e.dataTransfer.effectAllowed='move';
+  try { e.dataTransfer.setData('text/plain', dragging.id || 'card'); } catch(_){}
+}
+function do_(e) {
+  e.preventDefault();
+  if(!dragging) return;
+  const t = e.currentTarget;
+  if(t!==dragging) t.classList.add('drag-over');
+  return false;
+}
+function dl(e) { e.currentTarget.classList.remove('drag-over'); }
+function dp(e) {
+  e.preventDefault();
+  const t = e.currentTarget;
+  t.classList.remove('drag-over');
+  if(!dragging||t===dragging) return;
+  const grid = document.getElementById('wgrid');
+  const cards=[...grid.children];
+  const fi=cards.indexOf(dragging), ti=cards.indexOf(t);
+  if(fi<ti) grid.insertBefore(dragging,t.nextSibling);
+  else grid.insertBefore(dragging,t);
+}
+function de(e) {
+  if(dragging) dragging.classList.remove('dragging');
+  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  dragging=null;
+}
+
+/* Immediate drag-to-rearrange: cards are draggable on load, no edit mode needed. */
+(function enableImmediateDrag(){
+  function arm(){
+    document.querySelectorAll('#wgrid .wcard').forEach(c => c.draggable = true);
+    document.querySelectorAll('#card-grid .ccard').forEach(c => c.draggable = true);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
+  else arm();
+})();
+
+/* ── Content card drag-drop ── */
+let cdDragging = null;
+function cdDs(e) {
+  e.stopPropagation();
+  cdDragging = e.currentTarget;
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', 'cc'); } catch(_){}
+  setTimeout(() => cdDragging && cdDragging.classList.add('cc-dragging'), 0);
+}
+function cdDo(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!cdDragging) return;
+  const t = e.currentTarget;
+  if (t !== cdDragging) t.classList.add('cc-drag-over');
+  return false;
+}
+function cdDl(e) {
+  e.stopPropagation();
+  e.currentTarget.classList.remove('cc-drag-over');
+}
+function cdDp(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const t = e.currentTarget;
+  t.classList.remove('cc-drag-over');
+  if (!cdDragging || t === cdDragging) return;
+  const grid = document.getElementById('card-grid');
+  const cards = [...grid.children];
+  const fi = cards.indexOf(cdDragging), ti = cards.indexOf(t);
+  if (fi < ti) grid.insertBefore(cdDragging, t.nextSibling);
+  else grid.insertBefore(cdDragging, t);
+}
+function cdDe(e) {
+  e.stopPropagation();
+  if (cdDragging) cdDragging.classList.remove('cc-dragging');
+  document.querySelectorAll('.cc-drag-over').forEach(el => el.classList.remove('cc-drag-over'));
+  cdDragging = null;
+}
+
+/* ── Section drag-drop ── */
+let secDragging = null;
+function secDs(e) {
+  if (!editMode) return e.preventDefault();
+  secDragging = e.currentTarget;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => secDragging && secDragging.classList.add('sec-dragging'), 0);
+}
+function secDo(e) {
+  e.preventDefault();
+  if (!editMode || !secDragging) return;
+  const t = e.currentTarget;
+  if (t !== secDragging) t.classList.add('sec-drag-over');
+  return false;
+}
+function secDl(e) {
+  e.currentTarget.classList.remove('sec-drag-over');
+}
+function secDp(e) {
+  e.preventDefault();
+  const t = e.currentTarget;
+  t.classList.remove('sec-drag-over');
+  if (!secDragging || t === secDragging) return;
+  const cont = document.getElementById('sec-container');
+  const blocks = [...cont.children];
+  const fi = blocks.indexOf(secDragging), ti = blocks.indexOf(t);
+  if (fi < ti) cont.insertBefore(secDragging, t.nextSibling);
+  else cont.insertBefore(secDragging, t);
+}
+function secDe(e) {
+  if (secDragging) secDragging.classList.remove('sec-dragging');
+  document.querySelectorAll('.sec-drag-over').forEach(el => el.classList.remove('sec-drag-over'));
+  secDragging = null;
+}
+
+/* ── Notification panel ── */
+function openNotifPanel() {
+  document.getElementById('notif-panel').classList.add('open');
+  document.getElementById('notif-overlay').classList.add('show');
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = 'none';
+}
+function closeNotifPanel() {
+  document.getElementById('notif-panel').classList.remove('open');
+  document.getElementById('notif-overlay').classList.remove('show');
+}
+function toggleNotifPanel(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  if (panel.classList.contains('open')) { closeNotifPanel(); } else { openNotifPanel(); }
+}
+function markAllRead() {
+  _notifCount = 0;
+  document.getElementById('notif-dot').style.display = 'none';
+  document.getElementById('notif-count').textContent = '0';
+  document.getElementById('notif-count').style.background = '#f6f5f4';
+  document.getElementById('notif-count').style.color = '#9ca3af';
+  const wa = document.getElementById('wallet-alert');
+  if (wa) wa.style.display = 'none';
+  document.querySelectorAll('.notif-row.unread').forEach(r => r.classList.remove('unread'));
+}
+
+function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
+
+/* ── Dashboard chart palette ──
+   LIGHT mode: shades of the dark primary (slate/grey). DARK mode: keep the
+   original beige — it already reads well there. Chart.js paints to <canvas>,
+   which CSS theming can't reach, so we recolor in JS and re-run on theme flip. */
+const DASH_PAL = {
+  light: { o:'#191918', r:'#4b5563', p:'#191918', donut:['#111827','#374151','#6b7280','#9ca3af'], ring:'#374151' },
+  dark:  { o:'#b0aaa0', r:'#8f897e', p:'#c9c3ba', donut:['#7d776c','#948e84','#b0aaa0','#cbc5bc'], ring:'#8f897e' }
+};
+function dashPal(){ return DASH_PAL[document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light']; }
+const SP_ORDERS_D=[0,0,0,0,0,0], SP_REV_D=[0,0,0,0,0,0], SP_PROFIT_D=[0,0,0,0,0,0];
+function buildDashSparklines(){
+  const pal=dashPal();
+  Chart.getChart('sp-orders')?.destroy(); mkSparkline('sp-orders',SP_ORDERS_D,pal.o);
+  Chart.getChart('sp-rev')?.destroy();    mkBarSparkline('sp-rev',SP_REV_D,pal.r);
+  Chart.getChart('sp-profit')?.destroy(); mkSparkline('sp-profit',SP_PROFIT_D,pal.p);
+}
+function applyDashChartTheme(){
+  const pal=dashPal();
+  const pc=Chart.getChart('pchart'); if(pc){ pc.data.datasets[0].backgroundColor=pal.donut; pc.update('none'); }
+  document.querySelectorAll('#pleg [data-sw]').forEach((s,i)=>{ s.style.background=pal.donut[i%pal.donut.length]; });
+  const ring=document.getElementById('ful-ring'); if(ring) ring.setAttribute('stroke',pal.ring);
+  const fbar=document.getElementById('ful-bar'); if(fbar) fbar.style.background=pal.ring;
+}
+
+/* ── Init ── */
+buildDashSparklines();
+initRC();
+initPC();
+applyDashChartTheme();
+// Recolor the canvas/SVG charts whenever the theme attribute flips.
+new MutationObserver(function(){ buildDashSparklines(); applyDashChartTheme(); })
+  .observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+renderRecent();
+
+/* ── Live alert ticker ── */
+const TICKER = [
+  {type:'NEW ORDER', typeColor:'#16a34a', typeBg:'#dcfce7', text:'New order from Etsy — $44.00 from Nina Johansson', time:'Just now'},
+  {type:'WARNING',   typeColor:'#374151', typeBg:'#f0ede9', text:'Order #FF-8810 in queue 48+ hours — needs attention', time:'2h ago'},
+  {type:'SHIPPED',   typeColor:'#1d4ed8', typeBg:'#dbeafe', text:'28 orders shipped successfully today — great pace!', time:'3h ago'},
+  {type:'STOCK',     typeColor:'#dc2626', typeBg:'#fee2e2', text:'Ceramic Mug 11oz White stock critical — 3 units left', time:'4h ago'},
+  {type:'TRENDING',  typeColor:'#7c3aed', typeBg:'#ede9fe', text:'Comfort Colors Tee 1717 trending — +32% search volume this week', time:'1d ago'},
+  {type:'REVIEW',    typeColor:'#ca8a04', typeBg:'#fef9c3', text:'New 5-star review: "Amazing quality & fast shipping!"', time:'5h ago'},
+  {type:'SHIPPED',   typeColor:'#1d4ed8', typeBg:'#dbeafe', text:'Lena Fischer order delivered — Est. Apr 16 ✓', time:'6h ago'},
+  {type:'NEW ORDER', typeColor:'#16a34a', typeBg:'#dcfce7', text:'New order from Shopify — $91.00 Express delivery', time:'8h ago'},
+];
+let tickerIdx = 0;
+function showTicker(i) {
+  const t = TICKER[i % TICKER.length];
+  const el = document.getElementById('ticker-text');
+  const tp = document.getElementById('ticker-type');
+  const tm = document.getElementById('ticker-time');
+  if (!el) return;
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(6px)';
+  setTimeout(() => {
+    el.textContent = t.text;
+    tp.textContent = t.type;
+    tp.style.background = t.typeBg;
+    tp.style.color = t.typeColor;
+    if (tm) tm.textContent = t.time;
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+    el.style.transition = 'opacity .35s, transform .35s';
+  }, 180);
+}
+showTicker(0);
+// ticker removed from UI; interval kept to drive notif-dot count
+var _notifCount = 8;
+setInterval(() => {
+  tickerIdx++;
+  const dot = document.getElementById('notif-dot');
+  if (dot && dot.style.display !== 'none') {
+    _notifCount = Math.min(_notifCount + 1, 99);
+    dot.textContent = _notifCount > 9 ? '9+' : _notifCount;
+  }
+}, 4200);
+
+// ── Header shared JS ──
+const _I18N={en:{preferences:'Preferences',notifications:'Notifications',new_btn:'New',manual_order:'Manual order',manual_order_sub:'Create from scratch',sync_platforms:'Sync from platforms',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Appearance',light_mode:'Light mode',dark_mode:'Dark mode'},vi:{preferences:'Tùy chọn',notifications:'Thông báo',new_btn:'Tạo mới',manual_order:'Tạo đơn thủ công',manual_order_sub:'Nhập từ đầu',sync_platforms:'Kết nối sàn',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Giao diện',light_mode:'Chế độ sáng',dark_mode:'Chế độ tối'}};
+const _NAV={en:{'seller.html':'Dashboard','orders.html':'Orders','products-dash.html':'Products','settings.html#stores':'Stores','fulfillment.html':'Fulfillment','analytics.html':'Reports','wallet.html':'Wallet','design-lab.html':'Design Lab','chat.html':'Chat','settings.html':'Settings'},vi:{'seller.html':'Tổng quan','orders.html':'Đơn hàng','products-dash.html':'Sản phẩm','settings.html#stores':'Cửa hàng','fulfillment.html':'Sản xuất','analytics.html':'Báo cáo','wallet.html':'Ví tiền','design-lab.html':'Thiết kế','chat.html':'Tin nhắn','settings.html':'Cài đặt'}};
+let _lang=localStorage.getItem('eg_lang')||'en';
+function _t(k){return(_I18N[_lang]||_I18N.en)[k]||k}
+function applyLang(lang){
+  _lang=lang;localStorage.setItem('eg_lang',lang);
+  const btn=document.getElementById('lang-btn');if(btn)btn.textContent=lang.toUpperCase();
+  // New globe-icon button shows the active code (EN/VI) next to the globe
+  const code=document.getElementById('hdr-lang-code');if(code)code.textContent=lang.toUpperCase();
+  // Highlight the active row in the new dropdown
+  document.querySelectorAll('.lang-opt-row').forEach(el=>{
+    const active=el.dataset.lang===lang;
+    el.style.background=active?'#f6f5f4':'transparent';
+    el.style.color=active?'#191918':'#374151';
+  });
+  document.querySelectorAll('[data-i18n]').forEach(el=>{const v=_t(el.dataset.i18n);if(v)el.textContent=v;});
+  const nm=_NAV[lang]||_NAV.en;
+  document.querySelectorAll('a.ni[href]').forEach(el=>{
+    const href=el.getAttribute('href');const label=nm[href];if(!label)return;
+    const nodes=[...el.childNodes].filter(n=>n.nodeType===3&&n.textContent.trim());
+    if(nodes.length){nodes[nodes.length-1].textContent=label;}
+  });
+  const acc=document.querySelector('[data-section-label=account]');if(acc)acc.textContent=lang==='vi'?'TÀI KHOẢN':'ACCOUNT';
+}
+function toggleLang(){applyLang(_lang==='en'?'vi':'en');}
+function toggleLangDropdown(e){if(e)e.stopPropagation();const dd=document.getElementById('hdr-lang-dd');if(dd)dd.style.display=dd.style.display==='none'?'block':'none';}
+function pickLang(l){applyLang(l);const dd=document.getElementById('hdr-lang-dd');if(dd)dd.style.display='none';}
+window.toggleLangDropdown=toggleLangDropdown;window.pickLang=pickLang;
+function applyTheme(dark, skipSave){
+  document.documentElement.setAttribute('data-theme',dark?'dark':'light');
+  const lbl=document.getElementById('theme-label');
+  const knob=document.getElementById('toggle-knob');
+  const tgl=document.getElementById('theme-toggle-btn');
+  if(lbl)lbl.textContent=_t(dark?'dark_mode':'light_mode');
+  if(knob)knob.style.transform=dark?'translateX(18px)':'translateX(0)';
+  if(tgl)tgl.style.background=dark?'#374151':'#e5e4e0';
+  // Header toggle pill — same slider, light=LEFT, dark=RIGHT.
+  const hKnob=document.getElementById('hdr-theme-knob');
+  const hTrack=document.getElementById('hdr-theme-track');
+  if(hKnob)hKnob.style.transform=dark?'translateX(16px)':'translateX(0)';
+  if(hTrack)hTrack.style.background=dark?'#374151':'#e5e4e0';
+  if(!skipSave) localStorage.setItem('eg_theme',dark?'dark':'light');
+}
+function toggleTheme(){applyTheme(document.documentElement.getAttribute('data-theme')!=='dark');}
+function togglePrefPanel(e){if(e)e.stopPropagation();const p=document.getElementById('pref-panel');if(p)p.style.display=p.style.display==='none'?'block':'none';}
+function toggleNewMenu(e){if(e)e.stopPropagation();const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display=dd.style.display==='none'?'block':'none';}
+function toggleHdrSearch(){const wrap=document.getElementById('hdr-search-wrap');const inp=document.getElementById('hdr-search');const open=wrap.style.maxWidth&&wrap.style.maxWidth!=='0px'&&wrap.style.maxWidth!=='0';if(open){closeHdrSearch();}else{wrap.style.maxWidth='260px';wrap.style.opacity='1';setTimeout(()=>inp.focus(),220);}}
+function closeHdrSearch(){const wrap=document.getElementById('hdr-search-wrap');const inp=document.getElementById('hdr-search');const dd=document.getElementById('hdr-search-dd');wrap.style.maxWidth='0';wrap.style.opacity='0';if(inp)inp.value='';if(dd)dd.style.display='none';}
+function scheduleCollapseSearch(){setTimeout(function(){const dd=document.getElementById('hdr-search-dd');if(dd&&!dd.matches(':hover'))closeHdrSearch();},200);}
+function hdrSearchKey(e){if(e.key==='Escape')closeHdrSearch();}
+var HDR_DATA=[
+  {type:'Order',label:'#FF-7001 · Jane Smith',sub:'Shopify · $62 · New',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7002 · Mike Chen',sub:'Etsy · $88 · In Production',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7003 · Sara Lee',sub:'Manual · $45 · Shipped',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7004 · Tom Park',sub:'WooCommerce · $112 · QC',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7005 · Anna White',sub:'Shopify · $73 · Packed',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7006 · Luis Rivera',sub:'Etsy · $34 · New',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7007 · Rachel Kim',sub:'Amazon · $120 · Shipped',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7008 · Tom Wright',sub:'Etsy · $29 · In Review',url:'order-detail.html'},
+  {type:'Order',label:'#FF-7009 · Aisha Okafor',sub:'Shopify · $78 · In Production',url:'order-detail.html'},
+  {type:'Product',label:'Classic Tee — White/Black',sub:'SKU: CT-001 · 12 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Hoodie — Navy',sub:'SKU: HD-002 · 8 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Mug — 11oz White',sub:'SKU: MG-003 · 3 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Tote Bag — Natural',sub:'SKU: TB-004 · 2 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Poster — A3 Matte',sub:'SKU: PS-005 · 5 variants · Active',url:'products-dash.html'},
+  {type:'Product',label:'Phone Case — Clear',sub:'SKU: PC-006 · 20 variants · Draft',url:'products-dash.html'},
+  {type:'Product',label:'Canvas Print — 12x16',sub:'SKU: CP-007 · 4 variants · Active',url:'products-dash.html'},
+  {type:'Store',label:'My Shopify Store',sub:'Shopify · 523 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'Artisan Prints — Etsy',sub:'Etsy · 218 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'Sofia Studio — WooCommerce',sub:'WooCommerce · 91 orders · Connected',url:'settings.html#stores'},
+  {type:'Store',label:'RK Goods — Amazon',sub:'Amazon · 15 orders · Connected',url:'settings.html#stores'},
+  {type:'Page',label:'Dashboard',sub:'Overview & analytics',url:'seller.html'},
+  {type:'Page',label:'Orders',sub:'All orders & management',url:'orders.html'},
+  {type:'Page',label:'Products',sub:'Product catalog',url:'products-dash.html'},
+  {type:'Page',label:'Stores',sub:'Connected store management',url:'settings.html#stores'},
+  {type:'Page',label:'Reports',sub:'Revenue & order charts',url:'analytics.html'},
+  {type:'Page',label:'Wallet',sub:'Balance, payouts & top-up',url:'wallet.html'},
+  {type:'Page',label:'Design Lab',sub:'Upload & mockup generator',url:'design-lab.html'},
+  {type:'Page',label:'Chat',sub:'Seller ↔ factory messaging',url:'chat.html'},
+  {type:'Page',label:'Settings',sub:'Account, billing & integrations',url:'settings.html'},
+  {type:'Page',label:'API Docs',sub:'API reference & keys',url:'apidocs.html'},
+  {type:'Page',label:'Fulfillment',sub:'Fulfillment status tracker',url:'fulfillment.html'}
+];
+function runHdrSearch(q){
+  var dd=document.getElementById('hdr-search-dd');
+  if(!dd)return;
+  q=(q||'').trim().toLowerCase();
+  if(!q){dd.style.display='none';return;}
+  var pool=HDR_DATA.slice();try{if(typeof EGStore!=='undefined'&&EGStore.getOrders){(EGStore.getOrders()||[]).forEach(function(o){if(!o||!o.id)return;var cust=(o.customer&&o.customer.name)||'Customer';var src=o.source||'Manual';var stat=String(o.factoryStatus||o.status||'new').replace(/_/g,' ');pool.unshift({type:'Order',label:'#'+o.id+' · '+cust,sub:src+' · $'+(o.total||0)+' · '+stat,url:'order-detail.html?id='+o.id});});}}catch(e){}var results=pool.filter(function(d){return(d.label+' '+d.sub+' '+d.type).toLowerCase().indexOf(q)>=0;}).slice(0,8);
+  if(!results.length){dd.innerHTML='<div style="padding:14px 16px;font-size:14px;color:#9ca3af">No results for "'+q+'"</div>';dd.style.display='block';return;}
+  var groups={};results.forEach(function(r){if(!groups[r.type])groups[r.type]=[];groups[r.type].push(r);});
+  var typeIcon={Order:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',Product:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><path d="M8 2l5 3v6l-5 3-5-3V5z" stroke="currentColor" stroke-width="1.4"/></svg>',Store:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><path d="M1.5 6.5L4 3h8l2.5 3.5v.5a2 2 0 01-4 0 2 2 0 01-4 0 2 2 0 01-4 0v-.5z" stroke="currentColor" stroke-width="1.3"/><path d="M2 10v4h12v-4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',Page:'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="opacity:.5"><rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>'};
+  var html='';
+  Object.keys(groups).forEach(function(type){
+    html+='<div style="padding:8px 14px 4px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">'+type+'s</div>';
+    groups[type].forEach(function(r){
+      html+='<a href="'+r.url+'" style="display:flex;align-items:center;gap:10px;padding:8px 14px;text-decoration:none;color:#191918;transition:background .1s" onmouseover="this.style.background=\'#f4f2ef\'" onmouseout="this.style.background=\'\'">'+
+        '<span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:#f4f2ef;border-radius:7px;flex-shrink:0">'+(typeIcon[type]||'')+'</span>'+
+        '<div><div style="font-size:14px;font-weight:500;line-height:1.3">'+r.label+'</div><div style="font-size:12px;color:#9ca3af;line-height:1.3">'+r.sub+'</div></div></a>';
+    });
+  });
+  dd.innerHTML=html;dd.style.display='block';
+}
+function closeNewMenu(){const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display='none';}
+function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'){openNewOrderModal();}else{window.location='orders.html';}}
+function openQuickTopUp(){
+  if(typeof openDepositModal==='function'){openDepositModal();return;}
+  let m=document.getElementById('_qtm');
+  if(!m){
+    m=document.createElement('div');m.id='_qtm';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center';
+    m.innerHTML='<div style="background:#fff;border-radius:16px;width:360px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2);font-family:inherit"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div style="font-size:17px;font-weight:700;color:#191918">Add Funds</div><button onclick="document.getElementById(\'_qtm\').style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:19px;color:#9ca3af;padding:2px 6px;line-height:1">×</button></div><div class="qtm-beige" style="background:transparent;border:1.5px solid #cdc8bf;border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center"><div style="font-size:13px;color:#475569">Current Balance</div><div style="font-size:21px;font-weight:800;color:#1e293b" id="qtm-current-bal">$0.00</div></div><div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:8px">Quick add</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px"><button onclick="document.getElementById(\'_qa\').value=50" style="padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'#374151\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">$50</button><button onclick="document.getElementById(\'_qa\').value=100" style="padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'#374151\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">$100</button><button onclick="document.getElementById(\'_qa\').value=200" style="padding:8px;border-radius:8px;border:1.5px solid #111827;background:#111827;color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">$200</button></div><input id="_qa" type="number" value="200" placeholder="Custom amount" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid #e5e4e0;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px" onfocus="this.style.borderColor=\'#111827\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button class="qtm-beige-btn" onclick="applyQuickFunds()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">Add Funds →</button><div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#9ca3af;text-decoration:none">Go to Wallet →</a></div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',function(ev){if(ev.target===m)m.style.display='none';});
+  }
+  var _cb=document.getElementById('qtm-current-bal');if(_cb)_cb.textContent='$'+parseFloat(localStorage.getItem('eg_balance')||'0').toFixed(2);/*qtm-cb-sync*/m.style.display='flex';
+}
+function applyQuickFunds(){
+  const amt=parseFloat(document.getElementById('_qa').value);
+  if(!amt||amt<=0)return;
+  let bal=parseFloat(localStorage.getItem('eg_balance')||'0');
+  bal=parseFloat((bal+amt).toFixed(2));
+  localStorage.setItem('eg_balance',bal.toFixed(2));
+  document.querySelectorAll('#balance-val').forEach(el=>el.textContent='$'+bal.toFixed(2));
+  const bd=document.querySelector('#_qtm [style*="font-weight:800"]');
+  if(bd)bd.textContent='$'+bal.toFixed(2);
+  document.getElementById('_qtm').style.display='none';
+}
+document.addEventListener('click',function(e){
+  if(!document.getElementById('new-menu-btn')?.contains(e.target))closeNewMenu();
+  if(!document.getElementById('pref-btn')?.contains(e.target)){const p=document.getElementById('pref-panel');if(p)p.style.display='none';}
+  // Close the language dropdown when clicking outside its trigger button.
+  if(!document.getElementById('hdr-lang-btn')?.contains(e.target)){const ld=document.getElementById('hdr-lang-dd');if(ld)ld.style.display='none';}
+  var sw=document.getElementById('hdr-search-wrap');var sb=document.getElementById('hdr-search-btn');var sdd=document.getElementById('hdr-search-dd');
+  if(sw&&sb&&sdd&&!sw.contains(e.target)&&!sb.contains(e.target)&&!sdd.contains(e.target)){closeHdrSearch();}
+});
+document.querySelectorAll('#balance-val').forEach(function(el){el.textContent='$'+parseFloat(localStorage.getItem('eg_balance')||'0').toFixed(2);});
+(function(){var _f=/[?&]theme=(light|dark)/.exec(location.search);if(_f){applyTheme(_f[1]==='dark',true);}else{applyTheme(localStorage.getItem('eg_theme')==='dark');}applyLang(localStorage.getItem('eg_lang')||'en');})();
+</script>
+<div id="mob-ov" onclick="toggleSidebar()"></div>
+<script>
+(function(){
+  var a=document.querySelector('a.ni[href="products-dash.html"]');
+  if(!a)return;
+  var sub=a.nextElementSibling;
+  if(!sub||typeof sub.getAttribute!=='function'||!sub.getAttribute('href')||sub.getAttribute('href').indexOf('product-templates')<0)return;
+  var chev=a.querySelectorAll('svg');chev=chev[chev.length-1];
+  var open=a.classList.contains('on')||sub.classList.contains('on');
+  if(!open)sub.style.display='none';
+  if(chev){
+    chev.style.transition='transform .22s ease';
+    chev.style.cursor='pointer';
+    chev.style.opacity='.45';
+    if(open)chev.style.transform='rotate(180deg)';
+    chev.addEventListener('click',function(e){
+      e.preventDefault();e.stopPropagation();
+      open=!open;
+      sub.style.display=open?'flex':'none';
+      chev.style.transform=open?'rotate(180deg)':'rotate(0deg)';
+    });
+  }
+})();
+</script>
+
+<!-- Floating chat button -->
+<script src="nav-drag.js"></script>
+<script src="egfulfill-store.js"></script>
+<script src="egfulfill-drag.js"></script>
+<script src="egfulfill-tracking.js"></script>
+<script src="eg-new-order.js"></script>
+<script>
+// ── Overview stat cards wired to live orders (EGStore). Starts at 0; moves as orders are created. ──
+(function(){
+  if (!window.EGStore || !EGStore.bindStats) return;
+  function set(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; }
+  EGStore.bindStats(function(s){
+    set('sv-orders',  s.total);
+    set('sv-revenue', EGStore.money(s.revenue));
+    set('sv-profit',  EGStore.money(s.profit));
+    set('sv-fulfill', (s.fulfillmentRate || 0) + '%');
+  });
+})();
+</script>
+<script>
+// ── EG custom select enhancer: smooth dropdown w/ warm bg + light-grey highlight ──
+function egEnhanceSelect(sel){
+  if(sel._egEnhanced) return; sel._egEnhanced=true;
+  const opts=[].map.call(sel.options,function(o){return {v:o.value,t:o.textContent};});
+  const chev='<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const wrap=document.createElement('div'); wrap.className='eg-sel';
+  const btn=document.createElement('button'); btn.type='button'; btn.className='eg-sel-btn';
+  btn.innerHTML='<span class="eg-sel-lbl"></span>'+chev;
+  const menu=document.createElement('div'); menu.className='eg-sel-menu';
+  menu.innerHTML=opts.map(function(o){return '<div class="eg-sel-opt'+(o.v===sel.value?' sel':'')+'" data-v="'+o.v+'"><svg class="eg-check" viewBox="0 0 14 14" fill="none"><path d="M3 7.5l2.5 2.5L11 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span>'+o.t+'</span></div>';}).join('');
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(btn); wrap.appendChild(menu); wrap.appendChild(sel);
+  sel.style.display='none';
+  function curLabel(){ const o=opts.filter(function(o){return o.v===sel.value;})[0]||opts[0]; return o?o.t:''; }
+  function setLbl(){ wrap.querySelector('.eg-sel-lbl').textContent=curLabel(); }
+  setLbl();
+  btn.addEventListener('click',function(e){ e.stopPropagation(); const willOpen=!wrap.classList.contains('open'); document.querySelectorAll('.eg-sel.open').forEach(function(w){w.classList.remove('open');}); if(willOpen) wrap.classList.add('open'); });
+  menu.addEventListener('click',function(e){ const o=e.target.closest('.eg-sel-opt'); if(!o)return; const v=o.getAttribute('data-v'); sel.value=v; menu.querySelectorAll('.eg-sel-opt').forEach(function(x){x.classList.toggle('sel',x.getAttribute('data-v')===v);}); setLbl(); wrap.classList.remove('open'); sel.dispatchEvent(new Event('change',{bubbles:true})); });
+  // keep custom UI in sync if code sets sel.value programmatically
+  sel.addEventListener('change',function(){ setLbl(); menu.querySelectorAll('.eg-sel-opt').forEach(function(x){x.classList.toggle('sel',x.getAttribute('data-v')===sel.value);}); });
+}
+document.addEventListener('click',function(){ document.querySelectorAll('.eg-sel.open').forEach(function(w){w.classList.remove('open');}); });
+(function(){ function init(){ document.querySelectorAll('select[data-eg-select]').forEach(egEnhanceSelect); } if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init); })();
+</script>
+<script>window.XOC_ROLE = "seller";</script>
+<script src="eg-order-chat.js"></script>
+</body>
+</html>

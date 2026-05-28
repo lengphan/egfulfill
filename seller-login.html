@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Seller Login – EGFULFILL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background-color:#f7f5f0;background-image:linear-gradient(#e7e4dd 1px,transparent 1px),linear-gradient(90deg,#e7e4dd 1px,transparent 1px);background-size:26px 26px;color:#191918;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px}
+    .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:44px;line-height:1;color:#191918;text-decoration:none;margin-bottom:26px}
+    .card{width:100%;max-width:404px;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 34px rgba(0,0,0,.07);padding:34px 32px}
+    .heading{font-size:23px;font-weight:800;letter-spacing:-0.03em;margin-bottom:5px}
+    .subheading{font-size:13.5px;color:#9ca3af;margin-bottom:24px;line-height:1.5}
+    label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}
+    .input{width:100%;padding:11px 13px;border:1.5px solid #e5e4e0;border-radius:10px;font-size:13.5px;color:#191918;outline:none;font-family:inherit;background:#faf9f7;transition:border-color .15s,background .15s}
+    .input:focus{border-color:#374151;background:#fff}
+    .input.err{border-color:#dc2626}
+    /* Override the browser autofill blue/yellow with our beige field colour */
+    .input:-webkit-autofill,.input:-webkit-autofill:hover,.input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #faf9f7 inset;-webkit-text-fill-color:#191918;caret-color:#191918;transition:background-color 9999s ease-in-out 0s}
+    .field-err{font-size:11.5px;color:#dc2626;margin-top:4px;min-height:15px}
+    .pw-wrap{position:relative}
+    .pw-toggle{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;transition:color .15s;line-height:0}
+    .pw-toggle:hover{color:#374151}
+    .btn-dk{width:100%;padding:12px;background:#191918;color:#f3eee2;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+    .btn-dk:hover{background:#2c2a27}
+    .btn-dk:disabled{opacity:.55;cursor:not-allowed}
+    .error-banner{display:none;font-size:12.5px;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;border-radius:9px;padding:9px 12px;margin-bottom:14px}
+    .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .check{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:#6b7280}
+    .check input{accent-color:#191918;width:14px;height:14px}
+    .link{font-size:12.5px;color:#191918;text-decoration:none;font-weight:600}
+    .link:hover{text-decoration:underline}
+    .divider{display:flex;align-items:center;gap:12px;font-size:12px;color:#c4c3be;margin:20px 0}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#ececea}
+    .foot{font-size:13px;color:#9ca3af;text-align:center}
+    .foot a{color:#191918;font-weight:700;text-decoration:none}
+    .foot a:hover{text-decoration:underline}
+    .staff{margin-top:22px;text-align:center}
+    .staff a{font-size:12.5px;color:#9ca3af;text-decoration:none}
+    .staff a:hover{color:#374151}
+    .pagefoot{margin-top:26px;font-size:11.5px;color:#c4c3be;display:flex;gap:18px;align-items:center}
+    .pagefoot a{color:#c4c3be;text-decoration:none}.pagefoot a:hover{color:#9ca3af}
+    @keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .fu{animation:fu .3s cubic-bezier(.22,1,.36,1) both}
+  </style>
+</head>
+<body>
+
+  <a href="index.html" class="logo">egfulfill</a>
+
+  <div class="card fu">
+    <h1 class="heading">Welcome back</h1>
+    <p class="subheading">Sign in to your seller dashboard.</p>
+
+    <div id="login-error" class="error-banner"></div>
+
+    <form onsubmit="submitLogin(event)" novalidate>
+      <div style="margin-bottom:14px">
+        <label>Email</label>
+        <input id="login-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"/>
+        <div id="err-email" class="field-err"></div>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label style="margin:0">Password</label>
+          <a href="#" onclick="return false" class="link">Forgot password?</a>
+        </div>
+        <div class="pw-wrap">
+          <input id="login-password" class="input" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:42px"/>
+          <button type="button" class="pw-toggle" onclick="togglePw()">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+        <div id="err-password" class="field-err"></div>
+      </div>
+
+      <div class="row">
+        <label class="check"><input type="checkbox"/> Remember me</label>
+      </div>
+
+      <button type="submit" class="btn-dk" id="login-btn">Log in</button>
+    </form>
+
+    <div class="divider">or</div>
+
+    <div class="foot">Don't have an account? <a href="index.html">Start for free →</a></div>
+  </div>
+
+  <div class="pagefoot">
+    <span>© 2024 EGFULFILL, Inc.</span>
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+  </div>
+
+<script>
+  function togglePw(){ const inp = document.getElementById('login-password'); inp.type = inp.type === 'password' ? 'text' : 'password'; }
+  function submitLogin(e){
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    let ok = true;
+    ['err-email','err-password'].forEach(id => document.getElementById(id).textContent = '');
+    ['login-email','login-password'].forEach(id => document.getElementById(id).classList.remove('err'));
+    document.getElementById('login-error').style.display = 'none';
+    if(!email){ document.getElementById('err-email').textContent = 'Email is required'; document.getElementById('login-email').classList.add('err'); ok = false; }
+    else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ document.getElementById('err-email').textContent = 'Enter a valid email'; document.getElementById('login-email').classList.add('err'); ok = false; }
+    if(!password){ document.getElementById('err-password').textContent = 'Password is required'; document.getElementById('login-password').classList.add('err'); ok = false; }
+    if(!ok) return;
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+  }
+</script>
+</body>
+</html>

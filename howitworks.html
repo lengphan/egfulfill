@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How It Works – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+  <style>
+    /* Page/section headlines in the Fraunces brand font (heavy, even spacing) */
+    h1, h2 { font-family:'Fraunces', serif !important; font-weight:900 !important; font-optical-sizing:none; font-variation-settings:'opsz' 30, 'wght' 900 !important; letter-spacing:-0.01em !important; }
+    /* Remove the small eyebrow "✦ …" pills */
+    .section-tag { display:none !important; }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: #f7f5f0;
+      color: #191918;
+    }
+    /* Retro sticker cards (shared across public pages) */
+    .card,.eg-card{background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:3px 3px 0 #40403d;position:relative;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);top:0}
+    .card.is-hoverable:hover,a.card:hover,button.card:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+    .btn-retro{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+    .btn-retro:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+    .btn-retro:active{top:3px;box-shadow:1px 1px 0 #40403d}
+    .nav-link {
+      color: #555550;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.15s;
+      text-decoration: none;
+    }
+    .nav-link:hover { color: #111827; }
+    .nav-link.active { color: #111827; font-weight: 600; }
+
+    .fade-up {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1);
+    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
+    .fade-up.delay-1 { transition-delay: 0.08s; }
+    .fade-up.delay-2 { transition-delay: 0.16s; }
+    .fade-up.delay-3 { transition-delay: 0.24s; }
+    .fade-up.delay-4 { transition-delay: 0.32s; }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #555550;
+      margin-bottom: 20px;
+    }
+
+    /* Step connector line */
+    .step-line {
+      position: absolute;
+      left: 27px;
+      top: 56px;
+      bottom: -32px;
+      width: 2px;
+      background: linear-gradient(to bottom, #e5e4e0, transparent);
+    }
+
+    /* Step number bubble */
+    .step-num {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid #e5e4e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: #191918;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .step-num.gold {
+      background: #111827;
+      border-color: #111827;
+      color: white;
+    }
+
+    /* Feature card */
+    .feat-card {
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    /* FAQ accordion */
+    .faq-item {
+      border-bottom: 1px solid #f0ede9;
+    }
+    .faq-q {
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 15px;
+      font-weight: 600;
+      color: #191918;
+    }
+    .faq-q:hover { color: #374151; }
+    .faq-a {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.7;
+      padding-bottom: 0;
+    }
+    .faq-a.open { max-height: 200px; padding-bottom: 20px; }
+    .faq-chevron { transition: transform 0.25s; flex-shrink: 0; }
+    .faq-chevron.open { transform: rotate(180deg); }
+
+    /* Mock dashboard card */
+    .mock-window {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 16px 56px rgba(0,0,0,0.12);
+      overflow: hidden;
+    }
+    .mock-bar {
+      background: #f6f5f4;
+      border-bottom: 1px solid #e5e4e0;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* Integration logo pill */
+    .int-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      border: 1px solid #e5e4e0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #374151;
+    }
+  </style>
+<style id="eg-outline-btns">
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+</style>
+<style id="eg-input-focus">
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-retro-override">
+.feat-card,.bento-card,.floating-card,.testimonial-card,.mock-ui,.step-card,.faq-item,.feature-card,.benefit-card,.value-card,.pricing-card,.case-card,.product-card{background:#fdfcfa!important;border:1.5px solid #40403d!important;border-radius:14px!important;box-shadow:3px 3px 0 #40403d!important;overflow:visible!important}
+.feat-card{padding:24px!important}.faq-item{padding:18px 22px!important;margin-bottom:10px}
+.mock-header{background:#f3eee2!important;border-bottom:1.5px solid #40403d!important}
+.section-tag{background:#fdfcfa!important;border:1.5px solid #40403d!important;color:#191918!important;box-shadow:2px 2px 0 #40403d!important}
+section[style*="background:white"],section[style*="background: white"],section[style*="background:#fff"],section[style*="background: #fff"],section[style*="background:#f6f5f4"],section[style*="background:#f4f2ef"],section[style*="background:#f9f8f7"]{background:#f7f5f0!important}
+section [style*="background:#fff"][style*="border-radius:1"],section [style*="background: #fff"][style*="border-radius:1"],section [style*="background:white"][style*="border-radius:1"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
+</style>
+</head>
+<body>
+
+  <!-- NAV (shared canonical) -->
+  <nav style="background:#f7f5f0;position:sticky;top:0;z-index:50">
+    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+        <div class="hidden md:flex items-center gap-6">
+          <a href="products.html" class="nav-link" style="text-decoration:none">Products</a>
+          <a href="howitworks.html" class="nav-link active" style="text-decoration:none">How It Works</a>
+          <a href="about.html" class="nav-link" style="text-decoration:none">About</a>
+          <a href="apidocs.html" class="nav-link" style="text-decoration:none">API Documentation</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="seller-login.html" class="nav-link hidden md:block" style="text-decoration:none">Log in</a>
+        <a href="seller-login.html" class="btn-retro">Start for free</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section style="background:#f7f5f0;padding:80px 0 60px">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+      <div class="section-tag fade-up"><span style="color:#191918">✦</span> Simple by design</div>
+      <h1 class="text-5xl font-bold text-gray-900 mb-5 fade-up delay-1" style="letter-spacing:-0.08rem;line-height:1.1">
+        From design to doorstep.<br/>We handle everything.
+      </h1>
+      <p class="text-lg text-gray-500 mb-8 fade-up delay-2" style="max-width:560px;margin-left:auto;margin-right:auto">
+        Upload your artwork, pick your products, and connect your store. EGFULFILL prints, packs, and ships every order automatically — no inventory, no warehouse, no hassle.
+      </p>
+      <div class="flex items-center justify-center gap-3 flex-wrap fade-up delay-3">
+        <button style="background:#111827;color:white;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Start for free →</button>
+        <button style="background:white;color:#374151;font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid #e5e4e0;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">See our catalog</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEPS -->
+  <section style="background:#f7f5f0;padding:20px 0 80px">
+    <div class="max-w-5xl mx-auto px-6">
+
+      <div class="grid md:grid-cols-2 gap-6 items-start">
+
+        <!-- Steps list (left) -->
+        <div>
+          <!-- Step 1 -->
+          <div class="flex gap-5 mb-8 fade-up" style="position:relative">
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+              <div class="step-num gold">1</div>
+              <div style="flex:1;width:2px;background:linear-gradient(to bottom,#e5e4e0 0%,transparent 100%);margin-top:8px;min-height:48px"></div>
+            </div>
+            <div style="padding-top:12px">
+              <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">Create your free account</div>
+              <p style="font-size:14px;color:#6b7280;line-height:1.65">Sign up in 30 seconds — no credit card required. You get instant access to our full catalog of 491+ products, the design editor, and your seller dashboard.</p>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="flex gap-5 mb-8 fade-up delay-1" style="position:relative">
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+              <div class="step-num gold">2</div>
+              <div style="flex:1;width:2px;background:linear-gradient(to bottom,#e5e4e0 0%,transparent 100%);margin-top:8px;min-height:48px"></div>
+            </div>
+            <div style="padding-top:12px">
+              <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">Upload your design</div>
+              <p style="font-size:14px;color:#6b7280;line-height:1.65">Upload a PNG, JPG, or SVG. Use our mockup generator to preview exactly how your design looks on the product — adjust placement, scale, and print area in seconds.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="flex gap-5 mb-8 fade-up delay-2" style="position:relative">
+            <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+              <div class="step-num gold">3</div>
+              <div style="flex:1;width:2px;background:linear-gradient(to bottom,#e5e4e0 0%,transparent 100%);margin-top:8px;min-height:48px"></div>
+            </div>
+            <div style="padding-top:12px">
+              <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">Connect your store</div>
+              <p style="font-size:14px;color:#6b7280;line-height:1.65">Link Shopify, Etsy, WooCommerce, or any platform with one click. Your products sync automatically. When a customer buys, we receive the order instantly.</p>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="flex gap-5 fade-up delay-3">
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div class="step-num gold">4</div>
+            </div>
+            <div style="padding-top:12px">
+              <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">We print, pack & ship</div>
+              <p style="font-size:14px;color:#6b7280;line-height:1.65">Orders are routed to our production partners, printed, quality-checked, and shipped directly to your customer — usually within 2–5 business days. Tracking is sent automatically.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mock dashboard (right) -->
+        <div class="fade-up delay-2" style="position:sticky;top:80px">
+          <div class="mock-window">
+            <div class="mock-bar">
+              <div class="mock-dot" style="background:#f87171"></div>
+              <div class="mock-dot" style="background:#fbbf24"></div>
+              <div class="mock-dot" style="background:#34d399"></div>
+              <span style="font-size:11px;color:#9ca3af;margin-left:8px">dashboard.egfulfill.com</span>
+            </div>
+            <div style="padding:20px">
+              <!-- Order status rows -->
+              <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">Recent Orders</div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#f6f5f4;border-radius:8px;padding:10px 14px">
+                  <div>
+                    <div style="font-size:12px;font-weight:600;color:#191918">Order #4821</div>
+                    <div style="font-size:11px;color:#9ca3af">Unisex Crew-Neck Tee · Red · L</div>
+                  </div>
+                  <span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px">Shipped</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#f6f5f4;border-radius:8px;padding:10px 14px">
+                  <div>
+                    <div style="font-size:12px;font-weight:600;color:#191918">Order #4820</div>
+                    <div style="font-size:11px;color:#9ca3af">Pullover Hoodie · Sand · M</div>
+                  </div>
+                  <span style="background:#fef9c3;color:#a16207;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px">In production</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#f6f5f4;border-radius:8px;padding:10px 14px">
+                  <div>
+                    <div style="font-size:12px;font-weight:600;color:#191918">Order #4819</div>
+                    <div style="font-size:11px;color:#9ca3af">Crewneck Sweatshirt · Red · S</div>
+                  </div>
+                  <span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px">Shipped</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;background:#f6f5f4;border-radius:8px;padding:10px 14px">
+                  <div>
+                    <div style="font-size:12px;font-weight:600;color:#191918">Order #4818</div>
+                    <div style="font-size:11px;color:#9ca3af">Vintage Wash Dad Cap · Brown</div>
+                  </div>
+                  <span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px">Delivered</span>
+                </div>
+              </div>
+
+              <!-- Mini stats -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+                <div style="background:#111827;border-radius:10px;padding:12px">
+                  <div style="font-size:18px;font-weight:700;color:white;letter-spacing:-0.04em">$3,240</div>
+                  <div style="font-size:10px;color:#9ca3af;margin-top:2px">This month</div>
+                </div>
+                <div style="background:#f6f5f4;border-radius:10px;padding:12px">
+                  <div style="font-size:18px;font-weight:700;color:#191918;letter-spacing:-0.04em">48</div>
+                  <div style="font-size:10px;color:#9ca3af;margin-top:2px">Orders</div>
+                </div>
+                <div style="background:#f6f5f4;border-radius:10px;padding:12px">
+                  <div style="font-size:18px;font-weight:700;color:#191918;letter-spacing:-0.04em">2.8d</div>
+                  <div style="font-size:10px;color:#9ca3af;margin-top:2px">Avg. fulfil.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY EGFULFILL -->
+  <section style="background:white;padding:80px 0">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-14 fade-up">
+        <div class="section-tag"><span style="color:#191918">✦</span> Why sellers choose us</div>
+        <h2 style="font-size:2.25rem;font-weight:700;color:#191918;letter-spacing:-0.05rem;line-height:1.2">Built for sellers who want<br/>to focus on selling</h2>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5">
+
+        <div class="feat-card fade-up">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#191918" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Zero inventory risk</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Products are printed only when a customer orders. No upfront stock, no storage fees, no wasted inventory — ever.</p>
+        </div>
+
+        <div class="feat-card fade-up delay-1">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#191918" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="#191918" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">2–5 day production</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Most orders are printed and dispatched within 2–5 business days. Expedited options available for time-sensitive drops.</p>
+        </div>
+
+        <div class="feat-card fade-up delay-2">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="#191918" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 22V12h6v10" stroke="#191918" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Ships to 50+ countries</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Global fulfillment network with production partners close to your customers, reducing costs and delivery times worldwide.</p>
+        </div>
+
+        <div class="feat-card fade-up">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="#191918" stroke-width="1.8"/><path d="M8 21h8M12 17v4" stroke="#191918" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Automatic order routing</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Orders from your store sync to EGFULFILL automatically. No manual processing — from purchase to production without lifting a finger.</p>
+        </div>
+
+        <div class="feat-card fade-up delay-1">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="#191918" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Your brand, not ours</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Custom packing slips, branded labels, and poly mailers. Your customers receive a fully branded unboxing experience.</p>
+        </div>
+
+        <div class="feat-card fade-up delay-2">
+          <div style="width:44px;height:44px;background:#f7f5f0;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="#191918" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Live order tracking</div>
+          <p style="font-size:13px;color:#6b7280;line-height:1.65">Track every order from print to delivery in your dashboard. Tracking numbers sent to your customers automatically on dispatch.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section style="background:white;padding:80px 0">
+    <div class="max-w-2xl mx-auto px-6">
+      <div class="text-center mb-12 fade-up">
+        <div class="section-tag"><span style="color:#191918">✦</span> FAQ</div>
+        <h2 style="font-size:2.1rem;font-weight:700;color:#191918;letter-spacing:-0.05rem">Common questions</h2>
+      </div>
+
+      <div id="faq">
+
+        <div class="faq-item fade-up">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            Do I need to buy inventory upfront?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">No. Products are printed only when a customer places an order. There are zero upfront costs, no minimum orders, and no warehouse fees. You only pay our base cost when a sale is made.</div>
+        </div>
+
+        <div class="faq-item fade-up delay-1">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            How long does fulfillment take?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">Most orders are printed and dispatched within 2–5 business days. Shipping time is on top of that depending on the destination. Expedited production is available for select products.</div>
+        </div>
+
+        <div class="faq-item fade-up delay-2">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            Can I set my own retail prices?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">Yes, completely. You set the selling price in your store. EGFULFILL charges our base cost when the order is fulfilled. The difference between your price and our base cost is your profit margin.</div>
+        </div>
+
+        <div class="faq-item fade-up">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            What file formats do you accept for designs?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">We accept PNG (recommended), JPG, and SVG files. For best print quality, upload PNG files at 300 DPI or higher with a transparent background where applicable.</div>
+        </div>
+
+        <div class="faq-item fade-up delay-1">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            Can I order samples before selling?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">Absolutely. You can order any product as a sample at our base cost plus shipping. This lets you check print quality, sizing, and materials before listing products in your store.</div>
+        </div>
+
+        <div class="faq-item fade-up delay-2">
+          <button class="faq-q" onclick="toggleFaq(this)">
+            What happens if an order is lost or damaged?
+            <svg class="faq-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="faq-a">We cover reprints and replacements for orders that are lost in transit or arrive with print defects. Just raise a claim in your dashboard with a photo and we'll resolve it, no stress.</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section style="background:#f7f5f0;padding:80px 0">
+    <div class="max-w-6xl mx-auto px-6">
+      <div style="background:#111827;border-radius:20px;padding:60px 48px;text-align:center" class="fade-up">
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:4px 14px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:20px">
+          ✦ No minimums · No upfront cost
+        </div>
+        <h2 style="font-size:2.4rem;font-weight:700;color:white;letter-spacing:-0.06rem;margin-bottom:14px">Ready to launch your store?</h2>
+        <p style="color:#9ca3af;font-size:14px;max-width:440px;margin:0 auto 32px;line-height:1.7">Join thousands of sellers already using EGFULFILL. Set up your first product in under 10 minutes.</p>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
+          <button style="background:white;color:#111827;font-size:14px;font-weight:700;padding:13px 30px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Start for free →</button>
+          <a href="products.html" style="text-decoration:none;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:13px 30px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">Browse catalog</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER (shared canonical) -->
+  <footer style="background:#f7f5f0;border-top:1.5px solid #40403d;padding:56px 0 40px">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div class="col-span-2 md:col-span-1">
+          <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+          <p style="font-size:12.5px;color:#9ca3af;margin-top:10px">Print-on-demand fulfillment for creators &amp; brands.</p>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Product</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="products.html" style="text-decoration:none;color:inherit">Browse catalog</a></li>
+            <li><a href="design-maker.html" style="text-decoration:none;color:inherit">Design Maker</a></li>
+            <li><a href="howitworks.html" style="text-decoration:none;color:inherit">How it works</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Company</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="about.html" style="text-decoration:none;color:inherit">About us</a></li>
+            <li><a href="seller-login.html" style="text-decoration:none;color:inherit">Log in</a></li>
+          </ul>
+        </div>
+        <div>
+          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">API Documentation</div>
+          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+            <li><a href="apidocs.html" style="text-decoration:none;color:inherit">API docs</a></li>
+            <li><a href="help.html" style="text-decoration:none;color:inherit">Help center</a></li>
+            <li><a href="security.html" style="text-decoration:none;color:inherit">Security</a></li>
+          </ul>
+        </div>
+      </div>
+      <div style="border-top:1px solid #e5e4e0;padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:12px;color:#9ca3af;margin:0">© 2024 EGFULFILL, Inc. All rights reserved.</p>
+        <div style="display:flex;gap:18px;font-size:12px;color:#9ca3af">
+          <a href="privacy.html" style="text-decoration:none;color:inherit">Privacy</a>
+          <a href="terms.html" style="text-decoration:none;color:inherit">Terms</a>
+          <a href="ip-policy.html" style="text-decoration:none;color:inherit">IP Policy</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Fade-up on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.08, rootMargin: '0px 0px -20px 0px' });
+    document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+    setTimeout(() => document.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible')), 100);
+
+    // FAQ accordion
+    function toggleFaq(btn) {
+      const answer = btn.nextElementSibling;
+      const chevron = btn.querySelector('.faq-chevron');
+      const isOpen = answer.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.faq-a').forEach(a => a.classList.remove('open'));
+      document.querySelectorAll('.faq-chevron').forEach(c => c.classList.remove('open'));
+      // Open clicked (if was closed)
+      if (!isOpen) {
+        answer.classList.add('open');
+        chevron.classList.add('open');
+      }
+    }
+  </script>
+</body>
+</html>

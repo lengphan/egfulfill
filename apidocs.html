@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>API Documentation – EGFULFILL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0;color:#191918}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
+
+/* Retro sticker cards (shared across public pages) */
+.card,.eg-card{background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:3px 3px 0 #40403d;position:relative;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);top:0}
+.card.is-hoverable:hover,a.card:hover,button.card:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+.btn-retro{display:inline-flex;align-items:center;justify-content:center;background:#191918;color:#f3eee2;border:1.5px solid #40403d;border-radius:10px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;box-shadow:3px 3px 0 #40403d;transition:box-shadow .16s ease, top .14s cubic-bezier(.4,0,.2,1);position:relative;top:0}
+.btn-retro:hover{top:-1px;box-shadow:5px 5px 0 #40403d}
+.btn-retro:active{top:3px;box-shadow:1px 1px 0 #40403d}
+
+/* ── Public header (matches canonical max-w-7xl alignment used on index/about/products/howitworks) ── */
+.pub-header{position:sticky;top:0;left:0;right:0;height:56px;background:#f7f5f0;display:flex;justify-content:center;z-index:100}
+.pub-header-inner{display:flex;align-items:center;gap:32px;width:100%;max-width:80rem;padding:0 24px}
+.pub-logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;color:#191918;text-decoration:none;white-space:nowrap;flex-shrink:0}
+.pub-nav{display:flex;align-items:center;gap:24px;flex:1;margin-left:18px}
+.pub-nav-link{font-size:14px;color:#555550;text-decoration:none;font-weight:500;transition:color .15s;white-space:nowrap}
+.pub-nav-link:hover{color:#191918}
+.pub-nav-link.active{color:#191918;font-weight:600}
+.pub-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
+
+/* ── Layout ── */
+.api-layout{display:flex;min-height:calc(100vh - 56px);justify-content:center}
+
+/* ── Sidebar ── */
+.api-sidebar{
+  width:220px;flex-shrink:0;
+  position:sticky;top:56px;height:calc(100vh - 56px);
+  overflow-y:auto;padding:24px 0 48px;
+}
+.nav-group-label{font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.09em;padding:0 18px;margin:20px 0 6px}
+.nav-group-label:first-child{margin-top:0}
+.nav-link{
+  display:block;font-size:13px;color:#6b7280;
+  padding:6px 18px;text-decoration:none;
+  transition:color .12s,background .12s;
+  border-left:2px solid transparent;
+}
+.nav-link:hover{color:#191918;background:#f0ede9}
+.nav-link.active{color:#111827;font-weight:600;border-left-color:#111827;background:#f0ede9}
+
+/* ── Main content — centered single column ── */
+.api-main{
+  padding:0 0 0 32px;
+}
+.api-content{
+  width:780px;
+  padding:56px 0 120px;
+}
+
+/* ── Section ── */
+.doc-section{scroll-margin-top:80px;margin-bottom:64px}
+.doc-section:last-child{margin-bottom:0}
+.section-divider{height:1px;background:#f0ede9;margin-bottom:64px}
+
+/* ── Typography ── */
+.section-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  background:#f6f5f4;border:1px solid #e5e4e0;border-radius:999px;
+  padding:4px 14px;font-size:12px;font-weight:600;color:#555550;margin-bottom:20px;
+}
+.doc-h1{font-size:2.1rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;margin:0 0 14px;line-height:1.15}
+.doc-h2{font-size:1.3rem;font-weight:700;color:#191918;letter-spacing:-0.025rem;margin:0 0 12px;line-height:1.3}
+.doc-p{font-size:14.5px;color:#6b7280;line-height:1.82;margin:0 0 18px}
+.doc-p:last-child{margin-bottom:0}
+code{font-family:'SF Mono','Fira Code',monospace;font-size:12.5px;background:#f0ede9;color:#374151;padding:1px 7px;border-radius:4px}
+strong{color:#374151}
+
+/* ── Info cards (base url etc) ── */
+.info-cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.info-card{background:#f6f5f4;border:1px solid #e5e4e0;border-radius:10px;padding:14px 20px;min-width:140px}
+.info-card-label{font-size:10.5px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+
+/* ── Code blocks ── */
+.code-block{
+  background:#111827;border-radius:12px;overflow:hidden;
+  font-family:'SF Mono','Fira Code',monospace;font-size:12.5px;line-height:1.75;
+  margin-bottom:16px;
+}
+.code-block:last-child{margin-bottom:0}
+.cb-header{
+  background:#1f2937;padding:10px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid #374151;
+}
+.cb-lang{font-size:11px;color:#9ca3af;font-weight:600;font-family:'SF Mono',monospace}
+.cb-copy{
+  background:#374151;color:#9ca3af;border:none;border-radius:6px;
+  padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit;
+  transition:background .15s,color .15s;
+}
+.cb-copy:hover{background:#4b5563;color:#fff}
+.cb-body{
+  padding:18px 20px;color:#e5e7eb;overflow-x:auto;white-space:pre;
+}
+.cb-body .key{color:#93c5fd}
+.cb-body .str{color:#86efac}
+.cb-body .num{color:#fcd34d}
+.cb-body .kw{color:#f472b6}
+.cb-body .cm{color:#6b7280}
+
+/* ── Alert boxes ── */
+.alert{border-radius:10px;padding:13px 16px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start;margin-bottom:16px}
+.alert-warn{background:#fef9c3;border:1px solid #fde68a;color:#92400e}
+.alert-err{background:#fee2e2;border:1px solid #fca5a5;color:#991b1b}
+
+/* ── Tables ── */
+.tbl-wrap{border:1px solid #e5e4e0;border-radius:12px;overflow:hidden;margin-bottom:20px}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;padding:10px 16px;font-size:11.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;background:#f6f5f4;border-bottom:1px solid #e5e4e0}
+.tbl td{padding:10px 16px;border-bottom:1px solid #f0ede9;vertical-align:top;color:#6b7280;line-height:1.5}
+.tbl tr:last-child td{border-bottom:none}
+.param-name{font-family:'SF Mono',monospace;font-size:12.5px;color:#111827;font-weight:500}
+.param-type{font-size:11.5px;color:#9ca3af;background:#f4f2ef;padding:1px 7px;border-radius:4px;font-family:monospace}
+.pill-req{font-size:10.5px;color:#dc2626;font-weight:700;background:#fee2e2;padding:2px 7px;border-radius:4px}
+.pill-opt{font-size:10.5px;color:#6b7280;font-weight:700;background:#f0ede9;padding:2px 7px;border-radius:4px}
+
+/* ── Endpoint cards ── */
+.endpoint{background:#fff;border:1.5px solid #e5e4e0;border-radius:12px;overflow:hidden;margin-bottom:14px}
+.ep-head{
+  padding:14px 18px;display:flex;align-items:center;gap:10px;
+  cursor:pointer;user-select:none;transition:background .12s;
+}
+.ep-head:hover{background:#fafaf9}
+.ep-path{font-family:'SF Mono','Fira Code',monospace;font-size:13px;color:#374151;font-weight:500}
+.ep-desc{font-size:12.5px;color:#9ca3af;margin-left:auto}
+.ep-body{border-top:1px solid #f0ede9;padding:20px 20px;display:none}
+.ep-body.open{display:block}
+.method{
+  display:inline-block;font-size:11px;font-weight:700;
+  padding:3px 9px;border-radius:5px;letter-spacing:.04em;
+  font-family:'SF Mono',monospace;flex-shrink:0;
+}
+.get{background:#dcfce7;color:#15803d}
+.post{background:#dbeafe;color:#1d4ed8}
+.del{background:#fee2e2;color:#dc2626}
+
+/* ── Footer ── */
+.pub-footer{
+  background:#f6f5f4;border-top:1px solid #e5e4e0;
+  padding:22px 32px;display:flex;align-items:center;
+  justify-content:space-between;flex-wrap:wrap;gap:12px;
+}
+.pub-footer-link{font-size:12.5px;color:#9ca3af;text-decoration:none;transition:color .15s}
+.pub-footer-link:hover{color:#374151}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .35s cubic-bezier(.22,1,.36,1) both}
+
+@media(max-width:768px){
+  .api-layout{justify-content:flex-start}
+  .api-sidebar{display:none}
+  .api-main{padding:0 20px}
+  .api-content{width:100%;padding:36px 0 80px}
+}
+</style>
+<style id="eg-outline-btns">
+.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
+.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
+.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
+.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
+.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
+.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
+.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
+html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
+</style>
+<style id="eg-input-focus">
+input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
+.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
+.ni:focus{outline:none!important;box-shadow:none!important}
+</style>
+<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
+<style id="eg-dark-polish">
+/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
+   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
+html[data-theme=dark] .card,
+html[data-theme=dark] .wcard,
+html[data-theme=dark] .stat-card,
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
+}
+html[data-theme=dark] #section-overview .card,
+html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
+html[data-theme=dark] .card:hover,
+html[data-theme=dark] .wcard:hover{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
+}
+/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
+html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
+  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
+}
+html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
+  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
+}
+html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
+/* Active selections: faint fill + beige outline, beige text */
+html[data-theme=dark] .ni.on,
+html[data-theme=dark] .stab.on,
+html[data-theme=dark] .seg.on,
+html[data-theme=dark] .tab-btn.active,
+html[data-theme=dark] .pill-btn.active{
+  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
+}
+/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
+html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
+html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
+html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
+/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
+body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
+/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
+html[data-theme=dark] .fb{color:#9c968e!important}
+html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
+html[data-theme=dark] .filter-btn.active,
+html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
+/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
+html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
+html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
+html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
+</style>
+<style id="eg-retro-override">
+.feat-card,.bento-card,.floating-card,.testimonial-card,.mock-ui,.step-card,.faq-item,.feature-card,.benefit-card,.value-card,.pricing-card,.case-card,.product-card{background:#fdfcfa!important;border:1.5px solid #40403d!important;border-radius:14px!important;box-shadow:3px 3px 0 #40403d!important;overflow:visible!important}
+.feat-card{padding:24px!important}.faq-item{padding:18px 22px!important;margin-bottom:10px}
+.section-tag{background:#fdfcfa!important;border:1.5px solid #40403d!important;color:#191918!important;box-shadow:2px 2px 0 #40403d!important}
+.api-layout,.api-sidebar,main{background:#f7f5f0!important}
+</style>
+</head>
+<body>
+
+<!-- Header (shared canonical, max-w-7xl centered to match index/about/products/howitworks) -->
+<header class="pub-header">
+  <div class="pub-header-inner">
+    <a href="index.html" class="pub-logo">egfulfill</a>
+    <nav class="pub-nav">
+      <a href="products.html" class="pub-nav-link">Products</a>
+      <a href="howitworks.html" class="pub-nav-link">How It Works</a>
+      <a href="about.html" class="pub-nav-link">About</a>
+      <a href="apidocs.html" class="pub-nav-link active">API Documentation</a>
+    </nav>
+    <div class="pub-actions">
+      <a href="seller-login.html" class="pub-nav-link">Log in</a>
+      <a href="seller-login.html" class="btn-retro">Start for free</a>
+    </div>
+  </div>
+</header>
+
+<div class="api-layout">
+
+<!-- Sidebar -->
+<aside class="api-sidebar">
+  <div style="padding:0 18px 14px;border-bottom:1px solid #f0ede9;margin-bottom:4px">
+    <div style="font-size:11.5px;font-weight:700;color:#191918">REST API</div>
+    <div style="font-size:11px;color:#9ca3af;margin-top:2px">Version 1.0</div>
+  </div>
+  <div class="nav-group-label">Getting started</div>
+  <a href="#overview"        class="nav-link active" onclick="setActive(this)">Overview</a>
+  <a href="#authentication"  class="nav-link" onclick="setActive(this)">Authentication</a>
+  <a href="#base-url"        class="nav-link" onclick="setActive(this)">Base URL &amp; versioning</a>
+  <a href="#errors"          class="nav-link" onclick="setActive(this)">Errors</a>
+  <a href="#rate-limits"     class="nav-link" onclick="setActive(this)">Rate limits</a>
+  <div class="nav-group-label">Products</div>
+  <a href="#products-list"   class="nav-link" onclick="setActive(this)">List products</a>
+  <a href="#products-get"    class="nav-link" onclick="setActive(this)">Get product</a>
+  <div class="nav-group-label">Orders</div>
+  <a href="#orders-create"   class="nav-link" onclick="setActive(this)">Create order</a>
+  <a href="#orders-get"      class="nav-link" onclick="setActive(this)">Get order</a>
+  <a href="#orders-list"     class="nav-link" onclick="setActive(this)">List orders</a>
+  <a href="#orders-cancel"   class="nav-link" onclick="setActive(this)">Cancel order</a>
+  <div class="nav-group-label">Webhooks</div>
+  <a href="#webhooks-events" class="nav-link" onclick="setActive(this)">Events</a>
+  <a href="#webhooks-setup"  class="nav-link" onclick="setActive(this)">Verification</a>
+</aside>
+
+<!-- Main -->
+<main class="api-main">
+<div class="api-content">
+
+  <!-- OVERVIEW -->
+  <section id="overview" class="doc-section fu">
+
+    <h1 class="doc-h1">API Documentation</h1>
+    <p class="doc-p">The EGFULFILL API lets you programmatically create and manage print-on-demand orders, retrieve product catalogs, and receive real-time fulfillment events via webhooks. All requests and responses use JSON.</p>
+    <div class="info-cards">
+      <div class="info-card"><div class="info-card-label">Base URL</div><code>api.egfulfill.com</code></div>
+      <div class="info-card"><div class="info-card-label">Version</div><code>v1</code></div>
+      <div class="info-card"><div class="info-card-label">Format</div><code>JSON</code></div>
+      <div class="info-card"><div class="info-card-label">Auth</div><code>Bearer token</code></div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- AUTHENTICATION -->
+  <section id="authentication" class="doc-section">
+    <h2 class="doc-h2">Authentication</h2>
+    <p class="doc-p">All API requests must include your secret key in the <code>Authorization</code> header using Bearer token format. You can generate and manage API keys from <strong>Settings → API Keys</strong>.</p>
+    <div class="code-block">
+      <div class="cb-header">
+        <span class="cb-lang">Request header</span>
+        <button class="cb-copy" onclick="copyCode(this)">Copy</button>
+      </div>
+      <div class="cb-body"><span class="key">Authorization</span>: Bearer <span class="str">egf_live_sk_••••••••••••••••••••</span></div>
+    </div>
+    <div class="alert alert-warn">
+      <span style="flex-shrink:0">⚠️</span>
+      <span>Never expose your secret key in client-side code. Always make API calls from your backend server.</span>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- BASE URL -->
+  <section id="base-url" class="doc-section">
+    <h2 class="doc-h2">Base URL &amp; versioning</h2>
+    <p class="doc-p">Prefix all endpoints with the versioned base URL. We use path-based versioning to ensure backward compatibility — breaking changes are always released as new versions.</p>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Base URL</span></div>
+      <div class="cb-body"><span class="str">https://api.egfulfill.com/v1</span></div>
+    </div>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Example endpoints</span></div>
+      <div class="cb-body"><span class="key">GET</span>    https://api.egfulfill.com/v1/products
+<span class="key">POST</span>   https://api.egfulfill.com/v1/orders
+<span class="key">GET</span>    https://api.egfulfill.com/v1/orders/:id
+<span class="key">DELETE</span> https://api.egfulfill.com/v1/orders/:id</div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ERRORS -->
+  <section id="errors" class="doc-section">
+    <h2 class="doc-h2">Errors</h2>
+    <p class="doc-p">EGFULFILL uses standard HTTP status codes. All error responses return a JSON body with a <code>code</code> and a human-readable <code>message</code>.</p>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th style="width:90px">Status</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>200</code></td><td>OK — request succeeded</td></tr>
+          <tr><td><code>201</code></td><td>Created — resource was created</td></tr>
+          <tr><td><code>400</code></td><td>Bad request — invalid or missing parameters</td></tr>
+          <tr><td><code>401</code></td><td>Unauthorized — missing or invalid API key</td></tr>
+          <tr><td><code>404</code></td><td>Not found — resource doesn't exist</td></tr>
+          <tr><td><code>422</code></td><td>Unprocessable — validation failed</td></tr>
+          <tr><td><code>429</code></td><td>Rate limited — too many requests</td></tr>
+          <tr><td><code>500</code></td><td>Server error — try again later</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Error response</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="cb-body">{
+  <span class="key">"error"</span>: {
+    <span class="key">"code"</span>: <span class="str">"order_not_found"</span>,
+    <span class="key">"message"</span>: <span class="str">"No order found with ID ord_abc123"</span>,
+    <span class="key">"status"</span>: <span class="num">404</span>
+  }
+}</div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- RATE LIMITS -->
+  <section id="rate-limits" class="doc-section">
+    <h2 class="doc-h2">Rate limits</h2>
+    <p class="doc-p">Requests are limited to <strong>120 per minute</strong> per API key. Your current usage is returned in every response via the headers below. When limited, wait until the <code>X-RateLimit-Reset</code> Unix timestamp before retrying.</p>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Response headers</span></div>
+      <div class="cb-body"><span class="key">X-RateLimit-Limit</span>:     <span class="num">120</span>
+<span class="key">X-RateLimit-Remaining</span>: <span class="num">114</span>
+<span class="key">X-RateLimit-Reset</span>:     <span class="num">1714000860</span></div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- PRODUCTS -->
+  <section id="products-list" class="doc-section">
+    <h2 class="doc-h2">Products</h2>
+    <p class="doc-p">Retrieve products from the EGFULFILL catalog, including variants, pricing, and available print areas.</p>
+
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/products</span>
+        <span class="ep-desc">List all products</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body">
+        <p style="font-size:13.5px;color:#6b7280;margin:0 0 18px;line-height:1.7">Returns a paginated list of all available print-on-demand products.</p>
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Query parameters</div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:140px">Name</th><th style="width:90px">Type</th><th style="width:80px"></th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><span class="param-name">limit</span></td><td><span class="param-type">integer</span></td><td><span class="pill-opt">optional</span></td><td>Results per page (default: 20, max: 100)</td></tr>
+              <tr><td><span class="param-name">page</span></td><td><span class="param-type">integer</span></td><td><span class="pill-opt">optional</span></td><td>Page number (default: 1)</td></tr>
+              <tr><td><span class="param-name">category</span></td><td><span class="param-type">string</span></td><td><span class="pill-opt">optional</span></td><td>Filter by category slug, e.g. <code>apparel</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-block">
+          <div class="cb-header"><span class="cb-lang">Response 200</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+          <div class="cb-body">{
+  <span class="key">"data"</span>: [
+    {
+      <span class="key">"id"</span>: <span class="str">"prod_Uct9xR"</span>,
+      <span class="key">"name"</span>: <span class="str">"Unisex Crew-Neck Tee"</span>,
+      <span class="key">"category"</span>: <span class="str">"apparel"</span>,
+      <span class="key">"base_price"</span>: <span class="num">8.50</span>,
+      <span class="key">"currency"</span>: <span class="str">"USD"</span>,
+      <span class="key">"variants_count"</span>: <span class="num">17</span>
+    }
+  ],
+  <span class="key">"meta"</span>: { <span class="key">"total"</span>: <span class="num">491</span>, <span class="key">"page"</span>: <span class="num">1</span>, <span class="key">"limit"</span>: <span class="num">20</span> }
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="products-get" class="doc-section">
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/products/:id</span>
+        <span class="ep-desc">Get a single product</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body">
+        <p style="font-size:13.5px;color:#6b7280;margin:0 0 18px;line-height:1.7">Returns a single product with all variants, print areas, and available colors/sizes.</p>
+        <div class="code-block">
+          <div class="cb-header"><span class="cb-lang">Response 200</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+          <div class="cb-body">{
+  <span class="key">"id"</span>: <span class="str">"prod_Uct9xR"</span>,
+  <span class="key">"name"</span>: <span class="str">"Unisex Crew-Neck Tee"</span>,
+  <span class="key">"description"</span>: <span class="str">"100% combed cotton, 180gsm"</span>,
+  <span class="key">"category"</span>: <span class="str">"apparel"</span>,
+  <span class="key">"base_price"</span>: <span class="num">8.50</span>,
+  <span class="key">"print_areas"</span>: [<span class="str">"front"</span>, <span class="str">"back"</span>, <span class="str">"sleeve"</span>],
+  <span class="key">"variants"</span>: [
+    { <span class="key">"id"</span>: <span class="str">"var_001"</span>, <span class="key">"size"</span>: <span class="str">"S"</span>, <span class="key">"color"</span>: <span class="str">"Black"</span>, <span class="key">"in_stock"</span>: <span class="kw">true</span> },
+    { <span class="key">"id"</span>: <span class="str">"var_002"</span>, <span class="key">"size"</span>: <span class="str">"M"</span>, <span class="key">"color"</span>: <span class="str">"Black"</span>, <span class="key">"in_stock"</span>: <span class="kw">true</span> }
+  ]
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ORDERS -->
+  <section id="orders-create" class="doc-section">
+    <h2 class="doc-h2">Orders</h2>
+    <p class="doc-p">Create and manage fulfillment orders. Once submitted, orders are automatically routed to production.</p>
+
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method post">POST</span>
+        <span class="ep-path">/orders</span>
+        <span class="ep-desc">Create a new order</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body open">
+        <p style="font-size:13.5px;color:#6b7280;margin:0 0 18px;line-height:1.7">Submits a new order for fulfillment. The order is immediately queued for production upon creation.</p>
+        <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Body parameters</div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:175px">Name</th><th style="width:90px">Type</th><th style="width:80px"></th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><span class="param-name">external_id</span></td><td><span class="param-type">string</span></td><td><span class="pill-req">required</span></td><td>Your store's order ID for reference</td></tr>
+              <tr><td><span class="param-name">shipping</span></td><td><span class="param-type">object</span></td><td><span class="pill-req">required</span></td><td>Recipient address object</td></tr>
+              <tr><td><span class="param-name">items</span></td><td><span class="param-type">array</span></td><td><span class="pill-req">required</span></td><td>Array of line item objects</td></tr>
+              <tr><td><span class="param-name">items[].variant_id</span></td><td><span class="param-type">string</span></td><td><span class="pill-req">required</span></td><td>Product variant ID</td></tr>
+              <tr><td><span class="param-name">items[].design_url</span></td><td><span class="param-type">string</span></td><td><span class="pill-req">required</span></td><td>Public URL to print file (PNG or SVG)</td></tr>
+              <tr><td><span class="param-name">items[].quantity</span></td><td><span class="param-type">integer</span></td><td><span class="pill-req">required</span></td><td>Quantity (min: 1)</td></tr>
+              <tr><td><span class="param-name">items[].print_area</span></td><td><span class="param-type">string</span></td><td><span class="pill-opt">optional</span></td><td><code>front</code>, <code>back</code>, or <code>sleeve</code> (default: <code>front</code>)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="code-block">
+          <div class="cb-header"><span class="cb-lang">Request body</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+          <div class="cb-body">{
+  <span class="key">"external_id"</span>: <span class="str">"shopify-order-4821"</span>,
+  <span class="key">"shipping"</span>: {
+    <span class="key">"name"</span>: <span class="str">"Alex Kim"</span>,
+    <span class="key">"address1"</span>: <span class="str">"42 Sunset Blvd"</span>,
+    <span class="key">"city"</span>: <span class="str">"Los Angeles"</span>,
+    <span class="key">"state"</span>: <span class="str">"CA"</span>,
+    <span class="key">"zip"</span>: <span class="str">"90028"</span>,
+    <span class="key">"country"</span>: <span class="str">"US"</span>
+  },
+  <span class="key">"items"</span>: [{
+    <span class="key">"variant_id"</span>: <span class="str">"var_002"</span>,
+    <span class="key">"design_url"</span>: <span class="str">"https://yourcdn.com/designs/logo-front.png"</span>,
+    <span class="key">"quantity"</span>: <span class="num">1</span>,
+    <span class="key">"print_area"</span>: <span class="str">"front"</span>
+  }]
+}</div>
+        </div>
+        <div class="code-block">
+          <div class="cb-header"><span class="cb-lang">Response 201</span></div>
+          <div class="cb-body">{
+  <span class="key">"id"</span>: <span class="str">"ord_7fGkTp"</span>,
+  <span class="key">"status"</span>: <span class="str">"pending"</span>,
+  <span class="key">"external_id"</span>: <span class="str">"shopify-order-4821"</span>,
+  <span class="key">"created_at"</span>: <span class="str">"2024-04-22T09:14:00Z"</span>
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="orders-get" class="doc-section">
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/orders/:id</span>
+        <span class="ep-desc">Get order &amp; tracking</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body">
+        <p style="font-size:13.5px;color:#6b7280;margin:0 0 18px;line-height:1.7">Returns current status and tracking info for a specific order.</p>
+        <div class="code-block">
+          <div class="cb-header"><span class="cb-lang">Response 200</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+          <div class="cb-body">{
+  <span class="key">"id"</span>: <span class="str">"ord_7fGkTp"</span>,
+  <span class="key">"status"</span>: <span class="str">"shipped"</span>,
+  <span class="key">"tracking_number"</span>: <span class="str">"1Z999AA10123456784"</span>,
+  <span class="key">"carrier"</span>: <span class="str">"UPS"</span>,
+  <span class="key">"shipped_at"</span>: <span class="str">"2024-04-24T13:20:00Z"</span>,
+  <span class="key">"estimated_delivery"</span>: <span class="str">"2024-04-27"</span>
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="orders-list" class="doc-section">
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method get">GET</span>
+        <span class="ep-path">/orders</span>
+        <span class="ep-desc">List all orders</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th style="width:140px">Name</th><th style="width:90px">Type</th><th style="width:80px"></th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><span class="param-name">status</span></td><td><span class="param-type">string</span></td><td><span class="pill-opt">optional</span></td><td>Filter: <code>pending</code> <code>in_production</code> <code>shipped</code> <code>delivered</code></td></tr>
+              <tr><td><span class="param-name">from</span></td><td><span class="param-type">string</span></td><td><span class="pill-opt">optional</span></td><td>ISO 8601 date — returns orders after this date</td></tr>
+              <tr><td><span class="param-name">limit</span></td><td><span class="param-type">integer</span></td><td><span class="pill-opt">optional</span></td><td>Default: 20, max: 100</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="orders-cancel" class="doc-section">
+    <div class="endpoint">
+      <div class="ep-head" onclick="toggle(this)">
+        <span class="method del">DELETE</span>
+        <span class="ep-path">/orders/:id</span>
+        <span class="ep-desc">Cancel an order</span>
+        <svg style="margin-left:10px;flex-shrink:0;transition:transform .2s;color:#9ca3af" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ep-body">
+        <p style="font-size:13.5px;color:#6b7280;margin:0 0 14px;line-height:1.7">Cancels an order. Only possible while the status is <code>pending</code>.</p>
+        <div class="alert alert-err">
+          <span style="flex-shrink:0">🚫</span>
+          <span>Once an order moves to <code>in_production</code>, it can no longer be cancelled via the API.</span>
+        </div>
+        <div class="code-block" style="margin-top:14px">
+          <div class="cb-header"><span class="cb-lang">Response 200</span></div>
+          <div class="cb-body">{
+  <span class="key">"id"</span>: <span class="str">"ord_7fGkTp"</span>,
+  <span class="key">"status"</span>: <span class="str">"cancelled"</span>,
+  <span class="key">"cancelled_at"</span>: <span class="str">"2024-04-22T10:01:00Z"</span>
+}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- WEBHOOKS -->
+  <section id="webhooks-events" class="doc-section">
+    <h2 class="doc-h2">Webhooks</h2>
+    <p class="doc-p">EGFULFILL pushes real-time events to your server so you don't have to poll. Configure your webhook endpoint URL in <strong>Settings → Webhooks</strong>.</p>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Event</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>order.created</code></td><td>A new order was received</td></tr>
+          <tr><td><code>order.in_production</code></td><td>Order moved into production</td></tr>
+          <tr><td><code>order.shipped</code></td><td>Order dispatched — includes tracking number</td></tr>
+          <tr><td><code>order.delivered</code></td><td>Carrier confirmed delivery</td></tr>
+          <tr><td><code>order.cancelled</code></td><td>Order was cancelled</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Webhook payload — order.shipped</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="cb-body">{
+  <span class="key">"event"</span>: <span class="str">"order.shipped"</span>,
+  <span class="key">"created_at"</span>: <span class="str">"2024-04-24T13:20:00Z"</span>,
+  <span class="key">"data"</span>: {
+    <span class="key">"id"</span>: <span class="str">"ord_7fGkTp"</span>,
+    <span class="key">"external_id"</span>: <span class="str">"shopify-order-4821"</span>,
+    <span class="key">"tracking_number"</span>: <span class="str">"1Z999AA10123456784"</span>,
+    <span class="key">"carrier"</span>: <span class="str">"UPS"</span>,
+    <span class="key">"tracking_url"</span>: <span class="str">"https://www.ups.com/track?tracknum=1Z999AA10123456784"</span>
+  }
+}</div>
+    </div>
+  </section>
+
+  <section id="webhooks-setup" class="doc-section">
+    <h2 class="doc-h2">Signature verification</h2>
+    <p class="doc-p">Verify every incoming webhook by checking the <code>X-EGFULFILL-Signature</code> header — an HMAC-SHA256 of the raw request body signed with your webhook secret. Your secret is in <strong>Settings → Webhooks</strong>.</p>
+    <div class="code-block">
+      <div class="cb-header"><span class="cb-lang">Node.js — verify signature</span><button class="cb-copy" onclick="copyCode(this)">Copy</button></div>
+      <div class="cb-body"><span class="kw">const</span> crypto = require(<span class="str">'crypto'</span>);
+
+<span class="kw">function</span> verifyWebhook(rawBody, signature, secret) {
+  <span class="kw">const</span> expected = crypto
+    .createHmac(<span class="str">'sha256'</span>, secret)
+    .update(rawBody)
+    .digest(<span class="str">'hex'</span>);
+  <span class="kw">return</span> crypto.timingSafeEqual(
+    Buffer.from(expected),
+    Buffer.from(signature)
+  );
+}</div>
+    </div>
+  </section>
+
+</div>
+</main>
+</div>
+
+<!-- Footer (shared canonical) -->
+<footer style="background:#f7f5f0;border-top:1.5px solid #40403d" class="pt-14 pb-10">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+      <div class="col-span-2 md:col-span-1">
+        <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
+        <p style="font-size:12.5px;color:#9ca3af;margin-top:10px">Print-on-demand fulfillment for creators &amp; brands.</p>
+      </div>
+      <div>
+        <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Product</div>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+          <li><a href="products.html" style="text-decoration:none;color:inherit">Browse catalog</a></li>
+          <li><a href="design-maker.html" style="text-decoration:none;color:inherit">Design Maker</a></li>
+          <li><a href="howitworks.html" style="text-decoration:none;color:inherit">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Company</div>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+          <li><a href="about.html" style="text-decoration:none;color:inherit">About us</a></li>
+          <li><a href="seller-login.html" style="text-decoration:none;color:inherit">Log in</a></li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">API Documentation</div>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
+          <li><a href="apidocs.html" style="text-decoration:none;color:inherit">API docs</a></li>
+          <li><a href="help.html" style="text-decoration:none;color:inherit">Help center</a></li>
+          <li><a href="security.html" style="text-decoration:none;color:inherit">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div style="border-top:1px solid #e5e4e0;padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+      <p style="font-size:12px;color:#9ca3af;margin:0">© 2024 EGFULFILL, Inc. All rights reserved.</p>
+      <div style="display:flex;gap:18px;font-size:12px;color:#9ca3af">
+        <a href="privacy.html" style="text-decoration:none;color:inherit">Privacy</a>
+        <a href="terms.html" style="text-decoration:none;color:inherit">Terms</a>
+        <a href="ip-policy.html" style="text-decoration:none;color:inherit">IP Policy</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  function toggle(header) {
+    const body = header.nextElementSibling;
+    const chevron = header.querySelector('svg');
+    const open = body.classList.contains('open');
+    body.classList.toggle('open', !open);
+    chevron.style.transform = open ? '' : 'rotate(180deg)';
+  }
+
+  function copyCode(btn) {
+    const text = btn.closest('.code-block').querySelector('.cb-body').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+  }
+
+  // Scroll spy
+  const sections = document.querySelectorAll('[id]');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 90) current = s.id; });
+    document.querySelectorAll('.nav-link').forEach(l => {
+      l.classList.remove('active');
+      if (l.getAttribute('href') === '#' + current) l.classList.add('active');
+    });
+  }, { passive: true });
+</script>
+</body>
+</html>
