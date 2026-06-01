@@ -2659,6 +2659,8 @@ function openQuickPositionModal(orderNo, sku, viewOnly) {
         </div>
         <div style="padding:18px;display:flex;justify-content:center">
           <div id="qp-stage" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">
+            <!-- Fast background removal — sits on top of the image, top-right. -->
+            <button id="qp-rmbg" type="button" onclick="event.stopPropagation();qpRemoveBg()" title="Remove the design's background" style="position:absolute;top:7px;right:7px;z-index:5;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;backdrop-filter:blur(3px);box-shadow:0 1px 4px rgba(0,0,0,.08);transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2 2h10v10H2z" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1.6"/><path d="M4.5 9.5l2-2.5 1.5 1.8 1-1.2 1.5 1.9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="5.4" cy="5.2" r="1" fill="currentColor"/></svg>Remove BG</button>
             <div id="qp-design-wrap" style="position:absolute;cursor:grab">
               <img id="qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>
               <div id="qp-handle" style="position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div>
@@ -2697,6 +2699,9 @@ function openQuickPositionModal(orderNo, sku, viewOnly) {
   wrap.style.cursor = _locked ? 'default' : 'grab';
   const handleEl = document.getElementById('qp-handle');
   if (handleEl) handleEl.style.display = _locked ? 'none' : 'block';
+  // Remove-BG is an edit — hidden once the order is locked / in production.
+  const rmbgEl = document.getElementById('qp-rmbg');
+  if (rmbgEl) rmbgEl.style.display = _locked ? 'none' : '';
   // Hide Save when locked; Cancel becomes Close. Lab link stays for context.
   const footerBtns = modal.querySelectorAll('button.btn');
   footerBtns.forEach(b => {
@@ -2724,8 +2729,77 @@ function saveQuickPositionModal() {
     };
   }
   closeQuickPositionModal();
-  if (typeof renderOrders === 'function') renderOrders();
+  _qpSyncEverywhere();
 }
+// Refresh every surface that shows this design so a resize/move/bg-removal is
+// reflected immediately: the orders table thumbnails AND an open order-detail
+// modal (both use itemCompositeThumb against the same item.designPos / design).
+function _qpSyncEverywhere() {
+  if (typeof renderOrders === 'function') renderOrders();
+  // If the order-detail modal is open on this same order, re-render it so its
+  // item thumbnails pick up the new position / background.
+  try {
+    const dm = document.getElementById('new-order-modal') || document.getElementById('odm-modal');
+    const open = dm && (dm.style.display === 'flex' || dm.style.display === 'block' || dm.classList.contains('open'));
+    if (open && window._odmCurrentOrder && _qpCurrent && window._odmCurrentOrder.no === _qpCurrent.orderNo
+        && typeof openDetailModal === 'function') {
+      openDetailModal(_qpCurrent.orderNo);
+    }
+  } catch(e) {}
+}
+// Fast background removal for the design currently in the quick-position modal.
+// Samples the four image corners, clears pixels within a colour tolerance, then
+// writes the transparent PNG back to the item + design cache so it persists and
+// syncs to the table + detail modal. Self-contained (no design-maker dependency).
+function qpRemoveBg() {
+  if (!_qpCurrent) return;
+  if (_qpCurrent.locked) { if (typeof toast === 'function') toast('Order is locked — open Design Lab to edit'); return; }
+  const o = ORDERS.find(x => x.no === _qpCurrent.orderNo);
+  const item = o && o.itemsList.find(i => i.sku === _qpCurrent.sku);
+  const dEl = document.getElementById('qp-design');
+  if (!o || !item || !dEl || !dEl.src) return;
+  const btn = document.getElementById('qp-rmbg');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+  const img = new Image(); img.crossOrigin = 'anonymous';
+  img.onload = function(){
+    try {
+      const w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) { if (typeof toast === 'function') toast('Could not read image'); return; }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+      let data;
+      try { data = ctx.getImageData(0, 0, w, h); }
+      catch(e){ if (typeof toast === 'function') toast('This image can’t be processed in-browser'); return; }
+      const d = data.data;
+      const px = (x,y) => { const i=(y*w+x)*4; return [d[i],d[i+1],d[i+2]]; };
+      const cs = [px(0,0),px(w-1,0),px(0,h-1),px(w-1,h-1)];
+      let bg = [0,0,0];
+      cs.forEach(p => { bg[0]+=p[0]; bg[1]+=p[1]; bg[2]+=p[2]; });
+      bg = bg.map(v => v/4);
+      const tol = 46; let removed = 0;
+      for (let i=0;i<d.length;i+=4){
+        const dr=d[i]-bg[0], dg=d[i+1]-bg[1], db=d[i+2]-bg[2];
+        if (Math.sqrt(dr*dr+dg*dg+db*db) < tol){ d[i+3]=0; removed++; }
+      }
+      if (!removed){ if (typeof toast === 'function') toast('No uniform background detected'); return; }
+      ctx.putImageData(data, 0, 0);
+      const out = c.toDataURL('image/png');
+      // Live preview in the modal.
+      dEl.src = out;
+      // Persist on the item + the shared design cache so it survives reloads and
+      // shows on the factory boards' composites.
+      item.designUrl = out;
+      try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, item.sku, out); } catch(e){}
+      _qpSyncEverywhere();
+      if (typeof toast === 'function') toast('Background removed');
+    } finally {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    }
+  };
+  img.onerror = function(){ if (btn) { btn.disabled = false; btn.style.opacity=''; } if (typeof toast === 'function') toast('Could not load image'); };
+  img.src = dEl.src;
+}
+window.qpRemoveBg = qpRemoveBg;
 function _qpAttachInteractions() {
   const stage = document.getElementById('qp-stage');
   let mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
