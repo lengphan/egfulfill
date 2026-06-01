@@ -15,8 +15,8 @@
 (function () {
   'use strict';
 
-  var SUPABASE_URL      = 'https://YOUR-PROJECT-ref.supabase.co';
-  var SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
+  var SUPABASE_URL      = 'https://yzlyjgoaztufqggjvbqb.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6bHlqZ29henR1ZnFnZ2p2YnFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNzgxNTgsImV4cCI6MjA5NTg1NDE1OH0.q9788IlC4P0CMNLOaA04_4Y9LK6NJjH9mBnChF8J20E';
 
   if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
     console.error('[supabase] supabase-js not loaded — add the CDN <script> before supabase-client.js');
