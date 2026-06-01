@@ -320,7 +320,7 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       </div>
       <div class="flex items-center gap-3">
         <a href="seller-login.html" class="nav-link hidden md:block" style="text-decoration:none">Log in</a>
-        <a href="seller-login.html" class="btn-retro hidden md:inline-flex">Start for free</a>
+        <a href="seller-signup.html" class="btn-retro hidden md:inline-flex">Start for free</a>
         <button onclick="toggleMobileNav()" class="md:hidden" style="background:none;border:none;cursor:pointer;padding:5px;color:#191918;line-height:0" id="mob-nav-btn">
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 7h16M3 11h16M3 15h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         </button>
@@ -334,7 +334,7 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       <a href="apidocs.html" class="nav-link" style="text-decoration:none;padding:10px 0;border-bottom:1px solid #e5e4e0">API Documentation</a>
       <div style="display:flex;gap:8px;margin-top:8px">
         <a href="seller-login.html" class="btn-retro-ghost" style="flex:1">Log in</a>
-        <a href="seller-login.html" class="btn-retro" style="flex:1">Start for free</a>
+        <a href="seller-signup.html" class="btn-retro" style="flex:1">Start for free</a>
       </div>
     </div>
   </nav>
@@ -355,9 +355,17 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
          count up on scroll-into-view via egCountUp(). The "open dashboard"
          CTA bottom-right links to the real seller.html (which starts at
          zero). No iframe, no live sync. -->
-    <div class="fade-up delay-1" style="background:#f4f2ef;border-top:1px solid #e5e4e0;border-bottom:1px solid #e5e4e0;padding:32px 0 40px">
-      <a href="seller.html" style="text-decoration:none;color:inherit;display:block">
-      <div id="eg-banner-dash" style="max-width:1280px;margin:0 auto;padding:0 24px;font-family:Inter,sans-serif">
+    <div class="fade-up delay-1 max-w-7xl mx-auto px-6">
+      <!-- Contained "window" frame — sits inside the page margin (not full-bleed)
+           and is non-interactive (no link to seller.html). The count-up animation
+           still runs via #eg-banner-dash .eg-bn-num. -->
+      <div style="background:#f4f2ef;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.06)">
+        <div style="display:flex;align-items:center;gap:7px;padding:11px 16px;border-bottom:1px solid #e5e4e0;background:#fbfaf8">
+          <span style="width:11px;height:11px;border-radius:50%;background:#e5e4e0;display:inline-block"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#e5e4e0;display:inline-block"></span>
+          <span style="width:11px;height:11px;border-radius:50%;background:#e5e4e0;display:inline-block"></span>
+        </div>
+      <div id="eg-banner-dash" style="padding:24px;font-family:Inter,sans-serif">
         <!-- Welcome row -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
           <h3 style="font-size:1.15rem;font-weight:700;color:#191918;letter-spacing:-0.02em;margin:0">Welcome back, Phan <svg width="14" height="14" viewBox="0 0 18 18" fill="none" style="display:inline-block;vertical-align:-2px"><path d="M9 2l1.3 4.2a2 2 0 001.5 1.5L16 9l-4.2 1.3a2 2 0 00-1.5 1.5L9 16l-1.3-4.2a2 2 0 00-1.5-1.5L2 9l4.2-1.3a2 2 0 001.5-1.5z" fill="#191918"/></svg></h3>
@@ -369,7 +377,6 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
         </div>
         <!-- 4 hero stat cards (counter-animated) -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">
-          ${''/* Total Orders */}
           <div class="eg-bn-card" style="background:#fdfcfa;border:1px solid #40403d;border-radius:10px;box-shadow:2px 2px 0 #40403d;padding:18px 20px">
             <div style="font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Total Orders</div>
             <div class="eg-bn-num" data-target="12847" data-fmt="int" style="font-size:2.3rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:6px">0</div>
@@ -408,18 +415,8 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
                   <stop offset="100%" stop-color="#191918" stop-opacity="0"/>
                 </linearGradient>
               </defs>
-              ${(function(){
-                const pts = [[40,128],[140,108],[240,90],[340,72],[440,52],[560,22]];
-                const poly = pts.map(p=>p.join(',')).join(' ');
-                const area = '40,160 ' + poly + ' 560,160';
-                let html = '';
-                // gridlines
-                for (let i = 0; i < 5; i++) html += `<line x1="20" y1="${20 + i*32}" x2="580" y2="${20 + i*32}" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/>`;
-                html += `<polygon points="${area}" fill="url(#bn-area)"/>`;
-                html += `<polyline points="${poly}" fill="none" stroke="#191918" stroke-width="2" stroke-linejoin="round"/>`;
-                pts.forEach(p=>{ html += `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#191918"/>`; });
-                return html;
-              })()}
+              <!-- Static line chart (precomputed — index.html is plain HTML, no JS template eval) -->
+              <line x1="20" y1="20" x2="580" y2="20" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/><line x1="20" y1="52" x2="580" y2="52" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/><line x1="20" y1="84" x2="580" y2="84" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/><line x1="20" y1="116" x2="580" y2="116" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/><line x1="20" y1="148" x2="580" y2="148" stroke="#e5e4e0" stroke-dasharray="3,4" stroke-width="1"/><polygon points="40,160 40,128 140,108 240,90 340,72 440,52 560,22 560,160" fill="url(#bn-area)"/><polyline points="40,128 140,108 240,90 340,72 440,52 560,22" fill="none" stroke="#191918" stroke-width="2" stroke-linejoin="round"/><circle cx="40" cy="128" r="3.5" fill="#191918"/><circle cx="140" cy="108" r="3.5" fill="#191918"/><circle cx="240" cy="90" r="3.5" fill="#191918"/><circle cx="340" cy="72" r="3.5" fill="#191918"/><circle cx="440" cy="52" r="3.5" fill="#191918"/><circle cx="560" cy="22" r="3.5" fill="#191918"/>
             </svg>
             <div style="display:flex;justify-content:space-between;font-size:10.5px;color:#9ca3af;margin-top:4px;padding:0 30px"><span>Nov</span><span>Dec</span><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span></div>
           </div>
@@ -428,23 +425,9 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
             <div style="font-size:11.5px;color:#9ca3af;margin-bottom:14px">Current fulfillment status</div>
             <div style="display:flex;align-items:center;gap:14px;flex:1">
               <svg viewBox="0 0 100 100" style="width:120px;height:120px;flex-shrink:0">
-                ${(function(){
-                  // donut: 47 / 124 / 86 / 873 — slice angles
-                  const data = [47, 124, 86, 873];
-                  const colors = ['#0891b2','#1d4ed8','#9ca3af','#191918'];
-                  const total = data.reduce((a,b)=>a+b,0);
-                  let acc = 0, html = '';
-                  data.forEach((v,i) => {
-                    const start = acc / total * Math.PI * 2 - Math.PI/2;
-                    const end = (acc + v) / total * Math.PI * 2 - Math.PI/2;
-                    const large = (v / total > 0.5) ? 1 : 0;
-                    const x1 = 50 + 38 * Math.cos(start), y1 = 50 + 38 * Math.sin(start);
-                    const x2 = 50 + 38 * Math.cos(end), y2 = 50 + 38 * Math.sin(end);
-                    html += `<path d="M ${x1.toFixed(2)} ${y1.toFixed(2)} A 38 38 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}" stroke="${colors[i]}" stroke-width="14" fill="none"/>`;
-                    acc += v;
-                  });
-                  return html;
-                })()}
+                <!-- Static donut (precomputed slices for 47 / 124 / 86 / 873) -->
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#f0ede9" stroke-width="14"/>
+                <path d="M 50.00 12.00 A 38 38 0 0 1 59.82 13.29" stroke="#0891b2" stroke-width="14" fill="none" stroke-linecap="round"/><path d="M 59.82 13.29 A 38 38 0 0 1 80.93 27.92" stroke="#1d4ed8" stroke-width="14" fill="none"/><path d="M 80.93 27.92 A 38 38 0 0 1 87.62 44.63" stroke="#9ca3af" stroke-width="14" fill="none"/><path d="M 87.62 44.63 A 38 38 0 1 1 50.00 12.00" stroke="#191918" stroke-width="14" fill="none"/>
               </svg>
               <div style="flex:1;display:flex;flex-direction:column;gap:7px;font-size:11.5px">
                 <div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;background:#0891b2;border-radius:50%"></span><span style="color:#374151;flex:1">In Queue</span><span style="font-weight:700;color:#191918">47</span></div>
@@ -456,7 +439,7 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
           </div>
         </div>
       </div>
-      </a>
+      </div>
     </div>
     <script>
     // Counter animation — runs once when the banner scrolls into view. Reads
@@ -625,48 +608,42 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
           </div>
         </div>
 
-        <!-- Order details mockup -->
-        <div class="mock-ui fade-up delay-2">
-          <div class="mock-header">
-            <div class="mock-dot bg-red-400"></div>
-            <div class="mock-dot bg-yellow-400"></div>
-            <div class="mock-dot bg-green-400"></div>
-            <div class="ml-4 text-xs text-gray-500 font-medium">Order #EGF-00482 · Quality checked</div>
+        <!-- Order details mockup — self-contained card (no global mock-ui override
+             so the rounded corners + header clip cleanly). -->
+        <div class="fade-up delay-2" style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:16px;box-shadow:4px 4px 0 #40403d;overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:13px 18px;background:#f3eee2;border-bottom:1.5px solid #40403d">
+            <span style="width:11px;height:11px;border-radius:50%;background:#e06c5b;display:inline-block"></span>
+            <span style="width:11px;height:11px;border-radius:50%;background:#e3b341;display:inline-block"></span>
+            <span style="width:11px;height:11px;border-radius:50%;background:#5aa86f;display:inline-block"></span>
+            <span style="margin-left:8px;font-size:12px;color:#6b7280;font-weight:600">Order #EGF-00482 · Quality checked</span>
           </div>
-          <div class="p-5 bg-white space-y-4" style="min-height:340px">
-            <div class="flex gap-4">
-              <div class="w-20 h-24 bg-blue-50 rounded-lg flex items-center justify-center text-4xl flex-shrink-0">👕</div>
-              <div class="flex-1">
-                <div class="text-sm font-bold text-gray-900 mb-1">Classic Unisex Tee · Black · M</div>
-                <div class="text-xs text-gray-500 mb-2">Custom print · Front center</div>
-                <div class="flex items-center gap-2">
-                  <span class="mock-tag-green">Quality passed</span>
-                  <span class="mock-tag">Eco-friendly ink</span>
+          <div style="padding:22px">
+            <!-- Item -->
+            <div style="display:flex;gap:16px;align-items:center">
+              <div style="width:76px;height:76px;border-radius:12px;background:#eef4ff;border:1px solid #dbe6fb;display:flex;align-items:center;justify-content:center;font-size:2.1rem;flex-shrink:0">👕</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:3px">Classic Unisex Tee · Black · M</div>
+                <div style="font-size:12.5px;color:#9ca3af;margin-bottom:9px">Custom print · Front center</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Quality passed</span>
+                  <span style="background:#f0ede9;color:#6b7280;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px">Eco-friendly ink</span>
                 </div>
               </div>
             </div>
-            <div class="border-t border-gray-100 pt-4 space-y-2">
-              <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Production checklist</div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded bg-green-500 flex items-center justify-center"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2"/></svg></div>
-                <span class="text-xs text-gray-600">Artwork resolution verified (300 dpi)</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded bg-green-500 flex items-center justify-center"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2"/></svg></div>
-                <span class="text-xs text-gray-600">Color accuracy confirmed</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded bg-green-500 flex items-center justify-center"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2"/></svg></div>
-                <span class="text-xs text-gray-600">Garment inspection passed</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded bg-green-500 flex items-center justify-center"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2"/></svg></div>
-                <span class="text-xs text-gray-600">Branded packaging applied</span>
+            <!-- Checklist -->
+            <div style="margin-top:20px;padding-top:18px;border-top:1px solid #ece9e3">
+              <div style="font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Production checklist</div>
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:6px;background:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-size:13px;color:#374151">Artwork resolution verified (300 dpi)</span></div>
+                <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:6px;background:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-size:13px;color:#374151">Color accuracy confirmed</span></div>
+                <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:6px;background:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-size:13px;color:#374151">Garment inspection passed</span></div>
+                <div style="display:flex;align-items:center;gap:10px"><span style="width:18px;height:18px;border-radius:6px;background:#16a34a;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="font-size:13px;color:#374151">Branded packaging applied</span></div>
               </div>
             </div>
-            <div class="bg-green-50 border border-green-100 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div class="text-sm font-semibold text-green-700">Ready to ship</div>
-              <div class="text-xs text-green-600">USPS Priority · Est. Apr 17</div>
+            <!-- Ready to ship -->
+            <div style="margin-top:20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></span><span style="font-size:14px;font-weight:700;color:#15803d">Ready to ship</span></div>
+              <span style="font-size:12px;font-weight:600;color:#16a34a">USPS Priority · Est. Apr 17</span>
             </div>
           </div>
         </div>

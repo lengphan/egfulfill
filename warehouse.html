@@ -4,6 +4,9 @@
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <script src="egfulfill-store.js"></script>
+<script src="eg-sidebar-badges.js"></script>
+<script src="eg-board-settings.js"></script>
+<script src="eg-chat-extras.js"></script>
 <script src="egfulfill-drag.js"></script>
 <script src="egfulfill-tracking.js"></script>
 <script src="egfulfill-connect.js"></script>
@@ -119,9 +122,10 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 /* kb board */
 .kb-col{width:272px;flex-shrink:0;display:flex;flex-direction:column;border-radius:10px;transition:box-shadow .18s,transform .18s,background .15s}
 .kb-col-header{display:flex;align-items:center;gap:7px;padding:10px 12px;border-radius:10px 10px 0 0;font-size:13.75px;font-weight:700}
-.kb-col-body{background:#ece9e4;border-radius:0 0 10px 10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:120px;transition:background .15s,min-height .18s,outline .15s;outline:2px dashed transparent;outline-offset:-4px}
-.kb-col.dragging-into{box-shadow:0 0 0 2px #4e65ce,0 8px 32px rgba(78,101,206,.22);transform:translateY(-1px)}
-.kb-col.dragging-into .kb-col-body{background:#e8e6e0;min-height:260px;outline-color:rgba(78,101,206,.45)}
+.kb-col-body{background:#ece9e4;border-radius:0 0 10px 10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:120px;transition:background .15s,min-height .18s;outline:none}
+/* Drag-over: dark outline OUTSIDE column, no inner dashed blue. */
+.kb-col.dragging-into{box-shadow:0 0 0 2px #191918,0 8px 24px rgba(25,25,24,.18);transform:translateY(-1px)}
+.kb-col.dragging-into .kb-col-body{background:#e8e6e0;min-height:260px;outline:none}
 .kb-card{background:#fff;border:1px solid #e5e4e0;border-radius:10px;cursor:pointer;transition:box-shadow .15s,transform .15s;overflow:hidden;user-select:none;position:relative}
 .kb-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.10);transform:translateY(-1px)}
 .kb-card.dragging{opacity:.3;transform:scale(.96)}
@@ -129,7 +133,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .kb-card-img-ph{width:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#f4f2ef,#e8e5e0);display:flex;align-items:center;justify-content:center}
 .kb-card-body{padding:10px 11px 11px}
 .kb-col-body.drag-over{background:#d8d4ce}
-.udb-drop-ghost{border-radius:10px;background:rgba(78,101,206,.1);box-shadow:0 0 0 2px rgba(78,101,206,.4),0 4px 20px rgba(78,101,206,.2);min-height:70px;pointer-events:none}
+.udb-drop-ghost{border-radius:10px;background:rgba(25,25,24,.06);box-shadow:0 0 0 1.5px #191918;min-height:70px;pointer-events:none}
 .trello-chip{display:inline-flex;align-items:center;gap:5px;background:#0052cc;color:#fff;font-size:11.75px;font-weight:700;padding:2px 9px;border-radius:5px;text-decoration:none;cursor:pointer}
 .trello-chip:hover{opacity:.85}
 .b-draft,.b-submitted,.b-review,.b-approved,.b-rejected{background:#e5e4e0;color:#191918}
@@ -348,8 +352,8 @@ html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="so
 
 /* eg-kanban-harmonize */
 /* Kanban columns (light mode): NO body background by default — only show it on drag-over. */
-html:not([data-theme=dark]) .kb-col-body{background:transparent!important;border:none!important;border-top:none!important}
-html:not([data-theme=dark]) .kb-col-body.drag-over{background:#ece9e4!important;border:1px solid #c9c4bc!important;border-top:none!important}
+html:not([data-theme=dark]) .kb-col-body{background:#ece9e4!important;border:none!important;border-top:none!important}
+html:not([data-theme=dark]) .kb-col-body.drag-over{background:#e3dfd6!important;border:none!important;border-top:none!important}
 html:not([data-theme=dark]) .kb-col-header{border-left:none!important;border-right:none!important}
 /* Dark mode: keep the existing subtle outlined body */
 html[data-theme=dark] .kb-col-body{background:rgba(201,195,186,.08)!important;border:1px solid rgba(201,195,186,.3)!important;border-top:none!important}
@@ -545,7 +549,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
 </style>
 </head>
-<body>
+<body data-eg-role="warehouse">
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
@@ -563,7 +567,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </a>
     <a class="ni" href="#orders" data-section="orders" draggable="true">
       <svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>
-      Orders <span class="badge-red">7</span>
+      Orders <span class="badge-red" data-badge="orders">7</span>
     </a>
     <a class="ni" href="#inventory" data-section="inventory" draggable="true">
       <svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M2.3 3.4h11.4a1 1 0 011 1v2H1.3v-2a1 1 0 011-1zM1.3 7.9h13.4v3.7a1 1 0 01-1 1H2.3a1 1 0 01-1-1V7.9zm5 1.3a.65.65 0 000 1.3h3.4a.65.65 0 000-1.3H6.3z"/></svg>
@@ -587,7 +591,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </a>
     <a class="ni" href="#chat" data-section="chat" id="chat-nav" draggable="true">
       <svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>
-      Chat <span id="chat-unread" class="badge-red">3</span>
+      Chat <span id="chat-unread" class="badge-red" data-badge="chat">3</span>
     </a>
     <a class="ni" href="#activity-log" data-section="activity-log" draggable="true">
       <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="4" r="1.5"/><rect x="6" y="3.1" width="8.4" height="1.8" rx=".9"/><circle cx="3" cy="8" r="1.5"/><rect x="6" y="7.1" width="8.4" height="1.8" rx=".9"/><circle cx="3" cy="12" r="1.5"/><rect x="6" y="11.1" width="8.4" height="1.8" rx=".9"/></svg>
@@ -1448,92 +1452,308 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </div>
   </div>
 
-  <!-- ===== PRODUCTS ===== -->
+  <!-- ===== PRODUCTS (shared block — see eg-products.js) ===== -->
   <div id="section-products" class="section fi">
+
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="display:flex;gap:8px">
-        <div style="position:relative"><svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg><input id="prod-search" style="background:#f6f5f4;border:1px solid #e5e4e0;border-radius:8px;padding:7px 12px 7px 32px;font-size:14.25px;color:#191918;outline:none;font-family:inherit;width:220px" placeholder="Search products…" oninput="renderProducts()"/></div>
-        <select id="prod-filter-type" class="select" onchange="renderProducts()"><option value="">All Types</option><option>Apparel</option><option>Accessories</option><option>Wall Art</option></select>
-        <select id="prod-filter-status" class="select" onchange="renderProducts()"><option value="">All Status</option><option>Active</option><option>Draft</option></select>
+        <div style="position:relative"><svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg><input id="op-prod-search" oninput="renderOpProducts()" style="background:#f6f5f4;border:1px solid #e5e4e0;border-radius:8px;padding:7px 12px 7px 32px;font-size:14px;color:#191918;outline:none;font-family:inherit;width:220px" placeholder="Search products…"/></div>
+        <select id="op-prod-cat" class="select" onchange="renderOpProducts()"></select>
+        <select id="op-prod-status" class="select" onchange="renderOpProducts()"><option value="">All Status</option><option>Active</option><option>Draft</option></select>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-out" onclick="downloadWHProductTemplate()">↓ CSV Template</button>
-        <button class="btn btn-dk" onclick="openProductModal(null)">+ Add Product</button>
+        <button class="btn btn-out" onclick="downloadProductCSVTemplate()">↓ CSV Template</button>
+        <button class="btn btn-dk" onclick="openNewProductModal()">+ Add Product</button>
       </div>
     </div>
-    <div id="prod-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px"></div>
+    <div id="op-prod-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px"></div>
   </div>
 
-  <!-- Product modal -->
-  <div id="prod-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)closeProdModal()">
-    <div class="modal" style="max-width:520px">
-      <div style="padding:20px 24px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:16.25px;font-weight:700;color:#191918" id="prod-modal-title">Add Product</div>
-        <button onclick="closeProdModal()" style="background:none;border:none;cursor:pointer;font-size:21.25px;color:#9ca3af;line-height:1">×</button>
-      </div>
-      <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="grid-column:span 2">
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Product Name</label>
-            <input class="input" id="pf-name" placeholder="e.g. Gildan Hoodie 18500" oninput="autoGenProductSKU()"/>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">SKU / Style #</label>
-            <div style="display:flex;gap:6px">
-              <input class="input" id="pf-sku" placeholder="e.g. G18500" style="font-family:monospace;flex:1"/>
-              <button class="btn btn-out" style="white-space:nowrap;font-size:13.25px;padding:0 12px" onclick="autoGenProductSKU(true)">Auto SKU</button>
-            </div>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Type</label>
-            <select class="select" id="pf-type" style="width:100%"><option>Apparel</option><option>Accessories</option><option>Wall Art</option></select>
-          </div>
-          <div style="grid-column:1/-1">
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:6px">Print Methods Supported · Price per method</label>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <label style="display:grid;grid-template-columns:18px 1fr 130px;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-dtg" style="accent-color:#111827;width:16px;height:16px;margin:0"/><span style="font-size:13.5px;font-weight:600;color:#374151">DTG</span><input class="input" id="pf-dtg-price" type="number" step="0.01" min="0" placeholder="0.00"/></label>
-              <label style="display:grid;grid-template-columns:18px 1fr 130px;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-dtf" style="accent-color:#111827;width:16px;height:16px;margin:0"/><span style="font-size:13.5px;font-weight:600;color:#374151">DTF</span><input class="input" id="pf-dtf-price" type="number" step="0.01" min="0" placeholder="0.00"/></label>
-              <label style="display:grid;grid-template-columns:18px 1fr 130px;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-emb" style="accent-color:#111827;width:16px;height:16px;margin:0"/><span style="font-size:13.5px;font-weight:600;color:#374151">Embroidery</span><input class="input" id="pf-emb-price" type="number" step="0.01" min="0" placeholder="0.00"/></label>
-              <label style="display:grid;grid-template-columns:18px 1fr 130px;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-apl" style="accent-color:#111827;width:16px;height:16px;margin:0"/><span style="font-size:13.5px;font-weight:600;color:#374151">Applique</span><input class="input" id="pf-apl-price" type="number" step="0.01" min="0" placeholder="0.00"/></label>
-              <label style="display:grid;grid-template-columns:18px 1fr 130px;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="pf-lsr" style="accent-color:#111827;width:16px;height:16px;margin:0"/><span style="font-size:13.5px;font-weight:600;color:#374151">Laser</span><input class="input" id="pf-lsr-price" type="number" step="0.01" min="0" placeholder="0.00"/></label>
-            </div>
-            <div style="font-size:11px;color:#9ca3af;margin-top:8px">Tick each method and set its all-in unit price. DTG/DTF default to the base.</div>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Base Price ($)</label>
-            <input class="input" id="pf-price" type="number" step="0.01" min="0" placeholder="0.00"/>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px" title="Charged on the first item — flows through to the seller's order total at fulfillment.">Shipping Fee ($)</label>
-            <input class="input" id="pf-ship" type="number" step="0.01" min="0" placeholder="0.00"/>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Colors / Variants</label>
-            <input class="input" id="pf-variants" placeholder="e.g. 8 variants · 4 colors"/>
-          </div>
-          <div>
-            <label style="font-size:12.75px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Status</label>
-            <select class="select" id="pf-status" style="width:100%"><option>Active</option><option>Draft</option></select>
+
+  <style>
+  #new-product-modal .npm-tab{font-family:inherit;font-size:13px;font-weight:600;color:#9ca3af;background:none;border:none;border-bottom:2px solid transparent;padding:13px 13px 12px;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+  #new-product-modal .npm-tab:hover{color:#374151}
+  #new-product-modal .npm-tab.npm-tab-on{color:#191918;border-bottom-color:#191918}
+  #new-product-modal .npm-pg-btn{min-width:28px;height:28px;padding:0 6px;font-family:inherit;font-size:12.5px;font-weight:600;color:#374151;background:#fff;border:1px solid #e5e4e0;border-radius:7px;cursor:pointer;transition:border-color .12s,background .12s}
+  #new-product-modal .npm-pg-btn:hover:not(:disabled){border-color:#9ca3af}
+  #new-product-modal .npm-pg-btn.on{background:#111827;color:#fff;border-color:#111827}
+  #new-product-modal .npm-pg-btn:disabled{opacity:.4;cursor:default}
+  #new-product-modal .npm-ci-main{font-family:inherit;font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid #e5e4e0;background:#fff;color:#9ca3af;cursor:pointer;white-space:nowrap;transition:all .12s}
+  #new-product-modal .npm-ci-main:hover{border-color:#9ca3af;color:#374151}
+  #new-product-modal .npm-ci-main.is-main{background:#191918;border-color:#191918;color:#fff}
+  /* Dropzone drag-over state — clear visual confirmation that the file will land. */
+  /* No stage background on any side — PNG transparency is preserved across
+     Front, Back, Left, Right, Sleeve so the seller sees the same transparent
+     mockup the design maker will render. */
+  #new-product-modal #npm-pa-stage{background:transparent !important}
+  html[data-theme=dark] #new-product-modal #npm-pa-stage{background:transparent !important}
+  #new-product-modal #npm-pa-stage.npm-pa-drag{background:rgba(243,238,226,.55) !important}
+  #new-product-modal #npm-pa-stage.npm-pa-drag #npm-pa-empty{border-color:#191918;border-style:solid;background:rgba(255,255,255,.5);box-shadow:0 0 0 4px rgba(25,25,24,.06)}
+  </style>
+
+  <!-- Add/Edit Product modal (shared, rich multi-tab) -->
+<div id="new-product-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)npmRequestClose()">
+  <!-- max-height + flex column keeps the footer pinned when the inner body
+       grows (lots of size rows / many variants). Inner scroll lives on
+       #npm-right-body which already has overflow-y:auto. -->
+  <div class="modal" style="max-width:1060px;width:96vw;height:92vh;display:flex;flex-direction:column">
+    <div style="padding:16px 24px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
+      <div onclick="var n=document.getElementById('npm-name');if(n){n.focus();n.select&&n.select();}" title="Rename in the Product Name field below" style="font-size:16px;font-weight:700;color:#191918;cursor:pointer" id="npm-title">Add New Product</div>
+      <button onclick="npmRequestClose()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:23px;line-height:1;padding:0 4px">×</button>
+    </div>
+
+    <!-- Two-column body: design-maker mockup on the left, tabbed details on the right.
+         flex:1 + min-height:0 lets it absorb the modal's available height so the
+         footer below stays anchored even when the right panel scrolls long. -->
+    <div style="display:grid;grid-template-columns:minmax(360px,420px) 1fr;flex:1;min-height:0;overflow:hidden">
+
+      <!-- LEFT · the design-maker mockup canvas + print-area editor.
+           min-height:0 mirrors the right column so it can shrink and scroll
+           independently when the page gets short. -->
+      <div style="padding:18px 20px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:11px;overflow-y:auto;min-height:0">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <label style="font-size:12.5px;font-weight:700;color:#191918">Design Mockup</label>
+          <div style="display:flex;gap:6px">
+            <select id="npm-pa-side" class="select" style="font-size:12px;padding:3px 8px" onchange="npmPaSwitchSide()"><option value="front">Front</option><option value="back">Back</option><option value="left">Left Chest</option><option value="right">Right Chest</option><option value="sleeve">Sleeve</option></select>
+            <button type="button" class="btn btn-out" style="font-size:12px;padding:3px 10px" onclick="npmPaReset()">Reset</button>
           </div>
         </div>
-        <div id="pf-inv-options" style="background:#f6f5f4;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
-          <div style="font-size:12.75px;font-weight:600;color:#374151;margin-bottom:2px">After saving</div>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" id="pf-add-inv" checked style="accent-color:#111827"/>
-            <span style="font-size:13.75px;color:#374151">Add to inventory (0 units, reorder at 25)</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" id="pf-print-label" style="accent-color:#111827"/>
-            <span style="font-size:13.75px;color:#374151">Print SKU label</span>
-          </label>
+        <!-- Stage: when a per-side mockup exists, shows it + the draggable print
+             area box. When empty, the entire stage becomes a drag-and-drop
+             zone (click anywhere to browse). The "Upload mockup" footer
+             button is gone — uploading happens directly on the stage. -->
+        <!-- Stage has no background — transparent PNG mockups stay transparent
+             on every side (front, back, sleeves, neck) so what the operator
+             sees matches what the seller will render in the design maker. -->
+        <div id="npm-pa-stage"
+             ondragover="event.preventDefault();this.classList.add('npm-pa-drag')"
+             ondragleave="this.classList.remove('npm-pa-drag')"
+             ondrop="npmPaDropMockup(event)"
+             style="position:relative;background:transparent;border-radius:10px;aspect-ratio:1/1;overflow:hidden;user-select:none;border:none">
+          <img id="npm-pa-img" src="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none"/>
+          <!-- Empty state IS the dropzone — persistent dashed outline so the
+               affordance is obvious. Click → file picker; drag → instant load.
+               Inner circle icon gives the empty area a focal point instead of
+               leaving a huge blank square. -->
+          <div id="npm-pa-empty"
+               onclick="document.getElementById('npm-img-input').click()"
+               style="position:absolute;inset:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#9ca3af;font-size:13px;text-align:center;padding:18px;cursor:pointer;border:2px dashed #c9c3ba;border-radius:9px;background:transparent;transition:border-color .15s,background .15s,box-shadow .15s"
+               onmouseover="this.style.borderColor='#191918';this.style.background='#fff';this.style.boxShadow='inset 0 0 0 1px rgba(25,25,24,.04)'"
+               onmouseout="this.style.borderColor='#c9c3ba';this.style.background='transparent';this.style.boxShadow=''">
+            <div style="width:48px;height:48px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><path d="M11 4.5v10M7 8.5l4-4 4 4" stroke="#374151" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 18h16" stroke="#374151" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <div style="font-weight:600;color:#191918;font-size:13.5px;line-height:1.3">Drop mockup for <span id="npm-pa-empty-side">Front</span></div>
+            <div style="font-size:11.5px;color:#9ca3af;line-height:1.4">or <span style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c9c3ba">click to browse</span> · PNG, JPG, SVG</div>
+          </div>
+          <!-- Tiny "Replace" affordance shown only when an image exists. -->
+          <button id="npm-pa-replace" type="button" onclick="event.stopPropagation();document.getElementById('npm-img-input').click()" style="display:none;position:absolute;top:8px;right:8px;background:rgba(25,25,24,.78);color:#fff;border:none;border-radius:6px;padding:5px 9px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;backdrop-filter:blur(4px);transition:background .15s" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='rgba(25,25,24,.78)'">Replace</button>
+          <div id="npm-pa-box" style="display:none;position:absolute;border:2px dashed #111827;background:rgba(17,24,39,.05);cursor:move;box-sizing:border-box">
+            <span data-h="nw" style="position:absolute;left:-5px;top:-5px;width:10px;height:10px;background:#111827;cursor:nwse-resize;border-radius:2px"></span>
+            <span data-h="ne" style="position:absolute;right:-5px;top:-5px;width:10px;height:10px;background:#111827;cursor:nesw-resize;border-radius:2px"></span>
+            <span data-h="sw" style="position:absolute;left:-5px;bottom:-5px;width:10px;height:10px;background:#111827;cursor:nesw-resize;border-radius:2px"></span>
+            <span data-h="se" style="position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;background:#111827;cursor:nwse-resize;border-radius:2px"></span>
+            <div id="npm-pa-readout" style="position:absolute;bottom:4px;left:4px;font-size:11px;font-weight:600;color:#374151;font-family:'SF Mono',monospace;background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e4e0;white-space:nowrap"></div>
+          </div>
+        </div>
+        <!-- Hidden picker shared by the stage empty-state click + Replace button. -->
+        <input type="file" id="npm-img-input" accept="image/*" style="display:none" onchange="npmPreviewImage(this)"/>
+        <div style="font-size:11px;color:#9ca3af;line-height:1.45">Each side carries its own mockup. Drop or click to upload one for the selected side, then drag the dashed box to set the printable area.</div>
+      </div>
+
+      <!-- RIGHT · tabbed details -->
+      <!-- min-height:0 lets the flex child (#npm-right-body) actually
+           shrink so its overflow-y:auto kicks in. Without it the column
+           grows to fit content and the modal scrolls as a whole. -->
+      <div style="display:flex;flex-direction:column;min-width:0;min-height:0">
+        <div style="display:flex;gap:2px;padding:0 20px;border-bottom:1px solid #f3f3f1;flex-shrink:0;overflow-x:auto">
+          <button class="npm-tab npm-tab-on" data-tab="details" onclick="npmTab('details')">Details</button>
+          <button class="npm-tab" data-tab="print" onclick="npmTab('print')">Print Area</button>
+          <button class="npm-tab" data-tab="variants" onclick="npmTab('variants')">Variants</button>
+          <button class="npm-tab" data-tab="images" onclick="npmTab('images')">Images</button>
+          <button class="npm-tab" data-tab="notes" onclick="npmTab('notes')">Description</button>
+        </div>
+        <div id="npm-right-body" style="padding:18px 20px;overflow-y:auto;overflow-anchor:none;flex:1;min-height:0;display:flex;flex-direction:column;gap:14px">
+
+          <!-- TAB: Details -->
+          <div class="npm-panel" data-panel="details" style="display:flex;flex-direction:column;gap:14px">
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Product Name * <span style="font-weight:500;color:#9ca3af;text-transform:none">— edit here to rename</span></label>
+              <input class="input" id="npm-name" placeholder="e.g. Gildan 5000 Tee" oninput="autoNpmSKU()"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Style / SKU</label>
+              <div style="display:flex;gap:6px">
+                <input class="input" id="npm-sku" placeholder="e.g. G5000" style="flex:1;font-family:monospace" oninput="npmSkuTouched=true;npmUpdateVariantSKUs()"/>
+                <button class="btn btn-out" style="white-space:nowrap;font-size:13px;padding:0 12px" onclick="autoNpmSKU(true)">Auto SKU</button>
+              </div></div>
+            <!-- Category + Status are product-wide; price & shipping moved into
+                 the Sizes table below so each size can carry its own pricing. -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Category</label>
+                <select class="select" id="npm-cat" style="width:100%" onchange="npmCatChange(this)"></select></div>
+              <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Status</label>
+                <select class="select" id="npm-status" style="width:100%"><option>Active</option><option>Draft</option></select></div>
+            </div>
+
+            <!-- Sizes + pricing — one row per size; every field is editable.
+                 First row defaults to "S" so the operator can publish a
+                 single-size product without extra clicks. Each row:
+                 { size, price, shipping }. Saved to p.sizePrices.
+                 Styled as a plain section (same label rhythm as Category /
+                 Status) — no boxed panel. -->
+            <div id="npm-price-tiers" style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <label style="font-size:12.5px;font-weight:600;color:#6b7280">Sizes &amp; Pricing</label>
+                <button type="button" id="npm-add-tier-btn" onclick="npmAddPriceTier()" style="background:none;border:none;color:#374151;cursor:pointer;font-size:12.5px;font-weight:600;padding:0;line-height:1;display:inline-flex;align-items:center;gap:3px" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#374151'">+ Add size</button>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 110px 110px 24px;gap:6px;font-size:11px;color:#9ca3af">
+                <span>Size</span><span>Price ($)</span><span>Shipping ($)</span><span></span>
+              </div>
+              <div id="npm-price-tier-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+
+            <!-- Additional-item shipping — flat rate added on top of the
+                 first-item shipping for every extra item in the same order.
+                 Common POD convention: "$5.99 first, $2.99 each additional".
+                 Stored on the product as p.additionalItemShipping. -->
+            <div style="display:grid;grid-template-columns:1fr 110px;gap:6px;align-items:center;padding:8px 0 0">
+              <div>
+                <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block">Additional item shipping</label>
+                <div style="font-size:11px;color:#9ca3af;margin-top:1px">Flat fee added per extra item in the same order.</div>
+              </div>
+              <input class="input" id="npm-add-item-ship" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+            </div>
+
+            <!-- Hidden legacy inputs — kept so other code that reads
+                 #npm-price / #npm-ship still works. Populated from the first
+                 sizes-table row at save time. -->
+            <input type="hidden" id="npm-price"/>
+            <input type="hidden" id="npm-ship"/>
+
+            <div>
+              <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:8px">Print Method(s) Supported · Price per method</label>
+              <!-- Condensed 2-column grid; all methods pre-checked. Untick the
+                   ones the product doesn't support. Prices default to base
+                   price if left blank. -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px" id="npm-methods-grid">
+                <label style="display:grid;grid-template-columns:18px 1fr 110px;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="npm-dtg" checked style="accent-color:#111827;width:16px;height:16px;margin:0"/>
+                  <span style="font-size:13.5px;font-weight:600;color:#374151">DTG Print</span>
+                  <input class="input" id="npm-dtg-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+                </label>
+                <label style="display:grid;grid-template-columns:18px 1fr 110px;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="npm-dtf" checked style="accent-color:#111827;width:16px;height:16px;margin:0"/>
+                  <span style="font-size:13.5px;font-weight:600;color:#374151">DTF Print</span>
+                  <input class="input" id="npm-dtf-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+                </label>
+                <label style="display:grid;grid-template-columns:18px 1fr 110px;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="npm-emb" checked style="accent-color:#111827;width:16px;height:16px;margin:0"/>
+                  <span style="font-size:13.5px;font-weight:600;color:#374151">Embroidery</span>
+                  <input class="input" id="npm-emb-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+                </label>
+                <label style="display:grid;grid-template-columns:18px 1fr 110px;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="npm-apl" checked style="accent-color:#111827;width:16px;height:16px;margin:0"/>
+                  <span style="font-size:13.5px;font-weight:600;color:#374151">Appliqué</span>
+                  <input class="input" id="npm-apl-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+                </label>
+                <label style="display:grid;grid-template-columns:18px 1fr 110px;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="npm-lsr" checked style="accent-color:#111827;width:16px;height:16px;margin:0"/>
+                  <span style="font-size:13.5px;font-weight:600;color:#374151">Laser</span>
+                  <input class="input" id="npm-lsr-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px"/>
+                </label>
+              </div>
+              <div style="font-size:11px;color:#9ca3af;margin-top:8px">All methods are pre-selected — untick any that don't apply. Blank prices default to base.</div>
+            </div>
+          </div>
+
+          <!-- TAB: Print Area -->
+          <div class="npm-panel" data-panel="print" style="display:none;flex-direction:column;gap:12px">
+            <div style="font-size:12.5px;color:#6b7280;line-height:1.5">Editing the <strong id="npm-pa-side-label">Front</strong> placement. Drag the dashed box on the mockup to the left, or set exact dimensions here.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div><label style="font-size:11.5px;color:#9ca3af;display:block;margin-bottom:3px">Print Width (in)</label>
+                <input class="input" id="npm-w" type="number" step="0.25" placeholder="12" style="font-size:13px" oninput="npmPaSyncFromInches()"/></div>
+              <div><label style="font-size:11.5px;color:#9ca3af;display:block;margin-bottom:3px">Print Height (in)</label>
+                <input class="input" id="npm-h" type="number" step="0.25" placeholder="16" style="font-size:13px" oninput="npmPaSyncFromInches()"/></div>
+              <div><label style="font-size:11.5px;color:#9ca3af;display:block;margin-bottom:3px">Min DPI</label>
+                <input class="input" id="npm-dpi" type="number" placeholder="300" style="font-size:13px"/></div>
+              <div><label style="font-size:11.5px;color:#9ca3af;display:block;margin-bottom:3px">Price for this side ($)</label>
+                <div style="position:relative">
+                  <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px;color:#9ca3af;pointer-events:none">$</span>
+                  <input class="input" id="npm-side-price" type="number" step="0.01" min="0" placeholder="0.00" style="font-size:13px;padding-left:20px" oninput="npmPaSyncPrice()"/>
+                </div></div>
+            </div>
+            <div style="font-size:11px;color:#9ca3af;line-height:1.45">The rectangle is saved per-side as <strong>x · y · w · h</strong> percentages of the mockup image. The <strong>price</strong> is the extra charge added when this side is printed.</div>
+          </div>
+
+          <!-- TAB: Variants — atomic rows: one color · one size · one SKU · one stock each. -->
+          <div class="npm-panel" data-panel="variants" style="display:none;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <label style="font-size:12.5px;font-weight:600;color:#6b7280">Variants</label>
+              <button class="btn btn-out" style="font-size:12.5px;padding:3px 10px" onclick="npmAddVariantRowUI()">+ Add Row</button>
+            </div>
+            <!-- Bulk generator: type multiple colors + sizes + a stock, then expand into one row per combination. -->
+            <div style="padding:10px 12px;background:#f9f8f6;border:1px dashed #e5e4e0;border-radius:8px">
+              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Bulk generate</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 80px auto;gap:6px;align-items:center">
+                <input class="input" id="npm-bulk-colors" placeholder="Colors (e.g. White, Black, Navy)" style="font-size:13px" autocomplete="off" onfocus="npmBulkSuggest(this,'color')" onclick="npmBulkSuggest(this,'color')" oninput="npmBulkSuggest(this,'color')" onkeydown="npmSuggestKey(event, this, 'color')"/>
+                <input class="input" id="npm-bulk-sizes" placeholder="Sizes (e.g. S, M, L, XL)" style="font-size:13px" autocomplete="off" onfocus="npmBulkSuggest(this,'sizes')" onclick="npmBulkSuggest(this,'sizes')" oninput="npmBulkSuggest(this,'sizes')" onkeydown="npmSuggestKey(event, this, 'sizes')"/>
+                <input class="input" id="npm-bulk-stock" type="number" placeholder="Stock" style="font-size:13px"/>
+                <button type="button" class="btn btn-dk" style="font-size:12.5px;padding:6px 12px;white-space:nowrap" onclick="npmBulkGenerate()">Generate</button>
+              </div>
+            </div>
+            <div id="npm-variants" style="display:flex;flex-direction:column;gap:6px"></div>
+            <!-- Reverse-direction sync warning: a variant size that isn't priced
+                 in Sizes & Pricing. Mirrors the inline ".npm-tier-warn" on the
+                 pricing side. Populated by npmRefreshVariantWarning(). -->
+            <div id="npm-variant-warning" style="display:none;align-items:center;gap:8px;padding:6px 10px;background:#fdfcfa;border:1px solid #40403d;border-radius:6px;margin-top:4px"></div>
+            <div id="npm-variants-pager" style="display:none;align-items:center;gap:5px;margin-top:4px"></div>
+          </div>
+
+          <!-- TAB: Images -->
+          <div class="npm-panel" data-panel="images" style="display:none;flex-direction:column;gap:18px">
+            <!-- Color images — upload a photo per color; shown when buyers pick that color on the product page. -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label style="font-size:12.5px;font-weight:600;color:#6b7280">Color images <span style="color:#9ca3af;font-weight:500">· optional</span></label>
+                <button class="btn btn-out" style="font-size:12.5px;padding:3px 10px" onclick="addColorImageRow()">+ Add image</button>
+              </div>
+              <div style="font-size:11px;color:#9ca3af;line-height:1.45;margin-bottom:8px">If you add color images, the first one becomes the product thumbnail; otherwise the mockup above is used.</div>
+              <div id="npm-color-images" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+            <!-- Lifestyle / extra images — alternate angles, model shots, close-ups. No color tie. -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label style="font-size:12.5px;font-weight:600;color:#6b7280">Lifestyle &amp; extra images <span style="color:#9ca3af;font-weight:500">· optional</span></label>
+                <label class="btn btn-out" style="font-size:12.5px;padding:3px 10px;cursor:pointer">+ Add image<input type="file" accept="image/*" multiple style="display:none" onchange="npmHandleExtraImages(this)"/></label>
+              </div>
+              <div style="font-size:11px;color:#9ca3af;line-height:1.45;margin-bottom:8px">Model shots, close-ups, or other angles. Shown in the product gallery — not tied to any specific color. Upload as many as you want.</div>
+              <div id="npm-extra-images" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:8px"></div>
+            </div>
+            <!-- Mockup template removed: per-side mockups now live on the
+                 Design Mockup card on the left (Front / Back / Left / Right /
+                 Sleeve), each with its own drop zone. No second uploader needed. -->
+          </div>
+
+          <!-- TAB: Notes -->
+          <div class="npm-panel" data-panel="notes" style="display:none;flex-direction:column;gap:5px">
+            <label style="font-size:12.5px;font-weight:600;color:#6b7280">Description</label>
+            <div style="font-size:11px;color:#9ca3af;line-height:1.45;margin-bottom:4px">Shown to sellers on product detail and the seller's order detail page.</div>
+            <textarea class="input" rows="6" id="npm-notes" placeholder="Describe the product — materials, fit, care, anything sellers should know…" style="resize:none"></textarea>
+          </div>
+
         </div>
       </div>
-      <div style="padding:16px 24px;border-top:1px solid #f3f3f1;display:flex;justify-content:flex-end;gap:8px">
-        <button class="btn btn-out" onclick="closeProdModal()">Cancel</button>
-        <button class="btn btn-dk" onclick="saveProdModal()">Save Product</button>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-out" style="font-size:13px;color:#6b7280" onclick="npmRequestClose()">Cancel</button>
+        <button id="npm-delete-btn" style="display:none;font-size:13px;padding:6px 12px;border-radius:7px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;cursor:pointer;font-family:inherit;font-weight:600" onclick="npmDeleteProduct()">Delete</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-out" style="font-size:13px" onclick="saveProductDraft()">Save as Draft</button>
+        <button class="btn btn-dk" id="npm-publish-btn" onclick="publishProduct()">Publish Product →</button>
       </div>
     </div>
   </div>
+</div>
 
     <!-- ===== SHIPPING ===== -->
   <div id="section-shipping" class="section fi">
@@ -1983,34 +2203,33 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
            No nested cards, no card chrome. Just labels + content + a single
            subtle divider where it matters. -->
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="margin-bottom:10px">
           <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Sellers · 3</div>
-          <button class="btn btn-dk" style="font-size:12px;padding:4px 10px">+ Invite</button>
         </div>
         <div style="display:flex;flex-direction:column">
-          <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid #191918" onclick="selectSeller('seller-a',this)">
+          <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid #191918;background:transparent" onclick="selectSeller('seller-a',this)">
             <div style="display:flex;align-items:center;gap:9px">
               <div style="width:30px;height:30px;background:#ede9fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#7c3aed;flex-shrink:0">SA</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller A Store <span style="width:6px;height:6px;border-radius:50%;background:#15803d" title="Active"></span></div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller A Store <span style="width:6px;height:6px;border-radius:50%;background:#191918" title="Active"></span></div>
                 <div style="font-size:11.5px;color:#9ca3af">3 users · 2m ago</div>
               </div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-seller-b" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent" onmouseover="if(!this.dataset.sel)this.style.borderColor='#e5e4e0'" onmouseout="if(!this.dataset.sel)this.style.borderColor='transparent'" onclick="selectSeller('seller-b',this)">
+          <div class="seller-card-item" id="sc-seller-b" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('seller-b',this)">
             <div style="display:flex;align-items:center;gap:9px">
               <div style="width:30px;height:30px;background:#dbeafe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#1d4ed8;flex-shrink:0">SB</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller B Store <span style="width:6px;height:6px;border-radius:50%;background:#c2410c" title="Suspended"></span></div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller B Store <span style="width:6px;height:6px;border-radius:50%;background:#c9c3ba" title="Suspended"></span></div>
                 <div style="font-size:11.5px;color:#9ca3af">1 user · 6d ago</div>
               </div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-my-store" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent" onmouseover="if(!this.dataset.sel)this.style.borderColor='#e5e4e0'" onmouseout="if(!this.dataset.sel)this.style.borderColor='transparent'" onclick="selectSeller('my-store',this)">
+          <div class="seller-card-item" id="sc-my-store" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('my-store',this)">
             <div style="display:flex;align-items:center;gap:9px">
               <div style="width:30px;height:30px;background:#f0fdf4;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#16a34a;flex-shrink:0">MS</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">My Store <span style="width:6px;height:6px;border-radius:50%;background:#15803d" title="Active"></span></div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">My Store <span style="width:6px;height:6px;border-radius:50%;background:#191918" title="Active"></span></div>
                 <div style="font-size:11.5px;color:#9ca3af">1 user · 12h ago</div>
               </div>
             </div>
@@ -2018,77 +2237,71 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         </div>
         <!-- Quick stats — trimmed to 3 numbers. Return rate moved to a
              future quality dashboard; webhook lives under API & Sync. -->
-        <div id="seller-quick-stats" style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e4e0">
-          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Seller A · this month</div>
-          <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
-            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Orders</span><span style="font-weight:600;color:#191918">34</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Avg value</span><span style="font-weight:600;color:#191918">$61.40</span></div>
-            <div style="display:flex;justify-content:space-between"><span style="color:#6b7280">Last order</span><span style="font-weight:600;color:#191918">2m ago</span></div>
-          </div>
-        </div>
       </div>
 
-      <!-- Right: detail. No header card, no stat cards, no table card. Just
-           identity row → tabs → inline metric strip → table. -->
+      <!-- Right: detail. Identity band + tabs share a single sticker-shadow
+           card; the dark #191918 header sits flush against the tabs strip
+           so the whole header reads as one unit. -->
       <div>
-        <!-- Identity row (no card chrome) -->
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid #e5e4e0;margin-bottom:18px">
-          <div style="display:flex;align-items:center;gap:13px;min-width:0">
-            <div id="seller-detail-avatar" style="width:46px;height:46px;background:#ede9fe;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#7c3aed;flex-shrink:0">SA</div>
-            <div style="min-width:0">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <div id="seller-detail-name" style="font-size:18px;font-weight:700;color:#191918">Seller A Store</div>
-                <span id="seller-detail-status" style="font-size:11px;font-weight:700;color:#15803d;background:#dcfce7;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase">Active</span>
+        <div style="border:1px solid #40403d;border-radius:10px;overflow:hidden;box-shadow:2px 2px 0 #40403d;background:#fdfcfa;margin-bottom:18px">
+          <!-- Dark identity band -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
+            <div style="display:flex;align-items:center;gap:13px;min-width:0">
+              <div id="seller-detail-avatar" style="width:46px;height:46px;background:#ede9fe;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#7c3aed;flex-shrink:0">SA</div>
+              <div style="min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <div id="seller-detail-name" style="font-size:18px;font-weight:700;color:#fdfcfa">Seller A Store</div>
+                  <span id="seller-detail-status" style="font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase">Active</span>
+                </div>
+                <div id="seller-detail-email" style="font-size:12.5px;color:#a8a39c;margin-top:2px">sellera@store.com · Joined Jan 2025</div>
               </div>
-              <div id="seller-detail-email" style="font-size:12.5px;color:#9ca3af;margin-top:2px">sellera@store.com · Joined Jan 2025</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#fdfcfa;color:#191918;border:none;font-size:13px;font-weight:600;padding:6px 16px;border-radius:6px;cursor:pointer;font-family:inherit;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-            <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#191918;color:#fff;border:none;font-size:13px;font-weight:600;padding:6px 16px;border-radius:6px;cursor:pointer;font-family:inherit;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
+          <!-- Tabs row, attached directly under the dark band. Three zones:
+               (1) tabs on the left, (2) Adjust button after tabs, (3) Export
+               CSV / Invite Member on the far right. setSellerTab toggles
+               which action buttons surface for each tab. -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-top:1px solid #40403d;border-bottom:1px solid #40403d;background:#fdfcfa">
+            <div style="display:flex;gap:0">
+              <button id="stab-balance" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
+              <button id="stab-team" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('team',this)">Team & Permissions</button>
+              <button id="stab-api" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('api',this)">API & Sync</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+              <button id="seller-action-export" style="display:none;background:none;border:none;font-size:12.5px;font-weight:600;color:#6b7280;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.background='#f6f5f4';this.style.color='#191918'" onmouseout="this.style.background='transparent';this.style.color='#6b7280'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Export CSV</button>
+              <button id="seller-action-adjust" onclick="openSellerAdjustModal && openSellerAdjustModal()" style="display:none;background:#191918;color:#fff;border:none;font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Adjust</button>
+              <button id="seller-action-invite" class="btn btn-dk" style="display:none;font-size:13px;padding:6px 14px">+ Invite Member</button>
+            </div>
           </div>
-        </div>
 
-        <!-- Tabs — match the Shipping section style: underline on active, no
-             box outline. Sit on top of a light bottom border so the active
-             tab's underline overlaps it cleanly. -->
-        <div style="display:flex;gap:0;margin-bottom:20px">
-          <button id="stab-balance" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
-          <button id="stab-team" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('team',this)">Team & Permissions</button>
-          <button id="stab-api" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('api',this)">API & Sync</button>
-        </div>
-
-        <!-- Balance tab — single shaded card holding both the metric strip
-             and the transactions table. One container, one frame, internal
-             dividers do the visual separation. -->
+        <!-- Balance tab — flows directly inside the unified seller card. -->
         <div id="seller-tab-balance">
-          <div style="border:1.5px solid #40403d;border-radius:10px;background:#fafaf9;overflow:hidden;box-shadow:3px 3px 0 #40403d">
-            <!-- Top: metric strip (3 inline stats with vertical dividers) -->
-            <div style="display:flex;align-items:center;padding:18px 4px">
+          <div style="background:#fafaf9">
+            <!-- Top: metric strip (3 inline stats with vertical dividers).
+                 Values wired to live EGStore.getOrders() via
+                 updateSellerBalanceStats() — refreshed on selectSeller AND on
+                 the eg-orders-changed CustomEvent. -->
+            <div style="display:flex;align-items:center;padding:18px 4px;border-bottom:1px solid #e5e4e0">
               <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total earned</div>
-                <div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$8,420</div>
+                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total paid</div>
+                <div id="seller-stat-paid" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$0</div>
                 <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
               </div>
               <div style="width:1px;align-self:stretch;background:#e5e4e0"></div>
               <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Pending payout</div>
-                <div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$1,240</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">Processing</div>
+                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total refunded</div>
+                <div id="seller-stat-refunded" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$0</div>
+                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
               </div>
               <div style="width:1px;align-self:stretch;background:#e5e4e0"></div>
               <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Owed to factory</div>
-                <div style="font-size:24px;font-weight:800;color:#c2410c;line-height:1.1">$340</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">Production fees</div>
+                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total orders</div>
+                <div id="seller-stat-orders" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">0</div>
+                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
               </div>
-            </div>
-            <!-- Transactions header strip — separates the two halves visually -->
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 18px;border-top:1px solid #e5e4e0;background:#fff">
-              <div style="font-size:13.5px;font-weight:700;color:#191918">Recent transactions</div>
-              <button onclick="openSellerAdjustModal()" style="background:#191918;color:#fff;border:none;font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;margin-right:6px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Adjust</button><button style="background:none;border:none;font-size:12.5px;font-weight:600;color:#6b7280;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px" onmouseover="this.style.background='#f6f5f4';this.style.color='#191918'" onmouseout="this.style.background='transparent';this.style.color='#6b7280'">
-                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Export CSV
-              </button>
             </div>
             <!-- Transactions table — flows directly under the header strip -->
             <table class="dtable" style="border:none;margin:0;background:#fff">
@@ -2103,14 +2316,12 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           </div>
         </div>
 
-        <!-- Team & Permissions tab -->
+        <!-- Team & Permissions tab — flat table inside the outer card, no
+             nested chrome, no subtitle. The "+ Invite Member" CTA lives in
+             the tabs row above so the table can sit flush. -->
         <div id="seller-tab-team" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <div style="font-size:14px;color:#6b7280">Manage who on Seller A's team can access the seller portal and what they can do.</div>
-            <button class="btn btn-dk" style="font-size:13px">+ Invite Member</button>
-          </div>
-          <div class="card" style="overflow:hidden;margin-bottom:14px">
-            <table class="dtable">
+          <div style="overflow:hidden">
+            <table class="dtable" style="border:none;margin:0">
               <thead><tr><th>User</th><th>Role</th><th>Permissions</th><th>Last Active</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 <tr>
@@ -2149,7 +2360,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
              2) EGFULFILL API Access: the seller's own key for direct API
                 integration (only relevant for technical sellers). -->
         <div id="seller-tab-api" style="display:none">
-          <div style="border:1.5px solid #40403d;border-radius:10px;background:#fafaf9;overflow:hidden;box-shadow:3px 3px 0 #40403d">
+          <div style="background:#fafaf9">
             <!-- Section 1: Platform Connections -->
             <div style="padding:14px 18px;background:#fff;border-bottom:1px solid #e5e4e0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
@@ -2223,25 +2434,25 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           </div>
         </div>
 
+        </div><!-- /unified seller card -->
       </div>
     </div>
   </div>
 
 <!-- ===== SELLER SYNC ===== -->
   <!-- ===== CHAT ===== -->
-  <div id="section-chat" class="section fi" style="height:calc(100vh - 102px);display:none">
-    <div style="display:grid;grid-template-columns:260px 1fr;gap:0;height:100%;background:#fff;border:1px solid #e5e4e0;border-radius:12px;overflow:hidden">
+  <div id="section-chat" data-eg-chat-section class="section fi" style="height:calc(100vh - 102px);display:none">
+    <div class="card" data-eg-chat-card style="display:grid;grid-template-columns:260px 1fr;gap:0;height:100%;overflow:hidden">
       <!-- Conversations list -->
-      <div style="border-right:1px solid #e5e4e0;display:flex;flex-direction:column">
-        <div style="padding:14px 16px;border-bottom:1px solid #e8e7e4">
-          <div style="font-size:15.25px;font-weight:700;color:#191918;margin-bottom:8px">Messages</div>
-          <div style="position:relative"><svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%)" width="12" height="12" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg><input style="width:100%;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:7px;padding:6px 10px 6px 28px;font-size:13.75px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search conversations…"/></div>
+      <div style="border-right:1px solid #40403d;display:flex;flex-direction:column;min-height:0">
+        <div style="padding:10px 12px;border-bottom:1px solid #e8e7e4;flex-shrink:0">
+          <div style="position:relative"><svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg><input style="width:100%;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:8px;padding:7px 10px 7px 30px;font-size:13.5px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search conversations…"/></div>
         </div>
-        <div style="display:flex;gap:0;padding:8px 10px;border-bottom:1px solid #e8e7e4">
+        <div data-eg-chat-tabs style="display:flex;gap:0;padding:8px 10px;border-bottom:1px solid #e8e7e4;align-items:center">
           <button class="tab-btn on" id="chat-tab-sellers" onclick="setChatTab('sellers',this)" style="font-size:13.25px;padding:4px 10px">Sellers</button>
           <button class="tab-btn" id="chat-tab-team" onclick="setChatTab('team',this)" style="font-size:13.25px;padding:4px 10px">Team</button>
         </div>
-        <div style="flex:1;overflow-y:auto" id="chat-conv-list">
+        <div data-eg-chat-list-host style="flex:1;overflow-y:auto" id="chat-conv-list">
           <!-- Sellers tab -->
           <div id="chat-sellers-list">
             <div class="chat-conv-item active" data-conv="seller-a" onclick="openConv('seller-a',this)" style="padding:12px 14px;cursor:pointer;border-bottom:1px solid #e8e7e4;background:#f6f5f4">
@@ -2324,7 +2535,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           </div>
         </div>
         <!-- Messages -->
-        <div id="chat-messages" style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:0">
+        <div id="chat-messages" data-eg-chat-messages style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:0">
           <!-- Seller A conversation pre-populated -->
           <div class="chat-msg them">
             <div style="display:flex;flex-direction:column;gap:2px">
@@ -2358,7 +2569,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           </div>
         </div>
         <!-- Input bar -->
-        <div style="padding:10px 14px;border-top:1px solid #f3f3f1;display:flex;align-items:flex-end;gap:8px;flex-shrink:0">
+        <div data-eg-chat-foot style="padding:10px 14px;border-top:1px solid #f3f3f1;display:flex;align-items:flex-end;gap:8px;flex-shrink:0">
           <textarea id="chat-input" rows="1" style="flex:1;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:10px;padding:8px 12px;font-size:14.25px;font-family:inherit;outline:none;resize:none;max-height:80px;line-height:1.5;transition:border-color .15s" placeholder="Message Seller A Store…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}" oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'" onfocus="this.style.borderColor='#374151'" onblur="this.style.borderColor='#e5e4e0'"></textarea>
           <button class="btn btn-dk" style="padding:8px 14px;border-radius:10px;flex-shrink:0" onclick="sendChatMsg()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8l11-6-4 6 4 6-11-6z" fill="white"/></svg>
@@ -3150,6 +3361,65 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </div>
   </div><!-- /section-activity-log -->
 
+  <!-- ===== SETTINGS ===== -->
+  <div id="section-settings" class="section fi">
+    <style>
+      .fstab{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:8px;font-size:14px;font-weight:500;color:#374151;cursor:pointer;text-decoration:none;transition:background .15s}
+      .fstab:hover{background:#f1f0ec}.fstab.on{background:#eeede9;color:#111827;font-weight:600}
+      .fstab svg{width:15px;height:15px;flex-shrink:0;opacity:.65}.fstab.on svg{opacity:.9}
+    </style>
+    <div style="display:flex;gap:24px;align-items:flex-start;max-width:1040px;margin:0 auto;width:100%">
+      <div style="width:208px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
+        <a class="fstab on" onclick="whSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
+        <a class="fstab" onclick="whSettingsTab('notif',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5A4 4 0 004 5.5v4l-1.5 2h11L12 9.5v-4A4 4 0 008 1.5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3"/></svg>Notifications</a>
+        <a class="fstab" onclick="whSettingsTab('threads',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="11" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>Thread Colors</a>
+        <a class="fstab" onclick="whSettingsTab('boards',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2" width="4" height="8"  rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="10.5" y="2" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>Design Boards</a>
+        <a class="fstab" onclick="whSettingsTab('ops',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>Operations</a>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div id="wfpanel-profile" class="card fi" style="padding:22px 24px;max-width:720px">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:14px">My Profile</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:18px">
+            <div style="width:56px;height:56px;border-radius:12px;background:#191918;color:#e8e4dd;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex-shrink:0">WH</div>
+            <div><button class="btn btn-out" style="font-size:13px">Change avatar</button><div style="font-size:12px;color:#9ca3af;margin-top:5px">JPG, PNG up to 1MB</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">First Name</label><input class="input" value="Warehouse"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Last Name</label><input class="input" value="Admin"/></div>
+          </div>
+          <div style="margin-bottom:12px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Email</label><input class="input" value="factory@egops.com" type="email"/></div>
+          <div style="margin-bottom:16px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Role</label><input class="input" value="Warehouse" disabled style="background:#f4f2ef;color:#9ca3af;cursor:not-allowed"/></div>
+          <button class="btn btn-dk" style="font-size:13px">Save Changes</button>
+        </div>
+        <div id="wfpanel-notif" class="card fi" style="padding:22px 24px;max-width:720px;display:none">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Notifications</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Choose which alerts you receive.</div>
+          <div style="display:flex;flex-direction:column;gap:11px;font-size:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Incoming pickups & freight</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Low-stock alerts</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">QC fail alerts</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">New chat message</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Daily summary email</span><div class="toggle toggle-off"><div class="toggle-thumb"></div></div></div>
+          </div>
+        </div>
+        <div id="wfpanel-threads" class="card fi" style="padding:22px 24px;display:none">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:3px">Thread Colors</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">In-stock embroidery threads. Designs uploaded by sellers are matched against this list, and the chosen thread codes are sent with each order.</div>
+          <div id="wh-thread-mgr"></div>
+        </div>
+        <div id="wfpanel-boards" class="card fi" style="padding:22px 24px;display:none">
+          <div id="wh-boards-panel"></div>
+        </div>
+        <!-- Operations panel (additive, never touches the four panels above). -->
+        <div id="wfpanel-ops" class="card fi" style="padding:22px 24px;display:none;max-width:720px">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Operations</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:18px">Daily throughput cap, storage utilities, and demo data controls.</div>
+          <div id="wh-ops-body" style="display:flex;flex-direction:column;gap:0"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== DESIGN BOARD ===== -->
   <div id="section-design-studio" class="section fi">
 
@@ -3713,7 +3983,7 @@ function showSection(id) {
     void el.offsetWidth;
     el.classList.add('active');
     el.classList.add('fi');
-    if (id === 'chat') el.style.display = 'grid';
+    if (id === 'chat') el.style.display = 'flex';
   }
   const a = document.querySelector('.ni[data-section="' + id + '"]');
   if (a) a.classList.add('on');
@@ -3725,18 +3995,91 @@ function showSection(id) {
   if (id === 'purchases') { renderBackorderBanner(); renderPoHistory(); }
   if (id === 'design-studio') { if(typeof udbRenderTypeChips==='function') udbRenderTypeChips(); udbRenderBoard(); udbRenderList(); udbUpdateStats(); }
   if (id === 'shipping') { if (typeof renderScanHistory === 'function') renderScanHistory(); }
-  if (id === 'settings') { if (typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('wh-thread-mgr'); }
+  if (id === 'settings') {
+    if (typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('wh-thread-mgr');
+    var _bp = document.getElementById('wh-boards-panel');
+    if (_bp && typeof EGBoardSettings !== 'undefined') {
+      EGBoardSettings.renderInto(_bp, { onChange: function(){ if (typeof udbRenderTypeChips==='function') udbRenderTypeChips(); if (typeof udbRenderBoard==='function') udbRenderBoard(); if (typeof udbRenderList==='function') udbRenderList(); } });
+    }
+  }
   if (id === 'activity-log') { renderActivityLog(); }
 }
 
 // Settings tab switcher (seller-style left tabs → right panel).
 function whSettingsTab(name, el){
-  ['config','production','notif','security','threads','users','apihub','broadcast'].forEach(function(t){
+  // Existing 4 panels + the new 'ops' panel (additive — older callers still
+  // work and none of the existing panel ids changed).
+  ['profile','notif','threads','boards','ops'].forEach(function(t){
     var p = document.getElementById('wfpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
   if (el) el.classList.add('on');
   if (name==='threads' && typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('wh-thread-mgr');
+  if (name==='boards') {
+    var bp = document.getElementById('wh-boards-panel');
+    if (bp && typeof EGBoardSettings !== 'undefined') {
+      EGBoardSettings.renderInto(bp, { onChange: function(){ if (typeof udbRenderTypeChips==='function') udbRenderTypeChips(); if (typeof udbRenderBoard==='function') udbRenderBoard(); if (typeof udbRenderList==='function') udbRenderList(); } });
+    }
+  }
+  if (name==='ops' && typeof whRenderOpsPanel === 'function') whRenderOpsPanel();
+}
+
+/* ── Warehouse Operations panel ───────────────────────────────────────────
+   Read-only mirror of the admin's daily capacity + storage utilities, with
+   write access only on warehouse-relevant controls (capacity, clear caches,
+   reset). Plan/embroidery-pricing live on admin side only. */
+function whRenderOpsPanel() {
+  var body = document.getElementById('wh-ops-body');
+  if (!body || typeof EGStore === 'undefined') return;
+  var capDef = EGStore.getProductionCapacity && EGStore.getProductionCapacity();
+  var usage  = EGStore.getStorageUsage ? EGStore.getStorageUsage() : { totalBytes:0, ceilingBytes:1, percent:0 };
+  var pct = Math.round(usage.percent || 0);
+  var totalMb = (usage.totalBytes / 1024 / 1024).toFixed(2);
+  var ceilMb  = (usage.ceilingBytes / 1024 / 1024).toFixed(1);
+  body.innerHTML =
+    '<div style="border:1px solid #e5e4e0;border-radius:10px;padding:16px 18px;background:#fafaf9">'
+      + '<div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:3px">Daily production capacity</div>'
+      + '<div style="font-size:12.5px;color:#6b7280;margin-bottom:11px">Soft cap used to warn when daily item count exceeds this number. Empty = no cap.</div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<input id="wh-set-capacity" class="input" type="number" min="0" step="10" value="' + (capDef == null ? '' : capDef) + '" placeholder="200" style="width:140px"/>'
+        + '<span style="font-size:12.5px;color:#6b7280">items / day</span>'
+        + '<button class="btn btn-dk" style="font-size:13px" onclick="whSaveOps(\'capacity\')">Save</button>'
+        + '<span data-saved="capacity" style="font-size:12px;color:#16a34a;opacity:0;transition:opacity .2s">Saved ✓</span></div>'
+    + '</div>'
+    + '<div style="border:1px solid #e5e4e0;border-radius:10px;padding:16px 18px;background:#fafaf9;margin-top:14px">'
+      + '<div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:3px">Storage usage</div>'
+      + '<div style="font-size:12.5px;color:#6b7280;margin-bottom:11px">Approximate localStorage footprint vs the 5MB browser ceiling.</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div style="flex:1;height:8px;background:#e5e4e0;border-radius:999px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? '#c2410c' : '#191918') + ';border-radius:999px"></div></div><span style="font-size:12.5px;font-weight:600;color:#191918;font-variant-numeric:tabular-nums">' + pct + '%</span></div>'
+      + '<div style="font-size:11.5px;color:#9ca3af;margin-bottom:11px">' + totalMb + ' MB used / ' + ceilMb + ' MB ceiling</div>'
+      + '<div style="display:flex;gap:8px"><button class="btn btn-out" style="font-size:13px" onclick="whClearCaches()">Clear image caches</button><span data-saved="cache" style="font-size:12px;color:#16a34a;opacity:0;transition:opacity .2s;align-self:center">Cleared ✓</span></div>'
+    + '</div>'
+    + '<div style="border:1px solid #fed7aa;border-radius:10px;padding:16px 18px;background:#fff7ed;margin-top:14px">'
+      + '<div style="font-size:14px;font-weight:700;color:#7c2d12;margin-bottom:3px">Reset demo data</div>'
+      + '<div style="font-size:12.5px;color:#9a3412;margin-bottom:11px">Wipes every eg_* key in localStorage. Page will reload.</div>'
+      + '<button class="btn btn-out" style="font-size:13px;color:#c2410c;border-color:#fed7aa" onclick="whResetDemo()">Reset demo data…</button>'
+    + '</div>';
+}
+function _whFlashSaved(key) {
+  var el = document.querySelector('#wh-ops-body [data-saved="' + key + '"]');
+  if (el) { el.style.opacity = '1'; setTimeout(function(){ el.style.opacity = '0'; }, 1600); }
+}
+function whSaveOps(which) {
+  if (typeof EGStore === 'undefined') return;
+  if (which === 'capacity') {
+    EGStore.setProductionCapacity(document.getElementById('wh-set-capacity').value || 0);
+    _whFlashSaved('capacity');
+  }
+}
+function whClearCaches() {
+  if (typeof EGStore === 'undefined' || !EGStore.clearCaches) return;
+  EGStore.clearCaches();
+  _whFlashSaved('cache');
+  setTimeout(whRenderOpsPanel, 200);
+}
+function whResetDemo() {
+  if (!confirm('Reset all demo data?\n\nThis wipes orders, products, designs, threads, plans, and balance from localStorage. Cannot be undone.')) return;
+  if (typeof EGStore !== 'undefined' && EGStore.resetDemoData) EGStore.resetDemoData();
+  location.reload();
 }
 
 // Track which orders have been received (4-step flow only shown once)
@@ -4050,7 +4393,15 @@ function whCanonStatus(s) { return WH_STATUS_TAB[s] || s; }
 // Stock state for an item's blank — real inventory match when available, deterministic fallback otherwise.
 function whStockState(sku) {
   let inv = null;
-  try { inv = (typeof INVENTORY_ITEMS !== 'undefined') ? INVENTORY_ITEMS.find(i => i.sku === sku) : null; }
+  try {
+    // Live shared inventory (eg_inventory) so created-product stock shows here.
+    const rows = (typeof EGStore !== 'undefined' && EGStore.getInventory) ? (EGStore.getInventory() || [])
+               : (typeof INVENTORY_ITEMS !== 'undefined' ? INVENTORY_ITEMS : []);
+    inv = rows.find(i => i.sku === sku);
+    // Order items carry a print-method suffix (e.g. -DTF) that variant
+    // inventory SKUs don't — retry against the stripped variant SKU.
+    if (!inv) { const _b = String(sku||'').replace(/-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i,''); if (_b !== sku) inv = rows.find(i => i.sku === _b); }
+  }
   catch(e) { inv = null; }
   if (inv) {
     const avail = Math.max(0, (inv.inStock||0) - (inv.reserved||0));
@@ -4905,7 +5256,7 @@ function whScanOrderSingle(orderNum) {
   if (whScanOrder(orderNum)) {
     whRenderOrders(); whUpdateTabCounts();
     if (typeof renderScanHistory === 'function') renderScanHistory();
-    if (typeof whShowToast === 'function') whShowToast('✓ #' + orderNum + ' scanned → Scanned', '#16a34a');
+    if (typeof whShowToast === 'function') whShowToast('#' + orderNum + ' scanned → Scanned', '#16a34a');
   } else {
     if (typeof whShowToast === 'function') whShowToast('#' + orderNum + ' is not in Awaiting Scan', '#dc2626');
   }
@@ -4917,7 +5268,7 @@ function whScanBulkSelected() {
   whRenderOrders(); whUpdateTabCounts();
   if (typeof renderScanHistory === 'function') renderScanHistory();
   if (typeof whShowToast === 'function') {
-    whShowToast(done ? ('✓ Scanned ' + done + ' order' + (done>1?'s':'') + ' → Scanned') : 'No Awaiting-Scan orders in the selection', done ? '#16a34a' : '#dc2626');
+    whShowToast(done ? ('Scanned ' + done + ' order' + (done>1?'s':'') + ' → Scanned') : 'No Awaiting-Scan orders in the selection', done ? '#16a34a' : '#dc2626');
   }
 }
 // Start Printing — move a Scanned order to Printing (warehouse decides when to release to floor).
@@ -4938,12 +5289,14 @@ function whStartPrinting(orderNum) {
   if (Array.isArray(o.itemList)) o.itemList.forEach(it => {
     const cs = whCanonStatus(it.status);
     if (cs === 'scanned' || cs === 'replacement') it.status = 'printing';
+    // Bulk-mark every item Working so the per-item chips match and Mark Shipped surfaces.
+    if (typeof EGStore !== 'undefined' && EGStore.setItemFactoryStatus) EGStore.setItemFactoryStatus(orderNum, it.sku, 'working');
   });
   if (typeof EGStore !== 'undefined' && EGStore.update) {
     EGStore.update(o.id || orderNum, { factoryStatus: 'printing' });
   }
   whRenderOrders(); whUpdateTabCounts();
-  whShowToast && whShowToast('✓ #' + orderNum + (wasReplacement ? ' → Printing (replacement)' : ' → Printing'), '#16a34a');
+  whShowToast && whShowToast('#' + orderNum + ' — all items working' + (wasReplacement ? ' (replacement)' : ''), '#16a34a');
   return true;
 }
 // Mark Shipped — move a Printing order to Shipped (terminal state in the factory pipeline).
@@ -4959,7 +5312,7 @@ function whMarkShipped(orderNum) {
     EGStore.update(o.id || orderNum, { factoryStatus: 'shipped' });
   }
   whRenderOrders(); whUpdateTabCounts();
-  whShowToast && whShowToast('✓ #' + orderNum + ' → Shipped', '#15803d');
+  whShowToast && whShowToast('#' + orderNum + ' → Shipped', '#15803d');
   return true;
 }
 /* Toggle Hold from the warehouse row actions. Syncs via EGStore so operator
@@ -4982,9 +5335,11 @@ function whRowMenuOpen(ev, num) {
     pause:  '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="2.5" width="2.2" height="9" rx="0.8" stroke="currentColor" stroke-width="1.4"/><rect x="8.3" y="2.5" width="2.2" height="9" rx="0.8" stroke="currentColor" stroke-width="1.4"/></svg>',
     play:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2.5L11 7L4 11.5V2.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>',
     chat:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10a1 1 0 011 1v6a1 1 0 01-1 1H5l-2.5 2v-2H2a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
-    flag:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2v10M3 2.5l7 1.5L8 6l2 2-7-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    flag:   '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 2v10M3 2.5l7 1.5L8 6l2 2-7-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    scan:   '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="3" height="8" rx=".5" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2.5" width="1.6" height="11" rx=".5" fill="currentColor"/><rect x="9.5" y="4" width="3" height="8" rx=".5" stroke="currentColor" stroke-width="1.3"/><rect x="14" y="4" width="1.3" height="8" rx=".5" fill="currentColor"/></svg>'
   };
   var opts = [];
+  if (whCanonStatus(o.status) === 'awaiting_scan') opts.push({ label:'Scan', icon:ICN.scan, fn:"whScanOrderSingle('"+num+"')" });
   if (!isTerminal) opts.push({ label:'Print Label', icon:ICN.print, fn:"whOpenLabelModal('"+num+"')" });
   if (!isTerminal && !onHold) opts.push({ label:'Put on hold', icon:ICN.pause, fn:"whToggleHold('"+num+"')" });
   if (onHold) opts.push({ label:'Resume from hold', icon:ICN.play, fn:"whToggleHold('"+num+"')" });
@@ -5085,7 +5440,7 @@ function whPushDesign(orderNum, itemId, target) {
   whExpandedRows.add(orderNum);
   const r = document.getElementById('wh-detail-' + orderNum); if (r) r.style.display = 'table-row';
 }
-let whColOrder = ['order','seller','items','status','carrier','time','customer','tracking','actions'];
+let whColOrder = ['order','time','seller','customer','items','carrier','tracking','status','actions'];
 let whDragColIdx = null;
 function whDragColStart(e,colName){
   whDragColIdx = whColOrder.indexOf(colName);
@@ -5396,12 +5751,12 @@ function whRenderOrders() {
       <td data-col="actions" onclick="event.stopPropagation()" style="vertical-align:middle;white-space:nowrap;overflow:visible">
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
           ${(() => { const cs = whCanonStatus(o.status);
-            if (cs === 'awaiting_scan') return `<button onclick="event.stopPropagation();whScanOrderSingle('${o.num}')" title="Scan label → Scanned" style="height:32px;padding:0 11px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="3" height="8" rx=".5" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2.5" width="1.6" height="11" rx=".5" fill="currentColor"/><rect x="9.5" y="4" width="3" height="8" rx=".5" stroke="currentColor" stroke-width="1.3"/><rect x="14" y="4" width="1.3" height="8" rx=".5" fill="currentColor"/></svg>Scan</button>`;
-            if (cs === 'replacement' || cs === 'scanned') return `<button onclick="event.stopPropagation();whStartPrinting('${o.num}')" title="${cs === 'replacement' ? 'Start replacement print' : 'Start Printing'}" style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="3" y="1.5" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 9.5H1v4h14v-4h-2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="4" y="11" width="8" height="3" rx=".5" stroke="currentColor" stroke-width="1.2"/></svg>Start Printing</button>`;
+            // Scan is nested in the ⋯ menu — no standalone Scan button here.
+            if (cs === 'replacement' || cs === 'scanned') return `<button onclick="event.stopPropagation();whStartPrinting('${o.num}')" title="${cs === 'replacement' ? 'Start replacement print' : 'Start all items'}" style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'">Start All Items</button>`;
             if (cs === 'ready_print') return `<button onclick="whOpenBatchModal('${o.num}');event.stopPropagation()" title="Start Production" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#1c1512;border:none;color:#fff;cursor:pointer;flex-shrink:0;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'"><svg width="11" height="11" viewBox="0 0 8 8" fill="none"><polygon points="1,0.5 7.5,4 1,7.5" fill="#fff"/></svg></button>`;
             if (o.status === 'backorder') return `<span title="Awaiting stock" style="height:32px;padding:0 10px;display:inline-flex;align-items:center;border-radius:7px;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;font-size:12.25px;font-weight:700;white-space:nowrap">Backorder</span>`;
             if (o.status === 'on_hold') return `<button onclick="event.stopPropagation();whToggleHold('${o.num}')" title="Resume from hold" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;border:1.5px solid #fde68a;background:#fef3c7;color:#92400e;cursor:pointer;flex-shrink:0;font-size:12.5px;font-weight:600;font-family:inherit;transition:background .15s" onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="3" y="2.5" width="1.8" height="7" rx=".4"/><rect x="7.2" y="2.5" width="1.8" height="7" rx=".4"/></svg>On Hold</button>`;
-            if (o.status === 'working' || cs === 'printing') return `<button onclick="event.stopPropagation();whMarkShipped('${o.num}')" title="Mark Shipped" style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1 4h10v6H1zM11 6l3 2v2h-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>Mark Shipped</button>`;
+            if ((o.status === 'working' || cs === 'printing') && whAllItemsWorking(o)) return `<button onclick="event.stopPropagation();whMarkShipped('${o.num}')" title="Mark Shipped" style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;background:#191918;border:1.5px solid #191918;color:#fff;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Mark Shipped</button>`;
             return ''; })()}
           ${o.status === 'exception' ? `
             <button onclick="event.stopPropagation();whResolveException('${o.num}')" title="Resolve Exception" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#dcfce7;border:1.5px solid #bbf7d0;color:#15803d;cursor:pointer;flex-shrink:0;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -5418,7 +5773,7 @@ function whRenderOrders() {
       <td colspan="10" style="padding:0;border-bottom:none;background:#fafaf9">
         <div id="wh-batch-${o.num}" style="display:${batchCnt>0?'flex':'none'};padding:7px 16px;background:#1f2937;align-items:center;gap:10px">
           <span id="wh-batch-cnt-${o.num}" style="color:#fff;font-size:13.25px;font-weight:600">${batchCnt} item${batchCnt!==1?'s':''} selected</span>
-          <button onclick="event.stopPropagation();whBatchStartWorking('${o.num}')" style="font-size:12.25px;padding:3px 14px;border-radius:6px;background:#191918;color:#fff;border:none;cursor:pointer;font-weight:700">▶ Start Working</button>
+          <button onclick="event.stopPropagation();whBatchStartWorking('${o.num}')" style="font-size:12.25px;padding:3px 14px;border-radius:6px;background:#191918;color:#fff;border:none;cursor:pointer;font-weight:700">Start Working</button>
           <button onclick="event.stopPropagation();whClearItemChecks('${o.num}')" style="color:#9ca3af;font-size:12.75px;background:none;border:none;cursor:pointer;padding:3px 6px">Clear</button>
         </div>
         <div>
@@ -5465,15 +5820,34 @@ function whRenderOrders() {
             // falling back to EGStore mirrors if the card's blob was purged.
             const _dcard = (typeof EGStore !== 'undefined' && EGStore.getDesignCard) ? EGStore.getDesignCard(o.num, it.sku) : null;
             let metaRow;
+            // Hoisted so the _designReady check after the if/else can read
+            // whether a downloadable file actually resolved for this item.
+            let _hasFile = false;
             if (_dcard) {
               const _dsnText = _dcard.designId || _dcard.title || 'DSN';
               const _approved = _dcard.col === 'approved' || _dcard.col === 'paid';
               const _firstRaster = (_dcard.files || []).find(f => f && f.previewUrl);
               const _embStore = (typeof EGStore.getItemEmbFile === 'function') ? EGStore.getItemEmbFile(o.num, it.sku) : null;
               const _rawStore = (typeof EGStore.getRawDesign === 'function') ? EGStore.getRawDesign(o.num, it.sku) : null;
-              const _dlUrl  = _dcard.embDataUrl || (_firstRaster && _firstRaster.previewUrl) || _dcard.thumb || (_embStore && _embStore.dataUrl) || _rawStore || '';
-              const _dlName = _dcard.embFileName || (_firstRaster && _firstRaster.name) || (_embStore && _embStore.name) || ((_dsnText || 'design') + '.png');
-              const _hasFile = !!_dlUrl;
+              const _isReal = u => !!u && typeof u === 'string' && u.indexOf('placehold.co') === -1 && !u.startsWith('data:image/svg+xml');
+              const _EMB_EXT = /\.(emb|dst|pes|exp|jef|vp3)$/i;
+              const _embFileFromList = (_dcard.files || []).find(f => f && f.name && _EMB_EXT.test(f.name));
+              const _isEmbDesign = !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
+              let _dlUrl, _dlName;
+              if (_isEmbDesign) {
+                _dlUrl = (_isReal(_dcard.embDataUrl) && _dcard.embDataUrl)
+                      || (_embStore && _isReal(_embStore.dataUrl) && _embStore.dataUrl)
+                      || (_isReal(_rawStore) && _rawStore)
+                      || '';
+                _dlName = _dcard.embFileName || (_embStore && _embStore.name) || (_embFileFromList && _embFileFromList.name) || ((_dsnText || 'design') + '.dst');
+              } else {
+                _dlUrl = (_firstRaster && _isReal(_firstRaster.previewUrl) && _firstRaster.previewUrl)
+                      || (_isReal(_rawStore) && _rawStore)
+                      || (_isReal(_dcard.thumb) && _dcard.thumb)
+                      || '';
+                _dlName = (_firstRaster && _firstRaster.name) || ((_dsnText || 'design') + '.png');
+              }
+              _hasFile = !!_dlUrl;
               const _idHtml = (_approved && _hasFile)
                 ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.stopPropagation()" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
                 : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
@@ -5484,28 +5858,62 @@ function whRenderOrders() {
               const _threadSummary = _threads.length
                 ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:3px;margin-left:8px;flex-shrink:0">${_threads.slice(0,6).map(t => `<span style="width:8px;height:8px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block"></span>`).join('')}${_threads.length > 6 ? `<span style="font-size:10.5px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
                 : '';
-              metaRow = `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${it.sku} · ${_idHtml}</span>
-                  ${_stockPill} ${_threadSummary}`;
+              const _renderThreadChip = t => `<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:2px 8px 2px 3px;flex-shrink:0;white-space:nowrap"><span style="width:12px;height:12px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block;flex-shrink:0"></span><span style="font-size:10.75px;font-weight:700;color:#191918;font-family:monospace;line-height:1">${t.code||'—'}</span>${t.name?`<span style="font-size:10.5px;color:#6b7280;line-height:1">${t.name}</span>`:''}</span>`;
+              const _threadSummaryFull = _threads.length
+                ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0">${_threads.slice(0,6).map(_renderThreadChip).join('')}${_threads.length > 6 ? `<span style="font-size:10.75px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
+                : '';
+              const _stockNum = _stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0];
+              const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
+              const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
+              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
+                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Design</span>${_idHtml}</div>
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stockNum}</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Thread Colors</span>${_threadSummaryFull}</div>
+                  </div>`;
             } else {
               const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
                 ? (EGStore.getItemThreadColors(o.num, it.sku) || [])
                 : [];
+              const _renderThreadChip = t => `<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:2px 8px 2px 3px;flex-shrink:0;white-space:nowrap"><span style="width:12px;height:12px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block;flex-shrink:0"></span><span style="font-size:10.75px;font-weight:700;color:#191918;font-family:monospace;line-height:1">${t.code||'—'}</span>${t.name?`<span style="font-size:10.5px;color:#6b7280;line-height:1">${t.name}</span>`:''}</span>`;
               const _threadSummary = _threads.length
-                ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:3px;margin-left:8px;flex-shrink:0">${_threads.slice(0,6).map(t => `<span style="width:8px;height:8px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block"></span>`).join('')}${_threads.length > 6 ? `<span style="font-size:10.5px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
+                ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0">${_threads.slice(0,6).map(_renderThreadChip).join('')}${_threads.length > 6 ? `<span style="font-size:10.75px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
                 : '';
-              metaRow = `<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${it.sku} · ${fileLink}</span>
-                  ${dsBtn}
-                  ${_stockPill} ${_threadSummary}`;
+              const _stockNum = _stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0];
+              const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
+              const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
+              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
+                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Design</span>${fileLink}${dsBtn}</div>
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stockNum}</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Thread Colors</span>${_threadSummary}</div>
+                  </div>`;
             }
             const _threadInline = '';
+            const _itKey = `${o.num}|${String(it.sku).replace(/"/g,'&quot;')}`;
+            const _fs = (typeof EGStore !== 'undefined' && EGStore.getItemFactoryStatus) ? EGStore.getItemFactoryStatus(o.num, it.sku) : '';
+            // Design ready = card is approved AND a real downloadable file
+            // exists (EMB binary OR raster preview — both are valid prints).
+            // Seller-uploaded files that haven't been approved fall through
+            // to the "Awaiting design" placeholder so warehouse can't start.
+            const _designReady = !!(_dcard && (_dcard.col === 'approved' || _dcard.col === 'paid') && _hasFile);
+            // One-way: blank shows clickable "Start", working shows plain
+            // "Working" text (no further toggle from this UI).
+            const _fsLabel = _fs === 'working' ? 'Working' : 'Start';
+            const _fsBase = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:transparent;border:none;color:#191918;padding:0;cursor:pointer;font-family:inherit;white-space:nowrap';
+            const _fsStyle = _fs === '' ? _fsBase + ';text-decoration:underline;text-underline-offset:2px;text-decoration-color:#c9c3ba' : _fsBase + ';cursor:default';
+            // Per-item is a simple two-state control: Start → Working. No
+            // "Awaiting design" gating — staff can mark any item in-progress.
+            const _fsEl = `<button class="eg-item-fs-el" data-item-key="${_itKey}" data-order="${o.num}" data-sku="${String(it.sku).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();whCycleItemStatus(this.dataset.order, this.dataset.sku)" style="${_fsStyle}">${_fsLabel}</button>`;
             return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 28px;background:transparent;${sep}">
               ${thumb}
               <div style="flex:1;min-width:0;margin-right:12px">
                 <div style="font-size:13.75px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name} <span style="font-size:11.75px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
-                <div style="font-size:11.75px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
+                <div style="font-size:11.75px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:24px;flex-wrap:nowrap">
                   ${metaRow}
                 </div>
               </div>
+              <div class="eg-item-fs-slot" style="position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center">${_fsEl}</div>
             </div>`;
           }).join('')}
         </div>
@@ -5524,6 +5932,87 @@ function whSelectRow(num) {
   whRenderOrders();
   whUpdatePanel();
 }
+
+/* Per-item factory status: warehouse is the source of truth. Cycle blank →
+   working → done → blank. Updates DOM in place (no full re-render) so the
+   row's existing layout + selection state isn't disturbed. Operator/admin
+   read the same EGStore key and listen for eg-item-status-changed to
+   refresh their own chips. */
+function whCycleItemStatus(orderNum, sku) {
+  if (typeof EGStore === 'undefined' || !EGStore.setItemFactoryStatus) return;
+  var cur = EGStore.getItemFactoryStatus(orderNum, sku);
+  // One-way per the spec: blank → working, then stops. Warehouse staff can
+  // mark an item as in-progress but can't toggle it back from this control.
+  if (cur !== '') return;
+  EGStore.setItemFactoryStatus(orderNum, sku, 'working');
+  whRefreshItemStatusUI(orderNum, sku);
+  whSyncOrderStatusFromItems(orderNum);
+}
+// All items in this order in 'working' state? Drives whether the Actions-
+// column Mark Shipped button is enabled.
+function whAllItemsWorking(o) {
+  if (!o || !Array.isArray(o.itemList) || !o.itemList.length || typeof EGStore === 'undefined') return false;
+  return o.itemList.every(function(it){ return EGStore.getItemFactoryStatus(o.num, it.sku) === 'working'; });
+}
+
+/* Pipeline glue:
+     • Any item working AND order is upstream of printing  → order = printing
+     • Every item done                                     → enable Mark Shipped
+   Never downgrades — if the order is already past printing (e.g. shipped),
+   item-level changes don't pull the order backwards. */
+var WH_PRE_PRINTING = ['new','in_review','awaiting_scan','scanned'];
+function whSyncOrderStatusFromItems(orderNum) {
+  var o = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(function(x){ return x.num === orderNum; }) : null;
+  if (!o || !Array.isArray(o.itemList) || !o.itemList.length) return;
+  var anyWorking = false, allDone = true;
+  o.itemList.forEach(function(it){
+    var s = EGStore.getItemFactoryStatus(orderNum, it.sku);
+    if (s === 'working' || s === 'done') anyWorking = true;
+    if (s !== 'done') allDone = false;
+  });
+  // Bump to printing if appropriate.
+  var curStatus = String(o.status || '').toLowerCase();
+  if (anyWorking && WH_PRE_PRINTING.indexOf(curStatus) !== -1) {
+    o.status = 'printing';
+    try { if (EGStore && EGStore.update) EGStore.update(orderNum, { factoryStatus: 'printing' }); } catch(e){}
+    if (typeof whRenderOrders === 'function') whRenderOrders();
+  }
+  // Mark Shipped button surfaces / hides via DOM toggle so we don't re-render.
+  var btn = document.getElementById('wh-mark-shipped-' + orderNum);
+  if (btn) btn.style.display = (allDone && curStatus !== 'shipped' && curStatus !== 'delivered') ? '' : 'none';
+}
+function whMarkOrderShipped(orderNum) {
+  var o = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(function(x){ return x.num === orderNum; }) : null;
+  if (!o) return;
+  o.status = 'shipped';
+  try { if (EGStore && EGStore.update) EGStore.update(orderNum, { factoryStatus: 'shipped' }); } catch(e){}
+  if (typeof whRenderOrders === 'function') whRenderOrders();
+}
+function whRefreshItemStatusUI(orderNum, sku) {
+  if (typeof EGStore === 'undefined') return;
+  var fs = EGStore.getItemFactoryStatus(orderNum, sku);
+  var key = orderNum + '|' + sku;
+  var base = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:transparent;border:none;color:#191918;padding:0;cursor:pointer;font-family:inherit;white-space:nowrap';
+  var nextStyle = fs === '' ? base + ';text-decoration:underline;text-underline-offset:2px;text-decoration-color:#c9c3ba'
+                : fs === 'done' ? base + ';opacity:.55'
+                : base;
+  var nextLabel = fs === 'done' ? 'Done' : fs === 'working' ? 'Working' : 'Start';
+  document.querySelectorAll('.eg-item-fs-el[data-item-key="' + CSS.escape(key) + '"]').forEach(function(el){
+    el.textContent = nextLabel;
+    el.setAttribute('style', nextStyle);
+  });
+}
+window.addEventListener('eg-item-status-changed', function(e){
+  var d = (e && e.detail) || {};
+  if (d.orderId && d.sku) whRefreshItemStatusUI(d.orderId, d.sku);
+});
+window.addEventListener('storage', function(e){
+  if (e.key !== (typeof EGStore !== 'undefined' && EGStore.ITEM_FACTORY_STATUS_KEY)) return;
+  document.querySelectorAll('.eg-item-fs-chip').forEach(function(chip){
+    var k = (chip.getAttribute('data-item-key') || '').split('|');
+    if (k.length === 2) whRefreshItemStatusUI(k[0], k.slice(1).join('|'));
+  });
+});
 
 function whToggleDetail(num) {
   const row = document.getElementById('wh-detail-' + num);
@@ -6638,9 +7127,14 @@ renderPrintQueue();
 
 // ---- Sellers panel ----
 function selectSeller(id, el) {
-  document.querySelectorAll('.seller-card-item').forEach(c => { c.style.border = '1px solid #e5e4e0'; c.style.background = ''; c.style.borderWidth = '1px'; });
-  el.style.border = '1.5px solid #111827';
-  el.style.background = '#f6f5f4';
+  // Reset every seller pill: transparent border + transparent background so
+  // only the active one shows chrome, with no light-grey hover lingering on
+  // the others.
+  document.querySelectorAll('.seller-card-item').forEach(c => { c.style.border = '1.5px solid transparent'; c.style.background = 'transparent'; });
+  el.style.border = '1.5px solid #191918';
+  el.style.background = 'transparent';
+  // Refresh the Balance stats for the newly selected seller.
+  try { updateSellerBalanceStats(id); } catch(e){}
   const SELLER_INFO = {
     'seller-a': {name:'Seller A Store', email:'sellera@store.com · Since Jan 2025', avatar:'SA', avatarBg:'#ede9fe', avatarColor:'#7c3aed', status:'Active', statsLabel:'Seller A', earned:'$8,420', pending:'$1,240', owed:'$340'},
     'seller-b': {name:'Seller B Store', email:'sellerb@shop.com · Since Mar 2025', avatar:'SB', avatarBg:'#dbeafe', avatarColor:'#1d4ed8', status:'Suspended', statsLabel:'Seller B', earned:'$2,140', pending:'$0', owed:'$120'},
@@ -6654,10 +7148,20 @@ function selectSeller(id, el) {
   document.getElementById('seller-detail-email').textContent = info.email;
   const statusEl = document.getElementById('seller-detail-status');
   statusEl.textContent = info.status;
-  statusEl.className = 'badge ' + (info.status === 'Active' ? 'b-ok' : 'b-lowstock');
-  document.getElementById('seller-quick-stats').querySelector('.\\:first-child, div').textContent = '';
-  const qs = document.getElementById('seller-quick-stats');
-  if (qs) qs.querySelector('div').textContent = info.statsLabel + ' — Quick Stats';
+  // Keep the badge neutral regardless of state — colour stays #f3eee2 + #191918,
+  // the label is the only thing that changes (ACTIVE vs SUSPENDED).
+  statusEl.style.cssText = 'font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase';
+  statusEl.className = '';
+}
+// Populate Balance stats + surface Balance-tab actions on first load.
+function _initSellerSection() {
+  try { setSellerTab('balance'); } catch(e){}
+  try { updateSellerBalanceStats('seller-a'); } catch(e){}
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _initSellerSection);
+} else {
+  _initSellerSection();
 }
 
 // Single-button suspend/reactivate toggle. Reads the live status from the
@@ -6669,9 +7173,10 @@ function toggleSellerStatus() {
   if (!statusEl || !btn) return;
   var nowActive = /active/i.test(statusEl.textContent);
   var becomingActive = !nowActive;
-  // Update pill
+  // Update pill — neutral chrome (#f3eee2 bg + #191918 text) for both states.
+  // The label text alone communicates Active vs Suspended.
   statusEl.textContent = becomingActive ? 'ACTIVE' : 'SUSPENDED';
-  statusEl.style.cssText = 'font-size:11px;font-weight:700;color:' + (becomingActive?'#15803d':'#c2410c') + ';background:' + (becomingActive?'#dcfce7':'#fef3c7') + ';padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase';
+  statusEl.style.cssText = 'font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase';
   // Update button label/styling — Suspend (dark) / Reactivate (outlined)
   if (becomingActive) {
     btn.textContent = 'Suspend';
@@ -6704,7 +7209,8 @@ function toggleSellerStatus() {
     if (n.textContent.trim().split(/\s+/).slice(0,-1).join(' ') === '' || !key) return;
     // Only flip the currently-selected card's dot — robust enough for the demo.
     if (card.dataset.sel) {
-      dot.style.background = becomingActive ? '#15803d' : '#c2410c';
+      // Active = dark #191918, suspended/inactive = lighter grey #c9c3ba.
+      dot.style.background = becomingActive ? '#191918' : '#c9c3ba';
     }
   });
 }
@@ -6842,7 +7348,54 @@ function setSellerTab(tab, btn) {
     if (el) el.style.display = t === tab ? '' : 'none';
     if (b) { b.style.borderBottomColor = t === tab ? '#111827' : 'transparent'; b.style.color = t === tab ? '#191918' : '#6b7280'; b.style.fontWeight = t === tab ? '700' : '500'; }
   });
+  // Tabs row's action buttons are contextual:
+  //   Balance → "+ Adjust" (left of tabs area) + "↓ Export CSV" (far right)
+  //   Team    → "+ Invite Member" (far right)
+  //   API     → nothing
+  const setShow = (id, on, inline='inline-flex') => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = on ? inline : 'none';
+  };
+  setShow('seller-action-adjust', tab === 'balance');
+  setShow('seller-action-export', tab === 'balance');
+  setShow('seller-action-invite', tab === 'team');
 }
+
+/* Live wiring: map a seller pill id to the EGStore order.seller string so
+   we can filter live orders pushed by that seller. */
+const SELLER_KEY_TO_NAME = {
+  'seller-a': 'Seller A Store',
+  'seller-b': 'Seller B Store',
+  'my-store': 'My Store'
+};
+function updateSellerBalanceStats(sellerKey) {
+  let paid = 0, refunded = 0, orders = 0;
+  try {
+    const wantedName = SELLER_KEY_TO_NAME[sellerKey] || '';
+    const all = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []) : [];
+    const mine = wantedName ? all.filter(o => (o.seller || '') === wantedName) : all;
+    orders = mine.length;
+    mine.forEach(o => {
+      const t = parseFloat(o.total || o.price || 0) || 0;
+      const s = String(o.status || o.factoryStatus || '').toLowerCase();
+      if (s === 'refunded' || s === 'cancelled' || s === 'canceled' || o.refunded) {
+        refunded += (parseFloat(o.refundAmount) || t);
+      } else {
+        paid += t;
+      }
+    });
+  } catch (e) {}
+  const fmt = v => '$' + (Math.round(v * 100) / 100).toLocaleString();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('seller-stat-paid', fmt(paid));
+  set('seller-stat-refunded', fmt(refunded));
+  set('seller-stat-orders', String(orders));
+}
+window.addEventListener('eg-orders-changed', () => {
+  const activeSeller = document.querySelector('.seller-card-item[style*="#191918"]');
+  const id = activeSeller ? (activeSeller.id || '').replace(/^sc-/, '') : 'seller-a';
+  updateSellerBalanceStats(id);
+});
 
 function goStep(n) {
   for (let i = 1; i <= 4; i++) {
@@ -11314,5 +11867,70 @@ window.whDateClear = function() {
     wrap.appendChild(btn);
   };
 })();
-</script></body>
+</script><script>
+/* Align per-item factory-status chips directly under the order STATUS column.
+   Replaces the old fixed margin-right hack so chips track column
+   resize / show-hide / reorder, row expand/collapse, and window resize. */
+(function(){
+  function alignFsSlots(){
+    var slots = document.querySelectorAll('.eg-item-fs-slot');
+    if(!slots.length) return;
+    var cache = new Map();
+    slots.forEach(function(slot){
+      var row = slot.parentElement; if(!row) return;
+      var table = slot.closest('table'); if(!table) return;
+      var sx;
+      if(cache.has(table)){ sx = cache.get(table); }
+      else {
+        sx = null;
+        var sc = table.querySelector('tbody td[data-col="status"]');
+        if(sc && sc.offsetParent !== null){
+          var r = sc.getBoundingClientRect();
+          if(r.width > 0){ sx = r.left + (parseFloat(getComputedStyle(sc).paddingLeft)||0); }
+        }
+        cache.set(table, sx);
+      }
+      var rr = row.getBoundingClientRect();
+      var sr = slot.getBoundingClientRect();
+      var vis = slot.offsetParent !== null && sr.width > 0;
+      if(sx === null || rr.width === 0 || !vis){ slot.style.left=''; return; }
+      row.style.position = 'relative';
+      slot.style.left = (sx - rr.left) + 'px';
+      row.style.paddingRight = Math.max(14, rr.right - sx + 8) + 'px';
+    });
+  }
+  var raf = 0;
+  function schedule(){ if(raf) return; raf = requestAnimationFrame(function(){ raf=0; alignFsSlots(); }); }
+  window.egAlignFsSlots = schedule;
+  function wire(){
+    schedule();
+    document.querySelectorAll('table').forEach(function(t){
+      if(t.__egFsWired) return;
+      if(!t.querySelector('[data-col="status"]')) return;
+      t.__egFsWired = true;
+      if(window.ResizeObserver){ new ResizeObserver(schedule).observe(t); }
+      var th = t.querySelector('thead');
+      if(th){ new MutationObserver(schedule).observe(th, {attributes:true, attributeFilter:['style','class'], subtree:true, childList:true}); }
+      var tb = t.querySelector('tbody');
+      if(tb){ new MutationObserver(schedule).observe(tb, {childList:true, subtree:true}); }
+      t.addEventListener('click', function(){ schedule(); setTimeout(schedule,0); }, true);
+    });
+  }
+  window.addEventListener('resize', schedule);
+  window.addEventListener('scroll', schedule, true);
+  if(document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', function(){ setTimeout(wire,0); }); }
+  else { setTimeout(wire, 0); }
+  setTimeout(wire, 800);
+  setTimeout(wire, 2000);
+})();
+</script>
+<!-- Shared Products section + Add Product modal (same as operator/admin). -->
+<script src="eg-products.js"></script>
+<script>
+/* Compat shim: showSection() still calls renderProducts(); route it to the
+   shared renderer. The legacy prod-modal markup was replaced by the shared
+   #new-product-modal, so the old renderProducts/openProductModal are inert. */
+window.renderProducts = function(){ if (typeof renderOpProducts === 'function') renderOpProducts(); };
+</script>
+</body>
 </html>

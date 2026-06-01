@@ -6,6 +6,7 @@
 <title>Design Maker – EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="egfulfill-store.js"></script>
+<script src="eg-sidebar-badges.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 *{box-sizing:border-box}
@@ -160,6 +161,10 @@ html[data-theme=dark] .left-panel{background:#1f1d1b!important;border-right-colo
 html[data-theme=dark] .right-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.12)!important}
 /* Canvas: matches the side-panel surface (not pure black); thin, slightly-darker-beige grid lines */
 html[data-theme=dark] .canvas-area{background-color:#1f1d1b!important;background-image:linear-gradient(rgba(201,195,186,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(201,195,186,.07) 1px,transparent 1px)!important}
+/* Product mockup has no background — transparent PNGs render with their
+   transparency intact in every position (front, back, sides, sleeve). */
+#product-img{background:transparent !important}
+html[data-theme=dark] #product-img{background:transparent !important}
 /* Left tool rail: darker-beige idle → lighter-beige selected */
 html[data-theme=dark] .tool-btn{color:#9a948a!important;background:transparent!important}
 html[data-theme=dark] .tool-btn:hover{background:rgba(201,195,186,.06)!important;color:#e8e4dd!important}
@@ -214,9 +219,13 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
     <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M2 2h7l2 2v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M4 12V7h5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
     Save as Product Template
   </button>
-  <button class="btn btn-out" onclick="dmSaveTemplate()">
+  <button class="btn btn-out" onclick="dmSaveTemplate()" id="dm-save-template-btn">
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2h7l2 2v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M4 12V7h5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-    Save Template
+    <span id="dm-save-template-label">Save Template</span>
+  </button>
+  <button class="btn btn-out" onclick="dmSaveTemplateAs()" id="dm-save-template-as-btn" style="display:none">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 2h7l2 2v7a1 1 0 01-1 1H2a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/><path d="M4 12V7h5v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <span>Save As</span>
   </button>
   <div style="width:1px;height:24px;background:#e5e4e0;margin:0 2px"></div>
   <button id="primary-action-btn" class="btn btn-dk" onclick="pushToProduction()" style="gap:7px">
@@ -295,8 +304,8 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
     <!-- Text tool panel — primary button at top, then text + style controls -->
     <div class="panel-section" id="tool-panel-text" style="display:none">
       <div class="panel-label">Add Text</div>
-      <button onclick="dmAddTextLayerFromPanel()" class="btn btn-dk" style="width:100%;font-size:13px;padding:8px;justify-content:center;margin-bottom:10px">+ Add Text Layer</button>
-      <input id="tt-text" class="finput" placeholder="Type your text…" value="Your Text" style="font-size:13.5px;margin-bottom:8px"/>
+      <button onclick="dmAddTextLayerFromPanel()" class="btn btn-dk" style="width:100%;font-size:13px;padding:8px;justify-content:center;margin-bottom:10px">Add Text</button>
+      <input id="tt-text" class="finput" placeholder="Type your text…" value="Your Text" onkeydown="if(event.key==='Enter'){event.preventDefault();dmAddTextLayerFromPanel();}" style="font-size:13.5px;margin-bottom:8px"/>
       <div style="display:grid;grid-template-columns:1fr 80px;gap:6px;margin-bottom:10px">
         <select id="tt-font" class="finput" style="font-size:13px;padding:7px 10px;cursor:pointer;appearance:auto">
           <option value="Inter, sans-serif">Inter</option>
@@ -364,22 +373,22 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
         <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px">Print Specs</div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
           <span style="font-size:12.5px;color:#6b7280">Print area</span>
-          <span style="display:inline-flex;align-items:center;gap:3px">
-            <input id="ps-pa-w" type="number" min="1" step="0.5" value="12" oninput="dmApplyPrintArea()" style="width:40px;font-size:12.5px;font-weight:600;color:#111827;text-align:center;border:1px solid #d8d4cd;border-radius:6px;padding:3px 4px;background:transparent;font-family:inherit;outline:none"/>
+          <span style="display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;width:140px;border:1px solid #d8d4cd;border-radius:6px;padding:3px 6px;box-sizing:border-box">
+            <input id="ps-pa-w" type="number" min="1" step="0.5" value="12" oninput="dmApplyPrintArea()" style="width:34px;font-size:12.5px;font-weight:600;color:#111827;text-align:center;border:none;padding:0;background:transparent;font-family:inherit;outline:none"/>
             <span style="font-size:12px;color:#9ca3af">×</span>
-            <input id="ps-pa-h" type="number" min="1" step="0.5" value="16" oninput="dmApplyPrintArea()" style="width:40px;font-size:12.5px;font-weight:600;color:#111827;text-align:center;border:1px solid #d8d4cd;border-radius:6px;padding:3px 4px;background:transparent;font-family:inherit;outline:none"/>
-            <span style="font-size:12px;color:#6b7280">in</span>
+            <input id="ps-pa-h" type="number" min="1" step="0.5" value="16" oninput="dmApplyPrintArea()" style="width:34px;font-size:12.5px;font-weight:600;color:#111827;text-align:center;border:none;padding:0;background:transparent;font-family:inherit;outline:none"/>
+            <span style="font-size:12px;color:#6b7280;margin-left:2px">in</span>
           </span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
           <span style="font-size:12.5px;color:#6b7280">Resolution</span>
-          <select id="ps-dpi" style="font-size:12.5px;font-weight:600;color:#111827;border:1px solid #d8d4cd;border-radius:6px;padding:3px 6px;background:transparent;font-family:inherit;cursor:pointer;outline:none">
+          <select id="ps-dpi" style="width:140px;box-sizing:border-box;font-size:12.5px;font-weight:600;color:#111827;border:1px solid #d8d4cd;border-radius:6px;padding:3px 6px;background:transparent;font-family:inherit;cursor:pointer;outline:none">
             <option value="150">150 DPI</option><option value="300" selected>300 DPI</option><option value="600">600 DPI</option>
           </select>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:12.5px;color:#6b7280">Method</span>
-          <select id="ps-method" onchange="dmSetMethod(this.value)" style="font-size:12.5px;font-weight:600;color:#111827;border:1px solid #d8d4cd;border-radius:6px;padding:3px 6px;background:transparent;font-family:inherit;cursor:pointer;outline:none">
+          <select id="ps-method" onchange="dmSetMethod(this.value)" style="width:140px;box-sizing:border-box;font-size:12.5px;font-weight:600;color:#111827;border:1px solid #d8d4cd;border-radius:6px;padding:3px 6px;background:transparent;font-family:inherit;cursor:pointer;outline:none">
             <option value="DTG">DTG</option><option value="Embroidery">Embroidery</option><option value="Sublimation">Sublimation</option><option value="Screen print">Screen print</option>
           </select>
         </div>
@@ -424,7 +433,7 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
       <div style="position:relative;display:inline-block">
         <!-- Product photo mockup -->
         <img id="product-img" src="images/1822_fm.jpg"
-             style="height:560px;width:auto;display:block;filter:drop-shadow(0 3px 16px rgba(17,24,39,.08))"
+             style="height:560px;width:auto;display:block;background:transparent;filter:drop-shadow(0 3px 16px rgba(17,24,39,.08))"
              draggable="false" onload="repositionOverlay()"/>
 
         <!-- Print area label + boundary (repositioned by JS) -->
@@ -924,6 +933,19 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
       <feBlend in="merged" in2="wobbled" mode="overlay" result="blended"/>
       <feComposite in="blended" in2="wobbled" operator="in"/>
     </filter>
+    <!-- Slight fabric grain — overlays a faint noise texture onto whatever filter
+         output it receives. Clipped to the input alpha so empty pixels stay empty
+         (respects the chroma-keyed transparency from the texture filters). -->
+    <filter id="eg-emb-grain" x="0%" y="0%" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="2.4" numOctaves="2" seed="9" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="
+        0 0 0 0 0.5
+        0 0 0 0 0.5
+        0 0 0 0 0.5
+        0 0 0 0.32 0" result="grainGrey"/>
+      <feComposite in="grainGrey" in2="SourceGraphic" operator="in" result="grainClipped"/>
+      <feBlend in="grainClipped" in2="SourceGraphic" mode="overlay"/>
+    </filter>
   </defs>
 </svg>
 <script>
@@ -1057,6 +1079,7 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
 #design-stage-fill.dm-emb > div[data-stitch="satin"] > svg{
   filter:
     url(#eg-emb-tex-s)
+    url(#eg-emb-grain)
     drop-shadow(0.6px 0.6px 0 rgba(0,0,0,0.45))
     drop-shadow(-0.35px -0.35px 0 rgba(255,255,255,0.22))
     contrast(1.05) saturate(1.1);
@@ -1065,6 +1088,7 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
 #design-stage-fill.dm-emb > div[data-stitch="tatami"] > svg{
   filter:
     url(#eg-emb-tex-d)
+    url(#eg-emb-grain)
     drop-shadow(0.7px 0.7px 0 rgba(0,0,0,0.4))
     drop-shadow(-0.4px -0.4px 0 rgba(255,255,255,0.2))
     contrast(1.05) saturate(1.1);
@@ -1205,19 +1229,14 @@ function dmRenderShapePicker() {
   wrap.innerHTML = DM_SHAPES.map(s => {
     const sel = s.key === _dmShapeKind;
     const svg = dmShapeSvg(s.key, '#374151', false, 22);
-    // Click flow: first click on a different shape just selects it. Click again on the
-    // already-selected shape drops it into the canvas — replaces the explicit Add button.
-    return '<button type="button" onclick="dmPickOrAddShape(\'' + s.key + '\')" title="' + s.label + ' (click again to add)" style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:' + (sel?'#111827':'#fff') + ';border:1.5px solid ' + (sel?'#111827':'#e5e4e0') + ';border-radius:7px;cursor:pointer;color:' + (sel?'#fff':'#374151') + ';padding:0">' + svg.replace('#374151', sel?'#fff':'#374151') + '</button>';
+    return '<button type="button" onclick="dmPickOrAddShape(\'' + s.key + '\')" title="' + s.label + ' (click to add)" style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:' + (sel?'#111827':'#fff') + ';border:1.5px solid ' + (sel?'#111827':'#e5e4e0') + ';border-radius:7px;cursor:pointer;color:' + (sel?'#fff':'#374151') + ';padding:0">' + svg.replace('#374151', sel?'#fff':'#374151') + '</button>';
   }).join('');
 }
 
 function dmPickOrAddShape(kind) {
-  if (_dmShapeKind === kind) {
-    dmAddShapeLayer();
-  } else {
-    _dmShapeKind = kind;
-    dmRenderShapePicker();
-  }
+  _dmShapeKind = kind;
+  dmAddShapeLayer();
+  dmRenderShapePicker();
 }
 
 // Return SVG markup for a shape — used by both the picker and the canvas renderer.
@@ -1290,6 +1309,9 @@ function _dmSaveSellerTemplate(meta, composite, layers) {
   try {
     let arr = [];
     try { arr = JSON.parse(localStorage.getItem(META_KEY) || '[]'); } catch(e){ arr = []; }
+    // Dedupe: drop any existing entry with the same id so in-place saves
+    // update the record rather than producing a duplicate card.
+    arr = arr.filter(function(t){ return !t || String(t.id) !== String(meta.id); });
     arr.unshift(meta);
     if (arr.length > 30) arr = arr.slice(0, 30);
     try { tryWriteMeta(arr); metaSaved = true; }
@@ -1364,10 +1386,81 @@ function _dmSaveSellerTemplate(meta, composite, layers) {
 }
 window._dmSaveSellerTemplate = _dmSaveSellerTemplate;
 
+function _dmCommitTemplateSave(entryId, cleanName) {
+  // Capture the design-only image (no blank/mockup background) so the seller
+  // can overlay this template's artwork on THEIR product avatar in the order
+  // list, instead of overlaying a baked composite that re-shows the template's
+  // original mockup. Falls back to the first image layer's raw src, then to
+  // empty (text-only templates have no design-only image; the avatar shows
+  // the seller's blank with no overlay until they swap to a Design Lab edit).
+  let designOnlyImg = '';
+  try {
+    const firstImg = (Array.isArray(DM_LAYERS) ? DM_LAYERS : []).find(function(l){ return l && l.type === 'image' && l.src; });
+    if (firstImg) designOnlyImg = firstImg.src;
+  } catch(e) {}
+  const meta = {
+    id: entryId,
+    designId: 'T' + entryId,
+    cat: (_currentProduct && _currentProduct.cat) || 'apparel',
+    name: cleanName,
+    sub: 'Custom design · saved from Design Maker',
+    from: parseFloat(_currentProduct && (_currentProduct.from || _currentProduct.price)) || 0,
+    color: (_currentProduct && _currentProduct.color) || '—',
+    size: (_currentProduct && _currentProduct.size) || '—',
+    tech: (_dmMethod ? (_dmMethod === 'DTG' ? 'DTG printing' : _dmMethod)
+                     : ((_currentProduct && _currentProduct.tech) || 'DTG printing')),
+    productId: (_currentProduct && _currentProduct.id) || null,
+    productImg: (typeof currentProductImg !== 'undefined') ? currentProductImg : '',
+    designOnlyImg: designOnlyImg,
+    savedAt: new Date().toISOString().slice(0, 10)
+  };
+  _dmSaveSellerTemplate(meta, '', []);
+  toast('Template saved');
+  let navigated = false;
+  const go = function(){ if (navigated) return; navigated = true; window.location.href = 'product-templates.html'; };
+  try {
+    const layersSnapshot = JSON.parse(JSON.stringify(DM_LAYERS || []));
+    if (typeof dmCaptureComposite === 'function') {
+      dmCaptureComposite().then(function(composite){
+        try {
+          const blobs = JSON.parse(localStorage.getItem('eg_templates_blob') || '{}');
+          blobs[entryId] = { compositeImg: composite || '', layers: layersSnapshot };
+          try { localStorage.setItem('eg_templates_blob', JSON.stringify(blobs)); }
+          catch(quota) {
+            blobs[entryId] = { compositeImg: composite || '', layers: [] };
+            try { localStorage.setItem('eg_templates_blob', JSON.stringify(blobs)); }
+            catch(e2) {
+              const onlyMine = {}; onlyMine[entryId] = { compositeImg: composite || '', layers: [] };
+              try { localStorage.setItem('eg_templates_blob', JSON.stringify(onlyMine)); } catch(e3){}
+            }
+          }
+        } catch(e){ /* ignore — metadata already saved */ }
+        setTimeout(go, 200);
+      }, function(){ setTimeout(go, 200); });
+    } else {
+      setTimeout(go, 200);
+    }
+  } catch(e) { setTimeout(go, 200); }
+  setTimeout(go, 1500);
+}
+
 function dmSaveTemplate() {
   if (!DM_LAYERS.length) { toast('Add at least one layer before saving'); return; }
+  // In-place update when resumed from an existing template — no rename prompt,
+  // reuse the original entry id so the template card stays in place.
+  if (_dmEditingTemplateId) {
+    let existingName = '';
+    try {
+      const arr = JSON.parse(localStorage.getItem('eg_templates') || '[]');
+      const found = arr.find(function(t){ return t && String(t.id) === String(_dmEditingTemplateId); });
+      if (found) existingName = found.name || '';
+    } catch(e){}
+    const titleVal = (document.getElementById('design-title')?.value || '').trim();
+    const cleanName = (existingName || titleVal || 'My Template').slice(0, 60);
+    _dmCommitTemplateSave(_dmEditingTemplateId, cleanName);
+    return;
+  }
   const defaultName = (document.getElementById('design-title')?.value || 'My Template').trim();
-  // Project-styled prompt instead of the native browser dialog.
   dmPromptModal({
     title: 'Save template',
     sub: 'Give your template a name. You\'ll be able to edit it from the templates page.',
@@ -1378,72 +1471,31 @@ function dmSaveTemplate() {
   }, function(name){
     if (name == null || !name.trim()) return;
     const cleanName = name.trim().slice(0, 60);
-    /* CRITICAL ORDERING: persist the slim metadata FIRST (synchronously, no
-       async work yet) so the template card always survives. Composite capture
-       runs after — its data URL gets patched into the blob store, but if the
-       capture hangs/fails the user still lands on the templates page with the
-       new card present. */
-    const newEntryId = Date.now();
-    // Capture the design-only image (no blank/mockup background) so the seller
-    // can overlay this template's artwork on THEIR product avatar in the order
-    // list, instead of overlaying a baked composite that re-shows the template's
-    // original mockup. Falls back to the first image layer's raw src, then to
-    // empty (text-only templates have no design-only image; the avatar shows
-    // the seller's blank with no overlay until they swap to a Design Lab edit).
-    let designOnlyImg = '';
+    _dmCommitTemplateSave(Date.now(), cleanName);
+  });
+}
+
+function dmSaveTemplateAs() {
+  if (!DM_LAYERS.length) { toast('Add at least one layer before saving'); return; }
+  let baseName = (document.getElementById('design-title')?.value || 'My Template').trim();
+  if (_dmEditingTemplateId) {
     try {
-      const firstImg = (Array.isArray(DM_LAYERS) ? DM_LAYERS : []).find(function(l){ return l && l.type === 'image' && l.src; });
-      if (firstImg) designOnlyImg = firstImg.src;
-    } catch(e) {}
-    const meta = {
-      id: newEntryId,
-      designId: 'T' + newEntryId,
-      cat: (_currentProduct && _currentProduct.cat) || 'apparel',
-      name: cleanName,
-      sub: 'Custom design · saved from Design Maker',
-      from: parseFloat(_currentProduct && (_currentProduct.from || _currentProduct.price)) || 0,
-      color: (_currentProduct && _currentProduct.color) || '—',
-      size: (_currentProduct && _currentProduct.size) || '—',
-      tech: (_currentProduct && _currentProduct.tech) || 'DTG printing',
-      productId: (_currentProduct && _currentProduct.id) || null,
-      productImg: (typeof currentProductImg !== 'undefined') ? currentProductImg : '',
-      designOnlyImg: designOnlyImg,
-      savedAt: new Date().toISOString().slice(0, 10)
-    };
-    // Pass empty composite + layers — blob can be patched async below.
-    _dmSaveSellerTemplate(meta, '', []);
-    toast('Template saved');
-    // Capture composite + layers in the background, patch the blob, then
-    // navigate. If composite never resolves we still navigate on the timer.
-    let navigated = false;
-    const go = function(){ if (navigated) return; navigated = true; window.location.href = 'product-templates.html'; };
-    try {
-      const layersSnapshot = JSON.parse(JSON.stringify(DM_LAYERS || []));
-      if (typeof dmCaptureComposite === 'function') {
-        dmCaptureComposite().then(function(composite){
-          try {
-            const blobs = JSON.parse(localStorage.getItem('eg_templates_blob') || '{}');
-            blobs[newEntryId] = { compositeImg: composite || '', layers: layersSnapshot };
-            try { localStorage.setItem('eg_templates_blob', JSON.stringify(blobs)); }
-            catch(quota) {
-              // Quota? Drop the heavy layers, retry with just the composite.
-              blobs[newEntryId] = { compositeImg: composite || '', layers: [] };
-              try { localStorage.setItem('eg_templates_blob', JSON.stringify(blobs)); }
-              catch(e2) {
-                // Still no room? Keep only this entry's blob.
-                const onlyMine = {}; onlyMine[newEntryId] = { compositeImg: composite || '', layers: [] };
-                try { localStorage.setItem('eg_templates_blob', JSON.stringify(onlyMine)); } catch(e3){}
-              }
-            }
-          } catch(e){ /* ignore — metadata already saved */ }
-          setTimeout(go, 200);
-        }, function(){ setTimeout(go, 200); });
-      } else {
-        setTimeout(go, 200);
-      }
-    } catch(e) { setTimeout(go, 200); }
-    // Hard fallback — if composite hangs forever, still navigate after 1.5s.
-    setTimeout(go, 1500);
+      const arr = JSON.parse(localStorage.getItem('eg_templates') || '[]');
+      const found = arr.find(function(t){ return t && String(t.id) === String(_dmEditingTemplateId); });
+      if (found && found.name) baseName = found.name + ' copy';
+    } catch(e){}
+  }
+  dmPromptModal({
+    title: 'Save as new template',
+    sub: 'Give the new template a name — your original will stay untouched.',
+    placeholder: baseName,
+    value: baseName,
+    confirmLabel: 'Save as new',
+    confirmColor: '#191918'
+  }, function(name){
+    if (name == null || !name.trim()) return;
+    const cleanName = name.trim().slice(0, 60);
+    _dmCommitTemplateSave(Date.now(), cleanName);
   });
 }
 /* Lightweight project-styled prompt — replaces the browser's native dialog so
@@ -2095,7 +2147,13 @@ function dmDeleteLayer(id) {
 }
 function dmToggleVisible(id) { const l = DM_LAYERS.find(x => x.id === id); if (l) { l.visible = !l.visible; dmRender(); } }
 function dmToggleLock(id)    { const l = DM_LAYERS.find(x => x.id === id); if (l) { l.locked = !l.locked; dmRender(); } }
-function dmSelect(id)        { _dmSelectedId = id; dmRender(); if (typeof dmSyncControls === 'function') dmSyncControls(); }
+function dmSelect(id)        {
+  // Skip re-render when re-selecting the same layer — re-rendering replaces the
+  // DOM node, which prevents the browser from firing a dblclick on a fast second
+  // click (e.g. double-click-to-edit on a canvas text layer).
+  if (_dmSelectedId === id) return;
+  _dmSelectedId = id; dmRender(); if (typeof dmSyncControls === 'function') dmSyncControls();
+}
 function dmMoveLayer(id, dir) {
   const i = DM_LAYERS.findIndex(l => l.id === id);
   if (i < 0) return;
@@ -2105,9 +2163,75 @@ function dmMoveLayer(id, dir) {
   dmRender();
 }
 function dmEditTextLayer(id) {
-  const l = DM_LAYERS.find(x => x.id === id); if (!l || l.type !== 'text') return;
-  const nv = prompt('Edit text:', l.text);
-  if (nv !== null) { l.text = nv; l.name = nv.slice(0, 18) || 'Text'; dmRender(); }
+  const l = DM_LAYERS.find(x => x.id === id); if (!l || l.type !== 'text' || l.locked) return;
+  // Inline edit on the visible canvas text span — no popup.
+  const fill = document.getElementById('design-stage-fill');
+  const wrapper = fill && fill.querySelector('[data-layer-id="' + id + '"]');
+  const span = wrapper && wrapper.querySelector('.dm-text-fit');
+  if (!span) return;
+  // Hide the whole interaction stage during edit so the selection box, handles
+  // and floating toolbar don't clutter the editor — just the text + caret.
+  const interactionStage = document.getElementById('design-stage');
+  const prevStageDisplay = interactionStage ? interactionStage.style.display : '';
+  if (interactionStage) interactionStage.style.display = 'none';
+  const original = l.text || '';
+  span.contentEditable = 'true';
+  span.style.pointerEvents = 'auto';
+  span.style.userSelect = 'text';
+  span.style.caretColor = l.color || '#111827';
+  // Reset to just the caret — user starts typing fresh. Empty blur reverts.
+  span.textContent = '';
+  span.focus();
+  let done = false;
+  const commit = function(){
+    if (done) return; done = true;
+    if (interactionStage) interactionStage.style.display = prevStageDisplay || '';
+    const nv = (span.textContent || '').trim();
+    if (nv) { l.text = nv; l.name = nv.slice(0, 18); }
+    // else: empty — keep original text, dmRender below restores it from l.text
+    dmRender();
+  };
+  span.addEventListener('blur', commit, { once: true });
+  span.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); span.textContent = original; span.blur(); }
+  });
+}
+function dmHandleNameClick(el, id) {
+  const l = DM_LAYERS.find(x => x.id === id); if (!l) return;
+  dmSelect(id);
+  dmRenameLayerInline(el, id);
+}
+function dmRenameLayerInline(el, id) {
+  const l = DM_LAYERS.find(x => x.id === id); if (!l || !el) return;
+  const fallback = l.type === 'image' ? 'Image' : l.type === 'shape' ? 'Shape' : 'Text';
+  // For text layers the panel "name" mirrors the text content — editing one
+  // edits both so the canvas + panel stay in sync.
+  const old = (l.type === 'text' ? (l.text || l.name) : l.name) || fallback;
+  el.contentEditable = 'true';
+  el.style.background = '#fff';
+  el.style.outline = '1.5px solid #111827';
+  el.style.cursor = 'text';
+  el.style.overflow = 'visible';
+  el.textContent = old;
+  el.focus();
+  try {
+    const range = document.createRange(); range.selectNodeContents(el);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  } catch(e){}
+  let done = false;
+  const commit = function(){
+    if (done) return; done = true;
+    const nv = (el.textContent || '').trim() || fallback;
+    if (l.type === 'text') { l.text = nv; l.name = nv.slice(0, 40); }
+    else { l.name = nv.slice(0, 40); }
+    dmRender();
+  };
+  el.addEventListener('blur', commit, { once: true });
+  el.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    else if (e.key === 'Escape') { e.preventDefault(); el.textContent = old; el.blur(); }
+  });
 }
 
 function dmRender() { dmRenderStage(); dmRenderPanel(); }
@@ -2148,7 +2272,8 @@ function dmRenderStage() {
     el.innerHTML = _dmLayerContent(l, flipT, true);
     if (l.type === 'text') {
       el.style.containerType = 'size';
-      // Double-click anywhere on the text layer opens the inline editor.
+      // Single click just selects; double-click opens the inline editor.
+      el.onclick = (function(id){ return function(e){ e.stopPropagation(); dmSelect(id); }; })(l.id);
       el.ondblclick = (function(id){ return function(e){ e.stopPropagation(); dmEditTextLayer(id); }; })(l.id);
       el.style.cursor = l.locked ? 'default' : 'move';
     }
@@ -2210,6 +2335,7 @@ function dmRenderStage() {
       if (l.visible === false) return;
       var flipT = 'transform:scaleX(' + (l.flipH ? -1 : 1) + ') scaleY(' + (l.flipV ? -1 : 1) + ')';
       var fe = document.createElement('div');
+      fe.setAttribute('data-layer-id', l.id);
       fe.style.cssText = 'position:absolute;left:' + l.x + '%;top:' + l.y + '%;width:' + l.w + '%;height:' + l.h + '%;'
         + 'box-sizing:border-box;transform:rotate(' + (l.rot || 0) + 'deg);transform-origin:center center;'
         + 'display:flex;align-items:center;justify-content:center;pointer-events:none';
@@ -2246,9 +2372,10 @@ function dmRenderPanel() {
         ' ondragstart="dmDragStart(event,\'' + l.id + '\')" ondragover="event.preventDefault()" ondrop="dmDragDrop(event,\'' + l.id + '\')"' +
         ' onclick="dmSelect(\'' + l.id + '\')" style="' + (l.visible?'':'opacity:.55;') + '">' +
         icon +
-        '<span style="font-size:13px;color:' + (isSel?'#111827':'#374151') + ';flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"' +
-          (l.type==='text' ? ' ondblclick="event.stopPropagation();dmEditTextLayer(\'' + l.id + '\')" title="Double-click to edit text"' : '') +
-          '>' + (l.name || (l.type === 'image' ? 'Image' : 'Text')) + '</span>' +
+        '<span data-layer-name="' + l.id + '" style="font-size:13px;cursor:text;color:' + (isSel?'#111827':'#374151') + ';flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 4px;margin:-2px -4px;border-radius:4px"' +
+          ' onclick="event.stopPropagation();dmHandleNameClick(this,\'' + l.id + '\')"' +
+          ' title="' + (l.type==='text' ? 'Click to edit text' : 'Click to rename') + '"' +
+          '>' + (l.name || (l.type === 'image' ? 'Image' : l.type === 'shape' ? 'Shape' : 'Text')) + '</span>' +
         '<button onclick="event.stopPropagation();dmMoveLayer(\'' + l.id + '\',1)" title="Bring forward" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:#9ca3af;font-size:11px;line-height:1">▲</button>' +
         '<button onclick="event.stopPropagation();dmMoveLayer(\'' + l.id + '\',-1)" title="Send backward" style="background:none;border:none;cursor:pointer;padding:2px 4px;color:#9ca3af;font-size:11px;line-height:1">▼</button>' +
         '<button onclick="event.stopPropagation();dmToggleLock(\'' + l.id + '\')" title="' + (l.locked?'Unlock':'Lock') + '" style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center">' + (l.locked?lockOn:lockOff) + '</button>' +
@@ -2647,6 +2774,9 @@ if (document.readyState !== 'loading') dmInitFromURL();
    and sessionStorage has the matching template ref. Lets the Edit button on
    product-templates.html drop the seller back into the exact design state
    they left. */
+// Module-level flag: when set, dmSaveTemplate updates THIS template in-place
+// instead of prompting for a new name. Cleared on every fresh page load.
+var _dmEditingTemplateId = null;
 function dmResumeFromSession(){
   try {
     const params = new URLSearchParams(location.search);
@@ -2668,6 +2798,23 @@ function dmResumeFromSession(){
     }
     if (ctx.productId && typeof selectProductById === 'function') {
       try { selectProductById(ctx.productId); } catch(e){}
+    }
+    // Lock the seller into "editing" mode for this template — Save button
+    // becomes "Save" (no rename prompt) and writes back to the same record.
+    if (ctx.tplId) {
+      _dmEditingTemplateId = ctx.tplId;
+      var lbl = document.getElementById('dm-save-template-label');
+      if (lbl) lbl.textContent = 'Save';
+      // Show "Save As" alongside Save so the seller can fork into a new template
+      // without losing the original.
+      var sasBtn = document.getElementById('dm-save-template-as-btn');
+      if (sasBtn) sasBtn.style.display = '';
+      // Surface the original name in the design-title field so the seller
+      // sees what they're editing.
+      if (ctx.productName) {
+        var ttl = document.getElementById('design-title');
+        if (ttl) ttl.value = ctx.productName;
+      }
     }
   } catch(e){}
 }
@@ -2809,8 +2956,47 @@ function setPosition(btn, pos){
   document.querySelectorAll('.pos-pill').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   _currentSide = _DM_SIDE_MAP[pos] || 'front';
+  // Swap the canvas mockup to the per-side image the operator set in Edit Product.
+  // If the side has no mockup we DO NOT fall back to the front — instead we show
+  // a "not set" placeholder so it's obvious the operator never uploaded one.
+  if (_currentProduct) {
+    const sm = _currentProduct.sideMockups || {};
+    let nextSrc = sm[_currentSide] || '';
+    if (!nextSrc && _currentSide === 'front') {
+      nextSrc = _currentProduct.mockup || _currentProduct.img || '';
+    }
+    const img = document.getElementById('product-img');
+    if (nextSrc) {
+      currentProductImg = nextSrc;
+      if (img) { img.src = nextSrc; img.style.visibility = ''; }
+    } else if (img) {
+      // Side has no mockup — hide the image and surface a placeholder so the
+      // seller knows nothing was uploaded for this side.
+      img.style.visibility = 'hidden';
+    }
+    dmRenderSideMissingNotice(!nextSrc, btn ? (btn.textContent || _currentSide) : _currentSide);
+  }
   repositionOverlay();
   if (_currentProduct) dmUpdatePrintSpecs(_currentProduct);
+}
+
+// Mounts/removes a small "no mockup for this side" notice inside the canvas
+// so the seller isn't left wondering why the canvas looks blank.
+function dmRenderSideMissingNotice(show, sideLabel) {
+  const wrap = document.getElementById('mockup-wrap');
+  if (!wrap) return;
+  let notice = document.getElementById('dm-side-missing');
+  if (!show) { if (notice) notice.remove(); return; }
+  if (!notice) {
+    notice = document.createElement('div');
+    notice.id = 'dm-side-missing';
+    notice.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#9ca3af;font-size:13.5px;font-weight:600;background:rgba(255,255,255,.92);border:1.5px dashed #c9c3ba;border-radius:10px;pointer-events:none;z-index:4;text-align:center;padding:18px';
+    notice.innerHTML = '<div style="font-size:13.5px;color:#374151">No mockup for this side</div><div style="font-size:11.5px;font-weight:500;color:#9ca3af">Ask the operator to upload one for ' + (sideLabel || 'this side') + '</div>';
+    wrap.appendChild(notice);
+  } else {
+    const sub = notice.querySelector('div:last-child');
+    if (sub) sub.textContent = 'Ask the operator to upload one for ' + (sideLabel || 'this side');
+  }
 }
 
 /* ════════════ STEP 2 — LISTING / PUBLISH PAGE ════════════ */
@@ -3298,7 +3484,8 @@ function dmPersistTemplate(preComposite){
       from: (p && (p.from || p.price)) ? (p.from || p.price) : 0,
       color: (p && p.color) || '—',
       size: (p && p.size) || '—',
-      tech: (p && p.tech) || 'DTG printing',
+      tech: (_dmMethod ? (_dmMethod === 'DTG' ? 'DTG printing' : _dmMethod)
+                       : ((p && p.tech) || 'DTG printing')),
       productId: (p && p.id) || null,
       productImg: (typeof currentProductImg !== 'undefined') ? currentProductImg : '',
       savedAt: new Date().toISOString().slice(0, 10)

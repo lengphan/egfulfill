@@ -213,8 +213,23 @@
       var orders = _load();
       var o = orders.find(function(x){ return x.id === orderId; });
       if (!o) return null;
+      var _prevStatus = o.factoryStatus;
       Object.keys(patch || {}).forEach(function(k){ o[k] = patch[k]; });
       _save(orders);
+      // Notification wiring: surface seller-facing status changes. Only fire on
+      // an actual transition (not a no-op re-save) so we don't spam. Dedupe in
+      // emitOrderNotif keeps a repeated shipped/flag from doubling up.
+      if (patch && patch.factoryStatus && patch.factoryStatus !== _prevStatus) {
+        try {
+          if (patch.factoryStatus === 'shipped') {
+            this.emitOrderNotif('order_shipped', o, 'Order #' + orderId + ' shipped',
+              (o.carrier ? o.carrier + (o.tracking ? ' · ' + o.tracking : '') : 'Tracking assigned'));
+          } else if (patch.factoryStatus === 'flagged') {
+            this.emitOrderNotif('production_issue', o, 'Production issue · order #' + orderId,
+              (o.flagNote || 'Flagged for review — reprint, delay or defect'));
+          }
+        } catch (e) {}
+      }
       if (patch && patch.factoryStatus) {
         // Mirror factory status → seller code (new / review / prod / shipped / action / hold).
         var SELLER_CODE = {
@@ -316,6 +331,15 @@
       };
       orders.unshift(order);
       _save(orders);
+      // Notification wiring: a freshly-submitted (non-draft) order raises a
+      // "New order received" notification for the seller. Drafts stay silent.
+      if (newStatus !== 'draft') {
+        try {
+          var _cust = (order.customer && order.customer.name) || order.customer || 'a customer';
+          this.emitOrderNotif('new_order', order, 'New order #' + id,
+            (typeof _cust === 'string' ? _cust : 'New order') + ' · ' + ((order.items && order.items.length) || 0) + ' item' + (((order.items && order.items.length) || 0) === 1 ? '' : 's'));
+        } catch (e) {}
+      }
       return order;
     },
 
@@ -1541,9 +1565,17 @@
       var items = Array.isArray(order.items) ? order.items : [];
       var item = items.find(function(i){ return i.sku === sku; }) || { sku: sku, qty: 1 };
       var qty = parseInt(item.qty, 10) || 1;
-      var invRow = this.getInventory().find(function(r){ return r.sku === sku; });
+      var inv = this.getInventory();
+      var invRow = inv.find(function(r){ return r.sku === sku; });
+      // Order items carry a print-method suffix (e.g. -EMB) that variant
+      // inventory rows don't — retry against the stripped variant SKU so a
+      // stocked product isn't mistaken for an unstocked one.
+      if (!invRow) { var _b = String(sku||'').replace(/-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i,''); if (_b !== sku) invRow = inv.find(function(r){ return r.sku === _b; }); }
       var stock = invRow ? (parseInt(invRow.inStock, 10) || 0) : 0;
-      if (invRow && stock >= qty) return false; // enough on hand — nothing to order
+      // Only backorder a SKU we can actually see in inventory AND that is short.
+      // No inventory row → we can't prove it's out of stock, so we don't file
+      // a backorder (prevents stocked products from being flagged on receive).
+      if (!invRow || stock >= qty) return false;
       var need = Math.max(qty - stock, 0) || qty;
       var custName = (order.customer && order.customer.name) || order.customer || '';
       return this.addBackorder({
@@ -1629,6 +1661,197 @@
     getUnreadConversationCount: function(role) {
       var threads = this.getAllOrderChatThreads();
       return threads.reduce(function(n, t){ return n + (t.unread > 0 ? 1 : 0); }, 0);
+    },
+
+    // ── Product categories (operator-managed, surfaced everywhere) ──────────
+    // Operator publishes products under a category. Seller catalog filters and
+    // dashboards read the same list. Defaults match the original hard-coded
+    // dropdown.
+    PRODUCT_CATEGORIES_KEY: 'eg_product_categories',
+    _defaultProductCategories: function(){ return ['Apparel','Accessories','Wall Art','Drinkware','Stickers']; },
+    getProductCategories: function(){
+      try {
+        var raw = localStorage.getItem(this.PRODUCT_CATEGORIES_KEY);
+        if (!raw) return this._defaultProductCategories();
+        var arr = JSON.parse(raw);
+        if (!Array.isArray(arr) || !arr.length) return this._defaultProductCategories();
+        return arr;
+      } catch(e){ return this._defaultProductCategories(); }
+    },
+    addProductCategory: function(name){
+      var clean = String(name || '').trim();
+      if (!clean) return false;
+      var cats = this.getProductCategories();
+      var has = cats.some(function(c){ return c.toLowerCase() === clean.toLowerCase(); });
+      if (has) return false;
+      cats.push(clean);
+      try { localStorage.setItem(this.PRODUCT_CATEGORIES_KEY, JSON.stringify(cats)); } catch(e){}
+      try { window.dispatchEvent(new CustomEvent('eg-categories-changed', { detail:{ name: clean } })); } catch(e){}
+      return clean;
+    },
+    removeProductCategory: function(name){
+      var clean = String(name || '').trim().toLowerCase();
+      var cats = this.getProductCategories().filter(function(c){ return c.toLowerCase() !== clean; });
+      try { localStorage.setItem(this.PRODUCT_CATEGORIES_KEY, JSON.stringify(cats)); } catch(e){}
+      try { window.dispatchEvent(new CustomEvent('eg-categories-changed')); } catch(e){}
+    },
+
+    // ── Seller subscription plan ────────────────────────────────────────────
+    // Single source of truth for which tier the seller is on. Sidebar plan
+    // boxes, the billing card in Settings, and the "Upgrade to …" CTAs all
+    // read from this. Changing the plan via setPlan() fires a custom event so
+    // every dashboard updates without a reload.
+    PLAN_KEY: 'eg_seller_plan',
+    PLAN_TIERS: [
+      { id:'starter',    name:'Starter',    shortName:'Starter',    monthlyPrice:0,  orderLimit:500,      orderLimitLabel:'500',       storeLimit:1,         storeLimitLabel:'1 store',         tagline:'500 orders/month · 1 store · Basic analytics',           features:'Basic analytics' },
+      { id:'pro',        name:'Pro',        shortName:'Pro',        monthlyPrice:29, orderLimit:2000,     orderLimitLabel:'2,000',     storeLimit:5,         storeLimitLabel:'5 stores',        tagline:'2,000 orders/month · 5 stores · Full analytics · Priority support', features:'Full analytics · Priority support' },
+      { id:'enterprise', name:'Enterprise', shortName:'Enterprise', monthlyPrice:99, orderLimit:Infinity, orderLimitLabel:'Unlimited', storeLimit:Infinity,  storeLimitLabel:'Unlimited stores', tagline:'Unlimited orders · Unlimited stores · Dedicated manager', features:'Dedicated manager' }
+    ],
+    getPlan: function() {
+      try { return localStorage.getItem(this.PLAN_KEY) || 'starter'; }
+      catch (e) { return 'starter'; }
+    },
+    getPlanMeta: function(planId) {
+      var id = planId || this.getPlan();
+      return this.PLAN_TIERS.find(function(t){ return t.id === id; }) || this.PLAN_TIERS[0];
+    },
+    setPlan: function(planId) {
+      var valid = this.PLAN_TIERS.some(function(t){ return t.id === planId; });
+      if (!valid) return false;
+      try { localStorage.setItem(this.PLAN_KEY, planId); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail: { plan: planId } })); } catch (e) {}
+      return true;
+    },
+    // Next upgrade tier ("starter" → "pro" → "enterprise" → null on top tier).
+    getNextPlan: function(planId) {
+      var id = planId || this.getPlan();
+      var i = this.PLAN_TIERS.findIndex(function(t){ return t.id === id; });
+      if (i < 0 || i >= this.PLAN_TIERS.length - 1) return null;
+      return this.PLAN_TIERS[i + 1];
+    },
+    // Current usage for the active month. Stored separately so a test can
+    // override it via localStorage. Defaults to 847 (matches the demo seed).
+    getPlanUsage: function() {
+      try { return parseInt(localStorage.getItem('eg_seller_orders_used') || '847', 10) || 0; }
+      catch (e) { return 0; }
+    },
+
+    // ── Broadcast notifications (cross-role) ────────────────────────────────
+    // Factory roles (operator / warehouse / admin) post a broadcast; every
+    // role's Notifications surface picks it up. Stored as a single list under
+    // `eg_broadcasts` and synced across tabs via the native `storage` event +
+    // a same-tab `eg-broadcasts-changed` CustomEvent we fire on write.
+    BROADCAST_KEY: 'eg_broadcasts',
+    BROADCAST_LIMIT: 50,    // hard cap to keep localStorage small
+    getBroadcasts: function() {
+      try {
+        var raw = localStorage.getItem(this.BROADCAST_KEY);
+        if (!raw) return [];
+        var arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    },
+    // Notification categories — the single vocabulary shared by the broadcast
+    // composer, the auto order-events below, and the seller's preference toggles.
+    // `bell:false` means a muted category still SHOWS in the panel but doesn't
+    // raise the unread bell count (per product decision).
+    NOTIF_CATEGORIES: {
+      new_order:        { label: 'New order received',     prefKey: 'new_order' },
+      order_shipped:    { label: 'Order shipped',          prefKey: 'order_shipped' },
+      production_issue: { label: 'Production issue',        prefKey: 'production_issue' },
+      billing:          { label: 'Billing alert',          prefKey: 'billing' },
+      product_news:     { label: 'Product updates & news',  prefKey: 'product_news' },
+      general:          { label: 'General announcement',    prefKey: 'product_news' }
+    },
+    addBroadcast: function(payload) {
+      if (!payload || !payload.title) return null;
+      var list = this.getBroadcasts();
+      var cat = payload.category && this.NOTIF_CATEGORIES[payload.category] ? payload.category : 'general';
+      var rec = {
+        id: 'bc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        title: String(payload.title || '').trim(),
+        body:  String(payload.body  || '').trim(),
+        category:   cat,
+        sender:     payload.sender     || 'operator',  // role id
+        senderName: payload.senderName || 'Factory',
+        ts: Date.now()
+      };
+      list.unshift(rec);
+      if (list.length > this.BROADCAST_LIMIT) list.length = this.BROADCAST_LIMIT;
+      try { localStorage.setItem(this.BROADCAST_KEY, JSON.stringify(list)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('eg-broadcasts-changed', { detail: { id: rec.id } })); } catch (e) {}
+      return rec;
+    },
+
+    // ── Seller notification preferences ──
+    // Persisted map of { prefKey: true|false }. Missing key defaults to ON, so
+    // sellers see everything until they explicitly mute a category. The seller
+    // Settings toggles read/write this; the notif panel filters against it.
+    NOTIF_PREFS_KEY: 'eg_notif_prefs',
+    getNotifPrefs: function() {
+      try { var p = JSON.parse(localStorage.getItem(this.NOTIF_PREFS_KEY) || '{}'); return (p && typeof p === 'object') ? p : {}; }
+      catch (e) { return {}; }
+    },
+    isNotifPrefOn: function(prefKey) {
+      if (!prefKey) return true;
+      var p = this.getNotifPrefs();
+      return p[prefKey] !== false; // default ON
+    },
+    setNotifPref: function(prefKey, on) {
+      if (!prefKey) return false;
+      var p = this.getNotifPrefs();
+      p[prefKey] = !!on;
+      try { localStorage.setItem(this.NOTIF_PREFS_KEY, JSON.stringify(p)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('eg-notif-prefs-changed')); } catch (e) {}
+      return true;
+    },
+    // True when a broadcast's category should raise the unread bell for this
+    // seller. Muted categories return false (still listed, just not counted).
+    notifShouldAlert: function(bc) {
+      if (!bc) return true;
+      var cat = this.NOTIF_CATEGORIES[bc.category];
+      if (!cat) return true;
+      return this.isNotifPrefOn(cat.prefKey);
+    },
+
+    // Emit a categorized seller notification. Used by the auto order-event hooks
+    // (new order / shipped / production issue) so they flow through the SAME
+    // broadcast store + seller panel as manual announcements. De-duped per
+    // order+category so a re-save of the same order doesn't double-notify.
+    emitOrderNotif: function(category, order, title, body) {
+      try {
+        if (!category || !this.NOTIF_CATEGORIES[category] || !order) return null;
+        var oid = order.id || order.num || '';
+        var dedupe = 'auto:' + category + ':' + oid;
+        var list = this.getBroadcasts();
+        // Skip if we already filed this exact order+category notification.
+        if (list.some(function(b){ return b && b._auto === dedupe; })) return null;
+        var rec = {
+          id: 'bc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          title: String(title || '').trim(),
+          body:  String(body  || '').trim(),
+          category: category,
+          sender: 'system', senderName: 'EGFULFILL',
+          orderId: oid,
+          _auto: dedupe,
+          ts: Date.now()
+        };
+        list.unshift(rec);
+        if (list.length > this.BROADCAST_LIMIT) list.length = this.BROADCAST_LIMIT;
+        try { localStorage.setItem(this.BROADCAST_KEY, JSON.stringify(list)); } catch (e) {}
+        try { window.dispatchEvent(new CustomEvent('eg-broadcasts-changed', { detail: { id: rec.id } })); } catch (e) {}
+        return rec;
+      } catch (e) { return null; }
+    },
+    // Helper for the Notifications surfaces: returns a relative time label
+    // ("3m ago", "2h ago") given a numeric timestamp.
+    formatBroadcastAge: function(ts) {
+      var d = (Date.now() - (ts || 0)) / 1000;
+      if (d < 60)       return Math.max(1, Math.floor(d)) + 's ago';
+      if (d < 3600)     return Math.floor(d / 60)   + 'm ago';
+      if (d < 86400)    return Math.floor(d / 3600) + 'h ago';
+      if (d < 604800)   return Math.floor(d / 86400)+ 'd ago';
+      return new Date(ts).toLocaleDateString('en-US', { month:'short', day:'numeric' });
     },
 
     RAW_DESIGN_KEY: 'eg_design_raw',
@@ -1980,6 +2203,151 @@
         localStorage.setItem(this.EMB_PAID_KEY, JSON.stringify(m));
       } catch(e){}
     },
+    // ── Per-item factory working status ───────────────────────────────────
+    // Tracks which specific items the warehouse is actively working on. The
+    // warehouse sets the value; operator + admin read it to surface where
+    // production is. Key shape: { "orderId|sku": "working" | "done" | "" }.
+    // Fires eg-item-status-changed so other tabs/dashboards re-render.
+    ITEM_FACTORY_STATUS_KEY: 'eg_item_factory_status',
+    getItemFactoryStatus: function(orderId, sku) {
+      try {
+        var m = JSON.parse(localStorage.getItem(this.ITEM_FACTORY_STATUS_KEY) || '{}');
+        return m[orderId + '|' + sku] || '';
+      } catch(e) { return ''; }
+    },
+    setItemFactoryStatus: function(orderId, sku, status) {
+      try {
+        var m = JSON.parse(localStorage.getItem(this.ITEM_FACTORY_STATUS_KEY) || '{}');
+        var key = orderId + '|' + sku;
+        if (!status) delete m[key]; else m[key] = String(status);
+        localStorage.setItem(this.ITEM_FACTORY_STATUS_KEY, JSON.stringify(m));
+        try { window.dispatchEvent(new CustomEvent('eg-item-status-changed', { detail: { orderId: orderId, sku: sku, status: status || '' } })); } catch(e){}
+        return true;
+      } catch(e) { return false; }
+    },
+
+    // ── Plan tier overrides (admin-editable) ──────────────────────────────
+    // PLAN_TIERS above remains the immutable factory default. Admin saves a
+    // replacement list under this key; on next page load the EGStore IIFE at
+    // the bottom of this file mutates PLAN_TIERS IN PLACE so every existing
+    // caller (getPlanMeta / getNextPlan / sidebar widgets) sees the new
+    // numbers without any code change at their site.
+    PLAN_TIERS_OVERRIDE_KEY: 'eg_plan_tiers_override',
+    setPlanTiers: function(arr) {
+      if (!Array.isArray(arr) || !arr.length) return false;
+      try { localStorage.setItem(this.PLAN_TIERS_OVERRIDE_KEY, JSON.stringify(arr)); } catch(e) { return false; }
+      // Replace contents in-place — preserves the array reference so any
+      // module that closed over PLAN_TIERS keeps seeing the latest list.
+      this.PLAN_TIERS.length = 0;
+      arr.forEach(function(t){ this.PLAN_TIERS.push(t); }, this);
+      try { window.dispatchEvent(new CustomEvent('eg-plan-tiers-changed')); } catch(e){}
+      // Also fire eg-plan-changed so plan-name labels re-render against the
+      // (potentially renamed) current tier on every dashboard.
+      try { window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail: { plan: this.getPlan() } })); } catch(e){}
+      return true;
+    },
+    resetPlanTiers: function() {
+      try { localStorage.removeItem(this.PLAN_TIERS_OVERRIDE_KEY); } catch(e){}
+      // Caller must reload to restore the original PLAN_TIERS — we don't keep
+      // a deep copy of the defaults to avoid double the memory at load time.
+    },
+
+    // ── Wallet auto-topup config (admin) ──────────────────────────────────
+    // Persists the rule { enabled, threshold, amount } so admin can declare
+    // "when balance drops below $X, top up $Y from the default payment
+    // method". The UI just persists — actual auto-charge needs the wallet
+    // top-up flow on settings.html to read this on each balance change.
+    WALLET_AUTOTOPUP_KEY: 'eg_wallet_autotopup',
+    getWalletAutoTopup: function() {
+      try {
+        var raw = localStorage.getItem(this.WALLET_AUTOTOPUP_KEY);
+        if (!raw) return { enabled: false, threshold: 0, amount: 0 };
+        var o = JSON.parse(raw) || {};
+        return { enabled: !!o.enabled, threshold: parseFloat(o.threshold) || 0, amount: parseFloat(o.amount) || 0 };
+      } catch(e) { return { enabled: false, threshold: 0, amount: 0 }; }
+    },
+    setWalletAutoTopup: function(cfg) {
+      try {
+        var o = { enabled: !!(cfg && cfg.enabled), threshold: parseFloat(cfg && cfg.threshold) || 0, amount: parseFloat(cfg && cfg.amount) || 0 };
+        localStorage.setItem(this.WALLET_AUTOTOPUP_KEY, JSON.stringify(o));
+        try { window.dispatchEvent(new CustomEvent('eg-autotopup-changed', { detail: o })); } catch(e){}
+        return true;
+      } catch(e) { return false; }
+    },
+
+    // ── Admin platform settings ───────────────────────────────────────────
+    // Lightweight kv-style getters/setters for global admin-controlled values
+    // (default shipping fees, production capacity, storage utilities). Each
+    // pair just persists a primitive to localStorage; consumers read these on
+    // demand rather than holding stale in-memory copies, so a Save in Settings
+    // is reflected the next time the value is read.
+    DEFAULT_SHIPPING_FEE_KEY: 'eg_default_shipping_fee',
+    getDefaultShippingFee: function() {
+      try { var v = parseFloat(localStorage.getItem(this.DEFAULT_SHIPPING_FEE_KEY) || ''); return (isNaN(v) || v < 0) ? null : v; }
+      catch(e) { return null; }
+    },
+    setDefaultShippingFee: function(v) {
+      try { localStorage.setItem(this.DEFAULT_SHIPPING_FEE_KEY, String(parseFloat(v) || 0)); return true; } catch(e) { return false; }
+    },
+    DEFAULT_ADDL_ITEM_FEE_KEY: 'eg_default_addl_item_fee',
+    getDefaultAdditionalItemFee: function() {
+      try { var v = parseFloat(localStorage.getItem(this.DEFAULT_ADDL_ITEM_FEE_KEY) || ''); return (isNaN(v) || v < 0) ? null : v; }
+      catch(e) { return null; }
+    },
+    setDefaultAdditionalItemFee: function(v) {
+      try { localStorage.setItem(this.DEFAULT_ADDL_ITEM_FEE_KEY, String(parseFloat(v) || 0)); return true; } catch(e) { return false; }
+    },
+    PRODUCTION_CAPACITY_KEY: 'eg_production_capacity',
+    getProductionCapacity: function() {
+      try { var v = parseInt(localStorage.getItem(this.PRODUCTION_CAPACITY_KEY) || '', 10); return (isNaN(v) || v <= 0) ? null : v; }
+      catch(e) { return null; }
+    },
+    setProductionCapacity: function(v) {
+      try { localStorage.setItem(this.PRODUCTION_CAPACITY_KEY, String(parseInt(v, 10) || 0)); return true; } catch(e) { return false; }
+    },
+    // Storage usage gauge — rough localStorage footprint, broken out by the
+    // top eg_* keys so admin can spot which key is hogging space before
+    // cranking the clear-caches button.
+    getStorageUsage: function() {
+      var total = 0, byKey = {};
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i); if (!k) continue;
+          var v = localStorage.getItem(k) || '';
+          var sz = k.length + v.length; // approx UTF-16 chars
+          total += sz;
+          if (k.indexOf('eg_') === 0 || k.indexOf('egfulfill_') === 0) byKey[k] = sz;
+        }
+      } catch(e) {}
+      // Browsers typically allow ~5MB per origin. Express the percent against
+      // that ceiling so the gauge surfaces "70% used" before quota errors hit.
+      var ceiling = 5 * 1024 * 1024; // 5MB chars
+      return { totalBytes: total * 2, ceilingBytes: ceiling * 2, percent: Math.min(100, total * 2 / (ceiling * 2) * 100), byKey: byKey };
+    },
+    // Clears non-essential heavy blob caches — keeps metadata + user-set
+    // preferences intact. Use this when storage is full and the admin needs to
+    // free room without wiping demo orders / sellers / plan settings.
+    CLEARABLE_CACHE_KEYS: ['eg_catalog_products_blob','eg_emb_files','eg_image_cache','eg_design_raw','eg_design_templates','eg_templates_blob'],
+    clearCaches: function() {
+      var cleared = 0;
+      this.CLEARABLE_CACHE_KEYS.forEach(function(k){ try { localStorage.removeItem(k); cleared++; } catch(e){} });
+      return cleared;
+    },
+    // Nuke every eg_*/egfulfill_* key. Demo reset — used by Settings → System
+    // when the admin wants to start fresh. Does NOT touch theme/auth keys
+    // that other origins might own.
+    resetDemoData: function() {
+      var keys = [];
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && (k.indexOf('eg_') === 0 || k.indexOf('egfulfill_') === 0)) keys.push(k);
+        }
+      } catch(e) {}
+      keys.forEach(function(k){ try { localStorage.removeItem(k); } catch(e){} });
+      return keys.length;
+    },
+
     // ── Image downscale + method label utils ──────────────────────────────
     // Mockup/color uploads can easily be 5–10MB+ as raw data URLs; combined
     // they blow the ~5MB localStorage ceiling and the catalog blob save fails
@@ -2272,5 +2640,19 @@
   // Run EGStore.showSeed() to bring the demo sample orders back.
   try {
     if (localStorage.getItem('eg_hide_seed') === null) localStorage.setItem('eg_hide_seed', '1');
+  } catch(e) {}
+
+  // Hydrate PLAN_TIERS from the admin override at boot — mutates the array
+  // in place so existing this.PLAN_TIERS references on every dashboard pick
+  // up the new tier definitions without any code change at the call site.
+  try {
+    var _ptRaw = localStorage.getItem(window.EGStore && window.EGStore.PLAN_TIERS_OVERRIDE_KEY || 'eg_plan_tiers_override');
+    if (_ptRaw && window.EGStore && Array.isArray(window.EGStore.PLAN_TIERS)) {
+      var _pt = JSON.parse(_ptRaw);
+      if (Array.isArray(_pt) && _pt.length) {
+        window.EGStore.PLAN_TIERS.length = 0;
+        _pt.forEach(function(t){ window.EGStore.PLAN_TIERS.push(t); });
+      }
+    }
   } catch(e) {}
 })();

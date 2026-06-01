@@ -76,7 +76,7 @@ input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:fo
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
-      <a href="login.html" class="nav-link">Log in</a>
+      <a href="seller-login.html" class="nav-link">Log in</a>
       <button style="background:#111827;color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Start for free</button>
     </div>
   </div>
@@ -213,10 +213,10 @@ input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:fo
         </div>
 
         <!-- Public CTAs -->
-        <button onclick="window.location='login.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        <button onclick="window.location='seller-login.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
           Log in to start designing →
         </button>
-        <button onclick="window.location='signup.html'" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+        <button onclick="window.location='seller-signup.html'" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
           Create free account
         </button>
 
@@ -280,10 +280,10 @@ input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:fo
     <h2 style="font-size:1.8rem;font-weight:700;color:#fff;letter-spacing:-0.04em;margin:0 0 10px;line-height:1.2">Ready to sell this product?</h2>
     <p style="color:rgba(255,255,255,.5);font-size:13.5px;margin:0 0 24px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.6">Create a free account, upload your design, and start selling in minutes. We handle printing, packing, and shipping.</p>
     <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
-      <button onclick="window.location='signup.html'" style="background:#fff;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+      <button onclick="window.location='seller-signup.html'" style="background:#fff;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
         Create free account →
       </button>
-      <button onclick="window.location='login.html'" style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
+      <button onclick="window.location='seller-login.html'" style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
         Log in
       </button>
     </div>
@@ -355,21 +355,74 @@ var _params = new URLSearchParams(location.search);
 var _pid = parseInt(_params.get('id')) || 0;
 var _pname = _params.get('name') ? decodeURIComponent(_params.get('name')) : '';
 
-// Try exact id, then name match, then fallback
-var _prod = PRODUCT_DATA[_pid];
-if(!_prod && _pname) {
-  var lower = _pname.toLowerCase();
-  var ids = Object.keys(PRODUCT_DATA);
-  for(var i=0;i<ids.length;i++){
-    if(PRODUCT_DATA[ids[i]].name.toLowerCase()===lower){ _prod=PRODUCT_DATA[ids[i]]; break; }
+// Map common colour names → hex so operator-authored variant colours render as
+// real swatches even when stored as a name string.
+var PD_NAME2HEX = {
+  black:'#1c1917','jet black':'#1c1917','dark charcoal':'#292524',charcoal:'#3f3f46',
+  navy:'#1e3a5f','navy blue':'#1e3a5f',royal:'#1d4ed8','royal blue':'#1d4ed8',
+  white:'#f3f3f1','natural':'#efe9dd',cream:'#f5f0eb','sand':'#d8c4a0',
+  red:'#b91c1c','deep red':'#7c2d12',maroon:'#831843',brick:'#c84b31','brick red':'#c84b31',
+  'forest green':'#166534',green:'#16a34a',olive:'#4d5320',mint:'#bbf7d0',
+  gray:'#9ca3af',grey:'#9ca3af','ash gray':'#c8c7c2','ash grey':'#c8c7c2','heather gray':'#b8b4ad','heather grey':'#b8b4ad',
+  purple:'#7c3aed',lavender:'#e9d5ff',pink:'#fecdd3',berry:'#831843',
+  brown:'#78350f',tan:'#d2b48c',butter:'#fde68a',yellow:'#facc15',gold:'#d4a017',
+  'light blue':'#bfdbfe',sky:'#67e8f9',teal:'#0d9488',peach:'#fed7aa',orange:'#ea580c',orchid:'#f0abfc'
+};
+function pdHex(name){ return PD_NAME2HEX[String(name||'').trim().toLowerCase()] || '#c8c7c2'; }
+
+// Prefer the operator-published catalog (EGStore) so a real created product —
+// its images, variant colours and sizes — shows here. Fall back to the legacy
+// PRODUCT_DATA demo set, then DEFAULT_PRODUCT.
+var _prod = (function(){
+  if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
+    var list = EGStore.getCatalogProducts() || [];
+    var stored = list.find(function(p){ return String(p.id) === String(_pid); });
+    if (!stored && _pname) {
+      var ln = _pname.toLowerCase();
+      stored = list.find(function(p){ return String(p.name||'').toLowerCase() === ln; });
+    }
+    if (stored) {
+      var sizes = (stored.variants && /\b(?:XS|S|M|L|XL|2XL|3XL|4XL|One Size|11oz|15oz)\b/i.test(stored.variants))
+        ? (stored.variants.match(/\b(?:XS|S|M|L|XL|2XL|3XL|4XL|One Size|11oz|15oz)\b/gi) || ['S','M','L','XL'])
+        : ['S','M','L','XL'];
+      var _vc = [], _seenc = {};
+      (stored.variantSkus || []).forEach(function(v){ var c = v && v.color; if (c && !_seenc[c.toLowerCase()]) { _seenc[c.toLowerCase()] = 1; _vc.push(c); } });
+      var _names = _vc.length ? _vc : ['Black','Dark Charcoal','Navy','Ash Gray','White'];
+      return {
+        name: stored.name,
+        sub: 'Print on demand · ' + (stored.method || 'multiple techniques'),
+        from: typeof stored.price === 'number' ? stored.price : 10.95,
+        colors: _names.map(pdHex),
+        colorNames: _names,
+        colorImages: stored.colorImages || {},
+        sizes: sizes,
+        specs: [
+          {k:'Print method', v: stored.method || 'DTG'},
+          {k:'Category', v: stored.type || 'Apparel'},
+          {k:'Stock', v: stored.variants || '—'},
+          {k:'SKU', v: stored.sku || '—'}
+        ],
+        rating: 24,
+        img: stored.img,
+        extraImages: stored.images || [],
+        _storeRecord: stored
+      };
+    }
   }
-}
-if(!_prod) _prod = JSON.parse(JSON.stringify(DEFAULT_PRODUCT));
-if(_pname) _prod.name = _pname;
+  // Legacy demo fallback
+  var p = PRODUCT_DATA[_pid];
+  if(!p && _pname){ var lower=_pname.toLowerCase(); var ids=Object.keys(PRODUCT_DATA);
+    for(var i=0;i<ids.length;i++){ if(PRODUCT_DATA[ids[i]].name.toLowerCase()===lower){ p=PRODUCT_DATA[ids[i]]; break; } } }
+  if(!p) p = JSON.parse(JSON.stringify(DEFAULT_PRODUCT));
+  if(_pname) p.name = _pname;
+  return p;
+})();
+if(_pname && !_prod._storeRecord) _prod.name = _pname;
 
 var _heroIdx = 0;
 var _selColor = 0;
 var _tech = 'dtg';
+var _images = [];
 
 var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
 
@@ -383,6 +436,13 @@ function init() {
   document.getElementById('pd-price').textContent = '$' + (fromParam > 0 ? fromParam.toFixed(2) : _prod.from.toFixed(2));
 
   document.getElementById('pd-reviews').textContent = _prod.rating + ' Reviews';
+
+  // Build the image list — primary first, then any operator-uploaded extras.
+  _images = [];
+  if (_prod.img) _images.push(_prod.img);
+  if (Array.isArray(_prod.extraImages)) _prod.extraImages.forEach(function(im){ if (im && _images.indexOf(im) < 0) _images.push(im); });
+  pdRenderThumbs();
+  setHero(0);
 
   // Colors
   var cEl = document.getElementById('pd-colors');
@@ -405,14 +465,44 @@ function init() {
   }).join('');
 }
 
+// Render the thumbnail strip — real image slots first, placeholder tiles after.
+function pdRenderThumbs() {
+  var strip = document.querySelector('.pd-thumbs');
+  if (!strip) return;
+  var html = '';
+  for (var i = 0; i < 6; i++) {
+    var src = _images[i];
+    if (src) {
+      html += '<div class="thumb' + (i === 0 ? ' on' : '') + '" id="thumb-' + i + '" onclick="setHero(' + i + ')" style="cursor:pointer">'
+        + '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'"/>'
+      + '</div>';
+    } else {
+      html += '<div class="thumb" id="thumb-' + i + '" style="cursor:default;opacity:.5">'
+        + '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>'
+      + '</div>';
+    }
+  }
+  strip.innerHTML = html;
+}
+
 function selectColor(idx) {
   _selColor = idx;
   document.querySelectorAll('.clr-swatch').forEach(function(el,i){
     el.classList.toggle('on', i===idx);
     el.style.borderColor = i===idx ? '#191918' : '#e5e4e0';
   });
-  document.getElementById('pd-color-name').textContent = _prod.colorNames[idx];
-  document.getElementById('hero-inner').style.background = HERO_BKGS[idx % HERO_BKGS.length];
+  var name = _prod.colorNames[idx];
+  document.getElementById('pd-color-name').textContent = name;
+  // If the operator assigned a photo to this colour, show it in the hero.
+  var ci = _prod.colorImages && _prod.colorImages[name];
+  var heroEl = document.getElementById('hero-inner');
+  if (ci) {
+    heroEl.style.background = '#f6f5f4';
+    heroEl.innerHTML = '<img src="' + ci + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'\'"/>';
+    document.querySelectorAll('.thumb').forEach(function(t){ t.classList.remove('on'); });
+  } else if (heroEl) {
+    heroEl.style.background = HERO_BKGS[idx % HERO_BKGS.length];
+  }
 }
 
 function selectSize(btn) {
@@ -429,11 +519,26 @@ function setTech(t) {
 function setHero(idx) {
   _heroIdx = idx;
   document.querySelectorAll('.thumb').forEach(function(t,i){ t.classList.toggle('on', i===idx); });
-  document.getElementById('hero-inner').style.background = HERO_BKGS[idx];
+  var heroEl = document.getElementById('hero-inner');
+  if (!heroEl) return;
+  var src = _images[idx];
+  if (src) {
+    heroEl.style.background = '#f6f5f4';
+    heroEl.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'<div style=&quot;color:#9ca3af;font-size:13px&quot;>Image failed to load</div>\'"/>';
+  } else {
+    heroEl.style.background = HERO_BKGS[idx % HERO_BKGS.length];
+    heroEl.innerHTML = '<svg width="120" height="120" viewBox="0 0 120 120" fill="none">'
+      + '<rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>'
+      + '<circle cx="40" cy="52" r="12" fill="#d1d0cb"/>'
+      + '<path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>'
+      + '<text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">View ' + (idx + 1) + '</text>'
+    + '</svg>';
+  }
 }
 
 function heroNav(dir) {
-  var next = (_heroIdx + dir + 6) % 6;
+  var len = Math.max(1, _images.length || 6);
+  var next = (_heroIdx + dir + len) % len;
   setHero(next);
 }
 

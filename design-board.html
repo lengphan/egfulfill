@@ -345,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <button class="ibtn" style="position:relative" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">3</span></button>
     <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
     <button class="bal-chip" type="button" onclick="(typeof showSec==='function'&amp;&amp;showSec('wallet'))" title="Wallet" style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:inherit">
-      <span id="balance-val" style="font-variant-numeric:tabular-nums">$340.00</span>
+      <span id="balance-val" style="font-variant-numeric:tabular-nums">$0.00</span>
     </button>
     <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
     <div class="ibtn" style="cursor:pointer"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">D</div><div><div style="font-size:14px;font-weight:600;color:#191918;line-height:1.2">Designer</div><div style="font-size:12px;color:#9ca3af;line-height:1.2">designer@egops.com</div></div></div>
@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', function(){
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
     <div class="stat-card" style="border-left:3px solid #2eeeca">
       <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Available</div>
-      <div style="font-size:31px;font-weight:800;color:#191918">$340.00</div>
+      <div id="dsn-wallet-avail" style="font-size:31px;font-weight:800;color:#191918">$0.00</div>
       <div style="font-size:13px;color:#6b7280;margin-top:4px">Ready to withdraw</div>
     </div>
     <div class="stat-card" style="border-left:3px solid #191918">
@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <span style="font-size:12.5px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:2px 10px;border-radius:999px">PayPal connected</span>
     </div>
     <div style="display:flex;gap:10px;align-items:center">
-      <input class="input" type="number" value="340" placeholder="Amount" style="max-width:180px">
+      <input id="dsn-payout-amt" class="input" type="number" value="" placeholder="Amount" style="max-width:180px">
       <div style="font-size:13.5px;color:#9ca3af">→ phanmylinh04@gmail.com</div>
       <button onclick="dbRequestPayout()" class="btn" style="background:#15803d;color:#fff;margin-left:auto">Request Payout →</button>
     </div>
@@ -637,13 +637,17 @@ let _dbNextId = 100;
 let _dbBalance = (typeof EGStore !== 'undefined' && EGStore.getDesignerBalance) ? EGStore.getDesignerBalance() : 0;
 function _dbRefreshBalance() {
   _dbBalance = (typeof EGStore !== 'undefined' && EGStore.getDesignerBalance) ? EGStore.getDesignerBalance() : _dbBalance;
-  var el = document.getElementById('designer-balance');
-  if (el) el.textContent = '$' + _dbBalance.toFixed(2);
+  var txt = '$' + _dbBalance.toFixed(2);
+  ['designer-balance','balance-val','dsn-wallet-avail'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.textContent = txt;
+  });
 }
 window.addEventListener('storage', function(e){
   if (!e || e.key === null || e.key === 'eg_designer_balance' || e.key === 'eg_designer_ledger') _dbRefreshBalance();
 });
 window.addEventListener('eg-designer-balance-changed', _dbRefreshBalance);
+if (document.readyState !== 'loading') _dbRefreshBalance();
+else document.addEventListener('DOMContentLoaded', _dbRefreshBalance);
 
 const DB_COLUMNS = [
   { id:'incoming',   name:'Incoming',    color:'#4e65ce', icon:'📥' },

@@ -9,6 +9,8 @@
 <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="egfulfill-store.js"></script>
+<script defer src="eg-seller-plan.js"></script>
+<script src="eg-sidebar-badges.js"></script>
 <script src="egfulfill-tracking.js"></script>
 <style>
 body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
@@ -48,13 +50,15 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 /* Table background matches the operator board: rows sit on a near-white
    surface (#fafaf9), distinct from the page bg (#f7f5f0) so the table reads
    as its own panel. Hover is the only state that picks up a subtle tint. */
-.dtable td{padding:10px 12px;border-bottom:1px solid #f0ede9;color:#374151;vertical-align:middle!important;white-space:nowrap;line-height:1.4;background:#fafaf9}
+.dtable td{padding:10px 12px;border-bottom:1px solid #f0ede9;color:#374151;vertical-align:middle!important;white-space:nowrap;line-height:1.4;background:#fff}
 .dtable tr.main-row td{height:54px;box-sizing:border-box}
-.dtable tr.main-row:hover td{background:#f9f8f6}
-.dtable tr.exp-row td{background:#f4f2ef}
+.dtable tr.main-row:hover td{background:#fafaf9}
+/* Expanded item rows sit on the same surface as the main row — no grey
+   fill, just a thin separator between items. */
+.dtable tr.exp-row td{background:#fff;border-top:1px solid #f0ede9}
 /* Sticky Actions td sets its own background inline — override on hover so the
    row's hover tint spans the full width instead of getting cut off at the edge. */
-.dtable tr.main-row:hover td[data-col="actions"]{background:#f9f8f6!important}
+.dtable tr.main-row:hover td[data-col="actions"]{background:#fafaf9!important}
 .dtable tr.main-row.action-row:hover td[data-col="actions"]{background:#fff7f7!important}
 .row-chev{opacity:0;transition:transform .2s,opacity .15s}
 .dtable tr.main-row:hover .row-chev{opacity:1}
@@ -382,13 +386,13 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   <div style="height:54px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.14);flex-shrink:0"><a href="index.html" style="text-decoration:none"><span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;letter-spacing:0;color:#191918">egfulfill</span></a></div>
   <nav style="flex:1;padding:8px 0">
     <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
-    <a class="ni on" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni on" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span data-badge="orders" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
     <a class="ni" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
     <a class="ni" href="product-templates.html" style="margin-left:24px;display:none">Product Templates</a>
     <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
     <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
     <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
-    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <a class="ni" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span data-badge="chat" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
     <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
     <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
   </nav>
@@ -953,7 +957,7 @@ function renderOrders(ordersOverride) {
         : (o.carrier || o.del || '—')
       }</td>
       <td data-col="tracking" style="overflow:visible">${tr}</td>
-      <td data-col="actions" style="width:110px;overflow:visible;white-space:nowrap;position:sticky;right:0;background:${isAction?'#fff7f7':'#fafaf9'};z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:10px 10px">
+      <td data-col="actions" style="width:110px;overflow:visible;white-space:nowrap;position:sticky;right:0;background:${isAction?'#fff7f7':'#fff'};z-index:1;box-shadow:-4px 0 8px rgba(0,0,0,.04);padding:10px 10px">
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
           ${isAction ? `<span title="Action Needed — contact admin / operator / warehouse to resolve" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;cursor:help;flex-shrink:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg></span>` : ''}
           ${(o.status === 'new' || o.status === 'action') ? `<button id="push-btn-${o.no}" title="Push to Production" onclick="event.stopPropagation();pushOrderToProduction(${o.no},this)" style="height:32px;padding:0 11px;gap:6px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Push</button>` : ''}
@@ -1061,7 +1065,7 @@ function renderOrders(ordersOverride) {
       const pillHaloShadow = needsPick ? ';box-shadow:0 0 0 3px rgba(201,195,186,.18)' : '';
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
-        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 286px 112px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:#ededec;border-radius:8px;margin-bottom:${isLastItem?'0':'6px'}${needsSetup?'':';opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 286px 112px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
@@ -1084,8 +1088,8 @@ function renderOrders(ordersOverride) {
     }).join('');
 
     rows.push(`<tr class="exp-row" id="exp-${o.no}" style="display:${isExp?'table-row':'none'}">
-      <td colspan="11" style="padding:0">
-        <div style="background:#fafaf9;padding:8px 20px 12px 60px">
+      <td colspan="11" style="padding:0;background:#fff">
+        <div style="background:#fff;padding:8px 20px 12px 60px">
           ${expItemsHtml}
           ${needsSetup ? `<button onclick="event.stopPropagation();orderAddInlineItem(${o.no})" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#191918;background:transparent;border:1px dashed #c4c3be;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#191918';this.style.background='#fff'" onmouseout="this.style.borderColor='#c4c3be';this.style.background='transparent'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button>` : ''}
         </div>
@@ -1175,8 +1179,9 @@ function _egRenderTabs(){
         + '<button id="eg-add-tab-btn" onclick="event.stopPropagation();egToggleAddMenu()" title="Add status tab" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;border-radius:50%;color:#6b7280;cursor:pointer;font-family:inherit;padding:0;transition:color .12s,background .12s" onmouseover="this.style.color=\'#191918\';this.style.background=\'#f3eee2\'" onmouseout="this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
           + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
         + '</button>'
-        + '<div id="eg-add-tab-menu" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:3px 3px 0 #40403d;padding:6px;min-width:180px;z-index:200">'
-          + missing.map(k => '<button onclick="egAddTab(\''+k+'\')" style="display:block;width:100%;text-align:left;background:none;border:none;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background=\'#f6f5f4\'" onmouseout="this.style.background=\'transparent\'">' + EG_TAB_DEFS[k].label + '</button>').join('')
+        + '<div id="eg-add-tab-menu" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;min-width:180px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">'
+          + '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Filter by Status</div>'
+          + missing.map(k => '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151" onclick="egAddTab(\''+k+'\')"><input type="checkbox" style="accent-color:#111827;pointer-events:none">' + EG_TAB_DEFS[k].label + '</label>').join('')
         + '</div>'
       + '</div>'
     : '';
@@ -2143,7 +2148,7 @@ function openDetailModal(ordNo) {
     const odmPillDivider = `<span style="color:${odmPillLocked?'#c4c3be':'#374151'};font-weight:700;user-select:none;padding:0 8px;font-size:14px;line-height:1;flex:0 0 auto">·</span>`;
     // Select style: zero chrome — no border, no background, no chevron — just
     // the value. Hover underlines the text so the affordance is visible.
-    const odmPillSelStyle = `border:none;background:transparent;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:13.5px;font-weight:500;color:${odmPillTextColor};padding:0;margin:0;cursor:${odmPillLocked?'default':'pointer'};text-align:left;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;width:auto;min-width:0`;
+    const odmPillSelStyle = `border:none;background:transparent;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:13.5px;font-weight:500;color:${odmPillTextColor};padding:0;margin:0;cursor:${odmPillLocked?'default':'pointer'};text-align:center;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;width:auto;min-width:0`;
     const odmPillHover = odmPillLocked ? '' : ` onmouseover="this.style.color='#000';this.style.textDecoration='underline';this.style.textDecorationColor='#c4c3be';this.style.textUnderlineOffset='3px'" onmouseout="this.style.color='${odmPillTextColor}';this.style.textDecoration='none'"`;
     const colorOptsHtml = variantOpts.colors.map(c => `<option value="${c.replace(/"/g,'&quot;')}" ${c===curColor?'selected':''}>${c}</option>`).join('');
     const sizeOptsHtml  = variantOpts.sizes.map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${s===curSize?'selected':''}>${s}</option>`).join('');
@@ -2198,7 +2203,7 @@ function openDetailModal(ordNo) {
       designIcon = '<svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
     }
     // Variant chips — single muted pill with three values inside, separated by dots.
-    const chip = function(text){ return '<span style="display:inline-flex;align-items:center;padding:3px 9px;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#374151;white-space:nowrap">'+text+'</span>'; };
+    const chip = function(text){ return '<span style="display:inline-flex;align-items:center;padding:3px 9px;background:transparent;border:1px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#374151;white-space:nowrap">'+text+'</span>'; };
     return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:11px;position:relative">
       <!-- ROW 1 — image · name + sku · price · × -->
       <div style="display:grid;grid-template-columns:52px 1fr auto auto;gap:12px;align-items:center">
@@ -2213,9 +2218,9 @@ function openDetailModal(ordNo) {
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;${odmPillLocked?'opacity:.85':''}">
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};background:#f4f2ef;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};background:#f4f2ef;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
-          <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};background:#f4f2ef;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">
+          <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
+          <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
+          <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">
             <option value="DTG"${item.tech==='DTG'?' selected':''}>DTG</option>
             <option value="DTF"${item.tech==='DTF'?' selected':''}>DTF</option>
             <option value="EMB"${item.tech==='EMB'?' selected':''}>Embroidery</option>
@@ -2225,9 +2230,9 @@ function openDetailModal(ordNo) {
         </div>
         <div style="display:inline-flex;align-items:center;gap:8px">
           <div style="display:inline-flex;align-items:center;gap:5px">
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:#f6f5f4;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit">−</button>
+            <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">−</button>
             <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:20px;text-align:center">${item.qty || 1}</span>
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:#f6f5f4;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit">+</button>
+            <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">+</button>
           </div>
           ${designActions}
         </div>
@@ -4660,6 +4665,14 @@ window.removeUpThreadRow = removeUpThreadRow;
    Duplicates (same srcHex) are skipped so users can't pile on the same colour. */
 function pickThreadFromImage(ordNo, sku, ev) {
   ev.stopPropagation();
+  // Hide the magnifier lens + crosshair immediately on click. Without this,
+  // the lens stays visible while renderUploadItems() rebuilds the wrap with
+  // the new thread chip, and the lens drifts down to whatever vertical
+  // position the cursor lands at after layout grows.
+  try {
+    const _safe = `${ordNo}_${String(sku).replace(/[^a-z0-9]/gi,'_')}`;
+    if (typeof tpLensHide === 'function') tpLensHide(_safe);
+  } catch(e){}
   const img = ev.currentTarget;
   const rect = img.getBoundingClientRect();
   const cx = ev.clientX - rect.left;
@@ -5026,13 +5039,11 @@ function upThreadStrip(sku, ordNo) {
         <img id="tplens-img-${safe}" src="${dataUrl}"
              onclick="pickThreadFromImage(${ordNo},'${skuEsc}',event)"
              onmouseenter="tpLensShow('${safe}')"
-             title="Hover to magnify · click to add a thread colour"
              style="width:100%;height:200px;object-fit:contain;background:#fff;border:1.5px solid #e5e4e0;border-radius:8px;cursor:crosshair;display:block"/>
-        <button onclick="event.stopPropagation();resetUpItem('${skuEsc}',${ordNo})" title="Remove and upload a different file" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(25,25,24,0.78);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:0;backdrop-filter:blur(4px);transition:background .15s;z-index:3" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='rgba(25,25,24,0.78)'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        <button onclick="event.stopPropagation();resetUpItem('${skuEsc}',${ordNo})" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(25,25,24,0.78);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:0;backdrop-filter:blur(4px);transition:background .15s;z-index:3" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='rgba(25,25,24,0.78)'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg></button>
         <div id="tplens-${safe}" data-src="${dataUrl}" style="position:absolute;width:90px;height:90px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,0.25),0 0 0 1px rgba(0,0,0,0.08);background-repeat:no-repeat;pointer-events:none;display:none;z-index:2"></div>
         <div id="tplens-cross-${safe}" style="position:absolute;width:14px;height:14px;border:1.5px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,0.4);transform:translate(-50%,-50%);pointer-events:none;display:none;z-index:4"></div>
       </div>
-      <div style="font-size:11px;color:#9ca3af;line-height:1.4;text-align:center">${tm.length?'Hover to zoom · click to sample a thread colour':'No colours sampled yet · click anywhere on the design to add one'}</div>
     </div>
     ${tm.length ? `<div style="display:flex;flex-direction:column;gap:7px">${rows}</div>` : ''}
   </div>`;

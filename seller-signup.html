@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Seller Account – EGFULFILL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background-color:#f7f5f0;background-image:linear-gradient(#e7e4dd 1px,transparent 1px),linear-gradient(90deg,#e7e4dd 1px,transparent 1px);background-size:26px 26px;color:#191918;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px}
+    .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:44px;line-height:1;color:#191918;text-decoration:none;margin-bottom:26px}
+    .card{width:100%;max-width:404px;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 34px rgba(0,0,0,.07);padding:34px 32px}
+    .heading{font-size:23px;font-weight:800;letter-spacing:-0.03em;margin-bottom:5px}
+    .subheading{font-size:13.5px;color:#9ca3af;margin-bottom:24px;line-height:1.5}
+    label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}
+    .input{width:100%;padding:11px 13px;border:1.5px solid #e5e4e0;border-radius:10px;font-size:13.5px;color:#191918;outline:none;font-family:inherit;background:#faf9f7;transition:border-color .15s,background .15s}
+    .input:focus{border-color:#374151;background:#fff}
+    .input.err{border-color:#dc2626}
+    .input:-webkit-autofill,.input:-webkit-autofill:hover,.input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #faf9f7 inset;-webkit-text-fill-color:#191918;caret-color:#191918;transition:background-color 9999s ease-in-out 0s}
+    .field-err{font-size:11.5px;color:#dc2626;margin-top:4px;min-height:15px}
+    .pw-wrap{position:relative}
+    .pw-toggle{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;transition:color .15s;line-height:0}
+    .pw-toggle:hover{color:#374151}
+    .btn-dk{width:100%;padding:12px;background:#191918;color:#f3eee2;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
+    .btn-dk:hover{background:#2c2a27}
+    .btn-dk:disabled{opacity:.55;cursor:not-allowed}
+    .btn-social{width:100%;padding:11px;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;transition:border-color .15s,background .15s}
+    .btn-social:hover{border-color:#9ca3af;background:#faf9f7}
+    .error-banner{display:none;font-size:12.5px;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;border-radius:9px;padding:9px 12px;margin-bottom:14px}
+    .check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12.5px;color:#6b7280;line-height:1.5;margin-bottom:18px}
+    .check input{accent-color:#191918;width:14px;height:14px;margin-top:2px;flex-shrink:0}
+    .check a{color:#191918;font-weight:600;text-decoration:none}
+    .check a:hover{text-decoration:underline}
+    .link{font-size:12.5px;color:#191918;text-decoration:none;font-weight:600}
+    .link:hover{text-decoration:underline}
+    .divider{display:flex;align-items:center;gap:12px;font-size:12px;color:#c4c3be;margin:20px 0}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#ececea}
+    .foot{font-size:13px;color:#9ca3af;text-align:center;margin-top:22px}
+    .foot a{color:#191918;font-weight:700;text-decoration:none}
+    .foot a:hover{text-decoration:underline}
+    .pagefoot{margin-top:26px;font-size:11.5px;color:#c4c3be;display:flex;gap:18px;align-items:center}
+    .pagefoot a{color:#c4c3be;text-decoration:none}.pagefoot a:hover{color:#9ca3af}
+    @keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .fu{animation:fu .3s cubic-bezier(.22,1,.36,1) both}
+  </style>
+</head>
+<body>
+
+  <a href="index.html" class="logo">egfulfill</a>
+
+  <div class="card fu">
+    <h1 class="heading">Create your account</h1>
+    <p class="subheading">Start selling print-on-demand — no minimums, free to start.</p>
+
+    <div id="signup-error" class="error-banner"></div>
+
+    <form onsubmit="submitSignup(event)" novalidate>
+      <div style="margin-bottom:14px">
+        <label>Email</label>
+        <input id="su-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"/>
+        <div id="err-email" class="field-err"></div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label>Password</label>
+        <div class="pw-wrap">
+          <input id="su-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="padding-right:42px"/>
+          <button type="button" class="pw-toggle" onclick="togglePw('su-password')">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+        <div id="err-password" class="field-err"></div>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <label>Confirm password</label>
+        <div class="pw-wrap">
+          <input id="su-confirm" class="input" type="password" placeholder="Re-enter your password" autocomplete="new-password" style="padding-right:42px"/>
+          <button type="button" class="pw-toggle" onclick="togglePw('su-confirm')">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
+          </button>
+        </div>
+        <div id="err-confirm" class="field-err"></div>
+      </div>
+
+      <label class="check"><input type="checkbox" id="su-terms"/> <span>I agree to the <a href="#" onclick="return false">Terms of Service</a> and <a href="#" onclick="return false">Privacy Policy</a>.</span></label>
+
+      <button type="submit" class="btn-dk" id="su-btn">Create account</button>
+    </form>
+
+    <div class="divider">or sign up with</div>
+
+    <!-- Social sign-up -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button type="button" class="btn-social" onclick="socialSignup('Google')">
+        <svg width="17" height="17" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58A8.98 8.98 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        Sign up with Google
+      </button>
+      <button type="button" class="btn-social" onclick="socialSignup('Facebook')">
+        <svg width="17" height="17" viewBox="0 0 18 18"><path fill="#1877F2" d="M18 9a9 9 0 1 0-10.4 8.89v-6.29H5.31V9h2.29V7.02c0-2.26 1.35-3.5 3.4-3.5.99 0 2.02.17 2.02.17v2.22h-1.14c-1.12 0-1.47.7-1.47 1.41V9h2.5l-.4 2.6h-2.1v6.29A9 9 0 0 0 18 9z"/></svg>
+        Sign up with Facebook
+      </button>
+    </div>
+
+    <div class="foot">Already signed up? <a href="seller-login.html">Log in →</a></div>
+  </div>
+
+  <div class="pagefoot">
+    <span>© 2026 EGFULFILL, Inc.</span>
+    <a href="#">Privacy</a>
+    <a href="#">Terms</a>
+  </div>
+
+<script>
+  function togglePw(id){ const inp = document.getElementById(id); inp.type = inp.type === 'password' ? 'text' : 'password'; }
+
+  function socialSignup(provider){
+    const btns = document.querySelectorAll('.btn-social');
+    btns.forEach(b => b.disabled = true);
+    // Demo: simulate the OAuth handshake then land on the seller dashboard.
+    setTimeout(() => { window.location.href = 'seller.html'; }, 700);
+  }
+
+  function submitSignup(e){
+    e.preventDefault();
+    const email = document.getElementById('su-email').value.trim();
+    const pw = document.getElementById('su-password').value;
+    const confirm = document.getElementById('su-confirm').value;
+    const terms = document.getElementById('su-terms').checked;
+    let ok = true;
+    ['err-email','err-password','err-confirm'].forEach(id => document.getElementById(id).textContent = '');
+    ['su-email','su-password','su-confirm'].forEach(id => document.getElementById(id).classList.remove('err'));
+    const banner = document.getElementById('signup-error');
+    banner.style.display = 'none';
+
+    if(!email){ document.getElementById('err-email').textContent = 'Email is required'; document.getElementById('su-email').classList.add('err'); ok = false; }
+    else if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ document.getElementById('err-email').textContent = 'Enter a valid email'; document.getElementById('su-email').classList.add('err'); ok = false; }
+
+    if(!pw){ document.getElementById('err-password').textContent = 'Password is required'; document.getElementById('su-password').classList.add('err'); ok = false; }
+    else if(pw.length < 8){ document.getElementById('err-password').textContent = 'Use at least 8 characters'; document.getElementById('su-password').classList.add('err'); ok = false; }
+
+    if(!confirm){ document.getElementById('err-confirm').textContent = 'Please confirm your password'; document.getElementById('su-confirm').classList.add('err'); ok = false; }
+    else if(confirm !== pw){ document.getElementById('err-confirm').textContent = 'Passwords don\'t match'; document.getElementById('su-confirm').classList.add('err'); ok = false; }
+
+    if(!terms){ banner.textContent = 'Please accept the Terms of Service to continue.'; banner.style.display = 'block'; ok = false; }
+
+    if(!ok) return;
+    const btn = document.getElementById('su-btn');
+    btn.disabled = true; btn.textContent = 'Creating account…';
+    setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+  }
+</script>
+</body>
+</html>

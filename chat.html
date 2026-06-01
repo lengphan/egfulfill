@@ -36,7 +36,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 /* Chat-specific */
 .chat-tab{padding:5px 14px;border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent;background:transparent;color:#6b7280;transition:all .15s}
 .chat-tab.on{background:#fff;color:#191918;box-shadow:0 1px 3px rgba(0,0,0,.09)}
-.conv-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid #191918;transition:background .12s}
+.conv-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid #f3f0eb;transition:background .12s}
 .conv-item:hover{background:#f6f5f4}
 .conv-item.active{background:#f6f5f4}
 .chat-bubble{max-width:72%;padding:9px 13px;border-radius:12px;font-size:14px;line-height:1.5;position:relative}
@@ -291,6 +291,10 @@ html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color
 html[data-theme=dark] .filter-btn.active,
 html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
 /* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+.notif-panel{position:fixed;top:0;right:-400px;width:380px;height:100vh;background:#fff;border-left:1px solid #e5e4e0;z-index:210;transition:right .3s cubic-bezier(.22,1,.36,1);box-shadow:-4px 0 20px rgba(0,0,0,.08);display:flex;flex-direction:column}
+.notif-panel.open{right:0}
+.notif-row{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .15s}
+.notif-row:hover,.notif-row.unread{background:#fafaf9}
 html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
 html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
 html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
@@ -356,7 +360,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
 </style>
 </head>
-<body>
+<body data-eg-role="seller">
 
 <!-- SELLER SIDEBAR -->
 <aside class="sidebar">
@@ -365,13 +369,13 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   </div>
   <nav style="flex:1;padding:8px 0">
     <a class="ni" href="seller.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Dashboard</a>
-    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
+    <a class="ni" href="orders.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>Orders<span data-badge="orders" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">3</span></a>
     <a class="ni" href="products-dash.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M7.3 1.5a2 2 0 011.42.59l5.2 5.2a1.5 1.5 0 010 2.12l-4.92 4.92a1.5 1.5 0 01-2.12 0l-5.2-5.2A2 2 0 011.5 7.7V3.5a2 2 0 012-2h3.8zM5 4.2a1.2 1.2 0 100 2.4 1.2 1.2 0 000-2.4z"/></svg>Products</a>
     <a class="ni" href="product-templates.html" style="margin-left:24px;font-size:13.5px;color:#888884"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Product Templates</a>
     <a class="ni" href="analytics.html"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="8" width="3.6" height="6.5" rx="1.8"/><rect x="6.2" y="4.5" width="3.6" height="10" rx="1.8"/><rect x="10.9" y="1.5" width="3.6" height="13" rx="1.8"/></svg>Reports</a>
     <a class="ni" href="wallet.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
     <a class="ni" href="design-lab.html"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Lab</a>
-    <a class="ni on" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
+    <a class="ni on" href="chat.html"><svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M3 2.4h10A2.2 2.2 0 0115.2 4.6v4.6A2.2 2.2 0 0113 11.4H7.2l-3.1 2.7a.55.55 0 01-.92-.42v-2.3A2.2 2.2 0 011 9.2V4.6A2.2 2.2 0 013 2.4zM5.4 6a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9zm3 0a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>Chat<span data-badge="chat" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">2</span></a>
     <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
 
     <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>Settings</a>
@@ -416,23 +420,28 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 
   <!-- CHAT LAYOUT -->
   <div style="flex:1;padding:20px 24px 0;display:flex;flex-direction:column;min-height:0;max-width:1600px;margin:0 auto;width:100%">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px" class="fi">
-      <div style="position:relative;flex:1;max-width:360px;min-width:180px">
-        <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <input oninput="filterConvs(this.value)" placeholder="Search conversations…" autocomplete="off" style="width:100%;box-sizing:border-box;background:#f7f5f0;border:1px solid rgba(0,0,0,.12);border-radius:9px;padding:8px 12px 8px 34px;font-size:14px;color:#191918;outline:none;font-family:inherit;transition:border-color .15s,box-shadow .15s" onfocus="this.style.borderColor='#374151'" onblur="this.style.borderColor='rgba(0,0,0,.12)'"/>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:14px" class="fi">
       <button class="btn btn-out" onclick="newConv()"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>New message</button>
     </div>
 
-    <!-- Chat panel -->
-    <div id="chat-card" style="display:grid;grid-template-columns:280px 1fr;gap:0;flex:1;background:transparent;border:none;border-radius:12px;overflow:hidden;min-height:0;height:calc(100vh - 160px)">
+    <!-- Chat panel — cream card outline with dark border + offset shadow,
+         matching operator/admin/warehouse so the seller chat reads the same.
+         Height + max-height + corner radius match operator's chat card. -->
+    <div id="chat-card" class="card" style="display:grid;grid-template-columns:260px 1fr;gap:0;flex:1;overflow:hidden;min-height:0;height:calc(100vh - 130px);max-height:760px;border-radius:14px">
 
       <!-- LEFT: Conversation list -->
-      <div id="conv-pane" style="border-right:1px solid #191918;background:transparent;display:flex;flex-direction:column;min-height:0">
-        <!-- Tabs -->
-        <div style="display:flex;gap:2px;padding:7px 10px;border-bottom:1px solid #f3f3f1;background:transparent;flex-shrink:0">
-          <button class="chat-tab on" id="tab-team" onclick="setTab('team',this)">Team</button>
-          <button class="chat-tab" id="tab-support" onclick="setTab('support',this)">Support</button>
+      <div id="conv-pane" style="border-right:1px solid #40403d;background:transparent;display:flex;flex-direction:column;min-height:0">
+        <!-- Search lives inside the conv pane (matches operator/warehouse). -->
+        <div style="padding:10px 12px;border-bottom:1px solid #f3f0eb;flex-shrink:0">
+          <div style="position:relative">
+            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input oninput="filterConvs(this.value)" placeholder="Search conversations…" autocomplete="off" style="width:100%;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:8px;padding:7px 10px 7px 30px;font-size:13.5px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box"/>
+          </div>
+        </div>
+        <!-- Tabs — Inbox merges Team + Support so the seller has the same
+             two-tab layout as operator. -->
+        <div style="display:flex;gap:2px;padding:7px 10px;border-bottom:1px solid #f3f0eb;background:transparent;flex-shrink:0">
+          <button class="chat-tab on" id="tab-team" onclick="setTab('team',this)">Inbox</button>
           <button class="chat-tab" id="tab-history" onclick="setTab('history',this)">Notifications</button>
         </div>
         <!-- Conversations -->
@@ -468,41 +477,13 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </div>
           </div>
 
-          <!-- HISTORY tab (hidden) -->
+          <!-- Notifications tab — populated dynamically with broadcasts from
+               EGStore. Empty state placeholder lives directly in here when
+               there are no notifications. -->
           <div id="list-history" style="display:none;padding:8px 0">
-            <div style="padding:6px 16px;font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">April 2026</div>
-            <div class="hist-row">
-              <div style="width:34px;height:34px;background:#f3f3f1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">📋</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Order dispute — #FF-8810</div>
-                <div style="font-size:13px;color:#9ca3af">EGFULFILL Support · Resolved · Apr 20</div>
-              </div>
-              <span style="font-size:12px;color:#16a34a;font-weight:600;background:#dcfce7;padding:2px 8px;border-radius:999px;flex-shrink:0">Resolved</span>
-            </div>
-            <div class="hist-row">
-              <div style="width:34px;height:34px;background:#f3f3f1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">💳</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Billing question — March invoice</div>
-                <div style="font-size:13px;color:#9ca3af">Billing Team · Closed · Apr 15</div>
-              </div>
-              <span style="font-size:12px;color:#6b7280;font-weight:600;background:#f3f3f1;padding:2px 8px;border-radius:999px;flex-shrink:0">Closed</span>
-            </div>
-            <div style="padding:6px 16px;font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-top:8px">March 2026</div>
-            <div class="hist-row">
-              <div style="width:34px;height:34px;background:#f3f3f1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🚚</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Missing tracking — order #FF-8791</div>
-                <div style="font-size:13px;color:#9ca3af">EGFULFILL Support · Resolved · Mar 28</div>
-              </div>
-              <span style="font-size:12px;color:#16a34a;font-weight:600;background:#dcfce7;padding:2px 8px;border-radius:999px;flex-shrink:0">Resolved</span>
-            </div>
-            <div class="hist-row">
-              <div style="width:34px;height:34px;background:#f3f3f1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">⚙️</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">Webhook setup assistance</div>
-                <div style="font-size:13px;color:#9ca3af">EGFULFILL Support · Resolved · Mar 14</div>
-              </div>
-              <span style="font-size:12px;color:#16a34a;font-weight:600;background:#dcfce7;padding:2px 8px;border-radius:999px;flex-shrink:0">Resolved</span>
+            <div id="list-history-empty" style="padding:32px 18px;text-align:center;color:#9ca3af">
+              <div style="font-size:13.5px;font-weight:600;color:#374151;margin-bottom:4px">No notifications yet</div>
+              <div style="font-size:12.5px">Broadcasts from the factory will show up here.</div>
             </div>
           </div>
 
@@ -716,8 +697,12 @@ function setTab(tab, btn) {
   currentTab = tab;
   document.querySelectorAll('.chat-tab').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  document.getElementById('list-team').style.display = tab === 'team' ? '' : 'none';
-  document.getElementById('list-support').style.display = tab === 'support' ? '' : 'none';
+  // Inbox (formerly "Team") shows both team and support conversations as a
+  // single continuous list so the seller has one place for ongoing chats —
+  // mirrors operator's Inbox tab which merges Sellers + Team.
+  var showInbox = tab === 'team';
+  document.getElementById('list-team').style.display = showInbox ? '' : 'none';
+  document.getElementById('list-support').style.display = showInbox ? '' : 'none';
   document.getElementById('list-history').style.display = tab === 'history' ? '' : 'none';
 
   if (tab === 'history') {
@@ -1063,6 +1048,103 @@ document.addEventListener('click',function(e){
 </script>
 <script src="nav-drag.js"></script>
 <script src="egfulfill-store.js"></script>
+<script defer src="eg-seller-plan.js"></script>
+<script src="eg-sidebar-badges.js"></script>
+<style>
+/* Inbox-style notification rows in the History tab. Selectors match the
+   shared helper used by operator/admin/warehouse so seller's view reads the
+   same. */
+.notif-row{display:flex!important;align-items:center!important;gap:10px!important;padding:11px 16px!important;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .15s}
+.notif-row:hover,.notif-row.notif-active{background:#fafaf9}
+.notif-row > div:first-child{border-radius:50%!important;width:34px!important;height:34px!important;flex-shrink:0;margin-top:0!important}
+.notif-row > div:nth-child(2){flex:1!important;min-width:0!important;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.notif-row > div:nth-child(2) > div:first-child{font-size:13.5px;font-weight:700;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.35}
+.notif-row > div:nth-child(2) > div:nth-child(2){font-size:12.5px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.35}
+.notif-row > span:last-child{font-size:11.5px!important;color:#9ca3af!important;font-weight:500!important;white-space:nowrap;flex-shrink:0;align-self:center}
+</style>
+<script>
+// Seller-side adapter — chat.html already has a "Notifications" tab
+// (#tab-history → #list-history). We inject broadcast rows at the top of
+// that list and route clicks into the message pane as an admin card-style
+// bubble. Seller is receive-only: input bar hides on the notification view.
+(function(){
+  function role(){ return 'seller'; }
+  function buildBroadcastRow(bc){
+    var time = EGStore.formatBroadcastAge ? EGStore.formatBroadcastAge(bc.ts) : '';
+    var t = String(bc.title || '').replace(/"/g,'&quot;');
+    var b = String(bc.body  || '').replace(/"/g,'&quot;');
+    return '<div class="notif-row" data-nid="' + bc.id + '" data-title="' + t + '" data-sub="' + b + '" data-time="' + time + '" onclick="sellerShowAdminNotif(this)">'
+      + '<div style="background:#eeede9;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 4h9M2 7h7M2 10h5" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div>'
+      + '<div><div>' + t.replace(/</g,'&lt;') + '</div><div>' + (b.replace(/</g,'&lt;') || ('Broadcast from ' + (bc.senderName || 'Factory'))) + '</div></div>'
+      + '<span>' + time + '</span>'
+      + '</div>';
+  }
+  function rebuildHistoryList(){
+    var host = document.getElementById('list-history');
+    if (!host) return;
+    // Cache the empty-state once; otherwise it'd get wiped on first rebuild.
+    if (!host.dataset.emptyHtml) host.dataset.emptyHtml = host.innerHTML;
+    var bcs = (typeof EGStore!=='undefined' && EGStore.getBroadcasts) ? EGStore.getBroadcasts() : [];
+    host.innerHTML = bcs.length ? bcs.map(buildBroadcastRow).join('') : host.dataset.emptyHtml;
+  }
+  // Swap the right-hand pane to show this notification as a card-style admin
+  // bubble. Seller can't reply, so hide msg-pane's input bar.
+  window.sellerShowAdminNotif = function(rowEl){
+    if (!rowEl) return;
+    var n = { id: rowEl.dataset.nid, title: rowEl.dataset.title, sub: rowEl.dataset.sub, time: rowEl.dataset.time };
+    document.querySelectorAll('#list-history .notif-row').forEach(function(r){ r.classList.remove('notif-active'); r.style.background=''; });
+    rowEl.classList.add('notif-active');
+    rowEl.style.background = '#f6f5f4';
+    var hp = document.getElementById('history-pane');
+    var mp = document.getElementById('msg-pane');
+    if (hp) hp.style.display = 'none';
+    if (!mp) return;
+    mp.style.display = 'flex';
+    // Header swap
+    var name = document.getElementById('chat-name');   if (name) name.textContent = 'Admin';
+    var ava  = document.getElementById('chat-avatar'); if (ava) { ava.textContent = 'AD'; ava.style.background = '#191918'; ava.style.color = '#e8e4dd'; }
+    var st   = document.getElementById('chat-status'); if (st)  st.textContent = '● Notifications';
+    // Replace messages with the bubble
+    var msgs = document.getElementById('chat-messages');
+    if (msgs){
+      msgs.innerHTML = '';
+      var div = document.createElement('div');
+      div.className = 'chat-msg them';
+      div.innerHTML =
+        '<div style="display:flex;flex-direction:column;gap:6px;max-width:78%">' +
+          '<div style="background:#fdfcfa;border:1px solid #40403d;border-radius:10px;box-shadow:2px 2px 0 #40403d;padding:12px 14px">' +
+            '<div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px;line-height:1.35">' + (n.title || '').replace(/</g,'&lt;') + '</div>' +
+            '<div style="font-size:13.5px;color:#374151;line-height:1.5">' + (n.sub || '').replace(/</g,'&lt;') + '</div>' +
+          '</div>' +
+          '<div style="font-size:11.5px;color:#9ca3af;padding-left:4px">Admin · ' + (n.time || '') + '</div>' +
+        '</div>';
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+    // Hide the input bar — seller can't reply to broadcasts
+    var inputBar = document.querySelector('#msg-pane > div:last-child');
+    if (inputBar) inputBar.dataset.sellerNotifHidden = '1', inputBar.style.display = 'none';
+  };
+  // Restore the input bar when switching to other tabs (Team / Support).
+  var origSetTab = window.setTab;
+  if (typeof origSetTab === 'function') {
+    window.setTab = function(tab, btn){
+      origSetTab(tab, btn);
+      var inputBar = document.querySelector('#msg-pane > div:last-child');
+      if (inputBar && inputBar.dataset.sellerNotifHidden === '1' && tab !== 'history') {
+        delete inputBar.dataset.sellerNotifHidden;
+        inputBar.style.display = '';
+      }
+      if (tab === 'history') rebuildHistoryList();
+    };
+  }
+  function init(){ rebuildHistoryList(); }
+  if (document.readyState !== 'loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('storage', function(e){ if (e && (e.key === null || e.key === 'eg_broadcasts')) rebuildHistoryList(); });
+  window.addEventListener('eg-broadcasts-changed', rebuildHistoryList);
+})();
+</script>
 <script>window.XOC_ROLE='seller';</script>
 <script src="eg-order-chat.js"></script>
 <script>
@@ -1131,7 +1213,9 @@ document.addEventListener('click',function(e){
     if (!wrap) return;
     var convs = loadConversations();
     if (!convs.length) {
-      wrap.innerHTML = '<div style="padding:30px 18px;text-align:center;color:#9ca3af;font-size:13px;line-height:1.5">No conversations yet.<br><span style="font-size:12px">Open an order and chat with the factory to start one.</span></div>';
+      // Empty — collapse to nothing instead of showing a "No conversations yet"
+      // placeholder, since the Support list below provides content.
+      wrap.innerHTML = '';
       return;
     }
     wrap.innerHTML = convs.map(function(c){
