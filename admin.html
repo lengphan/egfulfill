@@ -1175,16 +1175,13 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="display:flex;gap:8px">
         <button class="btn btn-out" style="font-size:13.5px" onclick="alert('Exported inventory CSV')">Export CSV</button>
         <button class="btn btn-out" style="font-size:13.5px" onclick="openSkuLabelModal()">Print SKU Labels</button>
-        <button class="btn btn-dk" style="font-size:13.5px" onclick="openAddStockModal()">+ Add Stock</button>
+        <button class="btn btn-dk" style="font-size:13.5px" onclick="EGInventory.openAddFromCatalog()">+ Add from catalog</button>
       </div>
     </div>
 
-    <!-- Inventory table row: add Generate SKU column -->
+    <!-- Product-grouped inventory (shared EGInventory module) -->
     <div class="card" style="overflow:hidden">
-      <table class="dtable">
-        <thead><tr><th>SKU</th><th>Product</th><th>Variant</th><th>In Stock</th><th>Reserved</th><th>Available</th><th>Reorder At</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="inv-tbody"></tbody>
-      </table>
+      <div id="eg-inv-root"></div>
     </div>
   <!-- SKU Label Modal -->
   <div id="sku-label-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)document.getElementById('sku-label-modal').classList.add('modal-hidden')">
@@ -6971,29 +6968,11 @@ window.addEventListener('storage', function(e){
 });
 
 function renderInventory() {
-  const tbody = document.getElementById('inv-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = INVENTORY_ITEMS.map(item => {
-    const avail = Math.max(0, item.inStock - item.reserved);
-    const isOut   = avail <= 0;
-    const isLow   = !isOut && item.inStock <= item.reorderAt;
-    const statusLabel = isOut ? 'Out of Stock' : isLow ? 'Waiting for Stock' : 'In Stock';
-    const statusColor = isOut ? '#dc2626' : isLow ? '#b45309' : '#15803d';
-    const actionBtn   = isOut || isLow
-      ? `<button class="btn btn-amber" style="font-size:12.5px;padding:4px 10px" onclick="restockItem('${item.sku}','')">Restock →</button>`
-      : `<button class="btn btn-out"   style="font-size:12.5px;padding:4px 10px" onclick="adjustStock('${item.sku}')">Adjust</button>`;
-    return `<tr>
-      <td style="font-family:monospace;font-size:13px;color:#374151">${item.sku}</td>
-      <td style="font-weight:500">${item.name}</td>
-      <td style="color:#6b7280">${item.variant}</td>
-      <td style="font-weight:600">${item.inStock}</td>
-      <td style="color:#b45309">${item.reserved}</td>
-      <td style="color:${statusColor};font-weight:600">${avail}</td>
-      <td style="color:#9ca3af">${item.reorderAt}</td>
-      <td style="color:${statusColor};font-weight:600">${statusLabel}</td>
-      <td>${actionBtn}</td>
-    </tr>`;
-  }).join('');
+  // Product-grouped, inline-editable inventory shared with warehouse. Reads the
+  // live shared store (INVENTORY_ITEMS already seeds EGStore on load).
+  if (typeof EGInventory !== 'undefined') { EGInventory.render('eg-inv-root'); return; }
+  const root = document.getElementById('eg-inv-root');
+  if (root) root.innerHTML = '<div style="padding:24px;color:#9ca3af">Inventory module unavailable.</div>';
 }
 
 function adjustStock(sku) {
