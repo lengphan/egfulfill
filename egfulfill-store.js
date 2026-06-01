@@ -2895,11 +2895,16 @@
    and calling EGInventory.render('eg-inv-root').
    ───────────────────────────────────────────────────────────────────────── */
 (function(){
-  var COL = 'minmax(110px,1.4fr) 160px 90px 90px 84px 96px 104px 34px';
+  // checkbox | Variant | SKU | In stock | Reserved | Available | Reorder at | Status | Actions
+  var COL = '30px minmax(88px,1.25fr) 130px 78px 78px 72px 84px 84px 78px';
   var ESC = function(s){ return String(s==null?'':s).replace(/'/g,"\\'"); };
   var EGInventory = {
     _expanded: {},
+    _sel: {},
     _rootId: 'eg-inv-root',
+    // The product thumbnail is the catalog product's OWN main image — prefer the
+    // main mockup/avatar so it matches what the product shows elsewhere, falling
+    // back to a colour image only if no main image exists.
     _img: function(sku, name){
       try {
         var prods = (window.EGStore && EGStore.getCatalogProducts && EGStore.getCatalogProducts()) || [];
@@ -2909,13 +2914,23 @@
           var hit = vs.find(function(v){ return v && v.sku === sku; });
           var match = hit || (p.name && p.name === name) || (p.sku && sku && String(sku).indexOf(p.sku) === 0);
           if (match){
+            if (p.mockup) return p.mockup;
+            if (p.img)    return p.img;
+            if (p.image)  return p.image;
             if (hit && p.colorImages && hit.color && p.colorImages[hit.color]) return p.colorImages[hit.color];
             if (p.colorImages){ var k = Object.keys(p.colorImages); for (var j=0;j<k.length;j++){ if (p.colorImages[k[j]]) return p.colorImages[k[j]]; } }
-            return p.mockup || p.img || p.image || '';
           }
         }
       } catch(e){}
       return '';
+    },
+    // Recommended label size by product type (used for the SKU labels).
+    _recSize: function(r){
+      var s = ((r && r.category || '') + ' ' + (r && r.name || '')).toLowerCase();
+      if (/mug|cup|tumbler/.test(s))            return '2" × 1.25"';
+      if (/poster|canvas|print(?!er)/.test(s))  return '4" × 2"';
+      if (/ink|cartridge|consumable|vinyl/.test(s)) return '1" × 0.5"';
+      return '2" × 1"'; // apparel / default
     },
     _key: function(r){ return r.name || String(r.sku||'').split('-').slice(0,3).join('-'); },
     _groups: function(){
@@ -2923,6 +2938,10 @@
       var map = {}, order = [];
       rows.forEach(function(r){ var k = EGInventory._key(r); if(!map[k]){ map[k] = { key:k, name:r.name||k, rows:[] }; order.push(k); } map[k].rows.push(r); });
       return order.map(function(k){ return map[k]; });
+    },
+    _allSkus: function(){ return this._groups().reduce(function(a,g){ return a.concat(g.rows.map(function(r){return r.sku;})); }, []); },
+    _cb: function(checked, handler){
+      return '<input type="checkbox"'+(checked?' checked':'')+' onclick="event.stopPropagation();'+handler+'" style="width:15px;height:15px;cursor:pointer;accent-color:#191918;margin:0">';
     },
     render: function(rootId){
       this._rootId = rootId || this._rootId;
@@ -2932,17 +2951,32 @@
         root.innerHTML = '<div style="padding:30px;text-align:center;color:#9ca3af;font-size:14px;line-height:1.6">No inventory yet.<br>Use <b style="color:#374151">+ Add from catalog</b> to pull a product’s variants in.</div>';
         return;
       }
-      var html = '<div style="display:grid;grid-template-columns:'+COL+';gap:10px;padding:9px 16px;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e5e4e0">'
-        + '<div>Variant</div><div>SKU</div><div>In stock</div><div>Reserved</div><div>Available</div><div>Reorder at</div><div>Status</div><div></div></div>';
+      var selCount = Object.keys(this._sel).length;
+      var allSkus = this._allSkus();
+      var allSel = allSkus.length && allSkus.every(function(s){ return EGInventory._sel[s]; });
+      var html = '';
+      // Bulk action bar (only when something is selected)
+      if (selCount){
+        html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#191918;color:#fff;border-radius:10px;margin:10px 12px">'
+          + '<span style="font-size:13px;font-weight:600">'+selCount+' selected</span>'
+          + '<button onclick="EGInventory.printLabels()" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;font-family:inherit;background:#fff;color:#191918;border:none;border-radius:7px;padding:5px 12px;cursor:pointer"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 6V2h8v4M4 11h8v3H4zM2 6h12v5H2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Print SKU Labels</button>'
+          + '<button onclick="EGInventory.selClear()" style="font-size:12.5px;font-weight:600;font-family:inherit;background:transparent;color:#d1d5db;border:none;cursor:pointer;margin-left:auto">Clear</button>'
+          + '</div>';
+      }
+      html += '<div style="display:grid;grid-template-columns:'+COL+';gap:10px;padding:9px 16px;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e5e4e0">'
+        + '<div style="display:flex;align-items:center">'+this._cb(allSel, 'EGInventory.selAll(this.checked)')+'</div>'
+        + '<div>Variant</div><div>SKU</div><div>In stock</div><div>Reserved</div><div>Available</div><div>Reorder at</div><div>Status</div><div style="text-align:center">Label</div></div>';
       groups.forEach(function(g){
         var total=0, low=0, out=0;
         g.rows.forEach(function(r){ var a=Math.max(0,(+r.inStock||0)-(+r.reserved||0)); total+=(+r.inStock||0); if(a<=0)out++; else if(a<=(+r.reorderAt||0))low++; });
         var open = !!EGInventory._expanded[g.key];
         var img = EGInventory._img(g.rows[0].sku, g.name);
+        var groupSel = g.rows.every(function(r){ return EGInventory._sel[r.sku]; });
         var badge = out ? '<span style="font-size:11px;font-weight:700;color:#dc2626;background:#fef2f2;padding:2px 9px;border-radius:999px">'+out+' out</span>'
                   : low ? '<span style="font-size:11px;font-weight:700;color:#b45309;background:#fffbeb;padding:2px 9px;border-radius:999px">'+low+' low</span>'
                   : '<span style="font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;padding:2px 9px;border-radius:999px">OK</span>';
         html += '<div onclick="EGInventory.toggle(\''+ESC(g.key)+'\')" style="display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;border-bottom:1px solid #f0ede9;background:'+(open?'#faf9f7':'#fff')+'">'
+          + '<span style="width:15px;flex-shrink:0;display:inline-flex;justify-content:center">'+EGInventory._cb(groupSel, 'EGInventory.selGroup(\''+ESC(g.key)+'\',this.checked)')+'</span>'
           + '<span style="font-size:10px;color:#9ca3af;width:11px;flex-shrink:0;display:inline-block;transition:transform .15s;transform:rotate('+(open?90:0)+'deg)">▶</span>'
           + (img ? '<img src="'+img+'" style="width:40px;height:40px;border-radius:7px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0" onerror="this.style.visibility=\'hidden\'">' : '<div style="width:40px;height:40px;border-radius:7px;background:#f0ede9;flex-shrink:0"></div>')
           + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+g.name+'</div><div style="font-size:12px;color:#9ca3af">'+g.rows.length+' variant'+(g.rows.length!==1?'s':'')+'</div></div>'
@@ -2953,7 +2987,8 @@
             var a = Math.max(0,(+r.inStock||0)-(+r.reserved||0));
             var st = a<=0 ? {l:'Out of stock',c:'#dc2626'} : (a<=(+r.reorderAt||0) ? {l:'Low',c:'#b45309'} : {l:'In stock',c:'#15803d'});
             var inp = function(field,val){ return '<input type="number" min="0" value="'+(val||0)+'" onchange="EGInventory.update(\''+ESC(r.sku)+'\',\''+field+'\',this.value)" onclick="event.stopPropagation()" style="width:100%;box-sizing:border-box;border:1px solid #e5e4e0;border-radius:6px;padding:4px 6px;font-size:13px;font-family:inherit;text-align:center;outline:none;color:#191918" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'">'; };
-            html += '<div style="display:grid;grid-template-columns:'+COL+';gap:10px;align-items:center;padding:7px 16px;border-bottom:1px solid #f5f4f1;background:#fff">'
+            html += '<div style="display:grid;grid-template-columns:'+COL+';gap:10px;align-items:center;padding:7px 16px;border-bottom:1px solid #f5f4f1;background:'+(EGInventory._sel[r.sku]?'#fbfaf8':'#fff')+'">'
+              + '<div style="display:flex;align-items:center">'+EGInventory._cb(!!EGInventory._sel[r.sku], 'EGInventory.selToggle(\''+ESC(r.sku)+'\',this.checked)')+'</div>'
               + '<div style="font-size:13px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r.variant||'—')+'</div>'
               + '<div style="font-family:monospace;font-size:12px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.sku+'</div>'
               + '<div>'+inp('inStock',r.inStock)+'</div>'
@@ -2961,7 +2996,10 @@
               + '<div style="text-align:center;font-weight:700;color:'+st.c+'">'+a+'</div>'
               + '<div>'+inp('reorderAt',r.reorderAt)+'</div>'
               + '<div style="font-size:12px;font-weight:600;color:'+st.c+';white-space:nowrap">'+st.l+'</div>'
-              + '<div style="text-align:center"><button title="Remove SKU" onclick="event.stopPropagation();EGInventory.remove(\''+ESC(r.sku)+'\')" style="background:none;border:none;color:#c4c3be;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'">×</button></div>'
+              + '<div style="display:flex;align-items:center;justify-content:center;gap:4px">'
+                + '<button title="Print label · rec. '+EGInventory._recSize(r)+'" onclick="event.stopPropagation();EGInventory.printLabels([\''+ESC(r.sku)+'\'])" style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:5px;color:#374151;cursor:pointer;padding:3px 6px;display:inline-flex;align-items:center;font-family:inherit" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e7eb\'"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 6V2h8v4M4 11h8v3H4zM2 6h12v5H2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>'
+                + '<button title="Remove SKU" onclick="event.stopPropagation();EGInventory.remove(\''+ESC(r.sku)+'\')" style="background:none;border:none;color:#c4c3be;cursor:pointer;font-size:16px;line-height:1;padding:0 2px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'">×</button>'
+              + '</div>'
               + '</div>';
           });
         }
@@ -2970,6 +3008,62 @@
     },
     _rerender: function(){ this.render(this._rootId); },
     toggle: function(key){ this._expanded[key] = !this._expanded[key]; this._rerender(); },
+    selToggle: function(sku, on){ if(on) this._sel[sku]=true; else delete this._sel[sku]; this._rerender(); },
+    selGroup: function(key, on){
+      var g = this._groups().find(function(x){ return x.key === key; }); if(!g) return;
+      g.rows.forEach(function(r){ if(on) EGInventory._sel[r.sku]=true; else delete EGInventory._sel[r.sku]; });
+      this._rerender();
+    },
+    selAll: function(on){
+      var self = this; this._allSkus().forEach(function(s){ if(on) self._sel[s]=true; else delete self._sel[s]; }); this._rerender();
+    },
+    selClear: function(){ this._sel = {}; this._rerender(); },
+    _barcode: function(sku){
+      var bars=''; var s=String(sku||'');
+      for (var i=0;i<s.length;i++){ var w = 1 + (s.charCodeAt(i) % 4); var gap = (s.charCodeAt(i) % 2) ? 2 : 1;
+        bars += '<span style="display:inline-block;width:'+w+'px;height:34px;background:#191918;margin-right:'+gap+'px"></span>'; }
+      return '<div style="white-space:nowrap;line-height:0;margin:4px 0">'+bars+'</div>';
+    },
+    // Print SKU labels (bulk for the selection, or a single SKU). Opens a modal
+    // preview at the recommended size with a Print button.
+    printLabels: function(skus){
+      if(!(window.EGStore && EGStore.getInventory)) return;
+      var rows = EGStore.getInventory() || [];
+      var want = (skus && skus.length) ? skus : Object.keys(this._sel);
+      var list = rows.filter(function(r){ return want.indexOf(r.sku) !== -1; });
+      if(!list.length) return;
+      var labels = list.map(function(r){
+        return '<div style="border:1.5px solid #d1d5db;border-radius:8px;padding:12px 14px;width:230px;background:#fff;page-break-inside:avoid">'
+          + '<div style="font-size:13px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r.name||'Product')+'</div>'
+          + '<div style="font-size:11.5px;color:#6b7280;margin-bottom:2px">'+(r.variant||'')+'</div>'
+          + EGInventory._barcode(r.sku)
+          + '<div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918;letter-spacing:.04em">'+r.sku+'</div>'
+          + '<div style="font-size:10px;color:#9ca3af;margin-top:3px">Label size: '+EGInventory._recSize(r)+'</div>'
+          + '</div>';
+      }).join('');
+      var ov = document.getElementById('eg-inv-label-ov');
+      if(!ov){ ov = document.createElement('div'); ov.id='eg-inv-label-ov';
+        ov.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:10070;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+        ov.onclick=function(e){ if(e.target===ov) ov.style.display='none'; };
+        document.body.appendChild(ov);
+      }
+      ov.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;width:560px;max-width:92vw;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25)">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f0ede9"><div><div style="font-size:16px;font-weight:700;color:#191918">Print SKU Labels</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">'+list.length+' label'+(list.length!==1?'s':'')+' · recommended size shown per label</div></div><button onclick="document.getElementById(\'eg-inv-label-ov\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;line-height:1">×</button></div>'
+        + '<div id="eg-inv-label-sheet" style="padding:18px 20px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:12px;background:#faf9f7">'+labels+'</div>'
+        + '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #f0ede9"><button onclick="document.getElementById(\'eg-inv-label-ov\').style.display=\'none\'" style="font-size:13px;font-weight:600;font-family:inherit;background:#fff;color:#374151;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 14px;cursor:pointer">Close</button><button onclick="EGInventory._printSheet()" style="font-size:13px;font-weight:600;font-family:inherit;background:#191918;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer">Print</button></div>'
+        + '</div>';
+      ov.style.display='flex';
+    },
+    _printSheet: function(){
+      var sheet = document.getElementById('eg-inv-label-sheet');
+      if(!sheet) return;
+      var w = window.open('', '_blank', 'width=520,height=640');
+      if(!w){ window.print(); return; }
+      w.document.write('<html><head><title>SKU Labels</title></head><body style="font-family:Inter,Arial,sans-serif;margin:16px"><div style="display:flex;flex-wrap:wrap;gap:12px">'+sheet.innerHTML+'</div></body></html>');
+      w.document.close();
+      w.focus();
+      setTimeout(function(){ try{ w.print(); }catch(e){} }, 250);
+    },
     update: function(sku, field, value){
       if(!(window.EGStore && EGStore.getInventory)) return;
       var rows = EGStore.getInventory() || [];
@@ -2981,6 +3075,7 @@
     },
     remove: function(sku){
       if(!(window.EGStore && EGStore.getInventory)) return;
+      delete this._sel[sku];
       var rows = (EGStore.getInventory() || []).filter(function(x){ return x.sku !== sku; });
       EGStore.setInventory(rows);
       this._rerender();
