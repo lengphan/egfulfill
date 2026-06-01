@@ -3853,26 +3853,19 @@ function renderOpOrders() {
             const _EMB_EXT = /\.(emb|dst|pes|exp|jef|vp3)$/i;
             const _embFileFromList = (_dcard.files || []).find(f => f && f.name && _EMB_EXT.test(f.name));
             const _isEmbDesign = !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
-            let _dlUrl, _dlName;
-            if (_isEmbDesign) {
-              // Binary-only chain — embDataUrl on the card, then the mirrored copy
-              // in EGStore.getItemEmbFile, then the legacy raw store. NO raster.
-              _dlUrl = (_isReal(_dcard.embDataUrl)        && _dcard.embDataUrl)
-                    || (_embStore && _isReal(_embStore.dataUrl) && _embStore.dataUrl)
-                    || (_isReal(_rawStore) && _rawStore)
-                    || '';
-              _dlName = _dcard.embFileName
-                     || (_embStore && _embStore.name)
-                     || (_embFileFromList && _embFileFromList.name)
-                     || ((_dsnText || 'design') + '.dst');
-            } else {
-              // Raster design — first real file previewUrl wins.
-              _dlUrl = (_firstRaster && _isReal(_firstRaster.previewUrl) && _firstRaster.previewUrl)
-                    || (_isReal(_rawStore) && _rawStore)
-                    || (_isReal(_dcard.thumb) && _dcard.thumb)
-                    || '';
-              _dlName = (_firstRaster && _firstRaster.name) || ((_dsnText || 'design') + '.png');
-            }
+            // EMB-ONLY download. We never serve a PNG/JPG — the factory needs the
+            // actual machine file. Resolve the embroidery binary from the card's
+            // embDataUrl, then the mirrored EGStore copy, then a raw-store entry
+            // ONLY if it's a real .emb/.dst (not a raster). No raster fallback.
+            const _rawIsEmb = _isReal(_rawStore) && _embStore && _embStore.name && _EMB_EXT.test(_embStore.name);
+            let _dlUrl = (_isReal(_dcard.embDataUrl) && _dcard.embDataUrl)
+                      || (_embStore && _isReal(_embStore.dataUrl) && _embStore.dataUrl)
+                      || (_rawIsEmb ? _rawStore : '')
+                      || '';
+            let _dlName = _dcard.embFileName
+                       || (_embStore && _embStore.name)
+                       || (_embFileFromList && _embFileFromList.name)
+                       || ((_dsnText || 'design') + '.dst');
             const _hasFile = !!_dlUrl;
             // Encode payload for the inline onclick: base64 the URL string +
             // name so we can rebuild the Blob even when the data URL is huge
@@ -7492,25 +7485,20 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         const _EMB_EXT_X = /\.(emb|dst|pes|exp|jef|vp3)$/i;
         const _embFileFromListX = _dcardForItem ? (_dcardForItem.files || []).find(f => f && f.name && _EMB_EXT_X.test(f.name)) : null;
         const _isEmbDesignX = !!(_dcardForItem && (_dcardForItem.isEmb || _dcardForItem.embFileName || _embFileFromListX || (_embStoreX && _embStoreX.name && _EMB_EXT_X.test(_embStoreX.name))));
-        let _dlUrl, _dlName;
-        if (!_dcardForItem) {
-          _dlUrl = ''; _dlName = '';
-        } else if (_isEmbDesignX) {
-          _dlUrl = (_isRealX(_dcardForItem.embDataUrl) && _dcardForItem.embDataUrl)
-                || (_embStoreX && _isRealX(_embStoreX.dataUrl) && _embStoreX.dataUrl)
-                || (_isRealX(_rawStoreX) && _rawStoreX)
-                || '';
-          _dlName = _dcardForItem.embFileName
-                 || (_embStoreX && _embStoreX.name)
-                 || (_embFileFromListX && _embFileFromListX.name)
-                 || ((_dcardForItem.designId || 'design') + '.dst');
-        } else {
-          _dlUrl = (_firstRaster && _isRealX(_firstRaster.previewUrl) && _firstRaster.previewUrl)
-                || (_isRealX(_rawStoreX) && _rawStoreX)
-                || (_isRealX(_dcardForItem.thumb) && _dcardForItem.thumb)
-                || '';
-          _dlName = (_firstRaster && _firstRaster.name) || ((_dcardForItem.designId || 'design') + '.png');
-        }
+        // EMB-ONLY download. Never serve a PNG/JPG — only the embroidery machine
+        // file. Resolve embDataUrl → mirrored EGStore emb copy → raw store ONLY
+        // when it's a real .emb/.dst. No raster fallback.
+        const _rawIsEmbX = _isRealX(_rawStoreX) && _embStoreX && _embStoreX.name && _EMB_EXT_X.test(_embStoreX.name);
+        let _dlUrl = !_dcardForItem ? '' : (
+              (_isRealX(_dcardForItem.embDataUrl) && _dcardForItem.embDataUrl)
+           || (_embStoreX && _isRealX(_embStoreX.dataUrl) && _embStoreX.dataUrl)
+           || (_rawIsEmbX ? _rawStoreX : '')
+           || '');
+        let _dlName = !_dcardForItem ? '' : (
+              _dcardForItem.embFileName
+           || (_embStoreX && _embStoreX.name)
+           || (_embFileFromListX && _embFileFromListX.name)
+           || ((_dcardForItem.designId || 'design') + '.dst'));
         const _hasFileX = !!_dlUrl;
         const _cardDownload = (_isApproved && _hasFileX)
           ? `<a href="${_dlUrl}" download="${String(_dlName).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" title="Download ${_dlName}" style="font-size:11.5px;font-weight:600;color:#c9c3ba;background:#191918;border:1.5px solid #191918;border-radius:6px;padding:4px 10px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-family:inherit"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 1v8m0 0l-3-3m3 3l3-3M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Download ${_dcardForItem.designId || 'design'}</a>`
