@@ -5965,22 +5965,24 @@ var WH_PRE_PRINTING = ['new','in_review','awaiting_scan','scanned'];
 function whSyncOrderStatusFromItems(orderNum) {
   var o = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(function(x){ return x.num === orderNum; }) : null;
   if (!o || !Array.isArray(o.itemList) || !o.itemList.length) return;
-  var anyWorking = false, allDone = true;
+  var anyWorking = false;
   o.itemList.forEach(function(it){
     var s = EGStore.getItemFactoryStatus(orderNum, it.sku);
     if (s === 'working' || s === 'done') anyWorking = true;
-    if (s !== 'done') allDone = false;
   });
-  // Bump to printing if appropriate.
+  // Bump to printing the first time any item starts working.
   var curStatus = String(o.status || '').toLowerCase();
   if (anyWorking && WH_PRE_PRINTING.indexOf(curStatus) !== -1) {
     o.status = 'printing';
     try { if (EGStore && EGStore.update) EGStore.update(orderNum, { factoryStatus: 'printing' }); } catch(e){}
-    if (typeof whRenderOrders === 'function') whRenderOrders();
   }
-  // Mark Shipped button surfaces / hides via DOM toggle so we don't re-render.
-  var btn = document.getElementById('wh-mark-shipped-' + orderNum);
-  if (btn) btn.style.display = (allDone && curStatus !== 'shipped' && curStatus !== 'delivered') ? '' : 'none';
+  // Always re-render so the ACTIONS column re-evaluates the Mark Shipped button
+  // (which only surfaces once EVERY item is working). Starting items one-by-one
+  // leaves the order already in 'printing' after the first item, so without this
+  // the last item's start never triggered a re-render and Mark Shipped stayed
+  // hidden. (Replaces a broken DOM toggle that referenced a non-existent button
+  // id and gated on 'done' instead of 'working'.)
+  if (typeof whRenderOrders === 'function') whRenderOrders();
 }
 function whMarkOrderShipped(orderNum) {
   var o = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(function(x){ return x.num === orderNum; }) : null;
