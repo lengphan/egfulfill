@@ -875,6 +875,10 @@ function renderOrders(ordersOverride) {
   // seller table only shows orders that came in via the manual create-order modal / EGStore.
   const hideSeed = localStorage.getItem('eg_hide_seed') === '1';
   const baseOrders = hideSeed ? ORDERS.filter(o => o._live) : ORDERS;
+  // Keep every row's total live: recompute from its items + shipping before we
+  // render the TOTAL column, so adding/removing an item on the inline order row
+  // updates the total immediately — no need to open the detail modal first.
+  try { ORDERS.forEach(o => { if (o && Array.isArray(o.itemsList)) _recomputeOrderTotal(o); }); } catch(e){}
   let filtered = ordersOverride || (activeFilter === 'all' ? baseOrders : baseOrders.filter(o => o.status === activeFilter));
   if (!ordersOverride) {
     if (filterStores.size)  filtered = filtered.filter(o => filterStores.has(o.store));
@@ -2078,6 +2082,23 @@ function _itemShippingFee(item, idx) {
 }
 window._resolveItemUnitPrice = _resolveItemUnitPrice;
 window._itemShippingFee = _itemShippingFee;
+// Recompute o.total = Σ(unit × qty) + order shipping, write it back, and return
+// it. Used by renderOrders (so the table TOTAL column is always live as items
+// are added/removed inline) AND by openDetailModal — single source of truth so
+// the table and the detail modal never disagree.
+function _recomputeOrderTotal(o) {
+  if (!o || !Array.isArray(o.itemsList)) return o ? (o.total || 0) : 0;
+  let itemsTotal = 0;
+  o.itemsList.forEach(item => {
+    if (item._searching || !item.sku) return;
+    const qty = parseInt(item.qty) || 1;
+    itemsTotal += _resolveItemUnitPrice(item) * qty;
+  });
+  const grand = itemsTotal + _resolveOrderShipping(o);
+  o.total = Math.round(grand * 100) / 100;
+  return o.total;
+}
+window._recomputeOrderTotal = _recomputeOrderTotal;
 const ODM_TECH_LBL = {DTG:'Direct to Garment',EMB:'Embroidery',APL:'Applique',LSR:'Laser'};
 
 function openDetailModal(ordNo) {
@@ -2276,10 +2297,9 @@ function openDetailModal(ordNo) {
                      : (o.carrier ? o.carrier + (o.del && !o.carrier.toLowerCase().includes(o.del.toLowerCase()) ? ' ' + o.del : '') : (o.del || 'Standard shipping'));
   const shippingFee = _resolveOrderShipping(o);
   const grandTotal = itemsTotal + shippingFee;
-  // Keep o.total in sync so the orders table TOTAL column matches whatever
-  // the modal computes — without this the table shows the stale value the
-  // order was seeded with even after the seller adds/removes items.
-  o.total = Math.round(grandTotal * 100) / 100;
+  // Keep o.total in sync via the shared recompute so the table TOTAL column and
+  // this modal never disagree (same formula used by renderOrders).
+  _recomputeOrderTotal(o);
   // Always show the multiplier — even at qty=1 the seller sees "× 1 item",
   // matching the per-item × N display in the items list.
   const subBreakdown = ` <span style="color:#9ca3af;font-size:11.5px">× ${totalUnits} item${totalUnits===1?'':'s'}</span>`;
@@ -3637,14 +3657,9 @@ function orderSetItemVariant(ordNo, sku, key, value) {
       }
     }
   } catch (e) {}
-  // Recompute order total live (product subtotal only — shipping is platform-set).
-  try {
-    let sub = 0;
-    o.itemsList.forEach(it => {
-      sub += _resolveItemUnitPrice(it) * (parseInt(it.qty) || 1);
-    });
-    o.total = Math.round(sub * 100) / 100;
-  } catch(e) {}
+  // Recompute order total live via the shared helper (items + shipping), so the
+  // table TOTAL column stays consistent with the detail modal.
+  try { _recomputeOrderTotal(o); } catch(e) {}
   if (typeof renderOrders === 'function') renderOrders();
   // If the order detail modal is open showing this same order, refresh it
   // so the variant pill / print / composite thumbnail / total all reflect
@@ -4034,9 +4049,15 @@ function openNewOrderModal() {
   document.getElementById('new-order-card').classList.remove('modal-fade-out');
   document.getElementById('new-order-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+  // Fresh start every time — clear any data left from a previous open so the
+  // seller never has to wipe stale address/items before entering a new order.
+  ['no-fname','no-lname','no-street','no-apt','no-city','no-state','no-zip','no-paste'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.style.borderColor = '#e5e4e0'; }
+  });
   const list = document.getElementById('no-items-list');
-  if (!list.children.length) noAddItem();
-  ['no-fname','no-lname','no-street','no-city','no-state','no-zip'].forEach(id => { const el = document.getElementById(id); if (el) el.style.borderColor = '#e5e4e0'; });
+  if (list) list.innerHTML = '';
+  noAddItem();
   noSyncChannel();
 }
 function closeNewOrderModal() {
