@@ -3899,10 +3899,7 @@ function renderOpOrders() {
           const _threadInline = '';
           // Each chip is a pill with the swatch + code + short name so the
           // operator can read which threads are queued without hovering.
-          const _renderThreadChip = t => `<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:2px 8px 2px 3px;flex-shrink:0"><span style="width:12px;height:12px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block;flex-shrink:0"></span><span style="font-size:10.75px;font-weight:700;color:#191918;font-family:monospace;line-height:1">${t.code||'—'}</span>${t.name?`<span style="font-size:10.5px;color:#6b7280;line-height:1">${t.name}</span>`:''}</span>`;
-          const _threadSummary = _threads.length
-            ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0">${_threads.slice(0,6).map(_renderThreadChip).join('')}${_threads.length > 6 ? `<span style="font-size:10.75px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
-            : '';
+          const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
             const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
             const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
             metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
@@ -3916,10 +3913,7 @@ function renderOpOrders() {
             const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
               ? (EGStore.getItemThreadColors(o.num, it.sku) || [])
               : [];
-            const _renderThreadChip = t => `<span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:2px 8px 2px 3px;flex-shrink:0"><span style="width:12px;height:12px;border-radius:50%;background:${t.hex||'#e5e4e0'};border:1px solid rgba(0,0,0,.18);display:inline-block;flex-shrink:0"></span><span style="font-size:10.75px;font-weight:700;color:#191918;font-family:monospace;line-height:1">${t.code||'—'}</span>${t.name?`<span style="font-size:10.5px;color:#6b7280;line-height:1">${t.name}</span>`:''}</span>`;
-            const _threadSummary = _threads.length
-              ? `<span title="${_threads.map(t => (t.code||'—') + ' ' + (t.name||'')).join(', ')}" style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;flex-shrink:0">${_threads.slice(0,6).map(_renderThreadChip).join('')}${_threads.length > 6 ? `<span style="font-size:10.75px;font-weight:600;color:#9ca3af;margin-left:2px">+${_threads.length-6}</span>` : ''}</span>`
-              : '';
+            const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
             const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
             const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
             metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
@@ -5570,7 +5564,12 @@ function coUpdateSku(row, idx) {
   const sizeCode = sels[2].value.replace(/\s+/g,'').replace(/×/g,'X').toUpperCase();
   const tech = _coTechCode(sels[3].value);
   const skuBase = p.sku || p.skuBase || ('SKU-'+p.id);
-  let sku = tech ? `${skuBase}-${colorCode}-${sizeCode}-${tech}` : `${skuBase}-${colorCode}-${sizeCode}`;
+  // Prefer the operator's REAL variant SKU (matches inventory exactly) so we
+  // update the right stock row instead of inventing a new SKU. The print method
+  // is NOT part of the SKU (tracked on the item); rows differing only by method
+  // are disambiguated by the numeric suffix below.
+  const _vm = (Array.isArray(p.variantSkus) ? p.variantSkus : []).find(v => v && v.color === sels[1].value && v.size === sels[2].value);
+  let sku = (_vm && _vm.sku) ? _vm.sku : `${skuBase}-${colorCode}-${sizeCode}`;
   // Dedupe against other rows so identical configs get a -2/-3 suffix and
   // don't collide on the same upload state key.
   const otherSkus = _coItems.map((x,j) => j!==idx ? x.sku : null).filter(Boolean);

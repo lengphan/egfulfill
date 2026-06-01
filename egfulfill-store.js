@@ -2429,6 +2429,36 @@
       return t.split(/[\s\/]+/)[0] || 'DTG';
     },
 
+    // Shared thread-colour chip layout for every factory order row, so the
+    // styling stays identical across operator/admin/warehouse. Design:
+    //   • larger colour dot, NO colour name (decluttered)
+    //   • thread number/code in light grey
+    //   • max 5 chips per row; wraps to a 2nd row at 6–10; caps at 10 with a
+    //     "+N" overflow badge beyond that.
+    renderThreadChips: function(threads) {
+      threads = Array.isArray(threads) ? threads : [];
+      if (!threads.length) return '';
+      var MAX = 10, PER_ROW = 5;
+      var shown = threads.slice(0, MAX);
+      var extra = threads.length - shown.length;
+      var title = threads.map(function(t){ return (t.code || '—') + ' ' + (t.name || ''); }).join(', ');
+      var chip = function(t){
+        return '<span style="display:inline-flex;align-items:center;gap:5px;flex-shrink:0">'
+          + '<span style="width:16px;height:16px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1px solid rgba(0,0,0,.18);display:inline-block;flex-shrink:0"></span>'
+          + '<span style="font-size:11px;font-weight:600;color:#9ca3af;font-family:monospace;line-height:1">' + (t.code || '—') + '</span>'
+          + '</span>';
+      };
+      // Explicit rows of 5, stacked — first row 5, second row up to 5 more.
+      var rows = '';
+      for (var i = 0; i < shown.length; i += PER_ROW) {
+        var slice = shown.slice(i, i + PER_ROW);
+        var lastBadge = (i + PER_ROW >= shown.length && extra > 0)
+          ? '<span style="font-size:11px;font-weight:600;color:#9ca3af;align-self:center">+' + extra + '</span>' : '';
+        rows += '<span style="display:inline-flex;align-items:center;gap:14px;flex-shrink:0">' + slice.map(chip).join('') + lastBadge + '</span>';
+      }
+      return '<span title="' + title.replace(/"/g,'&quot;') + '" style="display:inline-flex;flex-direction:column;gap:6px;flex-shrink:0">' + rows + '</span>';
+    },
+
     // Raster uploads (PNG/JPG/WEBP/GIF) flow through the downscaler before
     // hitting localStorage, so the strict 5MB cap is unnecessary. Accept up
     // to 50MB — a 6000×6000 24-bit PNG is ~108MB raw but typically lands
