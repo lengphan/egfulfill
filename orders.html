@@ -4233,7 +4233,18 @@ function noUpdateSku(row) {
     return s.slice(0,3);
   }
   const techCode = _techCode(sels[3]?.value);
-  let sku = techCode ? `${p.skuBase}-${colorCode}-${sizeCode}-${techCode}` : `${p.skuBase}-${colorCode}-${sizeCode}`;
+  // Prefer the operator's REAL variant SKU (matches inventory exactly) over a
+  // synthesized one. The print method is NOT part of the SKU — it's tracked
+  // separately on the item — so two rows differing only by print method are
+  // disambiguated by the numeric suffix below, not a -EMB/-DTG tail.
+  const _wantColor = sels[1].value, _wantSize = sels[2].value;
+  let sku;
+  const _vMatch = (p.variantSkus || []).find(v => v && v.color === _wantColor && v.size === _wantSize);
+  if (_vMatch && _vMatch.sku) {
+    sku = _vMatch.sku;
+  } else {
+    sku = `${p.skuBase}-${colorCode}-${sizeCode}`;
+  }
   // Dedupe: if another row in the same modal already has this exact SKU,
   // append a numeric suffix so the two items keep separate upload state.
   // Without this, UP_STATE[ordNo][sku] is shared and dropping a file on row
@@ -5669,7 +5680,11 @@ function _mapCatProd(p) {
                          : (p.type ? [String(p.type).toUpperCase()] : ['DTG']));
   const colorCodes = Object.assign({}, p.colorCodes);
   colors.forEach(c => { if (!colorCodes[c]) colorCodes[c] = String(c).replace(/[^a-zA-Z]/g,'').substring(0,3).toUpperCase() || 'CLR'; });
-  return { id: p.id, name: p.name, skuBase: p.sku || p.skuBase || ('SKU-' + p.id), printTypes, colors, sizes, colorCodes };
+  // Keep the operator's real per-variant SKUs so the order item can use the
+  // EXACT inventory SKU (e.g. G5000-WHT-S) instead of a synthesized color code
+  // (G5000-WHI-S) — otherwise stock / backorder / design lookups never match.
+  const variantSkus = Array.isArray(p.variantSkus) ? p.variantSkus : [];
+  return { id: p.id, name: p.name, skuBase: p.sku || p.skuBase || ('SKU-' + p.id), printTypes, colors, sizes, colorCodes, variantSkus };
 }
 function syncBlankCatalog() {
   try {
