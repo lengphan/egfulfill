@@ -63,6 +63,17 @@
     // Fire a callback whenever the auth state changes (login/logout/refresh).
     onChange: function (cb) { return sb.auth.onAuthStateChange(function (_e, session) { cb(session); }); },
 
+    // Which dashboard a role lands on after login.
+    DASHBOARDS: { seller:'seller.html', operator:'operator.html', warehouse:'warehouse.html', admin:'admin.html', designer:'designer.html' },
+    dashboardFor: function (role) { return this.DASHBOARDS[role] || 'seller.html'; },
+
+    // Sign in, then redirect to the dashboard that matches the user's REAL role
+    // (from the profiles table) — no more guessing from the email string.
+    routeAfterLogin: function () {
+      var self = this;
+      return this.getRole().then(function (role) { window.location.href = self.dashboardFor(role); });
+    },
+
     // Convenience guard for a page: redirect to login if not signed in.
     requireLogin: function (loginUrl) {
       return this.getSession().then(function (s) {

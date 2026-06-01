@@ -161,16 +161,79 @@
       .subscribe();
   }
 
+  // ── Generic collection sync (inventory + design cards) ────────────────────
+  // Same idea as orders but driven off the localStorage key: localStorage stays
+  // the cache; we intercept writes to these keys and upsert to Supabase, hydrate
+  // on login, and refresh on realtime changes. Used for the FACTORY data only
+  // (gated by role below so a seller's RLS-empty read can't wipe their cache).
+  var _active = false;
+  var _suspend = {};
+  var _pushTimers = {};
+  var COLLECTIONS = {
+    eg_inventory: {
+      table: 'inventory', pk: 'sku',
+      fromDb: function (d) { return { sku: d.sku, name: d.name, variant: d.variant, inStock: d.in_stock, reserved: d.reserved, reorderAt: d.reorder_at, category: d.category }; },
+      toDb: function (r) { return { sku: r.sku, name: r.name || null, variant: r.variant || null, in_stock: parseInt(r.inStock, 10) || 0, reserved: parseInt(r.reserved, 10) || 0, reorder_at: r.reorderAt != null ? parseInt(r.reorderAt, 10) : 25, category: r.category || null }; }
+    },
+    egfulfill_design_cards: {
+      table: 'design_cards', pk: 'id',
+      fromDb: function (d) { return { id: d.id, order: d.order_id, sku: d.sku, designId: d.design_id, title: d.title, col: d.col, type: d.type, product: d.product, priority: d.priority, due: d.due, assignee: d.assignee, claimedBy: d.claimed_by, payment: d.payment, payStatus: d.pay_status, isEmb: d.is_emb, embFileName: d.emb_file_name, thumb: d.thumb, thumb_ref: d.thumb_ref, files: d.files || [], specs: d.specs || {}, notes: d.notes || [], history: d.history || [], checklist: d.checklist || [] }; },
+      toDb: function (c) { return { id: c.id, order_id: c.order || null, sku: c.sku || null, design_id: c.designId || c.title || null, title: c.title || null, col: c.col || 'incoming', type: c.type || null, product: c.product || null, priority: c.priority || 'normal', due: c.due || null, assignee: c.assignee || null, claimed_by: c.claimedBy || null, payment: parseFloat(c.payment) || 0, pay_status: c.payStatus || 'pending', is_emb: !!c.isEmb, emb_file_name: c.embFileName || null, thumb: c.thumb || null, thumb_ref: c.thumb_ref || null, files: c.files || [], specs: c.specs || {}, notes: c.notes || [], history: c.history || [], checklist: c.checklist || [] }; }
+    }
+  };
+  function _readArr(key) { try { return JSON.parse(localStorage.getItem(key) || '[]') || []; } catch (e) { return []; } }
+  function hydrateCollection(key) {
+    var c = COLLECTIONS[key]; if (!c) return;
+    return sb.from(c.table).select('*').then(function (res) {
+      if (res.error) { console.warn('[sync] hydrate ' + c.table + ' failed', res.error.message); return; }
+      _suspend[key] = true;
+      try { localStorage.setItem(key, JSON.stringify((res.data || []).map(c.fromDb))); } catch (e) {}
+      _suspend[key] = false;
+      try { window.dispatchEvent(new StorageEvent('storage', { key: key })); } catch (e) {}
+    });
+  }
+  function pushCollection(key) {
+    var c = COLLECTIONS[key]; if (!c || !_active) return;
+    var rows = _readArr(key).map(c.toDb).filter(function (r) { return r[c.pk] != null && r[c.pk] !== ''; });
+    if (!rows.length) return;
+    sb.from(c.table).upsert(rows, { onConflict: c.pk }).then(function (res) {
+      if (res.error) console.warn('[sync] push ' + c.table + ' failed', res.error.message);
+    });
+  }
+  function subscribeCollection(key) {
+    var c = COLLECTIONS[key]; if (!c) return; var t = null;
+    sb.channel('eg-' + c.table)
+      .on('postgres_changes', { event: '*', schema: 'public', table: c.table }, function () { clearTimeout(t); t = setTimeout(function () { hydrateCollection(key); }, 250); })
+      .subscribe();
+  }
+  // Intercept localStorage writes once: any write to a synced key pushes upstream.
+  (function () {
+    var orig = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function (key, val) {
+      orig(key, val);
+      if (COLLECTIONS[key] && _active && !_suspend[key]) { clearTimeout(_pushTimers[key]); _pushTimers[key] = setTimeout(function () { pushCollection(key); }, 400); }
+    };
+  })();
+
   // ── Boot: only sync when a user is signed in ──────────────────────────────
   function start(session) {
     if (!session) return;                 // logged out → leave demo/localStorage data alone
-    installWrappers();
+    _active = true;
+    installWrappers();                    // orders — everyone
     hydrate();
     subscribe();
+    // Inventory + design cards are FACTORY data — only sync them for staff, so a
+    // seller's RLS-restricted (empty) read can't blow away their local cache.
+    sb.from('profiles').select('role').eq('id', session.user.id).single().then(function (p) {
+      var role = p.data && p.data.role;
+      if (['operator', 'admin', 'warehouse', 'designer'].indexOf(role) !== -1) {
+        Object.keys(COLLECTIONS).forEach(function (key) { hydrateCollection(key); subscribeCollection(key); });
+      }
+    });
   }
   sb.auth.getSession().then(function (r) { start(r.data.session); });
   sb.auth.onAuthStateChange(function (_e, session) { if (session) start(session); });
 
   // Expose for manual refresh / debugging.
-  window.EGStoreSync = { hydrate: hydrate, pushOrder: pushOrder };
+  window.EGStoreSync = { hydrate: hydrate, pushOrder: pushOrder, hydrateCollection: hydrateCollection, pushCollection: pushCollection };
 })();

@@ -119,7 +119,7 @@
           b.textContent = res.error.message; b.style.display = 'block';
           btn.disabled = false; btn.textContent = 'Log in'; return;
         }
-        window.location.href = 'seller.html';
+        EGAuth.routeAfterLogin();   // land on the dashboard matching the user's role
       });
     } else {
       setTimeout(() => { window.location.href = 'seller.html'; }, 800);

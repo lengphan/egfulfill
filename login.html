@@ -89,6 +89,8 @@
     <a href="#">Terms</a>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
 <script>
   // Route to the matching dashboard based on the email/username (no separate role buttons).
   function destFor(id){
@@ -111,7 +113,19 @@
     if(!ok) return;
     const btn = document.getElementById('login-btn');
     btn.disabled = true; btn.textContent = 'Logging in…';
-    setTimeout(() => { window.location.href = destFor(email); }, 750);
+    if (window.EGAuth) {
+      EGAuth.signIn(email, pw).then(function(res){
+        if (res.error) {
+          document.getElementById('err-password').textContent = res.error.message;
+          document.getElementById('login-password').classList.add('err');
+          btn.disabled = false; btn.textContent = 'Log in'; return;
+        }
+        // Redirect by the user's REAL role (operator/admin/warehouse/designer/seller).
+        EGAuth.routeAfterLogin();
+      });
+    } else {
+      setTimeout(() => { window.location.href = destFor(email); }, 750);
+    }
   }
 </script>
 </body>
