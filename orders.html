@@ -1977,15 +1977,17 @@ function _resolveItemUnitPrice(item) {
         (p.name && item.blank && p.name === item.blank)
       );
       if (product) {
-        // New format: product.sizePrices = [{size, price, shipping}] — match
-        // the item's size and return the absolute price for that row.
+        // Resolve the BASE (garment/size) price, then ADD the per-method price
+        // on top — the print method is a surcharge, not a replacement. So a
+        // 2XL at $15 with Embroidery (+$3) = $18.
         const itemSize = String(item.size || '').trim().toLowerCase();
+        let base = null;
         if (Array.isArray(product.sizePrices) && product.sizePrices.length) {
           for (const row of product.sizePrices) {
             if (row.size != null) {
               if (itemSize && String(row.size).toLowerCase() === itemSize) {
                 const ap = parseFloat(row.price);
-                if (!isNaN(ap) && ap > 0) return ap;
+                if (!isNaN(ap) && ap > 0) { base = ap; break; }
               }
             } else if (row.sizes) {
               // Legacy compat: rows that stored size-list strings + price/upcharge.
@@ -1994,20 +1996,30 @@ function _resolveItemUnitPrice(item) {
                 const basePrice = parseFloat(product.price) || 0;
                 const u = (row.upcharge != null) ? parseFloat(row.upcharge)
                   : (row.price != null ? Math.max(0, parseFloat(row.price) - basePrice) : 0);
-                return basePrice + ((!isNaN(u) && u > 0) ? u : 0);
+                base = basePrice + ((!isNaN(u) && u > 0) ? u : 0); break;
               }
             }
           }
         }
-        // Fallbacks: methodPrices[tech] override → basePrice → price.
-        if (item.tech && product.methodPrices && typeof product.methodPrices === 'object') {
-          const mp = parseFloat(product.methodPrices[item.tech]);
-          if (!isNaN(mp) && mp > 0) return mp;
+        // No size-row match → fall back to the product base / price.
+        if (base == null) {
+          const bp = parseFloat(product.basePrice);
+          if (!isNaN(bp) && bp > 0) base = bp;
+          else { const altBp = parseFloat(product.price); if (!isNaN(altBp) && altBp > 0) base = altBp; }
         }
-        const bp = parseFloat(product.basePrice);
-        if (!isNaN(bp) && bp > 0) return bp;
-        const altBp = parseFloat(product.price);
-        if (!isNaN(altBp) && altBp > 0) return altBp;
+        // Per-method add-on. methodPrices is keyed DTG/DTF/EMB/APL/LSR; the
+        // item's tech may be the short code or a longer label, so normalise.
+        let methodAddOn = 0;
+        if (item.tech && product.methodPrices && typeof product.methodPrices === 'object') {
+          const _t = String(item.tech).toUpperCase();
+          const _key = /EMB/.test(_t) ? 'EMB' : /DTF/.test(_t) ? 'DTF' : /APL|APPLIQ/.test(_t) ? 'APL'
+                     : /LSR|LASER/.test(_t) ? 'LSR' : /DTG|DIRECT/.test(_t) ? 'DTG' : _t;
+          const mp = parseFloat(product.methodPrices[_key] != null ? product.methodPrices[_key] : product.methodPrices[item.tech]);
+          if (!isNaN(mp) && mp > 0) methodAddOn = mp;
+        }
+        if (base != null) return base + methodAddOn;
+        // No base resolved but a method price exists → use the method price alone.
+        if (methodAddOn > 0) return methodAddOn;
       }
     }
   } catch (e) {}

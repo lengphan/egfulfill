@@ -7462,8 +7462,24 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             (Array.isArray(p.variantSkus) && p.variantSkus.some(v => v && v.sku === it.sku)) ||
             (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()));
           if (product) {
-            if (it.tech && product.methodPrices && product.methodPrices[it.tech] != null) return parseFloat(product.methodPrices[it.tech]) || 0;
-            return parseFloat(product.basePrice) || parseFloat(product.price) || 0;
+            // Base (per-size if set, else product base/price) + method add-on,
+            // matching the seller's _resolveItemUnitPrice so totals agree.
+            let _base = null;
+            const _sz = String(it.size || '').trim().toLowerCase();
+            if (Array.isArray(product.sizePrices)) {
+              const row = product.sizePrices.find(r => r.size != null && String(r.size).toLowerCase() === _sz);
+              if (row && row.price != null) { const ap = parseFloat(row.price); if (!isNaN(ap) && ap > 0) _base = ap; }
+            }
+            if (_base == null) _base = parseFloat(product.basePrice) || parseFloat(product.price) || 0;
+            let _add = 0;
+            const _tech = String(it.tech || it.printType || '').toUpperCase();
+            if (_tech && product.methodPrices) {
+              const _k = /EMB/.test(_tech) ? 'EMB' : /DTF/.test(_tech) ? 'DTF' : /APL|APPLIQ/.test(_tech) ? 'APL'
+                       : /LSR|LASER/.test(_tech) ? 'LSR' : /DTG|DIRECT/.test(_tech) ? 'DTG' : _tech;
+              const mp = parseFloat(product.methodPrices[_k] != null ? product.methodPrices[_k] : product.methodPrices[it.tech]);
+              if (!isNaN(mp) && mp > 0) _add = mp;
+            }
+            return _base + _add;
           }
         }
       } catch(e){}
