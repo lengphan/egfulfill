@@ -1,8 +1,10 @@
 // EGFULFILL API — Fastify entry point.
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify } from './auth.js';
+import { signup, login, verify, isStaff } from './auth.js';
 import { ordersRoutes } from './routes/orders.js';
+import { inventoryRoutes } from './routes/inventory.js';
+import { designCardsRoutes } from './routes/design_cards.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: process.env.CORS_ORIGIN || '*' });
@@ -14,6 +16,10 @@ app.addHook('onRequest', async (req) => {
 });
 function requireAuth(req, reply, done) {
   if (!req.user) { reply.code(401).send({ error: 'Not signed in' }); return; }
+  done();
+}
+function requireStaff(req, reply, done) {
+  if (!isStaff(req.user)) { reply.code(403).send({ error: 'Staff only' }); return; }
   done();
 }
 
@@ -30,8 +36,10 @@ app.post('/api/auth/login', async (req, reply) => {
 });
 app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
 
-// ── Data routes (copy orders.js for inventory, design_cards, etc.) ──
+// ── Data routes ──
 ordersRoutes(app, requireAuth);
+inventoryRoutes(app, requireStaff);
+designCardsRoutes(app, requireAuth, requireStaff);
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

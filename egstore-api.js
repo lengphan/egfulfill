@@ -104,14 +104,65 @@
       return res;
     };
   }
+  // ── Inventory + design-card sync (FACTORY data — staff roles only) ────────
+  // localStorage is the cache; we intercept writes to these keys and POST the
+  // full (DB-shaped) list, hydrate on login, and refresh on the poll. Gated to
+  // staff so a seller's restricted read can't wipe their cache.
+  var _suspend = {}, _pushTimers = {};
+  var COLLECTIONS = {
+    eg_inventory: {
+      path: '/inventory',
+      fromDb: function (d) { return { sku: d.sku, name: d.name, variant: d.variant, inStock: d.in_stock, reserved: d.reserved, reorderAt: d.reorder_at, category: d.category }; },
+      toDb: function (r) { return { sku: r.sku, name: r.name || null, variant: r.variant || null, in_stock: parseInt(r.inStock, 10) || 0, reserved: parseInt(r.reserved, 10) || 0, reorder_at: r.reorderAt != null ? parseInt(r.reorderAt, 10) : 25, category: r.category || null }; }
+    },
+    egfulfill_design_cards: {
+      path: '/design_cards',
+      fromDb: function (d) { return { id: d.id, order: d.order_id, sku: d.sku, designId: d.design_id, title: d.title, col: d.col, type: d.type, product: d.product, priority: d.priority, due: d.due, assignee: d.assignee, claimedBy: d.claimed_by, payment: d.payment, payStatus: d.pay_status, isEmb: d.is_emb, embFileName: d.emb_file_name, thumb: d.thumb, thumb_ref: d.thumb_ref, files: d.files || [], specs: d.specs || {}, notes: d.notes || [], history: d.history || [], checklist: d.checklist || [] }; },
+      toDb: function (c) { return { id: c.id, order_id: c.order || null, sku: c.sku || null, design_id: c.designId || c.title || null, title: c.title || null, col: c.col || 'incoming', type: c.type || null, product: c.product || null, priority: c.priority || 'normal', due: c.due || null, assignee: c.assignee || null, claimed_by: c.claimedBy || null, payment: parseFloat(c.payment) || 0, pay_status: c.payStatus || 'pending', is_emb: !!c.isEmb, emb_file_name: c.embFileName || null, thumb: c.thumb || null, thumb_ref: c.thumb_ref || null, files: c.files || [], specs: c.specs || {}, notes: c.notes || [], history: c.history || [], checklist: c.checklist || [] }; }
+    }
+  };
+  function isStaff() { try { var u = JSON.parse(localStorage.getItem(USER_KEY) || 'null'); return u && ['operator', 'admin', 'warehouse', 'designer'].indexOf(u.role) !== -1; } catch (e) { return false; } }
+  function readArr(key) { try { return JSON.parse(localStorage.getItem(key) || '[]') || []; } catch (e) { return []; } }
+  function hydrateCollection(key) {
+    var c = COLLECTIONS[key];
+    return api(c.path).then(function (r) {
+      if (r.error) { console.warn('[egstore-api] hydrate ' + key + ':', r.error.message); return; }
+      _suspend[key] = true;
+      try { localStorage.setItem(key, JSON.stringify((r.data || []).map(c.fromDb))); } catch (e) {}
+      _suspend[key] = false;
+      try { window.dispatchEvent(new StorageEvent('storage', { key: key })); } catch (e) {}
+    });
+  }
+  function pushCollection(key) {
+    var c = COLLECTIONS[key];
+    var rows = readArr(key).map(c.toDb);
+    if (!rows.length) return;
+    api(c.path, { method: 'POST', body: rows });
+  }
+  (function () {                       // intercept writes to the synced keys
+    var orig = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function (key, val) {
+      orig(key, val);
+      if (COLLECTIONS[key] && token() && isStaff() && !_suspend[key]) {
+        clearTimeout(_pushTimers[key]);
+        _pushTimers[key] = setTimeout(function () { pushCollection(key); }, 500);
+      }
+    };
+  })();
+
   function start() {
     if (!token()) return;          // signed out → leave local/demo data alone
     installWrappers();
     hydrate();
+    var collKeys = isStaff() ? Object.keys(COLLECTIONS) : [];
+    collKeys.forEach(hydrateCollection);
     // Light polling for cross-board liveness (no realtime server yet). 15s.
     clearInterval(window.__egApiPoll);
-    window.__egApiPoll = setInterval(hydrate, 15000);
+    window.__egApiPoll = setInterval(function () {
+      hydrate();
+      collKeys.forEach(hydrateCollection);
+    }, 15000);
   }
   start();
-  window.EGStoreSync = { hydrate: hydrate };
+  window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection };
 })();
