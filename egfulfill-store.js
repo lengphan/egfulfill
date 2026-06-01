@@ -1260,6 +1260,86 @@
       } catch (e) { /* native href download already fired as the primary path */ }
     },
 
+    // ── Shared deliverable resolver ───────────────────────────────────────
+    // ONE canonical answer to "what file does this order item download, and is
+    // it ready?" — used by operator/admin/warehouse so the order rows AND the
+    // order-detail modal agree. Rule (unchanged): EMB items deliver the
+    // embroidery binary ONLY; DTG/etc deliver the raster. The link only appears
+    // once the design card is approved AND a real file exists.
+    resolveDeliverable: function(orderId, sku, item) {
+      var card = this.getDesignCard ? this.getDesignCard(orderId, sku) : null;
+      var approved = !!card && (card.col === 'approved' || card.col === 'paid');
+      var emb = this.getItemEmbFile ? this.getItemEmbFile(orderId, sku) : null;
+      var raw = this.getRawDesign ? this.getRawDesign(orderId, sku) : null;
+      var isReal = function(u){ return !!u && typeof u === 'string' && u.indexOf('placehold.co') === -1 && u.indexOf('data:image/svg+xml') !== 0; };
+      var EMB_EXT = /\.(emb|dst|pes|exp|jef|vp3)$/i;
+      var firstRaster = card ? (card.files || []).find(function(f){ return f && f.previewUrl; }) : null;
+      var embFromList = card ? (card.files || []).find(function(f){ return f && f.name && EMB_EXT.test(f.name); }) : null;
+      var tech = String((item && (item.printType || item.tech)) || '').toUpperCase();
+      var isEmb = tech ? /EMB/.test(tech)
+                       : !!(card && (card.isEmb || card.embFileName || embFromList || (emb && emb.name && EMB_EXT.test(emb.name))));
+      var url = '', name = '';
+      if (card) {
+        if (isEmb) {
+          url = (isReal(card.embDataUrl) && card.embDataUrl)
+             || (emb && isReal(emb.dataUrl) && emb.dataUrl)
+             || ((isReal(raw) && emb && emb.name && EMB_EXT.test(emb.name)) ? raw : '')
+             || '';
+          name = card.embFileName || (emb && emb.name) || (embFromList && embFromList.name) || ((card.designId || 'design') + '.dst');
+        } else {
+          url = (firstRaster && isReal(firstRaster.previewUrl) && firstRaster.previewUrl)
+             || (isReal(raw) && raw)
+             || (isReal(card.thumb) && card.thumb)
+             || '';
+          name = (firstRaster && firstRaster.name) || ((card.designId || 'design') + '.png');
+        }
+      }
+      return { card: card, designId: card ? (card.designId || card.title || 'design') : '', approved: approved, isEmb: isEmb, url: url, name: name, hasFile: !!url };
+    },
+    // Preview + Download markup for one order item — identical on every board.
+    // Returns '' when the design isn't approved yet or has no real file, so the
+    // three boards always show the SAME thing. Download is single-fire (the
+    // native href is suppressed; downloadDataUrl handles binary .emb reliably).
+    deliverableHTML: function(orderId, sku, item) {
+      var d = this.resolveDeliverable(orderId, sku, item);
+      if (!d.approved || !d.hasFile) return '';
+      var oid = String(orderId).replace(/'/g, "\\'");
+      var s = String(sku).replace(/'/g, "\\'");
+      var ext = d.isEmb ? ((String(d.name).match(/\.(emb|dst|pes|exp|jef|vp3)$/i) || ['.emb'])[0].toLowerCase()) : '.png';
+      var dlName = String(d.name).replace(/"/g, '&quot;');
+      var eye = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/></svg>';
+      var down = '<svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 1v8m0 0l-3-3m3 3l3-3M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var preview = '<button onclick="event.stopPropagation();EGStore.previewDeliverable(\'' + oid + '\',\'' + s + '\')" title="Preview design" style="font-size:11.5px;font-weight:600;color:#374151;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:5px;padding:2px 7px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:3px">' + eye + 'Preview</button>';
+      var dl = '<a href="' + d.url + '" download="' + dlName + '" onclick="event.preventDefault();event.stopPropagation();EGStore.downloadDataUrl(this.getAttribute(\'href\'),this.getAttribute(\'download\'))" title="Download ' + dlName + '" style="font-size:11.5px;font-weight:700;color:#15803d;text-decoration:none;display:inline-flex;align-items:center;gap:4px;cursor:pointer">' + down + (d.isEmb ? ext : ('Download ' + d.designId)) + '</a>';
+      return '<div style="display:inline-flex;align-items:center;gap:6px">' + preview + dl + '</div>';
+    },
+    // Shared preview modal. For an embroidery file we hand off to the board's
+    // stitch renderer (embPreviewByOrder) when present; otherwise we show the
+    // raster artwork (or an honest "binary embroidery file" note).
+    previewDeliverable: function(orderId, sku, item) {
+      var d = this.resolveDeliverable(orderId, sku, item);
+      if (d.isEmb && typeof window !== 'undefined' && typeof window.embPreviewByOrder === 'function') {
+        try { window.embPreviewByOrder(orderId, sku); return; } catch(e){}
+      }
+      var img = '';
+      if (!d.isEmb && d.url && String(d.url).indexOf('data:image') === 0) img = d.url;
+      if (!img && this.getRawDesign) { var r = this.getRawDesign(orderId, sku); if (r && String(r).indexOf('data:image') === 0) img = r; }
+      if (!img && this.getCachedImage) { var c = this.getCachedImage(orderId, sku); if (c) img = c; }
+      var ov = document.getElementById('eg-deliv-prev');
+      if (!ov) { ov = document.createElement('div'); ov.id = 'eg-deliv-prev';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:10060;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+        ov.onclick = function(e){ if (e.target === ov) ov.style.display = 'none'; };
+        document.body.appendChild(ov);
+      }
+      var body = img
+        ? '<img src="' + img + '" style="max-width:100%;max-height:62vh;display:block;border-radius:8px;border:1px solid #e5e4e0" onerror="this.outerHTML=\'<div style=&quot;padding:40px;color:#9ca3af&quot;>Preview unavailable</div>\'">'
+        : '<div style="padding:42px 20px;text-align:center;color:#6b7280;font-size:13.5px;line-height:1.6"><div style="font-size:30px;margin-bottom:8px">🧵</div>Embroidery machine file<br><b style="color:#191918">' + (d.name || 'design') + '</b><br><span style="font-size:12px;color:#9ca3af">Open in your stitch viewer to inspect.</span></div>';
+      ov.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;max-width:92vw;max-height:84vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f0ede9"><div style="font-size:14.5px;font-weight:700;color:#191918">' + (d.designId || 'Design') + ' · preview</div><button onclick="document.getElementById(\'eg-deliv-prev\').style.display=\'none\'" style="background:none;border:none;font-size:21px;color:#9ca3af;cursor:pointer;line-height:1">×</button></div>'
+        + '<div style="padding:16px">' + body + '</div></div>';
+      ov.style.display = 'flex';
+    },
+
     // ── Auto Design ID generator ──
     // Every file/design pushed to the board gets a stable DSN-### handle that
     // future orders can reference. Counter persists across sessions.

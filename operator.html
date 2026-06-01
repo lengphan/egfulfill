@@ -3888,7 +3888,7 @@ function renderOpOrders() {
             // silently (binary MIME quirks, oversized payloads, etc.). We do
             // NOT preventDefault so the native path always gets a shot.
             const _idHtml = (_approved && _hasFile)
-              ? `<a href="${_dlUrlEsc}" download="${_dlNameEsc}" onclick="event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlNameEsc}">${_dsnText} ↓</a>`
+              ? `<a href="${_dlUrlEsc}" download="${_dlNameEsc}" onclick="event.preventDefault();event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlNameEsc}">${_dsnText} ↓</a>`
               : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
           // Thread colour swatches — moved off the product-name row (was too
           // jammed) and into the metaRow as tiny dot-only swatches. Hover the
@@ -7543,7 +7543,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         }
         const _hasFileX = !!_dlUrl;
         const _cardDownload = (_isApproved && _hasFileX)
-          ? `<a href="${_dlUrl}" download="${String(_dlName).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" title="Download ${_dlName}" style="font-size:11.5px;font-weight:600;color:#c9c3ba;background:#191918;border:1.5px solid #191918;border-radius:6px;padding:4px 10px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-family:inherit"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 1v8m0 0l-3-3m3 3l3-3M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Download ${_dcardForItem.designId || 'design'}</a>`
+          ? `<a href="${_dlUrl}" download="${String(_dlName).replace(/"/g,'&quot;')}" onclick="event.preventDefault();event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" title="Download ${_dlName}" style="font-size:11.5px;font-weight:600;color:#c9c3ba;background:#191918;border:1.5px solid #191918;border-radius:6px;padding:4px 10px;text-decoration:none;display:inline-flex;align-items:center;gap:5px;font-family:inherit"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M7 1v8m0 0l-3-3m3 3l3-3M2 12h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Download ${_dcardForItem.designId || 'design'}</a>`
           : '';
         // Confirmed thread colours flow from the seller's upload picker via
         // EGStore.setItemThreadColors. Render as compact swatch+code chips so
@@ -7565,7 +7565,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             ${threadChips}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-            ${_cardDownload}
+            ${(typeof EGStore !== 'undefined' && EGStore.deliverableHTML) ? EGStore.deliverableHTML((o && o.id) || _xfomNum, it.sku, it) : _cardDownload}
           </div>
         </div>`;
       }).join('');
