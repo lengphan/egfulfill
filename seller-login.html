@@ -94,6 +94,8 @@
     <a href="#">Terms</a>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
 <script>
   function togglePw(){ const inp = document.getElementById('login-password'); inp.type = inp.type === 'password' ? 'text' : 'password'; }
   function submitLogin(e){
@@ -110,7 +112,18 @@
     if(!ok) return;
     const btn = document.getElementById('login-btn');
     btn.disabled = true; btn.textContent = 'Signing in…';
-    setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+    if (window.EGAuth) {
+      EGAuth.signIn(email, password).then(function(res){
+        if (res.error) {
+          var b = document.getElementById('login-error');
+          b.textContent = res.error.message; b.style.display = 'block';
+          btn.disabled = false; btn.textContent = 'Log in'; return;
+        }
+        window.location.href = 'seller.html';
+      });
+    } else {
+      setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+    }
   }
 </script>
 </body>

@@ -111,6 +111,8 @@
     <a href="#">Terms</a>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-client.js"></script>
 <script>
   function togglePw(id){ const inp = document.getElementById(id); inp.type = inp.type === 'password' ? 'text' : 'password'; }
 
@@ -147,7 +149,22 @@
     if(!ok) return;
     const btn = document.getElementById('su-btn');
     btn.disabled = true; btn.textContent = 'Creating account…';
-    setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+    // Real signup via Supabase Auth. The handle_new_user() trigger creates the
+    // matching profiles row with role='seller'. Falls back to the demo redirect
+    // if the client isn't loaded.
+    if (window.EGAuth) {
+      EGAuth.signUp(email, pw, { role: 'seller' }).then(function(res){
+        if (res.error) {
+          banner.textContent = res.error.message; banner.style.display = 'block';
+          btn.disabled = false; btn.textContent = 'Create account'; return;
+        }
+        // If email confirmation is OFF you're logged in immediately; if ON, the
+        // user must confirm via email before a session exists.
+        window.location.href = res.data && res.data.session ? 'seller.html' : 'seller-login.html';
+      });
+    } else {
+      setTimeout(() => { window.location.href = 'seller.html'; }, 800);
+    }
   }
 </script>
 </body>
