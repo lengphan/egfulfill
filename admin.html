@@ -84,6 +84,10 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .section{display:none;padding:24px 32px;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box}.section.active{display:block}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scanFlashOk{0%{border-color:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,.18)}100%{border-color:#e5e4e0;box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+@keyframes scanFlashErr{0%,40%{border-color:#dc2626;box-shadow:0 0 0 4px rgba(220,38,38,.22)}100%{border-color:#e5e4e0;box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+.scan-flash-ok{animation:scanFlashOk .55s ease-out}
+.scan-flash-err{animation:scanFlashErr .65s ease-out}
 .fi{animation:fadeUp .35s cubic-bezier(.22,1,.36,1) both}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 .modal{background:#fff;border:1px solid #e5e4e0;border-radius:16px;max-width:640px;width:90%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)}
@@ -1118,50 +1122,43 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- ===== INVENTORY ===== -->
   <div id="section-inventory" class="section fi">
 
-    <!-- Scanner panel -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
-      <!-- Scan In -->
-      <div class="card" style="padding:18px 20px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 5V3a1 1 0 011-1h2M11 2h2a1 1 0 011 1v2M14 11v2a1 1 0 01-1 1h-2M5 14H3a1 1 0 01-1-1v-2" stroke="#191918" stroke-width="1.3" stroke-linecap="round"/><path d="M5 8h6" stroke="#191918" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <!-- Scanner panel: split layout — scanner on left, recent log on right (matches warehouse) -->
+    <div class="card" id="scan-card" data-mode="in" style="padding:18px 20px;margin-bottom:18px">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start">
+        <!-- LEFT: scanner controls -->
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div id="scan-mode-icon" style="width:32px;height:32px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="4" height="8" rx=".5" stroke="#16a34a" stroke-width="1.3"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#16a34a" opacity=".4"/><rect x="10.5" y="4" width="4" height="8" rx=".5" stroke="#16a34a" stroke-width="1.3"/></svg>
+            </div>
+            <div style="font-size:14.5px;font-weight:700;color:#191918">Scanner</div>
+            <div role="tablist" style="display:inline-flex;background:#f0ede9;border-radius:8px;padding:3px;gap:2px;margin-left:6px">
+              <button id="scan-mode-in" onclick="setScanMode('in')" style="font-size:13px;font-weight:700;font-family:inherit;border:none;background:#16a34a;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all .15s;letter-spacing:.03em">＋ IN</button>
+              <button id="scan-mode-out" onclick="setScanMode('out')" style="font-size:13px;font-weight:700;font-family:inherit;border:none;background:transparent;color:#6b7280;padding:5px 14px;border-radius:6px;cursor:pointer;transition:all .15s;letter-spacing:.03em">− OUT</button>
+            </div>
           </div>
-          <div style="font-size:14.5px;font-weight:700;color:#191918">Scan In</div>
-          <span class="badge b-ok" style="font-size:11.5px;margin-left:auto">+12 today</span>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <div style="position:relative;flex:1">
-            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#9ca3af" opacity=".4"/><rect x="11" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/></svg>
-            <input id="scan-in-input" class="input" placeholder="Scan barcode or type SKU…" style="padding-left:34px;font-family:monospace" onkeydown="if(event.key==='Enter')doScan('in')"/>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div style="position:relative;flex:1;min-width:0">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#9ca3af" opacity=".4"/><rect x="11" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/></svg>
+              <input id="scan-input" class="input scan-input" placeholder="Scan barcode or type SKU…" style="padding-left:34px;font-family:monospace;border-width:1.5px;transition:border-color .15s,box-shadow .15s;width:100%" onkeydown="if(event.key==='Enter')doScan()" oninput="scanAutoCheck(this.value)"/>
+            </div>
+            <button id="scan-submit-btn" class="btn btn-green" style="flex-shrink:0" onclick="doScan()">＋ Scan In</button>
           </div>
-          <button class="btn btn-green" onclick="doScan('in')">+ Add</button>
-        </div>
-        <div id="scan-in-log" style="display:flex;flex-direction:column;gap:4px;max-height:90px;overflow-y:auto">
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f3f3f1"><span style="font-family:monospace;color:#374151">BLK-GLD-SM</span><span style="color:#374151;font-weight:600">+24 units · 9:14 AM</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f3f3f1"><span style="font-family:monospace;color:#374151">MUG-11OZ-W</span><span style="color:#374151;font-weight:600">+48 units · 8:50 AM</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0"><span style="font-family:monospace;color:#374151">PST-11X17</span><span style="color:#374151;font-weight:600">+100 units · 8:30 AM</span></div>
-        </div>
-      </div>
-      <!-- Scan Out -->
-      <div class="card" style="padding:18px 20px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <div style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 5V3a1 1 0 011-1h2M11 2h2a1 1 0 011 1v2M14 11v2a1 1 0 01-1 1h-2M5 14H3a1 1 0 01-1-1v-2" stroke="#191918" stroke-width="1.3" stroke-linecap="round"/><path d="M5 8h6M8 5l3 3-3 3" stroke="#191918" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div style="display:flex;gap:6px;font-size:12.5px;color:#6b7280">
+            <span class="badge b-ok" style="font-size:11.5px">+12 in today</span>
+            <span class="badge b-lowstock" style="font-size:11.5px">−8 out today</span>
           </div>
-          <div style="font-size:14.5px;font-weight:700;color:#191918">Scan Out</div>
-          <span class="badge b-lowstock" style="font-size:11.5px;margin-left:auto">−8 today</span>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:10px">
-          <div style="position:relative;flex:1">
-            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#9ca3af" opacity=".4"/><rect x="11" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/></svg>
-            <input id="scan-out-input" class="input" placeholder="Scan barcode or type SKU…" style="padding-left:34px;font-family:monospace" onkeydown="if(event.key==='Enter')doScan('out')"/>
+        <!-- RIGHT: recent scans -->
+        <div style="border-left:1px solid #f0ede9;padding-left:24px;min-width:0">
+          <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Recent scans</div>
+          <div id="scan-log" style="display:flex;flex-direction:column;max-height:140px;overflow-y:auto">
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+24 units · 9:14 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">WHT-GLD-M</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8821 · 9:03 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+48 units · 8:50 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8819 · 8:42 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−2 · #FF-8820 · 8:57 AM</span></div>
           </div>
-          <button class="btn btn-amber" onclick="doScan('out')">− Use</button>
-        </div>
-        <div id="scan-out-log" style="display:flex;flex-direction:column;gap:4px;max-height:90px;overflow-y:auto">
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f3f3f1"><span style="font-family:monospace;color:#374151">WHT-GLD-M</span><span style="color:#dc2626;font-weight:600">−1 unit · #FF-8821 · 9:03 AM</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f3f3f1"><span style="font-family:monospace;color:#374151">BLK-GLD-SM</span><span style="color:#dc2626;font-weight:600">−1 unit · #FF-8819 · 8:42 AM</span></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0"><span style="font-family:monospace;color:#374151">MUG-11OZ-W</span><span style="color:#dc2626;font-weight:600">−2 units · #FF-8820 · 8:57 AM</span></div>
         </div>
       </div>
     </div>
@@ -4225,10 +4222,10 @@ function whRenderOrders() {
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
           ${(() => { const cs = admCanonStatus(o.status);
             // Scan is nested in the ⋯ menu — no standalone Scan button here.
-            if (cs === 'scanned') return `<button onclick="event.stopPropagation();admStartPrinting('${o.num}')" title="Start All Items" style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.5px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="3" y="1.5" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M3 9.5H1v4h14v-4h-2" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><rect x="4" y="11" width="8" height="3" rx=".5" stroke="currentColor" stroke-width="1.2"/></svg>Start All Items</button>`;
+            if (cs === 'scanned') return `<button onclick="event.stopPropagation();admStartPrinting('${o.num}')" title="Start all items" style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'">Start All Items</button>`;
             if (cs === 'ready_print') return `<button onclick="admStartProduction('${o.num}');event.stopPropagation()" title="Start Production" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#1c1512;border:none;color:#fff;cursor:pointer;flex-shrink:0;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'"><svg width="11" height="11" viewBox="0 0 8 8" fill="none"><polygon points="1,0.5 7.5,4 1,7.5" fill="#fff"/></svg></button>`;
             if (o.status === 'backorder') return `<span title="Awaiting stock" style="height:32px;padding:0 10px;display:inline-flex;align-items:center;border-radius:7px;background:#fffbeb;color:#92400e;border:1.5px solid #fcd34d;font-size:12px;font-weight:700;white-space:nowrap">Backorder</span>`;
-            if ((cs === 'printing' || o.status === 'working') && admAllItemsWorking(o)) return `<button onclick="event.stopPropagation();admMarkShipped('${o.num}')" title="Mark Shipped" style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:5px;border-radius:7px;background:#fff;border:1.5px solid #e5e4e0;color:#374151;cursor:pointer;flex-shrink:0;font-size:12.5px;font-weight:600;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor='#374151'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1 4h10v6H1zM11 6l3 2v2h-3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>Mark Shipped</button>`;
+            if ((cs === 'printing' || o.status === 'working') && admAllItemsWorking(o)) return `<button onclick="event.stopPropagation();admMarkShipped('${o.num}')" title="Mark Shipped" style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;background:#191918;border:1.5px solid #191918;color:#fff;cursor:pointer;flex-shrink:0;font-size:12.75px;font-weight:600;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Mark Shipped</button>`;
             if (o.status === 'on_hold') return '';
             return ''; })()}
           ${(o.status === 'exception' || o.status === 'escalated') ? `
@@ -4678,9 +4675,13 @@ function admStartPrinting(orderNum) {
     return false;
   }
   o.status = 'printing';
-  if (Array.isArray(o.itemList) && typeof EGStore !== 'undefined' && EGStore.setItemFactoryStatus) {
-    o.itemList.forEach(function(it){ EGStore.setItemFactoryStatus(orderNum, it.sku, 'working'); });
-  }
+  // Mirror warehouse: also advance each item's own status to printing, not just
+  // the EGStore working flag, so the post-start rendering matches warehouse.
+  if (Array.isArray(o.itemList)) o.itemList.forEach(function(it){
+    const cs = admCanonStatus(it.status);
+    if (cs === 'scanned' || cs === 'replacement') it.status = 'printing';
+    if (typeof EGStore !== 'undefined' && EGStore.setItemFactoryStatus) EGStore.setItemFactoryStatus(orderNum, it.sku, 'working');
+  });
   if (typeof EGStore !== 'undefined' && EGStore.update) {
     EGStore.update(o.id || orderNum, { factoryStatus: 'printing' });
   }
@@ -4696,6 +4697,7 @@ function admMarkShipped(orderNum) {
     return false;
   }
   o.status = 'shipped';
+  if (Array.isArray(o.itemList)) o.itemList.forEach(function(it){ if (admCanonStatus(it.status) === 'printing') it.status = 'shipped'; });
   if (typeof EGStore !== 'undefined' && EGStore.update) {
     EGStore.update(o.id || orderNum, { factoryStatus: 'shipped' });
   }
@@ -5790,35 +5792,82 @@ function selectPrintOrder(num) {
   selectQueueOrder(num, '', 0, '');
 }
 
-function doScan(dir) {
-  const input = document.getElementById('scan-' + dir + '-input');
+// Unified scanner (ported from warehouse so both boards behave identically):
+// one box with an IN/OUT mode toggle, exact-match auto-fire, and a shared log.
+let SCAN_MODE = 'in';
+let _scanAutoTimer = null;
+function scanAutoCheck(val) {
+  clearTimeout(_scanAutoTimer);
+  const raw = (val || '').trim().toUpperCase();
+  if (!raw) return;
+  const m = raw.match(/^([A-Z0-9\-]+)\s*[Xx]?\s*(\d+)$/);
+  const sku = m ? m[1] : raw;
+  const exact = INVENTORY_ITEMS.find(i => i.sku === sku);
+  if (!exact) return;
+  const longer = INVENTORY_ITEMS.some(i => i.sku !== sku && i.sku.startsWith(sku));
+  if (longer) return;
+  _scanAutoTimer = setTimeout(() => doScan(), 70);
+}
+function scanFlash(ok) {
+  const input = document.getElementById('scan-input');
+  if (!input) return;
+  const cls = ok ? 'scan-flash-ok' : 'scan-flash-err';
+  input.classList.remove('scan-flash-ok','scan-flash-err');
+  void input.offsetWidth;
+  input.classList.add(cls);
+}
+function setScanMode(mode) {
+  SCAN_MODE = mode;
+  const iconWrap = document.getElementById('scan-mode-icon');
+  const btnIn = document.getElementById('scan-mode-in');
+  const btnOut = document.getElementById('scan-mode-out');
+  const submit = document.getElementById('scan-submit-btn');
+  const isIn = mode === 'in';
+  if (iconWrap) {
+    iconWrap.style.background = isIn ? '#f0fdf4' : '#fef2f2';
+    iconWrap.querySelector('svg').innerHTML = isIn
+      ? '<rect x="1.5" y="4" width="4" height="8" rx=".5" stroke="#16a34a" stroke-width="1.3"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#16a34a" opacity=".4"/><rect x="10.5" y="4" width="4" height="8" rx=".5" stroke="#16a34a" stroke-width="1.3"/>'
+      : '<rect x="1.5" y="4" width="4" height="8" rx=".5" stroke="#dc2626" stroke-width="1.3"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#dc2626" opacity=".4"/><rect x="10.5" y="4" width="4" height="8" rx=".5" stroke="#dc2626" stroke-width="1.3"/>';
+  }
+  if (btnIn)  { btnIn.style.background  = isIn ? '#16a34a' : 'transparent'; btnIn.style.color  = isIn ? '#fff' : '#6b7280'; }
+  if (btnOut) { btnOut.style.background = !isIn ? '#dc2626' : 'transparent'; btnOut.style.color = !isIn ? '#fff' : '#6b7280'; }
+  if (submit) {
+    submit.textContent = isIn ? '＋ Scan In' : '− Scan Out';
+    submit.classList.remove('btn-green','btn-amber');
+    submit.classList.add(isIn ? 'btn-green' : 'btn-amber');
+  }
+  const input = document.getElementById('scan-input');
+  if (input) input.focus();
+}
+function doScan() {
+  const input = document.getElementById('scan-input');
+  if (!input) return;
   const rawSku = input.value.trim().toUpperCase();
   if (!rawSku) return;
-  // Parse optional qty suffix: "BLK-GLD-SM x5" or "BLK-GLD-SM 5"
+  const dir = SCAN_MODE;
   const match = rawSku.match(/^([A-Z0-9\-]+)\s*[Xx]?\s*(\d+)$/);
   const sku = match ? match[1] : rawSku;
   const qty = match ? parseInt(match[2]) : 1;
-  // Update live inventory data
   const item = INVENTORY_ITEMS.find(i => i.sku === sku);
-  let statusNote = '';
+  let ok = false, statusNote = '';
   if (item) {
-    if (dir === 'in') {
-      item.inStock += qty;
-    } else {
-      if (item.inStock >= qty) { item.inStock -= qty; }
-      else { item.reserved = Math.max(0, item.reserved - qty + item.inStock); item.inStock = 0; }
-    }
+    if (dir === 'in') { item.inStock += qty; }
+    else if (item.inStock >= qty) { item.inStock -= qty; }
+    else { item.reserved = Math.max(0, item.reserved - qty + item.inStock); item.inStock = 0; }
     if (typeof EGStore !== 'undefined' && EGStore.setInventory) EGStore.setInventory(INVENTORY_ITEMS);
     renderInventory();
+    ok = true;
   } else { statusNote = ' · ⚠ SKU not found'; }
-  const log = document.getElementById('scan-' + dir + '-log');
+  const log = document.getElementById('scan-log');
   const time = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   const row = document.createElement('div');
-  row.style.cssText = 'display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #f3f3f1';
-  row.innerHTML = `<span style="font-family:monospace;color:#374151">${sku}${statusNote}</span><span style="color:${dir==='in'?'#16a34a':'#dc2626'};font-weight:600">${dir==='in'?'+':'−'}${qty} unit${qty!==1?'s':''} · ${time}</span>`;
-  log.insertBefore(row, log.firstChild);
+  row.style.cssText = 'display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9';
+  row.innerHTML = `<span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sku}${statusNote}</span><span style="color:${dir==='in'?'#16a34a':'#dc2626'};font-weight:600;white-space:nowrap">${dir==='in'?'+':'−'}${qty} unit${qty!==1?'s':''} · ${time}</span>`;
+  if (log) log.insertBefore(row, log.firstChild);
   input.value = '';
   input.focus();
+  scanFlash(ok);
+  if (typeof scanBeep === 'function') scanBeep(ok);
 }
 
 // ---- Live Alerts system ----
