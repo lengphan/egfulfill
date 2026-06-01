@@ -11,10 +11,18 @@
   'use strict';
 
   function readOrderOpen() {
+    // A page that renders its own order list (seller orders, factory boards) sets
+    // window.__egOrdersBadge to the count actually shown — use it so the badge
+    // matches the list exactly (was counting only OPEN orders, e.g. 3 of 4).
+    if (typeof window.__egOrdersBadge === 'number') return window.__egOrdersBadge;
     try {
+      if (typeof EGStore !== 'undefined' && typeof EGStore.getOrders === 'function') {
+        var all = EGStore.getOrders();
+        if (Array.isArray(all)) return all.length;
+      }
       if (typeof EGStore !== 'undefined' && typeof EGStore.stats === 'function') {
         var s = EGStore.stats();
-        return s && typeof s.open === 'number' ? s.open : 0;
+        return s && typeof s.total === 'number' ? s.total : (s && typeof s.open === 'number' ? s.open : 0);
       }
     } catch (e) {}
     return 0;

@@ -5585,6 +5585,9 @@ function whUpdateTabCounts() {
     if (tab in counts) counts[tab]++;
   });
   const set = (id, n) => { const el = document.getElementById(id); if(el) el.textContent = n; };
+  window.__egOrdersBadge = counts.all;
+  const _ob = document.querySelector('[data-badge="orders"]'); if (_ob) { _ob.textContent = counts.all; _ob.style.display = counts.all > 0 ? '' : 'none'; }
+  if (window.EGBadges && EGBadges.refresh) EGBadges.refresh();
   set('wh-cnt-all',           counts.all);
   set('wh-cnt-in_review',     counts.in_review);
   set('wh-cnt-awaiting_scan', counts.awaiting_scan);

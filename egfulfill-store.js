@@ -3121,3 +3121,53 @@
   };
   window.EGInventory = EGInventory;
 })();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Shared chat-image zoom (lightbox). Loaded everywhere via egfulfill-store.js,
+   so clicking an image in ANY chat — seller (chat.html), factory order chat
+   (operator/admin/warehouse), the attach-file bubbles — opens a full-screen
+   viewer. Previously there was no way to zoom an uploaded image in chat.
+   ───────────────────────────────────────────────────────────────────────── */
+(function(){
+  if (typeof document === 'undefined' || window.__egChatZoomInstalled) return;
+  window.__egChatZoomInstalled = true;
+  function lightbox(src){
+    if (!src) return;
+    var ov = document.getElementById('eg-chat-lightbox');
+    if (!ov){
+      ov = document.createElement('div');
+      ov.id = 'eg-chat-lightbox';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,12,16,.9);z-index:100000;display:none;align-items:center;justify-content:center;cursor:zoom-out;padding:28px';
+      ov.innerHTML = '<img alt="" style="max-width:94vw;max-height:90vh;border-radius:10px;box-shadow:0 16px 60px rgba(0,0,0,.55);object-fit:contain;background:#fff">'
+        + '<button aria-label="Close" style="position:absolute;top:18px;right:22px;background:rgba(255,255,255,.14);border:none;color:#fff;font-size:24px;width:42px;height:42px;border-radius:50%;cursor:pointer;line-height:1">&times;</button>';
+      ov.addEventListener('click', function(){ ov.style.display = 'none'; });
+      document.body.appendChild(ov);
+    }
+    ov.querySelector('img').src = src;
+    ov.style.display = 'flex';
+  }
+  window.egChatLightbox = lightbox;
+  var SEL = '.chat-bubble, .chat-msg, [data-eg-chat-messages], #msg-pane, [data-eg-chat-section], .eg-attach-bubble, [class*="chat"] .msg, .float-chat-body';
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || t.tagName !== 'IMG') return;
+    if (t.closest('#eg-chat-lightbox')) return;
+    if (!t.closest(SEL)) return;
+    var s = t.getAttribute('src'); if (!s) return;
+    e.preventDefault(); e.stopPropagation();
+    lightbox(s);
+  }, true);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ var ov = document.getElementById('eg-chat-lightbox'); if (ov) ov.style.display = 'none'; }
+  });
+  function injectCursor(){
+    try {
+      if (document.getElementById('eg-chat-zoom-css')) return;
+      var st = document.createElement('style'); st.id = 'eg-chat-zoom-css';
+      st.textContent = '.chat-bubble img,.chat-msg img,[data-eg-chat-messages] img,#msg-pane img,[data-eg-chat-section] img,.eg-attach-bubble img{cursor:zoom-in}';
+      (document.head || document.documentElement).appendChild(st);
+    } catch(e){}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectCursor);
+  else injectCursor();
+})();

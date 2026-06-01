@@ -4131,6 +4131,9 @@ function whUpdateTabCounts() {
     const el = document.getElementById('adm-cnt-'+k);
     if (el) el.textContent = v;
   });
+  window.__egOrdersBadge = counts.all;
+  const _ob = document.querySelector('[data-badge="orders"]'); if (_ob) { _ob.textContent = counts.all; _ob.style.display = counts.all > 0 ? '' : 'none'; }
+  if (window.EGBadges && EGBadges.refresh) EGBadges.refresh();
 }
 
 function whRenderOrders() {

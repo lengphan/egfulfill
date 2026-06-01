@@ -1110,6 +1110,11 @@ function renderOrders(ordersOverride) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = rows.join('');
   void tbody.offsetHeight; // force layout flush so rows paint immediately inside overflow:hidden card
+  // Keep the sidebar Orders badge in sync with the real order count (was static).
+  window.__egOrdersBadge = baseOrders.length;
+  const _ordBadge = document.querySelector('[data-badge="orders"]');
+  if (_ordBadge) { _ordBadge.textContent = baseOrders.length; _ordBadge.style.display = baseOrders.length > 0 ? '' : 'none'; }
+  if (window.EGBadges && EGBadges.refresh) EGBadges.refresh();
   initColDrag();
   updateFilterCounts();
   updateSel();

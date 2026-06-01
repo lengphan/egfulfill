@@ -3715,6 +3715,9 @@ function opUpdateTabCounts() {
   const counts = {};
   OP_ORDERS.forEach(o => { const s = opCanonStatus(o.status); counts[s] = (counts[s]||0) + 1; });
   var _allEl = document.getElementById('op-cnt-all'); if (_allEl) _allEl.textContent = OP_ORDERS.length;
+  window.__egOrdersBadge = OP_ORDERS.length;
+  var _ob = document.querySelector('[data-badge="orders"]'); if (_ob) { _ob.textContent = OP_ORDERS.length; _ob.style.display = OP_ORDERS.length > 0 ? '' : 'none'; }
+  if (window.EGBadges && EGBadges.refresh) EGBadges.refresh();
   ['in_review','awaiting_scan','scanned','printing','shipped','flagged','cancelled','refunded'].forEach(s => {
     const el = document.getElementById('op-cnt-'+s);
     if (el) el.textContent = counts[s] || 0;
