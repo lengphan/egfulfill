@@ -3835,7 +3835,6 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <div style="padding:20px 24px 16px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:16px;font-weight:700;color:#191918">Create New Order</div>
-        <div style="font-size:13px;color:#9ca3af;margin-top:2px" id="co-gen-id">Order #</div>
       </div>
       <button onclick="closeCreateOrderModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:5px;border-radius:7px;display:flex;align-items:center;font-size:19px;line-height:1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">×</button>
     </div>
@@ -9663,6 +9662,9 @@ window.addEventListener('storage', e => {
     cards.forEach(c => { if (!c.history) c.history = []; if (!c.notes) c.notes = []; });
     UDB_CARDS.length = 0; cards.forEach(c => UDB_CARDS.push(c));
     udbUpdateStats(); udbRenderBoard(); udbRenderList();
+    // Also refresh the orders list so each item's Design link reflects the new
+    // approval/file state immediately (turns green + clickable once approved).
+    if (typeof whRenderOrders === 'function') whRenderOrders();
   } catch(ex) {}
 });
 
