@@ -2014,46 +2014,62 @@ function _resolveItemUnitPrice(item) {
 /* Per-order shipping fee — derived from the catalog product's shippingFee that
    the factory set in Settings → Production. Applied once per order (first
    product's fee), since the platform charges shipping once per fulfillment. */
-// Sum the per-item shipping across the whole order. Earlier this returned a
-// single product-level fee, but sellers expect "Shipping = sum of every line"
-// — a 5-piece order pays shipping × 5.
+// Order shipping = first-item rate + additional-item rate for every EXTRA unit.
+// e.g. a product at $5.99 first + $2.00 each additional, ordered 3 units total,
+// costs 5.99 + 2.00 + 2.00 = $9.99 (NOT 5.99 × 3). The very first unit of the
+// whole order pays the full per-item shipping fee; every other unit (across all
+// lines) pays that line's additionalItemShipping.
 function _resolveOrderShipping(o) {
   if (!o || !Array.isArray(o.itemsList) || !o.itemsList.length) return 0;
-  let total = 0;
+  // Flatten the order into one entry per UNIT, each carrying its {base, addl}
+  // fees resolved from the catalog product (with per-size override for base).
+  const units = [];
   try {
-    if (window.EGStore && EGStore.getCatalogProducts) {
-      const cat = EGStore.getCatalogProducts();
-      for (let i = 0; i < o.itemsList.length; i++) {
-        const it = o.itemsList[i];
-        if (it && (it._searching || !it.sku)) continue;
-        const qty = parseInt(it.qty) || 1;
-        const base = String(it.sku || '').split('-')[0];
-        const product = cat.find(p =>
-          (Array.isArray(p.variantSkus) && p.variantSkus.some(v => v && v.sku === it.sku)) ||
-          (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()) ||
-          (p.name && it.blank && p.name === it.blank)
-        );
-        if (!product) continue;
-        // Per-size shipping (operator-set on the sizes table row) takes
-        // precedence over the product-wide fee.
-        let perItem = 0;
+    const cat = (window.EGStore && EGStore.getCatalogProducts) ? EGStore.getCatalogProducts() : [];
+    for (let i = 0; i < o.itemsList.length; i++) {
+      const it = o.itemsList[i];
+      if (it && (it._searching || !it.sku)) continue;
+      const qty = parseInt(it.qty) || 1;
+      const baseSku = String(it.sku || '').split('-')[0];
+      const product = cat.find(p =>
+        (Array.isArray(p.variantSkus) && p.variantSkus.some(v => v && v.sku === it.sku)) ||
+        (p.sku && baseSku && p.sku.toUpperCase() === baseSku.toUpperCase()) ||
+        (p.name && it.blank && p.name === it.blank)
+      );
+      let baseFee, addlFee;
+      if (product) {
+        // Per-size shipping (operator-set on the sizes table row) overrides the
+        // product-wide first-item fee.
+        baseFee = null;
         const itemSize = String(it.size || '').trim().toLowerCase();
         if (itemSize && Array.isArray(product.sizePrices)) {
           const row = product.sizePrices.find(r => r.size != null && String(r.size).toLowerCase() === itemSize);
           if (row && row.shipping != null) {
             const rs = parseFloat(row.shipping);
-            if (!isNaN(rs) && rs >= 0) perItem = rs;
+            if (!isNaN(rs) && rs >= 0) baseFee = rs;
           }
         }
-        if (!perItem && product.shippingFee != null) {
+        if (baseFee == null && product.shippingFee != null) {
           const sf = parseFloat(product.shippingFee);
-          if (!isNaN(sf) && sf >= 0) perItem = sf;
+          if (!isNaN(sf) && sf >= 0) baseFee = sf;
         }
-        total += perItem * qty;
+        if (baseFee == null) baseFee = ODM_SHIP_FIRST;
+        // Additional-item shipping set by the operator; falls back to the global.
+        addlFee = (product.additionalItemShipping != null && product.additionalItemShipping !== '' && !isNaN(parseFloat(product.additionalItemShipping)))
+          ? parseFloat(product.additionalItemShipping)
+          : ODM_SHIP_ADDL;
+      } else {
+        baseFee = (it && typeof it.shipping === 'number') ? it.shipping : ODM_SHIP_FIRST;
+        addlFee = ODM_SHIP_ADDL;
       }
+      for (let u = 0; u < qty; u++) units.push({ base: baseFee, addl: addlFee });
     }
   } catch(e){}
-  return total;
+  if (!units.length) return 0;
+  // First unit pays the full first-item fee; every other unit pays its addl fee.
+  let total = units[0].base;
+  for (let k = 1; k < units.length; k++) total += units[k].addl;
+  return Math.round(total * 100) / 100;
 }
 window._resolveOrderShipping = _resolveOrderShipping;
 function _itemShippingFee(item, idx) {
