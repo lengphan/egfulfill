@@ -1,0 +1,19 @@
+# Replace `your-domain.com` with your real domain (point its DNS A-record at the
+# VPS IP) and Caddy fetches a free HTTPS cert automatically.
+# No domain yet? Use `:80` instead of the domain line to test over plain HTTP.
+
+your-domain.com {
+	encode gzip
+
+	# API → the Node app
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Everything else → the static frontend (clean URLs: /orders → orders.html)
+	handle {
+		root * /srv
+		try_files {path} {path}.html /index.html
+		file_server
+	}
+}

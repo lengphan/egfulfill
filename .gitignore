@@ -29,4 +29,6 @@ agent-memory/
 
 # ── Secrets — never commit ──
 .env
-.env.*
+.env.local
+.env.production
+!.env.example

@@ -1,0 +1,39 @@
+# EGFULFILL — one-box self-hosted stack (DB + API + static frontend).
+# On your VPS:  cp .env.example .env  (edit it)  →  docker compose up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: egfulfill
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: egfulfill
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro  # runs once on first boot
+    restart: unless-stopped
+
+  api:
+    build: ./server
+    environment:
+      DATABASE_URL: postgres://egfulfill:${DB_PASSWORD:-changeme}@db:5432/egfulfill
+      JWT_SECRET: ${JWT_SECRET:-please-change-me}
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on: [db]
+    restart: unless-stopped
+
+  caddy:                       # HTTPS reverse-proxy + serves the static frontend
+    image: caddy:2-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./:/srv:ro             # your HTML/JS is served from the repo root
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  caddydata:
+  caddyconfig:
