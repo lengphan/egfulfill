@@ -1,7 +1,32 @@
+# ── Dependencies & build artifacts (Vercel installs/serves; keep out of repo) ──
 node_modules/
+package.json
+package-lock.json
+
+# ── Dev / scratch ──
 screenshots/
+*.bak
+fix_*.py
+update_*.py
+op_thread_check.js
+*.log
+
+# ── OS / editor ──
 .DS_Store
 **/.DS_Store
-fix_*.py
-*.log
-.claude/projects/
+.vscode/
+*.code-workspace
+
+# ── Claude Code config — NOT part of the app ──
+.claude/
+CLAUDE.md
+CLAUDE (Rules Based).md
+agents/
+rules/
+skills/
+projects/
+agent-memory/
+
+# ── Secrets — never commit ──
+.env
+.env.*
