@@ -5832,7 +5832,12 @@ function whRenderOrders() {
               const _isReal = u => !!u && typeof u === 'string' && u.indexOf('placehold.co') === -1 && !u.startsWith('data:image/svg+xml');
               const _EMB_EXT = /\.(emb|dst|pes|exp|jef|vp3)$/i;
               const _embFileFromList = (_dcard.files || []).find(f => f && f.name && _EMB_EXT.test(f.name));
-              const _isEmbDesign = !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
+              // Deliverable driven by the item's selected print method (EMB → emb
+              // file, DTG/etc → raster); only sniff the file when no method is set.
+              const _itemTech = String(it.printType || it.tech || '').toUpperCase();
+              const _isEmbDesign = _itemTech
+                ? /EMB/.test(_itemTech)
+                : !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
               let _dlUrl, _dlName;
               if (_isEmbDesign) {
                 _dlUrl = (_isReal(_dcard.embDataUrl) && _dcard.embDataUrl)

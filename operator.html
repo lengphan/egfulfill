@@ -3846,13 +3846,17 @@ function renderOpOrders() {
               if (u.startsWith('data:image/svg+xml')) return false;
               return true;
             };
-            // EMB-type detection — once we know this is an embroidery design we
-            // refuse to fall back to a raster previewUrl, since that's just a
-            // PNG/JPEG generated for display and downloading it would mislead
-            // the operator into thinking they got the real .emb/.dst.
+            // Deliverable type is driven by the item's SELECTED print method:
+            //   EMB  → embroidery machine file (.emb/.dst); never a raster.
+            //   DTG/etc → the PNG raster is the deliverable.
+            // We only fall back to sniffing the uploaded file when the item has
+            // no print method set.
             const _EMB_EXT = /\.(emb|dst|pes|exp|jef|vp3)$/i;
             const _embFileFromList = (_dcard.files || []).find(f => f && f.name && _EMB_EXT.test(f.name));
-            const _isEmbDesign = !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
+            const _itemTech = String(it.printType || it.tech || '').toUpperCase();
+            const _isEmbDesign = _itemTech
+              ? /EMB/.test(_itemTech)
+              : !!(_dcard.isEmb || _dcard.embFileName || _embFileFromList || (_embStore && _embStore.name && _EMB_EXT.test(_embStore.name)));
             // Download resolution (identical across operator / admin / warehouse):
             //   • EMB designs → the embroidery machine file ONLY. Never fall back
             //     to a PNG/JPG raster, even if the binary was stripped under quota.
@@ -7489,7 +7493,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         // either delivers the actual .emb/.dst bytes or stays empty.
         const _EMB_EXT_X = /\.(emb|dst|pes|exp|jef|vp3)$/i;
         const _embFileFromListX = _dcardForItem ? (_dcardForItem.files || []).find(f => f && f.name && _EMB_EXT_X.test(f.name)) : null;
-        const _isEmbDesignX = !!(_dcardForItem && (_dcardForItem.isEmb || _dcardForItem.embFileName || _embFileFromListX || (_embStoreX && _embStoreX.name && _EMB_EXT_X.test(_embStoreX.name))));
+        // Deliverable driven by the item's selected print method (EMB → emb
+        // file, DTG/etc → raster); only sniff the file when no method is set.
+        const _itemTechX = String(it.printType || it.tech || '').toUpperCase();
+        const _isEmbDesignX = _itemTechX
+          ? /EMB/.test(_itemTechX)
+          : !!(_dcardForItem && (_dcardForItem.isEmb || _dcardForItem.embFileName || _embFileFromListX || (_embStoreX && _embStoreX.name && _EMB_EXT_X.test(_embStoreX.name))));
         // Download resolution (identical across operator / admin / warehouse):
         //   • EMB designs → embroidery machine file ONLY, never a PNG/JPG raster.
         //   • Non-EMB (DTG/etc.) → the raster IS the deliverable, so serve it.
