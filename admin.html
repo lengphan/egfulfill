@@ -4024,8 +4024,12 @@ function admRefreshItemStatusChip(orderNum, sku) {
   if (typeof EGStore === 'undefined') return;
   var fs = EGStore.getItemFactoryStatus(orderNum, sku);
   var key = orderNum + '|' + sku;
+  // Once the order ships / is terminal, the per-item working chip stays hidden —
+  // mirrors the render-time rule so a live status event can't re-show it.
+  var _ord = (EGStore.getOrders ? EGStore.getOrders() : []).find(function(o){ return o.id === orderNum; });
+  var _done = _ord && /ship|deliver|cancel|refund|transit|fulfil/i.test(String(_ord.factoryStatus || _ord.status || ''));
   document.querySelectorAll('.eg-item-fs-chip[data-item-key="' + CSS.escape(key) + '"]').forEach(function(chip){
-    if (fs === 'working') {
+    if (fs === 'working' && !_done) {
       chip.style.display = '';
       chip.textContent = 'Working';
       chip.style.color = '#191918';
@@ -4330,8 +4334,8 @@ function whRenderOrders() {
               const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
               const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
               const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
-              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
-                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
+              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
+                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:0;flex-wrap:wrap;row-gap:6px">
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Design</span>${_idHtml}</div>
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
@@ -4344,8 +4348,8 @@ function whRenderOrders() {
               const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
               const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
               const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
-              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:220px;min-width:220px;flex-shrink:0">${it.sku}</span>
-                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
+              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
+                  <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:0;flex-wrap:wrap;row-gap:6px">
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Design</span>${fileLink}${dsBtn}</div>
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
@@ -4357,13 +4361,16 @@ function whRenderOrders() {
             const _fs = (typeof EGStore !== 'undefined' && EGStore.getItemFactoryStatus) ? EGStore.getItemFactoryStatus(o.num, it.sku) : '';
             // Read-only mirror; same style + STATUS-column alignment as operator.
             // Two-state mirror to match warehouse + operator.
-            const _fsLabelAdm = _fs === 'working' ? 'Working' : '';
+            // Drop the per-item working status once the order ships / is terminal —
+            // only the parent order status remains.
+            const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
+            const _fsLabelAdm = (_fs === 'working' && !_orderDone) ? 'Working' : '';
             const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#191918;white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
             return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 28px;${sep}">
               ${thumb}
               <div style="flex:1;min-width:0;margin-right:12px">
                 <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
-                <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:24px;flex-wrap:nowrap">
+                <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                   ${metaRow}
                 </div>
               </div>

@@ -3931,7 +3931,11 @@ function renderOpOrders() {
           // column via margin-right offset; blank when no status is set.
           // Two-state mirror — anything except 'working' is treated as not
           // started so the operator's chip stays in lockstep with warehouse.
-          const _fsLabelOp = _fs === 'working' ? 'Working' : '';
+          // Once the order ships (or is otherwise terminal) the per-item working
+          // status is dropped — only the parent order status remains, so it reads
+          // as "shipped complete, no longer working individual items".
+          const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
+          const _fsLabelOp = (_fs === 'working' && !_orderDone) ? 'Working' : '';
           const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#191918;white-space:nowrap;display:inline-block${_fsLabelOp?'':';display:none'}">${_fsLabelOp}</span>`;
           return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 28px;${sep}">
             <input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">
@@ -5259,8 +5263,11 @@ function opRefreshItemStatusChip(orderNum, sku) {
   if (typeof EGStore === 'undefined') return;
   var fs = EGStore.getItemFactoryStatus(orderNum, sku);
   var key = orderNum + '|' + sku;
+  // Once the order ships / is terminal, keep the per-item working chip hidden.
+  var _ord = (EGStore.getOrders ? EGStore.getOrders() : []).find(function(o){ return o.id === orderNum; });
+  var _done = _ord && /ship|deliver|cancel|refund|transit|fulfil/i.test(String(_ord.factoryStatus || _ord.status || ''));
   document.querySelectorAll('.eg-item-fs-chip[data-item-key="' + CSS.escape(key) + '"]').forEach(function(chip){
-    if (fs === 'working') {
+    if (fs === 'working' && !_done) {
       chip.style.display = '';
       chip.textContent = 'Working';
       chip.style.color = '#191918';

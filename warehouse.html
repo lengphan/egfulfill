@@ -5905,7 +5905,10 @@ function whRenderOrders() {
             const _fsStyle = _fs === '' ? _fsBase + ';text-decoration:underline;text-underline-offset:2px;text-decoration-color:#c9c3ba' : _fsBase + ';cursor:default';
             // Per-item is a simple two-state control: Start → Working. No
             // "Awaiting design" gating — staff can mark any item in-progress.
-            const _fsEl = `<button class="eg-item-fs-el" data-item-key="${_itKey}" data-order="${o.num}" data-sku="${String(it.sku).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();whCycleItemStatus(this.dataset.order, this.dataset.sku)" style="${_fsStyle}">${_fsLabel}</button>`;
+            // Once the order ships / is terminal, drop the per-item Start/Working
+            // control entirely — only the parent order status remains.
+            const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
+            const _fsEl = _orderDone ? '' : `<button class="eg-item-fs-el" data-item-key="${_itKey}" data-order="${o.num}" data-sku="${String(it.sku).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();whCycleItemStatus(this.dataset.order, this.dataset.sku)" style="${_fsStyle}">${_fsLabel}</button>`;
             return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 28px;background:transparent;${sep}">
               ${thumb}
               <div style="flex:1;min-width:0;margin-right:12px">
