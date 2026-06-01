@@ -630,9 +630,9 @@ function dsnSettingsTab(id, el){
           <div id="modal-drop" class="drop-zone" onclick="document.getElementById('modal-file-input').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="dbHandleDrop(event)">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="margin:0 auto 5px"><path d="M10 3v9M7 6l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
             <div style="font-weight:600;font-size:14px;margin-bottom:2px">Drop files or click to upload</div>
-            <div style="font-size:12.5px">PNG, JPG, PDF, AI, PSD · max 50MB</div>
+            <div style="font-size:12.5px">PNG, JPG, PDF, AI, PSD, EMB/DST · max 50MB</div>
           </div>
-          <input type="file" id="modal-file-input" multiple accept="image/*,.pdf,.ai,.psd" style="display:none" onchange="dbHandleFiles(this.files)">
+          <input type="file" id="modal-file-input" multiple accept="image/*,.pdf,.ai,.psd,.emb,.dst,.pes,.exp,.jef,.vp3" style="display:none" onchange="dbHandleFiles(this.files)">
           <div id="modal-files-list" style="margin-top:7px"></div>
         </div>
       </div>
@@ -1044,6 +1044,21 @@ function dbDrop(e, colId) {
     } else { DB_CARDS.push(dragged); }
   } else { DB_CARDS.push(dragged); }
   _dragId = null; _dragOverId = null;
+  // Designer credit fires HERE, on the designer board only — moving a card into
+  // the approved column pays the designer. Falls back to the global fee rate when
+  // no per-card payment was set (factory-pushed cards default to $0). EGStore
+  // dedupes by cardId so dragging out and back never double-pays.
+  if (colId === 'approved' && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
+    const fee = (dragged.payment > 0)
+      ? dragged.payment
+      : (EGStore.getDesignerFeeRate ? EGStore.getDesignerFeeRate() : 0);
+    if (fee > 0) {
+      dragged.payment = dragged.payment > 0 ? dragged.payment : fee;
+      dragged.payStatus = 'approved';
+      EGStore.addDesignerEarning(fee, { cardId: dragged.id, orderId: dragged.order || dragged.orderNum || null, label: 'Design approved · ' + (dragged.title || ''), by: 'Designer' });
+      if (typeof _dbRefreshBalance === 'function') _dbRefreshBalance();
+    }
+  }
   dbRender(); dbSave();
 }
 
@@ -1310,14 +1325,33 @@ function dbHandleFiles(fl) {
   if (rejected.length && typeof EGStore !== 'undefined' && EGStore.showUploadError) {
     EGStore.showUploadError(rejected[0].name, rejected[0].error + (rejected.length>1 ? ' (+'+(rejected.length-1)+' more file(s) rejected)' : ''));
   }
+  const embExts = /\.(emb|dst|pes|exp|jef|vp3)$/i;
+  const _ordKey = c.order || c.orderNum;
   accepted.forEach(f => {
     const sz = f.size>1048576?(f.size/1048576).toFixed(1)+'MB':Math.round(f.size/1024)+'KB';
+    const isEmb = embExts.test(f.name);
     const fobj = {name:f.name, size:sz, previewUrl:null};
-    if (imgExts.test(f.name)) {
-      const reader = new FileReader();
-      reader.onload = e => { fobj.previewUrl = e.target.result; renderModalFiles(c); dbSave(); };
-      reader.readAsDataURL(f);
-    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      if (!isEmb && imgExts.test(f.name)) { fobj.previewUrl = dataUrl; }
+      // Propagate the deliverable to EGStore so the operator/warehouse order row
+      // (which reads getItemEmbFile / getRawDesign) gets a clickable download once
+      // the card is approved. Keyed by the card's order + sku.
+      if (_ordKey && c.sku && typeof EGStore !== 'undefined') {
+        if (isEmb && EGStore.setItemEmbFile) {
+          EGStore.setItemEmbFile(_ordKey, c.sku, {name:f.name, dataUrl:dataUrl});
+          c.isEmb = true; c.embFileName = f.name;
+        } else if (EGStore.cacheRawDesign) {
+          EGStore.cacheRawDesign(_ordKey, c.sku, dataUrl);
+          if (EGStore.cacheImage) EGStore.cacheImage(_ordKey, c.sku, dataUrl);
+        }
+        try { localStorage.setItem('eg_design_ping', String(Date.now())); } catch(_e){}
+        try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch(_e){}
+      }
+      renderModalFiles(c); dbSave();
+    };
+    reader.readAsDataURL(f);
     c.files.push(fobj);
   });
   if (accepted.length) { renderModalFiles(c); dbRender(); dbSave(); toast(accepted.length+' file'+(accepted.length>1?'s':'')+' uploaded'); }

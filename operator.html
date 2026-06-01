@@ -7593,9 +7593,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}</div>
             <div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>
           </div>
-          <select class="select" style="font-size:12px;padding:4px 6px">
-            <option>DTG Board</option><option>DTF Board</option><option>EMB Board</option>
-          </select>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">${designSrc ? 'Replace File' : '↑ Upload'}</button>
+            <select class="select" style="font-size:12px;padding:4px 6px">
+              <option>DTG Board</option><option>DTF Board</option><option>EMB Board</option>
+            </select>
+          </div>
         </div>`;
       }).join('');
     } else {
@@ -7604,6 +7607,16 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     _xfomRenderHistory(num);
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
+  };
+  // Upload / replace the design file for an item on the open order. Manual orders
+  // arrive with no seller artwork, so this is the only way to attach a deliverable.
+  window.xfomUploadDesign = function(sku, name, tech) {
+    if (typeof EGStore === 'undefined' || !EGStore.openDesignUpload) return;
+    var ord = _xfomNum;
+    EGStore.openDesignUpload({
+      orderNum: ord, sku: sku, name: name, tech: tech, byRole: 'Operator',
+      onDone: function(){ if (_xfomNum === ord) xfomOpen(ord); if (typeof renderOpOrders === 'function') renderOpOrders(); }
+    });
   };
   // Order history for the factory side — shows EVERY event (including
   // internal:true entries the seller can't see). Pulled live from the EGStore

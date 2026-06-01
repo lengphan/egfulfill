@@ -4176,6 +4176,10 @@ function whMergeLiveOrders() {
         designUrl: it.designUrl || null,
         designPos: it.designPos || null,
         sellerImg: it.img || null,
+        // Carry printType (lowercase) so EGStore.methodLabel + the metaRow's EMB
+        // detection read the seller's chosen method — without it they default to
+        // DTG and the download link resolves the wrong deliverable type.
+        printType: (it.printType || 'dtg').toLowerCase(),
         type: (it.printType || 'dtg').toUpperCase(),
         qty: it.qty || 1,
         fulfillment_type: (it.printType || 'dtg').toLowerCase(),
@@ -5853,7 +5857,7 @@ function whRenderOrders() {
               }
               _hasFile = !!_dlUrl;
               const _idHtml = (_approved && _hasFile)
-                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.stopPropagation()" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
+                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.stopPropagation();try{EGStore&&EGStore.downloadDataUrl&&EGStore.downloadDataUrl(this.getAttribute('href'),this.getAttribute('download'));}catch(e){}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
                 : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
               // Thread colour swatches — moved off the name row into metaRow.
               const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
@@ -10594,15 +10598,28 @@ function whPrintLabel(num) {
           <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}</div>
           <div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>
         </div>
-        <select class="select" style="font-size:12px;padding:4px 6px">
-          <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
-        </select>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">↑ Upload</button>
+          <select class="select" style="font-size:12px;padding:4px 6px">
+            <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
+          </select>
+        </div>
       </div>`).join('');
     } else {
       desEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No designs to approve</div>';
     }
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
+  };
+  // Upload / replace the design file for an item on the open order (manual orders
+  // have no seller artwork — this attaches the deliverable so a DSN link surfaces).
+  window.xfomUploadDesign = function(sku, name, tech) {
+    if (typeof EGStore === 'undefined' || !EGStore.openDesignUpload) return;
+    var ord = _xfomNum;
+    EGStore.openDesignUpload({
+      orderNum: ord, sku: sku, name: name, tech: tech, byRole: 'Warehouse',
+      onDone: function(){ if (_xfomNum === ord) xfomOpen(ord); if (typeof whRenderOrders === 'function') whRenderOrders(); }
+    });
   };
   function _xfomRenderFooter() {
     const wrap = document.getElementById('xfom-footer-actions'); if (!wrap) return;

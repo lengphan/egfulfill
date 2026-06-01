@@ -3980,6 +3980,10 @@ function admMergeLiveOrders() {
         designUrl: it.designUrl || null,
         designPos: it.designPos || null,
         sellerImg: it.img || null,
+        // Carry printType (lowercase) so EGStore.methodLabel + the metaRow's EMB
+        // detection read the seller's chosen method — without it they default to
+        // DTG and the download link resolves the wrong deliverable type.
+        printType: (it.printType || 'dtg').toLowerCase(),
         type: (it.printType || 'dtg').toUpperCase(), qty: it.qty || 1
       };
     });
@@ -4317,7 +4321,7 @@ function whRenderOrders() {
               }
               const _hasFile = !!_dlUrl;
               const _idHtml = (_approved && _hasFile)
-                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.stopPropagation()" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
+                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.stopPropagation();try{EGStore&&EGStore.downloadDataUrl&&EGStore.downloadDataUrl(this.getAttribute('href'),this.getAttribute('download'));}catch(e){}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
                 : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
               // Thread colour swatches — moved off the name row into metaRow.
               const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
@@ -8036,20 +8040,8 @@ function udbDrop2(e,colId){
     card.col=colId;
     card.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Moved to '+udbStatLbl(colId),detail:'Was in '+udbStatLbl(oldCol)});
     udbUpdateStats();
-    // Dragging a card INTO the approved column must pay the designer too — not
-    // just the Approve button. EGStore dedupes by cardId so moving it out and
-    // back never double-pays. Mirrors udbApprove's credit logic.
-    if(colId==='approved'){
-      const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 2.5;
-      if(fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning){
-        const before = EGStore.getDesignerBalance();
-        EGStore.addDesignerEarning(fee, { cardId: card.id, orderId: card.order || null, label: 'Design approved · ' + (card.title || 'Card #' + card.id), by: 'Admin' });
-        if(EGStore.getDesignerBalance() > before){
-          card.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Designer paid',detail:'$' + fee.toFixed(2) + ' credited'});
-          udbToast('Approved · paid $' + fee.toFixed(2) + ' to designer');
-        }
-      }
-    }
+    // NOTE: the designer wallet is credited ONLY on the dedicated designer board,
+    // never from admin/operator/warehouse. Approving here just moves the column.
   }
   UDB_DRAG_ID=null;UDB_DRAG_OVER_ID=null;
   udbRenderBoard();udbSave();
@@ -8159,28 +8151,12 @@ function udbMoveToBoard(id,newTypeId){const c=UDB_CARDS.find(x=>x.id===id);if(!c
 function udbApprove(id){
   const c=UDB_CARDS.find(x=>x.id===id); if(!c) return;
   c.col='approved';
-  // Auto-credit designer balance with the global fee rate (admin sets it in
-  // Settings → Production). EGStore dedupes by cardId so re-approving the
-  // same card never double-pays.
-  const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 2.5;
-  let _paidLabel = '';
-  if (fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
-    const before = EGStore.getDesignerBalance();
-    EGStore.addDesignerEarning(fee, { cardId: id, orderId: c.order || null, label: 'Design approved · ' + (c.title || 'Card #' + id), by: 'Admin' });
-    const after = EGStore.getDesignerBalance();
-    if (after > before) _paidLabel = ' · paid $' + fee.toFixed(2) + ' to designer';
-  }
-  c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Approved',detail:'Design approved for production' + _paidLabel});
-  // Mirror the designer payout to the order's main timeline so it shows up in
-  // every board's History panel (internal — sellers don't need to see it).
-  if (_paidLabel && c.order && typeof EGStore !== 'undefined' && EGStore.appendOrderTimeline) {
-    EGStore.appendOrderTimeline(c.order, {
-      label: 'Designer paid', sub: '$' + fee.toFixed(2) + ' credited · card #' + id,
-      role: 'admin', internal: true
-    });
-  }
+  // NOTE: the designer wallet is credited ONLY on the dedicated designer board,
+  // never from admin. Approving here marks the design ready for production but
+  // does not touch the designer balance.
+  c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Approved',detail:'Design approved for production'});
   udbUpdateStats();udbRenderBoard();udbRenderList();udbSave();
-  udbToast(_paidLabel ? ('Design approved · designer credited $' + fee.toFixed(2)) : 'Design approved!');
+  udbToast('Design approved!');
   udbCloseCard();udbOpenCard(id);
 }
 function udbReject(id){const reason=prompt('Rejection reason (optional):')||'';const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;c.col='inprogress';c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Rejected',detail:reason||'Sent back to In Progress'});udbUpdateStats();udbRenderBoard();udbRenderList();udbSave();udbToast('Design sent back for revision');udbCloseCard();udbOpenCard(id);}
@@ -8498,15 +8474,28 @@ document.addEventListener('DOMContentLoaded', function() {
           <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}</div>
           <div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>
         </div>
-        <select class="select" style="font-size:12px;padding:4px 6px">
-          <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
-        </select>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">↑ Upload</button>
+          <select class="select" style="font-size:12px;padding:4px 6px">
+            <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
+          </select>
+        </div>
       </div>`).join('');
     } else {
       desEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No designs to approve</div>';
     }
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
+  };
+  // Upload / replace the design file for an item on the open order (manual orders
+  // have no seller artwork — this attaches the deliverable so a DSN link surfaces).
+  window.xfomUploadDesign = function(sku, name, tech) {
+    if (typeof EGStore === 'undefined' || !EGStore.openDesignUpload) return;
+    var ord = _xfomNum;
+    EGStore.openDesignUpload({
+      orderNum: ord, sku: sku, name: name, tech: tech, byRole: 'Admin',
+      onDone: function(){ if (_xfomNum === ord) xfomOpen(ord); if (typeof renderOrders === 'function') renderOrders(); }
+    });
   };
   function _xfomRenderFooter() {
     const wrap = document.getElementById('xfom-footer-actions'); if (!wrap) return;

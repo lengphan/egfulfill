@@ -1226,6 +1226,40 @@
       a.remove();
     },
 
+    // Robust download for a data: URL — rebuilds a Blob and clicks an object URL
+    // so binary deliverables (.emb/.dst) and oversized payloads download reliably,
+    // where a bare <a download> on a data: URL silently no-ops in some browsers.
+    // Shared so every factory board downloads files the same way.
+    downloadDataUrl: function(url, name) {
+      try {
+        if (!url) return;
+        if (url.indexOf('data:') === 0) {
+          var parts = url.split(',');
+          var meta = parts[0] || '';
+          var isB64 = /;base64/i.test(meta);
+          var mime = (meta.match(/^data:([^;]+)/) || [])[1] || 'application/octet-stream';
+          var body = parts.slice(1).join(',');
+          var bytes;
+          if (isB64) {
+            var bin = atob(body); bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          } else {
+            bytes = new TextEncoder().encode(decodeURIComponent(body));
+          }
+          var blob = new Blob([bytes], { type: mime });
+          var obj = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = obj; a.download = name || 'design';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(obj); }, 4000);
+        } else {
+          var a2 = document.createElement('a');
+          a2.href = url; a2.download = name || 'design';
+          document.body.appendChild(a2); a2.click(); a2.remove();
+        }
+      } catch (e) { /* native href download already fired as the primary path */ }
+    },
+
     // ── Auto Design ID generator ──
     // Every file/design pushed to the board gets a stable DSN-### handle that
     // future orders can reference. Counter persists across sessions.
@@ -2594,6 +2628,73 @@
         }
         return card;
       } catch(e) { return null; }
+    },
+
+    // ── Shared: upload a design / deliverable file directly onto an order item ──
+    // Used by the factory order-detail modal (operator/admin/warehouse) and the
+    // designer board, since a manually-created order has no seller-uploaded art.
+    // Opens a native file picker, then routes the chosen file in attachDesignFile.
+    // opts: { orderNum, sku, name, tech, byRole, onDone }
+    openDesignUpload: function(opts) {
+      var self = this;
+      var inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = '.png,.jpg,.jpeg,.svg,.webp,.gif,.pdf,.emb,.dst,.pes,.exp,.jef,.vp3,image/*';
+      inp.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+      inp.onchange = function() {
+        var f = inp.files && inp.files[0];
+        if (f) self.attachDesignFile(Object.assign({}, opts, { file: f }));
+        setTimeout(function(){ try { inp.remove(); } catch(e){} }, 0);
+      };
+      document.body.appendChild(inp);
+      inp.click();
+    },
+    // Routes an uploaded file to the right store and ensures a design card exists:
+    //   • EMB/DST/PES/EXP/JEF/VP3 → setItemEmbFile (the machine-stitch deliverable)
+    //   • everything else (png/jpg/svg/pdf…) → cacheRawDesign + cacheImage (raster)
+    // A design card is created (incoming) when none exists yet, so the order row
+    // gets a DSN-### handle. We DON'T duplicate the data URL onto the card — the
+    // row/download readers pull from the raw/emb caches. Fires a storage ping so
+    // every open board re-renders, then calls onDone(dataUrl, name).
+    attachDesignFile: function(opts) {
+      var self = this;
+      var f = opts.file; if (!f) return;
+      var fname = f.name || 'design';
+      var isEmb = /\.(emb|dst|pes|exp|jef|vp3)$/i.test(fname);
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var dataUrl = ev.target.result;
+        try {
+          if (isEmb) {
+            if (self.setItemEmbFile) self.setItemEmbFile(opts.orderNum, opts.sku, { name: fname, dataUrl: dataUrl });
+          } else {
+            if (self.cacheRawDesign) self.cacheRawDesign(opts.orderNum, opts.sku, dataUrl);
+            if (self.cacheImage)     self.cacheImage(opts.orderNum, opts.sku, dataUrl);
+          }
+          var card = self.getDesignCard ? self.getDesignCard(opts.orderNum, opts.sku) : null;
+          if (!card && self.pushToDesignBoard) {
+            card = self.pushToDesignBoard({
+              orderNum: opts.orderNum, sku: opts.sku,
+              board: (opts.tech || (isEmb ? 'emb' : 'dtg')),
+              name: opts.name, thumb: isEmb ? null : dataUrl,
+              byRole: opts.byRole || 'Factory'
+            });
+          }
+          // Stamp emb metadata on an existing card so the row's EMB detection is
+          // unambiguous even when the item has no print method set.
+          if (card && isEmb) {
+            try {
+              var cards = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
+              var rec = cards.find(function(c){ return c.id === card.id; });
+              if (rec) { rec.isEmb = true; rec.embFileName = fname; localStorage.setItem('egfulfill_design_cards', JSON.stringify(cards)); }
+            } catch(e){}
+          }
+        } catch(err) {}
+        try { localStorage.setItem('eg_design_ping', String(Date.now())); } catch(e){}
+        try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch(e){}
+        if (opts.onDone) { try { opts.onDone(dataUrl, fname); } catch(e){} }
+      };
+      reader.readAsDataURL(f);
     },
 
     // ── Shared: dropdown menu for picking a board, attached to body so no clipping ──
