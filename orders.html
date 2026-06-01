@@ -792,6 +792,11 @@ const CARRIER_SC = {
 
 let expanded = new Set();
 const ITEM_DESIGN_SEL = {};
+// Stable per-line-item id. Two line items can share a SKU (e.g. same Black/S
+// blank, one DTG + one EMB), so SKU is NOT a safe key for per-item UI state —
+// it made both rows' design buttons / field edits clash. Each item gets its own
+// __uid (assigned lazily at first render, persists on the item object).
+let __ITEM_UID_SEQ = 0;
 /* UP_STATE survives page reload via localStorage (we strip the dataUrl to stay under the quota) */
 const UP_STATE_KEY = 'eg_upload_state';
 const UP_STATE = (() => {
@@ -977,7 +982,9 @@ function renderOrders(ordersOverride) {
       const isLastItem = itemIdx === o.itemsList.length - 1;
       const techLabel = {DTG:'DTG',DTF:'DTF',EMB:'Embroidery',APL:'Applique',LSR:'Laser'}[item.tech]||item.tech;
       const autoBlank = item.blank || skuToBlank(item.sku);
-      const escSku = item.sku.replace(/[^a-zA-Z0-9]/g,'_');
+      // Per-item key for DOM ids + handlers — a stable unique id, NOT the SKU,
+      // so two line items with the same SKU don't share selection/edit state.
+      const escSku = item.__uid || (item.__uid = 'it' + (++__ITEM_UID_SEQ));
       const dot = (filled, n) => `<div class="step-dot" style="width:18px;height:18px;border-radius:50%;background:${filled?'#9ca3af':'#f0ede9'};color:${filled?'#fff':'#9ca3af'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;transition:background .2s,color .2s">${n}</div>`;
       const SEL = `border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 20px 4px 8px;font-size:13px;font-family:inherit;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c9c8c4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") no-repeat right 6px center;-webkit-appearance:none;appearance:none;cursor:pointer;outline:none;transition:border-color .15s,color .15s;text-overflow:ellipsis;white-space:nowrap;overflow:hidden`;
       // Blank options pull from the live EGStore catalog (what operator has actually
@@ -1322,7 +1329,7 @@ function pickDesign(ordNo, escSku, type) {
   });
   // Persist the new choice so it survives reloads (and clear any stale design-lab assignment if user switched away)
   const o = ORDERS.find(x => x.no === ordNo);
-  const item = o?.itemsList.find(i => i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
+  const item = o?.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (o && item) {
     const newSel = ITEM_DESIGN_SEL[key];
     if (newSel === 'template')      item.designSrc = 'template';
@@ -1352,7 +1359,7 @@ function pickDesign(ordNo, escSku, type) {
 function accessDesign(ordNo, escSku) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  const item = o.itemsList.find(i => i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
+  const item = o.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (!item) return;
   const upState = UP_STATE[ordNo]?.[item.sku];
   if (upState?.state === 'ok') {
@@ -1371,7 +1378,7 @@ function accessDesign(ordNo, escSku) {
 function clearDesign(ordNo, escSku) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  const item = o.itemsList.find(i => i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
+  const item = o.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (!item) return;
   item.designSrc = undefined;
   ITEM_DESIGN_SEL[ordNo+'_'+escSku] = null;
@@ -1391,7 +1398,7 @@ const EG_EDIT_KEY = 'eg_order_item_edits';
 function saveItemField(ordNo, escSku, field, value) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  const item = o.itemsList.find(i => i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
+  const item = o.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (!item) return;
   item[field] = value;
   // When the seller picks a blank for a brand-new line item, we need to
@@ -1524,7 +1531,7 @@ function applyItemChange(ordNo, escSku) {
   if (bar) bar.style.display = 'none';
   // Persist to ORDERS in memory
   const o = ORDERS.find(x=>x.no===ordNo);
-  if (o) { const item = o.itemsList.find(i=>i.sku.replace(/[^a-zA-Z0-9]/g,'_')===escSku); if (item) { if (blankEl) item.blank=blankEl.value; if (techEl) item.tech=techEl.value; } }
+  if (o) { const item = o.itemsList.find(i=>(i.__uid && i.__uid===escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_')===escSku); if (item) { if (blankEl) item.blank=blankEl.value; if (techEl) item.tech=techEl.value; } }
 }
 function cancelItemChange(ordNo, escSku) {
   const blankEl = document.getElementById('blank-'+ordNo+'-'+escSku);
@@ -1588,7 +1595,7 @@ function pushOrderToProduction(ordNo, btn) {
     // Pulse the design buttons on missing items so the user can see which ones still need work
     setTimeout(() => {
       missingItems.forEach(item => {
-        const escSku = item.sku.replace(/[^a-zA-Z0-9]/g, '_');
+        const escSku = item.__uid || item.sku.replace(/[^a-zA-Z0-9]/g, '_');
         ['upload','template','lab'].forEach(t => {
           const el = document.getElementById('dsb-' + ordNo + '-' + escSku + '-' + t);
           if (!el) return;
@@ -5356,7 +5363,7 @@ function processFile(file, sku, ordNo) {
     renderUploadItems(o, UP_FILTER_SKU);
     const rvItem = o.itemsList.find(i => i.sku === sku);
     if (rvItem) {
-      const escSku = sku.replace(/[^a-zA-Z0-9]/g,'_');
+      const escSku = rvItem.__uid || sku.replace(/[^a-zA-Z0-9]/g,'_');
       const blankEl = document.getElementById('blank-'+ordNo+'-'+escSku);
       const techEl  = document.getElementById('tech-'+ordNo+'-'+escSku);
       if (blankEl && blankEl.value) rvItem.blank = blankEl.value;
