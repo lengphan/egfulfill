@@ -963,6 +963,7 @@ function renderAction(c) {
 function dbClaim() {
   const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
   c.assignee = 'Phan'; c.col = 'inprogress';
+  c.claimedBy = 'Designer · Phan';
   c.notes.push({author:'Phan',avatar:'P',text:'Claimed — starting work.',ts:now()});
   closeCardModal(); dbRender(); toast('Card claimed — In Progress');
 }

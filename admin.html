@@ -8047,8 +8047,22 @@ function udbDrop2(e,colId){
     card.col=colId;
     card.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Moved to '+udbStatLbl(colId),detail:'Was in '+udbStatLbl(oldCol)});
     udbUpdateStats();
-    // NOTE: the designer wallet is credited ONLY on the dedicated designer board,
-    // never from admin/operator/warehouse. Approving here just moves the column.
+    // Credit is RELEASED on approval by admin/warehouse — never self-approval.
+    // Whoever claimed the design (a designer who claimed it, else the operator
+    // who pushed it) is paid the fee set in Settings. EGStore dedupes by cardId
+    // so re-approving never double-pays.
+    if(colId==='approved'){
+      const claimer = card.claimedBy || (card.assignee ? ('Designer · ' + card.assignee) : 'Operator');
+      const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 0;
+      if(fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning){
+        const before = EGStore.getDesignerBalance();
+        EGStore.addDesignerEarning(fee, { cardId: card.id, orderId: card.order || null, label: 'Design approved · claimed by ' + claimer, by: 'Admin' });
+        if(EGStore.getDesignerBalance() > before){
+          card.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Credit released',detail:'$' + fee.toFixed(2) + ' to ' + claimer});
+          udbToast('Approved · released $' + fee.toFixed(2) + ' to ' + claimer);
+        }
+      }
+    }
   }
   UDB_DRAG_ID=null;UDB_DRAG_OVER_ID=null;
   udbRenderBoard();udbSave();
@@ -8158,12 +8172,20 @@ function udbMoveToBoard(id,newTypeId){const c=UDB_CARDS.find(x=>x.id===id);if(!c
 function udbApprove(id){
   const c=UDB_CARDS.find(x=>x.id===id); if(!c) return;
   c.col='approved';
-  // NOTE: the designer wallet is credited ONLY on the dedicated designer board,
-  // never from admin. Approving here marks the design ready for production but
-  // does not touch the designer balance.
-  c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Approved',detail:'Design approved for production'});
+  // Admin approval releases the credit to whoever claimed the design (a designer
+  // who claimed it, else the operator who pushed it). Amount comes from Settings.
+  // EGStore dedupes by cardId so re-approving never double-pays.
+  const claimer = c.claimedBy || (c.assignee ? ('Designer · ' + c.assignee) : 'Operator');
+  const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 0;
+  let _paid = '';
+  if (fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
+    const before = EGStore.getDesignerBalance();
+    EGStore.addDesignerEarning(fee, { cardId: id, orderId: c.order || null, label: 'Design approved · claimed by ' + claimer, by: 'Admin' });
+    if (EGStore.getDesignerBalance() > before) _paid = ' · released $' + fee.toFixed(2) + ' to ' + claimer;
+  }
+  c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Approved',detail:'Design approved for production' + _paid});
   udbUpdateStats();udbRenderBoard();udbRenderList();udbSave();
-  udbToast('Design approved!');
+  udbToast('Design approved!' + _paid);
   udbCloseCard();udbOpenCard(id);
 }
 function udbReject(id){const reason=prompt('Rejection reason (optional):')||'';const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;c.col='inprogress';c.history.unshift({ts:udbNow(),by:'Admin',role:'admin',action:'Rejected',detail:reason||'Sent back to In Progress'});udbUpdateStats();udbRenderBoard();udbRenderList();udbSave();udbToast('Design sent back for revision');udbCloseCard();udbOpenCard(id);}

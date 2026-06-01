@@ -9942,7 +9942,23 @@ function udbDrop2(e,colId){
   if(old!==colId){
     dragCard.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Moved to '+udbStatLbl(colId),detail:'Was in '+udbStatLbl(old)});
     udbUpdateStats();
-    udbToast('Moved to '+udbStatLbl(colId));
+    // Warehouse approval releases the credit to whoever claimed the design (a
+    // designer who claimed it, else the operator who pushed it). Amount from
+    // Settings; EGStore dedupes by cardId so re-approving never double-pays.
+    if(colId==='approved'){
+      const claimer = dragCard.claimedBy || (dragCard.assignee ? ('Designer · ' + dragCard.assignee) : 'Operator');
+      const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 0;
+      if(fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning){
+        const before = EGStore.getDesignerBalance();
+        EGStore.addDesignerEarning(fee, { cardId: dragCard.id, orderId: dragCard.order || null, label: 'Design approved · claimed by ' + claimer, by: 'Warehouse' });
+        if(EGStore.getDesignerBalance() > before){
+          dragCard.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Credit released',detail:'$' + fee.toFixed(2) + ' to ' + claimer});
+          udbToast('Approved · released $' + fee.toFixed(2) + ' to ' + claimer);
+        }
+      }
+    } else {
+      udbToast('Moved to '+udbStatLbl(colId));
+    }
   }
   UDB_DRAG_ID=null;UDB_DRAG_OVER_ID=null;
   udbRenderBoard();udbSave();
@@ -10079,8 +10095,19 @@ function udbMoveToBoard(id,newTypeId){
 }
 function udbApprove(id) {
   const c=UDB_CARDS.find(x=>x.id===id); if(!c) return;
-  c.col='approved'; c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Approved',detail:'Design approved for production'});
-  udbUpdateStats(); udbRenderBoard(); udbRenderList(); udbSave(); udbToast('Design approved!');
+  c.col='approved';
+  // Warehouse approval releases the credit to whoever claimed the design. Amount
+  // from Settings; EGStore dedupes by cardId so re-approving never double-pays.
+  const claimer = c.claimedBy || (c.assignee ? ('Designer · ' + c.assignee) : 'Operator');
+  const fee = (typeof EGStore !== 'undefined' && EGStore.getDesignerFeeRate) ? EGStore.getDesignerFeeRate() : 0;
+  let _paid = '';
+  if (fee > 0 && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
+    const before = EGStore.getDesignerBalance();
+    EGStore.addDesignerEarning(fee, { cardId: id, orderId: c.order || null, label: 'Design approved · claimed by ' + claimer, by: 'Warehouse' });
+    if (EGStore.getDesignerBalance() > before) _paid = ' · released $' + fee.toFixed(2) + ' to ' + claimer;
+  }
+  c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Approved',detail:'Design approved for production' + _paid});
+  udbUpdateStats(); udbRenderBoard(); udbRenderList(); udbSave(); udbToast('Design approved!' + _paid);
   udbCloseCard(); udbOpenCard(id);
 }
 function udbReject(id) {

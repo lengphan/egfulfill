@@ -1044,21 +1044,9 @@ function dbDrop(e, colId) {
     } else { DB_CARDS.push(dragged); }
   } else { DB_CARDS.push(dragged); }
   _dragId = null; _dragOverId = null;
-  // Designer credit fires HERE, on the designer board only — moving a card into
-  // the approved column pays the designer. Falls back to the global fee rate when
-  // no per-card payment was set (factory-pushed cards default to $0). EGStore
-  // dedupes by cardId so dragging out and back never double-pays.
-  if (colId === 'approved' && typeof EGStore !== 'undefined' && EGStore.addDesignerEarning) {
-    const fee = (dragged.payment > 0)
-      ? dragged.payment
-      : (EGStore.getDesignerFeeRate ? EGStore.getDesignerFeeRate() : 0);
-    if (fee > 0) {
-      dragged.payment = dragged.payment > 0 ? dragged.payment : fee;
-      dragged.payStatus = 'approved';
-      EGStore.addDesignerEarning(fee, { cardId: dragged.id, orderId: dragged.order || dragged.orderNum || null, label: 'Design approved · ' + (dragged.title || ''), by: 'Designer' });
-      if (typeof _dbRefreshBalance === 'function') _dbRefreshBalance();
-    }
-  }
+  // NO self-credit here: a claimer (designer/operator) moving their OWN card to
+  // approved must NOT pay themselves. The credit is released only when admin or
+  // warehouse approves the card on the Unified Design Board.
   dbRender(); dbSave();
 }
 
@@ -1249,6 +1237,9 @@ function renderAction(c) {
 function dbClaim() {
   const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
   c.assignee = 'Phan'; c.col = 'inprogress';
+  // Record the claimer so the credit (released later on admin/warehouse approval)
+  // is attributed to this designer.
+  c.claimedBy = 'Designer · Phan';
   c.notes.push({author:'Phan',avatar:'P',text:'Claimed — starting work.',ts:now()});
   dbSave(); closeCardModal(); dbRender(); toast('Card claimed — In Progress');
 }
