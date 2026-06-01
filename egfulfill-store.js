@@ -2410,6 +2410,24 @@
         return self.METHOD_LABELS[k] || p.trim();
       }).filter(Boolean).join(' / ');
     },
+    // Per-item print-method display label, shared by every factory board's order
+    // row so the "Method: DTG" column reads identically everywhere. Reads the
+    // item's chosen method (printType / tech / method) and normalises to a short
+    // uppercase code (DTG, DTF, EMB, APL, LSR, SUB, SCR); falls back to DTG.
+    methodLabel: function(item) {
+      var raw = item && (item.printType || item.tech || item.method || item.printedType);
+      var t = String(raw || '').toUpperCase();
+      if (!t) return 'DTG';
+      if (/EMB|EMBROID/.test(t)) return 'EMB';
+      if (/DTF/.test(t)) return 'DTF';
+      if (/APL|APPLIQ/.test(t)) return 'APL';
+      if (/LSR|LASER/.test(t)) return 'LSR';
+      if (/SUB|SUBLIM/.test(t)) return 'SUB';
+      if (/SCR|SCREEN/.test(t)) return 'SCR';
+      if (/DTG|DIRECT/.test(t)) return 'DTG';
+      // Unknown — show the first token as-is (e.g. a custom method name).
+      return t.split(/[\s\/]+/)[0] || 'DTG';
+    },
 
     // Raster uploads (PNG/JPG/WEBP/GIF) flow through the downscaler before
     // hitting localStorage, so the strict 5MB cap is unnecessary. Accept up
