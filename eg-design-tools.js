@@ -17,21 +17,37 @@
     return q.length ? ('?' + q.join('&')) : '';
   }
 
-  // Full-screen overlay hosting one of the seller's real pages in an iframe.
-  function openSellerPage(src, title) {
+  // Overlay hosting one of the seller's real pages — sits BESIDE the factory
+  // sidebar (left:220px) so the board's left panel stays visible, with a
+  // breadcrumb back. onBack (optional) returns to a previous view (e.g. the hub).
+  var SIDEBAR_W = 220;
+  function overlayEl() {
     var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99990;display:flex;flex-direction:column';
-    ov.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid #e5e4e0;flex-shrink:0;background:#fdfcfa"><div style="font-size:14px;font-weight:700;color:#191918">' + esc(title) + '</div><button id="egdt-x" title="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 4px">&times;</button></div>'
+    ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:' + SIDEBAR_W + 'px;background:#fff;z-index:99990;display:flex;flex-direction:column';
+    return ov;
+  }
+  function header(crumbRoot, crumbLeaf, onRoot) {
+    var root = onRoot
+      ? '<button id="egdt-back" style="display:inline-flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;font-size:13.5px;font-weight:600;color:#6b7280;font-family:inherit"><span style="font-size:17px;line-height:1">‹</span>' + esc(crumbRoot) + '</button>'
+      : '<span style="font-size:13.5px;font-weight:600;color:#6b7280">' + esc(crumbRoot) + '</span>';
+    var leaf = crumbLeaf ? '<span style="color:#c4c3be">/</span><span style="font-size:14px;font-weight:700;color:#191918">' + esc(crumbLeaf) + '</span>' : '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid #e5e4e0;flex-shrink:0;background:#fdfcfa">'
+      + '<div style="display:flex;align-items:center;gap:9px">' + root + leaf + '</div>'
+      + '<button id="egdt-x" title="Back to board" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 4px">&times;</button></div>';
+  }
+  function openSellerPage(src, title, onBack) {
+    var ov = overlayEl();
+    ov.innerHTML = header('Design Lab', title, onBack)
       + '<iframe src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
     document.body.appendChild(ov);
-    document.body.style.overflow = 'hidden';
-    function close() {
+    function close(goBack) {
       try { document.body.removeChild(ov); } catch (e) {}
-      document.body.style.overflow = '';
       document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: {} }));
+      if (goBack && typeof onBack === 'function') onBack();
     }
-    ov.querySelector('#egdt-x').addEventListener('click', close);
-    document.addEventListener('keydown', function k(ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', k); } });
+    var back = ov.querySelector('#egdt-back'); if (back) back.addEventListener('click', function () { close(true); });
+    ov.querySelector('#egdt-x').addEventListener('click', function () { close(false); });
+    document.addEventListener('keydown', function k(ev) { if (ev.key === 'Escape') { close(false); document.removeEventListener('keydown', k); } });
   }
 
   // Upload — the existing shared seller flow (unchanged; same as the old Upload button).
@@ -59,9 +75,9 @@
     var BOX = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9" stroke="currentColor" stroke-width="1.6"/></svg>';
     var TPL = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
     var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:#f4f2ef;z-index:99990;display:flex;flex-direction:column;overflow:auto';
+    ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:' + SIDEBAR_W + 'px;background:#f4f2ef;z-index:99990;display:flex;flex-direction:column;overflow:auto';
     ov.innerHTML =
-      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid #e5e4e0;background:#fdfcfa;position:sticky;top:0;z-index:1"><div style="font-size:16px;font-weight:800;color:#191918">Design Lab</div><button id="egdl-x" title="Close" style="background:none;border:none;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:0 4px">&times;</button></div>'
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid #e5e4e0;background:#fdfcfa;position:sticky;top:0;z-index:1"><div style="font-size:16px;font-weight:800;color:#191918">Design Lab</div><button id="egdl-x" title="Back to board" style="background:none;border:none;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:0 4px">&times;</button></div>'
       + '<div style="max-width:1180px;margin:0 auto;padding:30px 24px;width:100%;box-sizing:border-box">'
       + '<div style="font-size:22px;font-weight:800;color:#191918;margin-bottom:20px">Welcome to Design Lab</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">'
@@ -77,8 +93,9 @@
       b.addEventListener('click', function () {
         var act = b.getAttribute('data-act');
         close();
-        if (act === 'templates') templates('', '');
-        else designMaker('', '');   // maker + catalog both open the editor
+        if (act === 'templates') openSellerPage('product-templates.html', 'Templates', designLab);
+        else openSellerPage('design-maker.html', 'Design Maker', designLab);   // maker + catalog open the editor
+
       });
     });
   }
