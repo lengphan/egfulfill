@@ -52,9 +52,23 @@ async function etsyGet(conn, path) {
   return data;
 }
 
+// Fetch a listing's primary image URL (cached per listing for the sync run).
+async function listingImage(conn, listingId, cache) {
+  if (!listingId) return null;
+  if (cache && Object.prototype.hasOwnProperty.call(cache, listingId)) return cache[listingId];
+  let url = null;
+  try {
+    const r = await etsyGet(conn, `/listings/${listingId}/images?limit=1`);
+    const im = r.results && r.results[0];
+    url = (im && (im.url_570xN || im.url_fullxfull || im.url_300x300 || im.url_170x135)) || null;
+  } catch (e) { url = null; }
+  if (cache) cache[listingId] = url;
+  return url;
+}
+
 // Upsert one Etsy receipt into orders. Returns 'imported' or 'skipped'.
 // Re-syncs never overwrite the internal pipeline (status/factory_status) or items.
-async function importReceipt(conn, rc, connectedSec) {
+async function importReceipt(conn, rc, connectedSec, imgCache) {
   const id = 'etsy-' + rc.receipt_id;
   const shipped = !!(rc.is_shipped || rc.was_shipped);
   const status = shipped ? 'shipped' : 'new';
@@ -74,16 +88,24 @@ async function importReceipt(conn, rc, connectedSec) {
        zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
      status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
   );
-  // Create line items only on first import — re-syncs leave them untouched.
+  // Create line items only on first import — re-syncs leave the workflow untouched,
+  // but we DO backfill the Etsy listing image so items aren't blank.
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
-  if (!hasItems.rowCount) {
-    for (const tr of (rc.transactions || [])) {
+  for (const tr of (rc.transactions || [])) {
+    const img = (tr.product_data && tr.product_data.image_url) || await listingImage(conn, tr.listing_id, imgCache);
+    if (!hasItems.rowCount) {
       await q(
         `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
          values ($1,$2,$3,$4,$5,$6,$7)`,
         [id, tr.sku || null, tr.title || null, tr.quantity || 1,
          (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
-         money(tr.price), (tr.product_data && tr.product_data.image_url) || null]
+         money(tr.price), img]
+      );
+    } else if (img) {
+      // Backfill the listing image on existing items without touching workflow.
+      await q(
+        `update order_items set img=$1 where order_id=$2 and sku is not distinct from $3 and (img is null or img='')`,
+        [img, id, tr.sku || null]
       );
     }
   }
@@ -204,12 +226,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           purgedShipped = del.rowCount || 0;
         }
         // ── Orders (receipts), paginated up to 500 ──
+        const imgCache = {};   // listing_id → image URL, shared across this shop's receipts
         for (let offset = 0; offset < 500; offset += 100) {
           const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions`);
           const results = r.results || [];
           if (!sample && results[0]) sample = results[0];
           for (const rc of results) {
-            if ((await importReceipt(conn, rc, connectedSec)) === 'skipped') skipped++; else orders++;
+            if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
           }
           if (results.length < 100) break;
         }
@@ -237,8 +260,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     let imported = 0;
     for (const conn of conns) {
       try {
+        const imgCache = {};
         const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=25&offset=0&includes=Transactions`);
-        for (const rc of (r.results || [])) { if ((await importReceipt(conn, rc, 0)) === 'imported') imported++; }
+        for (const rc of (r.results || [])) { if ((await importReceipt(conn, rc, 0, imgCache)) === 'imported') imported++; }
         await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
       } catch (e) { /* keep going for other shops */ }
     }
