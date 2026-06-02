@@ -11143,17 +11143,18 @@ function whRunHdrSearch(q) {
   q = (q || '').trim().toLowerCase();
   if (!q) { dd.style.display = 'none'; return; }
   const out = [];
-  // Orders
+  // Orders — search WH_ORDERS by customer / order # / marketplace # / SKU; open detail on click.
   try {
-    if (typeof WH_ORDERS !== 'undefined') {
-      WH_ORDERS.forEach(o => {
-        const num = (o.num||'').toLowerCase();
-        const cust = (o.customer||'').toLowerCase();
-        if (num.includes(q) || cust.includes(q)) {
-          out.push({ kind:'Order', label:'#'+o.num+' — '+(o.customer||''), sub:(o.status||''), action:`showSection('orders');whCloseHdrSearch()` });
-        }
-      });
-    }
+    const _src = (typeof WH_ORDERS !== 'undefined' && WH_ORDERS) ? WH_ORDERS : [];
+    _src.forEach(o => {
+      const num = String(o.num || '').toLowerCase();
+      const cust = String(o.customer || '').toLowerCase();
+      const skus = (o.itemList || []).map(it => String(it.sku || '').toLowerCase()).join(' ');
+      const market = (window.egOrderIds ? String(egOrderIds(o).market || '') : '').toLowerCase();
+      if (num.includes(q) || cust.includes(q) || skus.includes(q) || market.includes(q)) {
+        out.push({ kind: 'Order', label: (o.customer || 'Customer') + ' — ' + (market || ('#' + o.num)), sub: (o.status || ''), action: `xfomOpen('${o.num}');whCloseHdrSearch()` });
+      }
+    });
   } catch(e) {}
   // Sellers (if a sellers table exists in the DOM)
   document.querySelectorAll('[id^="sellers-tbody"] tr').forEach(tr => {

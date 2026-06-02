@@ -52,17 +52,25 @@ async function etsyGet(conn, path) {
   return data;
 }
 
-// Fetch a listing's primary image URL (cached per listing for the sync run).
-async function listingImage(conn, listingId, cache) {
+// Resolve the listing image URL. Prefers the EXACT image the buyer saw
+// (transaction.listing_image_id); falls back to the listing's first image.
+// Cached per listing[:image] for the sync run.
+function imgUrlOf(im) { return (im && (im.url_fullxfull || im.url_570xN || im.url_300x300 || im.url_170x135)) || null; }
+async function listingImage(conn, listingId, imageId, cache) {
   if (!listingId) return null;
-  if (cache && Object.prototype.hasOwnProperty.call(cache, listingId)) return cache[listingId];
+  const key = String(listingId) + (imageId ? (':' + imageId) : '');
+  if (cache && Object.prototype.hasOwnProperty.call(cache, key)) return cache[key];
   let url = null;
   try {
-    const r = await etsyGet(conn, `/listings/${listingId}/images?limit=1`);
-    const im = r.results && r.results[0];
-    url = (im && (im.url_570xN || im.url_fullxfull || im.url_300x300 || im.url_170x135)) || null;
+    if (imageId) {
+      url = imgUrlOf(await etsyGet(conn, `/listings/${listingId}/images/${imageId}`));
+    }
+    if (!url) {
+      const r = await etsyGet(conn, `/listings/${listingId}/images`);
+      url = imgUrlOf(r && r.results && r.results[0]);
+    }
   } catch (e) { url = null; }
-  if (cache) cache[listingId] = url;
+  if (cache) cache[key] = url;
   return url;
 }
 
@@ -92,7 +100,7 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   // but we DO backfill the Etsy listing image so items aren't blank.
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
   for (const tr of (rc.transactions || [])) {
-    const img = (tr.product_data && tr.product_data.image_url) || await listingImage(conn, tr.listing_id, imgCache);
+    const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache) || (tr.product_data && tr.product_data.image_url) || null;
     // Split variations into: customer-uploaded file (a URL), personalization text,
     // and the rest (size/color → variant).
     let uploadUrl = null, personalization = null; const vparts = [];

@@ -6989,17 +6989,18 @@ function opRunHdrSearch(q) {
   q = (q || '').trim().toLowerCase();
   if (!q) { dd.style.display = 'none'; return; }
   const out = [];
-  // Orders
+  // Orders — search OP_ORDERS by customer / order # / marketplace # / SKU; open detail on click.
   try {
-    if (typeof OP_ORDERS !== 'undefined') {
-      OP_ORDERS.forEach(o => {
-        const num = (o.num||'').toLowerCase();
-        const cust = (o.customer||'').toLowerCase();
-        if (num.includes(q) || cust.includes(q)) {
-          out.push({ kind:'Order', label:'#'+o.num+' — '+(o.customer||''), sub:(o.status||''), action:`showSection('orders');opCloseHdrSearch()` });
-        }
-      });
-    }
+    const _src = (typeof OP_ORDERS !== 'undefined' && OP_ORDERS) ? OP_ORDERS : [];
+    _src.forEach(o => {
+      const num = String(o.num || '').toLowerCase();
+      const cust = String(o.customer || '').toLowerCase();
+      const skus = (o.itemList || []).map(it => String(it.sku || '').toLowerCase()).join(' ');
+      const market = (window.egOrderIds ? String(egOrderIds(o).market || '') : '').toLowerCase();
+      if (num.includes(q) || cust.includes(q) || skus.includes(q) || market.includes(q)) {
+        out.push({ kind: 'Order', label: (o.customer || 'Customer') + ' — ' + (market || ('#' + o.num)), sub: (o.status || ''), action: `xfomOpen('${o.num}');opCloseHdrSearch()` });
+      }
+    });
   } catch(e) {}
   // Sections
   ['Overview','Orders','Inventory','Purchases','Products','Shipping','Chat','Design Board','Users & Roles','Wallet','Settings','API Hub','Broadcast'].forEach(label => {
