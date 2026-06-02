@@ -181,7 +181,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             await q(
               `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
                values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
-               on conflict (id) do update set status=excluded.status, total=excluded.total,
+               on conflict (id) do update set total=excluded.total,
                  customer=excluded.customer, address=excluded.address,
                  created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
               [id, conn.connected_by, conn.shop_name,
@@ -190,15 +190,19 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
                  zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
                status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
             );
-            await q('delete from order_items where order_id=$1', [id]);
-            for (const tr of (rc.transactions || [])) {
-              await q(
-                `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
-                 values ($1,$2,$3,$4,$5,$6,$7)`,
-                [id, tr.sku || null, tr.title || null, tr.quantity || 1,
-                 (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
-                 money(tr.price), (tr.product_data && tr.product_data.image_url) || null]
-              );
+            // Only create line items on first import — re-syncs leave them (and
+            // any per-item workflow) untouched.
+            const _hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
+            if (!_hasItems.rowCount) {
+              for (const tr of (rc.transactions || [])) {
+                await q(
+                  `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
+                   values ($1,$2,$3,$4,$5,$6,$7)`,
+                  [id, tr.sku || null, tr.title || null, tr.quantity || 1,
+                   (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
+                   money(tr.price), (tr.product_data && tr.product_data.image_url) || null]
+                );
+              }
             }
             orders++;
           }
