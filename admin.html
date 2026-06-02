@@ -577,6 +577,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;color:#9ca3af"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3l2 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
     </div>
   </div>
+  <a href="javascript:void(0)" title="Log out" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}" style="display:flex;align-items:center;gap:9px;padding:10px 14px;margin:0 6px 10px;border-radius:8px;text-decoration:none;color:#9ca3af;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .15s,color .15s" onmouseover="this.style.background='#fbeaea';this.style.color='#c0392b'" onmouseout="this.style.background='';this.style.color='#9ca3af'">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Log out
+  </a>
 </aside>
 
 <!-- MAIN -->
