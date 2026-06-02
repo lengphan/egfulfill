@@ -5779,8 +5779,7 @@ function whRenderOrders() {
     const mainRow = `<tr id="wh-row-${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select')&&!e.target.closest('a'))whToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s;${isActive?'background:#faf9f7;border-left:2px solid #111827;':''}">
       <td onclick="event.stopPropagation()" style="width:32px"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="whToggleOrder('${o.num}',this.checked)"/></td>
       <td data-col="order">
-        <div style="font-size:14.25px;font-weight:700;color:#191918">#${o.num}</div>
-        ${o.platId ? `<div style="font-size:11.25px;color:#9ca3af;margin-top:2px">${o.platId}</div>` : ''}
+        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};return '<div style="font-size:14.25px;font-weight:700;color:#191918">'+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11.25px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
         ${ageHtml}
       </td>
       <td data-col="seller">

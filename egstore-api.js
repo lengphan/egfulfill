@@ -210,5 +210,23 @@
     }, 15000);
   }
   start();
+  // Shared order-ID resolver so every board shows ids the same way:
+  // marketplace order # on top, EGFULFILL store id below.
+  window.egOrderIds = function (o) {
+    if (!o) return { market: '', eg: '' };
+    var num = String(o.num || o.id || '');
+    var plat = (o.platId && o.platId !== '—') ? String(o.platId) : '';
+    var m = num.match(/^([a-z]+)-(.+)$/i);
+    var LBL = { etsy: 'Etsy', shopify: 'Shopify', tiktok: 'TikTok', woocommerce: 'Woo', amazon: 'Amazon', ebay: 'eBay' };
+    // Synced marketplace order: primary key is "<platform>-<number>".
+    if (m && LBL[m[1].toLowerCase()]) {
+      return { market: LBL[m[1].toLowerCase()] + ' #' + m[2], eg: o.egId || ('MA-' + num.slice(-5)) };
+    }
+    // Seed/legacy: platId carries the marketplace id (SP-/ET-/…), num is the EG id.
+    if (plat) return { market: plat, eg: num };
+    // Manual order: no marketplace id — just the EGFULFILL id.
+    return { market: '', eg: num };
+  };
+
   window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, pushCatalog: pushCatalog };
 })();
