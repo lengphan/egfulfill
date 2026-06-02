@@ -3635,8 +3635,8 @@ const OP_STATUS_MAP = {
   replacement:   'Replacement',
   cancelled:     'Cancelled',
   refunded:      'Refunded',
+  new:           'New',
   // legacy aliases — old data collapses onto the new flow
-  new:           'In Review',
   design_review: 'In Review',
   prescan:       'Awaiting Scan',  // old "Pre-Scan" collapses straight to Awaiting Scan
   in_queue:      'Awaiting Scan',
@@ -3646,7 +3646,7 @@ const OP_STATUS_MAP = {
   packed:        'Printing',
 };
 function opCanonStatus(s) {
-  return ({ new:'in_review', design_review:'in_review',
+  return ({ design_review:'in_review',
             prescan:'awaiting_scan', in_queue:'awaiting_scan',
             ready_print:'scanned',
             packing:'printing', qc:'printing', packed:'printing',
@@ -8130,7 +8130,8 @@ document.addEventListener('DOMContentLoaded', opRenderPurchases);
 // removable via × on hover. Mirrors the seller-side customisable tab pattern
 // so factory boards don't show a wall of unused filter chips.
 (function() {
-  var DEFS = { all:{label:'All',filter:'all'}, in_review:{label:'In Review',filter:'in_review'}, awaiting_scan:{label:'Awaiting Scan',filter:'awaiting_scan'}, scanned:{label:'Scanned',filter:'scanned'}, printing:{label:'Printing',filter:'printing'}, shipped:{label:'Shipped',filter:'shipped'}, flagged:{label:'Flagged',filter:'flagged'}, cancelled:{label:'Cancelled',filter:'cancelled'}, refunded:{label:'Refunded',filter:'refunded'} };
+  var DEFS = { all:{label:'All',filter:'all'}, new:{label:'New',filter:'new'}, in_review:{label:'In Review',filter:'in_review'}, awaiting_scan:{label:'Awaiting Scan',filter:'awaiting_scan'}, scanned:{label:'Scanned',filter:'scanned'}, printing:{label:'Printing',filter:'printing'}, shipped:{label:'Shipped',filter:'shipped'}, flagged:{label:'Flagged',filter:'flagged'}, cancelled:{label:'Cancelled',filter:'cancelled'}, refunded:{label:'Refunded',filter:'refunded'} };
+  var DEFAULT_TABS = ['all','new','in_review','awaiting_scan','printing','shipped'];
   var KEY = 'eg_op_order_tabs';
   var STRIP_ID = 'op-tab-strip';
   var FILTER_CB = 'setOrderFilter';
@@ -8143,9 +8144,10 @@ document.addEventListener('DOMContentLoaded', opRenderPurchases);
   function _load() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (!raw) return ['all'];
+      if (!raw) return DEFAULT_TABS.slice();
       var parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || !parsed.length) return ['all'];
+      if (!Array.isArray(parsed) || !parsed.length) return DEFAULT_TABS.slice();
+      if (parsed.length === 1 && parsed[0] === 'all') return DEFAULT_TABS.slice();
       var list = parsed.filter(function(k){ return DEFS[k]; });
       if (list.indexOf('all') < 0) list.unshift('all');
       else if (list[0] !== 'all') { var i = list.indexOf('all'); list.splice(i,1); list.unshift('all'); }

@@ -1155,6 +1155,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           </tr></thead>
           <tbody id="wh-orders-tbody"></tbody>
         </table>
+        <div id="wh-pagination" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 4px 2px;font-size:13px;color:#6b7280"></div>
       </div>
 
       <!-- Right: quick view panel (hidden) -->
@@ -4147,7 +4148,7 @@ function whMergeLiveOrders() {
     const prev = _wcLiveSeen.get(o.id);
     if (prev === newSig) continue;
     _wcLiveSeen.set(o.id, newSig);
-    const statusMapEarly = { new:'in_review', in_review:'in_review', awaiting_scan:'awaiting_scan', scanned:'scanned', printing:'printing', packing:'printing', shipped:'shipped', flagged:'flagged',
+    const statusMapEarly = { new:'new', in_review:'in_review', awaiting_scan:'awaiting_scan', scanned:'scanned', printing:'printing', packing:'printing', shipped:'shipped', flagged:'flagged',
       prescan:'awaiting_scan', in_queue:'awaiting_scan', ready_print:'scanned' };
     let mappedStatus = statusMapEarly[o.factoryStatus] || 'in_review';
     if (mappedStatus === 'in_review' && (o.items || []).some(it => pushedMap[o.id + '|' + it.sku])) {
@@ -4322,6 +4323,8 @@ function whGetProdStatus(o) {
 
 let whStatusFilter = 'all';
 let whStoreFilter = 'all';
+let whPerPage = 25;   // rows per page in the orders table ('all' = no paging)
+let whPage = 1;
 let whSortCol = 'time';
 let whSortDir = 'desc';
 let whDateFilter = 'all';
@@ -4367,8 +4370,9 @@ const WH_STATUS_LABEL = {
   'replacement':   'Replacement',
   'cancelled':     'Cancelled',
   'refunded':      'Refunded',
+  'new':            'New',
   /* legacy aliases */
-  'new':'In Review','design_review':'In Review',
+  'design_review':'In Review',
   'prescan':'Awaiting Scan','in_queue':'Awaiting Scan',
   'ready_print':'Scanned',
   'packing':'Printing','qc':'Printing','packed':'Printing',
@@ -4378,6 +4382,7 @@ const WH_STATUS_LABEL = {
 };
 /* Tab mapping: which tab does each status belong to */
 const WH_STATUS_TAB = {
+  'new':'new',
   'in_review':'in_review',
   'awaiting_scan':'awaiting_scan',
   'scanned':'scanned',
@@ -4391,7 +4396,7 @@ const WH_STATUS_TAB = {
   'cancelled':'cancelled',
   'refunded':'refunded',
   /* legacy aliases */
-  'new':'in_review','design_review':'in_review',
+  'design_review':'in_review',
   'prescan':'awaiting_scan','in_queue':'awaiting_scan',
   'ready_print':'scanned',
   'packing':'printing','qc':'printing','packed':'printing',
@@ -5569,8 +5574,36 @@ document.addEventListener('click', e => {
   }
 });
 
+function whSetPerPage(v) { whPerPage = (v === 'all') ? 'all' : parseInt(v, 10); whPage = 1; whRenderOrders(); }
+function whGoPage(delta) { whPage += delta; whRenderOrders(); }
+function whRenderPagination(total) {
+  const bar = document.getElementById('wh-pagination'); if (!bar) return;
+  const pp = whPerPage;
+  const optHtml = [10, 25, 50, 100].map(n => `<option value="${n}"${pp === n ? ' selected' : ''}>${n}</option>`).join('')
+    + `<option value="all"${pp === 'all' ? ' selected' : ''}>All</option>`;
+  const sel = `<span style="display:inline-flex;align-items:center;gap:6px">Rows per page:
+    <select onchange="whSetPerPage(this.value)" style="border:1px solid #e5e4e0;border-radius:7px;padding:3px 6px;font-size:13px;font-family:inherit;color:#191918;background:#fff;cursor:pointer">${optHtml}</select></span>`;
+  let right;
+  if (pp === 'all' || total === 0) {
+    right = `<span>${total} order${total !== 1 ? 's' : ''}</span>`;
+  } else {
+    const pages = Math.max(1, Math.ceil(total / pp));
+    const start = (whPage - 1) * pp + 1;
+    const end = Math.min(total, whPage * pp);
+    const btnStyle = 'border:1px solid #e5e4e0;background:#fff;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:14px;color:#374151;line-height:1';
+    const dis = 'opacity:.4;cursor:default';
+    right = `<span style="display:inline-flex;align-items:center;gap:10px">
+      <span>${start}–${end} of ${total}</span>
+      <button onclick="whGoPage(-1)" ${whPage <= 1 ? 'disabled' : ''} style="${btnStyle}${whPage <= 1 ? ';' + dis : ''}">‹</button>
+      <span style="min-width:74px;text-align:center">Page ${whPage} / ${pages}</span>
+      <button onclick="whGoPage(1)" ${whPage >= pages ? 'disabled' : ''} style="${btnStyle}${whPage >= pages ? ';' + dis : ''}">›</button>
+    </span>`;
+  }
+  bar.innerHTML = sel + right;
+}
 function whSetFilter(val, btn) {
   whStatusFilter = val;
+  whPage = 1;
   document.querySelectorAll('#section-orders .tab-btn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   const dd = document.getElementById('wh-more-dd');
@@ -5702,6 +5735,16 @@ function whRenderOrders() {
     if (va > vb) return whSortDir === 'asc' ? 1 : -1;
     return 0;
   });
+  // Pagination: slice the filtered+sorted rows down to the current page.
+  const _total = rows.length;
+  if (whPerPage !== 'all') {
+    const _pages = Math.max(1, Math.ceil(_total / whPerPage));
+    if (whPage > _pages) whPage = _pages;
+    if (whPage < 1) whPage = 1;
+    const _start = (whPage - 1) * whPerPage;
+    rows = rows.slice(_start, _start + whPerPage);
+  }
+  whRenderPagination(_total);
   tbody.innerHTML = rows.map(o => {
     const isSel = whSelectedOrders.has(o.num);
     const isActive = whCurrentOrder === o.num;
@@ -11660,7 +11703,8 @@ window.addEventListener('storage', function(e){
 // removable via × on hover. Mirrors the seller-side customisable tab pattern
 // so factory boards don't show a wall of unused filter chips.
 (function() {
-  var DEFS = { all:{label:'All',filter:'all'}, in_review:{label:'In Review',filter:'in_review'}, awaiting_scan:{label:'Awaiting Scan',filter:'awaiting_scan'}, scanned:{label:'Scanned',filter:'scanned'}, printing:{label:'Printing',filter:'printing'}, shipped:{label:'Shipped',filter:'shipped'}, flagged:{label:'Flagged',filter:'flagged'}, replacement:{label:'Replacement',filter:'replacement'}, cancelled:{label:'Cancelled',filter:'cancelled'}, refunded:{label:'Refunded',filter:'refunded'} };
+  var DEFS = { all:{label:'All',filter:'all'}, new:{label:'New',filter:'new'}, in_review:{label:'In Review',filter:'in_review'}, awaiting_scan:{label:'Awaiting Scan',filter:'awaiting_scan'}, scanned:{label:'Scanned',filter:'scanned'}, printing:{label:'Printing',filter:'printing'}, shipped:{label:'Shipped',filter:'shipped'}, flagged:{label:'Flagged',filter:'flagged'}, replacement:{label:'Replacement',filter:'replacement'}, cancelled:{label:'Cancelled',filter:'cancelled'}, refunded:{label:'Refunded',filter:'refunded'} };
+  var DEFAULT_TABS = ['all','new','in_review','awaiting_scan','printing','shipped'];
   var KEY = 'eg_wh_order_tabs';
   var STRIP_ID = 'wh-list-tab-strip';
   var FILTER_CB = 'whSetFilter';
@@ -11673,9 +11717,10 @@ window.addEventListener('storage', function(e){
   function _load() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (!raw) return ['all'];
+      if (!raw) return DEFAULT_TABS.slice();
       var parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || !parsed.length) return ['all'];
+      if (!Array.isArray(parsed) || !parsed.length) return DEFAULT_TABS.slice();
+      if (parsed.length === 1 && parsed[0] === 'all') return DEFAULT_TABS.slice();
       var list = parsed.filter(function(k){ return DEFS[k]; });
       if (list.indexOf('all') < 0) list.unshift('all');
       else if (list[0] !== 'all') { var i = list.indexOf('all'); list.splice(i,1); list.unshift('all'); }
