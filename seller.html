@@ -2349,15 +2349,27 @@ document.querySelectorAll('#balance-val').forEach(function(el){el.textContent='$
 <script src="egfulfill-tracking.js"></script>
 <script src="eg-new-order.js"></script>
 <script>
-// ── Overview stat cards wired to live orders (EGStore). Starts at 0; moves as orders are created. ──
+// ── Overview stat cards — seller view. Counts only the seller's OWN orders;
+// factory-synced marketplace orders (Etsy etc., owned by the factory) are
+// excluded so they never inflate the seller's numbers. Shows 0 when none. ──
 (function(){
   if (!window.EGStore || !EGStore.bindStats) return;
   function set(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; }
-  EGStore.bindStats(function(s){
-    set('sv-orders',  s.total);
-    set('sv-revenue', EGStore.money(s.revenue));
-    set('sv-profit',  EGStore.money(s.profit));
-    set('sv-fulfill', (s.fulfillmentRate || 0) + '%');
+  function isFactorySynced(o){
+    return /^etsy-/i.test(String(o && o.id || '')) ||
+      ['etsy','shopify','tiktok','woocommerce','amazon','ebay'].indexOf(String(o && o.source || '').toLowerCase()) !== -1;
+  }
+  // bindStats just re-fires on order changes; we recompute from the filtered set.
+  EGStore.bindStats(function(){
+    var orders = ((EGStore.getOrders && EGStore.getOrders()) || []).filter(function(o){ return o && o.id && !isFactorySynced(o); });
+    var total = orders.length;
+    var revenue = orders.reduce(function(a,o){ return a + (Number(o.total) || 0); }, 0);
+    var profit  = orders.reduce(function(a,o){ return a + (Number(o.profit) || 0); }, 0);
+    var shipped = orders.filter(function(o){ return /ship|deliver|fulfil/i.test(String(o.factoryStatus || o.status || '')); }).length;
+    set('sv-orders',  total);
+    set('sv-revenue', EGStore.money(revenue));
+    set('sv-profit',  EGStore.money(profit));
+    set('sv-fulfill', (total ? Math.round(shipped / total * 100) : 0) + '%');
   });
 })();
 </script>
