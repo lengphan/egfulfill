@@ -6,6 +6,7 @@ import { ordersRoutes } from './routes/orders.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
 import { catalogRoutes } from './routes/catalog.js';
+import { etsyRoutes } from './routes/etsy.js';
 import { usersRoutes } from './routes/users.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -50,6 +51,7 @@ ordersRoutes(app, requireAuth);
 inventoryRoutes(app, requireStaff);
 designCardsRoutes(app, requireAuth, requireStaff);
 catalogRoutes(app, requireAuth, requireStaff);
+etsyRoutes(app, requireAuth, requireStaff);
 usersRoutes(app, requireAdmin);
 
 const port = Number(process.env.PORT) || 3000;

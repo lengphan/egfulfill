@@ -80,6 +80,24 @@ create table if not exists catalog_products (
   created_at timestamptz default now(), updated_at timestamptz default now()
 );
 
+-- Connected sales channels (Etsy, etc.). One row per shop; OAuth tokens stored
+-- here (refreshed automatically). Supports several shops under one account.
+create table if not exists platform_connections (
+  id uuid primary key default gen_random_uuid(),
+  platform text not null default 'etsy',
+  shop_id text not null,
+  shop_name text,
+  access_token text,
+  refresh_token text,
+  token_expires_at timestamptz,
+  scopes text,
+  last_sync_at timestamptz,
+  connected_by uuid references users(id) on delete set null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (platform, shop_id)
+);
+
 create table if not exists backorders (
   id uuid primary key default gen_random_uuid(),
   order_id text references orders(id) on delete cascade,

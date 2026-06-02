@@ -6,6 +6,7 @@
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
 <script src="eg-admin-users.js"></script>
+<script src="eg-etsy.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -2060,9 +2061,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13.5px;font-weight:600;color:#191918">Etsy</div>
-                  <div style="font-size:11.5px;color:#9ca3af">Not connected</div>
+                  <div id="etsy-substatus" style="font-size:11.5px;color:#9ca3af">Not connected</div>
                 </div>
-                <button onclick="alert('Connect Etsy via OAuth')" class="btn btn-out" style="font-size:12px;padding:5px 12px">Connect</button>
+                <div id="etsy-actions" style="display:flex;align-items:center;gap:8px">
+                  <button id="etsy-connect-btn" onclick="egConnectEtsy()" class="btn btn-out" style="font-size:12px;padding:5px 12px">Connect</button>
+                </div>
               </div>
               <!-- TikTok Shop (not connected) -->
               <div style="display:flex;align-items:center;gap:12px;padding:13px 18px">

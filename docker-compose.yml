@@ -23,6 +23,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-please-change-me}
       PORT: 3000
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # Etsy keystring is a public app ID (it appears in OAuth URLs), so a default
+      # here is fine. The shared secret is NOT needed for OAuth; only later for
+      # webhook signature checks, and would go in .env as ETSY_SHARED_SECRET.
+      ETSY_KEYSTRING: ${ETSY_KEYSTRING:-ijo2vcdd3opuo9vj15wedqd8}
+      ETSY_REDIRECT_URI: ${ETSY_REDIRECT_URI:-https://egful.store/oauth-callback.html}
+      ETSY_SHARED_SECRET: ${ETSY_SHARED_SECRET:-}
     depends_on: [db]
     restart: unless-stopped
 

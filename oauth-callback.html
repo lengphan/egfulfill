@@ -47,6 +47,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   var qs = new URLSearchParams(location.search);
   var platform = (qs.get('platform') || 'shopify').toLowerCase().replace(/[^a-z]/g, '');
   var force = qs.get('force'); // 'fail' to simulate decline; otherwise success
+  var code = qs.get('code');   // present when Etsy redirects back to us
+  var stateRet = qs.get('state');
+  if (code) platform = 'etsy'; // Etsy's return URL carries only code+state, no platform
   var names = {
     shopify: 'Shopify', etsy: 'Etsy', tiktok: 'TikTok Shop', tiktokshop: 'TikTok Shop',
     woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay', bigcommerce: 'BigCommerce'
@@ -56,12 +59,60 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   document.getElementById('title').textContent = 'Connecting to ' + name + '…';
   document.getElementById('sub').textContent = "We're getting your store linked up.";
 
-  setTimeout(function () { finish(force !== 'fail'); }, 1500);
+  // ── Real Etsy OAuth (PKCE). Other platforms keep the demo path below. ──
+  var ETSY_PKCE_KEY = 'eg_etsy_pkce';
+  function b64url(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function randStr(){ var a=new Uint8Array(48); crypto.getRandomValues(a); return b64url(a.buffer); }
+  async function challenge(v){ var d=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v)); return b64url(d); }
 
-  function finish(success) {
+  async function etsyStart(){
+    try {
+      var cfg = await fetch('/api/etsy/config').then(function(r){return r.json();});
+      if (!cfg || !cfg.keystring) { fail('Etsy app is not configured on the server yet'); return; }
+      var verifier = randStr();
+      var st = randStr().slice(0,24);
+      localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier: verifier, state: st }));
+      var ch = await challenge(verifier);
+      var redirect = cfg.redirect_uri || (location.origin + '/oauth-callback.html');
+      location.href = 'https://www.etsy.com/oauth/connect'
+        + '?response_type=code'
+        + '&client_id=' + encodeURIComponent(cfg.keystring)
+        + '&redirect_uri=' + encodeURIComponent(redirect)
+        + '&scope=' + encodeURIComponent(cfg.scopes || 'transactions_r listings_r')
+        + '&state=' + encodeURIComponent(st)
+        + '&code_challenge=' + encodeURIComponent(ch)
+        + '&code_challenge_method=S256';
+    } catch (e) { fail(e.message); }
+  }
+
+  async function etsyExchange(c, st){
+    try {
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem(ETSY_PKCE_KEY) || '{}'); } catch(_){}
+      if (saved.state && st && saved.state !== st) { fail('Security check failed (state mismatch)'); return; }
+      var tok = localStorage.getItem('eg_token') || '';
+      var res = await fetch('/api/etsy/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ code: c, code_verifier: saved.verifier, redirect_uri: location.origin + '/oauth-callback.html' })
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      localStorage.removeItem(ETSY_PKCE_KEY);
+      if (!res.ok) { fail(data.error || ('Connection failed (' + res.status + ')')); return; }
+      finish(true, data.shop_name || 'Etsy shop');
+    } catch (e) { fail(e.message); }
+  }
+
+  function fail(reason){ var s=document.getElementById('sub'); if(s) s.textContent = reason || 'Something went wrong.'; finish(false); }
+
+  if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
+  else if (platform === 'etsy') { etsyStart(); }       // starting the Etsy flow
+  else { setTimeout(function () { finish(force !== 'fail'); }, 1500); } // demo for other platforms
+
+  function finish(success, shopLabel) {
     var card = document.getElementById('card');
     if (success) {
-      var shopName = name + ' · my-store.example';
+      var shopName = shopLabel || (name + ' · my-store.example');
       card.innerHTML =
         '<span class="ok-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' +
         '<div class="title">Connected!</div>' +
