@@ -4,6 +4,10 @@
 import { q } from '../db.js';
 
 const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
+// Etsy's x-api-key header for API data calls must be "keystring:shared_secret"
+// (the shared secret is NOT needed for the PKCE token exchange, only here).
+const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
+const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
 const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html';
 const SCOPES = 'transactions_r transactions_w listings_r listings_w';
 const TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
@@ -41,7 +45,7 @@ async function validToken(conn) {
 async function etsyGet(conn, path) {
   const token = await validToken(conn);
   const res = await fetch(API + path, {
-    headers: { 'x-api-key': KEYSTRING, Authorization: 'Bearer ' + token }
+    headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data.error || ('Etsy API ' + res.status)) + ' @ ' + path);
@@ -124,11 +128,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       shopId ? [shopId] : []
     )).rows;
     if (!rows.length) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET. Add it to the server .env and redeploy.' }; }
 
     const summary = [];
     for (const conn of rows) {
       let orders = 0, listings = 0, sample = null;
       try {
+        // Resolve the real shop name (the connect-time lookup needed the secret too).
+        try {
+          const shop = await etsyGet(conn, `/shops/${conn.shop_id}`);
+          if (shop && shop.shop_name && shop.shop_name !== conn.shop_name) {
+            await q('update platform_connections set shop_name=$1 where id=$2', [shop.shop_name, conn.id]);
+            conn.shop_name = shop.shop_name;
+          }
+        } catch (_) {}
         // ── Orders (receipts), paginated up to 500 ──
         for (let offset = 0; offset < 500; offset += 100) {
           const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions`);
