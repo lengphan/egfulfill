@@ -132,16 +132,24 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
 
     const summary = [];
     for (const conn of rows) {
-      let orders = 0, listings = 0, sample = null;
+      let orders = 0, listings = 0, sample = null, resolved = null;
       try {
-        // Resolve the real shop name (the connect-time lookup needed the secret too).
+        // Resolve the REAL shop id+name from the token's user id. The connect-time
+        // lookup may have failed (needed the secret), leaving shop_id == user_id.
         try {
-          const shop = await etsyGet(conn, `/shops/${conn.shop_id}`);
-          if (shop && shop.shop_name && shop.shop_name !== conn.shop_name) {
-            await q('update platform_connections set shop_name=$1 where id=$2', [shop.shop_name, conn.id]);
-            conn.shop_name = shop.shop_name;
+          const userId = String(conn.access_token).split('.')[0];
+          const sr = await etsyGet(conn, `/users/${userId}/shops`);
+          const shop = sr && (sr.shop_id ? sr : (Array.isArray(sr.results) ? sr.results[0] : null));
+          resolved = shop ? { shop_id: shop.shop_id, shop_name: shop.shop_name } : { keys: sr ? Object.keys(sr) : null };
+          if (shop && shop.shop_id) {
+            const realId = String(shop.shop_id);
+            if (realId !== String(conn.shop_id) || (shop.shop_name && shop.shop_name !== conn.shop_name)) {
+              await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
+                [realId, shop.shop_name || conn.shop_name, conn.id]);
+              conn.shop_id = realId; conn.shop_name = shop.shop_name || conn.shop_name;
+            }
           }
-        } catch (_) {}
+        } catch (e) { resolved = { error: e.message }; }
         // ── Orders (receipts), paginated up to 500 ──
         for (let offset = 0; offset < 500; offset += 100) {
           const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions`);
@@ -200,10 +208,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           if (results.length < 100) break;
         }
         await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, listings });
+        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, listings, resolved });
       } catch (e) {
         summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, listings, error: e.message,
-                       sample_keys: sample ? Object.keys(sample) : null });
+                       resolved, sample_keys: sample ? Object.keys(sample) : null });
       }
     }
     return { ok: true, synced: summary };
