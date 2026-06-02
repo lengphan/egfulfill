@@ -4482,12 +4482,12 @@ function whRenderOrders() {
                   ${metaRow}${(it.img && /^(https?:|data:)/.test(it.img)) ? ('<a href="' + it.img + '" target="_blank" onclick="event.stopPropagation()" title="View Etsy listing image" style="font-size:11px;color:#9ca3af;text-decoration:underline;margin-left:8px;white-space:nowrap;flex-shrink:0">Listing ↗</a>') : ''}
                 </div>
               </div>
-              <div style="display:flex;gap:6px;flex-shrink:0;margin-left:18px" onclick="event.stopPropagation()">
+              ${_fsChip}
+              <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto" onclick="event.stopPropagation()">
                 <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.upload('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}','${String(it.type||it.printType||'').replace(/'/g,"\\'")}')">↑ Upload</button>
                 <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.templates('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}')">Templates</button>
                 <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.designMaker('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}')">Design Maker</button>
               </div>
-              ${_fsChip}
             </div>`;
           }).join('')}
         </div>

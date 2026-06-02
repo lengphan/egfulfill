@@ -38,8 +38,23 @@
   function openSellerPage(src, title, onBack) {
     var ov = overlayEl();
     ov.innerHTML = header('Design Lab', title, onBack)
-      + '<iframe src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
+      + '<iframe id="egdt-frame" src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
     document.body.appendChild(ov);
+    // The iframed seller pages carry their OWN sidebar + dashboard header. Since
+    // it's same-origin, strip that chrome so we don't show a second side panel /
+    // header. Only do it when the page actually has a sidebar (the editor doesn't,
+    // so it keeps its own toolbar).
+    var ifr = ov.querySelector('#egdt-frame');
+    ifr.addEventListener('load', function () {
+      try {
+        var d = ifr.contentDocument || ifr.contentWindow.document;
+        if (d && d.querySelector('.sidebar')) {
+          var st = d.createElement('style');
+          st.textContent = '.sidebar{display:none!important}[style*="margin-left:220px"]{margin-left:0!important}header{display:none!important}';
+          (d.head || d.documentElement).appendChild(st);
+        }
+      } catch (e) { /* cross-origin (e.g. local file://) — ignore */ }
+    });
     function close(goBack) {
       try { document.body.removeChild(ov); } catch (e) {}
       document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: {} }));
