@@ -544,6 +544,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <a class="fstab on" onclick="dsnSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
       <a class="fstab" onclick="dsnSettingsTab('payout',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 7h13" stroke="currentColor" stroke-width="1.3"/></svg>Payout</a>
       <a class="fstab" onclick="dsnSettingsTab('appearance',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M13 3l-1.4 1.4M4.4 11.6L3 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Appearance</a>
+      <div style="border-top:1px solid #f0ede9;margin:8px 4px"></div>
+      <a class="fstab" style="color:#dc2626;cursor:pointer" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Log out</a>
     </div>
     <div style="flex:1;min-width:0">
       <!-- Profile -->
@@ -581,13 +583,6 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
             <span id="toggle-knob2" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s;display:block"></span>
           </button>
         </div>
-      </div>
-      <!-- Log out (bottom of settings) -->
-      <div style="margin-top:20px;padding-top:18px;border-top:1px solid #f0ede9">
-        <button onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}" style="display:inline-flex;align-items:center;gap:8px;background:#fff5f5;border:1px solid #f3d0d0;color:#dc2626;font-size:13.5px;font-weight:600;padding:9px 16px;border-radius:9px;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff5f5'">
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Log out
-        </button>
       </div>
     </div>
   </div>

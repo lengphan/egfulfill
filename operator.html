@@ -1561,6 +1561,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <a class="fstab on" onclick="opSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
         <a class="fstab" onclick="opSettingsTab('notif',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5A4 4 0 004 5.5v4l-1.5 2h11L12 9.5v-4A4 4 0 008 1.5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3"/></svg>Notifications</a>
         <a class="fstab" onclick="opSettingsTab('threads',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="11" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>Thread Colors</a>
+        <div style="border-top:1px solid #f0ede9;margin:8px 4px"></div>
+        <a class="fstab" style="color:#dc2626;cursor:pointer" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Log out</a>
       </div>
       <div style="flex:1;min-width:0">
         <!-- Profile -->
@@ -1600,13 +1602,6 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:3px">Thread Colors</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">In-stock embroidery threads. Designs uploaded by sellers are matched against this list, and the chosen thread codes are sent with each order.</div>
           <div id="op-thread-mgr"></div>
-        </div>
-        <!-- Log out (bottom of settings) -->
-        <div style="margin-top:20px;padding-top:18px;border-top:1px solid #f0ede9">
-          <button onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}" style="display:inline-flex;align-items:center;gap:8px;background:#fff5f5;border:1px solid #f3d0d0;color:#dc2626;font-size:13.5px;font-weight:600;padding:9px 16px;border-radius:9px;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fff5f5'">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Log out
-          </button>
         </div>
       </div>
     </div>
@@ -3767,9 +3762,7 @@ function renderOpOrders() {
     const isActive = currentOpOrder?.num === o.num;
     const st = o.flagged ? 'flagged' : o.status;
     const badge = `<span style="font-size:12.5px;font-weight:600;white-space:nowrap;${OP_STATUS_STYLE[st]||'background:transparent;color:#374151'}">${OP_STATUS_MAP[st]||st}</span>`;
-    const srcBadge = o.source
-      ? `<div style="font-size:12px;color:#c4c2be;font-weight:400;margin-top:2px">${o.source==='api'?'via API':o.source==='csv'?'via CSV':'Manual'}</div>`
-      : '';
+    const srcBadge = `<div style="font-size:12px;color:#c4c2be;font-weight:400;margin-top:2px">${window.egOrderIds?egOrderIds(o).source:(o.source||'Manual')}</div>`;
     const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : '';
     const isExp = opExpandedRows.has(o.num);
     const mainRow = `<tr data-num="${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select'))opToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s${rowBg?`;background:${rowBg}`:''}">
@@ -3796,7 +3789,6 @@ function renderOpOrders() {
       <td data-col="time" style="font-size:13px;color:#6b7280;white-space:nowrap;display:${opColVisible('time')?'':'none'}">${opFmtOrderDate(o)}</td>
       <td data-col="customer" style="display:${opColVisible('customer')?'':'none'}">
         <div style="font-size:13.5px;font-weight:600;color:#374151">${o.customer}</div>
-        <div style="font-size:12px;color:#9ca3af;margin-top:1px">${o.addr}</div>
       </td>
       <td data-col="tracking" style="font-size:12.5px;color:#9ca3af;display:${opColVisible('tracking')?'':'none'}">${window.EGTracking ? EGTracking.renderCell({ id: o.num, source: o.source, tracking: o.tracking, trackingLabelUrl: o.trackingLabelUrl, trackingCarrier: o.trackingCarrier }) : (o.tracking ? `<span style="font-family:monospace;color:#374151">${o.tracking}</span>` : '—')}</td>
       <td data-col="actions" style="white-space:nowrap;overflow:visible">

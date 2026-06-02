@@ -213,19 +213,20 @@
   // Shared order-ID resolver so every board shows ids the same way:
   // marketplace order # on top, EGFULFILL store id below.
   window.egOrderIds = function (o) {
-    if (!o) return { market: '', eg: '' };
+    if (!o) return { market: '', eg: '', source: 'Manual' };
     var num = String(o.num || o.id || '');
     var plat = (o.platId && o.platId !== '—') ? String(o.platId) : '';
     var m = num.match(/^([a-z]+)-(.+)$/i);
-    var LBL = { etsy: 'Etsy', shopify: 'Shopify', tiktok: 'TikTok', woocommerce: 'Woo', amazon: 'Amazon', ebay: 'eBay' };
-    // Synced marketplace order: primary key is "<platform>-<number>".
+    var LBL = { etsy: 'Etsy', shopify: 'Shopify', tiktok: 'TikTok', woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay' };
+    var PFX = { SP: 'Shopify', ET: 'Etsy', WC: 'WooCommerce', AM: 'Amazon', TT: 'TikTok' };
+    // Synced marketplace order: primary key is "<platform>-<number>". Show just the number.
     if (m && LBL[m[1].toLowerCase()]) {
-      return { market: LBL[m[1].toLowerCase()] + ' #' + m[2], eg: o.egId || ('MA-' + num.slice(-5)) };
+      return { market: '#' + m[2], eg: o.egId || ('MA-' + num.slice(-5)), source: LBL[m[1].toLowerCase()] };
     }
     // Seed/legacy: platId carries the marketplace id (SP-/ET-/…), num is the EG id.
-    if (plat) return { market: plat, eg: num };
+    if (plat) return { market: plat, eg: num, source: PFX[plat.slice(0, 2).toUpperCase()] || 'Etsy' };
     // Manual order: no marketplace id — just the EGFULFILL id.
-    return { market: '', eg: num };
+    return { market: '', eg: num, source: 'Manual' };
   };
 
   window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, pushCatalog: pushCatalog };
