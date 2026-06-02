@@ -292,4 +292,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       return { ok: true };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
+
+  // Debug (staff): return the RAW Etsy receipt(s) + transactions so we can see
+  // exactly which fields Etsy sends — including any personalization/file-upload
+  // fields. Read-only. Optional ?id=<receipt_id> for one order, else first 3.
+  app.get('/api/etsy/debug', { preHandler: requireStaff }, async (req, reply) => {
+    const conn = (await q(`select * from platform_connections where platform='etsy' limit 1`)).rows[0];
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    try {
+      if (req.query && req.query.id) {
+        const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${req.query.id}?includes=Transactions`);
+        return r;
+      }
+      const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=3&offset=0&includes=Transactions`);
+      return r;
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
 }
