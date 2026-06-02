@@ -2061,11 +2061,9 @@ document.addEventListener('DOMContentLoaded', function(){
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13.5px;font-weight:600;color:#191918">Etsy</div>
-                  <div id="etsy-substatus" style="font-size:11.5px;color:#9ca3af">Not connected</div>
+                  <div style="font-size:11.5px;color:#9ca3af">Manage in Settings → Platform</div>
                 </div>
-                <div id="etsy-actions" style="display:flex;align-items:center;gap:8px">
-                  <button id="etsy-connect-btn" onclick="egConnectEtsy()" class="btn btn-out" style="font-size:12px;padding:5px 12px">Connect</button>
-                </div>
+                <button onclick="showSection('settings');admSettingsTab('platform',document.querySelector('#section-settings .fstab[onclick*=platform]'))" class="btn btn-out" style="font-size:12px;padding:5px 12px">Open</button>
               </div>
               <!-- TikTok Shop (not connected) -->
               <div style="display:flex;align-items:center;gap:12px;padding:13px 18px">
@@ -3034,6 +3032,40 @@ document.addEventListener('DOMContentLoaded', function(){
              dedicated EGStore getter/setter so writes survive reloads and
              other dashboards re-read on next access. -->
         <div id="afpanel-platform" class="card fi" style="padding:22px 24px;display:none;max-width:720px">
+          <!-- Sales Channels: real marketplace connections (Etsy live; others coming) -->
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Sales Channels</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Connect the marketplaces you sell on. Orders and listings sync into egfulfill.</div>
+          <div style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden">
+            <!-- Etsy (functional) -->
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 16px">
+              <div style="width:32px;height:32px;border-radius:7px;background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="#ea580c" stroke-width="1.4"/><path d="M6 5v6M6 8h3" stroke="#ea580c" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13.5px;font-weight:600;color:#191918">Etsy</div>
+                <div id="etsy-substatus" style="font-size:11.5px;color:#9ca3af">Not connected</div>
+              </div>
+              <div id="etsy-actions" style="display:flex;align-items:center;gap:8px">
+                <button id="etsy-connect-btn" onclick="egConnectEtsy()" class="btn btn-out" style="font-size:12px;padding:5px 12px">Connect</button>
+              </div>
+            </div>
+            <!-- Shopify / TikTok (placeholders until wired) -->
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid #f3f3f1;opacity:.6">
+              <div style="width:32px;height:32px;border-radius:7px;background:#f0f9ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#0d7c66" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#0d7c66" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </div>
+              <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#191918">Shopify</div><div style="font-size:11.5px;color:#9ca3af">Coming soon</div></div>
+              <button disabled class="btn btn-out" style="font-size:12px;padding:5px 12px;cursor:default">Connect</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid #f3f3f1;opacity:.6">
+              <div style="width:32px;height:32px;border-radius:7px;background:#fdf2f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M9 2v8a2 2 0 11-2-2" stroke="#be185d" stroke-width="1.4" stroke-linecap="round"/><path d="M9 5a3 3 0 003 3" stroke="#be185d" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </div>
+              <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#191918">TikTok Shop</div><div style="font-size:11.5px;color:#9ca3af">Coming soon</div></div>
+              <button disabled class="btn btn-out" style="font-size:12px;padding:5px 12px;cursor:default">Connect</button>
+            </div>
+          </div>
+          <div style="border-top:1px solid #f0ede9;margin:22px 0 18px"></div>
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Platform Settings</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:18px">Global controls applied across operator, warehouse, and seller-facing pricing.</div>
           <div id="adm-platform-body" style="display:flex;flex-direction:column;gap:18px"></div>
@@ -3548,6 +3580,7 @@ function admSettingsTab(name, el){
     var p = document.getElementById('afpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
   if (name === 'users' && window.EGAdminUsers) EGAdminUsers.load();
+  if (name === 'platform' && window.egRefreshEtsy) egRefreshEtsy();
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
   if (el) el.classList.add('on');
   if (name==='threads' && typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('adm-thread-mgr');
