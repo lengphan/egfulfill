@@ -136,7 +136,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
 
     const summary = [];
     for (const conn of rows) {
-      let orders = 0, sample = null, resolved = null;
+      let orders = 0, skipped = 0, purgedShipped = 0, sample = null, resolved = null;
       try {
         // Resolve the REAL shop id+name from the token's user id. The connect-time
         // lookup may have failed (needed the secret), leaving shop_id == user_id.
@@ -154,6 +154,17 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             }
           }
         } catch (e) { resolved = { error: e.message }; }
+        // Save storage: drop the historical shipped backlog — orders shipped BEFORE
+        // you connected this shop. New orders, active/open orders, and orders that
+        // ship after connecting are kept. Cutoff = the connection date.
+        const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
+        if (connectedSec) {
+          const del = await q(
+            `delete from orders where source='etsy' and seller_id=$1 and status='shipped' and created_at < to_timestamp($2)`,
+            [conn.connected_by, connectedSec]
+          );
+          purgedShipped = del.rowCount || 0;
+        }
         // ── Orders (receipts), paginated up to 500 ──
         for (let offset = 0; offset < 500; offset += 100) {
           const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions`);
@@ -165,6 +176,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             // Etsy timestamps are epoch SECONDS; created_timestamp is the order date.
             const createdTs = rc.created_timestamp || rc.create_timestamp;
             const createdIso = createdTs ? new Date(createdTs * 1000).toISOString() : null;
+            // Skip the pre-connection shipped backlog entirely (don't store it).
+            if ((rc.is_shipped || rc.was_shipped) && createdTs && connectedSec && createdTs < connectedSec) { skipped++; continue; }
             await q(
               `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
                values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
@@ -196,9 +209,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         // finished Etsy listings must not pollute it. (Cleanup of any previously
         // imported listings happens once below, before the shop loop.)
         await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, resolved });
+        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved });
       } catch (e) {
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, error: e.message,
+        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, error: e.message,
                        resolved, sample_keys: sample ? Object.keys(sample) : null });
       }
     }

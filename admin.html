@@ -4037,6 +4037,7 @@ function admMergeLiveOrders() {
     });
     WH_ORDERS.unshift({
       num: o.id, store: o.seller || 'Seller', source: 'api',
+      _ts: o.submittedAt || o.createdAt || 0,
       customer: custName, email: '', addr: (typeof EGStore.formatAddress === 'function' ? EGStore.formatAddress(o) : (o.address || '—')),
       shipTo: (typeof EGStore.getShipTo === 'function' ? EGStore.getShipTo(o) : null),
       items: itemList.length + ' item' + (itemList.length!==1?'s':''),
@@ -4240,8 +4241,9 @@ function whRenderOrders() {
     else if (admSortCol === 'carrier')  { va = a.carrier||'';  vb = b.carrier||''; }
     else if (admSortCol === 'customer') { va = a.customer||''; vb = b.customer||''; }
     else if (admSortCol === 'tracking') { va = a.tracking||a.label?.tracking_number||''; vb = b.tracking||b.label?.tracking_number||''; }
-    else { /* time fallback: lower array index = newer, invert so desc puts newest first */
-      va = WH_ORDERS.indexOf(b); vb = WH_ORDERS.indexOf(a);
+    else { /* time: sort by real order timestamp (newest first in desc). Seeds with no _ts fall back to array order. */
+      va = a._ts || 0; vb = b._ts || 0;
+      if (va === vb) { va = WH_ORDERS.indexOf(b); vb = WH_ORDERS.indexOf(a); }
     }
     if (va < vb) return admSortDir === 'asc' ? -1 : 1;
     if (va > vb) return admSortDir === 'asc' ? 1 : -1;

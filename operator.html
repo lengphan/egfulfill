@@ -5244,6 +5244,7 @@ function opMergeLiveOrders() {
     if (!itemList.length) itemList.push({ name: 'Custom Item', sku: 'CUSTOM-001', file: null, status: _mappedStatus, printType: 'dtg', qty: 1 });
     OP_ORDERS.unshift({
       num: o.id, platId: '—', store: o.seller || 'Seller', source: 'live',
+      _ts: o.submittedAt || o.createdAt || 0,
       customer: custName, addr: (typeof EGStore.formatAddress === 'function' ? EGStore.formatAddress(o) : (o.address || '—')),
       shipTo: (typeof EGStore.getShipTo === 'function' ? EGStore.getShipTo(o) : null),
       items: itemList.length + ' item' + (itemList.length !== 1 ? 's' : ''),

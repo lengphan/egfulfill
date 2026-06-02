@@ -46,7 +46,11 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; }
       if (!res.ok) { alert('Sync failed: ' + (res.d.error || 'unknown')); return; }
       var s = (res.d.synced || []).map(function (x) {
-        return (x.shop || x.shop_id) + ': ' + (x.error ? ('ERROR — ' + x.error) : (x.orders + ' orders'));
+        if (x.error) return (x.shop || x.shop_id) + ': ERROR — ' + x.error;
+        var extra = [];
+        if (x.skipped) extra.push(x.skipped + ' old shipped skipped');
+        if (x.purgedShipped) extra.push(x.purgedShipped + ' old shipped removed');
+        return (x.shop || x.shop_id) + ': ' + x.orders + ' orders' + (extra.length ? ' (' + extra.join(', ') + ')' : '');
       }).join('\n');
       var purged = res.d.catalog_listings_purged ? ('\n\nRemoved ' + res.d.catalog_listings_purged + ' Etsy listings from the base catalog.') : '';
       alert('Etsy sync complete\n\n' + (s || 'nothing returned') + purged);
