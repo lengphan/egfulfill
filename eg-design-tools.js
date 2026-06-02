@@ -43,7 +43,45 @@
   }
   function templates(orderNum, sku, name) { openSellerPage('product-templates.html' + ctxQS(orderNum, sku), 'Templates' + (name ? (' · ' + name) : '')); }
   function designMaker(orderNum, sku, name) { openSellerPage('design-maker.html' + ctxQS(orderNum, sku), 'Design Maker' + (name ? (' · ' + name) : '')); }
-  function designLab() { openSellerPage('design-lab.html', 'Design Lab'); }
+
+  // Design Lab hub — mirrors the SELLER's design-lab layout (the 3 cards) but
+  // rendered chrome-less inside the factory shell (no seller sidebar/account).
+  // Each card launches the same reused flow.
+  function designLab() {
+    var card = function (icon, title, desc, cta, action) {
+      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e5e4e0;border-radius:14px;padding:22px;cursor:pointer;font-family:inherit;transition:box-shadow .15s,border-color .15s" onmouseover="this.style.boxShadow=\'0 6px 22px rgba(0,0,0,.08)\';this.style.borderColor=\'#d4cfc7\'" onmouseout="this.style.boxShadow=\'\';this.style.borderColor=\'#e5e4e0\'">'
+        + '<div style="color:#374151;margin-bottom:14px">' + icon + '</div>'
+        + '<div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">' + title + '</div>'
+        + '<div style="font-size:13.5px;color:#6b7280;line-height:1.55;margin-bottom:16px">' + desc + '</div>'
+        + '<div style="font-size:13.5px;font-weight:600;color:#191918">' + cta + '</div></button>';
+    };
+    var PEN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    var BOX = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9" stroke="currentColor" stroke-width="1.6"/></svg>';
+    var TPL = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:#f4f2ef;z-index:99990;display:flex;flex-direction:column;overflow:auto';
+    ov.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid #e5e4e0;background:#fdfcfa;position:sticky;top:0;z-index:1"><div style="font-size:16px;font-weight:800;color:#191918">Design Lab</div><button id="egdl-x" title="Close" style="background:none;border:none;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:0 4px">&times;</button></div>'
+      + '<div style="max-width:1180px;margin:0 auto;padding:30px 24px;width:100%;box-sizing:border-box">'
+      + '<div style="font-size:22px;font-weight:800;color:#191918;margin-bottom:20px">Welcome to Design Lab</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px">'
+      + card(PEN, 'Upload &amp; Design', 'Start with your artwork — upload a file, place it on a blank, generate a mockup, and publish.', 'Open editor →', 'maker')
+      + card(BOX, 'Browse Catalog', 'Pick a blank product first — tees, mugs, hoodies — then drop your design on top.', 'Browse blanks →', 'catalog')
+      + card(TPL, 'Use a Template', 'Start from a saved product setup. Apply a fresh design to something already configured.', 'View product templates →', 'templates')
+      + '</div></div>';
+    document.body.appendChild(ov);
+    document.body.style.overflow = 'hidden';
+    function close() { try { document.body.removeChild(ov); } catch (e) {} document.body.style.overflow = ''; }
+    ov.querySelector('#egdl-x').addEventListener('click', close);
+    ov.querySelectorAll('.egdl-card').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var act = b.getAttribute('data-act');
+        close();
+        if (act === 'templates') templates('', '');
+        else designMaker('', '');   // maker + catalog both open the editor
+      });
+    });
+  }
 
   window.EGDesignTools = { upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage };
 })();
