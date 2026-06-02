@@ -4487,13 +4487,10 @@ function whRenderOrders() {
                 </div>
               </div>
               ${_fsChip}
-              <div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto" onclick="event.stopPropagation()">
-                <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.upload('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}','${String(it.type||it.printType||'').replace(/'/g,"\\'")}')">↑ Upload</button>
-                <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.templates('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}')">Templates</button>
-                <button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="window.EGDesignTools&&EGDesignTools.designMaker('${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||'').replace(/'/g,"\\'")}')">Design Maker</button>
-              </div>
+              ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
             </div>`;
           }).join('')}
+          ${window.EGDesignTools ? EGDesignTools.pushButton(o) : ''}
         </div>
       </td>
     </tr>` : '';

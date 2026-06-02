@@ -63,6 +63,10 @@
     return { sku: it.sku, name: it.name, listing: it.listing, printType: it.print_type, tech: it.print_type,
              qty: it.qty, color: it.color, size: it.size, variant: it.variant, blank: it.blank,
              unitPrice: Number(it.unit_price) || 0, designSrc: it.design_src, designUrl: it.design_src,
+             // customerFile = the buyer's marketplace upload (e.g. Etsy "Upload Your
+             // Logo") — a real URL. Kept separate from designSrc (which the seller UI
+             // treats as a 'design-lab'/'template' enum) so the two never collide.
+             customerFile: /^https?:\/\//i.test(String(it.design_src || '')) ? it.design_src : null,
              personalization: it.personalization, img: it.img, designPos: it.design_pos };
   }
   function dbToOrder(r) {

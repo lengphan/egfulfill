@@ -1021,8 +1021,16 @@ function renderOrders(ordersOverride) {
       // Recover the dark "active" state from persistent storage so it survives
       // re-renders (adding a new item, switching tabs, page reload, etc).
       // Priority: in-memory selection → item.designSrc → live UP_STATE upload.
+      // Pre-fill the drop-zone with the buyer's marketplace upload so it reads
+      // as "already uploaded" (customer files arrive attached to synced orders).
+      if (item.customerFile && !(UP_STATE[o.no] && UP_STATE[o.no][item.sku])) {
+        UP_STATE[o.no] = UP_STATE[o.no] || {};
+        UP_STATE[o.no][item.sku] = { state: 'ok', file: { name: 'Customer upload' }, dataUrl: item.customerFile, fromCustomer: true };
+      }
       if (!ITEM_DESIGN_SEL[dsKey]) {
-        if (item.designSrc) ITEM_DESIGN_SEL[dsKey] = item.designSrc === 'design-lab' ? 'lab' : 'template';
+        // designSrc is an enum ('design-lab'/'template'); ignore URL values that
+        // can arrive on synced orders so a customer file isn't mis-tagged.
+        if (item.designSrc && !/^https?:\/\//i.test(String(item.designSrc))) ITEM_DESIGN_SEL[dsKey] = item.designSrc === 'design-lab' ? 'lab' : 'template';
         else if (UP_STATE[o.no]?.[item.sku]?.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
       }
       const DS_ACT = '#374151';
@@ -2614,7 +2622,10 @@ function _itemDesignURL(o, item) {
   // on the blank even after a full navigation round-trip).
   const fromUp = UP_STATE[o.no] && UP_STATE[o.no][item.sku] && UP_STATE[o.no][item.sku].dataUrl;
   if (fromUp) return fromUp;
-  if (item.designUrl) return item.designUrl;
+  // Seller's own design wins; otherwise show the buyer's marketplace upload
+  // (Etsy "Upload Your Logo", etc.) on the blank until they replace it.
+  if (item.designUrl && item.designUrl !== item.customerFile) return item.designUrl;
+  if (item.customerFile) return item.customerFile;
   try {
     if (typeof EGStore !== 'undefined' && EGStore.getRawDesign && o.id) {
       const raw = EGStore.getRawDesign(o.id, item.sku);
