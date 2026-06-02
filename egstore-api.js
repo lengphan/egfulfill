@@ -72,6 +72,7 @@
              delivery: r.delivery, carrier: r.carrier, service: r.service, tracking: r.tracking,
              timeline: r.timeline || [], notes: r.notes || [], gates: r.gates || {},
              createdAt: r.created_at ? Date.parse(r.created_at) : Date.now(),
+             submittedAt: r.created_at ? Date.parse(r.created_at) : Date.now(),
              items: (r.items || []).map(dbToItem), _live: true };
   }
   function writeCache(orders) {

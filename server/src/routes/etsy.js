@@ -130,9 +130,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     if (!rows.length) { reply.code(400); return { error: 'No Etsy shop connected' }; }
     if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET. Add it to the server .env and redeploy.' }; }
 
+    // One-time cleanup: purge any Etsy listings a previous version imported into
+    // the base-product catalog (they don't belong there).
+    const purged = await q(`delete from catalog_products where id like 'etsy-%'`);
+
     const summary = [];
     for (const conn of rows) {
-      let orders = 0, listings = 0, sample = null, resolved = null;
+      let orders = 0, sample = null, resolved = null;
       try {
         // Resolve the REAL shop id+name from the token's user id. The connect-time
         // lookup may have failed (needed the secret), leaving shop_id == user_id.
@@ -157,17 +161,21 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           if (!sample && results[0]) sample = results[0];
           for (const rc of results) {
             const id = 'etsy-' + rc.receipt_id;
-            const status = rc.is_shipped || rc.was_shipped ? 'shipped' : (rc.is_paid || rc.was_paid ? 'new' : 'new');
+            const status = (rc.is_shipped || rc.was_shipped) ? 'shipped' : 'new';
+            // Etsy timestamps are epoch SECONDS; created_timestamp is the order date.
+            const createdTs = rc.created_timestamp || rc.create_timestamp;
+            const createdIso = createdTs ? new Date(createdTs * 1000).toISOString() : null;
             await q(
-              `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking)
-               values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9)
+              `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
+               values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
                on conflict (id) do update set status=excluded.status, total=excluded.total,
-                 customer=excluded.customer, address=excluded.address, updated_at=now()`,
+                 customer=excluded.customer, address=excluded.address,
+                 created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
               [id, conn.connected_by, conn.shop_name,
                { name: rc.name, email: rc.buyer_email || null },
                { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
                  zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
-               status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null]
+               status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
             );
             await q('delete from order_items where order_id=$1', [id]);
             for (const tr of (rc.transactions || [])) {
@@ -183,37 +191,17 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           }
           if (results.length < 100) break;
         }
-        // ── Listings → catalog_products, paginated up to 500 ──
-        for (let offset = 0; offset < 500; offset += 100) {
-          const r = await etsyGet(conn, `/shops/${conn.shop_id}/listings?limit=100&offset=${offset}&includes=Images`);
-          const results = r.results || [];
-          for (const ls of results) {
-            const img = (ls.images && ls.images[0] && (ls.images[0].url_fullxfull || ls.images[0].url_570xN)) || null;
-            const product = {
-              id: 'etsy-' + ls.listing_id, name: ls.title || 'Etsy listing',
-              sku: (ls.skus && ls.skus[0]) || null, price: money(ls.price), basePrice: money(ls.price),
-              status: ls.state === 'active' ? 'Active' : 'Inactive', source: 'etsy',
-              img, mockup: img, type: ls.taxonomy_id ? String(ls.taxonomy_id) : null
-            };
-            await q(
-              `insert into catalog_products (id, name, sku, status, base_price, price, img_path, mockup_path, data, updated_at)
-               values ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
-               on conflict (id) do update set name=excluded.name, sku=excluded.sku, status=excluded.status,
-                 base_price=excluded.base_price, price=excluded.price, img_path=excluded.img_path,
-                 mockup_path=excluded.mockup_path, data=excluded.data, updated_at=now()`,
-              [product.id, product.name, product.sku, product.status, product.basePrice, product.price, img, img, product]
-            );
-            listings++;
-          }
-          if (results.length < 100) break;
-        }
+        // NOTE: we intentionally do NOT import Etsy listings into catalog_products.
+        // The catalog is for BASE products to customize and push OUT to platforms;
+        // finished Etsy listings must not pollute it. (Cleanup of any previously
+        // imported listings happens once below, before the shop loop.)
         await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, listings, resolved });
+        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, resolved });
       } catch (e) {
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, listings, error: e.message,
+        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, error: e.message,
                        resolved, sample_keys: sample ? Object.keys(sample) : null });
       }
     }
-    return { ok: true, synced: summary };
+    return { ok: true, synced: summary, catalog_listings_purged: purged.rowCount || 0 };
   });
 }
