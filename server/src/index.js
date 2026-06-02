@@ -5,6 +5,8 @@ import { signup, login, verify, isStaff } from './auth.js';
 import { ordersRoutes } from './routes/orders.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
+import { catalogRoutes } from './routes/catalog.js';
+import { usersRoutes } from './routes/users.js';
 
 const app = Fastify({ logger: true });
 await app.register(cors, { origin: process.env.CORS_ORIGIN || '*' });
@@ -20,6 +22,10 @@ function requireAuth(req, reply, done) {
 }
 function requireStaff(req, reply, done) {
   if (!isStaff(req.user)) { reply.code(403).send({ error: 'Staff only' }); return; }
+  done();
+}
+function requireAdmin(req, reply, done) {
+  if (!req.user || req.user.role !== 'admin') { reply.code(403).send({ error: 'Admin only' }); return; }
   done();
 }
 
@@ -40,6 +46,8 @@ app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
 ordersRoutes(app, requireAuth);
 inventoryRoutes(app, requireStaff);
 designCardsRoutes(app, requireAuth, requireStaff);
+catalogRoutes(app, requireAuth, requireStaff);
+usersRoutes(app, requireAdmin);
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

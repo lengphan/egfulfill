@@ -43,3 +43,6 @@ export async function login({ email, password }) {
 }
 
 export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'designer'].includes(user.role);
+
+// Reusable bcrypt hasher for admin-created users / password resets.
+export async function hashPassword(plain) { return bcrypt.hash(plain, 10); }

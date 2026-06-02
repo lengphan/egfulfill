@@ -150,19 +150,64 @@
     };
   })();
 
+  // ── Catalog products (the shared product catalog) ──
+  // Stored locally split across eg_catalog_products (metadata) + _blob (images)
+  // and reassembled by EGStore.getCatalogProducts(), so the plain setItem
+  // interceptor above can't see the full product. We wrap setCatalogProducts —
+  // the lossless chokepoint — instead. Readable by all; writable by staff.
+  var _suspendCatalog = false, _catalogTimer = null;
+  function pushCatalog() {
+    if (!window.EGStore || !EGStore.getCatalogProducts) return;
+    var list = EGStore.getCatalogProducts() || [];
+    api('/catalog_products', { method: 'POST', body: list });
+  }
+  function hydrateCatalog() {
+    if (!window.EGStore || !EGStore.setCatalogProducts) return Promise.resolve();
+    return api('/catalog_products').then(function (r) {
+      if (r.error) { console.warn('[egstore-api] hydrate catalog:', r.error.message); return; }
+      var server = r.data || [];
+      if (!server.length) {
+        // DB empty — seed it from anything already in this browser (don't wipe).
+        var local = EGStore.getCatalogProducts() || [];
+        if (local.length && isStaff()) pushCatalog();
+        return;
+      }
+      _suspendCatalog = true;
+      try { EGStore.setCatalogProducts(server); } catch (e) {}
+      _suspendCatalog = false;
+      try { window.dispatchEvent(new StorageEvent('storage', { key: 'eg_catalog_products' })); } catch (e) {}
+    });
+  }
+  function wrapCatalog() {
+    if (!window.EGStore || !EGStore.setCatalogProducts || EGStore.__catalogWrapped) return;
+    var origSet = EGStore.setCatalogProducts.bind(EGStore);
+    EGStore.setCatalogProducts = function (products) {
+      var ok = origSet(products);
+      if (token() && isStaff() && !_suspendCatalog) {
+        clearTimeout(_catalogTimer);
+        _catalogTimer = setTimeout(pushCatalog, 500);
+      }
+      return ok;
+    };
+    EGStore.__catalogWrapped = true;
+  }
+
   function start() {
     if (!token()) return;          // signed out → leave local/demo data alone
     installWrappers();
+    wrapCatalog();
     hydrate();
+    hydrateCatalog();
     var collKeys = isStaff() ? Object.keys(COLLECTIONS) : [];
     collKeys.forEach(hydrateCollection);
     // Light polling for cross-board liveness (no realtime server yet). 15s.
     clearInterval(window.__egApiPoll);
     window.__egApiPoll = setInterval(function () {
       hydrate();
+      hydrateCatalog();
       collKeys.forEach(hydrateCollection);
     }, 15000);
   }
   start();
-  window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection };
+  window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, pushCatalog: pushCatalog };
 })();

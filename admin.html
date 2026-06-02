@@ -5,6 +5,7 @@
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
+<script src="eg-admin-users.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -2985,6 +2986,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <a class="fstab" onclick="admSettingsTab('threads',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="11" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>Thread Colors</a>
         <a class="fstab" onclick="admSettingsTab('boards',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2" width="4" height="8"  rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="10.5" y="2" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>Design Boards</a>
         <a class="fstab" onclick="admSettingsTab('platform',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>Platform</a>
+        <a class="fstab" onclick="admSettingsTab('users',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.4" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 13c0-2.6 2-4 4.5-4s4.5 1.4 4.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 5.5a2 2 0 010 4M12.5 13c0-1.6-.6-2.8-1.6-3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Users</a>
       </div>
       <div style="flex:1;min-width:0">
         <!-- Profile -->
@@ -3032,6 +3034,12 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Platform Settings</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:18px">Global controls applied across operator, warehouse, and seller-facing pricing.</div>
           <div id="adm-platform-body" style="display:flex;flex-direction:column;gap:18px"></div>
+        </div>
+        <!-- Users (admin-only) -->
+        <div id="afpanel-users" class="card fi" style="padding:22px 24px;display:none">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Users</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Add team members, change roles, reset passwords. Admin only — backed by your server.</div>
+          <div id="eg-users-root"></div>
         </div>
       </div>
     </div>
@@ -3533,9 +3541,10 @@ function showSection(id) {
 function admSettingsTab(name, el){
   // Existing 4 panels + the new 'platform' panel (additive — older callers
   // still work, none of the existing panel ids changed).
-  ['profile','notif','threads','boards','platform'].forEach(function(t){
+  ['profile','notif','threads','boards','platform','users'].forEach(function(t){
     var p = document.getElementById('afpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
+  if (name === 'users' && window.EGAdminUsers) EGAdminUsers.load();
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
   if (el) el.classList.add('on');
   if (name==='threads' && typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('adm-thread-mgr');
