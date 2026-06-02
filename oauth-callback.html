@@ -91,6 +91,8 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       try { saved = JSON.parse(localStorage.getItem(ETSY_PKCE_KEY) || '{}'); } catch(_){}
       if (saved.state && st && saved.state !== st) { fail('Security check failed (state mismatch)'); return; }
       var tok = localStorage.getItem('eg_token') || '';
+      if (!tok) { fail('Not logged in to egfulfill. Open the admin board, sign in as admin, then click Connect again.'); return; }
+      if (!saved.verifier) { fail('Lost the security key (PKCE verifier). Click Connect again from the start — don’t reload this window.'); return; }
       var res = await fetch('/api/etsy/exchange', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
@@ -103,13 +105,13 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
     } catch (e) { fail(e.message); }
   }
 
-  function fail(reason){ var s=document.getElementById('sub'); if(s) s.textContent = reason || 'Something went wrong.'; finish(false); }
+  function fail(reason){ finish(false, null, reason); }
 
   if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
   else if (platform === 'etsy') { etsyStart(); }       // starting the Etsy flow
   else { setTimeout(function () { finish(force !== 'fail'); }, 1500); } // demo for other platforms
 
-  function finish(success, shopLabel) {
+  function finish(success, shopLabel, reason) {
     var card = document.getElementById('card');
     if (success) {
       var shopName = shopLabel || (name + ' · my-store.example');
@@ -127,8 +129,8 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       card.innerHTML =
         '<span class="err-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 7l10 10M17 7L7 17" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span>' +
         '<div class="title">Could not connect</div>' +
-        '<div class="sub">Permission was declined or the request timed out.</div>' +
-        '<div class="row"><a class="btn" href="?platform=' + platform + '">Try again</a><a class="btn ghost" href="javascript:void(0)" onclick="closeNow()">Close</a></div>';
+        '<div class="sub" style="word-break:break-word">' + (reason || 'Permission was declined or the request timed out.') + '</div>' +
+        '<div class="row"><a class="btn" href="oauth-callback.html?platform=' + platform + '">Try again</a><a class="btn ghost" href="javascript:void(0)" onclick="closeNow()">Close</a></div>';
       try {
         window.opener && window.opener.postMessage(
           { kind: 'eg-connect-result', ok: false, platform: platform, reason: 'declined' }, '*'
