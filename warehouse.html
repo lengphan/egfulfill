@@ -4404,6 +4404,16 @@ const WH_STATUS_TAB = {
   'production':'printing','queued':'printing',
 };
 function whCanonStatus(s) { return WH_STATUS_TAB[s] || s; }
+// One consistent "real order date" format: marketplace date for synced orders,
+// upload time for manual orders (both stored in _ts).
+function whFmtOrderDate(o) {
+  const ts = o && o._ts ? o._ts : 0;
+  if (!ts) return o && (o.placed || o.time) ? (o.placed || o.time) : '—';
+  const d = new Date(ts);
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `<div>${date}</div><div style="font-size:11.5px;color:#c4c3be">${time}</div>`;
+}
 // Stock state for an item's blank — real inventory match when available, deterministic fallback otherwise.
 function whStockState(sku) {
   let inv = null;
@@ -5791,7 +5801,7 @@ function whRenderOrders() {
         <div style="font-size:13.25px;color:#374151">${o.carrier||'—'}</div>
         <div style="font-size:12.25px;color:#9ca3af;margin-top:1px">${o.total||''}</div>
       </td>
-      <td data-col="time" style="font-size:13.25px;color:#9ca3af;white-space:nowrap">${o.time}</td>
+      <td data-col="time" style="font-size:13.25px;color:#6b7280;white-space:nowrap">${whFmtOrderDate(o)}</td>
       <td data-col="customer">
         <div style="font-size:13.75px;font-weight:600;color:#191918">${o.customer}</div>
         <div style="font-size:12.25px;color:#9ca3af;margin-top:2px">${addrSnippet}</div>
@@ -9046,7 +9056,7 @@ function submitManualOrder() {
       listing: it.listing || null,
       file: it.designDataUrl || null
     })),
-    status:'new', carrier, total:'—', source:'manual', placed:'Just now', time:'Just now', note:null };
+    status:'new', carrier, total:'—', source:'manual', _ts: Date.now(), placed:'Just now', time:'Just now', note:null };
   // Adaptive injection — push into whichever orders array this board uses
   // and call the matching renderer so the table refreshes immediately.
   if (typeof WH_ORDERS !== 'undefined') {
