@@ -3904,6 +3904,9 @@ function odmRemoveDesign(ordNo, sku) {
       for (let _i = liveOrders.length - 1; _i >= 0; _i--) {
         const lo = liveOrders[_i];
         if (seedIds.has(lo.id)) continue; // already in seed (or already hydrated this load)
+        // Factory-synced marketplace orders (connected from the admin board) are
+        // fulfilled through admin/warehouse/operator ONLY — never shown to the seller.
+        if (/^etsy-/i.test(String(lo.id)) || ['etsy','shopify','tiktok','woocommerce','amazon','ebay'].indexOf(String(lo.source || '').toLowerCase()) !== -1) continue;
         // Convert EGStore schema → seller-table row schema
         const created = lo.submittedAt ? new Date(lo.submittedAt) : new Date();
         const fmtDate = (created.getMonth()+1) + '/' + created.getDate() + '/' + created.getFullYear();
