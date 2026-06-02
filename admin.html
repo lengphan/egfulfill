@@ -4383,7 +4383,7 @@ function whRenderOrders() {
             // Product thumbnail + stock pill (matches the operator layout)
             // Avatar = live composite (mockup + design overlay at seller's
             // designPos). Raw design stays the click target for the file link.
-            const prodImg = ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
+            const prodImg = (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
             const _designSrc = it.designUrl || ((it.file && String(it.file).startsWith('data:')) ? it.file : '');
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
             const _overlay = _designSrc
@@ -4479,7 +4479,7 @@ function whRenderOrders() {
               <div style="flex:1;min-width:0;margin-right:12px">
                 <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
                 <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
-                  ${metaRow}
+                  ${metaRow}${(it.img && /^(https?:|data:)/.test(it.img)) ? ('<a href="' + it.img + '" target="_blank" onclick="event.stopPropagation()" title="View Etsy listing image" style="font-size:11px;color:#9ca3af;text-decoration:underline;margin-left:8px;white-space:nowrap;flex-shrink:0">Listing ↗</a>') : ''}
                 </div>
               </div>
               ${_fsChip}
