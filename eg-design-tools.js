@@ -60,17 +60,23 @@
 
   // ── Design Maker: open the editor in an overlay, passing order+sku context ──
   function designMaker(orderNum, sku, name) {
-    var src = 'design-maker.html?order=' + encodeURIComponent(orderNum || '') + '&sku=' + encodeURIComponent(sku || '') + '&embed=1';
+    // Standalone (from the sidebar) → full seller flow incl. publish-to-product.
+    // From an order item → carry order+sku context so the design ties to the item.
+    var hasCtx = !!(orderNum || sku);
+    var src = hasCtx
+      ? ('design-maker.html?order=' + encodeURIComponent(orderNum || '') + '&sku=' + encodeURIComponent(sku || '') + '&embed=1')
+      : 'design-maker.html';
     var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.6);z-index:99990;display:flex;flex-direction:column;padding:20px';
-    ov.innerHTML = '<div style="max-width:1100px;width:100%;height:100%;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #e5e4e0;flex-shrink:0"><div style="font-size:14px;font-weight:700">Design Maker · ' + esc(name || sku || '') + '</div><button id="egdt-dm-x" style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1">&times;</button></div>'
-      + '<iframe src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe></div>';
+    // Full-screen overlay.
+    ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:99990;display:flex;flex-direction:column';
+    var title = (orderNum || sku) ? ('Design Maker · ' + esc(name || sku || '')) : 'Design Maker';
+    ov.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid #e5e4e0;flex-shrink:0;background:#fdfcfa"><div style="font-size:14px;font-weight:700;color:#191918">' + title + '</div><button id="egdt-dm-x" title="Close" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 4px">&times;</button></div>'
+      + '<iframe src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
     document.body.appendChild(ov);
-    ov.querySelector('#egdt-dm-x').addEventListener('click', function () {
-      try { document.body.removeChild(ov); } catch (e) {}
-      document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
-    });
+    document.body.style.overflow = 'hidden';
+    function close() { try { document.body.removeChild(ov); } catch (e) {} document.body.style.overflow = ''; document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } })); }
+    ov.querySelector('#egdt-dm-x').addEventListener('click', close);
+    document.addEventListener('keydown', function esc2(ev) { if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', esc2); } });
   }
 
   window.EGDesignTools = { upload: upload, templates: templates, designMaker: designMaker, applyDesign: applyDesign };
