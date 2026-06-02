@@ -7,6 +7,7 @@
 <script src="egstore-api.js"></script>
 <script src="eg-admin-users.js"></script>
 <script src="eg-etsy.js"></script>
+<script src="eg-design-tools.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -8642,6 +8643,8 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
           <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">↑ Upload</button>
+          <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomTemplates('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Templates</button>
+          <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomDesignMaker('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Design Maker</button>
           <select class="select" style="font-size:12px;padding:4px 6px">
             <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
           </select>
@@ -8663,6 +8666,9 @@ document.addEventListener('DOMContentLoaded', function() {
       onDone: function(){ if (_xfomNum === ord) xfomOpen(ord); if (typeof renderOrders === 'function') renderOrders(); }
     });
   };
+  window.xfomTemplates = function(sku, name){ if (window.EGDesignTools) EGDesignTools.templates(_xfomNum, sku, name); };
+  window.xfomDesignMaker = function(sku, name){ if (window.EGDesignTools) EGDesignTools.designMaker(_xfomNum, sku, name); };
+  document.addEventListener('eg-design-updated', function(e){ try{ if (e.detail && e.detail.orderNum === _xfomNum && typeof xfomOpen === 'function') xfomOpen(_xfomNum); }catch(_){} });
   function _xfomRenderFooter() {
     const wrap = document.getElementById('xfom-footer-actions'); if (!wrap) return;
     const role = XFOM_ROLE;

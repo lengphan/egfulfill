@@ -6,6 +6,7 @@
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
 <script src="eg-etsy.js"></script>
+<script src="eg-design-tools.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="egfulfill-drag.js"></script>
 <script src="egfulfill-tracking.js"></script>
@@ -7614,6 +7615,8 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
             <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">${designSrc ? 'Replace File' : '↑ Upload'}</button>
+            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomTemplates('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Templates</button>
+            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomDesignMaker('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Design Maker</button>
             <select class="select" style="font-size:12px;padding:4px 6px">
               <option>DTG Board</option><option>DTF Board</option><option>EMB Board</option>
             </select>
@@ -7637,6 +7640,9 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
       onDone: function(){ if (_xfomNum === ord) xfomOpen(ord); if (typeof renderOpOrders === 'function') renderOpOrders(); }
     });
   };
+  window.xfomTemplates = function(sku, name){ if (window.EGDesignTools) EGDesignTools.templates(_xfomNum, sku, name); };
+  window.xfomDesignMaker = function(sku, name){ if (window.EGDesignTools) EGDesignTools.designMaker(_xfomNum, sku, name); };
+  document.addEventListener('eg-design-updated', function(e){ try{ if (e.detail && e.detail.orderNum === _xfomNum && typeof xfomOpen === 'function') xfomOpen(_xfomNum); }catch(_){} });
   // Order history for the factory side — shows EVERY event (including
   // internal:true entries the seller can't see). Pulled live from the EGStore
   // timeline so seller actions, operator/admin/warehouse hold/resume, gate
