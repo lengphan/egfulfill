@@ -5,6 +5,7 @@
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
+<script src="eg-etsy.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -5332,6 +5333,10 @@ function whMarkShipped(orderNum) {
   }
   whRenderOrders(); whUpdateTabCounts();
   whShowToast && whShowToast('#' + orderNum + ' → Shipped', '#15803d');
+  // If this is an Etsy order, offer to push tracking back to Etsy (notifies buyer).
+  if (window.EGEtsyFulfill && /^etsy-/i.test(orderNum)) {
+    EGEtsyFulfill(orderNum, o.tracking || '', o.carrier || 'usps');
+  }
   return true;
 }
 /* Toggle Hold from the warehouse row actions. Syncs via EGStore so operator

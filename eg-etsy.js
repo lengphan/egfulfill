@@ -63,5 +63,18 @@
     api('/etsy/connections/' + encodeURIComponent(shopId), { method: 'DELETE' }).then(egRefreshEtsy);
   };
 
+  // Push tracking back to Etsy for an Etsy order. Customer-facing: confirms first
+  // because it marks the order shipped on Etsy and emails the buyer.
+  window.EGEtsyFulfill = function (orderId, tracking, carrier) {
+    if (!/^etsy-/i.test(String(orderId || ''))) return Promise.resolve(false); // not an Etsy order
+    if (!confirm('Mark this order shipped on Etsy and notify the buyer?\n\nTracking: ' + (tracking || '(none)'))) return Promise.resolve(false);
+    return api('/etsy/fulfill', { method: 'POST', body: { order_id: orderId, tracking_code: tracking || '', carrier_name: carrier || 'usps' } })
+      .then(function (r) {
+        if (!r.ok) { alert('Etsy update failed: ' + (r.d.error || 'unknown')); return false; }
+        alert('Etsy order marked shipped + tracking sent.');
+        return true;
+      });
+  };
+
   document.addEventListener('DOMContentLoaded', function () { setTimeout(egRefreshEtsy, 600); });
 })();

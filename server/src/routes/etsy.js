@@ -52,6 +52,44 @@ async function etsyGet(conn, path) {
   return data;
 }
 
+// Upsert one Etsy receipt into orders. Returns 'imported' or 'skipped'.
+// Re-syncs never overwrite the internal pipeline (status/factory_status) or items.
+async function importReceipt(conn, rc, connectedSec) {
+  const id = 'etsy-' + rc.receipt_id;
+  const shipped = !!(rc.is_shipped || rc.was_shipped);
+  const status = shipped ? 'shipped' : 'new';
+  const createdTs = rc.created_timestamp || rc.create_timestamp;            // epoch seconds
+  const createdIso = createdTs ? new Date(createdTs * 1000).toISOString() : null;
+  // Skip the pre-connection shipped backlog entirely (don't store it).
+  if (shipped && createdTs && connectedSec && createdTs < connectedSec) return 'skipped';
+  await q(
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
+     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
+     on conflict (id) do update set total=excluded.total,
+       customer=excluded.customer, address=excluded.address,
+       created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
+    [id, conn.connected_by, conn.shop_name,
+     { name: rc.name, email: rc.buyer_email || null },
+     { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
+       zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
+     status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
+  );
+  // Create line items only on first import — re-syncs leave them untouched.
+  const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
+  if (!hasItems.rowCount) {
+    for (const tr of (rc.transactions || [])) {
+      await q(
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
+         values ($1,$2,$3,$4,$5,$6,$7)`,
+        [id, tr.sku || null, tr.title || null, tr.quantity || 1,
+         (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
+         money(tr.price), (tr.product_data && tr.product_data.image_url) || null]
+      );
+    }
+  }
+  return 'imported';
+}
+
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
   // ensure table exists even on a DB that booted before this feature (idempotent)
@@ -171,40 +209,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           const results = r.results || [];
           if (!sample && results[0]) sample = results[0];
           for (const rc of results) {
-            const id = 'etsy-' + rc.receipt_id;
-            const status = (rc.is_shipped || rc.was_shipped) ? 'shipped' : 'new';
-            // Etsy timestamps are epoch SECONDS; created_timestamp is the order date.
-            const createdTs = rc.created_timestamp || rc.create_timestamp;
-            const createdIso = createdTs ? new Date(createdTs * 1000).toISOString() : null;
-            // Skip the pre-connection shipped backlog entirely (don't store it).
-            if ((rc.is_shipped || rc.was_shipped) && createdTs && connectedSec && createdTs < connectedSec) { skipped++; continue; }
-            await q(
-              `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
-               values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
-               on conflict (id) do update set total=excluded.total,
-                 customer=excluded.customer, address=excluded.address,
-                 created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
-              [id, conn.connected_by, conn.shop_name,
-               { name: rc.name, email: rc.buyer_email || null },
-               { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
-                 zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
-               status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
-            );
-            // Only create line items on first import — re-syncs leave them (and
-            // any per-item workflow) untouched.
-            const _hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
-            if (!_hasItems.rowCount) {
-              for (const tr of (rc.transactions || [])) {
-                await q(
-                  `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
-                   values ($1,$2,$3,$4,$5,$6,$7)`,
-                  [id, tr.sku || null, tr.title || null, tr.quantity || 1,
-                   (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
-                   money(tr.price), (tr.product_data && tr.product_data.image_url) || null]
-                );
-              }
-            }
-            orders++;
+            if ((await importReceipt(conn, rc, connectedSec)) === 'skipped') skipped++; else orders++;
           }
           if (results.length < 100) break;
         }
@@ -220,5 +225,47 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       }
     }
     return { ok: true, synced: summary, catalog_listings_purged: purged.rowCount || 0 };
+  });
+
+  // ── Webhook receiver (real-time). Etsy POSTs here when an order event fires.
+  // Public (Etsy has no bearer token). Effect is read-only: we re-pull recent
+  // receipts for the connected shops and import them — so it can't be abused to
+  // mutate anything. Register this URL in the Etsy webhooks portal:
+  //   https://egful.store/api/webhooks/etsy
+  app.post('/api/webhooks/etsy', async () => {
+    const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
+    let imported = 0;
+    for (const conn of conns) {
+      try {
+        const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=25&offset=0&includes=Transactions`);
+        for (const rc of (r.results || [])) { if ((await importReceipt(conn, rc, 0)) === 'imported') imported++; }
+        await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
+      } catch (e) { /* keep going for other shops */ }
+    }
+    return { ok: true, imported };
+  });
+
+  // ── Push tracking back to Etsy (marks the order shipped on Etsy AND emails the
+  // buyer). Customer-facing — call it deliberately, not on every status change.
+  app.post('/api/etsy/fulfill', { preHandler: requireStaff }, async (req, reply) => {
+    const { order_id, tracking_code, carrier_name } = req.body || {};
+    const m = String(order_id || '').match(/^etsy-(.+)$/i);
+    if (!m) { reply.code(400); return { error: 'Not an Etsy order' }; }
+    const receiptId = m[1];
+    const ord = (await q('select store from orders where id=$1', [order_id])).rows[0];
+    const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
+    const conn = conns.find((c) => c.shop_name === (ord && ord.store)) || conns[0];
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    try {
+      const token = await validToken(conn);
+      const res = await fetch(`${API}/shops/${conn.shop_id}/receipts/${receiptId}/tracking`, {
+        method: 'POST',
+        headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ tracking_code: tracking_code || '', carrier_name: (carrier_name || 'usps').toLowerCase(), send_bcc: 'false' }).toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { reply.code(400); return { error: data.error || ('Etsy ' + res.status) }; }
+      return { ok: true };
+    } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }
