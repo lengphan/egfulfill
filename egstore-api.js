@@ -62,7 +62,8 @@
   function dbToItem(it) {
     return { sku: it.sku, name: it.name, listing: it.listing, printType: it.print_type, tech: it.print_type,
              qty: it.qty, color: it.color, size: it.size, variant: it.variant, blank: it.blank,
-             unitPrice: Number(it.unit_price) || 0, designSrc: it.design_src, img: it.img, designPos: it.design_pos };
+             unitPrice: Number(it.unit_price) || 0, designSrc: it.design_src, designUrl: it.design_src,
+             personalization: it.personalization, img: it.img, designPos: it.design_pos };
   }
   function dbToOrder(r) {
     return { id: r.id, store: r.store, seller: r.store, source: r.source,

@@ -93,20 +93,33 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
   for (const tr of (rc.transactions || [])) {
     const img = (tr.product_data && tr.product_data.image_url) || await listingImage(conn, tr.listing_id, imgCache);
+    // Split variations into: customer-uploaded file (a URL), personalization text,
+    // and the rest (size/color → variant).
+    let uploadUrl = null, personalization = null; const vparts = [];
+    for (const v of (tr.variations || [])) {
+      const val = String(v.formatted_value || v.value || '');
+      const nm = String(v.formatted_name || '').toLowerCase();
+      if (/^https?:\/\//i.test(val) && (/upload|logo|file|image|photo|art|design/.test(nm) || /\.(png|jpe?g|gif|webp|svg|pdf|ai|eps|psd|tiff?)(\?|$)/i.test(val))) {
+        uploadUrl = val;
+      } else if (nm.indexOf('personaliz') !== -1) {
+        personalization = val;
+      } else if (val) {
+        vparts.push(val);
+      }
+    }
+    const variant = vparts.join(', ') || null;
     if (!hasItems.rowCount) {
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img)
-         values ($1,$2,$3,$4,$5,$6,$7)`,
-        [id, tr.sku || null, tr.title || null, tr.quantity || 1,
-         (tr.variations || []).map(v => v.formatted_value || v.value).join(', ') || null,
-         money(tr.price), img]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization]
       );
-    } else if (img) {
-      // Backfill the listing image on existing items without touching workflow.
-      await q(
-        `update order_items set img=$1 where order_id=$2 and sku is not distinct from $3 and (img is null or img='')`,
-        [img, id, tr.sku || null]
-      );
+    } else {
+      // Backfill new fields on existing items without touching workflow or any
+      // staff-uploaded design that's already there.
+      if (img) await q(`update order_items set img=$1 where order_id=$2 and sku is not distinct from $3 and (img is null or img='')`, [img, id, tr.sku || null]);
+      if (uploadUrl) await q(`update order_items set design_src=$1 where order_id=$2 and sku is not distinct from $3 and (design_src is null or design_src='')`, [uploadUrl, id, tr.sku || null]);
+      if (personalization) await q(`update order_items set personalization=$1 where order_id=$2 and sku is not distinct from $3 and (personalization is null or personalization='')`, [personalization, id, tr.sku || null]);
     }
   }
   return 'imported';
@@ -122,6 +135,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
        last_sync_at timestamptz, connected_by uuid references users(id) on delete set null,
        created_at timestamptz default now(), updated_at timestamptz default now(),
        unique (platform, shop_id))`).catch(() => {});
+  // Buyer personalization text per item (added with the customer-upload feature).
+  q('alter table order_items add column if not exists personalization text').catch(() => {});
 
   // Frontend reads this to build the Etsy authorize URL (keystring is public).
   app.get('/api/etsy/config', async () => ({
