@@ -4103,6 +4103,7 @@ let whStatusFilter = 'all';
 let whStoreFilter = 'all';
 let whPerPage = 25;   // rows per page in the orders table ('all' = no paging)
 let whPage = 1;
+let whDateFrom = null, whDateTo = null;   // filter by real marketplace order date (_ts)
 let whSelectedOrders = new Set();
 let whCurrentOrder = null;
 let whExpandedCards = new Set();
@@ -4229,6 +4230,12 @@ function whRenderOrders() {
     if (whStoreFilter !== 'all') {
       const storeMap = {'my-store':'My Store','seller-a':'Seller A Store','seller-b':'Seller B Store'};
       if (o.store !== storeMap[whStoreFilter]) return false;
+    }
+    if (whDateFrom || whDateTo) {           // filter by actual marketplace order date
+      const t = o._ts || 0;
+      if (!t) return false;
+      if (whDateFrom && t < whDateFrom) return false;
+      if (whDateTo && t > whDateTo) return false;
     }
     return true;
   });
@@ -9891,12 +9898,19 @@ window.admSourceClear = function() {
 };
 window.admDateApply = function() {
   var fr = document.getElementById('adm-date-from'); var to = document.getElementById('adm-date-to');
-  _admSetFbOn('adm-date-btn', !!(fr && fr.value) || !!(to && to.value));
+  whDateFrom = (fr && fr.value) ? new Date(fr.value + 'T00:00:00').getTime() : null;
+  whDateTo   = (to && to.value) ? new Date(to.value + 'T23:59:59.999').getTime() : null;
+  _admSetFbOn('adm-date-btn', !!whDateFrom || !!whDateTo);
+  whPage = 1;
+  if (typeof whRenderOrders === 'function') whRenderOrders();
 };
 window.admDateClear = function() {
   var fr = document.getElementById('adm-date-from'); if (fr) fr.value = '';
   var to = document.getElementById('adm-date-to');   if (to) to.value = '';
+  whDateFrom = null; whDateTo = null;
   _admSetFbOn('adm-date-btn', false);
+  whPage = 1;
+  if (typeof whRenderOrders === 'function') whRenderOrders();
 };
 </script>
 
