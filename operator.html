@@ -7580,6 +7580,11 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             <div style="font-size:13px;color:#9ca3af;margin-top:2px">${it.sku || ''}${it.printType ? ' · ' + it.printType : (it.tech ? ' · ' + it.tech : '')}</div>
             <div style="font-size:13px;color:#6b7280;margin-top:3px"><span style="color:#9ca3af">Unit</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${unit.toFixed(2)}</strong> <span style="color:#9ca3af">× ${qty} =</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${line.toFixed(2)}</strong></div>
             ${threadChips}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+              <button class="btn btn-out" style="font-size:11px;padding:3px 8px" onclick="xfomUploadDesign('${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||it.product||'Design').replace(/'/g,"\\'")}','${String(it.printType||it.tech||'').replace(/'/g,"\\'")}')">↑ Upload</button>
+              <button class="btn btn-out" style="font-size:11px;padding:3px 8px" onclick="xfomTemplates('${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||it.product||'Design').replace(/'/g,"\\'")}')">Templates</button>
+              <button class="btn btn-out" style="font-size:11px;padding:3px 8px" onclick="xfomDesignMaker('${(it.sku||'').replace(/'/g,"\\'")}','${String(it.name||it.product||'Design').replace(/'/g,"\\'")}')">Design Maker</button>
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
             ${(typeof EGStore !== 'undefined' && EGStore.deliverableHTML) ? EGStore.deliverableHTML((o && o.id) || _xfomNum, it.sku, it) : _cardDownload}
@@ -7618,9 +7623,6 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             <div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomUploadDesign('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}','${String(d.printType||d.printedType||'').replace(/'/g,"\\'")}')">${designSrc ? 'Replace File' : '↑ Upload'}</button>
-            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomTemplates('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Templates</button>
-            <button class="btn btn-out" style="font-size:11.5px;padding:4px 9px;white-space:nowrap" onclick="xfomDesignMaker('${(d.sku||'').replace(/'/g,"\\'")}','${String(d.name||d.product||'Design').replace(/'/g,"\\'")}')">Design Maker</button>
             <select class="select" style="font-size:12px;padding:4px 6px">
               <option>DTG Board</option><option>DTF Board</option><option>EMB Board</option>
             </select>
