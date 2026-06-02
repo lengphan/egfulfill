@@ -96,13 +96,16 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
        zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
      status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
   );
-  // Create line items only on first import — re-syncs leave the workflow untouched,
-  // but we DO backfill the Etsy listing image so items aren't blank.
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
+  // Pre-load existing items so re-syncs DON'T refetch listing images (Etsy rate limit:
+  // 10/sec, 10k/day). We only call the image API for items that have no image yet.
+  const existing = {};
+  if (hasItems.rowCount) {
+    const ex = await q('select sku, img, design_src, personalization from order_items where order_id=$1', [id]);
+    for (const r of ex.rows) existing[String(r.sku || '')] = r;
+  }
   for (const tr of (rc.transactions || [])) {
-    const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache) || (tr.product_data && tr.product_data.image_url) || null;
-    // Split variations into: customer-uploaded file (a URL), personalization text,
-    // and the rest (size/color → variant).
+    // Split variations: customer-uploaded file (URL), personalization text, size/color.
     let uploadUrl = null, personalization = null; const vparts = [];
     for (const v of (tr.variations || [])) {
       const val = String(v.formatted_value || v.value || '');
@@ -116,18 +119,22 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
       }
     }
     const variant = vparts.join(', ') || null;
+    const exItem = existing[String(tr.sku || '')];
     if (!hasItems.rowCount) {
+      const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);   // first import → fetch once
       await q(
         `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization]
       );
-    } else {
-      // Backfill new fields on existing items without touching workflow or any
-      // staff-uploaded design that's already there.
-      if (img) await q(`update order_items set img=$1 where order_id=$2 and sku is not distinct from $3 and (img is null or img='')`, [img, id, tr.sku || null]);
-      if (uploadUrl) await q(`update order_items set design_src=$1 where order_id=$2 and sku is not distinct from $3 and (design_src is null or design_src='')`, [uploadUrl, id, tr.sku || null]);
-      if (personalization) await q(`update order_items set personalization=$1 where order_id=$2 and sku is not distinct from $3 and (personalization is null or personalization='')`, [personalization, id, tr.sku || null]);
+    } else if (exItem) {
+      // Existing item — only hit the image API if it still has no image.
+      if (!exItem.img) {
+        const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);
+        if (img) await q(`update order_items set img=$1 where order_id=$2 and sku is not distinct from $3 and (img is null or img='')`, [img, id, tr.sku || null]);
+      }
+      if (uploadUrl && !exItem.design_src) await q(`update order_items set design_src=$1 where order_id=$2 and sku is not distinct from $3 and (design_src is null or design_src='')`, [uploadUrl, id, tr.sku || null]);
+      if (personalization && !exItem.personalization) await q(`update order_items set personalization=$1 where order_id=$2 and sku is not distinct from $3 and (personalization is null or personalization='')`, [personalization, id, tr.sku || null]);
     }
   }
   return 'imported';
