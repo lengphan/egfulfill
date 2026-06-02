@@ -5856,13 +5856,16 @@ function whRenderOrders() {
             const iid = it.id || String(ei);
             const typePill = `<span style="font-size:11.25px;font-weight:700;background:${tBg};color:${tFg};border-radius:4px;padding:1px 7px">${tLbl}</span>`;
             // Clickable file link → opens shared preview popup. Composite-only legacy orders still get a link.
-            const _hasDesign = !!(it.file || it.thumb);
+            const _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+            const _hasDesign = !!(it.file || it.thumb || _custFile);
             const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
-            const fileLink = _hasDesign
-              ? (_fileIsFilename
-                  ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
-                  : `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>`)
-              : '<span style="color:#d1ceca;font-style:italic">no file</span>';
+            const fileLink = _custFile
+              ? `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`
+              : (_hasDesign
+                  ? (_fileIsFilename
+                      ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
+                      : `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>`)
+                  : '<span style="color:#d1ceca;font-style:italic">no file</span>');
             // Push action lives inside the product zoom modal now; the row only
             // shows the pushed-status pill so operators can still tell at a glance.
             let _pushed = null;

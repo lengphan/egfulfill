@@ -4365,13 +4365,17 @@ function whRenderOrders() {
             const sep  = idx < expandItems.length - 1 ? 'border-bottom:1px solid #eeede9' : '';
             const tLbl = (it.type||'DTG').substring(0,3).toUpperCase();
             // File link → opens shared preview popup. Composite-only legacy orders still get a link.
-            const _hasDesign = !!(it.file || it.thumb);
+            // Customer-uploaded file from the marketplace (Etsy) — a URL on the item's design source.
+            const _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+            const _hasDesign = !!(it.file || it.thumb || _custFile);
             const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
-            const fileLink = _hasDesign
-              ? (_fileIsFilename
-                  ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();admPreviewFile('${o.num}',${idx})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
-                  : `<a href="#" onclick="event.preventDefault();event.stopPropagation();admPreviewFile('${o.num}',${idx})" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>`)
-              : '<span style="color:#d1ceca;font-style:italic">no file</span>';
+            const fileLink = _custFile
+              ? `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`
+              : (_hasDesign
+                  ? (_fileIsFilename
+                      ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();admPreviewFile('${o.num}',${idx})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
+                      : `<a href="#" onclick="event.preventDefault();event.stopPropagation();admPreviewFile('${o.num}',${idx})" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>`)
+                  : '<span style="color:#d1ceca;font-style:italic">no file</span>');
             // Push to board button (or greyed-out chip if already pushed)
             let _pushed = null;
             try { _pushed = (JSON.parse(localStorage.getItem('eg_pushed_to_board')||'{}'))[o.num+'|'+it.sku] || null; } catch(e) {}

@@ -3830,13 +3830,16 @@ function renderOpOrders() {
             : '';
           // File link → opens preview popup. Either a real raw-design file OR a composite-only
           // legacy order earns the link (so the operator can still preview/push).
-          const _hasDesign = !!(it.file || it.thumb);
+          const _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+          const _hasDesign = !!(it.file || it.thumb || _custFile);
           const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
-          const fileLink = _hasDesign
-            ? (_fileIsFilename
-                ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">'+it.file+'</a>'
-                : '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>')
-            : '<span style="color:#d1ceca;font-style:italic">no file</span>';
+          const fileLink = _custFile
+            ? '<a href="'+_custFile+'" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>'
+            : (_hasDesign
+                ? (_fileIsFilename
+                    ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">'+it.file+'</a>'
+                    : '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;font-weight:600;text-decoration:underline;text-decoration-color:#c4c2be">File uploaded</a>')
+                : '<span style="color:#d1ceca;font-style:italic">no file</span>');
           // Stock-availability pill for the item's blank
           const _stock = opStockState(it.sku);
           const _stockPill = `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:${_stock.color};white-space:nowrap;flex-shrink:0" title="Blank stock">`
