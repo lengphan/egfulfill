@@ -580,13 +580,9 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <span style="font-size:13px;color:#9ca3af">per page</span>
           </div>
         </div>
-        <div style="display:flex;gap:4px">
+        <div id="orders-pagination" style="display:flex;gap:4px">
           <button class="fb" style="padding:5px 10px;font-size:13px;color:#c9c3ba" disabled>← Prev</button>
           <button class="fb" style="padding:5px 10px;font-size:13px;background:#f4f2ef;color:#191918;border-color:#c9c3ba;font-weight:600">1</button>
-          <button class="fb" style="padding:5px 10px;font-size:13px;color:#c9c3ba">2</button>
-          <button class="fb" style="padding:5px 10px;font-size:13px;color:#c9c3ba">3</button>
-          <span style="padding:5px 4px;font-size:13px;color:#c9c3ba">…</span>
-          <button class="fb" style="padding:5px 10px;font-size:13px;color:#c9c3ba">85</button>
           <button class="fb" style="padding:5px 10px;font-size:13px;color:#c9c3ba">Next →</button>
         </div>
       </div>
@@ -681,7 +677,7 @@ function getEgRv() { try { return JSON.parse(localStorage.getItem(EG_RV_KEY)||'{
 /* ── Filter state ── */
 let activeFilter = 'all';
 let orderSearchQuery = '';      // inline header search (matches #, customer, SKU, store)
-function setOrderSearch(v){ orderSearchQuery = (v||'').trim().toLowerCase(); renderOrders(); }
+function setOrderSearch(v){ orderSearchQuery = (v||'').trim().toLowerCase(); window.ordersPage = 1; renderOrders(); }
 let filterStores = new Set();   // empty = all
 let filterSources = new Set();  // empty = all
 let filterDateFrom = null;      // Date or null
@@ -872,6 +868,25 @@ function sortBy(col) {
   renderOrders();
 }
 
+function gotoOrdersPage(n) { window.ordersPage = n; renderOrders(); }
+function renderOrdersPagination(page, total) {
+  const box = document.getElementById('orders-pagination'); if (!box) return;
+  const btn = (label, p, o) => {
+    o = o || {};
+    const style = 'padding:5px 10px;font-size:13px;' + (o.current ? 'background:#f4f2ef;color:#191918;border-color:#c9c3ba;font-weight:600' : 'color:' + (o.disabled ? '#d8d4cd' : '#6b7280'));
+    return '<button class="fb" style="' + style + '"' + (o.disabled ? ' disabled' : ' onclick="gotoOrdersPage(' + p + ')"') + '>' + label + '</button>';
+  };
+  const pages = [], lo = Math.max(2, page - 1), hi = Math.min(total - 1, page + 1);
+  pages.push(1);
+  if (lo > 2) pages.push('…');
+  for (let i = lo; i <= hi; i++) pages.push(i);
+  if (hi < total - 1) pages.push('…');
+  if (total > 1) pages.push(total);
+  let html = btn('← Prev', page - 1, { disabled: page <= 1 });
+  pages.forEach(p => { html += (p === '…') ? '<span style="padding:5px 4px;font-size:13px;color:#c9c3ba">…</span>' : btn(String(p), p, { current: p === page }); });
+  html += btn('Next →', page + 1, { disabled: page >= total });
+  box.innerHTML = html;
+}
 function renderOrders(ordersOverride) {
   // eg_hide_seed (set by EGStore.clearAll()) suppresses the JS-baked demo orders so the
   // seller table only shows orders that came in via the manual create-order modal / EGStore.
@@ -898,15 +913,27 @@ function renderOrders(ordersOverride) {
       });
     }
   }
-  // Apply per-page cap so "Show N per page" actually limits the table.
-  // PAGE_SIZE is the global picker value; we always show the first N until
-  // we add real pagination buttons.
+  // Real pagination: slice by the current page, clamp the page into range, and
+  // rebuild the page buttons to match the actual filtered total (the buttons
+  // were previously static "1 2 3 … 85" baked from a 847-order mock, so an empty
+  // list still showed 85 pages).
   const _totalFiltered = filtered.length;
-  const _pageSize = (typeof PAGE_SIZE === 'number' && PAGE_SIZE > 0) ? PAGE_SIZE : _totalFiltered;
-  const _pageRows = filtered.slice(0, _pageSize);
+  const _pageSize = (typeof PAGE_SIZE === 'number' && PAGE_SIZE > 0) ? PAGE_SIZE : (_totalFiltered || 1);
+  const _totalPages = Math.max(1, Math.ceil(_totalFiltered / _pageSize));
+  let _page = window.ordersPage || 1;
+  if (_page > _totalPages) _page = _totalPages;
+  if (_page < 1) _page = 1;
+  window.ordersPage = _page;
+  const _start = (_page - 1) * _pageSize;
+  const _pageRows = filtered.slice(_start, _start + _pageSize);
   // Keep the "Showing X of Y orders" label in sync with the actual slice.
   const _pcLbl = document.getElementById('page-count-label');
-  if (_pcLbl) _pcLbl.textContent = 'Showing 1–' + Math.min(_pageSize, _totalFiltered) + ' of ' + _totalFiltered + ' order' + (_totalFiltered === 1 ? '' : 's');
+  if (_pcLbl) {
+    const _from = _totalFiltered === 0 ? 0 : _start + 1;
+    const _to = Math.min(_start + _pageSize, _totalFiltered);
+    _pcLbl.textContent = 'Showing ' + _from + '–' + _to + ' of ' + _totalFiltered + ' order' + (_totalFiltered === 1 ? '' : 's');
+  }
+  if (typeof renderOrdersPagination === 'function') renderOrdersPagination(_page, _totalPages);
   const rows = [];
   _pageRows.forEach((o, idx) => {
     const sc = SC[o.status] || SC.new;
@@ -1245,6 +1272,7 @@ document.addEventListener('DOMContentLoaded', _egRenderTabs);
 
 function filterOrders(f, btn) {
   activeFilter = f;
+  window.ordersPage = 1;
   document.querySelectorAll('.filter-btn').forEach(b => {
     b.classList.remove('active');
     b.style.background = '';
@@ -1953,6 +1981,7 @@ document.addEventListener('click', e => {
 let PAGE_SIZE = 10;
 function updatePageSize(val) {
   PAGE_SIZE = parseInt(val) || 10;
+  window.ordersPage = 1;
   // renderOrders re-reads PAGE_SIZE and applies the slice + updates the label.
   if (typeof renderOrders === 'function') renderOrders();
 }

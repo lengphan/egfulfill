@@ -109,6 +109,20 @@
       try { api('/orders/' + encodeURIComponent(orderId), { method: 'PATCH', body: patch }); } catch (e) {}
       return res;
     };
+    // submitOrder is the path EVERY manual/imported seller order takes — it
+    // writes localStorage directly (bypassing add), so without this wrapper the
+    // server never records it and the next hydrate (a full cache overwrite)
+    // wipes it. POST the resulting order so it persists server-side too. The
+    // POST upserts by id, so re-submits (drafts → submit, edits) are safe.
+    var origSubmit = EGStore.submitOrder;
+    if (typeof origSubmit === 'function') EGStore.submitOrder = function (opts) {
+      var res = origSubmit.apply(EGStore, arguments);
+      try {
+        var saved = res || (opts && opts.id && (EGStore.getOrders() || []).find(function (o) { return o.id === opts.id; }));
+        if (saved && saved.id) api('/orders', { method: 'POST', body: saved });
+      } catch (e) {}
+      return res;
+    };
   }
   // ── Inventory + design-card sync (FACTORY data — staff roles only) ────────
   // localStorage is the cache; we intercept writes to these keys and POST the
