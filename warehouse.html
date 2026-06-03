@@ -6,6 +6,7 @@
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
 <script src="eg-etsy.js"></script>
+<script src="eg-usps.js"></script>
 <script src="eg-design-tools.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
@@ -6182,8 +6183,20 @@ function whOpenLabelModal(num) {
   m.querySelector('#whlm-to-name').value     = name;
   m.querySelector('#whlm-to-addr').value     = street;
   m.querySelector('#whlm-to-city').value     = csz;
-  m.querySelector('#whlm-carrier').value     = carrier || o.carrier || 'USPS Priority Mail';
+  var _toApt = m.querySelector('#whlm-to-apt'); if (_toApt) _toApt.value = '';
   m.querySelector('#whlm-items').textContent = o.itemList.map(i=>i.name+' ×'+i.qty).join(', ');
+  // Default to USPS Ground Advantage; map a legacy "Priority" hint if present.
+  var _svc = m.querySelector('#whlm-carrier');
+  if (_svc) _svc.value = /express/i.test(carrier||o.carrier||'') ? 'USPS Priority Mail Express'
+                       : /priority/i.test(carrier||o.carrier||'') ? 'USPS Priority Mail' : 'USPS Ground Advantage';
+  // Prefill the SHIP FROM (return) address from the remembered origin.
+  try {
+    var org = (window.EGUSPS && EGUSPS.getOrigin) ? (EGUSPS.getOrigin() || {}) : {};
+    var setv = function(id, v){ var el = m.querySelector(id); if (el) el.value = v || ''; };
+    setv('#whlm-from-name', org.name); setv('#whlm-from-addr', org.street);
+    setv('#whlm-from-apt', org.street2);
+    setv('#whlm-from-city', [org.city, [org.state, org.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '));
+  } catch(e){}
   m._orderNum = num;
   var pasteEl = m.querySelector('#whlm-paste'); if (pasteEl) pasteEl.value = '';
   var validEl = m.querySelector('#whlm-paste-validate'); if (validEl) { validEl.textContent = ''; validEl.style.color = '#9ca3af'; }
@@ -6202,43 +6215,53 @@ function whCreateLabelModalDOM() {
       </div>
       <button onclick="document.getElementById('wh-label-modal').classList.add('modal-hidden')" style="background:none;border:none;font-size:23.25px;color:#9ca3af;cursor:pointer;line-height:1">×</button>
     </div>
-    <div style="padding:18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="padding:18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:70vh;overflow:auto">
       <div style="grid-column:1/-1">
         <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Items</div>
         <div id="whlm-items" style="font-size:13.25px;color:#374151;padding:7px 10px;background:#f9f9f8;border-radius:7px;border:1px solid #e5e4e0"></div>
       </div>
       <div style="grid-column:1/-1">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
-          <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Paste address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c4c3be">(optional)</span></div>
+          <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Paste ship-to address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#c4c3be">(optional)</span></div>
           <div id="whlm-paste-validate" style="font-size:11.5px;color:#9ca3af"></div>
         </div>
-        <textarea id="whlm-paste" rows="3" placeholder="Daniel Park&#10;1243 Valley View Ave&#10;Santa Fe Springs, CA 90670" oninput="whlmParsePastedAddr(this.value)" onpaste="setTimeout(() => whlmParsePastedAddr(document.getElementById('whlm-paste').value), 0)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;resize:none;line-height:1.5" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"></textarea>
+        <textarea id="whlm-paste" rows="2" placeholder="Daniel Park&#10;1243 Valley View Ave&#10;Santa Fe Springs, CA 90670" oninput="whlmParsePastedAddr(this.value)" onpaste="setTimeout(() => whlmParsePastedAddr(document.getElementById('whlm-paste').value), 0)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;resize:none;line-height:1.5" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"></textarea>
       </div>
-      <div>
-        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ship To — Name</div>
-        <input id="whlm-to-name" class="input" style="width:100%" placeholder="Customer name">
-      </div>
-      <div>
-        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Street Address</div>
-        <input id="whlm-to-addr" class="input" style="width:100%" placeholder="123 Main St">
-      </div>
-      <div style="grid-column:1/-1">
-        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div>
-        <input id="whlm-to-city" class="input" style="width:100%" placeholder="Austin, TX 78701">
-      </div>
-      <div>
-        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Service</div>
+
+      <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:2px">SHIP TO</div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Name</div><input id="whlm-to-name" class="input" style="width:100%" placeholder="Customer name"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Street</div><input id="whlm-to-addr" class="input" style="width:100%" placeholder="123 Main St"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Apt / Suite <span style="font-weight:400;text-transform:none;color:#c4c3be">(optional)</span></div><input id="whlm-to-apt" class="input" style="width:100%" placeholder="Apt 4B"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div><input id="whlm-to-city" class="input" style="width:100%" placeholder="Austin, TX 78701"></div>
+
+      <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:6px;display:flex;align-items:center;gap:8px">SHIP FROM <span style="font-weight:400;font-size:10.5px;color:#9ca3af;letter-spacing:0">return address — remembered for next time</span></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Name / Business</div><input id="whlm-from-name" class="input" style="width:100%" placeholder="EGFULFILL"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Street</div><input id="whlm-from-addr" class="input" style="width:100%" placeholder="456 Warehouse Rd"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Apt / Suite <span style="font-weight:400;text-transform:none;color:#c4c3be">(optional)</span></div><input id="whlm-from-apt" class="input" style="width:100%" placeholder="Unit 2"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div><input id="whlm-from-city" class="input" style="width:100%" placeholder="Dallas, TX 75001"></div>
+
+      <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:6px">PACKAGE</div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Service</div>
         <select id="whlm-carrier" class="select" style="width:100%">
-          <option>USPS Priority Mail</option>
-          <option>USPS First Class</option>
           <option>USPS Ground Advantage</option>
-          <option>UPS Ground</option>
-          <option>FedEx Home Delivery</option>
+          <option>USPS Priority Mail</option>
+          <option>USPS Priority Mail Express</option>
         </select>
       </div>
-      <div>
-        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Weight (oz)</div>
-        <input class="input" style="width:100%" placeholder="e.g. 12" type="number" min="1">
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Weight (oz)</div><input id="whlm-weight" class="input" style="width:100%" placeholder="12" type="number" min="1" value="8"></div>
+      <div style="grid-column:1/-1">
+        <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dimensions (in) — L × W × H</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <input id="whlm-len" class="input" type="number" min="1" placeholder="L" value="9">
+          <input id="whlm-wid" class="input" type="number" min="1" placeholder="W" value="6">
+          <input id="whlm-hgt" class="input" type="number" min="1" placeholder="H" value="2">
+        </div>
+      </div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Label format</div>
+        <select id="whlm-format" class="select" style="width:100%">
+          <option value="PDF">PDF (regular printer)</option>
+          <option value="ZPL203DPI">ZPL (thermal / Zebra)</option>
+        </select>
       </div>
     </div>
     <div style="padding:12px 20px;border-top:1px solid #e5e4e0;display:flex;align-items:center;gap:8px;justify-content:flex-end">
@@ -6248,47 +6271,49 @@ function whCreateLabelModalDOM() {
   </div>`;
   document.body.appendChild(el);
 }
-function whGenerateLabel(num) {
+async function whGenerateLabel(num) {
   var modal = document.getElementById('wh-label-modal');
-  var fakeTracking = 'USP' + Math.random().toString(36).substring(2,12).toUpperCase();
-  // Standalone path — no order attached. Just generate + show success.
-  if (!num) {
-    if (modal) modal.classList.add('modal-hidden');
-    try {
-      navigator.clipboard && navigator.clipboard.writeText(fakeTracking);
-    } catch(e){}
-    alert('Label created — tracking ' + fakeTracking + ' (copied to clipboard).');
-    return;
-  }
-  // Linked path — attached to a known order. Update order data + sync to EGStore.
+  if (!window.EGUSPS) { alert('USPS helper not loaded — hard-refresh the page.'); return; }
+  var g = function (id) { var e = modal && modal.querySelector(id); return e ? String(e.value || '').trim() : ''; };
+  var toCSZ = EGUSPS.parseCityStateZip(g('#whlm-to-city'));
+  var fromCSZ = EGUSPS.parseCityStateZip(g('#whlm-from-city'));
+  var to = { name: g('#whlm-to-name'), street: g('#whlm-to-addr'), street2: g('#whlm-to-apt'), city: toCSZ.city, state: toCSZ.state, zip: toCSZ.zip };
+  var from = { name: g('#whlm-from-name'), street: g('#whlm-from-addr'), street2: g('#whlm-from-apt'), city: fromCSZ.city, state: fromCSZ.state, zip: fromCSZ.zip };
+  if (!to.street || !to.zip)   { alert('Enter the recipient Street + a valid "City, ST ZIP".'); return; }
+  if (!from.street || !from.zip) { alert('Enter your Ship From Street + "City, ST ZIP" (it\'s remembered next time).'); return; }
+  EGUSPS.setOrigin(from);   // remember the return address
+
   var src = (typeof WH_ORDERS !== 'undefined' && WH_ORDERS) ? WH_ORDERS
           : (typeof OP_ORDERS !== 'undefined' && OP_ORDERS) ? OP_ORDERS : [];
-  var o = src.find(function(x){ return x.num === num; });
-  if (!o) {
-    // Order not in local list (may live only in EGStore) — still sync.
-    try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(num, { tracking: fakeTracking, factoryStatus: 'shipped', carrier: 'USPS' }); } catch(e){}
-    if (modal) modal.classList.add('modal-hidden');
-    return;
-  }
-  if (!o.label) o.label = { state: 'not_started' };
-  o.label.state = 'label_ready';
-  o.label.tracking_number = fakeTracking;
-  o.label.generated_at = new Date().toISOString();
-  o.tracking = fakeTracking; // top-level mirror so EGTracking renderers see it
-  // Push the tracking back to the seller side via the cross-page store so it
-  // shows in the seller orders table and order detail page.
-  try {
-    if (typeof EGStore !== 'undefined' && EGStore.update) {
-      EGStore.update(o.id || num, { tracking: fakeTracking, factoryStatus: 'shipped', carrier: o.carrier || 'USPS', service: (o.label && o.label.service) || 'USPS Priority Mail' });
-    }
-  } catch(e){}
+  var o = src.find(function (x) { return x.num === num; });
+  var payload = {
+    orderId: (o && o.id) || num || undefined,
+    to: to, from: from,
+    weightOz: parseFloat(g('#whlm-weight')) || 8,
+    length: parseFloat(g('#whlm-len')) || 9, width: parseFloat(g('#whlm-wid')) || 6, height: parseFloat(g('#whlm-hgt')) || 2,
+    mailClass: EGUSPS.mailClassOf(g('#whlm-carrier')),
+    imageType: g('#whlm-format') || 'PDF'
+  };
+
+  var btn = modal && modal.querySelector('.btn-dk');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creating label…'; }
+  var res; try { res = await EGUSPS.createLabel(payload); } catch (e) { res = { error: e.message }; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Generate Label'; }
+  if (!res || res.error) { alert('USPS label failed: ' + ((res && res.error) || 'unknown error')); return; }
+
+  var tracking = res.trackingNumber || '';
+  try { EGUSPS.openLabel(res.labelImage, res.imageType || payload.imageType, tracking); } catch (e) {}
+  if (o) { if (!o.label) o.label = {}; o.label.state = 'label_ready'; o.label.tracking_number = tracking; o.label.generated_at = new Date().toISOString(); o.tracking = tracking; }
+  // Server already stamps tracking on the order; mirror to the local cache so the
+  // seller side + other boards see it immediately.
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update((o && o.id) || num, { tracking: tracking, factoryStatus: 'shipped', carrier: 'USPS' }); } catch (e) {}
   if (modal) modal.classList.add('modal-hidden');
   if (typeof whRenderOrders === 'function') whRenderOrders();
-  else if (typeof renderOpOrders === 'function') renderOpOrders();
   if (typeof renderScanHistory === 'function') renderScanHistory();
   if ((typeof whCurrentOrder !== 'undefined' ? whCurrentOrder : null) === num && typeof whPopulateSingle === 'function') whPopulateSingle(num);
   if ((typeof whCurrentView !== 'undefined' ? whCurrentView : null) === 'batch' && typeof whRenderBatchView === 'function') whRenderBatchView();
-  if (typeof canFinishOrder === 'function' && canFinishOrder(o) && typeof whAutoFinish === 'function') whAutoFinish(num);
+  if (typeof canFinishOrder === 'function' && o && canFinishOrder(o) && typeof whAutoFinish === 'function') whAutoFinish(num);
+  if (tracking) alert('USPS label created — tracking ' + tracking + (/ZPL/i.test(payload.imageType) ? ' (ZPL downloaded)' : ' (opened in a new tab to print)'));
 }
 
 /* Paid-orders sync: any order pushed via localStorage eg_wh_incoming appears as new */

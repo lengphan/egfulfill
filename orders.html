@@ -5176,7 +5176,17 @@ function upThreadStrip(sku, ordNo) {
     if (stored && stored.length) { tm = stored; if (UP_STATE[ordNo]?.[sku]) UP_STATE[ordNo][sku].threadMatch = stored; }
   }
   if (!tm) tm = [];
-  const dataUrl = UP_STATE[ordNo]?.[sku]?.dataUrl;
+  // Design image for the magnifier preview. Prefer the live upload, then fall back
+  // to the persisted design (raw cache / image cache, which hydrateOrderDesigns
+  // refills from the server) so the preview still shows after a refresh/re-open.
+  let dataUrl = UP_STATE[ordNo]?.[sku]?.dataUrl;
+  if (!dataUrl && o && typeof EGStore !== 'undefined') {
+    try {
+      if (EGStore.getRawDesign) dataUrl = EGStore.getRawDesign(o.id, sku);
+      if (!dataUrl && EGStore.getCachedImage) dataUrl = EGStore.getCachedImage(o.id, sku);
+      if (!dataUrl && EGStore.getCachedImageByRef) dataUrl = EGStore.getCachedImageByRef(o.id + '|' + sku);
+    } catch (e) {}
+  }
   // Render the row strip — empty array → no rows, the magnifier still shows so
   // the seller can start sampling again after removing all threads.
   const rows = tm.map((row, idx) => {
