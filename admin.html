@@ -9002,50 +9002,27 @@ window.renderRecentShipments = function() {
 <script>
 // ── Unified Create Shipping Label modal (shared with warehouse) ──
 function whOpenLabelModal(num) {
-  const o = WH_ORDERS.find(x => x.num === num);
-  if (!o) return;
-  const modal = document.getElementById('wh-label-modal');
-  if (!modal) { whCreateLabelModalDOM(); }
-  const m = document.getElementById('wh-label-modal');
-  m.querySelector('#whlm-order').textContent   = '#' + o.num + (o.platId ? '  (' + o.platId + ')' : '');
-
-  // Prefer structured demo data (REV_ORDER_DETAIL / FOM_ADDR_DATA) → then EGStore live order →
-  // then the legacy comma-split parse of o.addr. Fields stay editable either way.
-  let name = '', street = '', csz = '', carrier = '';
+  const o = (WH_ORDERS || []).find(x => x.num === num);
+  if (!o || !window.EGUSPS) return;
+  // Extract ship-to (REV_ORDER_DETAIL → EGStore → o.addr), then open the shared
+  // EGUSPS label modal (real USPS call + saved Ship-From origin).
+  let name = '', street = '', csz = '', egId = num;
   const rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
-  if (rd) {
-    name    = rd.name    || '';
-    street  = rd.line    || '';
-    csz     = [rd.city, rd.state].filter(Boolean).join(', ');
-    carrier = rd.shipping || '';
-  }
+  if (rd) { name = rd.name || ''; street = rd.line || ''; csz = [rd.city, rd.state].filter(Boolean).join(', '); }
   if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
     try {
       const eg = (EGStore.getOrders() || []).find(x => x.id === num);
-      if (eg && eg.customer) {
-        name   = eg.customer.name || '';
-        const sh = eg.customer.shipTo || {};
-        street = [sh.street, sh.apt].filter(Boolean).join(', ');
-        csz    = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-      }
-    } catch(e){}
+      if (eg) { egId = eg.id; if (eg.customer) { name = eg.customer.name || ''; const sh = eg.customer.shipTo || {}; street = [sh.street, sh.apt].filter(Boolean).join(', '); csz = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); } }
+    } catch (e) {}
   }
-  if (!street) {
-    name = name || o.customer || '';
-    const addrParts = (o.addr||'').split(', ');
-    street = addrParts[0] || '';
-    csz    = csz || addrParts.slice(1).join(', ') || '';
-  }
-
-  m.querySelector('#whlm-to-name').value     = name;
-  m.querySelector('#whlm-to-addr').value     = street;
-  m.querySelector('#whlm-to-city').value     = csz;
-  m.querySelector('#whlm-carrier').value     = carrier || o.carrier || 'USPS Priority Mail';
-  m.querySelector('#whlm-items').textContent = o.itemList.map(i=>i.name+' ×'+i.qty).join(', ');
-  m._orderNum = num;
-  var pasteEl = m.querySelector('#whlm-paste'); if (pasteEl) pasteEl.value = '';
-  var validEl = m.querySelector('#whlm-paste-validate'); if (validEl) { validEl.textContent = ''; validEl.style.color = '#9ca3af'; }
-  m.classList.remove('modal-hidden');
+  if (!street) { name = name || o.customer || ''; const ap = (o.addr || '').split(', '); street = ap[0] || ''; csz = csz || ap.slice(1).join(', ') || ''; }
+  EGUSPS.openLabelModal({
+    orderNum: num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
+    onDone: function (tracking) {
+      try { if (o) { o.tracking = tracking; o.status = 'shipped'; } } catch (e) {}
+      if (typeof admMergeLiveOrders === 'function') admMergeLiveOrders();
+    }
+  });
 }
 function whCreateLabelModalDOM() {
   const el = document.createElement('div');
@@ -9199,24 +9176,10 @@ window.whlmParsePastedAddr = function(raw) {
 };
 
 window.shippingNewLabel = function() {
-  // Open the create-shipping-label modal in STANDALONE mode — no order linked,
-  // blank ship-to fields. Header "+ New Label" should never force the user to
-  // pick an order first; per-order generation lives in the Scan History row.
-  if (typeof whCreateLabelModalDOM === 'function' && !document.getElementById('wh-label-modal')) whCreateLabelModalDOM();
-  var m = document.getElementById('wh-label-modal');
-  if (!m) { alert('Label modal not available.'); return; }
-  // Reset to standalone state
-  var oEl = m.querySelector('#whlm-order'); if (oEl) oEl.textContent = 'New shipping label (no order attached)';
-  var f;
-  if ((f = m.querySelector('#whlm-to-name'))) f.value = '';
-  if ((f = m.querySelector('#whlm-to-addr'))) f.value = '';
-  if ((f = m.querySelector('#whlm-to-city'))) f.value = '';
-  if ((f = m.querySelector('#whlm-carrier'))) f.value = 'USPS Priority Mail';
-  if ((f = m.querySelector('#whlm-items'))) f.textContent = '—';
-  var paste = m.querySelector('#whlm-paste'); if (paste) paste.value = '';
-  var valid = m.querySelector('#whlm-paste-validate'); if (valid) { valid.textContent = ''; valid.style.color = '#9ca3af'; }
-  m._orderNum = null;
-  m.classList.remove('modal-hidden');
+  // Standalone "+ New Label" — open the shared EGUSPS label modal with no order
+  // attached (blank ship-to, Ship-From from the saved origin, real USPS call).
+  if (window.EGUSPS) { EGUSPS.openLabelModal({}); return; }
+  alert('Label modal not available — hard-refresh the page.');
 };
 </script>
 <script>window.XOC_ROLE = 'admin';</script>

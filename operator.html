@@ -3988,8 +3988,25 @@ let opColOrder = ['order','time','seller','customer','items','carrier','tracking
 let opDragColIdx = null;
 let opSortCol = 'time';
 let opSortDir = 'desc';
-function opOpenLabel(num) { openOpNewLabelModal(num); }
-function bulkPrintLabels() { openOpNewLabelModal(); }
+// Build ship-to data for an order (FOM_ADDR_DATA → EGStore → OP_ORDERS fallback).
+function opLabelData(num) {
+  var o = (OP_ORDERS || []).find(function (x) { return x.num === num; }) || {};
+  var name = '', street = '', apt = '', city = '', state = '', zip = '', egId = num;
+  var fa = (typeof FOM_ADDR_DATA !== 'undefined') ? FOM_ADDR_DATA[num] : null;
+  if (fa) { name = fa.name || ''; street = fa.line || ''; city = fa.city || ''; var sp = (fa.state || '').trim().split(/\s+/); state = (sp[0] || '').toUpperCase(); zip = sp.slice(1).join(' ') || ''; }
+  if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
+    try { var eg = (EGStore.getOrders() || []).find(function (x) { return x.id === num; }); if (eg) { egId = eg.id; if (eg.customer) { name = eg.customer.name || ''; var sh = eg.customer.shipTo || {}; street = sh.street || ''; apt = sh.apt || ''; city = sh.city || ''; state = sh.state || ''; zip = sh.zip || ''; } } } catch (e) {}
+  }
+  if (!name) name = o.customer || '';
+  var csz = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  return { orderNum: num, orderId: egId, toName: name, toStreet: street, toApt: apt, toCSZ: csz,
+    onDone: function (tracking) {
+      try { var oo = (OP_ORDERS || []).find(function (x) { return x.num === num; }); if (oo) { oo.tracking = tracking; oo.status = 'shipped'; } } catch (e) {}
+      if (typeof renderOpOrders === 'function') renderOpOrders();
+    } };
+}
+function opOpenLabel(num) { if (window.EGUSPS) EGUSPS.openLabelModal(opLabelData(num)); else openOpNewLabelModal(num); }
+function bulkPrintLabels() { if (window.EGUSPS) EGUSPS.openLabelModal({}); else openOpNewLabelModal(); }
 /* Bulk Send to Scan — push every selected order straight into the warehouse
    scan queue, skipping the board path. Used when designs are already
    attached + approved and the operator just wants production to start. */
