@@ -1060,6 +1060,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <!-- Pagination footer -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #f3f3f1">
           <span id="op-page-info" style="font-size:13px;color:#9ca3af">Showing 1–10 of <span id="op-total-count">7</span> orders</span>
+          <div id="op-pagination" style="display:flex;gap:4px"></div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:13px;color:#9ca3af">Show</span>
             <select id="op-per-page" class="select" style="font-size:13px;padding:3px 8px;width:64px" onchange="opSetPerPage(+this.value)">
@@ -3727,7 +3728,28 @@ function setOrderFilter(type, btn) {
 
 function opSetStore(v) { renderOpOrders(); }
 var opPerPage = 10;
-function opSetPerPage(n) { opPerPage = n; renderOpOrders(); }
+var opPage = 1;
+function opSetPerPage(n) { opPerPage = n; opPage = 1; renderOpOrders(); }
+function gotoOpPage(n) { opPage = n; renderOpOrders(); }
+function opRenderPagination(page, total) {
+  var box = document.getElementById('op-pagination'); if (!box) return;
+  if (total <= 1) { box.innerHTML = ''; return; }
+  var btn = function (label, p, o) {
+    o = o || {};
+    var style = 'padding:5px 10px;font-size:13px;border-radius:6px;border:1px solid #e5e4e0;background:' + (o.current ? '#191918;color:#fff;border-color:#191918;font-weight:600' : '#fff;color:' + (o.disabled ? '#d8d4cd' : '#374151')) + ';cursor:' + (o.disabled ? 'default' : 'pointer') + ';font-family:inherit';
+    return '<button style="' + style + '"' + (o.disabled ? ' disabled' : ' onclick="gotoOpPage(' + p + ')"') + '>' + label + '</button>';
+  };
+  var pages = [], lo = Math.max(2, page - 1), hi = Math.min(total - 1, page + 1);
+  pages.push(1);
+  if (lo > 2) pages.push('…');
+  for (var i = lo; i <= hi; i++) pages.push(i);
+  if (hi < total - 1) pages.push('…');
+  if (total > 1) pages.push(total);
+  var html = btn('‹', page - 1, { disabled: page <= 1 });
+  pages.forEach(function (p) { html += (p === '…') ? '<span style="padding:5px 4px;font-size:13px;color:#c4c3be">…</span>' : btn(String(p), p, { current: p === page }); });
+  html += btn('›', page + 1, { disabled: page >= total });
+  box.innerHTML = html;
+}
 
 function opUpdateTabCounts() {
   const counts = {};
@@ -3751,10 +3773,15 @@ function renderOpOrders() {
   if (!tbody) return;
   const allOrders = opGetFilteredOrders();
   const total = allOrders.length;
-  const orders = allOrders.slice(0, opPerPage);
-  const showing = Math.min(opPerPage, total);
+  const perPage = opPerPage > 0 ? opPerPage : (total || 1);
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  if (opPage > totalPages) opPage = totalPages;
+  if (opPage < 1) opPage = 1;
+  const start = (opPage - 1) * perPage;
+  const orders = allOrders.slice(start, start + perPage);
   const info = document.getElementById('op-page-info');
-  if (info) info.innerHTML = `Showing 1–${showing} of <span id="op-total-count">${total}</span> orders`;
+  if (info) info.innerHTML = `Showing ${total ? start + 1 : 0}–${Math.min(start + perPage, total)} of <span id="op-total-count">${total}</span> orders`;
+  if (typeof opRenderPagination === 'function') opRenderPagination(opPage, totalPages);
   // Update thead visibility
   const thead = tbody.closest('table')?.querySelector('thead tr');
   if (thead) {
