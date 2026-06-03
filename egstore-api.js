@@ -248,6 +248,37 @@
       try { window.dispatchEvent(new StorageEvent('storage', { key: 'eg_catalog_products' })); } catch (e) {}
     });
   }
+  // Templates live server-side now (heavy composites were blowing localStorage).
+  // Pull them into the local cache so "Use a Template" + Design Maker readers work
+  // unchanged; composites are best-effort (dropped if the quota is hit — the server
+  // still has them). Merges in any local-only template not yet on the server.
+  function hydrateTemplates() {
+    if (!token()) return Promise.resolve();
+    return api('/templates').then(function (r) {
+      if (r.error || !Array.isArray(r.data)) return;
+      var serverIds = {}, meta = [], blobs = {};
+      r.data.forEach(function (t) {
+        if (!t || t.id == null) return;
+        serverIds[t.id] = true;
+        var m = (t.data && typeof t.data === 'object') ? t.data : { id: t.id, name: t.name };
+        m.id = m.id != null ? m.id : t.id; m.name = m.name || t.name;
+        meta.push(m);
+        if (t.composite || (t.layers && t.layers.length)) blobs[t.id] = { compositeImg: t.composite || '', layers: t.layers || [] };
+      });
+      // Preserve any local template the server hasn't confirmed yet (just saved).
+      try {
+        var localMeta = JSON.parse(localStorage.getItem('eg_templates') || '[]') || [];
+        localMeta.forEach(function (m) { if (m && m.id != null && !serverIds[m.id]) meta.push(m); });
+      } catch (e) {}
+      try { localStorage.setItem('eg_templates', JSON.stringify(meta.slice(0, 60))); } catch (e) {}
+      try { localStorage.setItem('eg_templates_blob', JSON.stringify(blobs)); }
+      catch (e) {
+        // Quota — drop composites, keep just layers so re-open still works.
+        try { var lite = {}; Object.keys(blobs).forEach(function (k) { lite[k] = { compositeImg: '', layers: blobs[k].layers || [] }; }); localStorage.setItem('eg_templates_blob', JSON.stringify(lite)); } catch (_) {}
+      }
+      try { window.dispatchEvent(new StorageEvent('storage', { key: 'eg_templates' })); } catch (e) {}
+    });
+  }
   function wrapCatalog() {
     if (!window.EGStore || !EGStore.setCatalogProducts || EGStore.__catalogWrapped) return;
     var origSet = EGStore.setCatalogProducts.bind(EGStore);
@@ -268,6 +299,7 @@
     wrapCatalog();
     hydrate();
     hydrateCatalog();
+    hydrateTemplates();
     var collKeys = isStaff() ? Object.keys(COLLECTIONS) : [];
     collKeys.forEach(hydrateCollection);
     // Light polling for cross-board liveness (no realtime server yet). 15s.
@@ -298,5 +330,5 @@
     return { market: '', eg: num, source: 'Manual' };
   };
 
-  window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, pushCatalog: pushCatalog };
+  window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, hydrateTemplates: hydrateTemplates, pushCatalog: pushCatalog };
 })();

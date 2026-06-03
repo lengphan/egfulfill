@@ -6,6 +6,7 @@
 <title>Design Maker – EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="egfulfill-store.js"></script>
+<script src="egstore-api.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -1372,6 +1373,14 @@ function _dmSaveSellerTemplate(meta, composite, layers) {
       }
     }
   } catch(e) { console.warn('[template] blob write failed', e); }
+  // === Server save — the source of truth (so localStorage size is irrelevant) ===
+  try {
+    var _tok = localStorage.getItem('eg_token');
+    if (_tok) {
+      var _body = JSON.stringify({ id: meta.id, name: meta.name, data: meta, composite: composite || '', layers: Array.isArray(layers) ? layers : [] });
+      fetch('/api/templates', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+_tok }, body:_body, keepalive: _body.length < 60000 }).catch(function(){});
+    }
+  } catch(e) {}
 }
 window._dmSaveSellerTemplate = _dmSaveSellerTemplate;
 
