@@ -5,16 +5,23 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 
 export function ordersRoutes(app, requireAuth) {
+  // Idempotent: ensure the factory_order column exists (also created in etsy.js).
+  q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+
   // List
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
     const join = `left join order_items i on i.order_id = o.id`;
     const agg  = `coalesce(json_agg(i.*) filter (where i.id is not null), '[]') as items`;
     if (isStaff(req.user)) {
+      // Staff (admin/operator/warehouse/designer) see every order, including the
+      // factory-synced Etsy orders.
       const r = await q(`select o.*, ${agg} from orders o ${join} group by o.id order by o.created_at desc`);
       return r.rows;
     }
+    // Sellers only see their OWN orders, never the admin/factory-synced ones
+    // (admin's Etsy store is separate from a seller's own connected stores).
     const r = await q(
-      `select o.*, ${agg} from orders o ${join} where o.seller_id=$1 group by o.id order by o.created_at desc`,
+      `select o.*, ${agg} from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
       [req.user.sub]
     );
     return r.rows;

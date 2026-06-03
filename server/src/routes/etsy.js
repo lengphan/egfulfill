@@ -84,9 +84,12 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   const createdIso = createdTs ? new Date(createdTs * 1000).toISOString() : null;
   // Skip the pre-connection shipped backlog entirely (don't store it).
   if (shipped && createdTs && connectedSec && createdTs < connectedSec) return 'skipped';
+  // factory_order=true: this came from the ADMIN/factory Etsy connection, so it
+  // belongs to the factory boards (admin/operator/warehouse), NOT to sellers. A
+  // future seller-owned shop connection would insert these with factory_order=false.
   await q(
-    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at)
-     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()))
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order)
+     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), true)
      on conflict (id) do update set total=excluded.total,
        customer=excluded.customer, address=excluded.address,
        created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
@@ -152,6 +155,11 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
        unique (platform, shop_id))`).catch(() => {});
   // Buyer personalization text per item (added with the customer-upload feature).
   q('alter table order_items add column if not exists personalization text').catch(() => {});
+  // factory_order: orders synced from the ADMIN/factory connection belong to the
+  // factory boards, not to sellers. Sellers' GET excludes these (see orders.js).
+  q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+  // Backfill: every Etsy order pulled so far came from the admin/factory connection.
+  q(`update orders set factory_order=true where source='etsy' and factory_order=false`).catch(() => {});
 
   // Frontend reads this to build the Etsy authorize URL (keystring is public).
   app.get('/api/etsy/config', async () => ({

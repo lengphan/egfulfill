@@ -24,9 +24,14 @@
     opts = opts || {};
     var headers = { 'Content-Type': 'application/json' };
     if (token()) headers['Authorization'] = 'Bearer ' + token();
+    var bodyStr = opts.body ? JSON.stringify(opts.body) : undefined;
+    // keepalive lets a write (POST/PATCH) finish even if the user navigates away
+    // immediately after (e.g. create order → click Design Lab). Capped at 64KB by
+    // the browser, so only enable it for small bodies.
+    var ka = !!(opts.method && opts.method !== 'GET' && bodyStr && bodyStr.length < 60000);
     return fetch(API_BASE + '/api' + path, {
       method: opts.method || 'GET', headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
+      body: bodyStr, keepalive: ka
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
         return r.ok ? { data: data, error: null }
@@ -81,7 +86,27 @@
              items: (r.items || []).map(dbToItem), _live: true };
   }
   function writeCache(orders) {
-    try { localStorage.setItem(KEY, JSON.stringify(orders)); } catch (e) {}
+    // MERGE, don't blindly overwrite. A hydrate() replaces the cache with the
+    // server's orders — but a just-created local order whose POST is still in
+    // flight (or was aborted by a fast navigation to Design Lab) isn't on the
+    // server yet, so a naive overwrite would wipe it. Preserve local-only orders
+    // created in the last 5 min until the server confirms them.
+    var incoming = orders || [];
+    try {
+      var ids = {};
+      incoming.forEach(function (o) { if (o && o.id != null) ids[o.id] = true; });
+      var local = [];
+      try { local = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { local = []; }
+      var now = Date.now(), FRESH = 5 * 60 * 1000;
+      var keep = local.filter(function (o) {
+        if (!o || o.id == null || ids[o.id]) return false;            // server already has it
+        var ts = o._pendingSync || o.submittedAt || o.createdAt || 0;
+        return ts && (now - ts) < FRESH;                              // freshly created, not yet synced
+      });
+      localStorage.setItem(KEY, JSON.stringify(incoming.concat(keep)));
+    } catch (e) {
+      try { localStorage.setItem(KEY, JSON.stringify(incoming)); } catch (_) {}
+    }
     try { window.dispatchEvent(new Event('eg-orders-changed')); } catch (e) {}
     try { window.dispatchEvent(new StorageEvent('storage', { key: KEY })); } catch (e) {}
   }
