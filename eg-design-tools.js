@@ -32,17 +32,38 @@
   // the overlay and "the page doesn't show up". mount() tears down any previous
   // overlay + wires a capture-phase listener that dismisses on any sidebar nav
   // click (the nav's own onclick still runs, so the section shows through).
-  var _ov = null, _navHandler = null;
+  var _ov = null, _navHandler = null, _prevActive = null;
+  // Give the "Design Lab" sidebar item the same .on highlight as a real section
+  // while the overlay is open, so it's clear it's selected. Restore the previously
+  // active item when we close via Escape (a section click re-sets .on itself).
+  function labItems() { return document.querySelectorAll('.ni[onclick*="designLab"]'); }
+  function setLabActive(on) {
+    try {
+      if (on) {
+        _prevActive = document.querySelector('.ni.on');
+        document.querySelectorAll('.ni.on').forEach(function (el) { if (!el.matches('[onclick*="designLab"]')) el.classList.remove('on'); });
+        labItems().forEach(function (el) { el.classList.add('on'); });
+      } else {
+        labItems().forEach(function (el) { el.classList.remove('on'); });
+        if (_prevActive && !document.querySelector('.ni.on')) _prevActive.classList.add('on');
+        _prevActive = null;
+      }
+    } catch (e) {}
+  }
   function unmount() {
     if (_navHandler) { document.removeEventListener('click', _navHandler, true); _navHandler = null; }
     if (_ov) { try { document.body.removeChild(_ov); } catch (e) {} _ov = null; }
     document.body.style.overflow = '';
+    setLabActive(false);
   }
   function mount(ov) {
+    var wasOpen = !!_ov;
     unmount();
     _ov = ov;
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
+    if (!wasOpen) setLabActive(true);   // entering the lab (not just swapping hub↔page)
+    else labItems().forEach(function (el) { el.classList.add('on'); });
     _navHandler = function (e) {
       if (_ov && _ov.contains(e.target)) return;                 // clicks inside the overlay are fine
       var n = e.target && e.target.closest && e.target.closest('.ni,[onclick*="showSection"]');

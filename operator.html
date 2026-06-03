@@ -5183,7 +5183,7 @@ function opMergeLiveOrders() {
     var newSig = (o.submittedAt || 0) + '|' + (o.factoryStatus || '');
     var prevSig = _opLiveIds.get(o.id);
     if (prevSig === newSig) continue;
-    var _statusMap = { new:'in_review', in_review:'in_review', awaiting_scan:'awaiting_scan', scanned:'scanned', printing:'printing', packing:'printing', packed:'packed', shipped:'shipped', flagged:'flagged',
+    var _statusMap = { new:'new', in_review:'in_review', awaiting_scan:'awaiting_scan', scanned:'scanned', printing:'printing', packing:'printing', packed:'packed', shipped:'shipped', flagged:'flagged',
       prescan:'awaiting_scan', in_queue:'awaiting_scan', ready_print:'scanned',
       // Cross-board status sync: when warehouse/admin sets on_hold / cancelled /
       // refunded / escalated, mirror it here instead of silently demoting to
