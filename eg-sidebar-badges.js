@@ -10,14 +10,14 @@
 (function () {
   'use strict';
 
-  // Staff (factory) boards count every order; the seller never sees factory-
-  // synced marketplace orders, so they must be excluded from the seller's badge
-  // fallback — otherwise admin's ~500 synced orders leak in as a stale "99+".
-  function isStaffUser() {
-    try {
-      var u = JSON.parse(localStorage.getItem('eg_user') || 'null');
-      return !!(u && ['operator', 'admin', 'warehouse', 'designer'].indexOf(u.role) !== -1);
-    } catch (e) { return false; }
+  // Factory boards count every order (incl. the synced marketplace ones); the
+  // SELLER board never shows admin/factory-synced orders, so they must be excluded
+  // from its badge fallback — otherwise admin's ~500 synced orders leak in as a
+  // stale "99+". Keyed on the PAGE, not the user role, because a staff account can
+  // browse the seller board too (and would otherwise still see the inflated count).
+  function isFactoryBoard() {
+    var f = (location.pathname.split('/').pop() || '').toLowerCase();
+    return ['admin.html', 'operator.html', 'warehouse.html', 'designer.html', 'factory.html'].indexOf(f) !== -1;
   }
   var SYNCED_SRC = ['etsy', 'shopify', 'tiktok', 'woocommerce', 'amazon', 'ebay'];
   function isFactorySynced(o) {
@@ -35,7 +35,7 @@
       if (typeof EGStore !== 'undefined' && typeof EGStore.getOrders === 'function') {
         var all = EGStore.getOrders();
         if (Array.isArray(all)) {
-          if (!isStaffUser()) all = all.filter(function (o) { return !isFactorySynced(o); });
+          if (!isFactoryBoard()) all = all.filter(function (o) { return !isFactorySynced(o); });
           return all.length;
         }
       }
