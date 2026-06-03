@@ -2162,6 +2162,18 @@ const ODM_TECH_LBL = {DTG:'Direct to Garment',EMB:'Embroidery',APL:'Applique',LS
 function openDetailModal(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
+  // Pull this order's server-stored designs into the local cache, then refresh
+  // the modal + rows so uploaded artwork shows even after a refresh / new device.
+  // Guarded to hydrate once per order id so the re-open below can't loop.
+  if (window.EGStore && EGStore.hydrateOrderDesigns && o.id) {
+    window.__egDesignsHydrated = window.__egDesignsHydrated || {};
+    if (!window.__egDesignsHydrated[o.id]) {
+      window.__egDesignsHydrated[o.id] = true;
+      EGStore.hydrateOrderDesigns(o.id).then(function(rows){
+        if (rows && rows.length) { try { renderOrders(); if (window._odmCurrentOrder && window._odmCurrentOrder.no === ordNo) openDetailModal(ordNo); } catch(e){} }
+      });
+    }
+  }
   const sc = SC[o.status] || SC.new;
   const needsSetup = ['new','action'].includes(o.status);
   const SEL = `border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 24px 4px 8px;font-size:13px;font-family:inherit;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c9c8c4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") no-repeat right 7px center;-webkit-appearance:none;appearance:none;cursor:pointer;outline:none;`;

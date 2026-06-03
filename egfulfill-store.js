@@ -1969,21 +1969,43 @@
     },
 
     RAW_DESIGN_KEY: 'eg_design_raw',
+    // POST a design (data URL) to the server so it persists regardless of the
+    // browser's ~5MB localStorage cap. Fire-and-forget; the server is the source
+    // of truth and hydrateOrderDesigns() reads it back on any device.
+    _pushDesign: function(orderId, sku, dataUrl, name, kind) {
+      try {
+        var tok = localStorage.getItem('eg_token') || '';
+        if (!tok || !orderId || !sku || !dataUrl) return;
+        var body = JSON.stringify({ sku: sku, data: dataUrl, name: name || null, kind: kind || 'raster' });
+        fetch('/api/orders/' + encodeURIComponent(orderId) + '/designs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: body,
+          keepalive: body.length < 60000   // browsers cap keepalive bodies at 64KB
+        }).catch(function(){});
+      } catch (e) {}
+    },
+    // Best-effort write into a localStorage map keyed by "orderId|sku". Evicts the
+    // oldest half on quota and, if still full, silently gives up — the server copy
+    // is authoritative, so we never surface a "storage full" error to the user.
+    _localCachePut: function(key, mapKey, val) {
+      try {
+        var c = JSON.parse(localStorage.getItem(key) || '{}');
+        c[mapKey] = val;
+        try { localStorage.setItem(key, JSON.stringify(c)); }
+        catch (e) {
+          var ks = Object.keys(c);
+          for (var i = 0; i < Math.floor(ks.length / 2); i++) delete c[ks[i]];
+          c[mapKey] = val;
+          try { localStorage.setItem(key, JSON.stringify(c)); } catch (e2) { /* give up locally — server has it */ }
+        }
+      } catch (e) {}
+    },
     cacheRawDesign: function(orderId, sku, dataUrl) {
       if (!orderId || !sku || !dataUrl) return { ok:false, error:'Missing data' };
-      try {
-        var cache = JSON.parse(localStorage.getItem(this.RAW_DESIGN_KEY) || '{}');
-        cache[orderId + '|' + sku] = dataUrl;
-        try { localStorage.setItem(this.RAW_DESIGN_KEY, JSON.stringify(cache)); return { ok:true }; }
-        catch(quotaErr) {
-          // Quota hit — drop the oldest half and retry once.
-          var keys = Object.keys(cache);
-          for (var i = 0; i < Math.floor(keys.length/2); i++) delete cache[keys[i]];
-          cache[orderId + '|' + sku] = dataUrl;
-          try { localStorage.setItem(this.RAW_DESIGN_KEY, JSON.stringify(cache)); return { ok:true }; }
-          catch(e2) { return { ok:false, error:'Storage full' }; }
-        }
-      } catch(e) { return { ok:false, error:'Save failed' }; }
+      this._pushDesign(orderId, sku, dataUrl, null, 'raster');
+      this._localCachePut(this.RAW_DESIGN_KEY, orderId + '|' + sku, dataUrl);
+      return { ok:true };
     },
     getRawDesign: function(orderId, sku) {
       try {
@@ -1993,25 +2015,39 @@
     },
     IMAGE_CACHE_KEY: 'eg_image_cache',
     cacheImage: function(orderId, sku, dataUrl) {
-      // Returns { ok: bool, error?: string }. The error is now honest about
-      // its cause — it's a localStorage quota issue, not a per-file size
-      // limit. Callers (processFile) downscale before calling, so this
-      // should rarely fail with a properly compressed image.
+      // Design images are now stored SERVER-side (see _pushDesign), so a full
+      // localStorage no longer blocks an upload — the local copy is just a fast
+      // cache. This used to return a "Browser storage is full" error; it no longer
+      // fails the upload on quota.
       if (!orderId || !sku || !dataUrl) return { ok:false, error:'Missing image data' };
-      var quotaMsg = 'Browser storage is full — clear old uploads or templates and try again.';
+      this._pushDesign(orderId, sku, dataUrl, null, 'raster');
+      this._localCachePut(this.IMAGE_CACHE_KEY, orderId + '|' + sku, dataUrl);
+      return { ok:true };
+    },
+    // Pull all server-stored designs for one order into the local caches (best
+    // effort). Call when an order is opened so uploads reappear after a refresh /
+    // on another device / on the factory boards.
+    hydrateOrderDesigns: function(orderId) {
+      var self = this;
       try {
-        var cache = JSON.parse(localStorage.getItem(this.IMAGE_CACHE_KEY) || '{}');
-        cache[orderId + '|' + sku] = dataUrl;
-        try { localStorage.setItem(this.IMAGE_CACHE_KEY, JSON.stringify(cache)); return { ok:true }; }
-        catch(quotaErr) {
-          // Quota hit — drop the oldest half and retry
-          var keys = Object.keys(cache);
-          for (var i = 0; i < Math.floor(keys.length/2); i++) delete cache[keys[i]];
-          cache[orderId + '|' + sku] = dataUrl;
-          try { localStorage.setItem(this.IMAGE_CACHE_KEY, JSON.stringify(cache)); return { ok:true }; }
-          catch(e2) { return { ok:false, error: quotaMsg }; }
-        }
-      } catch(e) { return { ok:false, error: quotaMsg }; }
+        var tok = localStorage.getItem('eg_token') || '';
+        if (!tok || !orderId) return Promise.resolve([]);
+        return fetch('/api/orders/' + encodeURIComponent(orderId) + '/designs', { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : []; })
+          .then(function(rows){
+            (rows || []).forEach(function(d){
+              if (!d || !d.sku || !d.data) return;
+              if (d.kind === 'emb') {
+                self._localCachePut(self.EMB_FILE_KEY, orderId + '|' + d.sku, { name: d.name, dataUrl: d.data, addedAt: Date.now() });
+              } else {
+                self._localCachePut(self.RAW_DESIGN_KEY, orderId + '|' + d.sku, d.data);
+                self._localCachePut(self.IMAGE_CACHE_KEY, orderId + '|' + d.sku, d.data);
+              }
+            });
+            if (rows && rows.length) { try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch(e){} }
+            return rows || [];
+          }).catch(function(){ return []; });
+      } catch (e) { return Promise.resolve([]); }
     },
     getCachedImage: function(orderId, sku) {
       try {
@@ -2279,11 +2315,11 @@
        reads this to surface the gated-download link. */
     EMB_FILE_KEY: 'eg_emb_files',
     setItemEmbFile: function(orderId, sku, fileInfo) {
-      try {
-        var m = JSON.parse(localStorage.getItem(this.EMB_FILE_KEY) || '{}');
-        m[orderId+'|'+sku] = Object.assign({ addedAt: Date.now() }, fileInfo || {});
-        localStorage.setItem(this.EMB_FILE_KEY, JSON.stringify(m));
-      } catch(e){}
+      fileInfo = fileInfo || {};
+      // Persist the stitch file server-side too (kind='emb') so it survives the
+      // localStorage cap, then keep a best-effort local copy.
+      if (fileInfo.dataUrl) this._pushDesign(orderId, sku, fileInfo.dataUrl, fileInfo.name, 'emb');
+      this._localCachePut(this.EMB_FILE_KEY, orderId + '|' + sku, Object.assign({ addedAt: Date.now() }, fileInfo));
     },
     getItemEmbFile: function(orderId, sku) {
       try { var m = JSON.parse(localStorage.getItem(this.EMB_FILE_KEY) || '{}'); return m[orderId+'|'+sku] || null; }

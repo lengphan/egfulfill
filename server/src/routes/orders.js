@@ -7,6 +7,13 @@ import { isStaff } from '../auth.js';
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+  // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
+  // the moment a seller uploads a few images → "Browser storage is full"). One row
+  // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
+  q(`create table if not exists order_designs (
+       order_id text not null, sku text not null, kind text not null default 'raster',
+       data text, name text, updated_at timestamptz default now(),
+       primary key (order_id, sku, kind))`).catch(() => {});
 
   // List
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
@@ -69,5 +76,25 @@ export function ordersRoutes(app, requireAuth) {
     if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(req.user.sub); }
     await q(`update orders set ${sets.join(',')} where ${where}`, vals);
     return { ok: true };
+  });
+
+  // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
+  // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
+  app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req) => {
+    const { sku, data, name, kind } = req.body || {};
+    if (!sku || !data) return { error: 'sku and data required' };
+    await q(
+      `insert into order_designs (order_id, sku, kind, data, name, updated_at)
+       values ($1,$2,$3,$4,$5, now())
+       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, updated_at=now()`,
+      [req.params.id, sku, kind || 'raster', data, name || null]
+    );
+    return { ok: true };
+  });
+  // Fetch all designs for one order — called lazily when the order is opened, so a
+  // big base64 payload never rides along on the main /api/orders list.
+  app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req) => {
+    const r = await q(`select sku, kind, data, name from order_designs where order_id=$1`, [req.params.id]);
+    return r.rows;
   });
 }
