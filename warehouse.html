@@ -3381,6 +3381,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <a class="fstab" onclick="whSettingsTab('threads',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="11" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>Thread Colors</a>
         <a class="fstab" onclick="whSettingsTab('boards',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2" width="4" height="8"  rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="10.5" y="2" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>Design Boards</a>
         <a class="fstab" onclick="whSettingsTab('ops',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>Operations</a>
+        <a class="fstab" onclick="whSettingsTab('shipping',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="5" width="9" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 7.5H13L14.5 9.5V12H10.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4" cy="12.5" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12" cy="12.5" r="1.2" stroke="currentColor" stroke-width="1.3"/></svg>Shipping</a>
         <div style="border-top:1px solid #f0ede9;margin:8px 4px"></div>
         <a class="fstab" style="color:#dc2626;cursor:pointer" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Log out</a>
       </div>
@@ -3398,6 +3399,19 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <div style="margin-bottom:12px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Email</label><input class="input" value="factory@egops.com" type="email"/></div>
           <div style="margin-bottom:16px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Role</label><input class="input" value="Warehouse" disabled style="background:#f4f2ef;color:#9ca3af;cursor:not-allowed"/></div>
           <button class="btn btn-dk" style="font-size:13px">Save Changes</button>
+        </div>
+        <div id="wfpanel-shipping" class="card fi" style="padding:22px 24px;max-width:720px;display:none">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Shipping origin</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Your warehouse return address. Used as the <b>Ship From</b> on every USPS label, so staff don't re-enter it.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Name / Business</label><input id="wh-org-name" class="input" placeholder="EGFULFILL"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Street</label><input id="wh-org-street" class="input" placeholder="14535 Valley View Ave"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Apt / Suite <span style="font-weight:400;color:#c4c3be">(optional)</span></label><input id="wh-org-apt" class="input" placeholder="Ste V"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">City</label><input id="wh-org-city" class="input" placeholder="Santa Fe Springs"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">State</label><input id="wh-org-state" class="input" placeholder="CA" maxlength="2" style="text-transform:uppercase"/></div>
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">ZIP</label><input id="wh-org-zip" class="input" placeholder="90670"/></div>
+          </div>
+          <button class="btn btn-dk" style="font-size:13px" onclick="whSaveShipOrigin(this)">Save shipping origin</button>
         </div>
         <div id="wfpanel-notif" class="card fi" style="padding:22px 24px;max-width:720px;display:none">
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Notifications</div>
@@ -4016,11 +4030,12 @@ function showSection(id) {
 function whSettingsTab(name, el){
   // Existing 4 panels + the new 'ops' panel (additive — older callers still
   // work and none of the existing panel ids changed).
-  ['profile','notif','threads','boards','ops'].forEach(function(t){
+  ['profile','notif','threads','boards','ops','shipping'].forEach(function(t){
     var p = document.getElementById('wfpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
   if (el) el.classList.add('on');
+  if (name==='shipping' && typeof whLoadShipOrigin==='function') whLoadShipOrigin();
   if (name==='threads' && typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('wh-thread-mgr');
   if (name==='boards') {
     var bp = document.getElementById('wh-boards-panel');
@@ -6184,7 +6199,8 @@ function whOpenLabelModal(num) {
   m.querySelector('#whlm-to-addr').value     = street;
   m.querySelector('#whlm-to-city').value     = csz;
   var _toApt = m.querySelector('#whlm-to-apt'); if (_toApt) _toApt.value = '';
-  m.querySelector('#whlm-items').textContent = o.itemList.map(i=>i.name+' ×'+i.qty).join(', ');
+  m.querySelector('#whlm-items').textContent = (o.itemList||[]).map(i=>i.name+' ×'+i.qty).join(', ');
+  var _ir = m.querySelector('#whlm-items-row'); if (_ir) _ir.style.display = (o.itemList && o.itemList.length) ? '' : 'none';
   // Default to USPS Ground Advantage; map a legacy "Priority" hint if present.
   var _svc = m.querySelector('#whlm-carrier');
   if (_svc) _svc.value = /express/i.test(carrier||o.carrier||'') ? 'USPS Priority Mail Express'
@@ -6216,7 +6232,7 @@ function whCreateLabelModalDOM() {
       <button onclick="document.getElementById('wh-label-modal').classList.add('modal-hidden')" style="background:none;border:none;font-size:23.25px;color:#9ca3af;cursor:pointer;line-height:1">×</button>
     </div>
     <div style="padding:18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:70vh;overflow:auto">
-      <div style="grid-column:1/-1">
+      <div style="grid-column:1/-1" id="whlm-items-row">
         <div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Items</div>
         <div id="whlm-items" style="font-size:13.25px;color:#374151;padding:7px 10px;background:#f9f9f8;border-radius:7px;border:1px solid #e5e4e0"></div>
       </div>
@@ -6234,11 +6250,11 @@ function whCreateLabelModalDOM() {
       <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Apt / Suite <span style="font-weight:400;text-transform:none;color:#c4c3be">(optional)</span></div><input id="whlm-to-apt" class="input" style="width:100%" placeholder="Apt 4B"></div>
       <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div><input id="whlm-to-city" class="input" style="width:100%" placeholder="Austin, TX 78701"></div>
 
-      <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:6px;display:flex;align-items:center;gap:8px">SHIP FROM <span style="font-weight:400;font-size:10.5px;color:#9ca3af;letter-spacing:0">return address — remembered for next time</span></div>
-      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Name / Business</div><input id="whlm-from-name" class="input" style="width:100%" placeholder="EGFULFILL"></div>
-      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Street</div><input id="whlm-from-addr" class="input" style="width:100%" placeholder="456 Warehouse Rd"></div>
-      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Apt / Suite <span style="font-weight:400;text-transform:none;color:#c4c3be">(optional)</span></div><input id="whlm-from-apt" class="input" style="width:100%" placeholder="Unit 2"></div>
-      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div><input id="whlm-from-city" class="input" style="width:100%" placeholder="Dallas, TX 75001"></div>
+      <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:6px;display:flex;align-items:center;gap:8px">SHIP FROM <span style="font-weight:400;font-size:10.5px;color:#9ca3af;letter-spacing:0">warehouse default · <a onclick="showSection('settings');setTimeout(function(){whSettingsTab('shipping',document.querySelector('#section-settings .fstab:nth-child(6)'));},60);document.getElementById('wh-label-modal').classList.add('modal-hidden')" style="color:#6b7280;text-decoration:underline;cursor:pointer">edit in Settings</a></span></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Name / Business</div><input id="whlm-from-name" class="input" readonly style="width:100%;background:#f4f2ef;color:#6b7280" placeholder="Set in Settings → Shipping"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Street</div><input id="whlm-from-addr" class="input" readonly style="width:100%;background:#f4f2ef;color:#6b7280" placeholder="Set in Settings → Shipping"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Apt / Suite</div><input id="whlm-from-apt" class="input" readonly style="width:100%;background:#f4f2ef;color:#6b7280" placeholder="—"></div>
+      <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">City, State ZIP</div><input id="whlm-from-city" class="input" readonly style="width:100%;background:#f4f2ef;color:#6b7280" placeholder="Set in Settings → Shipping"></div>
 
       <div style="grid-column:1/-1;font-size:11px;font-weight:800;color:#191918;letter-spacing:.04em;margin-top:6px">PACKAGE</div>
       <div><div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Service</div>
@@ -6271,17 +6287,31 @@ function whCreateLabelModalDOM() {
   </div>`;
   document.body.appendChild(el);
 }
+function whLoadShipOrigin(){
+  var o = (window.EGUSPS && EGUSPS.getOrigin) ? (EGUSPS.getOrigin() || {}) : {};
+  var set = function(id, v){ var e = document.getElementById(id); if (e) e.value = v || ''; };
+  set('wh-org-name', o.name); set('wh-org-street', o.street); set('wh-org-apt', o.street2);
+  set('wh-org-city', o.city); set('wh-org-state', o.state); set('wh-org-zip', o.zip);
+}
+function whSaveShipOrigin(btn){
+  var g = function(id){ var e = document.getElementById(id); return e ? String(e.value||'').trim() : ''; };
+  var o = { name:g('wh-org-name'), street:g('wh-org-street'), street2:g('wh-org-apt'),
+            city:g('wh-org-city'), state:g('wh-org-state').toUpperCase(), zip:g('wh-org-zip') };
+  if (!o.street || !o.city || !o.state || !o.zip) { alert('Fill in street, city, state and ZIP.'); return; }
+  if (window.EGUSPS && EGUSPS.setOrigin) EGUSPS.setOrigin(o);
+  if (btn) { var t = btn.textContent; btn.textContent = 'Saved ✓'; setTimeout(function(){ btn.textContent = t; }, 1400); }
+}
 async function whGenerateLabel(num) {
   var modal = document.getElementById('wh-label-modal');
   if (!window.EGUSPS) { alert('USPS helper not loaded — hard-refresh the page.'); return; }
   var g = function (id) { var e = modal && modal.querySelector(id); return e ? String(e.value || '').trim() : ''; };
   var toCSZ = EGUSPS.parseCityStateZip(g('#whlm-to-city'));
-  var fromCSZ = EGUSPS.parseCityStateZip(g('#whlm-from-city'));
   var to = { name: g('#whlm-to-name'), street: g('#whlm-to-addr'), street2: g('#whlm-to-apt'), city: toCSZ.city, state: toCSZ.state, zip: toCSZ.zip };
-  var from = { name: g('#whlm-from-name'), street: g('#whlm-from-addr'), street2: g('#whlm-from-apt'), city: fromCSZ.city, state: fromCSZ.state, zip: fromCSZ.zip };
+  // Ship From is the saved warehouse origin (Settings → Shipping), not editable here.
+  var org = (EGUSPS.getOrigin && EGUSPS.getOrigin()) || {};
+  var from = { name: org.name || '', street: org.street || '', street2: org.street2 || '', city: org.city || '', state: org.state || '', zip: org.zip || '' };
   if (!to.street || !to.zip)   { alert('Enter the recipient Street + a valid "City, ST ZIP".'); return; }
-  if (!from.street || !from.zip) { alert('Enter your Ship From Street + "City, ST ZIP" (it\'s remembered next time).'); return; }
-  EGUSPS.setOrigin(from);   // remember the return address
+  if (!from.street || !from.zip) { alert('Set your warehouse Ship From address in Settings → Shipping first.'); return; }
 
   var src = (typeof WH_ORDERS !== 'undefined' && WH_ORDERS) ? WH_ORDERS
           : (typeof OP_ORDERS !== 'undefined' && OP_ORDERS) ? OP_ORDERS : [];
