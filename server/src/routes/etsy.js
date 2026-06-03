@@ -41,9 +41,27 @@ async function validToken(conn) {
   return t.access_token;
 }
 
+// Global rate limiter — Etsy caps at 10 requests/second. Space EVERY Etsy call at
+// least 140ms apart (~7/sec) so a sync can never trip the per-second limit, no
+// matter how many receipts/images it touches. Sequential awaits alone weren't
+// enough because cached image responses return in <100ms.
+let _rlLast = 0, _rlChain = Promise.resolve();
+function rateLimit() {
+  // Serialize through a chain so even an auto-sync overlapping a manual sync can't
+  // burst — every call is guaranteed ≥MIN_GAP after the previous one.
+  _rlChain = _rlChain.then(async () => {
+    const MIN_GAP = 140;
+    const wait = _rlLast + MIN_GAP - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    _rlLast = Date.now();
+  });
+  return _rlChain;
+}
+
 // Authenticated GET against the Etsy API.
 async function etsyGet(conn, path) {
   const token = await validToken(conn);
+  await rateLimit();
   const res = await fetch(API + path, {
     headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }
   });
@@ -56,8 +74,8 @@ async function etsyGet(conn, path) {
 // (form) or a FormData (image upload); set opts.headers for the form content-type.
 async function etsyFetch(conn, path, opts = {}) {
   const token = await validToken(conn);
-  const headers = Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }, opts.headers || {});
-  const res = await fetch(API + path, { method: opts.method || 'GET', headers, body: opts.body });
+  await rateLimit();
+  const res = await fetch(API + path, { method: opts.method || 'GET', headers: Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }, opts.headers || {}), body: opts.body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
   return data;
@@ -365,12 +383,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // our platform. Optional for a DRAFT — include it if the shop has one, else
       // create the draft without it and let the seller set shipping on Etsy before
       // going live. (Caller may also pass shipping_profile_id explicitly.)
-      let shipId = (b.shipping_profile_id != null) ? String(b.shipping_profile_id) : null;
+      // Etsy REQUIRES a shipping profile for physical listings (even drafts). Use the
+      // one passed in, else the shop's first. Surface the real reason if none.
+      let shipId = (b.shipping_profile_id != null) ? String(b.shipping_profile_id) : null, shipDiag = '';
       if (!shipId) {
         try {
           const sp = await etsyFetch(conn, `/shops/${conn.shop_id}/shipping-profiles`);
-          shipId = sp.results && sp.results[0] && sp.results[0].shipping_profile_id;
-        } catch (e) { /* no scope / none yet — proceed without it for the draft */ }
+          const list = sp.results || sp.shippingProfiles || [];
+          shipId = list[0] && (list[0].shipping_profile_id || list[0].shippingProfileId);
+          if (!shipId) shipDiag = 'your Etsy shop returned 0 shipping profiles';
+        } catch (e) { shipDiag = 'could not read shipping profiles (' + e.message + ')'; }
+      }
+      if (!shipId) {
+        reply.code(400);
+        return { error: 'Etsy needs a shipping profile for physical listings — ' + (shipDiag || 'none found') + '. Create one in your Etsy Shop Manager → Settings → Shipping, then retry (or pass shipping_profile_id).' };
       }
 
       // Taxonomy/category: use the one passed in, else borrow from an existing listing.
