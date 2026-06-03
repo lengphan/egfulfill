@@ -9,7 +9,11 @@ const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
 const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
 const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
 const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html';
-const SCOPES = 'transactions_r transactions_w listings_r listings_w';
+// shops_r/shops_w are needed to READ shipping profiles (and shop-level data) and to
+// create them — without shops_r, /shops/{id}/shipping-profiles returns 403 and Etsy
+// publish fails ("shipping_profile_id required"). Adding a scope requires the user
+// to RECONNECT (re-authorize) so the new token carries it.
+const SCOPES = 'transactions_r transactions_w listings_r listings_w shops_r shops_w';
 const TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
 const API = 'https://api.etsy.com/v3/application';
 
