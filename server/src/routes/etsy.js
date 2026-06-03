@@ -52,6 +52,17 @@ async function etsyGet(conn, path) {
   return data;
 }
 
+// Generic authed Etsy call (GET/POST). Pass opts.body as a URLSearchParams string
+// (form) or a FormData (image upload); set opts.headers for the form content-type.
+async function etsyFetch(conn, path, opts = {}) {
+  const token = await validToken(conn);
+  const headers = Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }, opts.headers || {});
+  const res = await fetch(API + path, { method: opts.method || 'GET', headers, body: opts.body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
+  return data;
+}
+
 // Resolve the listing image URL. Prefers the EXACT image the buyer saw
 // (transaction.listing_image_id); falls back to the listing's first image.
 // Cached per listing[:image] for the sync run.
@@ -232,7 +243,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // API calls — far under the 10/sec + 10k/day limits — instead of re-pulling the
   // whole shop (incl. already-shipped) like a manual full sync.
   if (KEYSTRING && SHARED_SECRET && !globalThis.__egEtsyAutoSync) {
-    globalThis.__egEtsyAutoSync = setInterval(() => { syncAllEtsy({ full: false }).catch(() => {}); }, 10 * 60 * 1000);
+    globalThis.__egEtsyAutoSync = setInterval(() => { syncAllEtsy({ full: false }).catch(() => {}); }, 5 * 60 * 1000);
     if (globalThis.__egEtsyAutoSync.unref) globalThis.__egEtsyAutoSync.unref();
   }
 
@@ -241,6 +252,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     keystring: KEYSTRING, redirect_uri: REDIRECT_URI, scopes: SCOPES,
     configured: !!KEYSTRING
   }));
+
+  // Lightweight connection check for ANY logged-in user (sellers publish to the
+  // shop connected on the admin side). No tokens leaked — just names.
+  app.get('/api/etsy/connected', { preHandler: requireAuth }, async () => {
+    const r = await q(`select shop_name from platform_connections where platform='etsy' order by created_at`);
+    return { connected: r.rowCount > 0, shops: r.rows.map(x => x.shop_name).filter(Boolean) };
+  });
 
   // List connected shops (no tokens leaked).
   app.get('/api/etsy/connections', { preHandler: requireStaff }, async () => {
@@ -313,6 +331,75 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const res = await syncAllEtsy({});   // incremental — picks up the event's order
     const imported = Array.isArray(res.synced) ? res.synced.reduce((n, s) => n + (s.orders || 0), 0) : 0;
     return { ok: true, imported };
+  });
+
+  // ── Publish a design to Etsy as a DRAFT listing, then upload the design image.
+  // Called from the "Publish to store" window on the seller + factory design pages.
+  // body: { title, description, price, quantity?, image (data URL), images?[], sku?, taxonomy_id? }
+  app.post('/api/etsy/publish', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET.' }; }
+      const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected.' }; }
+      const b = req.body || {};
+      const title = String(b.title || '').trim();
+      const price = Number(b.price) || 0;
+      if (!title) { reply.code(400); return { error: 'A listing title is required.' }; }
+      if (!price) { reply.code(400); return { error: 'A retail price is required.' }; }
+
+      // Shipping profile (required for physical listings).
+      let shipId = null;
+      try {
+        const sp = await etsyFetch(conn, `/shops/${conn.shop_id}/shipping-profiles`);
+        shipId = sp.results && sp.results[0] && sp.results[0].shipping_profile_id;
+      } catch (e) {}
+      if (!shipId) { reply.code(400); return { error: 'No Etsy shipping profile found — create one in your Etsy shop settings first.' }; }
+
+      // Taxonomy/category: use the one passed in, else borrow from an existing listing.
+      let taxId = b.taxonomy_id;
+      if (!taxId) {
+        try {
+          const al = await etsyFetch(conn, `/shops/${conn.shop_id}/listings?state=active&limit=1`);
+          taxId = al.results && al.results[0] && al.results[0].taxonomy_id;
+        } catch (e) {}
+      }
+      if (!taxId) { reply.code(400); return { error: 'No category (taxonomy_id) available — pass one, or publish one listing manually on Etsy first so we can reuse its category.' }; }
+
+      // Create the DRAFT listing.
+      const form = new URLSearchParams({
+        quantity: String(b.quantity || 999),
+        title: title.slice(0, 140),
+        description: String(b.description || title),
+        price: String(price),
+        who_made: 'i_did', when_made: 'made_to_order', type: 'physical', state: 'draft',
+        taxonomy_id: String(taxId), shipping_profile_id: String(shipId)
+      });
+      const listing = await etsyFetch(conn, `/shops/${conn.shop_id}/listings`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString()
+      });
+      const listingId = listing.listing_id;
+
+      // Upload the design image(s).
+      const imgs = (Array.isArray(b.images) && b.images.length) ? b.images : (b.image ? [b.image] : []);
+      let uploaded = 0;
+      for (const dataUrl of imgs) {
+        try {
+          const m = /^data:(image\/[a-z.+-]+);base64,(.+)$/i.exec(String(dataUrl));
+          if (!m) continue;
+          const buf = Buffer.from(m[2], 'base64');
+          const ext = (m[1].split('/')[1] || 'png').replace('jpeg', 'jpg');
+          const fd = new FormData();
+          fd.append('image', new Blob([buf], { type: m[1] }), 'design.' + ext);
+          await etsyFetch(conn, `/shops/${conn.shop_id}/listings/${listingId}/images`, { method: 'POST', body: fd });
+          uploaded++;
+        } catch (e) { /* keep going; the draft still exists without the image */ }
+      }
+
+      return {
+        ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
+        url: listing.url || `https://www.etsy.com/listing/${listingId}`
+      };
+    } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
   // ── Push tracking back to Etsy (marks the order shipped on Etsy AND emails the

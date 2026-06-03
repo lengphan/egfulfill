@@ -562,35 +562,21 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
     <!-- Publish to store (full width) -->
     <div class="lcard">
       <div class="lcard-head">Publish to store</div>
+      <!-- Etsy is the only channel we currently support. The row reflects the real
+           connection state (filled in by dmRefreshEtsyConn); Shopify/Amazon removed. -->
       <div id="dm-store-list" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:8px;margin-bottom:16px">
-        <label class="store-row">
-          <input type="checkbox" data-store="Main Store (Shopify)" checked style="accent-color:#059669;flex-shrink:0"/>
-          <div style="width:26px;height:26px;background:#96bf48;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M1.5 6.5h10M6.5 1.5l5 5-5 5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <span style="font-size:14px;color:#111827;font-weight:500;flex:1">Main Store (Shopify)</span>
-          <span style="font-size:12px;color:#059669;font-weight:600;background:#f0fdf4;padding:2px 7px;border-radius:4px">Connected</span>
-        </label>
-        <label class="store-row">
-          <input type="checkbox" data-store="Etsy Store" style="accent-color:#059669;flex-shrink:0"/>
+        <label class="store-row" id="dm-etsy-row">
+          <input type="checkbox" data-store="Etsy Store" checked style="accent-color:#059669;flex-shrink:0"/>
           <div style="width:26px;height:26px;background:#f45800;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
             <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="4" stroke="#fff" stroke-width="1.3"/></svg>
           </div>
-          <span style="font-size:14px;color:#111827;font-weight:500;flex:1">Etsy Store</span>
-          <span style="font-size:12px;color:#059669;font-weight:600;background:#f0fdf4;padding:2px 7px;border-radius:4px">Connected</span>
-        </label>
-        <label class="store-row">
-          <input type="checkbox" data-store="Amazon US" style="accent-color:#059669;flex-shrink:0"/>
-          <div style="width:26px;height:26px;background:#ff9900;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="4" width="10" height="6" rx="1" stroke="#fff" stroke-width="1.3"/></svg>
-          </div>
-          <span style="font-size:14px;color:#111827;font-weight:500;flex:1">Amazon US</span>
-          <span style="font-size:12px;color:#9ca3af;font-weight:500;background:#f4f2ef;padding:2px 7px;border-radius:4px">Not connected</span>
+          <span style="font-size:14px;color:#111827;font-weight:500;flex:1" id="dm-etsy-name">Etsy Store</span>
+          <span id="dm-etsy-badge" style="font-size:12px;color:#9ca3af;font-weight:500;background:#f4f2ef;padding:2px 7px;border-radius:4px">Checking…</span>
         </label>
       </div>
-      <button class="btn btn-dk" style="width:100%;justify-content:center;padding:11px;font-size:14.5px;gap:7px" onclick="dmConnectStore()">
+      <button id="dm-publish-btn" class="btn btn-dk" style="width:100%;justify-content:center;padding:11px;font-size:14.5px;gap:7px" onclick="dmConnectStore()">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M3.5 5L7 1l3.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 11h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        Connect to Store &amp; Publish
+        Publish to Etsy
       </button>
     </div>
 
@@ -3108,19 +3094,72 @@ function dmRegenDesc(){
 }
 
 /* Connect to store → publish the design to selling platforms */
-function dmConnectStore(){
+// Reflect the real Etsy connection state in the publish row (works for any logged-in
+// user — the shop is the one connected on the admin/factory side).
+async function dmRefreshEtsyConn(){
+  const badge = document.getElementById('dm-etsy-badge');
+  const nameEl = document.getElementById('dm-etsy-name');
+  const cb = document.querySelector('#dm-store-list input[data-store="Etsy Store"]');
+  const btn = document.getElementById('dm-publish-btn');
+  const tok = localStorage.getItem('eg_token');
+  if (!badge) return;
+  try {
+    const r = await fetch('/api/etsy/connected', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} }).then(x => x.json());
+    if (r && r.connected) {
+      badge.textContent = 'Connected'; badge.style.color = '#059669'; badge.style.background = '#f0fdf4';
+      if (r.shops && r.shops[0] && nameEl) nameEl.textContent = r.shops[0];
+      if (cb) { cb.checked = true; cb.disabled = false; }
+      if (btn) btn.textContent = 'Publish to Etsy';
+    } else {
+      badge.textContent = 'Not connected'; badge.style.color = '#9ca3af'; badge.style.background = '#f4f2ef';
+      if (cb) { cb.checked = false; }
+      if (btn) btn.textContent = 'Connect Etsy first';
+    }
+  } catch (e) { badge.textContent = 'Not connected'; }
+}
+
+// Create a DRAFT Etsy listing from the current design + listing details.
+async function dmPublishToEtsy(){
+  const tok = localStorage.getItem('eg_token');
+  if (!tok) { toast('Log in to publish to Etsy'); return false; }
+  const title = (document.getElementById('dm-listing-title').value
+    || (typeof currentProductName !== 'undefined' ? currentProductName : '') || 'My Design').trim();
+  const description = (document.getElementById('dm-listing-desc').value || title).trim();
+  const priceEl = document.querySelector('#dm-pricing-body input[type=number]');
+  const price = priceEl ? (parseFloat(priceEl.value) || 0) : 0;
+  let image = '';
+  try { if (typeof dmCaptureComposite === 'function') image = await dmCaptureComposite(); } catch (e) {}
+  if (!image && typeof currentProductImg !== 'undefined') image = currentProductImg;
+  toast('Publishing draft to Etsy…');
+  try {
+    const res = await fetch('/api/etsy/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ title, description, price, quantity: 999, image })
+    }).then(r => r.json());
+    if (!res || res.error) { toast('Etsy publish failed: ' + ((res && res.error) || 'unknown error')); return false; }
+    toast('✓ Draft listing created on Etsy');
+    if (res.url) { try { window.open(res.url, '_blank'); } catch (e) {} }
+    return true;
+  } catch (e) { toast('Etsy publish failed: ' + e.message); return false; }
+}
+
+async function dmConnectStore(){
   const checked = [...document.querySelectorAll('#dm-store-list input[type=checkbox]:checked')]
     .map(c => c.dataset.store);
-  if (!checked.length) { toast('Select at least one store to publish to'); return; }
-  toast('✓ Published to ' + checked.join(', '));
+  if (!checked.length) { toast('Select Etsy to publish'); return; }
+  // Etsy is the only channel — publish for real and only show success if it worked.
+  const ok = await dmPublishToEtsy();
+  if (!ok) return;
   const card = document.getElementById('prod-success-card');
   if (card) {
     const h = document.querySelector('#prod-success div[style*="font-weight:800"]');
-    if (h) h.textContent = 'Published to Store!';
+    if (h) h.textContent = 'Published to Etsy!';
     document.getElementById('prod-success').style.display = 'flex';
     document.body.style.overflow = 'hidden';
   }
 }
+document.addEventListener('DOMContentLoaded', function(){ try { dmRefreshEtsyConn(); } catch(e){} });
 
 /* ── Order search ── */
 function filterOrders(q){
