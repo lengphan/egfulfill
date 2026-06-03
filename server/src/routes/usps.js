@@ -1,0 +1,123 @@
+// USPS Labels integration (new USPS APIs platform).
+//
+// Two tokens are required to buy/print a label:
+//   1) OAuth token        — from your app's Consumer Key/Secret (client_credentials)
+//   2) Payment auth token — from the Payments 3.0 API, which needs CRID + MID + EPS
+//
+// TEM (test) returns watermarked labels and doesn't charge — but still needs the
+// payment token. Flip USPS_BASE to apis.usps.com for live postage.
+//
+// .env:
+//   USPS_CONSUMER_KEY=...        USPS_CONSUMER_SECRET=...
+//   USPS_BASE=https://apis-tem.usps.com      (default; prod = https://apis.usps.com)
+//   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
+//   USPS_ACCOUNT_TYPE=EPS
+import { q } from '../db.js';
+
+const KEY    = process.env.USPS_CONSUMER_KEY || '';
+const SECRET = process.env.USPS_CONSUMER_SECRET || '';
+const BASE   = (process.env.USPS_BASE || 'https://apis-tem.usps.com').replace(/\/+$/, '');
+const CRID   = process.env.USPS_CRID || '';
+const MID    = process.env.USPS_MID || '';
+const ACCT   = process.env.USPS_ACCOUNT_NUMBER || '';
+const ACCT_TYPE = process.env.USPS_ACCOUNT_TYPE || 'EPS';
+
+let _oauth = { token: '', exp: 0 };
+let _pay   = { token: '', exp: 0 };
+
+// 1) OAuth — client_credentials. Cached until ~1 min before expiry.
+async function oauthToken() {
+  if (_oauth.token && Date.now() < _oauth.exp - 60000) return _oauth.token;
+  if (!KEY || !SECRET) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
+  const res = await fetch(`${BASE}/oauth2/v3/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET }).toString()
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || !d.access_token) throw new Error('USPS OAuth failed: ' + (d.error_description || d.error || ('HTTP ' + res.status)));
+  _oauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000) };
+  return _oauth.token;
+}
+
+// 2) Payment authorization token — needs CRID + MID + EPS account.
+async function paymentToken() {
+  if (_pay.token && Date.now() < _pay.exp - 60000) return _pay.token;
+  if (!CRID || !MID || !ACCT) throw new Error('Server missing USPS_CRID / USPS_MID / USPS_ACCOUNT_NUMBER (needed for the payment token)');
+  const tok = await oauthToken();
+  const body = {
+    roles: [
+      { roleName: 'PAYER',       CRID, MID, accountType: ACCT_TYPE, accountNumber: ACCT },
+      { roleName: 'LABEL_OWNER', CRID, MID, accountType: ACCT_TYPE, accountNumber: ACCT }
+    ]
+  };
+  const res = await fetch(`${BASE}/payments/v3/payment-authorization`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+    body: JSON.stringify(body)
+  });
+  const d = await res.json().catch(() => ({}));
+  const token = d.paymentAuthorizationToken || d.token;
+  if (!res.ok || !token) throw new Error('USPS payment authorization failed: ' + (d.error?.message || d.message || JSON.stringify(d).slice(0, 300)));
+  _pay = { token, exp: Date.now() + (50 * 60 * 1000) };   // ~1h tokens; refresh at 50m
+  return _pay.token;
+}
+
+export function uspsRoutes(app, requireAuth, requireStaff) {
+  // Connectivity/qualification check — surfaces exactly which step is wired.
+  app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
+    const out = { base: BASE, env: BASE.includes('-tem') ? 'TEM (test)' : 'PRODUCTION',
+      consumerKey: !!KEY, consumerSecret: !!SECRET, crid: !!CRID, mid: !!MID, account: !!ACCT };
+    try { await oauthToken(); out.oauth = 'ok'; }
+    catch (e) { out.oauth = 'FAILED: ' + e.message; return out; }
+    try { await paymentToken(); out.payment = 'ok'; out.qualified = true; }
+    catch (e) { out.payment = 'FAILED: ' + e.message; out.qualified = false; }
+    return out;
+  });
+
+  // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},
+  //   weightOz, length, width, height, mailClass, imageType('PDF'|'ZPL...'), orderId }
+  app.post('/api/usps/label', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const b = req.body || {};
+      const to = b.to || {}, from = b.from || {};
+      if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
+      if (!from.zip || !from.street) { reply.code(400); return { error: 'Sender (from) street + ZIP are required' }; }
+      const oauth = await oauthToken();
+      const pay = await paymentToken();
+      const splitName = (n) => { const p = String(n || '').trim().split(/\s+/); return { first: p.shift() || 'Customer', last: p.join(' ') || '-' }; };
+      const tn = splitName(to.name), fn = splitName(from.name);
+      const payload = {
+        imageInfo: { imageType: (b.imageType || 'PDF'), labelType: '4X6LABEL' },
+        toAddress: { firstName: tn.first, lastName: tn.last, streetAddress: to.street, secondaryAddress: to.street2 || undefined, city: to.city, state: to.state, ZIPCode: String(to.zip).slice(0, 5) },
+        fromAddress: { firstName: fn.first, lastName: fn.last, streetAddress: from.street, secondaryAddress: from.street2 || undefined, city: from.city, state: from.state, ZIPCode: String(from.zip).slice(0, 5) },
+        packageDescription: {
+          mailClass: b.mailClass || 'USPS_GROUND_ADVANTAGE',
+          rateIndicator: b.rateIndicator || 'SP',
+          weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),   // oz → lb, min 1oz
+          length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 2,
+          processingCategory: 'MACHINABLE',
+          destinationEntryFacilityType: 'NONE'
+        }
+      };
+      const res = await fetch(`${BASE}/labels/v3/label`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json',
+                   Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay },
+        body: JSON.stringify(payload)
+      });
+      const ct = res.headers.get('content-type') || '';
+      const raw = await res.text();
+      if (!res.ok) { reply.code(400); return { error: 'USPS label failed: ' + raw.slice(0, 500) }; }
+      // Labels 3.0 returns JSON with the label image base64 + tracking number.
+      let data = {}; try { data = JSON.parse(raw); } catch (e) {}
+      const tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || '';
+      const labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || '';
+      // Persist tracking onto the order if one was passed.
+      if (b.orderId && tracking) {
+        try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [tracking, b.orderId]); } catch (e) {}
+      }
+      return { ok: true, trackingNumber: tracking, imageType: payload.imageInfo.imageType, labelImage, contentType: ct };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+}
