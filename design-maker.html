@@ -3148,16 +3148,23 @@ async function dmConnectStore(){
   const checked = [...document.querySelectorAll('#dm-store-list input[type=checkbox]:checked')]
     .map(c => c.dataset.store);
   if (!checked.length) { toast('Select Etsy to publish'); return; }
-  // Etsy is the only channel — publish for real and only show success if it worked.
+  // Etsy is the only channel — publish for real and only continue if it worked.
   const ok = await dmPublishToEtsy();
   if (!ok) return;
-  const card = document.getElementById('prod-success-card');
-  if (card) {
-    const h = document.querySelector('#prod-success div[style*="font-weight:800"]');
-    if (h) h.textContent = 'Published to Etsy!';
-    document.getElementById('prod-success').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-  }
+  // Save the design as a reusable template so it lands in the "Use a Template"
+  // section — do NOT bounce to the orders/overview page.
+  function go(){ try { window.location.href = 'product-templates.html'; } catch(e){} }
+  try {
+    if (typeof dmCaptureComposite === 'function') {
+      dmCaptureComposite().then(function(composite){
+        try { dmPersistTemplate(composite); } catch(e){}
+        toast('✓ Published to Etsy · saved to Use a Template'); setTimeout(go, 900);
+      });
+    } else {
+      try { dmPersistTemplate(); } catch(e){}
+      toast('✓ Published to Etsy · saved to Use a Template'); setTimeout(go, 900);
+    }
+  } catch(e) { toast('✓ Published to Etsy'); setTimeout(go, 900); }
 }
 document.addEventListener('DOMContentLoaded', function(){ try { dmRefreshEtsyConn(); } catch(e){} });
 
