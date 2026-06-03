@@ -3115,17 +3115,25 @@ async function dmRefreshEtsyConn(){
   const btn = document.getElementById('dm-publish-btn');
   const tok = localStorage.getItem('eg_token');
   if (!badge) return;
+  // The connected Etsy shop belongs to the FACTORY/admin account. Only staff should
+  // see it — a seller's view must NOT present the admin's store as their own. The
+  // publish wiring stays intact; sellers just see "no store connected" until they
+  // link their own shop.
+  var _u = null; try { _u = JSON.parse(localStorage.getItem('eg_user') || 'null'); } catch (e) {}
+  var _isStaff = !!(_u && ['operator', 'admin', 'warehouse', 'designer'].indexOf(_u.role) !== -1);
   try {
     const r = await fetch('/api/etsy/connected', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} }).then(x => x.json());
-    if (r && r.connected) {
+    if (r && r.connected && _isStaff) {
       badge.textContent = 'Connected'; badge.style.color = '#059669'; badge.style.background = '#f0fdf4';
       if (r.shops && r.shops[0] && nameEl) nameEl.textContent = r.shops[0];
       if (cb) { cb.checked = true; cb.disabled = false; }
       if (btn) btn.textContent = 'Publish to Etsy';
     } else {
+      // Seller (or genuinely not connected): generic row, no admin shop name.
       badge.textContent = 'Not connected'; badge.style.color = '#9ca3af'; badge.style.background = '#f4f2ef';
+      if (nameEl) nameEl.textContent = 'Etsy Store';
       if (cb) { cb.checked = false; }
-      if (btn) btn.textContent = 'Connect Etsy first';
+      if (btn) btn.textContent = _isStaff ? 'Connect Etsy first' : 'Connect your store';
     }
   } catch (e) { badge.textContent = 'Not connected'; }
 }
