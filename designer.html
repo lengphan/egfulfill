@@ -4,7 +4,7 @@
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Design Board — EGFULFILL</title>
+<title>Board — EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
@@ -350,9 +350,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <a class="ni on" data-sec="overview" onclick="showSec('overview')">
       <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.8"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.8"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.8"/></svg>Overview</a>
     <a class="ni" data-sec="board" onclick="showSec('board')">
-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Design Board<span id="nav-badge-board" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">7</span></a>
-    <a class="ni" href="javascript:void(0)" onclick="window.EGDesignTools&&EGDesignTools.designLab()">
-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 12.5V14h1.5l7-7-1.5-1.5-7 7z"/><path d="M11.3 4.2l1.5 1.5 1.05-1.05a1.06 1.06 0 000-1.5l-.5-.5a1.06 1.06 0 00-1.5 0L11.3 4.2z"/></svg>Design Lab</a>
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>Board<span id="nav-badge-board" style="margin-left:auto;background:#191918;color:#e8e4dd;border:none;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5">7</span></a>
     <a class="ni" data-sec="wallet" onclick="showSec('wallet')">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.5 3.4h9A1.5 1.5 0 0113 4.9v.6h-2.3a2.5 2.5 0 000 5H13v.6A1.5 1.5 0 0111.5 12.6h-9A1.5 1.5 0 011 11.1V4.9A1.5 1.5 0 012.5 3.4z"/><path d="M10.8 6.6h3.7a.5.5 0 01.5.5v1.8a.5.5 0 01-.5.5h-3.7a1.4 1.4 0 010-2.8z"/></svg>Wallet</a>
     <a class="ni" data-sec="settings" onclick="showSec('settings')">
@@ -375,7 +373,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 
 <!-- TOPBAR -->
 <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px 0 230px;position:fixed;left:0;right:0;top:0;z-index:35;gap:8px;flex-shrink:0">
-  <div id="hdr-title" style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em;flex-shrink:0">Design Board</div>
+  <div id="hdr-title" style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em;flex-shrink:0">Board</div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
     <div style="display:flex;align-items:center;gap:4px;position:relative">
       <div id="dsn-hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
@@ -878,7 +876,7 @@ window.addEventListener('storage', e => {
 // ══════════════════════════════════════════════════
 // SECTIONS
 // ══════════════════════════════════════════════════
-const SECTION_TITLES = { overview:'Overview', board:'Design Board', wallet:'Wallet', settings:'Settings' };
+const SECTION_TITLES = { overview:'Overview', board:'Board', wallet:'Wallet', settings:'Settings' };
 
 function showSec(id) {
   ['overview','board','wallet','settings'].forEach(s => {
@@ -1053,7 +1051,7 @@ function dbDrop(e, colId) {
   _dragId = null; _dragOverId = null;
   // NO self-credit here: a claimer (designer/operator) moving their OWN card to
   // approved must NOT pay themselves. The credit is released only when admin or
-  // warehouse approves the card on the Unified Design Board.
+  // warehouse approves the card on the Unified Board.
   dbRender(); dbSave();
 }
 
@@ -1485,7 +1483,7 @@ function dsnRunHdrSearch(q) {
       });
     }
   } catch(e) {}
-  ['Overview','Design Board','Wallet','Settings'].forEach(label => {
+  ['Overview','Board','Wallet','Settings'].forEach(label => {
     if (label.toLowerCase().includes(q)) {
       const slug = label.toLowerCase().replace(/ +/g,'').replace('designboard','board');
       out.push({ kind:'Page', label, sub:'Jump to section', action:`showSec('${slug}');dsnCloseHdrSearch()` });
