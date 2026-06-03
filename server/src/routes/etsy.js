@@ -143,6 +143,71 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   return 'imported';
 }
 
+// Sync ONE connection's receipts into orders. Incremental by default: only pulls
+// receipts modified since last_sync_at (Etsy's min_last_modified), so repeat syncs
+// don't re-fetch the whole shop (incl. the already-shipped backlog) every time —
+// that's what burns the 10k/day quota. Pass {full:true} to force a complete pull.
+async function syncConnection(conn, opts = {}) {
+  const full = !!opts.full;
+  const firstSync = !conn.last_sync_at;
+  let orders = 0, skipped = 0, purgedShipped = 0, resolved = null;
+  // Resolve the real shop id/name only on a full or first sync (saves a call/run).
+  if (full || firstSync) {
+    try {
+      const userId = String(conn.access_token).split('.')[0];
+      const sr = await etsyGet(conn, `/users/${userId}/shops`);
+      const shop = sr && (sr.shop_id ? sr : (Array.isArray(sr.results) ? sr.results[0] : null));
+      if (shop && shop.shop_id) {
+        const realId = String(shop.shop_id);
+        if (realId !== String(conn.shop_id) || (shop.shop_name && shop.shop_name !== conn.shop_name)) {
+          await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
+            [realId, shop.shop_name || conn.shop_name, conn.id]);
+          conn.shop_id = realId; conn.shop_name = shop.shop_name || conn.shop_name;
+        }
+        resolved = { shop_id: conn.shop_id, shop_name: conn.shop_name };
+      }
+    } catch (e) { resolved = { error: e.message }; }
+  }
+  const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
+  // One-time: drop the pre-connection shipped backlog (full/first sync only).
+  if ((full || firstSync) && connectedSec) {
+    const del = await q(
+      `delete from orders where source='etsy' and seller_id=$1 and status='shipped' and created_at < to_timestamp($2)`,
+      [conn.connected_by, connectedSec]);
+    purgedShipped = del.rowCount || 0;
+  }
+  // Incremental window: only receipts modified since last sync (5-min overlap for safety).
+  const sinceSec = (!full && conn.last_sync_at)
+    ? Math.max(0, Math.floor(new Date(conn.last_sync_at).getTime() / 1000) - 300) : null;
+  const sinceQS = sinceSec ? `&min_last_modified=${sinceSec}` : '';
+  const imgCache = {};
+  for (let offset = 0; offset < 500; offset += 100) {
+    const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions${sinceQS}`);
+    const results = r.results || [];
+    for (const rc of results) {
+      if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
+    }
+    if (results.length < 100) break;
+  }
+  await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
+  return { shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved, incremental: !!sinceSec };
+}
+
+// Sync all connected Etsy shops (or just one via opts.shopId).
+async function syncAllEtsy(opts = {}) {
+  if (!SHARED_SECRET) return { error: 'Server is missing ETSY_SHARED_SECRET.' };
+  const rows = (await q(
+    opts.shopId ? `select * from platform_connections where platform='etsy' and shop_id=$1`
+                : `select * from platform_connections where platform='etsy'`,
+    opts.shopId ? [opts.shopId] : [])).rows;
+  const summary = [];
+  for (const conn of rows) {
+    try { summary.push(await syncConnection(conn, opts)); }
+    catch (e) { summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, error: e.message }); }
+  }
+  return { ok: true, synced: summary };
+}
+
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
   // ensure table exists even on a DB that booted before this feature (idempotent)
@@ -160,6 +225,15 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
   // Backfill: every Etsy order pulled so far came from the admin/factory connection.
   q(`update orders set factory_order=true where source='etsy' and factory_order=false`).catch(() => {});
+
+  // Auto-sync: poll Etsy incrementally so new orders land WITHOUT anyone clicking
+  // "Sync now". Incremental (min_last_modified) means each run is just a couple of
+  // API calls — far under the 10/sec + 10k/day limits — instead of re-pulling the
+  // whole shop (incl. already-shipped) like a manual full sync.
+  if (KEYSTRING && SHARED_SECRET && !globalThis.__egEtsyAutoSync) {
+    globalThis.__egEtsyAutoSync = setInterval(() => { syncAllEtsy({ full: false }).catch(() => {}); }, 10 * 60 * 1000);
+    if (globalThis.__egEtsyAutoSync.unref) globalThis.__egEtsyAutoSync.unref();
+  }
 
   // Frontend reads this to build the Etsy authorize URL (keystring is public).
   app.get('/api/etsy/config', async () => ({
@@ -217,93 +291,26 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     return { ok: true };
   });
 
-  // Pull orders (receipts) + listings for one shop (or all if no shop_id) into our DB.
+  // Pull orders (receipts) into our DB. Incremental by default (only what changed
+  // since the last sync); pass { full: true } in the body to force a complete pull.
   app.post('/api/etsy/sync', { preHandler: requireStaff }, async (req, reply) => {
-    const shopId = (req.body && req.body.shop_id) || null;
-    const rows = (await q(
-      shopId ? `select * from platform_connections where platform='etsy' and shop_id=$1`
-             : `select * from platform_connections where platform='etsy'`,
-      shopId ? [shopId] : []
-    )).rows;
-    if (!rows.length) { reply.code(400); return { error: 'No Etsy shop connected' }; }
     if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET. Add it to the server .env and redeploy.' }; }
-
+    const has = await q(`select 1 from platform_connections where platform='etsy' limit 1`);
+    if (!has.rowCount) { reply.code(400); return { error: 'No Etsy shop connected' }; }
     // One-time cleanup: purge any Etsy listings a previous version imported into
     // the base-product catalog (they don't belong there).
     const purged = await q(`delete from catalog_products where id like 'etsy-%'`);
-
-    const summary = [];
-    for (const conn of rows) {
-      let orders = 0, skipped = 0, purgedShipped = 0, sample = null, resolved = null;
-      try {
-        // Resolve the REAL shop id+name from the token's user id. The connect-time
-        // lookup may have failed (needed the secret), leaving shop_id == user_id.
-        try {
-          const userId = String(conn.access_token).split('.')[0];
-          const sr = await etsyGet(conn, `/users/${userId}/shops`);
-          const shop = sr && (sr.shop_id ? sr : (Array.isArray(sr.results) ? sr.results[0] : null));
-          resolved = shop ? { shop_id: shop.shop_id, shop_name: shop.shop_name } : { keys: sr ? Object.keys(sr) : null };
-          if (shop && shop.shop_id) {
-            const realId = String(shop.shop_id);
-            if (realId !== String(conn.shop_id) || (shop.shop_name && shop.shop_name !== conn.shop_name)) {
-              await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
-                [realId, shop.shop_name || conn.shop_name, conn.id]);
-              conn.shop_id = realId; conn.shop_name = shop.shop_name || conn.shop_name;
-            }
-          }
-        } catch (e) { resolved = { error: e.message }; }
-        // Save storage: drop the historical shipped backlog — orders shipped BEFORE
-        // you connected this shop. New orders, active/open orders, and orders that
-        // ship after connecting are kept. Cutoff = the connection date.
-        const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
-        if (connectedSec) {
-          const del = await q(
-            `delete from orders where source='etsy' and seller_id=$1 and status='shipped' and created_at < to_timestamp($2)`,
-            [conn.connected_by, connectedSec]
-          );
-          purgedShipped = del.rowCount || 0;
-        }
-        // ── Orders (receipts), paginated up to 500 ──
-        const imgCache = {};   // listing_id → image URL, shared across this shop's receipts
-        for (let offset = 0; offset < 500; offset += 100) {
-          const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions`);
-          const results = r.results || [];
-          if (!sample && results[0]) sample = results[0];
-          for (const rc of results) {
-            if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
-          }
-          if (results.length < 100) break;
-        }
-        // NOTE: we intentionally do NOT import Etsy listings into catalog_products.
-        // The catalog is for BASE products to customize and push OUT to platforms;
-        // finished Etsy listings must not pollute it. (Cleanup of any previously
-        // imported listings happens once below, before the shop loop.)
-        await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved });
-      } catch (e) {
-        summary.push({ shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, error: e.message,
-                       resolved, sample_keys: sample ? Object.keys(sample) : null });
-      }
-    }
-    return { ok: true, synced: summary, catalog_listings_purged: purged.rowCount || 0 };
+    const res = await syncAllEtsy({ full: !!(req.body && req.body.full), shopId: (req.body && req.body.shop_id) || null });
+    return { ...res, catalog_listings_purged: purged.rowCount || 0 };
   });
 
   // ── Webhook receiver (real-time). Etsy POSTs here when an order event fires.
-  // Public (Etsy has no bearer token). Effect is read-only: we re-pull recent
-  // receipts for the connected shops and import them — so it can't be abused to
-  // mutate anything. Register this URL in the Etsy webhooks portal:
-  //   https://egful.store/api/webhooks/etsy
+  // Public (Etsy has no bearer token). Effect is read-only: an incremental sync
+  // pulls just the changed receipts — so it can't be abused to mutate anything.
+  // Register this URL in the Etsy webhooks portal: https://egful.store/api/webhooks/etsy
   app.post('/api/webhooks/etsy', async () => {
-    const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
-    let imported = 0;
-    for (const conn of conns) {
-      try {
-        const imgCache = {};
-        const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=25&offset=0&includes=Transactions`);
-        for (const rc of (r.results || [])) { if ((await importReceipt(conn, rc, 0, imgCache)) === 'imported') imported++; }
-        await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-      } catch (e) { /* keep going for other shops */ }
-    }
+    const res = await syncAllEtsy({});   // incremental — picks up the event's order
+    const imported = Array.isArray(res.synced) ? res.synced.reduce((n, s) => n + (s.orders || 0), 0) : 0;
     return { ok: true, imported };
   });
 
