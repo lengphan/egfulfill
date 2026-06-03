@@ -223,8 +223,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // factory_order: orders synced from the ADMIN/factory connection belong to the
   // factory boards, not to sellers. Sellers' GET excludes these (see orders.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
-  // Backfill: every Etsy order pulled so far came from the admin/factory connection.
-  q(`update orders set factory_order=true where source='etsy' and factory_order=false`).catch(() => {});
+  // Backfill: real Etsy imports (etsy- id) are factory orders. Keyed on the id, not
+  // source, so a seller's manual order tagged with a marketplace source isn't caught.
+  q(`update orders set factory_order=true where id like 'etsy-%' and factory_order=false`).catch(() => {});
 
   // Auto-sync: poll Etsy incrementally so new orders land WITHOUT anyone clicking
   // "Sync now". Incremental (min_last_modified) means each run is just a couple of
