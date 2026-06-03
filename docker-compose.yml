@@ -39,6 +39,7 @@ services:
       USPS_MID: ${USPS_MID:-}
       USPS_ACCOUNT_NUMBER: ${USPS_ACCOUNT_NUMBER:-}
       USPS_ACCOUNT_TYPE: ${USPS_ACCOUNT_TYPE:-EPS}
+      USPS_SCOPE: ${USPS_SCOPE:-}
     depends_on: [db]
     restart: unless-stopped
 

@@ -29,10 +29,15 @@ let _pay   = { token: '', exp: 0 };
 async function oauthToken() {
   if (_oauth.token && Date.now() < _oauth.exp - 60000) return _oauth.token;
   if (!KEY || !SECRET) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
+  // By default the token carries whatever scopes the app is entitled to. If the
+  // Payments scope isn't included (→ "Insufficient OAuth scope" on payment-auth),
+  // set USPS_SCOPE in .env to request it explicitly once USPS grants it.
+  var _body = { grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET };
+  if (process.env.USPS_SCOPE) _body.scope = process.env.USPS_SCOPE;
   const res = await fetch(`${BASE}/oauth2/v3/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET }).toString()
+    body: new URLSearchParams(_body).toString()
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok || !d.access_token) throw new Error('USPS OAuth failed: ' + (d.error_description || d.error || ('HTTP ' + res.status)));
