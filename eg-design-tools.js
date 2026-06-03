@@ -63,13 +63,16 @@
   }
   function openSellerPage(src, title, onBack) {
     var ov = overlayEl();
-    ov.innerHTML = header('Design Lab', title, onBack)
-      + '<iframe id="egdt-frame" src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
+    // No breadcrumb strip — the embedded page's OWN header sits flush at the top so
+    // its separator lines up with the board sidebar (no double header). Dismiss via
+    // a sidebar nav click (wired by mount) or Escape; the sidebar's "Design Lab"
+    // item reopens the hub.
+    ov.innerHTML = '<iframe id="egdt-frame" title="' + esc(title || '') + '" src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
     mount(ov);
-    // The iframed seller pages carry their OWN sidebar + dashboard header. Since
-    // it's same-origin, strip that chrome so we don't show a second side panel /
-    // header. Only do it when the page actually has a sidebar (the editor doesn't,
-    // so it keeps its own toolbar).
+    // The iframed seller BOARD pages carry their own sidebar + dashboard top bar —
+    // strip that chrome so we don't show a second side panel / seller header. The
+    // editor (design-maker) has no .sidebar, so this is a no-op there and it keeps
+    // its own toolbar header as the single top bar.
     var ifr = ov.querySelector('#egdt-frame');
     ifr.addEventListener('load', function () {
       try {
@@ -81,14 +84,14 @@
         }
       } catch (e) { /* cross-origin (e.g. local file://) — ignore */ }
     });
-    function close(goBack) {
-      unmount();
-      document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: {} }));
-      if (goBack && typeof onBack === 'function') onBack();
+    function onKey(ev) {
+      if (ev.key === 'Escape') {
+        document.removeEventListener('keydown', onKey);
+        unmount();
+        document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: {} }));
+      }
     }
-    var back = ov.querySelector('#egdt-back'); if (back) back.addEventListener('click', function () { close(true); });
-    ov.querySelector('#egdt-x').addEventListener('click', function () { close(false); });
-    document.addEventListener('keydown', function k(ev) { if (ev.key === 'Escape') { close(false); document.removeEventListener('keydown', k); } });
+    document.addEventListener('keydown', onKey);
   }
 
   // Upload — the existing shared seller flow (unchanged; same as the old Upload button).
