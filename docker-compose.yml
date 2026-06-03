@@ -29,6 +29,16 @@ services:
       ETSY_KEYSTRING: ${ETSY_KEYSTRING:-ijo2vcdd3opuo9vj15wedqd8}
       ETSY_REDIRECT_URI: ${ETSY_REDIRECT_URI:-https://egful.store/oauth-callback.html}
       ETSY_SHARED_SECRET: ${ETSY_SHARED_SECRET:-}
+      # USPS Labels — values come from .env. Defaults to the TEM test environment
+      # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
+      # only when going live.
+      USPS_CONSUMER_KEY: ${USPS_CONSUMER_KEY:-}
+      USPS_CONSUMER_SECRET: ${USPS_CONSUMER_SECRET:-}
+      USPS_BASE: ${USPS_BASE:-https://apis-tem.usps.com}
+      USPS_CRID: ${USPS_CRID:-}
+      USPS_MID: ${USPS_MID:-}
+      USPS_ACCOUNT_NUMBER: ${USPS_ACCOUNT_NUMBER:-}
+      USPS_ACCOUNT_TYPE: ${USPS_ACCOUNT_TYPE:-EPS}
     depends_on: [db]
     restart: unless-stopped
 
