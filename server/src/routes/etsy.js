@@ -299,6 +299,22 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     return r.rows;
   });
 
+  // Diagnostic: list the connected shop's shipping profiles (so we can see if one
+  // exists + its id, and whether reading them is a scope problem).
+  app.get('/api/etsy/shipping-profiles', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+      const sp = await etsyGet(conn, `/shops/${conn.shop_id}/shipping-profiles`);
+      const list = sp.results || sp.shippingProfiles || [];
+      return {
+        shop_id: conn.shop_id, scopes: conn.scopes, count: list.length,
+        profiles: list.map((p) => ({ id: p.shipping_profile_id || p.shippingProfileId, title: p.title || p.name })),
+        response_keys: Object.keys(sp || {})
+      };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
   // OAuth code → tokens. Called by oauth-callback.html after Etsy redirects back.
   app.post('/api/etsy/exchange', { preHandler: requireStaff }, async (req, reply) => {
     const { code, code_verifier, redirect_uri } = req.body || {};
