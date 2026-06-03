@@ -399,35 +399,34 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       if (!title) { reply.code(400); return { error: 'A listing title is required.' }; }
       if (!price) { reply.code(400); return { error: 'A retail price is required.' }; }
 
-      // Shipping profile lives on ETSY (Shop Manager → Settings → Shipping), not on
-      // our platform. Optional for a DRAFT — include it if the shop has one, else
-      // create the draft without it and let the seller set shipping on Etsy before
-      // going live. (Caller may also pass shipping_profile_id explicitly.)
-      // Etsy REQUIRES a shipping profile for physical listings (even drafts). Use the
-      // one passed in, else the shop's first. Surface the real reason if none.
-      let shipId = (b.shipping_profile_id != null) ? String(b.shipping_profile_id) : null, shipDiag = '';
+      // Physical listings require several shop-specific IDs that Etsy keeps adding to
+      // (shipping_profile_id, then readiness_state_id, …). The reliable way to get
+      // valid values for THIS shop is to borrow them from one of its existing active
+      // listings — then we always match whatever Etsy currently requires.
+      let shipId = (b.shipping_profile_id != null) ? String(b.shipping_profile_id) : null;
+      let taxId = (b.taxonomy_id != null) ? String(b.taxonomy_id) : null;
+      let readinessId = (b.readiness_state_id != null) ? String(b.readiness_state_id) : null;
+      let returnPolicyId = (b.return_policy_id != null) ? String(b.return_policy_id) : null;
+      try {
+        const al = await etsyFetch(conn, `/shops/${conn.shop_id}/listings?state=active&limit=1`);
+        const ex = al.results && al.results[0];
+        if (ex) {
+          if (!taxId && ex.taxonomy_id != null) taxId = String(ex.taxonomy_id);
+          if (!shipId && ex.shipping_profile_id != null) shipId = String(ex.shipping_profile_id);
+          if (!readinessId && ex.readiness_state_id != null) readinessId = String(ex.readiness_state_id);
+          if (!returnPolicyId && ex.return_policy_id != null) returnPolicyId = String(ex.return_policy_id);
+        }
+      } catch (e) {}
+      // Fallback: shipping profile from the shop's profile list if no active listing.
       if (!shipId) {
         try {
           const sp = await etsyFetch(conn, `/shops/${conn.shop_id}/shipping-profiles`);
           const list = sp.results || sp.shippingProfiles || [];
-          shipId = list[0] && (list[0].shipping_profile_id || list[0].shippingProfileId);
-          if (!shipId) shipDiag = 'your Etsy shop returned 0 shipping profiles';
-        } catch (e) { shipDiag = 'could not read shipping profiles (' + e.message + ')'; }
-      }
-      if (!shipId) {
-        reply.code(400);
-        return { error: 'Etsy needs a shipping profile for physical listings — ' + (shipDiag || 'none found') + '. Create one in your Etsy Shop Manager → Settings → Shipping, then retry (or pass shipping_profile_id).' };
-      }
-
-      // Taxonomy/category: use the one passed in, else borrow from an existing listing.
-      let taxId = b.taxonomy_id;
-      if (!taxId) {
-        try {
-          const al = await etsyFetch(conn, `/shops/${conn.shop_id}/listings?state=active&limit=1`);
-          taxId = al.results && al.results[0] && al.results[0].taxonomy_id;
+          if (list[0]) shipId = String(list[0].shipping_profile_id || list[0].shippingProfileId || '');
         } catch (e) {}
       }
-      if (!taxId) { reply.code(400); return { error: 'No category (taxonomy_id) available — pass one, or publish one listing manually on Etsy first so we can reuse its category.' }; }
+      if (!taxId)  { reply.code(400); return { error: 'No category (taxonomy_id) available — publish one listing manually on Etsy first so we can reuse its category, or pass taxonomy_id.' }; }
+      if (!shipId) { reply.code(400); return { error: 'No Etsy shipping profile found — create one in your Etsy Shop Manager → Settings → Shipping (or pass shipping_profile_id).' }; }
 
       // Create the DRAFT listing.
       const form = new URLSearchParams({
@@ -436,9 +435,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         description: String(b.description || title),
         price: String(price),
         who_made: 'i_did', when_made: 'made_to_order', type: 'physical', state: 'draft',
-        taxonomy_id: String(taxId)
+        taxonomy_id: String(taxId), shipping_profile_id: String(shipId)
       });
-      if (shipId) form.append('shipping_profile_id', String(shipId));
+      if (readinessId) form.append('readiness_state_id', String(readinessId));
+      if (returnPolicyId) form.append('return_policy_id', String(returnPolicyId));
       const listing = await etsyFetch(conn, `/shops/${conn.shop_id}/listings`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString()
       });

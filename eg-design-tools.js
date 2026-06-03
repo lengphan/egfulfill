@@ -88,7 +88,10 @@
     // its separator lines up with the board sidebar (no double header). Dismiss via
     // a sidebar nav click (wired by mount) or Escape; the sidebar's "Design Lab"
     // item reopens the hub.
-    ov.innerHTML = '<iframe id="egdt-frame" title="' + esc(title || '') + '" src="' + esc(src) + '" style="flex:1;border:0;width:100%"></iframe>';
+    // Cache-bust: iframes cache HTML very stubbornly, so the factory kept loading an
+    // OLD design-maker/templates page. A unique param forces a fresh fetch each open.
+    var _bust = src + (src.indexOf('?') >= 0 ? '&' : '?') + '_v=' + Date.now();
+    ov.innerHTML = '<iframe id="egdt-frame" title="' + esc(title || '') + '" src="' + esc(_bust) + '" style="flex:1;border:0;width:100%"></iframe>';
     mount(ov);
     // The iframed seller BOARD pages carry their own sidebar + dashboard top bar —
     // strip that chrome so we don't show a second side panel / seller header. The
