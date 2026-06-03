@@ -1315,7 +1315,10 @@ function _dmSaveSellerTemplate(meta, composite, layers) {
         // STEP 3: even [newEntry] alone doesn't fit? Drop other large eg_*
         // keys we control as a last resort, then retry one final time.
         if (!metaSaved) {
-          ['eg_image_cache','eg_design_raw','eg_emb_files','eg_design_templates'].forEach(function(k){
+          // Last resort: drop the heaviest re-hydratable caches. egfulfill_orders +
+          // the catalog blob both rebuild from the server on next load, so it's safe
+          // to sacrifice them to keep the template save alive.
+          ['eg_image_cache','eg_design_raw','eg_emb_files','eg_design_templates','eg_catalog_products_blob','egfulfill_orders'].forEach(function(k){
             try { localStorage.removeItem(k); } catch(_){}
           });
           try { tryWriteMeta([meta]); metaSaved = true; }

@@ -347,13 +347,17 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       if (!title) { reply.code(400); return { error: 'A listing title is required.' }; }
       if (!price) { reply.code(400); return { error: 'A retail price is required.' }; }
 
-      // Shipping profile (required for physical listings).
-      let shipId = null;
-      try {
-        const sp = await etsyFetch(conn, `/shops/${conn.shop_id}/shipping-profiles`);
-        shipId = sp.results && sp.results[0] && sp.results[0].shipping_profile_id;
-      } catch (e) {}
-      if (!shipId) { reply.code(400); return { error: 'No Etsy shipping profile found — create one in your Etsy shop settings first.' }; }
+      // Shipping profile lives on ETSY (Shop Manager → Settings → Shipping), not on
+      // our platform. Optional for a DRAFT — include it if the shop has one, else
+      // create the draft without it and let the seller set shipping on Etsy before
+      // going live. (Caller may also pass shipping_profile_id explicitly.)
+      let shipId = (b.shipping_profile_id != null) ? String(b.shipping_profile_id) : null;
+      if (!shipId) {
+        try {
+          const sp = await etsyFetch(conn, `/shops/${conn.shop_id}/shipping-profiles`);
+          shipId = sp.results && sp.results[0] && sp.results[0].shipping_profile_id;
+        } catch (e) { /* no scope / none yet — proceed without it for the draft */ }
+      }
 
       // Taxonomy/category: use the one passed in, else borrow from an existing listing.
       let taxId = b.taxonomy_id;
@@ -372,8 +376,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         description: String(b.description || title),
         price: String(price),
         who_made: 'i_did', when_made: 'made_to_order', type: 'physical', state: 'draft',
-        taxonomy_id: String(taxId), shipping_profile_id: String(shipId)
+        taxonomy_id: String(taxId)
       });
+      if (shipId) form.append('shipping_profile_id', String(shipId));
       const listing = await etsyFetch(conn, `/shops/${conn.shop_id}/listings`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString()
       });
