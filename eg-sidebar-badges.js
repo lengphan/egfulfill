@@ -10,6 +10,22 @@
 (function () {
   'use strict';
 
+  // Staff (factory) boards count every order; the seller never sees factory-
+  // synced marketplace orders, so they must be excluded from the seller's badge
+  // fallback — otherwise admin's ~500 synced orders leak in as a stale "99+".
+  function isStaffUser() {
+    try {
+      var u = JSON.parse(localStorage.getItem('eg_user') || 'null');
+      return !!(u && ['operator', 'admin', 'warehouse', 'designer'].indexOf(u.role) !== -1);
+    } catch (e) { return false; }
+  }
+  var SYNCED_SRC = ['etsy', 'shopify', 'tiktok', 'woocommerce', 'amazon', 'ebay'];
+  function isFactorySynced(o) {
+    if (!o) return false;
+    if (/^etsy-/i.test(String(o.id || ''))) return true;
+    return SYNCED_SRC.indexOf(String(o.source || '').toLowerCase()) !== -1;
+  }
+
   function readOrderOpen() {
     // A page that renders its own order list (seller orders, factory boards) sets
     // window.__egOrdersBadge to the count actually shown — use it so the badge
@@ -18,7 +34,10 @@
     try {
       if (typeof EGStore !== 'undefined' && typeof EGStore.getOrders === 'function') {
         var all = EGStore.getOrders();
-        if (Array.isArray(all)) return all.length;
+        if (Array.isArray(all)) {
+          if (!isStaffUser()) all = all.filter(function (o) { return !isFactorySynced(o); });
+          return all.length;
+        }
       }
       if (typeof EGStore !== 'undefined' && typeof EGStore.stats === 'function') {
         var s = EGStore.stats();
