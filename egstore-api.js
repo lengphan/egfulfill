@@ -117,6 +117,31 @@
       writeCache((r.data || []).map(dbToOrder));
     });
   }
+  // The /api/orders POST only stores scalar fields + a few item columns — it
+  // ignores img/designUrl/file/designPos. Those can be multi-MB data URLs, and a
+  // whole order of them can blow past the 25MB body limit → the request is
+  // rejected and NOTHING persists. So POST a LEAN copy: only what the server
+  // saves, and never a data: blob (images go through /api/orders/:id/designs).
+  function leanOrder(o) {
+    if (!o) return o;
+    var lean = {};
+    ['id', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
+      .forEach(function (k) { if (o[k] !== undefined) lean[k] = o[k]; });
+    if (Array.isArray(o.items)) {
+      lean.items = o.items.map(function (it) {
+        it = it || {};
+        var ds = it.designSrc;
+        if (typeof ds === 'string' && ds.indexOf('data:') === 0) ds = null;   // never ship a data blob
+        return {
+          sku: it.sku, name: it.name, listing: it.listing,
+          printType: it.printType || it.tech, tech: it.tech,
+          qty: it.qty, color: it.color, size: it.size, variant: it.variant,
+          unitPrice: it.unitPrice, designSrc: ds
+        };
+      });
+    }
+    return lean;
+  }
   function installWrappers() {
     if (EGStore.__apiWrapped) return; EGStore.__apiWrapped = true;
     var origAdd = EGStore.add;
@@ -124,7 +149,7 @@
       var res = origAdd.apply(EGStore, arguments);
       try {
         var saved = (EGStore.getOrders() || []).find(function (o) { return o.id === ((res && res.id) || (order && order.id)); }) || order;
-        api('/orders', { method: 'POST', body: saved });
+        api('/orders', { method: 'POST', body: leanOrder(saved) });
       } catch (e) {}
       return res;
     };
@@ -144,7 +169,7 @@
       var res = origSubmit.apply(EGStore, arguments);
       try {
         var saved = res || (opts && opts.id && (EGStore.getOrders() || []).find(function (o) { return o.id === opts.id; }));
-        if (saved && saved.id) api('/orders', { method: 'POST', body: saved });
+        if (saved && saved.id) api('/orders', { method: 'POST', body: leanOrder(saved) });
       } catch (e) {}
       return res;
     };
