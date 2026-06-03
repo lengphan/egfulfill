@@ -552,7 +552,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </a>
     <a class="ni" href="#design-studio" data-section="design-studio">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>
-      Design Studio
+      Board
     </a>
     <a class="ni" href="javascript:void(0)" onclick="window.EGDesignTools&&EGDesignTools.designLab()">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 12.5V14h1.5l7-7-1.5-1.5-7 7z"/><path d="M11.3 4.2l1.5 1.5 1.05-1.05a1.06 1.06 0 000-1.5l-.5-.5a1.06 1.06 0 00-1.5 0L11.3 4.2z"/></svg>
@@ -2466,7 +2466,7 @@ html[data-theme=dark] #new-menu-btn svg [stroke="white"],html[data-theme=dark] #
 
 <script>
 console.log('%c[main-script:start L2585]','color:#1d4ed8;font-weight:700');
-const TITLES = {overview:'Overview',orders:'Orders',purchases:'Purchases',products:'Products',shipping:'Shipping',print:'Shipping',chat:'Chat','shift-log':'Activity Log','design-studio':'Design Studio',settings:'Settings'};
+const TITLES = {overview:'Overview',orders:'Orders',purchases:'Purchases',products:'Products',shipping:'Shipping',print:'Shipping',chat:'Chat','shift-log':'Activity Log','design-studio':'Board',settings:'Settings'};
 
 document.querySelectorAll('.ni[data-section]').forEach(a => {
   a.addEventListener('click', function(e) {
@@ -3990,14 +3990,14 @@ let opSortDir = 'desc';
 function opOpenLabel(num) { openOpNewLabelModal(num); }
 function bulkPrintLabels() { openOpNewLabelModal(); }
 /* Bulk Send to Scan — push every selected order straight into the warehouse
-   scan queue, skipping the design studio path. Used when designs are already
+   scan queue, skipping the board path. Used when designs are already
    attached + approved and the operator just wants production to start. */
 function bulkSendToScan() {
   if (!selectedOrders || !selectedOrders.size) { alert('Select orders first.'); return; }
   const count = selectedOrders.size;
   opConfirmModal({
     title: 'Send to Scan',
-    body: 'Send ' + count + ' order' + (count>1?'s':'') + ' directly to scan? They will bypass the design studio.',
+    body: 'Send ' + count + ' order' + (count>1?'s':'') + ' directly to scan? They will bypass the board.',
     confirmLabel: 'Send to Scan',
     confirmColor: '#0891b2'
   }, function(ok){
@@ -4134,7 +4134,7 @@ function opSendToScanRow(num) {
   const o = OP_ORDERS.find(x => x.num === num); if (!o) return;
   opConfirmModal({
     title: 'Send to Scan',
-    body: '#' + num + ' will skip the design studio and go straight into the warehouse scan queue. Make sure the design is already attached and approved.',
+    body: '#' + num + ' will skip the board and go straight into the warehouse scan queue. Make sure the design is already attached and approved.',
     confirmLabel: 'Send to Scan',
     confirmColor: '#0891b2'
   }, function(ok){
@@ -5121,7 +5121,7 @@ function fomPushTrello_direct(num, i) {
   if (!o) return;
   const item = o.itemList[i];
   const d = MY_DESIGNS.find(x => x.order === num && x.file === item.file);
-  if (d) pushToTrello(d.id, d); else alert('No Design Studio entry for '+item.file+'. Upload via Design Studio first.');
+  if (d) pushToTrello(d.id, d); else alert('No Board entry for '+item.file+'. Upload via Board first.');
 }
 
 function fomPushPink_direct(num, i) {
@@ -5129,7 +5129,7 @@ function fomPushPink_direct(num, i) {
   if (!o) return;
   const item = o.itemList[i];
   const d = MY_DESIGNS.find(x => x.order === num && x.file === item.file);
-  if (d) pushToPinkAPI(d.id, d); else alert('No Design Studio entry for '+item.file+'. Upload via Design Studio first.');
+  if (d) pushToPinkAPI(d.id, d); else alert('No Board entry for '+item.file+'. Upload via Board first.');
 }
 
 function bulkApproveAll() {
@@ -7726,7 +7726,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
   window.xfomPushToBoard = function(){ if (typeof opSendToDesignStudio === 'function' && _xfomNum) opSendToDesignStudio(_xfomNum); else alert('Push #' + _xfomNum + ' to design board'); };
   window.xfomFlag = function(){ if (typeof openFlagModal === 'function' && _xfomNum) openFlagModal(_xfomNum); else alert('Flag #' + _xfomNum); };
   /* Hold toggles a "temporary stop" status. Send to Scan moves the order
-     straight into the awaiting_scan queue, skipping the design studio path
+     straight into the awaiting_scan queue, skipping the board path
      (used when the design is already attached + approved). Both sync via
      EGStore so warehouse/admin/seller boards see the change. */
   window.xfomHold = function(){
@@ -8449,7 +8449,7 @@ window.opDateClear = function() {
 </script>
 
 <script>
-// ── Design Studio (UDB) — ported from warehouse so operator board renders
+// ── Board (UDB) — ported from warehouse so operator board renders
 //    the kanban + list view instead of an empty section.
 const UDB_ROLE = 'operator';
 let UDB_COLS = [

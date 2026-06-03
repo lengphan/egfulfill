@@ -590,7 +590,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     </a>
     <a class="ni" href="#design-studio" data-section="design-studio" draggable="true">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>
-      Design Studio
+      Board
     </a>
     <a class="ni" href="javascript:void(0)" onclick="window.EGDesignTools&&EGDesignTools.designLab()">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 12.5V14h1.5l7-7-1.5-1.5-7 7z"/><path d="M11.3 4.2l1.5 1.5 1.05-1.05a1.06 1.06 0 000-1.5l-.5-.5a1.06 1.06 0 00-1.5 0L11.3 4.2z"/></svg>
@@ -3319,7 +3319,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <option value="inventory">Inventory</option>
         <option value="purchases">Purchases</option>
         <option value="labels">Print Labels</option>
-        <option value="design">Design Studio</option>
+        <option value="design">Board</option>
         <option value="scan">Scan Events</option>
         <option value="settings">Settings</option>
       </select>
@@ -3916,7 +3916,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 </style>
 
 <script>
-const TITLES = {overview:'Overview',orders:'Orders',inventory:'Inventory',purchases:'Purchases',products:'Products',shipping:'Shipping',print:'Print Queue','design-studio':'Design Studio','scan-history':'Scan History','activity-log':'Activity Log',chat:'Chat','users':'Users & Roles',balance:'Wallet',settings:'Settings','api-hub':'API Hub',broadcast:'Broadcast',sellers:'Sellers'};
+const TITLES = {overview:'Overview',orders:'Orders',inventory:'Inventory',purchases:'Purchases',products:'Products',shipping:'Shipping',print:'Print Queue','design-studio':'Board','scan-history':'Scan History','activity-log':'Activity Log',chat:'Chat','users':'Users & Roles',balance:'Wallet',settings:'Settings','api-hub':'API Hub',broadcast:'Broadcast',sellers:'Sellers'};
 
 function togglePwd(btn) {
   const inp = btn.previousElementSibling;
@@ -6688,10 +6688,10 @@ function whStartWorkingSingle(num) {
 function whBulkPushDesigns() {
   const nums = [...whSelectedOrders];
   if (nums.length < 2) { alert('Select 2 or more orders to bulk-push designs.'); return; }
-  if (confirm('Push designs for ' + nums.length + ' orders to Design Studio?\n\n' + nums.map(n => '#' + n).join(', '))) {
+  if (confirm('Push designs for ' + nums.length + ' orders to Board?\n\n' + nums.map(n => '#' + n).join(', '))) {
     showSection('design-studio');
     whClearSelect();
-    alert('Opened Design Studio. Link each design to its order using the order dropdown.');
+    alert('Opened Board. Link each design to its order using the order dropdown.');
   }
 }
 function whUpdateBulkPushBtn() {
@@ -9588,7 +9588,7 @@ function exportActivityLog() {
 }
 
 // ─── Unified Design Board (UDB) ───────────────────────────────────────────────
-const MY_DESIGNS = []; // legacy compat — UDB replaces design studio
+const MY_DESIGNS = []; // legacy compat — UDB replaces board
 const UDB_ROLE = 'warehouse';
 let UDB_COLS = [
   {id:'incoming',   name:'Incoming',    color:'#9ca3af'},
@@ -10705,7 +10705,7 @@ function whPrintLabel(num) {
     }
     if (role === 'warehouse') {
       // Warehouse intercept buttons: Hold (pause production), Send to Scan
-      // (skip design studio for orders that haven't been scanned yet),
+      // (skip board for orders that haven't been scanned yet),
       // Replacement (re-run a finished order through printing → shipped),
       // Backorder (mark OOS → flows into the PO queue). Cancellation is
       // admin-only by policy.
