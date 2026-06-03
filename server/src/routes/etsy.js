@@ -187,21 +187,35 @@ async function syncConnection(conn, opts = {}) {
       [conn.connected_by, connectedSec]);
     purgedShipped = del.rowCount || 0;
   }
-  // Incremental window: only receipts modified since last sync (5-min overlap for safety).
-  const sinceSec = (!full && conn.last_sync_at)
-    ? Math.max(0, Math.floor(new Date(conn.last_sync_at).getTime() / 1000) - 300) : null;
-  const sinceQS = sinceSec ? `&min_last_modified=${sinceSec}` : '';
+  const isIncremental = !full && !!conn.last_sync_at;
   const imgCache = {};
-  for (let offset = 0; offset < 500; offset += 100) {
-    const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions${sinceQS}`);
-    const results = r.results || [];
-    for (const rc of results) {
-      if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
+  // Pull one filtered page-set of receipts and import each (importReceipt upserts,
+  // so overlapping passes are harmless). Throttled implicitly by sequential awaits.
+  async function pullPass(qs) {
+    for (let offset = 0; offset < 1000; offset += 100) {
+      const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions${qs}`);
+      const results = r.results || [];
+      for (const rc of results) {
+        if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
+      }
+      if (results.length < 100) break;
     }
-    if (results.length < 100) break;
+  }
+  if (isIncremental) {
+    // Only receipts changed since the last sync (5-min overlap) → tiny call count.
+    const sinceSec = Math.max(0, Math.floor(new Date(conn.last_sync_at).getTime() / 1000) - 300);
+    await pullPass(`&min_last_modified=${sinceSec}`);
+  } else {
+    // Full/first sync — SCOPED so we never pull the entire shipped history (that's
+    // what blew the quota). Two narrow passes:
+    //   1) orders CREATED since you connected (from the import date forward)
+    //   2) any order still UNSHIPPED/open, regardless of date (the active queue)
+    // Together: "today's orders onward + everything not yet shipped" — nothing else.
+    if (connectedSec) await pullPass(`&min_created=${connectedSec}`);
+    await pullPass(`&was_shipped=false`);
   }
   await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]);
-  return { shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved, incremental: !!sinceSec };
+  return { shop: conn.shop_name, shop_id: conn.shop_id, orders, skipped, purgedShipped, resolved, incremental: isIncremental };
 }
 
 // Sync all connected Etsy shops (or just one via opts.shopId).

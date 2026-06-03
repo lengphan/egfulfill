@@ -42,7 +42,11 @@
 
   window.egSyncEtsy = function (btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
-    api('/etsy/sync', { method: 'POST', body: {} }).then(function (res) {
+    // Manual "Sync now" = a SCOPED full sync (orders since connect + still-unshipped,
+    // images only for items missing one). Safe to repeat — it can't pull the whole
+    // history or re-fetch every image, so it won't blow the quota. The 5-min
+    // auto-sync stays incremental.
+    api('/etsy/sync', { method: 'POST', body: { full: true } }).then(function (res) {
       if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; }
       if (!res.ok) { alert('Sync failed: ' + (res.d.error || 'unknown')); return; }
       var s = (res.d.synced || []).map(function (x) {
