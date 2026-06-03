@@ -1718,6 +1718,11 @@ function pushOrderToProduction(ordNo, btn) {
     EGStore.submitOrder({
       id: o.id,
       seller: o.store || 'My Store',
+      // Seller already picked the product + design, so a pushed seller order lands
+      // on the factory boards as IN_REVIEW (review/file-push mode) — NOT 'new' (which
+      // is the factory setup mode for marketplace-synced orders that still need a
+      // blank + print method chosen).
+      factoryStatus: 'in_review',
       // Include the recipient address stashed by submitNewOrder (or fall back to just the name
       // for seed orders that don't carry shipTo). The factory's label form auto-fills from here.
       customer: { name: o.cust, email: '', shipTo: o.shipTo || null },
