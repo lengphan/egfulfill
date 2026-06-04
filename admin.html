@@ -8964,6 +8964,8 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 <script>
+// Hook the shared label modal's "Go to Shipments →" button to this board's nav.
+window.egGoToShipments = function () { if (typeof showSection === 'function') showSection('shipping'); if (typeof setPrintTab === 'function') setPrintTab('shipments'); };
 // Shipping tabs (Scan History | Shipments) — mirrors operator's setPrintTab so the page
 // behaves identically. Re-renders the active tab's data on switch.
 window.setPrintTab = function(tab) {

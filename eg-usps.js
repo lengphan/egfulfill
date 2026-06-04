@@ -37,33 +37,65 @@
     }).then(function (r) { return r.json(); });
   }
 
-  // Open / download the returned label. Accepts the full result object: a SAMPLE
-  // (test-mode) label has labelHtml; a real label has base64 labelImage (+ imageType).
+  // Show the returned label in an IN-PAGE modal (no new tab): a SAMPLE (test-mode)
+  // label has labelHtml; a real label has base64 labelImage (+ imageType). The modal
+  // has Print/Download and a "Go to Shipments →" button that the host page wires up
+  // via window.egGoToShipments.
+  var _lblModal = null;
   function openLabel(res, tracking) {
     res = res || {};
-    if (typeof res === 'string') res = { labelImage: res, imageType: arguments[1] };  // back-compat
+    if (typeof res === 'string') res = { labelHtml: res };  // back-compat (old labelHtml string)
+    var t = String(res.imageType || (res.labelHtml ? 'HTML' : 'PDF')).toUpperCase();
+    var inner;
     if (res.labelHtml) {
-      try { var wh = window.open('', '_blank'); if (wh) wh.document.write('<title>Label ' + (tracking || '') + '</title><body style="margin:0;display:flex;justify-content:center;padding:24px;background:#f4f2ef">' + res.labelHtml + '<\/body>'); } catch (e) {}
+      inner = '<div style="display:flex;justify-content:center;padding:18px;background:#f4f2ef">' + res.labelHtml + '</div>';
+    } else if (res.labelImage && /PDF/.test(t)) {
+      inner = '<iframe src="data:application/pdf;base64,' + res.labelImage + '" style="width:100%;height:62vh;border:0;background:#fff"></iframe>';
+    } else if (res.labelImage && /(PNG|JPG|JPEG|GIF)/.test(t)) {
+      inner = '<div style="text-align:center;padding:18px;background:#f4f2ef"><img src="data:image/png;base64,' + res.labelImage + '" style="max-width:100%;border:1px solid #e5e4e0"></div>';
+    } else if (res.labelImage) {
+      inner = '<div style="padding:36px 24px;text-align:center;color:#6b7280;font-size:14px">' + t + ' label ready — use <b>Download</b> to save it for your thermal printer.</div>';
+    } else {
+      inner = '<div style="padding:36px 24px;text-align:center;color:#9ca3af;font-size:14px">No label image to preview.</div>';
+    }
+    if (!_lblModal) {
+      _lblModal = document.createElement('div');
+      _lblModal.id = 'egusps-label-view';
+      _lblModal.style.cssText = 'display:none;position:fixed;inset:0;z-index:10070;background:rgba(0,0,0,.5);align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+      _lblModal.addEventListener('click', function (e) { if (e.target === _lblModal) _lblModal.style.display = 'none'; });
+      document.body.appendChild(_lblModal);
+    }
+    var hasShip = (typeof window.egGoToShipments === 'function');
+    _lblModal.innerHTML =
+      '<div style="background:#fff;border-radius:14px;width:460px;max-width:95vw;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+      + '<div style="padding:14px 18px;border-bottom:1px solid #e5e4e0;display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:15px;font-weight:700;color:#191918">Shipping Label</div>' + (tracking ? '<div style="font-size:12.5px;color:#9ca3af;font-family:monospace;margin-top:2px">' + tracking + '</div>' : '') + '</div><button id="egusps-lv-x" style="background:none;border:none;font-size:23px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
+      + '<div id="egusps-lv-body">' + inner + '</div>'
+      + '<div style="padding:12px 18px;border-top:1px solid #e5e4e0;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:#fff">'
+      + '<button id="egusps-lv-print" style="font-size:13px;padding:8px 14px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit;font-weight:600">' + (res.labelHtml ? 'Print' : 'Download') + '</button>'
+      + (hasShip ? '<button id="egusps-lv-ship" style="font-size:13px;padding:8px 16px;border-radius:8px;border:none;background:#191918;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Go to Shipments →</button>' : '')
+      + '</div></div>';
+    _lblModal.style.display = 'flex';
+    _lblModal.querySelector('#egusps-lv-x').onclick = function () { _lblModal.style.display = 'none'; };
+    _lblModal.querySelector('#egusps-lv-print').onclick = function () { _printOrDownload(res, tracking); };
+    var sb = _lblModal.querySelector('#egusps-lv-ship');
+    if (sb) sb.onclick = function () { _lblModal.style.display = 'none'; try { window.egGoToShipments(); } catch (e) {} };
+  }
+  // Print (HTML sample) or download (PDF/ZPL/PNG) the label.
+  function _printOrDownload(res, tracking) {
+    var t = String(res.imageType || (res.labelHtml ? 'HTML' : 'PDF')).toUpperCase();
+    if (res.labelHtml) {
+      try { var w = window.open('', '_blank'); if (w) { w.document.write('<title>Label ' + (tracking || '') + '</title><body style="margin:0;display:flex;justify-content:center;padding:24px;background:#fff" onload="window.print()">' + res.labelHtml + '</body>'); w.document.close(); } } catch (e) {}
       return;
     }
-    var labelImage = res.labelImage;
-    if (!labelImage) return;
-    var t = String(res.imageType || 'PDF').toUpperCase();
-    if (/ZPL/.test(t)) {
-      try {
-        var bin = atob(labelImage), bytes = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        var url = URL.createObjectURL(new Blob([bytes], { type: 'text/plain' }));
-        var a = document.createElement('a'); a.href = url; a.download = 'label-' + (tracking || 'usps') + '.zpl';
-        document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-      } catch (e) {}
-      return;
-    }
-    var mime = t === 'PDF' ? 'application/pdf' : 'image/png';
-    var src = 'data:' + mime + ';base64,' + labelImage;
+    if (!res.labelImage) return;
+    var mime = /PDF/.test(t) ? 'application/pdf' : (/ZPL/.test(t) ? 'text/plain' : 'image/png');
+    var ext = /PDF/.test(t) ? 'pdf' : (/ZPL/.test(t) ? 'zpl' : 'png');
     try {
-      var w = window.open('', '_blank');
-      if (w) w.document.write('<title>USPS Label ' + (tracking || '') + '</title><iframe src="' + src + '" style="position:fixed;inset:0;width:100%;height:100%;border:0"></iframe>');
+      var bin = atob(res.labelImage), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      var a = document.createElement('a'); a.href = url; a.download = 'label-' + (tracking || 'usps') + '.' + ext;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
     } catch (e) {}
   }
 
