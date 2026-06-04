@@ -254,7 +254,7 @@
     });
     _modal.style.display = 'none';
     if (_ctx && typeof _ctx.onDone === 'function') { try { _ctx.onDone(tracking, res); } catch (e) {} }
-    if (tracking) alert('USPS label created — tracking ' + tracking + (/ZPL/i.test(payload.imageType) ? ' (ZPL downloaded)' : ' (opened in a new tab to print)'));
+    // No alert — the in-page label modal (openLabel) is confirmation enough.
   }
 
   // ── Shipments store — manual + order labels, newest first (localStorage) ──────
