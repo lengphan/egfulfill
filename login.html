@@ -113,7 +113,18 @@
     const btn = document.getElementById('login-btn');
     btn.disabled = true; btn.textContent = 'Logging in…';
     if (window.EGAuth) {
+      // Watchdog: if the API never responds (container down/restarting), don't sit
+      // on "Logging in…" forever — surface an error after 15s.
+      let done = false;
+      const fail = (msg) => {
+        if (done) return; done = true;
+        document.getElementById('err-password').textContent = msg;
+        document.getElementById('login-password').classList.add('err');
+        btn.disabled = false; btn.textContent = 'Log in';
+      };
+      const watchdog = setTimeout(() => fail('Server not responding — please try again in a moment.'), 15000);
       EGAuth.signIn(email, pw).then(function(res){
+        if (done) return; done = true; clearTimeout(watchdog);
         if (res.error) {
           document.getElementById('err-password').textContent = res.error.message;
           document.getElementById('login-password').classList.add('err');
@@ -121,7 +132,7 @@
         }
         // Redirect by the user's REAL role (operator/admin/warehouse/designer/seller).
         EGAuth.routeAfterLogin();
-      });
+      }).catch(function(e){ clearTimeout(watchdog); fail((e && e.message) || 'Login failed — please try again.'); });
     } else {
       setTimeout(() => { window.location.href = destFor(email); }, 750);
     }
