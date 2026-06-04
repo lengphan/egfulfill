@@ -16,9 +16,34 @@
   var TOKEN_KEY = 'eg_token', USER_KEY = 'eg_user';
 
   function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
+  // Auth keys are tiny and MUST always persist. The big regenerable caches (order
+  // cache, design/image blobs, label blobs, templates) can blow past the ~5MB
+  // localStorage quota and make even setItem('eg_token', …) throw — which would
+  // block login. So prune those caches and retry before giving up.
+  var _ESSENTIAL = { eg_token: 1, eg_user: 1, eg_ship_origin: 1 };
+  function _pruneStorage(aggressive) {
+    var bigPrefixes = ['egfulfill_orders', 'eg_shipments', 'eg_templates', 'eg_design', 'eg_img', 'eg_raw', 'eg_cache', 'eg_order_designs'];
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var key = localStorage.key(i);
+      if (!key || _ESSENTIAL[key]) continue;
+      if (aggressive || bigPrefixes.some(function (p) { return key.indexOf(p) === 0; })) {
+        try { localStorage.removeItem(key); } catch (e) {}
+      }
+    }
+  }
+  function _safeSet(k, v) {
+    try { localStorage.setItem(k, v); return true; }
+    catch (e) {
+      try { _pruneStorage(false); localStorage.setItem(k, v); return true; }   // drop big caches
+      catch (e2) {
+        try { _pruneStorage(true); localStorage.setItem(k, v); return true; }  // last resort: clear all non-auth
+        catch (e3) { console.warn('[egstore-api] could not persist ' + k + ':', e3.message); return false; }
+      }
+    }
+  }
   function setSession(d) {
-    if (d && d.token) localStorage.setItem(TOKEN_KEY, d.token);
-    if (d && d.user)  localStorage.setItem(USER_KEY, JSON.stringify(d.user));
+    if (d && d.token) _safeSet(TOKEN_KEY, d.token);
+    if (d && d.user)  _safeSet(USER_KEY, JSON.stringify(d.user));
   }
   function api(path, opts) {
     opts = opts || {};
