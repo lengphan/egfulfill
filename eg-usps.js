@@ -257,6 +257,19 @@
     // No alert — the in-page label modal (openLabel) is confirmation enough.
   }
 
+  // Build a "Contents" line from an order's items — base product name + qty (+ method),
+  // tolerant of the various item shapes across the boards/EGStore.
+  function contentsFromItems(items) {
+    if (!items || !items.length) return '';
+    return items.map(function (i) {
+      i = i || {};
+      var name = i.name || i.product || i.productName || i.title || 'Item';
+      var qty = i.qty || i.quantity || i.qnty || i.count || '';
+      var method = i.print || i.method || i.printType || i.printMethod || i.technique || '';
+      return name + (qty ? ' ×' + qty : '') + (method ? ' — ' + method : '');
+    }).join('; ');
+  }
+
   // ── Shipments store — manual + order labels, newest first (localStorage) ──────
   var SHIP_KEY = 'eg_shipments';
   function _todayStr() { try { return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return ''; } }
@@ -286,10 +299,77 @@
     try { openLabel(s.label, s.tracking); } catch (e) { alert('Could not open the label.'); }
   }
 
+  // ── Shared Recent-Shipments table + detail-panel hydration (warehouse + admin) ──
+  // Expects the standard panel ids: sh-table-body, sh-detail-empty, sh-detail-content,
+  // sh-d-{order,status,carrier,weight,cost,ref,name,addr,date,tracking}, sh-d-labelpreview,
+  // sh-d-fakebar, sh-today-count. Operator has its own (opRenderShipments) with a seed.
+  function _esc(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  function renderShipments(tbodyId) {
+    var body = document.getElementById(tbodyId || 'sh-table-body');
+    if (!body) return;
+    var list = getShipments();
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af;font-size:13.5px">No shipments yet</td></tr>';
+    } else {
+      body.innerHTML = list.slice(0, 50).map(function (s) {
+        var order = s.orderNum || '';
+        var orderCell = order ? '<span style="font-weight:600">#' + order + '</span>' : '<span style="color:#9ca3af">Manual</span>';
+        var hasLbl = s.label && (s.label.labelHtml || s.label.labelImage);
+        var trkClean = (s.tracking || '').replace(/\s/g, '');
+        var svcShort = s.service ? String(s.service).replace(/^USPS /, '') : '';
+        var carrierTxt = s.carrier || 'USPS';
+        var trk = s.tracking ? (hasLbl
+          ? '<a onclick="event.stopPropagation();EGUSPS.openSavedLabel(\'' + trkClean + '\')" title="See label" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">' + s.tracking + '</a>'
+          : '<span style="font-family:monospace;font-size:12.5px;color:#374151">' + s.tracking + '</span>') : '—';
+        return '<tr class="sh-row" style="cursor:pointer" onclick="EGUSPS.selectShipment(this,\'' + _esc(order) + '\',\'' + _esc(trkClean) + '\',\'' + _esc(s.recipient) + '\',\'' + _esc(s.recipientAddr) + '\',\'' + _esc(carrierTxt + (svcShort ? ' ' + svcShort : '')) + '\',\'\',\'' + _esc(s.cost ? '$' + s.cost : '') + '\',\'' + _esc(s.date) + '\',\'Shipped\')" onmouseover="if(!this.classList.contains(\'sh-sel\'))this.style.background=\'#fafaf9\'" onmouseout="if(!this.classList.contains(\'sh-sel\'))this.style.background=\'\'">'
+          + '<td>' + orderCell + '</td>'
+          + '<td>' + trk + '</td>'
+          + '<td>' + (s.recipient || '—') + '</td>'
+          + '<td>' + carrierTxt + (svcShort ? '<span style="color:#9ca3af;font-size:11.5px"> · ' + svcShort + '</span>' : '') + '</td>'
+          + '<td style="color:#16a34a;font-weight:600">' + (s.cost ? '$' + s.cost : '—') + '</td>'
+          + '<td style="color:#9ca3af;font-size:12.5px">' + (s.date || '') + '</td>'
+          + '<td><span class="badge b-shipped">Shipped</span></td>'
+          + '</tr>';
+      }).join('');
+    }
+    var cnt = document.getElementById('sh-today-count');
+    if (cnt) { var today = _todayStr(); cnt.textContent = list.filter(function (x) { return x.date === today; }).length + ' today'; }
+  }
+  function _setTxt(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; }
+  function selectShipment(row, order, tracking, name, addr, carrier, weight, cost, date, status) {
+    try { Array.prototype.forEach.call(document.querySelectorAll('#sh-table-body tr'), function (r) { r.classList.remove('sh-sel'); r.style.background = ''; }); } catch (e) {}
+    if (row) { row.classList.add('sh-sel'); row.style.background = '#f9fafb'; }
+    var empty = document.getElementById('sh-detail-empty'); if (empty) empty.style.display = 'none';
+    var content = document.getElementById('sh-detail-content'); if (content) content.style.display = '';
+    window.opCurrentShipTracking = (tracking || '').replace(/\s/g, '');
+    _setTxt('sh-d-order', order ? ('#' + order) : 'Manual');
+    _setTxt('sh-d-tracking', tracking);
+    _setTxt('sh-d-carrier', String(carrier || 'USPS').toUpperCase());
+    _setTxt('sh-d-weight', weight || '');
+    _setTxt('sh-d-cost', cost || '');
+    _setTxt('sh-d-ref', order ? ('#' + order) : '—');
+    _setTxt('sh-d-name', name || '');
+    _setTxt('sh-d-addr', addr || '');
+    _setTxt('sh-d-date', 'Generated: ' + (date || ''));
+    var sd = document.getElementById('sh-d-status');
+    if (sd) { var map = { 'Shipped': 'b-shipped', 'In transit': 'b-prod', 'Delivered': 'b-shipped', 'Awaiting pickup': 'b-packed' }; sd.textContent = status || 'Shipped'; sd.className = 'badge ' + (map[status] || 'b-shipped'); }
+    var prev = document.getElementById('sh-d-labelpreview');
+    var fake = document.getElementById('sh-d-fakebar');
+    var sh = getShipmentLabel(window.opCurrentShipTracking);
+    var lbl = sh && sh.label;
+    if (prev && lbl && (lbl.labelHtml || lbl.labelImage)) {
+      if (lbl.labelHtml) prev.innerHTML = '<div style="transform:scale(.82);transform-origin:top center;display:flex;justify-content:center">' + lbl.labelHtml + '</div>';
+      else if (/PDF/i.test(lbl.imageType || '')) prev.innerHTML = '<iframe src="data:application/pdf;base64,' + lbl.labelImage + '" style="width:100%;height:300px;border:0;background:#fff"></iframe>';
+      else prev.innerHTML = '<img src="data:image/png;base64,' + lbl.labelImage + '" style="max-width:100%;border:1px solid #e5e4e0">';
+      prev.style.display = ''; if (fake) fake.style.display = 'none';
+    } else { if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; } if (fake) fake.style.display = ''; }
+  }
+
   window.EGUSPS = {
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,
     createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate,
-    getShipments: getShipments, recordShipment: recordShipment, getShipmentLabel: getShipmentLabel, openSavedLabel: openSavedLabel
+    getShipments: getShipments, recordShipment: recordShipment, getShipmentLabel: getShipmentLabel, openSavedLabel: openSavedLabel,
+    renderShipments: renderShipments, selectShipment: selectShipment, contentsFromItems: contentsFromItems
   };
 })();

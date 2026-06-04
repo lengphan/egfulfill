@@ -1808,8 +1808,31 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 
     <!-- Shipments tab -->
     <div id="pst-shipments" style="display:none">
-      <div style="display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start">
+      <div style="display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:16px;align-items:start">
+
+        <!-- Left: Carrier Accounts + Shipping Rules (stacked) -->
         <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:12px">Carrier Accounts</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">USPS</span><span class="badge b-shipped">Active</span></div><div style="font-size:12.5px;color:#6b7280">Priority · Ground Advantage · First Class</div></div>
+              <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">UPS</span><span class="badge b-shipped">Active</span></div><div style="font-size:12.5px;color:#6b7280">Ground · 2nd Day Air · Next Day Air</div></div>
+              <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">FedEx</span><span class="badge b-disc">Disconnected</span></div><button class="btn btn-out" style="font-size:12.5px;width:100%;justify-content:center;margin-top:8px">Connect FedEx</button></div>
+            </div>
+          </div>
+          <div class="card" style="padding:16px 18px">
+            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:12px">Shipping Rules</div>
+            <div style="display:flex;flex-direction:column;gap:12px;font-size:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Auto-select cheapest carrier</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Require signature over $100</span><div class="toggle toggle-off"><div class="toggle-thumb"></div></div></div>
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">International: DHL Express</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
+              <div style="border-top:1px solid #f0ede9;padding-top:12px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Default label format</label><select class="select" style="width:100%"><option>PDF — Regular printer</option><option>ZPL — Thermal (Zebra/Dymo)</option></select></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle: Recent Shipments (primary focus) -->
+        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
           <div class="card" style="overflow:hidden">
             <div style="padding:14px 18px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
               <div style="display:flex;align-items:center;gap:8px">
@@ -1821,37 +1844,59 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
                 <button class="btn btn-dk" style="font-size:12.5px" onclick="setPrintTab('scan')">+ New Label</button>
               </div>
             </div>
-            <table class="dtable">
-              <thead><tr><th>Order</th><th>Tracking #</th><th>Recipient</th><th>Carrier</th><th>Cost</th><th>Generated</th><th>Status</th></tr></thead>
-              <tbody id="sh-table-body"></tbody>
-            </table>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-            <div class="card" style="padding:16px 18px">
-              <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:12px">Carrier Accounts</div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">USPS</span><span class="badge b-shipped">Active</span></div><div style="font-size:12.5px;color:#6b7280">Priority · Ground Advantage · First Class</div></div>
-                <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">UPS</span><span class="badge b-shipped">Active</span></div><div style="font-size:12.5px;color:#6b7280">Ground · 2nd Day Air · Next Day Air</div></div>
-                <div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px 12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:14px;font-weight:600;color:#191918">FedEx</span><span class="badge b-disc">Disconnected</span></div><button class="btn btn-out" style="font-size:12.5px;width:100%;justify-content:center;margin-top:8px">Connect FedEx</button></div>
-              </div>
-            </div>
-            <div class="card" style="padding:16px 18px">
-              <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:12px">Shipping Rules</div>
-              <div style="display:flex;flex-direction:column;gap:12px;font-size:14px">
-                <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Auto-select cheapest carrier</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
-                <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">Require signature over $100</span><div class="toggle toggle-off"><div class="toggle-thumb"></div></div></div>
-                <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#374151">International: DHL Express</span><div class="toggle toggle-on"><div class="toggle-thumb"></div></div></div>
-                <div style="border-top:1px solid #f0ede9;padding-top:12px"><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Default label format</label><select class="select" style="width:100%"><option>PDF — Regular printer</option><option>ZPL — Thermal (Zebra/Dymo)</option></select></div>
-              </div>
+            <div style="overflow-x:auto">
+              <table class="dtable" style="width:100%">
+                <thead><tr><th>Order</th><th>Tracking #</th><th>Recipient</th><th>Carrier</th><th>Cost</th><th>Generated</th><th>Status</th></tr></thead>
+                <tbody id="sh-table-body"></tbody>
+              </table>
             </div>
           </div>
         </div>
+
+        <!-- Right: Label detail panel -->
         <div class="card" style="padding:0;overflow:hidden;position:sticky;top:16px">
           <div id="sh-detail-empty" style="padding:40px 20px;text-align:center">
             <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="color:#d1d5db;margin:0 auto 10px;display:block"><rect x="5" y="3" width="26" height="30" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M10 11h16M10 17h16M10 23h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <div style="font-size:14px;color:#9ca3af;font-weight:500">Click any shipment<br>to view label</div>
           </div>
+          <div id="sh-detail-content" style="display:none">
+            <div style="padding:12px 16px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
+              <span id="sh-d-order" style="font-size:15px;font-weight:700;color:#191918;font-family:monospace">—</span>
+              <span id="sh-d-status" class="badge b-shipped">Shipped</span>
+            </div>
+            <div style="padding:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                <div id="sh-d-carrier" style="font-size:12.5px;font-weight:700;color:#374151;background:#f6f5f4;border-radius:6px;padding:4px 10px;letter-spacing:.03em">USPS</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <span id="sh-d-weight" style="font-size:12.5px;color:#9ca3af"></span>
+                  <span id="sh-d-cost" style="font-size:14.5px;font-weight:700;color:#16a34a"></span>
+                </div>
+              </div>
+              <div id="sh-d-labelpreview" style="display:none;background:#f4f2ef;border-radius:8px;padding:12px;text-align:center;margin-bottom:14px"></div>
+              <div id="sh-d-fakebar" style="background:#f6f5f4;border-radius:8px;padding:12px;text-align:center;margin-bottom:14px">
+                <div style="display:flex;justify-content:center;gap:1px;margin-bottom:6px;height:36px;align-items:flex-end">
+                  <div style="width:2px;height:100%;background:#111827"></div><div style="width:1px;height:80%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:1px;height:60%;background:#111827"></div><div style="width:2px;height:100%;background:#111827"></div><div style="width:1px;height:90%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:2px;height:70%;background:#111827"></div><div style="width:1px;height:100%;background:#111827"></div><div style="width:2px;height:85%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:1px;height:60%;background:#111827"></div><div style="width:2px;height:100%;background:#111827"></div><div style="width:3px;height:80%;background:#111827"></div><div style="width:1px;height:100%;background:#111827"></div>
+                </div>
+                <div id="sh-d-tracking" style="font-family:monospace;font-size:11.5px;font-weight:700;color:#374151;letter-spacing:.08em;word-break:break-all"></div>
+              </div>
+              <div style="border:1px dashed #d1d5db;border-radius:6px;padding:8px 12px;margin-bottom:14px;background:#fafaf9">
+                <div style="font-size:9.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Ref · Order</div>
+                <div id="sh-d-ref" style="font-size:13px;font-weight:700;color:#111827;font-family:monospace"></div>
+              </div>
+              <div style="margin-bottom:16px">
+                <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ship To</div>
+                <div id="sh-d-name" style="font-size:16px;font-weight:800;color:#191918;line-height:1.2"></div>
+                <div id="sh-d-addr" style="font-size:13.5px;color:#374151;margin-top:3px"></div>
+              </div>
+              <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px" id="sh-d-date"></div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-out" style="flex:1;justify-content:center;font-size:13px" onclick="window.EGUSPS&&EGUSPS.openSavedLabel(window.opCurrentShipTracking)">See Label</button>
+                <button class="btn btn-dk" style="flex:1;justify-content:center;font-size:13px" onclick="window.EGUSPS&&EGUSPS.openSavedLabel(window.opCurrentShipTracking)">Print Label</button>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -6205,7 +6250,9 @@ function whOpenLabelModal(num) {
   // Extra Services / Format) — same as operator & admin. Falls back to the old
   // bespoke DOM modal only if eg-usps.js failed to load.
   if (window.EGUSPS && EGUSPS.openLabelModal) {
-    const contents = (o.itemList||[]).map(i => i.name + (i.qty ? ' ×' + i.qty : '')).join('; ');
+    let items = (o.itemList && o.itemList.length) ? o.itemList : null;
+    if (!items) { try { const eg = (EGStore.getOrders() || []).find(x => x.id === num); if (eg && eg.items && eg.items.length) items = eg.items; } catch (e) {} }
+    const contents = EGUSPS.contentsFromItems(items || []);
     EGUSPS.openLabelModal({
       orderNum: o.num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
       seller: o.seller || o.store || 'Seller', contents: contents,
@@ -11170,33 +11217,7 @@ window.shippingNewLabel = function() {
 // in the shared EGUSPS shipments store. The tracking number links back to the
 // saved label for an easy re-download.
 window.renderRecentShipments = function() {
-  const body = document.getElementById('sh-table-body');
-  if (!body) return;
-  const list = (window.EGUSPS && EGUSPS.getShipments) ? EGUSPS.getShipments() : [];
-  if (!list.length) {
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af;font-size:13.5px">No shipments yet</td></tr>';
-    const cnt = document.getElementById('sh-today-count'); if (cnt) cnt.textContent = '0 today';
-    return;
-  }
-  body.innerHTML = list.slice(0, 50).map(s => {
-    const orderCell = s.orderNum ? `#${s.orderNum}` : `<span style="color:#9ca3af">Manual</span>`;
-    const hasLbl = s.label && (s.label.labelHtml || s.label.labelImage);
-    const trk = s.tracking
-      ? (hasLbl
-          ? `<a onclick="EGUSPS.openSavedLabel('${s.tracking}')" title="See label" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${s.tracking}</a>`
-          : `<span style="font-family:monospace;font-size:12.5px;color:#374151">${s.tracking}</span>`)
-      : '—';
-    return `<tr>
-    <td style="font-weight:600;color:#191918">${orderCell}</td>
-    <td>${trk}</td>
-    <td>${s.recipient || '—'}</td>
-    <td>${s.carrier || 'USPS'}${s.service ? `<span style="color:#9ca3af;font-size:11.5px"> · ${s.service.replace(/^USPS /,'')}</span>` : ''}</td>
-    <td style="color:#16a34a;font-weight:600">${s.cost ? '$'+s.cost : '—'}</td>
-    <td style="color:#9ca3af;font-size:12.5px">${s.date || ''}</td>
-    <td><span class="badge b-shipped">Shipped</span></td>
-  </tr>`;}).join('');
-  const cnt = document.getElementById('sh-today-count');
-  if (cnt) { const today = EGUSPS.getShipments().filter(s => s.date === new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})).length; cnt.textContent = today + ' today'; }
+  if (window.EGUSPS && EGUSPS.renderShipments) EGUSPS.renderShipments('sh-table-body');
 };
 </script>
 

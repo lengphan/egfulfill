@@ -4049,12 +4049,10 @@ function opLabelData(num) {
   }
   if (!name) name = o.customer || '';
   var csz = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-  // Contents line for REFERENCE INFO — "Product (×qty) — METHOD" joined.
-  var contents = '';
-  try {
-    var its = o.items || (o.its) || [];
-    contents = its.map(function (it) { return (it.name || it.product || 'Item') + (it.qty ? ' ×' + it.qty : '') + (it.print || it.method ? ' — ' + (it.print || it.method) : ''); }).join('; ');
-  } catch (e) {}
+  // Contents line for REFERENCE INFO — "Product ×qty — METHOD" joined.
+  var its = (o.items && o.items.length) ? o.items : (o.its && o.its.length ? o.its : (o.itemList && o.itemList.length ? o.itemList : null));
+  if (!its) { try { var eg2 = (EGStore.getOrders() || []).find(function (x) { return x.id === num; }); if (eg2 && eg2.items && eg2.items.length) its = eg2.items; } catch (e) {} }
+  var contents = (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(its || []) : '';
   return { orderNum: num, orderId: egId, toName: name, toStreet: street, toApt: apt, toCSZ: csz,
     seller: o.seller || o.store || 'Seller', contents: contents,
     onDone: function (tracking) {
