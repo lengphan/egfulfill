@@ -14,7 +14,9 @@ import { templatesRoutes } from './routes/templates.js';
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
 // quota (~5-10MB total), so 25MB is plenty of headroom.
-const app = Fastify({ logger: true, bodyLimit: 25 * 1024 * 1024 });
+// 60MB body limit: full-resolution print files (e.g. 4000×5000 PNG ~10-25MB) are
+// ~33% larger as base64, so 25MB could silently reject a legit design upload.
+const app = Fastify({ logger: true, bodyLimit: 60 * 1024 * 1024 });
 await app.register(cors, { origin: process.env.CORS_ORIGIN || '*' });
 
 // Attach req.user from the Bearer token on every request (null if not signed in).
