@@ -6162,14 +6162,10 @@ function whUpdatePanel() {
 function whOpenLabelModal(num) {
   const o = WH_ORDERS.find(x => x.num === num);
   if (!o) return;
-  const modal = document.getElementById('wh-label-modal');
-  if (!modal) { whCreateLabelModalDOM(); }
-  const m = document.getElementById('wh-label-modal');
-  m.querySelector('#whlm-order').textContent   = '#' + o.num + (o.platId ? '  (' + o.platId + ')' : '');
 
   // Prefer structured demo data (REV_ORDER_DETAIL / FOM_ADDR_DATA) → then EGStore live order →
   // then the legacy comma-split parse of o.addr. Fields stay editable either way.
-  let name = '', street = '', csz = '', carrier = '';
+  let name = '', street = '', csz = '', carrier = '', egId = num;
   const rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
   if (rd) {
     name    = rd.name    || '';
@@ -6180,12 +6176,12 @@ function whOpenLabelModal(num) {
   if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
     try {
       const eg = (EGStore.getOrders() || []).find(x => x.id === num);
-      if (eg && eg.customer) {
+      if (eg) { egId = eg.id; if (eg.customer) {
         name   = eg.customer.name || '';
         const sh = eg.customer.shipTo || {};
         street = [sh.street, sh.apt].filter(Boolean).join(', ');
         csz    = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-      }
+      } }
     } catch(e){}
   }
   if (!street) {
@@ -6195,6 +6191,27 @@ function whOpenLabelModal(num) {
     csz    = csz || addrParts.slice(1).join(', ') || '';
   }
 
+  // Use the shared unified modal (single paste-box + USPS validate + Reference Info /
+  // Extra Services / Format) — same as operator & admin. Falls back to the old
+  // bespoke DOM modal only if eg-usps.js failed to load.
+  if (window.EGUSPS && EGUSPS.openLabelModal) {
+    const contents = (o.itemList||[]).map(i => i.name + (i.qty ? ' ×' + i.qty : '')).join('; ');
+    EGUSPS.openLabelModal({
+      orderNum: o.num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
+      seller: o.seller || o.store || 'Seller', contents: contents,
+      onDone: function (tracking) {
+        try { o.tracking = tracking; o.status = 'shipped'; } catch (e) {}
+        if (typeof whRenderOrders === 'function') whRenderOrders();
+        if (typeof renderRecentShipments === 'function') renderRecentShipments();
+      }
+    });
+    return;
+  }
+
+  const modal = document.getElementById('wh-label-modal');
+  if (!modal) { whCreateLabelModalDOM(); }
+  const m = document.getElementById('wh-label-modal');
+  m.querySelector('#whlm-order').textContent   = '#' + o.num + (o.platId ? '  (' + o.platId + ')' : '');
   m.querySelector('#whlm-to-name').value     = name;
   m.querySelector('#whlm-to-addr').value     = street;
   m.querySelector('#whlm-to-city').value     = csz;
@@ -11117,6 +11134,8 @@ window.shippingNewLabel = function() {
   // Open the create-shipping-label modal in STANDALONE mode — no order linked,
   // blank ship-to fields. Header "+ New Label" should never force the user to
   // pick an order first; per-order generation lives in the Scan History row.
+  // Prefer the shared unified modal (blank, only ship-from remembered).
+  if (window.EGUSPS && EGUSPS.openLabelModal) { EGUSPS.openLabelModal({}); return; }
   if (typeof whCreateLabelModalDOM === 'function' && !document.getElementById('wh-label-modal')) whCreateLabelModalDOM();
   var m = document.getElementById('wh-label-modal');
   if (!m) { alert('Label modal not available.'); return; }
