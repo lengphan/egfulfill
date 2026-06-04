@@ -41,7 +41,7 @@ async function oauthToken() {
   });
   const d = await res.json().catch(() => ({}));
   if (!res.ok || !d.access_token) throw new Error('USPS OAuth failed: ' + (d.error_description || d.error || ('HTTP ' + res.status)));
-  _oauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000) };
+  _oauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '' };
   return _oauth.token;
 }
 
@@ -73,8 +73,10 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
   app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
     const out = { base: BASE, env: BASE.includes('-tem') ? 'TEM (test)' : 'PRODUCTION',
       consumerKey: !!KEY, consumerSecret: !!SECRET, crid: !!CRID, mid: !!MID, account: !!ACCT };
-    try { await oauthToken(); out.oauth = 'ok'; }
+    try { await oauthToken(); out.oauth = 'ok'; out.scopes = _oauth.scope || '(none returned)'; out.requestedScope = process.env.USPS_SCOPE || '(default — none requested)'; }
     catch (e) { out.oauth = 'FAILED: ' + e.message; return out; }
+    // Does the granted token actually include the payments scope?
+    out.hasPaymentsScope = /payment/i.test(_oauth.scope || '');
     try { await paymentToken(); out.payment = 'ok'; out.qualified = true; }
     catch (e) { out.payment = 'FAILED: ' + e.message; out.qualified = false; }
     return out;
