@@ -1985,21 +1985,19 @@
         }).catch(function(){});
       } catch (e) {}
     },
-    // Best-effort write into a localStorage map keyed by "orderId|sku". Evicts the
-    // oldest half on quota and, if still full, silently gives up — the server copy
-    // is authoritative, so we never surface a "storage full" error to the user.
+    // Design/artwork data URLs are NO LONGER mirrored into localStorage — they are
+    // multi-MB base64 and overflowed the ~5MB quota (which could even block the auth
+    // token). The server (order_designs) is the source of truth; we keep a fast
+    // IN-MEMORY cache for the page session that hydrateOrderDesigns() refills from
+    // the server when an order is opened. Keyed the same ("orderId|sku").
+    _memCache: {},
     _localCachePut: function(key, mapKey, val) {
-      try {
-        var c = JSON.parse(localStorage.getItem(key) || '{}');
-        c[mapKey] = val;
-        try { localStorage.setItem(key, JSON.stringify(c)); }
-        catch (e) {
-          var ks = Object.keys(c);
-          for (var i = 0; i < Math.floor(ks.length / 2); i++) delete c[ks[i]];
-          c[mapKey] = val;
-          try { localStorage.setItem(key, JSON.stringify(c)); } catch (e2) { /* give up locally — server has it */ }
-        }
-      } catch (e) {}
+      if (!this._memCache[key]) this._memCache[key] = {};
+      this._memCache[key][mapKey] = val;
+    },
+    _localCacheGet: function(key, mapKey) {
+      var m = this._memCache[key];
+      return (m && m[mapKey] !== undefined) ? m[mapKey] : null;
     },
     cacheRawDesign: function(orderId, sku, dataUrl) {
       if (!orderId || !sku || !dataUrl) return { ok:false, error:'Missing data' };
@@ -2008,10 +2006,7 @@
       return { ok:true };
     },
     getRawDesign: function(orderId, sku) {
-      try {
-        var cache = JSON.parse(localStorage.getItem(this.RAW_DESIGN_KEY) || '{}');
-        return cache[orderId + '|' + sku] || null;
-      } catch(e) { return null; }
+      return this._localCacheGet(this.RAW_DESIGN_KEY, orderId + '|' + sku);
     },
     IMAGE_CACHE_KEY: 'eg_image_cache',
     cacheImage: function(orderId, sku, dataUrl) {
@@ -2050,18 +2045,11 @@
       } catch (e) { return Promise.resolve([]); }
     },
     getCachedImage: function(orderId, sku) {
-      try {
-        var cache = JSON.parse(localStorage.getItem(this.IMAGE_CACHE_KEY) || '{}');
-        return cache[orderId + '|' + sku] || null;
-      } catch(e) { return null; }
+      return this._localCacheGet(this.IMAGE_CACHE_KEY, orderId + '|' + sku);
     },
     // Accepts "orderId|sku" string OR (orderId, sku)
     getCachedImageByRef: function(ref) {
-      if (!ref) return null;
-      try {
-        var cache = JSON.parse(localStorage.getItem(this.IMAGE_CACHE_KEY) || '{}');
-        return cache[ref] || null;
-      } catch(e) { return null; }
+      return ref ? this._localCacheGet(this.IMAGE_CACHE_KEY, ref) : null;
     },
 
     // ── Thread-color matching ───────────────────────────────────────────────
@@ -2322,6 +2310,7 @@
       this._localCachePut(this.EMB_FILE_KEY, orderId + '|' + sku, Object.assign({ addedAt: Date.now() }, fileInfo));
     },
     getItemEmbFile: function(orderId, sku) {
+      var hit = this._localCacheGet(this.EMB_FILE_KEY, orderId + '|' + sku); if (hit) return hit;
       try { var m = JSON.parse(localStorage.getItem(this.EMB_FILE_KEY) || '{}'); return m[orderId+'|'+sku] || null; }
       catch(e){ return null; }
     },
@@ -3206,4 +3195,27 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectCursor);
   else injectCursor();
+})();
+
+// One-time migration: move any design/image/emb blobs that older builds wrote into
+// localStorage into the in-memory cache, then DELETE the localStorage copies to
+// reclaim the space (these are now server-backed via order_designs). This clears
+// the bloat that was causing "Setting the value of 'eg_token' exceeded the quota".
+(function () {
+  try {
+    var S = window.EGStore; if (!S) return;
+    [S.RAW_DESIGN_KEY, S.IMAGE_CACHE_KEY, S.EMB_FILE_KEY].forEach(function (key) {
+      if (!key) return;
+      var raw; try { raw = localStorage.getItem(key); } catch (e) { return; }
+      if (!raw) return;
+      try {
+        var obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') {
+          if (!S._memCache[key]) S._memCache[key] = {};
+          Object.keys(obj).forEach(function (k) { S._memCache[key][k] = obj[k]; });
+        }
+      } catch (e) {}
+      try { localStorage.removeItem(key); } catch (e) {}   // reclaim the quota
+    });
+  } catch (e) {}
 })();
