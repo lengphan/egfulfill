@@ -6,8 +6,13 @@ import { hashPassword } from '../auth.js';
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
 
 export function usersRoutes(app, requireAdmin) {
+  // Soft-disable flag. Deactivating keeps the user row (so seller_id stays on all
+  // their orders — nothing is orphaned), but blocks login. schema.sql sets this on
+  // fresh installs; this alter covers existing databases.
+  q('alter table users add column if not exists active boolean not null default true').catch(() => {});
+
   app.get('/api/users', { preHandler: requireAdmin }, async () => {
-    const r = await q('select id, email, name, role, store_name, created_at from users order by created_at desc');
+    const r = await q('select id, email, name, role, store_name, active, created_at from users order by created_at desc');
     return r.rows;   // never returns password_hash
   });
 
@@ -30,10 +35,14 @@ export function usersRoutes(app, requireAdmin) {
   });
 
   app.patch('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
-    const { role, password, name } = req.body || {};
+    const { role, password, name, active } = req.body || {};
     const sets = [], vals = []; let n = 1;
     if (role) { if (!ROLES.includes(role)) { reply.code(400); return { error: 'Invalid role' }; } sets.push(`role=$${n++}`); vals.push(role); }
     if (name != null) { sets.push(`name=$${n++}`); vals.push(name); }
+    if (typeof active === 'boolean') {
+      if (!active && req.params.id === req.user.sub) { reply.code(400); return { error: "You can't deactivate your own account" }; }
+      sets.push(`active=$${n++}`); vals.push(active);
+    }
     if (password) { if (password.length < 8) { reply.code(400); return { error: 'Password too short' }; } sets.push(`password_hash=$${n++}`); vals.push(await hashPassword(password)); }
     if (!sets.length) return { ok: true };
     vals.push(req.params.id);

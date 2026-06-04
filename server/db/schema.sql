@@ -13,6 +13,7 @@ create table if not exists users (
   role          text not null default 'seller',   -- seller|operator|admin|warehouse|designer
   name          text,
   store_name    text,
+  active        boolean not null default true,     -- false = deactivated (login blocked, data kept)
   created_at    timestamptz default now()
 );
 

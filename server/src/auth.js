@@ -40,6 +40,7 @@ export async function login({ email, password }) {
   if (!u || !(await bcrypt.compare(password || '', u.password_hash))) {
     throw new Error('Invalid email or password');
   }
+  if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
   const safe = { id: u.id, email: u.email, role: u.role, name: u.name };
   return { user: safe, token: sign(safe) };
 }

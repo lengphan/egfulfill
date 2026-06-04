@@ -32,13 +32,21 @@
       var root = document.getElementById('eg-users-root'); if (!root) return;
       var roleOpts = function (sel) { return ROLES.map(function (rr) { return '<option value="' + rr + '"' + (sel === rr ? ' selected' : '') + '>' + rr + '</option>'; }).join(''); };
       var rows = users.map(function (u) {
-        return '<tr style="border-bottom:1px solid #f0ede9">'
-          + '<td style="padding:9px 10px"><div style="font-weight:600;color:#191918">' + esc(u.name || '—') + '</div><div style="font-size:12px;color:#9ca3af">' + esc(u.email) + '</div></td>'
+        var isActive = u.active !== false;
+        var nameCell = '<div style="font-weight:600;color:#191918' + (isActive ? '' : ';opacity:.5') + '">' + esc(u.name || '—')
+          + (isActive ? '' : ' <span style="font-size:9.5px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:4px;padding:1px 6px;vertical-align:middle;letter-spacing:.04em">INACTIVE</span>')
+          + '</div><div style="font-size:12px;color:#9ca3af' + (isActive ? '' : ';opacity:.6') + '">' + esc(u.email) + '</div>';
+        var toggleBtn = isActive
+          ? '<button onclick="EGAdminUsers.setActive(\'' + u.id + '\',\'' + esc(u.email) + '\',false)" class="btn btn-out" style="font-size:12px;padding:3px 9px">Deactivate</button> '
+          : '<button onclick="EGAdminUsers.setActive(\'' + u.id + '\',\'' + esc(u.email) + '\',true)" class="btn btn-dk" style="font-size:12px;padding:3px 9px">Activate</button> ';
+        return '<tr style="border-bottom:1px solid #f0ede9' + (isActive ? '' : ';background:#fcfbfa') + '">'
+          + '<td style="padding:9px 10px">' + nameCell + '</td>'
           + '<td style="padding:9px 10px"><select onchange="EGAdminUsers.setRole(\'' + u.id + '\',this.value)" class="select" style="font-size:13px;padding:4px 8px">' + roleOpts(u.role) + '</select></td>'
           + '<td style="padding:9px 10px;font-size:12px;color:#9ca3af;white-space:nowrap">' + (u.created_at ? String(u.created_at).slice(0, 10) : '') + '</td>'
           + '<td style="padding:9px 10px;text-align:right;white-space:nowrap">'
             + '<button onclick="EGAdminUsers.resetPw(\'' + u.id + '\',\'' + esc(u.email) + '\')" class="btn btn-out" style="font-size:12px;padding:3px 9px">Reset password</button> '
-            + '<button onclick="EGAdminUsers.del(\'' + u.id + '\',\'' + esc(u.email) + '\')" title="Delete user" style="background:none;border:none;color:#c4c3be;cursor:pointer;font-size:17px;line-height:1;padding:2px 6px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'">&times;</button>'
+            + toggleBtn
+            + '<button onclick="EGAdminUsers.del(\'' + u.id + '\',\'' + esc(u.email) + '\')" title="Delete permanently (orphans their orders — prefer Deactivate)" style="background:none;border:none;color:#c4c3be;cursor:pointer;font-size:17px;line-height:1;padding:2px 6px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'">&times;</button>'
           + '</td></tr>';
       }).join('');
       root.innerHTML =
@@ -58,6 +66,15 @@
           + '<tbody>' + (rows || '<tr><td colspan="4" style="padding:16px;color:#9ca3af;font-size:13px">No users yet.</td></tr>') + '</tbody></table></div>';
     },
     setRole: function (id, role) { api('/users/' + id, { method: 'PATCH', body: { role: role } }).then(function (r) { msg(r.error ? ('Error: ' + r.error) : ('Role updated → ' + role), !r.error); }); },
+    // Soft enable/disable — keeps the user + all their orders/attribution intact,
+    // just blocks (or restores) login. Use this instead of Delete to avoid orphaning.
+    setActive: function (id, email, active) {
+      if (!active && !confirm('Deactivate ' + email + '?\n\nThey will be blocked from logging in. All their orders and data are kept and stay attributed — reactivate any time. (No reassignment needed.)')) return;
+      api('/users/' + id, { method: 'PATCH', body: { active: active } }).then(function (r) {
+        if (r.error) { msg('Error: ' + r.error, false); return; }
+        EGAdminUsers.load(); setTimeout(function () { msg((active ? 'Activated ' : 'Deactivated ') + email, true); }, 200);
+      });
+    },
     add: function () {
       var email = (document.getElementById('nu-email').value || '').trim();
       var name = (document.getElementById('nu-name').value || '').trim();
@@ -75,7 +92,7 @@
       api('/users/' + id, { method: 'PATCH', body: { password: p } }).then(function (r) { msg(r.error ? ('Error: ' + r.error) : ('Password reset for ' + email), !r.error); });
     },
     del: function (id, email) {
-      if (!confirm('Delete ' + email + '? This cannot be undone.')) return;
+      if (!confirm('PERMANENTLY delete ' + email + '?\n\nTheir orders will lose their owner (seller_id cleared) and you may need to reassign them. To keep everything attributed, use Deactivate instead.\n\nThis cannot be undone.')) return;
       api('/users/' + id, { method: 'DELETE' }).then(function (r) { if (r.error) { msg('Error: ' + r.error, false); return; } EGAdminUsers.load(); setTimeout(function () { msg('Deleted ' + email, true); }, 200); });
     }
   };
