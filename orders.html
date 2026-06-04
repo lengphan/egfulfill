@@ -6265,7 +6265,37 @@ function downloadUploadTemplate() {
 
 /* ── Import modal ── */
 // `ship_country` removed — warehouse only ships to the US, country is set to "US" automatically.
-const REQUIRED_COLS = ['ship_name','ship_address_1','ship_city','ship_state','ship_zip','item_sku','item_quantity','print_type'];
+// Only the ship-to fields are truly required; item identity is checked separately
+// (SKU or name), and print_type / quantity default if absent. This lets real-world
+// store/marketplace exports import without hand-editing every column.
+const REQUIRED_COLS = ['ship_name','ship_address_1','ship_city','ship_state','ship_zip'];
+
+// Header aliases — map common store/marketplace column names onto our canonical
+// keys so a Shopify/Etsy/generic export imports without renaming columns. The
+// official template's exact headers already match the canonical keys directly.
+const COL_ALIASES = {
+  order_number:['order','order_id','order_no','order_number','order_num'],
+  ship_name:['ship_name','name','customer','customer_name','recipient','recipient_name','ship_to','shipping_name','deliver_to','buyer','buyer_name','full_name'],
+  ship_email:['ship_email','email','customer_email','buyer_email'],
+  ship_address_1:['ship_address_1','address','address1','address_1','street','street_address','shipping_address','shipping_address_1','ship_address','address_line_1'],
+  ship_address_2:['ship_address_2','address2','address_2','apt','suite','unit','address_line_2'],
+  ship_city:['ship_city','city','town','shipping_city'],
+  ship_state:['ship_state','state','province','region','state_province','shipping_state'],
+  ship_zip:['ship_zip','zip','zipcode','zip_code','postal','postal_code','postcode','shipping_zip'],
+  store_name:['store_name','store','shop','shop_name'],
+  item_sku:['item_sku','sku','lineitem_sku','line_item_sku','product_sku','variant_sku'],
+  item_name:['item_name','item','product','product_name','title','lineitem_name','item_title','product_title','description'],
+  item_quantity:['item_quantity','quantity','qty','lineitem_quantity','line_item_quantity','item_qty'],
+  print_type:['print_type','print','method','technique','print_method','decoration'],
+  item_color:['item_color','color','colour','variant_color'],
+  item_size:['item_size','size','variant_size'],
+  design_file_url:['design_file_url','design','design_url','artwork','art_url','design_file'],
+  internal_notes:['internal_notes','notes','note','internal_note','order_note'],
+  shipping_service:['shipping_service','service','ship_method','shipping_method'],
+  sales_channel:['sales_channel','channel','source']
+};
+const _ALIAS_LOOKUP = {};
+Object.keys(COL_ALIASES).forEach(canon => COL_ALIASES[canon].forEach(v => { _ALIAS_LOOKUP[v] = canon; }));
 let _importRows = [];
 
 function openImportModal() {
@@ -6304,20 +6334,50 @@ function handleImportFile(file) {
   }
 }
 
-function parseImportCSV(text) {
-  const lines = text.trim().split('\n').map(l => l.split(',').map(v => v.replace(/^"|"$/g,'').trim()));
-  parseImportRows(lines);
+// Proper CSV parser — handles quoted fields with embedded commas/newlines and ""
+// escapes, plus CRLF. (The old naive split(',') broke on addresses like
+// "123 Main St, Apt 4", shifting every column and failing validation.)
+function _parseCSVText(text) {
+  text = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rows = []; let row = [], cur = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ',') { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+  return rows.map(r => r.map(c => String(c).trim())).filter(r => r.some(c => c !== ''));
+}
+function parseImportCSV(text) { parseImportRows(_parseCSVText(text)); }
+
+// Normalize a raw header to a canonical key (via the alias table when possible).
+function _canonHeader(h) {
+  const norm = String(h).toLowerCase().trim().replace(/#/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  return _ALIAS_LOOKUP[norm] || norm;
 }
 
-// Shared parser — accepts the 2D-array shape from either CSV.split or XLSX.sheet_to_json.
+// Shared parser — accepts the 2D-array shape from either CSV or XLSX.sheet_to_json.
 function parseImportRows(rows) {
   if (!rows || rows.length < 2) { alert('File must have a header row and at least one data row.'); return; }
-  const headers = rows[0].map(h => String(h).toLowerCase().trim().replace(/\s+/g,'_'));
+  const headers = rows[0].map(_canonHeader);
   _importRows = rows.slice(1).map((row, i) => {
     const obj = {};
-    headers.forEach((h, j) => { obj[h] = row[j] != null ? String(row[j]).trim() : ''; });
+    headers.forEach((h, j) => { if (h && obj[h] === undefined) obj[h] = row[j] != null ? String(row[j]).trim() : ''; });
+    // Sensible defaults so real-world exports (no print method, no qty) still import.
+    if (!obj.item_quantity) obj.item_quantity = '1';
+    if (!obj.print_type) obj.print_type = 'DTG';
+    if (!obj.item_sku && obj.item_name) obj.item_sku = obj.item_name.replace(/\s+/g, '-').toUpperCase().slice(0, 40);
     const missing = REQUIRED_COLS.filter(c => !obj[c]);
-    return { ...obj, _rowNum: i + 2, _valid: missing.length === 0, _errors: missing.length ? 'Missing: ' + missing.join(', ') : '' };
+    const noItem = !obj.item_sku && !obj.item_name;
+    const errs = [];
+    if (missing.length) errs.push('Missing: ' + missing.join(', '));
+    if (noItem) errs.push('No item (SKU or name)');
+    return { ...obj, _rowNum: i + 2, _valid: !errs.length, _errors: errs.join('; ') };
   });
   renderImportPreview();
 }
@@ -6331,10 +6391,10 @@ function renderImportPreview() {
   tbody.innerHTML = _importRows.map(r => `
     <tr style="background:${r._valid?'#f0fdf4':'#fff7f7'}">
       <td style="padding:6px 10px;font-size:12.5px;color:#6b7280">${r._rowNum}</td>
-      <td style="padding:6px 10px;font-size:13px;font-weight:500;color:#191918">${r.customer_name||'—'}</td>
-      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.blank_sku||'—'}</td>
+      <td style="padding:6px 10px;font-size:13px;font-weight:500;color:#191918">${r.ship_name||'—'}</td>
+      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_sku||r.item_name||'—'}</td>
       <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.print_type||'—'}</td>
-      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.quantity||'—'}</td>
+      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_quantity||'—'}</td>
       <td style="padding:6px 10px">
         ${r._valid
           ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;color:#15803d"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 6l3 3 4-5" stroke="#15803d" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Valid</span>`
@@ -6816,7 +6876,7 @@ function confirmImport() {
         ondragover="event.preventDefault();this.classList.add('drag-over');this.style.borderColor='#111827';this.style.background='#fafaf9'"
         ondragleave="this.classList.remove('drag-over');this.style.borderColor='#d1d5db';this.style.background=''"
         ondrop="event.preventDefault();this.classList.remove('drag-over');this.style.borderColor='#d1d5db';this.style.background='';handleImportFile(event.dataTransfer.files[0])">
-        <input id="import-file" type="file" accept=".csv" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="handleImportFile(this.files[0])"/>
+        <input id="import-file" type="file" accept=".csv,.xlsx,.xls" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%" onchange="handleImportFile(this.files[0])"/>
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none" style="color:#9ca3af;margin:0 auto 8px"><path d="M4 18v4a2 2 0 002 2h16a2 2 0 002-2v-4M14 4v14M8 10l6-6 6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div style="font-size:14.5px;font-weight:600;color:#374151">Drop your CSV here or <span style="color:#6366f1">browse</span></div>
         <div style="font-size:12.5px;color:#9ca3af;margin-top:3px">egfulfill_order_upload_template.csv format required</div>
