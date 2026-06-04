@@ -4562,7 +4562,9 @@ function admRowMenuOpen(ev, num) {
   };
   var opts = [];
   if (admCanonStatus(o.status) === 'awaiting_scan') opts.push({ label:'Scan', icon:ICN.scan, fn:"whScanOrderSingle('"+num+"')" });
-  if (!isTerminal) opts.push({ label:'Print Label', icon:ICN.print, fn:"openReviewModal('"+num+"')" });
+  var _admLabeled = o.tracking || (o.label && o.label.tracking_number);
+  if (_admLabeled) opts.push({ label:'See Label', icon:ICN.print, fn:"admSeeLabel('"+num+"')" });
+  else if (!isTerminal) opts.push({ label:'Print Label', icon:ICN.print, fn:"whOpenLabelModal('"+num+"')" });
   if (!isTerminal && !onHold) opts.push({ label:'Put on hold', icon:ICN.pause, fn:"admHoldOrder('"+num+"')" });
   if (onHold) opts.push({ label:'Resume from hold', icon:ICN.play, fn:"admHoldOrder('"+num+"')" });
   opts.push({ label:'Chat with Seller', icon:ICN.chat, fn:"xOrderChatOpen('"+num+"',{subtitle:'"+(o.customer||'').replace(/'/g,"\\'")+" · "+(o.store||'').replace(/'/g,"\\'")+"'})" });
@@ -8979,23 +8981,33 @@ window.setPrintTab = function(tab) {
 // label-creation modal yet. A real implementation would prompt for order selection.
 
 // Demo render of recent shipments using whichever order data the page has.
+// Recent Shipments — every successfully created label (manual + order) is recorded
+// in the shared EGUSPS shipments store; the tracking number reopens the label.
 window.renderRecentShipments = function() {
   const body = document.getElementById('sh-table-body');
   if (!body) return;
-  const list = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.filter(o => o.tracking || (o.status||'').toLowerCase().includes('ship')) : [];
+  const list = (window.EGUSPS && EGUSPS.getShipments) ? EGUSPS.getShipments() : [];
   if (!list.length) {
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af;font-size:13.5px">No shipments yet</td></tr>';
     return;
   }
-  body.innerHTML = list.slice(0, 20).map(o => `<tr>
-    <td style="font-weight:600;color:#191918">#${o.num}</td>
-    <td style="font-family:monospace;font-size:12.5px;color:#374151">${o.tracking || '—'}</td>
-    <td>${o.customer || ''}</td>
-    <td>${o.carrier || 'TBD'}</td>
-    <td style="color:#16a34a;font-weight:600">${o.cost ? '$'+o.cost : '—'}</td>
-    <td style="color:#9ca3af;font-size:12.5px">${o.date || ''}</td>
-    <td><span class="badge b-${((o.status||'new').toLowerCase().includes('ship'))?'shipped':'packed'}">${o.status || 'Pending'}</span></td>
-  </tr>`).join('');
+  body.innerHTML = list.slice(0, 50).map(s => {
+    const orderCell = s.orderNum ? `#${s.orderNum}` : `<span style="color:#9ca3af">Manual</span>`;
+    const hasLbl = s.label && (s.label.labelHtml || s.label.labelImage);
+    const trk = s.tracking
+      ? (hasLbl
+          ? `<a onclick="EGUSPS.openSavedLabel('${s.tracking}')" title="See label" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${s.tracking}</a>`
+          : `<span style="font-family:monospace;font-size:12.5px;color:#374151">${s.tracking}</span>`)
+      : '—';
+    return `<tr>
+    <td style="font-weight:600;color:#191918">${orderCell}</td>
+    <td>${trk}</td>
+    <td>${s.recipient || '—'}</td>
+    <td>${s.carrier || 'USPS'}${s.service ? `<span style="color:#9ca3af;font-size:11.5px"> · ${s.service.replace(/^USPS /,'')}</span>` : ''}</td>
+    <td style="color:#16a34a;font-weight:600">${s.cost ? '$'+s.cost : '—'}</td>
+    <td style="color:#9ca3af;font-size:12.5px">${s.date || ''}</td>
+    <td><span class="badge b-shipped">Shipped</span></td>
+  </tr>`;}).join('');
 };
 </script>
 
@@ -9022,10 +9034,18 @@ function whOpenLabelModal(num) {
     orderNum: num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
     seller: o.seller || o.store || 'Seller', contents: contents,
     onDone: function (tracking) {
-      try { if (o) { o.tracking = tracking; o.status = 'shipped'; } } catch (e) {}
+      try { if (o) { o.tracking = tracking; o.status = 'shipped'; o.label = Object.assign({}, o.label, { state: 'label_ready', tracking_number: tracking }); } } catch (e) {}
       if (typeof admMergeLiveOrders === 'function') admMergeLiveOrders();
+      if (typeof renderRecentShipments === 'function') renderRecentShipments();
     }
   });
+}
+// Reopen a previously-created label for an order (from the shared shipments store).
+function admSeeLabel(num) {
+  const o = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(x => x.num === num) : null;
+  const trk = (o && o.tracking) || (o && o.label && o.label.tracking_number) || '';
+  if (window.EGUSPS && EGUSPS.openSavedLabel) { EGUSPS.openSavedLabel(num || trk); return; }
+  alert('Label viewer unavailable.');
 }
 function whCreateLabelModalDOM() {
   const el = document.createElement('div');

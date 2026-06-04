@@ -1814,7 +1814,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
             <div style="padding:14px 18px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="font-size:14.5px;font-weight:700;color:#191918">Recent Shipments</div>
-                <span style="background:#f4f2ef;color:#6b7280;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px">18 today</span>
+                <span id="sh-today-count" style="background:#f4f2ef;color:#6b7280;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px">0 today</span>
               </div>
               <div style="display:flex;gap:8px">
                 <button class="btn btn-out" style="font-size:12.5px">Export CSV</button>
@@ -4878,7 +4878,7 @@ function whRenderBatchView() {
               <span><span style="color:#9ca3af">Store:</span> <strong style="color:#374151">${o.store||'—'}</strong></span>
               <span><span style="color:#9ca3af">Placed:</span> ${o.time||o.placed||'—'}</span>
               ${o.label?.tracking_number
-                ? `<span><span style="color:#9ca3af">Tracking:</span> <span style="font-family:monospace;color:#374151;font-size:12.25px">${o.label.tracking_number}</span></span>`
+                ? `<span><span style="color:#9ca3af">Tracking:</span> <a onclick="event.stopPropagation();whSeeLabel('${o.num}')" title="See label" style="font-family:monospace;color:#3a5a96;font-size:12.25px;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${o.label.tracking_number}</a></span>`
                 : `<button onclick="event.stopPropagation();whOpenLabelModal('${o.num}')" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;border:1.5px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12.25px;font-weight:600;cursor:pointer;font-family:inherit">Generate Label</button>`}
               ${o.label?.state === 'label_ready' && !o.label?.scan_state
                 ? `<button onclick="event.stopPropagation();whPreScanLabel('${o.num}')" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12.25px;font-weight:600;cursor:pointer;font-family:inherit">✓ Pre-scan Label</button>`
@@ -5385,7 +5385,9 @@ function whRowMenuOpen(ev, num) {
   };
   var opts = [];
   if (whCanonStatus(o.status) === 'awaiting_scan') opts.push({ label:'Scan', icon:ICN.scan, fn:"whScanOrderSingle('"+num+"')" });
-  if (!isTerminal) opts.push({ label:'Print Label', icon:ICN.print, fn:"whOpenLabelModal('"+num+"')" });
+  var _labeled = (o.label && o.label.tracking_number) || o.tracking;
+  if (_labeled) opts.push({ label:'See Label', icon:ICN.print, fn:"whSeeLabel('"+num+"')" });
+  else if (!isTerminal) opts.push({ label:'Print Label', icon:ICN.print, fn:"whOpenLabelModal('"+num+"')" });
   if (!isTerminal && !onHold) opts.push({ label:'Put on hold', icon:ICN.pause, fn:"whToggleHold('"+num+"')" });
   if (onHold) opts.push({ label:'Resume from hold', icon:ICN.play, fn:"whToggleHold('"+num+"')" });
   opts.push({ label:'Chat with Seller', icon:ICN.chat, fn:"xOrderChatOpen('"+num+"',{subtitle:'"+(o.customer||'').replace(/'/g,"\\'")+" · "+(o.store||'').replace(/'/g,"\\'")+"'})" });
@@ -6159,6 +6161,14 @@ function whUpdatePanel() {
   whUpdateBulkBar();
 }
 
+// Reopen a previously-created label for an order (from the shared shipments store).
+function whSeeLabel(num) {
+  const o = (WH_ORDERS || []).find(x => x.num === num);
+  const trk = (o && o.label && o.label.tracking_number) || (o && o.tracking) || '';
+  if (window.EGUSPS && EGUSPS.openSavedLabel) { EGUSPS.openSavedLabel(num || trk); return; }
+  alert('Label viewer unavailable.');
+}
+
 function whOpenLabelModal(num) {
   const o = WH_ORDERS.find(x => x.num === num);
   if (!o) return;
@@ -6200,8 +6210,10 @@ function whOpenLabelModal(num) {
       orderNum: o.num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
       seller: o.seller || o.store || 'Seller', contents: contents,
       onDone: function (tracking) {
-        try { o.tracking = tracking; o.status = 'shipped'; } catch (e) {}
+        try { o.tracking = tracking; o.status = 'shipped';
+              o.label = Object.assign({}, o.label, { state: 'label_ready', tracking_number: tracking }); } catch (e) {}
         if (typeof whRenderOrders === 'function') whRenderOrders();
+        if (typeof whRenderBatchView === 'function') whRenderBatchView();
         if (typeof renderRecentShipments === 'function') renderRecentShipments();
       }
     });
@@ -11152,24 +11164,37 @@ window.shippingNewLabel = function() {
   m._orderNum = null;
   m.classList.remove('modal-hidden');
 };
-// Demo render of recent shipments using whichever order data the page has.
+// Recent Shipments — every successfully created label (manual + order) is recorded
+// in the shared EGUSPS shipments store. The tracking number links back to the
+// saved label for an easy re-download.
 window.renderRecentShipments = function() {
   const body = document.getElementById('sh-table-body');
   if (!body) return;
-  const list = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.filter(o => o.tracking || (o.status||'').toLowerCase().includes('ship')) : [];
+  const list = (window.EGUSPS && EGUSPS.getShipments) ? EGUSPS.getShipments() : [];
   if (!list.length) {
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af;font-size:13.5px">No shipments yet</td></tr>';
+    const cnt = document.getElementById('sh-today-count'); if (cnt) cnt.textContent = '0 today';
     return;
   }
-  body.innerHTML = list.slice(0, 20).map(o => `<tr>
-    <td style="font-weight:600;color:#191918">#${o.num}</td>
-    <td style="font-family:monospace;font-size:12.5px;color:#374151">${o.tracking || '—'}</td>
-    <td>${o.customer || ''}</td>
-    <td>${o.carrier || 'TBD'}</td>
-    <td style="color:#16a34a;font-weight:600">${o.cost ? '$'+o.cost : '—'}</td>
-    <td style="color:#9ca3af;font-size:12.5px">${o.date || ''}</td>
-    <td><span class="badge b-${((o.status||'new').toLowerCase().includes('ship'))?'shipped':'packed'}">${o.status || 'Pending'}</span></td>
-  </tr>`).join('');
+  body.innerHTML = list.slice(0, 50).map(s => {
+    const orderCell = s.orderNum ? `#${s.orderNum}` : `<span style="color:#9ca3af">Manual</span>`;
+    const hasLbl = s.label && (s.label.labelHtml || s.label.labelImage);
+    const trk = s.tracking
+      ? (hasLbl
+          ? `<a onclick="EGUSPS.openSavedLabel('${s.tracking}')" title="See label" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${s.tracking}</a>`
+          : `<span style="font-family:monospace;font-size:12.5px;color:#374151">${s.tracking}</span>`)
+      : '—';
+    return `<tr>
+    <td style="font-weight:600;color:#191918">${orderCell}</td>
+    <td>${trk}</td>
+    <td>${s.recipient || '—'}</td>
+    <td>${s.carrier || 'USPS'}${s.service ? `<span style="color:#9ca3af;font-size:11.5px"> · ${s.service.replace(/^USPS /,'')}</span>` : ''}</td>
+    <td style="color:#16a34a;font-weight:600">${s.cost ? '$'+s.cost : '—'}</td>
+    <td style="color:#9ca3af;font-size:12.5px">${s.date || ''}</td>
+    <td><span class="badge b-shipped">Shipped</span></td>
+  </tr>`;}).join('');
+  const cnt = document.getElementById('sh-today-count');
+  if (cnt) { const today = EGUSPS.getShipments().filter(s => s.date === new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})).length; cnt.textContent = today + ' today'; }
 };
 </script>
 

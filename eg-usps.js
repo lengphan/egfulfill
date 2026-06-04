@@ -95,14 +95,12 @@
       '<div style="background:#fff;border-radius:14px;width:580px;max-width:95vw;max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">'
       + '<div style="padding:16px 20px;border-bottom:1px solid #e5e4e0;display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:15px;font-weight:700;color:#191918">Create Shipping Label</div><div id="egusps-order" style="font-size:13px;color:#9ca3af;margin-top:2px"></div></div><button id="egusps-x" style="background:none;border:none;font-size:23px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
       + '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">'
-      // SHIP TO — single paste box + validate
+      // SHIP TO — single paste box (auto-validates with USPS on blur)
       + '<div><div style="display:flex;align-items:baseline;justify-content:space-between"><div style="' + LB + '">Ship to <span style="font-weight:400;text-transform:none;color:#9ca3af">— paste name + address</span></div><span id="egusps-to-val" style="font-size:11px;font-weight:700"></span></div>'
-      + '<textarea id="egusps-to" style="' + TA + '" placeholder="Jane Doe&#10;123 Main St, Apt 4&#10;Austin, TX 78701"></textarea>'
-      + '<button type="button" onclick="EGUSPS._validate(\'to\')" style="margin-top:6px;font-size:12px;padding:5px 11px;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit">✓ Validate with USPS</button></div>'
-      // SHIP FROM — single paste box (remembered)
+      + '<textarea id="egusps-to" onblur="EGUSPS._validate(\'to\')" style="' + TA + '" placeholder="Jane Doe&#10;123 Main St, Apt 4&#10;Austin, TX 78701"></textarea></div>'
+      // SHIP FROM — single paste box (remembered, auto-validates on blur)
       + '<div><div style="display:flex;align-items:baseline;justify-content:space-between"><div style="' + LB + '">Ship from <span style="font-weight:400;text-transform:none;color:#9ca3af">— return address, remembered</span></div><span id="egusps-from-val" style="font-size:11px;font-weight:700"></span></div>'
-      + '<textarea id="egusps-from" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea>'
-      + '<button type="button" onclick="EGUSPS._validate(\'from\')" style="margin-top:6px;font-size:12px;padding:5px 11px;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit">✓ Validate with USPS</button></div>'
+      + '<textarea id="egusps-from" onblur="EGUSPS._validate(\'from\')" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea></div>'
       // PACKAGE
       + '<div style="' + HD + '">PACKAGE</div>'
       + '<div style="display:grid;grid-template-columns:1.3fr .7fr 1fr;gap:10px">'
@@ -141,19 +139,25 @@
 
   // Validate one address box against USPS Addresses API (best effort — needs only
   // OAuth, no payment scope; standardizes the address in place on success).
+  var _valCache = {};
   async function _validate(which) {
     var taId = which === 'from' ? 'egusps-from' : 'egusps-to';
     var statEl = _modal.querySelector('#' + (which === 'from' ? 'egusps-from-val' : 'egusps-to-val'));
-    var a = parseAddressBlock(getv(taId));
     var setStat = function (t, c) { if (statEl) { statEl.textContent = t; statEl.style.color = c; } };
-    if (!a.street || !a.zip) { setStat('need street + ZIP', '#dc2626'); return; }
+    var raw = getv(taId);
+    if (!raw) { setStat('', ''); return; }                 // empty box — no nag
+    if (_valCache[which] === raw) return;                   // already validated this exact text
+    var a = parseAddressBlock(raw);
+    if (!a.street || !a.zip) { setStat('', ''); return; }    // not enough yet — stay quiet, validate on next blur
     setStat('checking…', '#9ca3af');
     try {
       var qs = new URLSearchParams({ streetAddress: a.street, secondaryAddress: a.street2 || '', city: a.city || '', state: a.state || '', ZIPCode: a.zip || '' }).toString();
       var r = await fetch('/api/usps/validate-address?' + qs, { headers: { Authorization: 'Bearer ' + token() } }).then(function (x) { return x.json(); });
       if (r && r.ok && r.address && r.address.zip) {
         var v = r.address;
-        setv(taId, (a.name ? a.name + '\n' : '') + v.street + (v.street2 ? ' ' + v.street2 : '') + '\n' + v.city + ', ' + v.state + ' ' + v.zip + (v.zip4 ? '-' + v.zip4 : ''));
+        var rebuilt = (a.name ? a.name + '\n' : '') + v.street + (v.street2 ? ' ' + v.street2 : '') + '\n' + v.city + ', ' + v.state + ' ' + v.zip + (v.zip4 ? '-' + v.zip4 : '');
+        setv(taId, rebuilt);
+        _valCache[which] = rebuilt;
         setStat('✓ validated', '#059669');
       } else { setStat('✕ ' + ((r && r.error) || 'not found'), '#dc2626'); }
     } catch (e) { setStat('✕ ' + e.message, '#dc2626'); }
@@ -175,6 +179,7 @@
     setv('egusps-contents', opts.contents || '');
     var v1 = _modal.querySelector('#egusps-to-val'); if (v1) v1.textContent = '';
     var v2 = _modal.querySelector('#egusps-from-val'); if (v2) v2.textContent = '';
+    _valCache = {};
     _modal.style.display = 'flex';
   }
   async function generateFromModal() {
@@ -200,14 +205,59 @@
     var tracking = res.trackingNumber || '';
     try { openLabel(res, tracking); } catch (e) {}
     try { if (window.EGStore && EGStore.update && (_ctx.orderId || _ctx.orderNum)) EGStore.update(_ctx.orderId || _ctx.orderNum, { tracking: tracking, factoryStatus: 'shipped', carrier: 'USPS' }); } catch (e) {}
+    // Record the shipment (manual labels = no order; order labels carry orderNum)
+    // so it shows in the Recent Shipments table and the label can be reopened.
+    recordShipment({
+      tracking: tracking,
+      orderNum: (_ctx && _ctx.orderNum) || '',
+      orderId: (_ctx && _ctx.orderId) || '',
+      recipient: to.name || '',
+      recipientAddr: [[to.street, to.street2].filter(Boolean).join(', '), [to.city, [to.state, to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+      carrier: 'USPS',
+      service: getv('egusps-svc') || '',
+      date: _todayStr(),
+      status: 'shipped',
+      manual: !(_ctx && _ctx.orderNum),
+      label: { labelHtml: res.labelHtml || '', labelImage: res.labelImage || '', imageType: res.imageType || payload.imageType || 'PDF' }
+    });
     _modal.style.display = 'none';
     if (_ctx && typeof _ctx.onDone === 'function') { try { _ctx.onDone(tracking, res); } catch (e) {} }
     if (tracking) alert('USPS label created — tracking ' + tracking + (/ZPL/i.test(payload.imageType) ? ' (ZPL downloaded)' : ' (opened in a new tab to print)'));
   }
 
+  // ── Shipments store — manual + order labels, newest first (localStorage) ──────
+  var SHIP_KEY = 'eg_shipments';
+  function _todayStr() { try { return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return ''; } }
+  function getShipments() { try { return JSON.parse(localStorage.getItem(SHIP_KEY) || '[]'); } catch (e) { return []; } }
+  function _saveShipments(a) {
+    try { localStorage.setItem(SHIP_KEY, JSON.stringify(a)); return true; }
+    catch (e) {   // over quota — drop the heavy label blobs and retry (keep metadata)
+      try { localStorage.setItem(SHIP_KEY, JSON.stringify(a.map(function (s) { return Object.assign({}, s, { label: null }); }))); } catch (e2) {}
+      return false;
+    }
+  }
+  function recordShipment(entry) {
+    if (!entry || !entry.tracking) return;
+    var a = getShipments().filter(function (x) { return x.tracking !== entry.tracking; });
+    a.unshift(entry);
+    if (a.length > 200) a = a.slice(0, 200);
+    _saveShipments(a);
+  }
+  function getShipmentLabel(key) {
+    var a = getShipments();
+    for (var i = 0; i < a.length; i++) { if (a[i].tracking === key || (key && a[i].orderNum === key) || (key && a[i].orderId === key)) return a[i]; }
+    return null;
+  }
+  function openSavedLabel(key) {
+    var s = getShipmentLabel(key);
+    if (!s || !s.label || (!s.label.labelHtml && !s.label.labelImage)) { alert('No saved label image for ' + (key || '') + '.'); return; }
+    try { openLabel(s.label, s.tracking); } catch (e) { alert('Could not open the label.'); }
+  }
+
   window.EGUSPS = {
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,
-    createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate
+    createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate,
+    getShipments: getShipments, recordShipment: recordShipment, getShipmentLabel: getShipmentLabel, openSavedLabel: openSavedLabel
   };
 })();

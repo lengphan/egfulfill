@@ -1323,8 +1323,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
               <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px" id="sh-d-date"></div>
               <!-- actions -->
               <div style="display:flex;gap:8px">
-                <button class="btn btn-out" style="flex:1;justify-content:center;font-size:13px" onclick="alert('Downloading PDF…')">Download PDF</button>
-                <button class="btn btn-dk" style="flex:1;justify-content:center;font-size:13px" onclick="alert('Sending to printer…')">Print Label</button>
+                <button class="btn btn-out" style="flex:1;justify-content:center;font-size:13px" onclick="window.EGUSPS&&EGUSPS.openSavedLabel(window.opCurrentShipTracking)">See Label</button>
+                <button class="btn btn-dk" style="flex:1;justify-content:center;font-size:13px" onclick="window.EGUSPS&&EGUSPS.openSavedLabel(window.opCurrentShipTracking)">Print Label</button>
               </div>
             </div>
           </div>
@@ -2909,13 +2909,15 @@ function selectShipment(row, order, tracking, name, addr, carrier, weight, cost,
   document.getElementById('sh-detail-empty').style.display = 'none';
   document.getElementById('sh-detail-content').style.display = '';
 
+  // Remember which shipment is selected so the panel buttons can reopen its label.
+  window.opCurrentShipTracking = (tracking || '').replace(/\s/g, '');
   // Populate fields
-  document.getElementById('sh-d-order').textContent = '#' + order;
+  document.getElementById('sh-d-order').textContent = order ? ('#' + order) : 'Manual';
   document.getElementById('sh-d-tracking').textContent = tracking;
   document.getElementById('sh-d-carrier').textContent = carrier.toUpperCase();
   document.getElementById('sh-d-weight').textContent = weight;
   document.getElementById('sh-d-cost').textContent = cost;
-  document.getElementById('sh-d-ref').textContent = '#' + order;
+  document.getElementById('sh-d-ref').textContent = order ? ('#' + order) : '—';
   document.getElementById('sh-d-name').textContent = name;
   document.getElementById('sh-d-addr').textContent = addr;
   document.getElementById('sh-d-date').textContent = 'Generated: ' + date;
@@ -4037,9 +4039,17 @@ function opLabelData(num) {
     onDone: function (tracking) {
       try { var oo = (OP_ORDERS || []).find(function (x) { return x.num === num; }); if (oo) { oo.tracking = tracking; oo.status = 'shipped'; } } catch (e) {}
       if (typeof renderOpOrders === 'function') renderOpOrders();
+      if (typeof opRenderShipments === 'function') opRenderShipments();
     } };
 }
 function opOpenLabel(num) { if (window.EGUSPS) EGUSPS.openLabelModal(opLabelData(num)); else openOpNewLabelModal(num); }
+// Reopen a previously-created label for an order (from the shared shipments store).
+function opSeeLabel(num) {
+  var o = (OP_ORDERS || []).find(function (x) { return x.num === num; });
+  var trk = (o && o.tracking) || '';
+  if (window.EGUSPS && EGUSPS.openSavedLabel) { EGUSPS.openSavedLabel(num || trk); return; }
+  alert('Label viewer unavailable.');
+}
 function bulkPrintLabels() { if (window.EGUSPS) EGUSPS.openLabelModal({}); else openOpNewLabelModal(); }
 /* Bulk Send to Scan — push every selected order straight into the warehouse
    scan queue, skipping the board path. Used when designs are already
@@ -4115,19 +4125,11 @@ function opRowMenuOpen(ev, num) {
   if (onHold)                  opts.push({ label: 'Resume from hold',    icon: ICN.play,  fn: `opToggleHold('${num}')` });
   if (!isTerminal)             opts.push({ label: 'Send to Scan',        icon: ICN.scan,  fn: `opSendToScanRow('${num}')` });
   if (st === 'in_review')      opts.push({ label: 'Push to Design Board',icon: ICN.board, fn: `opSendToDesignStudio && opSendToDesignStudio('${num}')` });
-  if (!isTerminal) {
-    opts.push({
-      label: hasTracking ? 'Create Label (already has tracking)' : 'Create Label',
-      icon: ICN.label,
-      fn: `openOpNewLabelModal('${num}')`,
-      disabled: hasTracking
-    });
-    opts.push({
-      label: hasTracking ? 'Print Label' : 'Print Label (no tracking yet)',
-      icon: ICN.print,
-      fn: `opPrintTrackingLabel('${num}')`,
-      disabled: !hasTracking
-    });
+  if (hasTracking) {
+    // Already labeled — reopen the saved label.
+    opts.push({ label: 'See Label', icon: ICN.print, fn: `opSeeLabel('${num}')` });
+  } else if (!isTerminal) {
+    opts.push({ label: 'Create Label', icon: ICN.label, fn: `opOpenLabel('${num}')` });
   }
   if (!isTerminal)             opts.push({ label: 'Flag for review',     icon: ICN.flag,  fn: `opRowFlag('${num}')`, danger:true });
   if (!opts.length) return;
@@ -5954,16 +5956,28 @@ const OP_SHIPMENTS_SEED = [
   { order:'FF-8794', tracking:'9400 1000 0000 3309 5510 88', name:'Mark R. · Phoenix, AZ', addr:'600 Prospect Ave, Phoenix, AZ 85003', carrier:'USPS Priority Mail',    weight:'1.2 lb', cost:'$9.85',  date:'Yesterday 1:05 PM', status:'Delivered' },
   { order:'FF-8790', tracking:'7748 0000 1122 3344',         name:'Sara L. · Seattle, WA', addr:'55 Riverside Dr, Seattle, WA 98101',  carrier:'FedEx 2Day',           weight:'0.8 lb', cost:'$18.50', date:'Apr 30, 4:00 PM',  status:'Delivered' },
 ];
-const OP_SH_BADGE = { 'Awaiting pickup':'b-packed', 'In transit':'b-prod', 'Delivered':'b-shipped' };
-function opLoadShipments() {
-  try {
-    const raw = localStorage.getItem(OP_SHIPMENTS_KEY);
-    if (raw) { const a = JSON.parse(raw); if (Array.isArray(a)) return a; }
-  } catch(e){}
-  return OP_SHIPMENTS_SEED.map(s => ({ ...s }));
+const OP_SH_BADGE = { 'Awaiting pickup':'b-packed', 'In transit':'b-prod', 'Delivered':'b-shipped', 'Shipped':'b-shipped' };
+// Normalize either shape (legacy seed OR the shared EGUSPS shipment) into one row.
+function opNormShip(d) {
+  const svc = d.service ? (' ' + String(d.service).replace(/^USPS /, '')) : '';
+  return {
+    order:    d.order != null ? d.order : (d.orderNum || ''),
+    tracking: d.tracking || '',
+    name:     d.name || d.recipient || '—',
+    addr:     d.addr || d.recipientAddr || '',
+    carrier:  d.carrier ? (d.carrier + (d.service ? svc : '')) : '—',
+    weight:   d.weight || '—',
+    cost:     d.cost || '—',
+    date:     d.date || 'Just now',
+    status:   d.status === 'shipped' ? 'In transit' : (d.status || 'Awaiting pickup'),
+    hasLabel: !!(d.label && (d.label.labelHtml || d.label.labelImage))
+  };
 }
-function opSaveShipments(list) {
-  try { localStorage.setItem(OP_SHIPMENTS_KEY, JSON.stringify(list)); } catch(e){}
+// Real shipments come from the shared EGUSPS store; the seed is a display-only
+// fallback when nothing's been generated yet (never written to the shared key).
+function opLoadShipments() {
+  const real = (window.EGUSPS && EGUSPS.getShipments) ? EGUSPS.getShipments() : [];
+  return (real.length ? real : OP_SHIPMENTS_SEED).map(opNormShip);
 }
 function opRenderShipments() {
   const body = document.getElementById('sh-table-body');
@@ -5971,9 +5985,13 @@ function opRenderShipments() {
   const esc = s => String(s||'').replace(/'/g, "\\'");
   body.innerHTML = opLoadShipments().map(d => {
     const badge = OP_SH_BADGE[d.status] || 'b-packed';
+    const orderCell = d.order ? `<span style="font-weight:600">#${d.order}</span>` : `<span style="color:#9ca3af">Manual</span>`;
+    const trk = d.hasLabel
+      ? `<a onclick="event.stopPropagation();EGUSPS.openSavedLabel('${esc((d.tracking||'').replace(/\s/g,''))}')" title="See label" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${d.tracking}</a>`
+      : `<span style="font-family:monospace;font-size:12.5px;color:#374151">${d.tracking}</span>`;
     return `<tr class="sh-row" onclick="selectShipment(this,'${esc(d.order)}','${esc((d.tracking||'').replace(/\s/g,''))}','${esc(d.name)}','${esc(d.addr)}','${esc(d.carrier)}','${esc(d.weight||'—')}','${esc(d.cost)}','${esc(d.date)}','${esc(d.status)}')" style="cursor:pointer" onmouseover="if(!this.classList.contains('sh-sel'))this.style.background='#fafaf9'" onmouseout="if(!this.classList.contains('sh-sel'))this.style.background=''">`
-      + `<td><span style="font-weight:600">#${d.order}</span></td>`
-      + `<td style="font-family:monospace;font-size:12.5px;color:#374151">${d.tracking}</td>`
+      + `<td>${orderCell}</td>`
+      + `<td>${trk}</td>`
       + `<td>${d.name||'—'}</td><td>${d.carrier||'—'}</td>`
       + `<td style="color:#16a34a;font-weight:600">${d.cost||'—'}</td>`
       + `<td style="font-size:12.5px;color:#9ca3af">${d.date||'Just now'}</td>`
@@ -5981,15 +5999,18 @@ function opRenderShipments() {
       + `</tr>`;
   }).join('');
 }
-// Prepend a generated label to the persisted Recent Shipments list.
+// Prepend a generated label to Recent Shipments — delegates to the shared EGUSPS
+// store (single source) so it shows on every board. (Legacy callers; the modal
+// itself records via EGUSPS on success.)
 function opAddShipmentRow(d) {
-  const list = opLoadShipments();
-  list.unshift({
-    order: d.order, tracking: d.tracking, name: d.name || '—', addr: d.addr || '',
-    carrier: d.carrier || '—', weight: d.weight || '—', cost: d.cost || '—',
-    date: d.date || 'Just now', status: d.status || 'Awaiting pickup'
-  });
-  opSaveShipments(list);
+  if (window.EGUSPS && EGUSPS.recordShipment) {
+    EGUSPS.recordShipment({
+      tracking: (d.tracking || '').replace(/\s/g, ''), orderNum: d.order || '', orderId: d.order || '',
+      recipient: d.name || '', recipientAddr: d.addr || '', carrier: (d.carrier || 'USPS').split(' ')[0],
+      service: d.carrier || '', cost: (d.cost || '').replace(/^\$/, ''), date: d.date || 'Just now',
+      status: 'shipped', manual: !d.order, label: d.label || null
+    });
+  }
   opRenderShipments();
 }
 
