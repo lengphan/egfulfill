@@ -39,9 +39,19 @@ export function ordersRoutes(app, requireAuth) {
   });
 
   // Create / upsert (the seller who creates it owns it)
-  app.post('/api/orders', { preHandler: requireAuth }, async (req) => {
+  app.post('/api/orders', { preHandler: requireAuth }, async (req, reply) => {
     const o = req.body || {};
     if (!o.id) { return { error: 'order id required' }; }
+    // Ownership guard: a seller may only create/update THEIR OWN, non-factory
+    // orders. Block a crafted id from overwriting another seller's order or
+    // un-flagging a factory order into the seller's own view. Staff may upsert any.
+    if (!isStaff(req.user)) {
+      const ex = await q('select seller_id, factory_order from orders where id=$1', [o.id]);
+      const row = ex.rows[0];
+      if (row && (row.factory_order || row.seller_id !== req.user.sub)) {
+        reply.code(403); return { error: 'Not allowed to modify this order' };
+      }
+    }
     // This route only ever creates SELLER/staff-made orders — Etsy imports use
     // importReceipt(). So factory_order is always false here (insert AND on
     // conflict), guaranteeing manual orders stay visible to the seller even if a

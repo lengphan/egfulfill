@@ -15,8 +15,10 @@ export function verify(token) {
 export async function signup({ email, password, role = 'seller', name = '', store_name = '' }) {
   if (!email || !password) throw new Error('Email and password are required');
   if (password.length < 8) throw new Error('Password must be at least 8 characters');
-  // Staff roles can't be self-assigned via public signup — only 'seller'.
-  const safeRole = role === 'seller' ? 'seller' : 'seller';
+  // Staff roles can't be self-assigned via public signup — public signup is ALWAYS
+  // 'seller'. Factory staff (operator/warehouse/designer/admin) are provisioned in
+  // the DB via src/scripts/set-role.js. login() reads the real role back from the DB.
+  const safeRole = 'seller';
   const hash = await bcrypt.hash(password, 10);
   try {
     const r = await q(
