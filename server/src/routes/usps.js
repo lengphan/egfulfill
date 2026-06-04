@@ -75,8 +75,12 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       consumerKey: !!KEY, consumerSecret: !!SECRET, crid: !!CRID, mid: !!MID, account: !!ACCT };
     try { await oauthToken(); out.oauth = 'ok'; out.scopes = _oauth.scope || '(none returned)'; out.requestedScope = process.env.USPS_SCOPE || '(default — none requested)'; }
     catch (e) { out.oauth = 'FAILED: ' + e.message; return out; }
-    // Does the granted token actually include the payments scope?
-    out.hasPaymentsScope = /payment/i.test(_oauth.scope || '');
+    // Does the granted token include the scopes the label flow needs? Note the
+    // word boundary — "usps:payment_methods" is NOT the "payments" scope that
+    // Payments 3.0 payment-authorization requires.
+    var sc = ' ' + (_oauth.scope || '').toLowerCase() + ' ';
+    out.hasPaymentsScope = /[\s:]payments[\s]/.test(sc);
+    out.hasLabelsScope = /[\s:]labels[\s]/.test(sc);
     try { await paymentToken(); out.payment = 'ok'; out.qualified = true; }
     catch (e) { out.payment = 'FAILED: ' + e.message; out.qualified = false; }
     return out;
