@@ -4879,7 +4879,7 @@ function whRenderBatchView() {
               <span><span style="color:#9ca3af">Placed:</span> ${o.time||o.placed||'—'}</span>
               ${o.label?.tracking_number
                 ? `<span><span style="color:#9ca3af">Tracking:</span> <span style="font-family:monospace;color:#374151;font-size:12.25px">${o.label.tracking_number}</span></span>`
-                : `<button onclick="event.stopPropagation();whOpenLabelModal('${o.num}')" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;border:1.5px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12.25px;font-weight:600;cursor:pointer;font-family:inherit">🏷 Generate Label</button>`}
+                : `<button onclick="event.stopPropagation();whOpenLabelModal('${o.num}')" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;border:1.5px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12.25px;font-weight:600;cursor:pointer;font-family:inherit">Generate Label</button>`}
               ${o.label?.state === 'label_ready' && !o.label?.scan_state
                 ? `<button onclick="event.stopPropagation();whPreScanLabel('${o.num}')" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:6px;border:1.5px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12.25px;font-weight:600;cursor:pointer;font-family:inherit">✓ Pre-scan Label</button>`
                 : o.label?.scan_state === 'pre_scanned'
