@@ -4777,7 +4777,7 @@ function whRenderBatchView() {
 
     // Label chip — shown in ORDER column for non-prescan groups when label is generated
     const labelChipHtml = (activeGroup.id !== 'prescan' && hasLabel)
-      ? `<div style="padding-left:16px;margin-top:3px"><span style="font-size:10.25px;font-weight:700;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 5px;display:inline-block">🏷 Label Ready</span></div>`
+      ? `<div style="padding-left:16px;margin-top:3px"><span style="font-size:10.25px;font-weight:700;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;padding:1px 5px;display:inline-block">Label Ready</span></div>`
       : '';
 
     // Customer city/state
@@ -4927,8 +4927,8 @@ function whRenderBatchView() {
     </div>`;
   } else {
     headerRight = `<div style="display:flex;align-items:center;gap:8px">
-      ${withLabel > 0 ? `<span style="font-size:12.25px;font-weight:700;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:3px 8px">🏷 ${withLabel} labeled</span>` : ''}
-      ${noLabel > 0 ? `<button onclick="whBvGenLabels()" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;font-size:13.25px;font-weight:600;cursor:pointer;font-family:inherit">🏷 Generate Labels</button>` : ''}
+      ${withLabel > 0 ? `<span style="font-size:12.25px;font-weight:700;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:3px 8px">${withLabel} labeled</span>` : ''}
+      ${noLabel > 0 ? `<button onclick="whBvGenLabels()" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;font-size:13.25px;font-weight:600;cursor:pointer;font-family:inherit">Generate Labels</button>` : ''}
       ${withLabel > 0 ? `<button onclick="whBvPreScanAll()" style="display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:7px;border:none;background:#4f46e5;color:#fff;font-size:13.25px;font-weight:600;cursor:pointer;font-family:inherit">✓ Pre-scan All Labels</button>` : ''}
     </div>`;
   }
