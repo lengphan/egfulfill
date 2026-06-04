@@ -64,7 +64,7 @@
       <div style="margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <label style="margin:0">Password</label>
-          <button type="button" class="link" onclick="fillDemo()">Use demo</button>
+          <a href="#" onclick="return false" class="link">Forgot password?</a>
         </div>
         <div class="pw-wrap">
           <input id="login-password" class="input" type="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:42px"/>
@@ -98,7 +98,6 @@
     if (v.indexOf('operator') >= 0 || v.indexOf('op') === 0) return 'operator.html';
     return 'admin.html'; // default staff landing
   }
-  function fillDemo(){ document.getElementById('login-email').value = 'operator@egops.com'; document.getElementById('login-password').value = 'demo1234'; }
   function togglePw(){ const inp = document.getElementById('login-password'); inp.type = inp.type === 'password' ? 'text' : 'password'; }
   function submitLogin(e){
     e.preventDefault();
