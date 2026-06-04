@@ -88,6 +88,23 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       const to = b.to || {}, from = b.from || {};
       if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
       if (!from.zip || !from.street) { reply.code(400); return { error: 'Sender (from) street + ZIP are required' }; }
+      // TEST MODE — when USPS_MOCK is set, skip OAuth/payment and return a SAMPLE
+      // label so the whole flow (modal → label → tracking → seller sync) can be
+      // tested before USPS enables the Payments scope. Set USPS_MOCK= (empty) for real.
+      if (process.env.USPS_MOCK) {
+        const t = '9400TEST' + String(Date.now()).slice(-10);
+        const e = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+        const html =
+          '<div style="font-family:Arial,sans-serif;width:384px;border:2px solid #111;padding:16px;box-sizing:border-box">'
+          + '<div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px">USPS &mdash; SAMPLE (TEM TEST)</div>'
+          + '<div style="font-size:11px;color:#555">FROM</div><div style="font-size:13px;font-weight:600;margin-bottom:10px">' + e(from.name) + '<br>' + e(from.street) + (from.street2 ? ' ' + e(from.street2) : '') + '<br>' + e(from.city) + ', ' + e(from.state) + ' ' + e(from.zip) + '</div>'
+          + '<div style="font-size:11px;color:#555">SHIP TO</div><div style="font-size:17px;font-weight:700;margin-bottom:12px">' + e(to.name) + '<br>' + e(to.street) + (to.street2 ? ' ' + e(to.street2) : '') + '<br>' + e(to.city) + ', ' + e(to.state) + ' ' + e(to.zip) + '</div>'
+          + '<div style="font-family:monospace;letter-spacing:3px;font-size:38px;text-align:center;line-height:1;margin:4px 0">█║█║║██║█║║║█║██</div>'
+          + '<div style="text-align:center;font-family:monospace;font-weight:700;font-size:15px;margin-top:4px">' + t + '</div>'
+          + '<div style="text-align:center;font-size:10px;color:#999;margin-top:10px">NOT VALID FOR POSTAGE · TEST LABEL</div></div>';
+        if (b.orderId) { try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [t, b.orderId]); } catch (e2) {} }
+        return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: html };
+      }
       const oauth = await oauthToken();
       const pay = await paymentToken();
       const splitName = (n) => { const p = String(n || '').trim().split(/\s+/); return { first: p.shift() || 'Customer', last: p.join(' ') || '-' }; };

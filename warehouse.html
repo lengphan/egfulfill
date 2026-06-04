@@ -6332,7 +6332,7 @@ async function whGenerateLabel(num) {
   if (!res || res.error) { alert('USPS label failed: ' + ((res && res.error) || 'unknown error')); return; }
 
   var tracking = res.trackingNumber || '';
-  try { EGUSPS.openLabel(res.labelImage, res.imageType || payload.imageType, tracking); } catch (e) {}
+  try { EGUSPS.openLabel(res, tracking); } catch (e) {}
   if (o) { if (!o.label) o.label = {}; o.label.state = 'label_ready'; o.label.tracking_number = tracking; o.label.generated_at = new Date().toISOString(); o.tracking = tracking; }
   // Server already stamps tracking on the order; mirror to the local cache so the
   // seller side + other boards see it immediately.

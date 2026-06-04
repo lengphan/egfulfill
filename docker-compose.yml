@@ -40,6 +40,7 @@ services:
       USPS_ACCOUNT_NUMBER: ${USPS_ACCOUNT_NUMBER:-}
       USPS_ACCOUNT_TYPE: ${USPS_ACCOUNT_TYPE:-EPS}
       USPS_SCOPE: ${USPS_SCOPE:-}
+      USPS_MOCK: ${USPS_MOCK:-}
     depends_on: [db]
     restart: unless-stopped
 

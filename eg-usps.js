@@ -37,10 +37,18 @@
     }).then(function (r) { return r.json(); });
   }
 
-  // Open / download the returned label (base64). PDF opens in a tab; ZPL downloads.
-  function openLabel(labelImage, imageType, tracking) {
+  // Open / download the returned label. Accepts the full result object: a SAMPLE
+  // (test-mode) label has labelHtml; a real label has base64 labelImage (+ imageType).
+  function openLabel(res, tracking) {
+    res = res || {};
+    if (typeof res === 'string') res = { labelImage: res, imageType: arguments[1] };  // back-compat
+    if (res.labelHtml) {
+      try { var wh = window.open('', '_blank'); if (wh) wh.document.write('<title>Label ' + (tracking || '') + '</title><body style="margin:0;display:flex;justify-content:center;padding:24px;background:#f4f2ef">' + res.labelHtml + '<\/body>'); } catch (e) {}
+      return;
+    }
+    var labelImage = res.labelImage;
     if (!labelImage) return;
-    var t = String(imageType || 'PDF').toUpperCase();
+    var t = String(res.imageType || 'PDF').toUpperCase();
     if (/ZPL/.test(t)) {
       try {
         var bin = atob(labelImage), bytes = new Uint8Array(bin.length);
@@ -136,7 +144,7 @@
     if (btn) { btn.disabled = false; btn.textContent = 'Generate Label'; }
     if (!res || res.error) { alert('USPS label failed: ' + ((res && res.error) || 'unknown error')); return; }
     var tracking = res.trackingNumber || '';
-    try { openLabel(res.labelImage, res.imageType || payload.imageType, tracking); } catch (e) {}
+    try { openLabel(res, tracking); } catch (e) {}
     try { if (window.EGStore && EGStore.update && (_ctx.orderId || _ctx.orderNum)) EGStore.update(_ctx.orderId || _ctx.orderNum, { tracking: tracking, factoryStatus: 'shipped', carrier: 'USPS' }); } catch (e) {}
     _modal.style.display = 'none';
     if (_ctx && typeof _ctx.onDone === 'function') { try { _ctx.onDone(tracking, res); } catch (e) {} }
