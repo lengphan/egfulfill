@@ -616,7 +616,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <button class="btn btn-dk" onclick="(typeof opToggleNewMenu==='function'&amp;&amp;opToggleNewMenu(event))||(typeof toggleNewMenu==='function'&amp;&amp;toggleNewMenu(event))" id="new-menu-btn" style="gap:6px"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg><span>New</span><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5 8 3.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></button>
         <div id="op-new-menu-dd" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:6px;min-width:220px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.12)">
           <div onclick="(typeof openCreateOrderModal==='function'&amp;&amp;openCreateOrderModal());document.getElementById('op-new-menu-dd').style.display='none'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 7h6M4 4.5h6M4 9.5h3" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">Create New Order</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Quick-add to print queue</div></div></div>
-          <div onclick="(typeof openOpNewLabelModal==='function'&amp;&amp;openOpNewLabelModal());document.getElementById('op-new-menu-dd').style.display='none'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 5.5h6M4 8h4" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">New Label</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Generate shipping label</div></div></div>
+          <div onclick="(window.EGUSPS?EGUSPS.openLabelModal({}):(typeof openOpNewLabelModal==='function'&amp;&amp;openOpNewLabelModal()));document.getElementById('op-new-menu-dd').style.display='none'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 5.5h6M4 8h4" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">New Label</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Generate shipping label</div></div></div>
         </div>
       </div>
       <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
@@ -1185,7 +1185,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <button id="pst-tab-scan"      onclick="setPrintTab('scan')"      style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-2px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">Scan History</button>
       <button id="pst-tab-shipments" onclick="setPrintTab('shipments')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Shipments</button>
       <div style="flex:1"></div>
-      <button class="btn btn-dk" style="font-size:12.5px;padding:6px 14px;margin-bottom:6px" onclick="openOpNewLabelModal()">+ New Label</button>
+      <button class="btn btn-dk" style="font-size:12.5px;padding:6px 14px;margin-bottom:6px" onclick="window.EGUSPS?EGUSPS.openLabelModal({}):openOpNewLabelModal()">+ New Label</button>
     </div>
 
     <!-- ══════════════════════════════════════════
@@ -4026,7 +4026,14 @@ function opLabelData(num) {
   }
   if (!name) name = o.customer || '';
   var csz = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  // Contents line for REFERENCE INFO — "Product (×qty) — METHOD" joined.
+  var contents = '';
+  try {
+    var its = o.items || (o.its) || [];
+    contents = its.map(function (it) { return (it.name || it.product || 'Item') + (it.qty ? ' ×' + it.qty : '') + (it.print || it.method ? ' — ' + (it.print || it.method) : ''); }).join('; ');
+  } catch (e) {}
   return { orderNum: num, orderId: egId, toName: name, toStreet: street, toApt: apt, toCSZ: csz,
+    seller: o.seller || o.store || 'Seller', contents: contents,
     onDone: function (tracking) {
       try { var oo = (OP_ORDERS || []).find(function (x) { return x.num === num; }); if (oo) { oo.tracking = tracking; oo.status = 'shipped'; } } catch (e) {}
       if (typeof renderOpOrders === 'function') renderOpOrders();

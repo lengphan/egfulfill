@@ -9016,8 +9016,11 @@ function whOpenLabelModal(num) {
     } catch (e) {}
   }
   if (!street) { name = name || o.customer || ''; const ap = (o.addr || '').split(', '); street = ap[0] || ''; csz = csz || ap.slice(1).join(', ') || ''; }
+  let contents = '';
+  try { const its = o.items || []; contents = its.map(it => (it.name || it.product || 'Item') + (it.qty ? ' ×' + it.qty : '') + (it.print || it.method ? ' — ' + (it.print || it.method) : '')).join('; '); } catch (e) {}
   EGUSPS.openLabelModal({
     orderNum: num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
+    seller: o.seller || o.store || 'Seller', contents: contents,
     onDone: function (tracking) {
       try { if (o) { o.tracking = tracking; o.status = 'shipped'; } } catch (e) {}
       if (typeof admMergeLiveOrders === 'function') admMergeLiveOrders();

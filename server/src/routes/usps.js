@@ -80,6 +80,23 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
     return out;
   });
 
+  // Address validation (USPS Addresses 3.0) — standardizes/verifies an address.
+  // Only needs OAuth (no payment scope). Query: streetAddress, secondaryAddress,
+  // city, state, ZIPCode. Returns the standardized address or an error.
+  app.get('/api/usps/validate-address', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const oauth = await oauthToken();
+      const qy = req.query || {};
+      const p = new URLSearchParams();
+      ['streetAddress', 'secondaryAddress', 'city', 'state', 'ZIPCode'].forEach((k) => { if (qy[k]) p.set(k, qy[k]); });
+      const res = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + oauth } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { reply.code(400); return { error: (data.error && (data.error.message || data.error)) || data.message || ('HTTP ' + res.status) }; }
+      const a = data.address || data;
+      return { ok: true, address: { street: a.streetAddress || '', street2: a.secondaryAddress || '', city: a.city || '', state: a.state || '', zip: a.ZIPCode || '', zip4: a.ZIPPlus4 || '' }, raw: data };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},
   //   weightOz, length, width, height, mailClass, imageType('PDF'|'ZPL...'), orderId }
   app.post('/api/usps/label', { preHandler: requireStaff }, async (req, reply) => {
@@ -99,8 +116,10 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
           + '<div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:1px;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px">USPS &mdash; SAMPLE (TEM TEST)</div>'
           + '<div style="font-size:11px;color:#555">FROM</div><div style="font-size:13px;font-weight:600;margin-bottom:10px">' + e(from.name) + '<br>' + e(from.street) + (from.street2 ? ' ' + e(from.street2) : '') + '<br>' + e(from.city) + ', ' + e(from.state) + ' ' + e(from.zip) + '</div>'
           + '<div style="font-size:11px;color:#555">SHIP TO</div><div style="font-size:17px;font-weight:700;margin-bottom:12px">' + e(to.name) + '<br>' + e(to.street) + (to.street2 ? ' ' + e(to.street2) : '') + '<br>' + e(to.city) + ', ' + e(to.state) + ' ' + e(to.zip) + '</div>'
+          + ((b.signature || b.insurance) ? '<div style="font-size:10px;color:#111;font-weight:700;margin-bottom:8px">' + [b.signature ? 'SIGNATURE CONFIRMATION' : '', b.insurance ? 'INSURED' : ''].filter(Boolean).join(' · ') + '</div>' : '')
           + '<div style="font-family:monospace;letter-spacing:3px;font-size:38px;text-align:center;line-height:1;margin:4px 0">█║█║║██║█║║║█║██</div>'
           + '<div style="text-align:center;font-family:monospace;font-weight:700;font-size:15px;margin-top:4px">' + t + '</div>'
+          + ((b.refNo || b.refNo2 || b.contents) ? '<div style="border-top:1px dashed #bbb;margin-top:10px;padding-top:6px;font-size:10px;color:#555;line-height:1.5">' + [b.refNo ? 'Ref 1: ' + e(b.refNo) : '', b.refNo2 ? 'Ref 2: ' + e(b.refNo2) : '', b.contents ? e(b.contents) : ''].filter(Boolean).join('<br>') + '</div>' : '')
           + '<div style="text-align:center;font-size:10px;color:#999;margin-top:10px">NOT VALID FOR POSTAGE · TEST LABEL</div></div>';
         if (b.orderId) { try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [t, b.orderId]); } catch (e2) {} }
         return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: html };
