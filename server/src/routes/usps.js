@@ -50,10 +50,14 @@ async function paymentToken() {
   if (_pay.token && Date.now() < _pay.exp - 60000) return _pay.token;
   if (!CRID || !MID || !ACCT) throw new Error('Server missing USPS_CRID / USPS_MID / USPS_ACCOUNT_NUMBER (needed for the payment token)');
   const tok = await oauthToken();
+  // Per Payments 3.0 spec: PAYER needs CRID + accountType + accountNumber (EPS).
+  // LABEL_OWNER needs CRID + MID + manifestMID (NOT account fields). manifestMID
+  // defaults to the MID (matches USPS's MinimumPaymentAuthorizationRequest example).
+  const MANIFEST_MID = process.env.USPS_MANIFEST_MID || MID;
   const body = {
     roles: [
-      { roleName: 'PAYER',       CRID, MID, accountType: ACCT_TYPE, accountNumber: ACCT },
-      { roleName: 'LABEL_OWNER', CRID, MID, accountType: ACCT_TYPE, accountNumber: ACCT }
+      { roleName: 'PAYER',       CRID, MID, manifestMID: MANIFEST_MID, accountType: ACCT_TYPE, accountNumber: ACCT },
+      { roleName: 'LABEL_OWNER', CRID, MID, manifestMID: MANIFEST_MID }
     ]
   };
   const res = await fetch(`${BASE}/payments/v3/payment-authorization`, {
@@ -83,6 +87,17 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
     out.hasLabelsScope = /[\s:]labels[\s]/.test(sc);
     try { await paymentToken(); out.payment = 'ok'; out.qualified = true; }
     catch (e) { out.payment = 'FAILED: ' + e.message; out.qualified = false; }
+    // EPS account / funds inquiry (Payments 3.0 GET /payment-account). Also needs
+    // the `payments` scope, so it 403s until USPS grants it — but once it works it
+    // reports whether the EPS account exists and is funded.
+    if (ACCT) {
+      try {
+        const oauth = await oauthToken();
+        const r = await fetch(`${BASE}/payments/v3/payment-account/${encodeURIComponent(ACCT)}?accountType=${ACCT_TYPE}`, { headers: { Authorization: 'Bearer ' + oauth } });
+        const d = await r.json().catch(() => ({}));
+        out.epsAccount = r.ok ? { ok: true, accountType: d.accountType, nonProfit: d.nonProfitStatus } : ('FAILED: ' + ((d.error && (d.error.message || d.error)) || ('HTTP ' + r.status)));
+      } catch (e) { out.epsAccount = 'FAILED: ' + e.message; }
+    }
     return out;
   });
 
