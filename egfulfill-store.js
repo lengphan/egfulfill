@@ -1363,9 +1363,9 @@
     DESIGN_TYPES_KEY: 'eg_design_types',
     _defaultDesignTypes: function() {
       return [
-        { id: 'dtg', name: 'DTG', color: '#5f52b0' },
-        { id: 'dtf', name: 'DTF', color: '#a05a2c' },
-        { id: 'emb', name: 'EMB', color: '#286038' },
+        { id: 'dtg', name: 'DTG', color: '#d6d6d6' },
+        { id: 'dtf', name: 'DTF', color: '#9a9a9a' },
+        { id: 'emb', name: 'EMB', color: '#3a3a3a' },
       ];
     },
     getDesignTypes: function() {

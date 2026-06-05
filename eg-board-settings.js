@@ -42,7 +42,6 @@
           '</div>' +
           '<input type="color" data-act="color" value="' + t.color + '" title="Edit color" style="width:34px;height:34px;border:1.5px solid #e5e4e0;border-radius:6px;cursor:pointer;padding:1px;background:#fff;flex-shrink:0">' +
           '<input data-act="name" value="' + String(t.name).replace(/"/g, '&quot;') + '" maxlength="20" style="flex:1;font-size:14px;font-weight:600;padding:7px 10px;border:1.5px solid #f0ede9;border-radius:6px;outline:none;font-family:inherit;text-transform:uppercase">' +
-          '<span style="font-family:monospace;font-size:11.5px;color:#b0aaa4;flex-shrink:0">' + t.id + '</span>' +
           '<button data-act="del" title="Delete" style="width:30px;height:30px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:6px;cursor:pointer;font-size:15px;line-height:1;font-family:inherit;flex-shrink:0">×</button>' +
         '</div>';
     }).join('');
