@@ -14,10 +14,24 @@
 // VietQR portal's "Username/Password khách hàng cung cấp" fields).
 import jwt from 'jsonwebtoken';
 import { q } from '../db.js';
+import { isStaff } from '../auth.js';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
-const VQ_USER = process.env.VIETQR_USERNAME || '';
+const VQ_USER = process.env.VIETQR_USERNAME || '';   // inbound: VietQR -> us
 const VQ_PASS = process.env.VIETQR_PASSWORD || '';
+
+// Outbound: us -> VietQR (Account API creds VietQR issued, for get-token/generate/test).
+const VQ_API_BASE = (process.env.VIETQR_API_BASE || 'https://dev.vietqr.org').replace(/\/+$/, '');
+const VQ_API_USER = process.env.VIETQR_API_USERNAME || '';
+const VQ_API_PASS = process.env.VIETQR_API_PASSWORD || '';
+async function vqOutboundToken() {
+  if (!VQ_API_USER || !VQ_API_PASS) throw new Error('Server missing VIETQR_API_USERNAME / VIETQR_API_PASSWORD');
+  const auth = Buffer.from(VQ_API_USER + ':' + VQ_API_PASS).toString('base64');
+  const r = await fetch(VQ_API_BASE + '/vqr/api/token_generate', { method: 'POST', headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json' } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.access_token) throw new Error('VietQR get-token failed: ' + (d.message || ('HTTP ' + r.status)));
+  return d.access_token;
+}
 
 function basicOk(req) {
   const m = (req.headers.authorization || '').match(/^Basic\s+(.+)$/i);
@@ -131,5 +145,53 @@ export function vietqrRoutes(app, requireAuth) {
     if (!rate || rate <= 0) { reply.code(400); return { error: 'Invalid rate' }; }
     await q("insert into settings (key,value,updated_at) values ('vqr_rate',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [String(rate)]);
     return { ok: true, rate };
+  });
+
+  // ── Self-test: run VietQR's 3-step sandbox flow (get-token → generate QR →
+  //    test-callback) and confirm the callback reached our transaction-sync. Staff only.
+  //    Usage: /api/vietqr/selftest?bankCode=MB&account=0369053640&name=LE THI MAI HUONG&amount=10000
+  app.get('/api/vietqr/selftest', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const qy = req.query || {};
+    const out = { base: VQ_API_BASE };
+    let token;
+    try { token = await vqOutboundToken(); out.step1_getToken = 'ok'; }
+    catch (e) { out.step1_getToken = 'FAILED: ' + e.message; return out; }
+
+    const bankCode = qy.bankCode, account = qy.account, name = qy.name || 'EGFULFILL';
+    const amount = Number(qy.amount) || 10000;
+    if (!bankCode || !account) { out.note = 'Pass ?bankCode=MB&account=0369053640&name=LE THI MAI HUONG&amount=10000'; return out; }
+
+    const ts = Date.now().toString().slice(-8);
+    const content = 'EGTEST' + ts;          // ≤23, alnum, no special chars
+    const orderId = 'EG' + ts;              // ≤13
+    let genContent = content;
+    try {
+      const gr = await fetch(VQ_API_BASE + '/vqr/api/qr/generate-customer', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content, amount, orderId, qrType: 0, transType: 'C' })
+      });
+      const gd = await gr.json().catch(() => ({}));
+      if (!gr.ok) { out.step2_generate = 'FAILED: ' + JSON.stringify(gd).slice(0, 300); return out; }
+      genContent = gd.content || content;
+      out.step2_generate = { ok: true, content: genContent, vaAccount: gd.vaAccount, transactionRefId: gd.transactionRefId };
+    } catch (e) { out.step2_generate = 'FAILED: ' + e.message; return out; }
+
+    try {
+      const cr = await fetch(VQ_API_BASE + '/vqr/bank/api/test/transaction-callback', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankAccount: account, content: genContent, amount, bankCode, transType: 'C' })
+      });
+      const cd = await cr.json().catch(() => ({}));
+      out.step3_testCallback = cr.ok ? Object.assign({ ok: true }, cd) : ('FAILED: ' + JSON.stringify(cd).slice(0, 300));
+    } catch (e) { out.step3_testCallback = 'FAILED: ' + e.message; return out; }
+
+    // VietQR posts to our transaction-sync asynchronously — wait, then check our DB.
+    await new Promise((r) => setTimeout(r, 3000));
+    try {
+      const rr = await q("select transactionid, amount, content, created_at from vietqr_transactions where content ilike '%'||$1||'%' order by created_at desc limit 1", [genContent]);
+      out.recordedInOurDB = rr.rows[0] || 'NOT FOUND YET — VietQR accepted the callback but we have not received the transaction-sync POST. Check the connection is approved + our callback URL (https://egful.store/vqr) is registered.';
+    } catch (e) { out.recordedInOurDB = 'check failed: ' + e.message; }
+    return out;
   });
 }

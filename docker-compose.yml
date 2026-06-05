@@ -47,6 +47,10 @@ services:
       # from /vqr/api/token_generate before posting balance-change transactions.
       VIETQR_USERNAME: ${VIETQR_USERNAME:-}
       VIETQR_PASSWORD: ${VIETQR_PASSWORD:-}
+      # Outbound VietQR Account API (get-token/generate/test) — for sandbox testing.
+      VIETQR_API_BASE: ${VIETQR_API_BASE:-https://dev.vietqr.org}
+      VIETQR_API_USERNAME: ${VIETQR_API_USERNAME:-}
+      VIETQR_API_PASSWORD: ${VIETQR_API_PASSWORD:-}
       # PayPal wallet top-up (Orders API v2). Use sandbox keys to test, live in prod.
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
       PAYPAL_SECRET: ${PAYPAL_SECRET:-}
