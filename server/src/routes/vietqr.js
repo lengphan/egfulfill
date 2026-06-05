@@ -103,8 +103,10 @@ export function vietqrRoutes(app, requireAuth) {
   app.get('/api/vietqr/status', { preHandler: requireAuth }, async (req) => {
     const ref = String((req.query && req.query.ref) || '').trim();
     if (!ref) return { paid: false };
+    // Match an order (matched_order/order_id) OR a top-up reference embedded in the
+    // transfer content (addInfo) — wallet top-ups carry a code, not an order id.
     const r = await q(
-      "select * from vietqr_transactions where (matched_order=$1 or order_id=$1) and upper(coalesce(trans_type,'C'))='C' order by created_at desc limit 1",
+      "select * from vietqr_transactions where (matched_order=$1 or order_id=$1 or content ilike '%'||$1||'%') and upper(coalesce(trans_type,'C'))='C' order by created_at desc limit 1",
       [ref]
     );
     const t = r.rows[0];
@@ -114,5 +116,20 @@ export function vietqrRoutes(app, requireAuth) {
   app.get('/api/vietqr/transactions', { preHandler: requireAuth }, async () => {
     const r = await q('select transactionid, referencenumber, bankaccount, amount, trans_type, content, matched_order, created_at from vietqr_transactions order by created_at desc limit 100');
     return r.rows;
+  });
+
+  // ── Admin-set USD→VND exchange rate (shared across all sellers) ──────────────
+  q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`).catch(() => {});
+  app.get('/api/vietqr/rate', { preHandler: requireAuth }, async () => {
+    const r = await q("select value from settings where key='vqr_rate'");
+    const rate = r.rows[0] ? Number(r.rows[0].value) : 0;
+    return { rate: rate > 0 ? rate : 25400 };
+  });
+  app.put('/api/vietqr/rate', { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only — only an admin can set the exchange rate' }; }
+    const rate = Math.round(Number((req.body || {}).rate) || 0);
+    if (!rate || rate <= 0) { reply.code(400); return { error: 'Invalid rate' }; }
+    await q("insert into settings (key,value,updated_at) values ('vqr_rate',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [String(rate)]);
+    return { ok: true, rate };
   });
 }

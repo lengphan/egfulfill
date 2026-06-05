@@ -771,7 +771,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>
-      <select id="modal-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
+      <select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
+        <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
       </select>
@@ -780,13 +781,21 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>
       <div style="position:relative">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span>
-        <input id="modal-amount" type="number" min="1" step="0.01" placeholder="0.00" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:700" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+        <input id="modal-amount" type="number" min="1" step="0.01" placeholder="0.00" oninput="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:700" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
       </div>
       <div style="display:flex;gap:6px;margin-top:8px">
-        <button onclick="document.getElementById('modal-amount').value='280'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$280</button>
-        <button onclick="document.getElementById('modal-amount').value='500'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$500</button>
-        <button onclick="document.getElementById('modal-amount').value='840'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$840</button>
-        <button onclick="document.getElementById('modal-amount').value='1000'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$1,000</button>
+        <button onclick="document.getElementById('modal-amount').value='280';vqrSyncDepositUI()" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$280</button>
+        <button onclick="document.getElementById('modal-amount').value='500';vqrSyncDepositUI()" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$500</button>
+        <button onclick="document.getElementById('modal-amount').value='840';vqrSyncDepositUI()" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$840</button>
+        <button onclick="document.getElementById('modal-amount').value='1000';vqrSyncDepositUI()" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$1,000</button>
+      </div>
+      <!-- VietQR live conversion (admin's rate) — shown only for the VietQR method -->
+      <div id="dep-vqr-box" style="display:none;margin-top:12px;background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px">
+          <span style="color:#6b7280">Your rate — 1 USD = ₫</span>
+          <input id="dep-vqr-rate" type="number" min="1" step="1" oninput="vqrSaveRate(this.value);vqrSyncDepositUI()" style="width:100px;text-align:right;border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;font-weight:700;outline:none" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#6b7280">Transfer amount</span><b id="dep-vnd-preview" style="font-size:14.5px;color:#191918">₫0</b></div>
       </div>
     </div>
     <button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
@@ -811,6 +820,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="margin-bottom:14px">
       <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>
       <select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'">
+        <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
       </select>
@@ -1060,6 +1070,41 @@ function submitAddBank() {
 function openDepositModal() {
   document.getElementById('deposit-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+  if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
+}
+// Admin's USD→VND rate (set by admin, shared via server; cached locally). Default 25,400.
+function egVqrRate() { var r = parseFloat(localStorage.getItem('eg_vqr_rate')); return (r && r > 0) ? r : 25400; }
+function egIsAdmin() { try { return (JSON.parse(localStorage.getItem('eg_user') || '{}').role) === 'admin'; } catch (e) { return false; } }
+function vqrSaveRate(v) {
+  var n = Math.round(parseFloat(v)); if (!n || n <= 0) return;
+  localStorage.setItem('eg_vqr_rate', String(n));
+  // Only an admin persists the shared rate to the server (sellers see it read-only).
+  var tok = localStorage.getItem('eg_token');
+  if (tok && egIsAdmin()) {
+    fetch('/api/vietqr/rate', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ rate: n }) }).catch(function () {});
+  }
+}
+// Live-sync the deposit modal: show the VietQR box + ₫ preview at the set rate,
+// recomputed from whichever amount the seller picked.
+function vqrSyncDepositUI() {
+  var methodEl = document.getElementById('modal-method'); if (!methodEl) return;
+  var isVqr = methodEl.value === 'vietqr';
+  var box = document.getElementById('dep-vqr-box'); if (box) box.style.display = isVqr ? 'block' : 'none';
+  var rateEl = document.getElementById('dep-vqr-rate');
+  if (rateEl) {
+    if (!rateEl.value) rateEl.value = egVqrRate();
+    // Sellers see the admin's rate read-only; only admins can change it.
+    var admin = egIsAdmin();
+    rateEl.readOnly = !admin;
+    rateEl.title = admin ? 'Set the USD→VND rate (applies to all sellers)' : 'Exchange rate is set by the admin';
+    rateEl.style.opacity = admin ? '1' : '.75';
+    rateEl.style.cursor = admin ? 'text' : 'not-allowed';
+  }
+  var amt = parseFloat((document.getElementById('modal-amount') || {}).value) || 0;
+  var vnd = Math.max(0, Math.round(amt * egVqrRate() / 1000) * 1000);
+  var pv = document.getElementById('dep-vnd-preview'); if (pv) pv.textContent = '₫' + vnd.toLocaleString('en-US');
+  var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
+  if (btn && btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isVqr ? 'Show VietQR code' : 'Confirm Deposit';
 }
 function closeDepositModal() {
   document.getElementById('deposit-modal').style.display = 'none';
@@ -1069,6 +1114,9 @@ function submitDeposit() {
   const amount = parseFloat(document.getElementById('modal-amount').value);
   const method = document.getElementById('modal-method').value;
   if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
+  // VietQR: don't credit instantly — show the scan-to-pay QR and wait for the
+  // bank transfer to land (auto-confirmed via /api/vietqr/status).
+  if (method === 'vietqr') { closeDepositModal(); openVietQRTopUp(amount); return; }
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amount).toFixed(2));
   localStorage.setItem('eg_balance', bal.toFixed(2));
@@ -1080,6 +1128,134 @@ function submitDeposit() {
   updateUnfundedSection();
   closeDepositModal();
 }
+
+/* ── VietQR top-up ──────────────────────────────────────────────────────────
+   Shows a Vietcombank VietQR code (img.vietqr.io) for the entered amount with a
+   unique transfer note (addInfo). Polls /api/vietqr/status?ref=<note>; when the
+   matching bank transfer lands (VietQR pushes it to our transaction-sync endpoint)
+   the wallet is credited automatically. Reconciliation matches on the note, so the
+   approximate USD→VND rate below only affects the suggested transfer amount. */
+const EG_VQR = {
+  bank: '970436',            // Vietcombank BIN
+  account: '0971000021199',
+  name: 'EMBROIDERY GOODS',
+  usdToVnd: 25400            // approx; QR amount only (matching is by the note)
+};
+let _vqrPoll = null;
+function vqrCreditWallet(amountUSD) {
+  let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
+  bal = parseFloat((bal + amountUSD).toFixed(2));
+  localStorage.setItem('eg_balance', bal.toFixed(2));
+  document.querySelectorAll('#balance-val').forEach(el => el.textContent = '$' + bal.toFixed(2));
+  const big = document.getElementById('wallet-bal-big'); if (big) big.textContent = '$' + bal.toFixed(2);
+}
+function closeVietQR() {
+  if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
+  const m = document.getElementById('vqr-modal'); if (m) m.style.display = 'none';
+  document.body.style.overflow = '';
+}
+function openVietQRTopUp(amountUSD) {
+  // Tag the transfer note with the seller so the right wallet is credited (all
+  // top-ups land in the admin's one account; the note routes the credit).
+  var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
+  var tag = (String((u.email || '').split('@')[0] || u.id || 'S').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase()) || 'S';
+  const ref = ('EG' + tag + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+  const rate = egVqrRate();
+  const vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
+  const qr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-compact2.png'
+    + '?amount=' + vnd + '&addInfo=' + encodeURIComponent(ref) + '&accountName=' + encodeURIComponent(EG_VQR.name);
+  let m = document.getElementById('vqr-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'vqr-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;z-index:400;align-items:center;justify-content:center;font-family:inherit';
+    document.body.appendChild(m);
+  }
+  const vndStr = vnd.toLocaleString('en-US');
+  m.innerHTML =
+    '<div onclick="closeVietQR()" style="position:fixed;inset:0;background:rgba(0,0,0,.45)"></div>'
+    + '<div style="position:relative;background:#fff;border-radius:16px;width:380px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:16px;font-weight:700;color:#191918">Top up via VietQR</div><button onclick="closeVietQR()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
+    + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$' + amountUSD.toFixed(2) + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer ≈ ₫' + vndStr + ' · 1 USD = ₫' + rate.toLocaleString('en-US') + '</div></div>'
+    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><img src="' + qr + '" alt="VietQR" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;background:#fff" onerror="this.style.display=\'none\'"></div>'
+    + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:12px">'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>Vietcombank</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b style="font-family:monospace">' + EG_VQR.account + '</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Name</span><b>' + EG_VQR.name + '</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (bắt buộc)</span><b style="font-family:monospace;color:#b45309">' + ref + '</b></div>'
+    + '</div>'
+    + '<div style="font-size:12px;color:#9ca3af;text-align:center;margin-bottom:10px">Scan with your banking app. The note <b style="color:#b45309;font-family:monospace">' + ref + '</b> must be kept — it confirms your top-up automatically.</div>'
+    + '<div id="vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:8px;background:#f6f5f4;border-radius:9px">'
+      + '<span class="vqr-spin" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#6b7280;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Waiting for your transfer…</div>'
+    + '<div style="text-align:center;margin-top:10px"><button onclick="vqrSimulate(' + amountUSD + ',\'' + ref + '\')" style="background:none;border:none;color:#c4c3be;font-size:11.5px;cursor:pointer;text-decoration:underline;font-family:inherit">Simulate payment (test only)</button></div>'
+    + '</div>';
+  if (!document.getElementById('vqr-spin-css')) {
+    const st = document.createElement('style'); st.id = 'vqr-spin-css';
+    st.textContent = '@keyframes vqrspin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+  m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+
+  // Poll for the matching transfer.
+  if (_vqrPoll) clearInterval(_vqrPoll);
+  const started = Date.now();
+  const tok = localStorage.getItem('eg_token') || '';
+  _vqrPoll = setInterval(function () {
+    if (Date.now() - started > 15 * 60 * 1000) { clearInterval(_vqrPoll); _vqrPoll = null; return; }   // stop after 15 min
+    fetch('/api/vietqr/status?ref=' + encodeURIComponent(ref), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.paid) vqrOnPaid(amountUSD, ref); })
+      .catch(function () {});
+  }, 4000);
+}
+function vqrOnPaid(amountUSD, ref) {
+  if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
+  vqrCreditWallet(amountUSD);
+  vqrRecordDeposit(amountUSD, ref);
+  const s = document.getElementById('vqr-status');
+  if (s) { s.style.background = '#e7f6ec'; s.style.color = '#15803d';
+    s.innerHTML = '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 8l3 3 6-7" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Payment received — $' + amountUSD.toFixed(2) + ' added'; }
+  setTimeout(closeVietQR, 2200);
+}
+// Record a successful top-up into the wallet's payment history (persisted) so it
+// shows in the Transactions table and the Deposits filter.
+function vqrRecordDeposit(amountUSD, ref) {
+  try {
+    var bal = parseFloat(localStorage.getItem('eg_balance') || '0');
+    var now = new Date();
+    var rec = {
+      date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      desc: 'Wallet top-up (VietQR)', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'VietQR',
+      type: 'deposit', amount: amountUSD, balance: bal
+    };
+    if (typeof TX !== 'undefined') TX.unshift(rec);
+    var saved = []; try { saved = JSON.parse(localStorage.getItem('eg_wallet_tx') || '[]'); } catch (e) {}
+    saved.unshift(rec); localStorage.setItem('eg_wallet_tx', JSON.stringify(saved.slice(0, 200)));
+    try { var d = (STATS.all[currentPeriod] || STATS.all.month); d.dep += amountUSD; } catch (e) {}
+    if (typeof renderTx === 'function') renderTx();
+    if (typeof updateStats === 'function') updateStats();
+  } catch (e) {}
+}
+// Test helper (VietQR not live yet): pretend the transfer arrived.
+function vqrSimulate(amountUSD, ref) { vqrOnPaid(amountUSD, ref); }
+
+// On load: pull the admin's shared rate, and restore persisted top-up history.
+(function () {
+  var tok = localStorage.getItem('eg_token');
+  if (tok) {
+    fetch('/api/vietqr/rate', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.rate) { localStorage.setItem('eg_vqr_rate', String(d.rate)); if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI(); } })
+      .catch(function () {});
+  }
+  try {
+    var saved = JSON.parse(localStorage.getItem('eg_wallet_tx') || '[]');
+    if (Array.isArray(saved) && saved.length && typeof TX !== 'undefined') {
+      saved.slice().reverse().forEach(function (r) { TX.unshift(r); });
+      if (typeof renderTx === 'function') renderTx();
+    }
+  } catch (e) {}
+})();
 
 /* ── Withdraw ── Minimum $50 + can't exceed available balance.
    On submit: debits localStorage eg_balance and updates every visible
