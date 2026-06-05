@@ -3162,6 +3162,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Users</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Add team members, change roles, reset passwords. Admin only — backed by your server.</div>
           <div id="eg-users-root"></div>
+          <div id="adm-reset-requests" style="margin-top:20px"></div>
         </div>
       </div>
     </div>
@@ -9827,6 +9828,51 @@ setInterval(function () {
   if (document.getElementById('section-balance') && document.getElementById('section-balance').classList.contains('active')) { admRenderPendingTopups(); admReconcileTopups(); }
 }, 10000);
 document.addEventListener('DOMContentLoaded', function () { admRenderPendingTopups(); admReconcileTopups(); });
+
+// ── Password reset requests (admin-mediated) ──────────────────────────────────
+function admRenderResetRequests() {
+  var box = document.getElementById('adm-reset-requests'); if (!box) return;
+  var tok = localStorage.getItem('eg_token'); if (!tok) return;
+  fetch('/api/auth/reset-requests', { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (list) {
+      if (!Array.isArray(list) || !list.length) { box.innerHTML = ''; return; }
+      box.innerHTML =
+        '<div style="border:1px solid #e5e4e0;border-radius:12px;overflow:hidden">'
+        + '<div style="padding:12px 16px;background:#fff7ed;border-bottom:1px solid #fde7cf;font-size:13.5px;font-weight:700;color:#9a3412">Password reset requests <span style="font-weight:600;color:#c2620c">(' + list.length + ')</span></div>'
+        + list.map(function (q0) {
+            var when = new Date(q0.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+            var em = String(q0.email || '').replace(/'/g, "\\'");
+            return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 16px;border-top:1px solid #f3f3f1">'
+              + '<div><div style="font-size:13.5px;font-weight:600;color:#191918">' + (q0.email || '—') + '</div><div style="font-size:12px;color:#9ca3af">Requested ' + when + '</div></div>'
+              + '<div style="display:flex;gap:8px">'
+              + '<button onclick="admResolveReset(\'' + q0.id + '\',\'' + em + '\')" style="background:#191918;color:#fff;border:none;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Set new password</button>'
+              + '<button onclick="admRejectReset(\'' + q0.id + '\')" style="background:#fff;color:#6b7280;border:1px solid #e5e4e0;border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Dismiss</button>'
+              + '</div></div>';
+          }).join('')
+        + '</div>';
+    }).catch(function () {});
+}
+function admResolveReset(id, email) {
+  var pw = prompt('Set a new password for ' + email + ' (min 6 chars). Share it with them securely:');
+  if (pw == null) return;
+  if (pw.length < 6) { alert('Password must be at least 6 characters.'); return; }
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/auth/reset-requests/' + id + '/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ password: pw }) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (d && d.error) { alert('Could not set password: ' + d.error); return; } alert('Password updated for ' + email + '. Share the new password with them securely.'); admRenderResetRequests(); })
+    .catch(function (e) { alert('Error: ' + e.message); });
+}
+function admRejectReset(id) {
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/auth/reset-requests/' + id + '/reject', { method: 'POST', headers: { Authorization: 'Bearer ' + tok } })
+    .then(function () { admRenderResetRequests(); }).catch(function () {});
+}
+window.admRenderResetRequests = admRenderResetRequests;
+window.admResolveReset = admResolveReset;
+window.admRejectReset = admRejectReset;
+document.addEventListener('DOMContentLoaded', admRenderResetRequests);
+setInterval(admRenderResetRequests, 15000);
 function walRenderLedger() {
   var tbody = document.getElementById('wal-ledger-rows');
   var empty = document.getElementById('wal-empty');

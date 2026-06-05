@@ -66,6 +66,15 @@ services:
       # Stripe card top-up. Use test keys (sk_test/pk_test) to test, live in prod.
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      # Password-reset email link (optional). Leave SMTP_HOST blank to keep resets
+      # admin-mediated only; set these to turn on self-service email reset links.
+      APP_URL: ${APP_URL:-https://egful.store}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     depends_on: [db]
     restart: unless-stopped
 

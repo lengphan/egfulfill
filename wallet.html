@@ -1420,7 +1420,7 @@ function openVietQRTopUp(amountUSD) {
     if (Date.now() - started > 15 * 60 * 1000) { clearInterval(_vqrPoll); _vqrPoll = null; return; }   // stop after 15 min
     fetch('/api/vietqr/status?ref=' + encodeURIComponent(_vqrRef), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d && d.paid) vqrOnPaid(amountUSD, _vqrRef, d.transaction && d.transaction.transactionid); })
+      .then(function (d) { if (d && d.paid) vqrOnPaid(amountUSD, _vqrRef, d.transaction && (d.transaction.referencenumber || d.transaction.transactionid)); })
       .catch(function () {});
   }, 4000);
 }
@@ -1442,7 +1442,7 @@ function vqrRecordDeposit(amountUSD, ref, method, txnId) {
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'VietQR top-up', order: '', ref: ref || '', txnId: txnId || '', platform: 'all', method: method,
+      desc: 'Wallet Top Up', order: '', ref: ref || '', txnId: txnId || '', platform: 'all', method: method,
       type: 'deposit', amount: amountUSD, balance: bal
     };
     if (typeof TX !== 'undefined') TX.unshift(rec);
@@ -1486,7 +1486,7 @@ function vqrRecordPending(amountUSD, ref, topupId) {
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'VietQR top-up', order: '', ref: ref || '', txnId: '', platform: 'all', method: 'BIDV',
+      desc: 'Wallet Top Up', order: '', ref: ref || '', txnId: '', platform: 'all', method: 'BIDV',
       type: 'deposit', amount: amountUSD, balance: parseFloat(localStorage.getItem('eg_balance') || '0'),
       pending: true, ref: ref, topupId: topupId
     };

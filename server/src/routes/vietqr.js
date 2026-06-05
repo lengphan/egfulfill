@@ -103,9 +103,12 @@ export function vietqrRoutes(app, requireAuth) {
       // what makes a real payment land → auto-confirm with no admin action.
       if (String(b.transType || 'C').toUpperCase() === 'C') {
         if (matched) await q('update orders set paid=true, paid_at=now() where id=$1', [matched]).catch(() => {});
+        // Show the bank's reference number (what the payer sees on their bank
+        // screen, e.g. 6156…) as the transaction id — fall back to VietQR's id.
+        const bankRef = String(b.referencenumber || '').trim() || txid;
         await q(
           "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%'",
-          [content, txid]
+          [content, bankRef]
         ).catch(() => {});
       }
       return { error: false, errorReason: null, toastMessage: 'OK', object: { reftransactionid: txid } };
