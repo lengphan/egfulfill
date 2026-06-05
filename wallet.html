@@ -1187,7 +1187,8 @@ function openVietQRTopUp(amountUSD) {
     + '<div style="font-size:12px;color:#9ca3af;text-align:center;margin-bottom:10px">Scan with your banking app. The note <b style="color:#b45309;font-family:monospace">' + ref + '</b> must be kept — it confirms your top-up automatically.</div>'
     + '<div id="vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:8px;background:#f6f5f4;border-radius:9px">'
       + '<span class="vqr-spin" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#6b7280;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Waiting for your transfer…</div>'
-    + '<div style="text-align:center;margin-top:10px"><button onclick="vqrSimulate(' + amountUSD + ',\'' + ref + '\')" style="background:none;border:none;color:#c4c3be;font-size:11.5px;cursor:pointer;text-decoration:underline;font-family:inherit">Simulate payment (test only)</button></div>'
+    + '<button onclick="vqrIveTransferred(' + amountUSD + ',\'' + ref + '\',' + vnd + ',this)" style="margin-top:8px;width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">I\'ve transferred — notify admin</button>'
+    + '<div style="text-align:center;margin-top:8px"><button onclick="vqrSimulate(' + amountUSD + ',\'' + ref + '\')" style="background:none;border:none;color:#c4c3be;font-size:11px;cursor:pointer;text-decoration:underline;font-family:inherit">Simulate (test)</button></div>'
     + '</div>';
   if (!document.getElementById('vqr-spin-css')) {
     const st = document.createElement('style'); st.id = 'vqr-spin-css';
@@ -1238,6 +1239,43 @@ function vqrRecordDeposit(amountUSD, ref) {
 }
 // Test helper (VietQR not live yet): pretend the transfer arrived.
 function vqrSimulate(amountUSD, ref) { vqrOnPaid(amountUSD, ref); }
+// Seller clicked "I've transferred" → create a pending top-up the admin can confirm,
+// then wait for the admin's "Received". On confirm, vqrOnPaid credits the wallet AND
+// records it in the seller's transaction history (vqrRecordDeposit).
+function vqrIveTransferred(amountUSD, ref, vnd, btn) {
+  var tok = localStorage.getItem('eg_token');
+  if (!tok) { alert('Please sign in first.'); return; }
+  var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
+  if (btn) { btn.disabled = true; btn.textContent = 'Notifying admin…'; }
+  fetch('/api/topups', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ amount: amountUSD, vnd: vnd, ref: ref, note: ref, name: (u.name || u.email || '') }) })
+    .then(function (r) { return r.json(); })
+    .then(function (rec) {
+      var s = document.getElementById('vqr-status');
+      if (s) { s.style.background = '#fef6e7'; s.style.color = '#b45309';
+        s.innerHTML = '<span class="vqr-spin" style="width:14px;height:14px;border:2px solid #f3d9a6;border-top-color:#b45309;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Sent to admin — waiting for confirmation…'; }
+      if (btn) btn.style.display = 'none';
+      if (rec && rec.id) vqrPollTopup(rec.id, amountUSD, ref);
+    })
+    .catch(function (e) { if (btn) { btn.disabled = false; btn.textContent = "I've transferred — notify admin"; } alert('Could not notify admin: ' + e.message); });
+}
+function vqrPollTopup(id, amountUSD, ref) {
+  if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
+  var tok = localStorage.getItem('eg_token'); var started = Date.now();
+  _vqrPoll = setInterval(function () {
+    if (Date.now() - started > 30 * 60 * 1000) { clearInterval(_vqrPoll); _vqrPoll = null; return; }
+    fetch('/api/topups', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+      .then(function (r) { return r.json(); })
+      .then(function (list) {
+        if (!Array.isArray(list)) return;
+        var rec = list.find(function (x) { return x.id === id; });
+        if (rec && rec.status === 'received') { vqrOnPaid(amountUSD, ref); }
+        else if (rec && rec.status === 'rejected') {
+          clearInterval(_vqrPoll); _vqrPoll = null;
+          var s = document.getElementById('vqr-status'); if (s) { s.style.background = '#fef2f2'; s.style.color = '#dc2626'; s.textContent = '✕ Top-up was rejected by admin'; }
+        }
+      }).catch(function () {});
+  }, 5000);
+}
 
 // On load: pull the admin's shared rate, and restore persisted top-up history.
 (function () {
