@@ -98,9 +98,15 @@ export function vietqrRoutes(app, requireAuth) {
         [txid, b.referencenumber || null, b.bankaccount || null, Number(b.amount) || 0, b.transType || null, content || null, cand || null, matched, JSON.stringify(b)]
       );
 
-      // Credit (money in) + matched order → mark it paid.
-      if (String(b.transType || 'C').toUpperCase() === 'C' && matched) {
-        await q('update orders set paid=true, paid_at=now() where id=$1', [matched]).catch(() => {});
+      // Credit (money in): mark a matched order paid, AND auto-approve any pending
+      // wallet top-up whose reference note is inside the transfer content. This is
+      // what makes a real payment land → auto-confirm with no admin action.
+      if (String(b.transType || 'C').toUpperCase() === 'C') {
+        if (matched) await q('update orders set paid=true, paid_at=now() where id=$1', [matched]).catch(() => {});
+        await q(
+          "update topup_requests set status='received', confirmed_at=now() where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%'",
+          [content]
+        ).catch(() => {});
       }
       return { error: false, errorReason: null, toastMessage: 'OK', object: { reftransactionid: txid } };
     } catch (e) {

@@ -9789,9 +9789,31 @@ function admRejectTopup(id) {
 }
 window.admConfirmTopup = admConfirmTopup;
 window.admRejectTopup = admRejectTopup;
-// Poll so new seller top-ups surface without a manual refresh.
-setInterval(function () { if (document.getElementById('section-balance') && document.getElementById('section-balance').classList.contains('active')) admRenderPendingTopups(); }, 10000);
-document.addEventListener('DOMContentLoaded', admRenderPendingTopups);
+// Auto-record any top-ups that were already confirmed (e.g. auto-approved by the
+// VietQR callback) into the factory ledger — deduped by topupId, so this captures
+// real payments that landed without anyone clicking "Received".
+function admReconcileTopups() {
+  var tok = localStorage.getItem('eg_token'); if (!tok || !(window.EGStore && EGStore.recordFactoryTopup)) return;
+  fetch('/api/topups?status=received', { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.json(); })
+    .then(function (list) {
+      if (!Array.isArray(list) || !list.length) return;
+      var seen = {}; try { EGStore.getFactoryLedger().forEach(function (e) { if (e.type === 'topup' && e.topupId) seen[e.topupId] = 1; }); } catch (e) {}
+      var changed = false;
+      list.forEach(function (t) {
+        if (seen[t.id]) return;
+        EGStore.recordFactoryTopup(t.amount_usd, { topupId: t.id, ref: t.ref, label: 'Seller top-up — ' + (t.seller_email || t.seller_name || 'seller') });
+        changed = true;
+      });
+      if (changed && typeof walRefresh === 'function') walRefresh();
+    }).catch(function () {});
+}
+window.admReconcileTopups = admReconcileTopups;
+// Poll so new seller top-ups surface + auto-recorded ones get logged, without a manual refresh.
+setInterval(function () {
+  if (document.getElementById('section-balance') && document.getElementById('section-balance').classList.contains('active')) { admRenderPendingTopups(); admReconcileTopups(); }
+}, 10000);
+document.addEventListener('DOMContentLoaded', function () { admRenderPendingTopups(); admReconcileTopups(); });
 function walRenderLedger() {
   var tbody = document.getElementById('wal-ledger-rows');
   var empty = document.getElementById('wal-empty');
