@@ -411,8 +411,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         </select>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button id="wallet-gear" class="btn btn-out" onclick="toggleWalletSettings(event)" title="Bank connections & auto-reload" aria-label="Wallet settings" style="padding:8px 11px">
-          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.3" stroke="currentColor" stroke-width="1.3"/><path d="M8 1.6v1.6M8 12.8v1.6M14.4 8h-1.6M3.2 8H1.6M12.5 3.5l-1.1 1.1M4.6 11.4l-1.1 1.1M12.5 12.5l-1.1-1.1M4.6 4.6L3.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <button id="wallet-gear" onclick="toggleWalletSettings(event)" title="Bank connections & auto-reload" aria-label="Wallet settings" style="background:none;border:none;cursor:pointer;padding:7px;border-radius:8px;color:#374151;display:inline-flex;align-items:center;justify-content:center;transition:background .12s" onmouseover="this.style.background='#f0ede9'" onmouseout="this.style.background='transparent'">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M19.4 13a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
         </button>
         <button class="btn btn-out" onclick="openDepositModal()">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Add Funds
@@ -650,22 +650,23 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <!-- Wallet settings popover — bank connections + auto-reload (toggled by the gear) -->
     <div id="wallet-settings-pop" style="display:none;position:fixed;width:340px;max-width:92vw;background:#fff;border:1px solid #e5e4e0;border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.18);z-index:400;padding:16px;font-family:inherit">
       <div style="font-size:13.5px;font-weight:700;color:#191918;margin-bottom:10px">Bank connections</div>
-      <div id="bank-conn-list" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-        <button onclick="openDepositModal()" title="PingPong — connected" style="display:inline-flex;align-items:center;gap:5px;background:#f3eee2;border:1px solid #40403d;border-radius:999px;padding:4px 10px 4px 4px;font-size:12.5px;font-weight:700;color:#191918;cursor:pointer;font-family:inherit;white-space:nowrap">
-          <span style="width:18px;height:18px;border-radius:50%;background:#1a1a2e;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#fff" stroke-width="1.4"/></svg></span>
-          PingPong<svg width="9" height="9" viewBox="0 0 10 10" fill="none" style="margin-left:1px"><path d="M2 5l2 2 4-4" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div id="bank-conn-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button onclick="openDepositModal()" title="PingPong — connected" style="display:flex;align-items:center;gap:8px;width:100%;background:#f3eee2;border:1.5px solid #40403d;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:700;color:#191918;cursor:pointer;font-family:inherit;text-align:left">
+          <span style="width:20px;height:20px;border-radius:50%;background:#1a1a2e;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="#fff" stroke-width="1.4"/></svg></span>
+          <span style="flex:1">PingPong</span>
+          <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#15803d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button onclick="connectGateway('lianlian')" title="Connect LianLian" style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:4px 10px 4px 4px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit;white-space:nowrap;transition:border-color .12s,color .12s" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">
-          <span style="width:18px;height:18px;border-radius:50%;background:#e8f4fd;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 16 16" fill="none"><rect x="3" y="6" width="10" height="7" rx="1" stroke="#1d7ed8" stroke-width="1.4"/></svg></span>
-          LianLian
+        <button onclick="connectGateway('lianlian')" title="Connect LianLian" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+          <span style="width:20px;height:20px;border-radius:50%;background:#e8f4fd;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="6" width="10" height="7" rx="1" stroke="#1d7ed8" stroke-width="1.4"/></svg></span>
+          <span style="flex:1">LianLian</span>
         </button>
-        <button onclick="connectGateway('vcb')" title="Connect Vietcombank" style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:4px 10px 4px 4px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit;white-space:nowrap;transition:border-color .12s,color .12s" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">
-          <span style="width:18px;height:18px;border-radius:50%;background:#fff0f0;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1" stroke="#dc2626" stroke-width="1.4"/></svg></span>
-          Vietcombank
+        <button onclick="connectGateway('vcb')" title="Vietcombank — top up" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+          <span style="width:20px;height:20px;border-radius:50%;background:#fff0f0;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1" stroke="#dc2626" stroke-width="1.4"/></svg></span>
+          <span style="flex:1">Vietcombank</span>
         </button>
-        <button onclick="connectGateway('paypal')" title="Connect PayPal" style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e4e0;border-radius:999px;padding:4px 10px 4px 4px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit;white-space:nowrap;transition:border-color .12s,color .12s" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">
-          <span style="width:18px;height:18px;border-radius:50%;background:#e8f0fe;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M5 4h6a2.5 2.5 0 010 5H7L6 13H4l2-9z" stroke="#003087" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
-          PayPal
+        <button onclick="connectGateway('paypal')" title="PayPal — top up" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+          <span style="width:20px;height:20px;border-radius:50%;background:#e8f0fe;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M5 4h6a2.5 2.5 0 010 5H7L6 13H4l2-9z" stroke="#003087" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
+          <span style="flex:1">PayPal</span>
         </button>
       </div>
       <button onclick="openAddBank()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:13px;color:#191918;font-weight:600;background:#f6f5f4;border:1px solid #e5e4e0;cursor:pointer;font-family:inherit;padding:8px;border-radius:8px" onmouseover="this.style.background='#efece7'" onmouseout="this.style.background='#f6f5f4'">
@@ -1302,13 +1303,13 @@ function vqrOnPaid(amountUSD, ref) {
 // Record a successful top-up into the wallet's payment history (persisted) so it
 // shows in the Transactions table and the Deposits filter.
 function vqrRecordDeposit(amountUSD, ref, method) {
-  method = method || 'VietQR';
+  method = method || 'Vietcombank';
   try {
     var bal = parseFloat(localStorage.getItem('eg_balance') || '0');
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up (' + method + ')', order: ref ? ('· ' + ref) : '', platform: 'all', method: method,
+      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: method,
       type: 'deposit', amount: amountUSD, balance: bal
     };
     if (typeof TX !== 'undefined') TX.unshift(rec);
@@ -1352,7 +1353,7 @@ function vqrRecordPending(amountUSD, ref, topupId) {
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up (VietQR)', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'VietQR',
+      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'Vietcombank',
       type: 'deposit', amount: amountUSD, balance: parseFloat(localStorage.getItem('eg_balance') || '0'),
       pending: true, ref: ref, topupId: topupId
     };

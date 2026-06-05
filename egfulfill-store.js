@@ -493,6 +493,27 @@
       try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('eg-factory-balance-changed')); } catch(e){}
       return bal;
     },
+    // Record a confirmed seller wallet top-up into the factory wallet (admin side):
+    // credits the balance + adds a visible ledger entry. De-duped by topupId.
+    recordFactoryTopup: function(amount, opts) {
+      var amt = parseFloat(amount) || 0;
+      if (amt <= 0) return this.getFactoryBalance();
+      opts = opts || {};
+      var ledger = this.getFactoryLedger();
+      if (opts.topupId) {
+        var dup = ledger.find(function (e) { return e.type === 'topup' && e.topupId === opts.topupId; });
+        if (dup) return this.getFactoryBalance();
+      }
+      var bal = parseFloat((this.getFactoryBalance() + amt).toFixed(2));
+      try { localStorage.setItem(this.FACTORY_BALANCE_KEY, bal.toFixed(2)); } catch (e) {}
+      this._appendFactoryLedger({
+        type: 'topup', amount: amt, ts: _ts(),
+        orderId: opts.ref || null, topupId: opts.topupId || null,
+        label: opts.label || 'Seller wallet top-up', by: opts.by || 'admin'
+      });
+      try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('eg-factory-balance-changed')); } catch (e) {}
+      return bal;
+    },
     // Refund money from factory back to seller. Partial or full. Returns
     // { ok:true, factoryBal, sellerBal } so callers can update UI.
     refundToSeller: function(orderId, amount, opts) {

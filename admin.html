@@ -9770,7 +9770,13 @@ function admConfirmTopup(id) {
   var tok = localStorage.getItem('eg_token');
   fetch('/api/topups/' + id + '/confirm', { method: 'POST', headers: { Authorization: 'Bearer ' + tok } })
     .then(function (r) { return r.json(); })
-    .then(function (rec) { if (rec && rec.id) admRenderPendingTopups(); else alert('Could not confirm: ' + ((rec && rec.error) || 'error')); })
+    .then(function (rec) {
+      if (!rec || !rec.id) { alert('Could not confirm: ' + ((rec && rec.error) || 'error')); return; }
+      // Record it in the factory wallet (credits balance + visible ledger row).
+      try { if (window.EGStore && EGStore.recordFactoryTopup) EGStore.recordFactoryTopup(rec.amount_usd, { topupId: rec.id, ref: rec.ref, label: 'Seller top-up — ' + (rec.seller_email || rec.seller_name || 'seller') }); } catch (e) {}
+      admRenderPendingTopups();
+      if (typeof walRefresh === 'function') walRefresh();
+    })
     .catch(function (e) { alert('Error: ' + e.message); });
 }
 function admRejectTopup(id) {
@@ -9819,10 +9825,11 @@ function walRenderLedger() {
   tbody.innerHTML = rows.map(e => {
     var d = new Date(e.ts || Date.now());
     var when = d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—');
-    var typeColor = e.type === 'charge' ? '#15803d' : (e.type === 'payout' ? '#c2410c' : '#374151');
-    var sign = e.type === 'charge' ? '+' : '−';
-    var amtColor = e.type === 'charge' ? '#15803d' : '#dc2626';
+    var isCredit = e.type === 'charge' || e.type === 'topup';
+    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type === 'topup' ? 'Top-up' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—'));
+    var typeColor = isCredit ? '#15803d' : (e.type === 'payout' ? '#c2410c' : '#374151');
+    var sign = isCredit ? '+' : '−';
+    var amtColor = isCredit ? '#15803d' : '#dc2626';
     return '<tr style="border-top:1px solid #f3f3f1">'
       + '<td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px;font-variant-numeric:tabular-nums">' + when + '</td>'
       + '<td style="padding:11px 12px"><span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.04em">' + typeLbl + '</span></td>'
