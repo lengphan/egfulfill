@@ -1,7 +1,7 @@
 // EGFULFILL API — Fastify entry point.
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth } from './auth.js';
 import { ordersRoutes } from './routes/orders.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
@@ -52,6 +52,26 @@ app.post('/api/auth/login', async (req, reply) => {
   catch (e) { reply.code(400); return { error: e.message }; }
 });
 app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
+
+// ── Google Sign-In ──
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+// Frontend fetches the public client-id to init the Google button.
+app.get('/api/auth/google/client-id', async () => ({ clientId: GOOGLE_CLIENT_ID }));
+app.post('/api/auth/google', async (req, reply) => {
+  try {
+    const cred = (req.body || {}).credential;
+    if (!cred) { reply.code(400); return { error: 'Missing Google credential' }; }
+    if (!GOOGLE_CLIENT_ID) { reply.code(500); return { error: 'Google login not configured on the server' }; }
+    // Verify the ID token with Google (validates signature + expiry), then we check
+    // the audience is our app and the email is verified.
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(cred));
+    const c = await r.json().catch(() => ({}));
+    if (!r.ok || !c.email) { reply.code(401); return { error: 'Invalid Google token' }; }
+    if (c.aud !== GOOGLE_CLIENT_ID) { reply.code(401); return { error: 'Google token audience mismatch' }; }
+    if (!(c.email_verified === true || c.email_verified === 'true')) { reply.code(401); return { error: 'Google email not verified' }; }
+    return await googleAuth({ email: c.email, name: c.name || '' });
+  } catch (e) { reply.code(400); return { error: e.message }; }
+});
 
 // ── Data routes ──
 ordersRoutes(app, requireAuth);

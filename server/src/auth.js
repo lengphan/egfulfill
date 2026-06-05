@@ -49,3 +49,24 @@ export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'd
 
 // Reusable bcrypt hasher for admin-created users / password resets.
 export async function hashPassword(plain) { return bcrypt.hash(plain, 10); }
+
+// Sign in with Google: the caller has already VERIFIED the Google ID token (see
+// the /api/auth/google route). Here we just find-or-create the user by email and
+// issue our own app JWT. New Google users are sellers (staff get promoted later).
+export async function googleAuth({ email, name = '' }) {
+  if (!email) throw new Error('Google account has no email');
+  const lc = email.toLowerCase();
+  let r = await q('select * from users where email=$1', [lc]);
+  let u = r.rows[0];
+  if (!u) {
+    const hash = await bcrypt.hash(crypto.randomUUID(), 10);   // random; Google users sign in via Google
+    const ins = await q(
+      'insert into users (email, password_hash, role, name) values ($1,$2,$3,$4) returning id, email, role, name, active',
+      [lc, hash, 'seller', name]
+    );
+    u = ins.rows[0];
+  }
+  if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
+  const safe = { id: u.id, email: u.email, role: u.role, name: u.name };
+  return { user: safe, token: sign(safe) };
+}

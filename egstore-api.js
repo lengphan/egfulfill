@@ -78,6 +78,11 @@
       return api('/auth/login', { method: 'POST', body: { email: email, password: password } })
         .then(function (r) { if (r.data) setSession(r.data); return { data: r.data ? { user: r.data.user } : null, error: r.error }; });
     },
+    // Exchange a Google ID token (credential) for an app session.
+    googleSignIn: function (credential) {
+      return api('/auth/google', { method: 'POST', body: { credential: credential } })
+        .then(function (r) { if (r.data) setSession(r.data); return { data: r.data ? { user: r.data.user } : null, error: r.error }; });
+    },
     signOut: function () { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); return Promise.resolve(); },
     getUser: function () { try { return Promise.resolve(JSON.parse(localStorage.getItem(USER_KEY) || 'null')); } catch (e) { return Promise.resolve(null); } },
     getRole: function () { return this.getUser().then(function (u) { return (u && u.role) || null; }); },

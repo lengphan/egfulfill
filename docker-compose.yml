@@ -51,6 +51,8 @@ services:
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
       PAYPAL_SECRET: ${PAYPAL_SECRET:-}
       PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
+      # Google Sign-In — your OAuth 2.0 Web client ID (public; used to verify ID tokens).
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     depends_on: [db]
     restart: unless-stopped
 

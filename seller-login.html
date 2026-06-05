@@ -85,6 +85,8 @@
 
     <div class="divider">or</div>
 
+    <div id="g-signin" style="display:flex;justify-content:center;min-height:44px"></div>
+
     <div class="foot">Don't have an account? <a href="seller-signup.html">Start for free →</a></div>
   </div>
 
@@ -95,7 +97,38 @@
   </div>
 
 <script src="egstore-api.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
+  // ── Google Sign-In: fetch the client-id, render the button, exchange the ID
+  //    token for an app session, then route by role. No-op if not configured. ──
+  function _egGoogleCb(resp) {
+    if (!resp || !resp.credential || !window.EGAuth) return;
+    EGAuth.googleSignIn(resp.credential).then(function (res) {
+      if (res.error) {
+        var b = document.getElementById('login-error');
+        if (b) { b.textContent = res.error.message || 'Google sign-in failed'; b.style.display = 'block'; }
+        return;
+      }
+      EGAuth.routeAfterLogin();
+    });
+  }
+  function _egInitGoogle() {
+    var host = document.getElementById('g-signin'); if (!host) return;
+    fetch('/api/auth/google/client-id')
+      .then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        if (!cfg || !cfg.clientId) { host.style.display = 'none'; return; }   // not configured yet
+        function render() {
+          if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(render, 300); return; }
+          google.accounts.id.initialize({ client_id: cfg.clientId, callback: _egGoogleCb });
+          google.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: 320 });
+        }
+        render();
+      })
+      .catch(function () { host.style.display = 'none'; });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _egInitGoogle); else _egInitGoogle();
+
   function togglePw(){ const inp = document.getElementById('login-password'); inp.type = inp.type === 'password' ? 'text' : 'password'; }
   function submitLogin(e){
     e.preventDefault();
