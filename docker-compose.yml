@@ -53,6 +53,9 @@ services:
       PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
       # Google Sign-In — your OAuth 2.0 Web client ID (public; used to verify ID tokens).
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # Stripe card top-up. Use test keys (sk_test/pk_test) to test, live in prod.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
     depends_on: [db]
     restart: unless-stopped
 

@@ -13,6 +13,7 @@ import { templatesRoutes } from './routes/templates.js';
 import { vietqrRoutes } from './routes/vietqr.js';
 import { topupsRoutes } from './routes/topups.js';
 import { paypalRoutes } from './routes/paypal.js';
+import { stripeRoutes } from './routes/stripe.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
@@ -85,6 +86,7 @@ templatesRoutes(app, requireAuth);
 vietqrRoutes(app, requireAuth);   // /vqr/* are PUBLIC (VietQR server-to-server); /api/vietqr/* need auth
 topupsRoutes(app, requireAuth);   // manual top-up reconciliation (pending → admin "Received")
 paypalRoutes(app, requireAuth);   // PayPal card/balance wallet top-up (auto-capture)
+stripeRoutes(app, requireAuth);   // Stripe card wallet top-up (Payment Element)
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

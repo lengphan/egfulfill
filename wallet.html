@@ -331,6 +331,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 <style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
 </style>
+<script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
 
@@ -675,6 +676,9 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div style="border-top:1px solid #f0ede9;margin:14px 0 12px"></div>
       <button onclick="openAutoReloadModal();toggleWalletSettings()" style="width:100%;display:flex;align-items:center;gap:8px;font-size:13.5px;color:#374151;font-weight:600;background:none;border:1px solid #e5e4e0;cursor:pointer;font-family:inherit;padding:9px 12px;border-radius:8px" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background='transparent'">
         <svg width="14" height="14" viewBox="0 0 13 13" fill="none"><path d="M2 6.5A4.5 4.5 0 016.5 2a4.5 4.5 0 014.5 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 2v3H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6.5A4.5 4.5 0 016.5 11 4.5 4.5 0 012 6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-dasharray="2 1.5"/></svg>Auto-Reload settings
+      </button>
+      <button onclick="openCardTopUp();toggleWalletSettings()" style="width:100%;display:flex;align-items:center;gap:8px;font-size:13.5px;color:#fff;font-weight:700;background:#191918;border:none;cursor:pointer;font-family:inherit;padding:10px 12px;border-radius:8px;margin-top:8px;justify-content:center" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="#fff" stroke-width="1.3"/><path d="M1.5 6.5h13" stroke="#fff" stroke-width="1.3"/></svg>Top up by card
       </button>
     </div>
 
@@ -1105,6 +1109,83 @@ function _walSettingsOutside(ev) {
   pop.style.display = 'none'; document.removeEventListener('mousedown', _walSettingsOutside);
 }
 window.toggleWalletSettings = toggleWalletSettings;
+
+// ── Stripe card top-up (Payment Element) ─────────────────────────────────────
+var _stripe = null, _stripeElements = null, _stripePI = null, _cardAmount = 0;
+function closeCardModal() { var m = document.getElementById('card-modal'); if (m) m.style.display = 'none'; document.body.style.overflow = ''; }
+function openCardTopUp() {
+  var m = document.getElementById('card-modal');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'card-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;font-family:inherit';
+    document.body.appendChild(m);
+    m.addEventListener('click', function (e) { if (e.target === m) closeCardModal(); });
+  }
+  m.innerHTML =
+    '<div onclick="closeCardModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.45)"></div>'
+    + '<div style="position:relative;background:#fff;border-radius:16px;width:400px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="font-size:16px;font-weight:700;color:#191918">Top up by card</div><button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
+    + '<div id="card-step-amount">'
+    +   '<label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>'
+    +   '<div style="position:relative;margin-bottom:10px"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span><input id="card-amount" type="number" min="1" step="0.01" value="50" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box" onfocus="this.style.borderColor=\'#111827\'" onblur="this.style.borderColor=\'#e5e4e0\'"></div>'
+    +   '<div style="display:flex;gap:6px;margin-bottom:14px">' + ['50', '100', '200', '500'].map(function (a) { return '<button onclick="document.getElementById(\'card-amount\').value=\'' + a + '\'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$' + a + '</button>'; }).join('') + '</div>'
+    +   '<button id="card-continue" onclick="cardContinue()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Continue</button>'
+    + '</div>'
+    + '<div id="card-step-pay" style="display:none">'
+    +   '<div style="font-size:13px;color:#6b7280;margin-bottom:10px">Paying <b id="card-amt-label" style="color:#191918"></b></div>'
+    +   '<div id="stripe-pe" style="margin-bottom:14px"></div>'
+    +   '<div id="card-error" style="font-size:12.5px;color:#dc2626;margin-bottom:10px;display:none"></div>'
+    +   '<button id="card-pay" onclick="cardPay()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay</button>'
+    + '</div>'
+    + '</div>';
+  m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+}
+function cardContinue() {
+  var amt = parseFloat(document.getElementById('card-amount').value) || 0;
+  if (amt <= 0) { alert('Enter a valid amount.'); return; }
+  if (!window.Stripe) { alert('Stripe failed to load — check your connection and reload.'); return; }
+  _cardAmount = amt;
+  var btn = document.getElementById('card-continue'); btn.disabled = true; btn.textContent = 'Loading…';
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/stripe/config', { headers: { Authorization: 'Bearer ' + tok } }).then(function (r) { return r.json(); }).then(function (cfg) {
+    if (!cfg || !cfg.enabled || !cfg.publishableKey) { alert('Card payments aren\'t configured yet (set STRIPE_SECRET_KEY/STRIPE_PUBLISHABLE_KEY on the server).'); btn.disabled = false; btn.textContent = 'Continue'; return; }
+    _stripe = Stripe(cfg.publishableKey);
+    return fetch('/api/stripe/create-intent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ amount: amt }) })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        if (d.error) { alert('Could not start payment: ' + d.error); btn.disabled = false; btn.textContent = 'Continue'; return; }
+        _stripePI = d.id;
+        _stripeElements = _stripe.elements({ clientSecret: d.clientSecret, appearance: { theme: 'stripe' } });
+        _stripeElements.create('payment').mount('#stripe-pe');
+        document.getElementById('card-step-amount').style.display = 'none';
+        document.getElementById('card-step-pay').style.display = 'block';
+        document.getElementById('card-amt-label').textContent = '$' + amt.toFixed(2);
+        document.getElementById('card-pay').textContent = 'Pay $' + amt.toFixed(2);
+      });
+  }).catch(function (e) { alert('Error: ' + e.message); btn.disabled = false; btn.textContent = 'Continue'; });
+}
+function cardPay() {
+  var btn = document.getElementById('card-pay'); var errEl = document.getElementById('card-error');
+  if (errEl) errEl.style.display = 'none';
+  btn.disabled = true; btn.textContent = 'Processing…';
+  _stripe.confirmPayment({ elements: _stripeElements, redirect: 'if_required' }).then(function (result) {
+    if (result.error) { if (errEl) { errEl.textContent = result.error.message; errEl.style.display = 'block'; } btn.disabled = false; btn.textContent = 'Pay $' + _cardAmount.toFixed(2); return; }
+    // Verify server-side before crediting (don't trust the client).
+    var tok = localStorage.getItem('eg_token');
+    fetch('/api/stripe/verify-intent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ id: _stripePI }) })
+      .then(function (r) { return r.json(); }).then(function (v) {
+        if (v && v.ok) {
+          var amt = v.amount || _cardAmount;
+          vqrCreditWallet(amt); vqrRecordDeposit(amt, _stripePI, 'Card');
+          closeCardModal();
+          walToast('Payment received — $' + amt.toFixed(2) + ' added');
+        } else {
+          if (errEl) { errEl.textContent = 'Payment not completed (' + ((v && v.status) || 'unknown') + ')'; errEl.style.display = 'block'; }
+          btn.disabled = false; btn.textContent = 'Pay $' + _cardAmount.toFixed(2);
+        }
+      });
+  });
+}
+window.openCardTopUp = openCardTopUp;
 // Admin's USD→VND rate (set by admin, shared via server; cached locally). Default 25,400.
 function egVqrRate() { var r = parseFloat(localStorage.getItem('eg_vqr_rate')); return (r && r > 0) ? r : 25400; }
 function egIsAdmin() { try { return (JSON.parse(localStorage.getItem('eg_user') || '{}').role) === 'admin'; } catch (e) { return false; } }
