@@ -3123,6 +3123,35 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Platform Settings</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:18px">Global controls applied across operator, warehouse, and seller-facing pricing.</div>
           <div id="adm-platform-body" style="display:flex;flex-direction:column;gap:18px"></div>
+          <!-- VietQR exchange rate (admin-set, shared with every seller's top-up) -->
+          <div style="border:1px solid #e5e4e0;border-radius:12px;padding:16px 18px;margin-top:18px">
+            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">VietQR Exchange Rate</div>
+            <div style="font-size:13px;color:#6b7280;margin-bottom:12px">USD → VND rate for seller wallet top-ups. The scan-to-pay QR converts at this rate; sellers see it read-only.</div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13.5px;color:#374151;font-weight:600">1 USD = ₫</span>
+              <input id="adm-vqr-rate" type="number" min="1" step="1" placeholder="25400" style="width:140px;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;font-size:14px;font-weight:700;font-family:inherit;outline:none" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+              <button class="btn btn-dk" style="font-size:13px" onclick="admSaveVqrRate()">Save rate</button>
+              <span id="adm-vqr-rate-msg" style="font-size:12.5px;font-weight:600"></span>
+            </div>
+          </div>
+          <script>
+          async function admLoadVqrRate(){
+            var el=document.getElementById('adm-vqr-rate'); if(!el) return;
+            try{ var tok=localStorage.getItem('eg_token'); var r=await fetch('/api/vietqr/rate',{headers:{Authorization:'Bearer '+tok}}).then(x=>x.json()); if(r&&r.rate){ el.value=r.rate; localStorage.setItem('eg_vqr_rate',String(r.rate)); } }catch(e){}
+          }
+          async function admSaveVqrRate(){
+            var el=document.getElementById('adm-vqr-rate'), msg=document.getElementById('adm-vqr-rate-msg');
+            var n=Math.round(parseFloat(el.value));
+            if(!n||n<=0){ if(msg){msg.textContent='Enter a valid rate';msg.style.color='#dc2626';} return; }
+            try{
+              var tok=localStorage.getItem('eg_token');
+              var r=await fetch('/api/vietqr/rate',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({rate:n})}).then(x=>x.json());
+              if(r&&r.ok){ localStorage.setItem('eg_vqr_rate',String(r.rate)); if(msg){msg.textContent='Saved ✓ 1 USD = ₫'+r.rate.toLocaleString('en-US');msg.style.color='#15803d';} }
+              else { if(msg){msg.textContent='Error: '+((r&&r.error)||'failed');msg.style.color='#dc2626';} }
+            }catch(e){ if(msg){msg.textContent='Error: '+e.message;msg.style.color='#dc2626';} }
+          }
+          document.addEventListener('DOMContentLoaded', admLoadVqrRate);
+          </script>
         </div>
         <!-- Users (admin-only) -->
         <div id="afpanel-users" class="card fi" style="padding:22px 24px;display:none">
