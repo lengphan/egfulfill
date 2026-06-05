@@ -2238,7 +2238,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <!-- Ledger table — outline card matching the sellers page transactions -->
     <div id="bal-pane-all" class="bal-pane" style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#fff">
       <table class="dtable" style="border:none;margin:0">
-        <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Order</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
+        <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Reference</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Transaction ID</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
         <tbody id="wal-ledger-rows"></tbody>
       </table>
       <div id="wal-empty" style="display:none;padding:48px 24px;text-align:center;color:#9ca3af;font-size:13.5px;line-height:1.6">No transactions yet.<br><span style="font-size:12.5px">Charges appear when sellers push orders to production. Refunds + payouts appear when admin approves them.</span></div>
@@ -11783,6 +11783,31 @@ function walRefresh() {
   }
   walRenderLedger();
 }
+// Pull confirmed seller top-ups from the server into the shared factory ledger so
+// the WAREHOUSE board sees the same money state as admin (deduped by topupId).
+function whReconcileTopups() {
+  var tok = localStorage.getItem('eg_token');
+  if (!tok || !(window.EGStore && EGStore.recordFactoryTopup)) return;
+  fetch('/api/topups?status=received', { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (list) {
+      if (!Array.isArray(list) || !list.length) return;
+      var seen = {}; try { EGStore.getFactoryLedger().forEach(function (e) { if (e.type === 'topup' && e.topupId) seen[e.topupId] = 1; }); } catch (e) {}
+      var changed = false;
+      list.forEach(function (t) {
+        if (seen[t.id]) return;
+        EGStore.recordFactoryTopup(t.amount_usd, { topupId: t.id, ref: t.ref, txnId: t.txn_id, label: 'Seller top-up — ' + (t.seller_email || t.seller_name || 'seller') });
+        changed = true;
+      });
+      if (changed) walRefresh();
+    }).catch(function () {});
+}
+window.whReconcileTopups = whReconcileTopups;
+document.addEventListener('DOMContentLoaded', whReconcileTopups);
+setInterval(function () {
+  var s = document.getElementById('section-balance');
+  if (s && s.classList.contains('active')) whReconcileTopups();
+}, 10000);
 function walRenderLedger() {
   var tbody = document.getElementById('wal-ledger-rows');
   var empty = document.getElementById('wal-empty');
@@ -11816,14 +11841,19 @@ function walRenderLedger() {
   tbody.innerHTML = rows.map(e => {
     var d = new Date(e.ts || Date.now());
     var when = d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—');
-    var typeColor = e.type === 'charge' ? '#15803d' : (e.type === 'payout' ? '#c2410c' : '#374151');
-    var sign = e.type === 'charge' ? '+' : '−';
-    var amtColor = e.type === 'charge' ? '#15803d' : '#dc2626';
+    // Cash-on-hand model: only top-ups are real money in (green +). Order payments
+    // ('charge') are informational (cash already counted at top-up) → neutral gray.
+    var isCredit = e.type === 'topup';
+    var isCharge = e.type === 'charge';
+    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type === 'topup' ? 'Top-up' : (e.type === 'charge' ? 'Order payment' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—')));
+    var typeColor = isCredit ? '#15803d' : (isCharge ? '#9ca3af' : (e.type === 'payout' ? '#c2410c' : '#374151'));
+    var sign = isCredit ? '+' : (isCharge ? '' : '−');
+    var amtColor = isCredit ? '#15803d' : (isCharge ? '#9ca3af' : '#dc2626');
     return '<tr style="border-top:1px solid #f3f3f1">'
       + '<td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px;font-variant-numeric:tabular-nums">' + when + '</td>'
       + '<td style="padding:11px 12px"><span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.04em">' + typeLbl + '</span></td>'
       + '<td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">' + (e.orderId || '—') + '</td>'
+      + '<td style="font-family:monospace;font-size:12px;color:#9ca3af;padding:11px 12px">' + (e.txnId || '—') + '</td>'
       + '<td style="font-size:13px;color:#191918;padding:11px 12px">' + (e.label || '—') + '</td>'
       + '<td style="font-weight:700;color:' + amtColor + ';padding:11px 18px 11px 12px;text-align:right;font-variant-numeric:tabular-nums">' + sign + '$' + Number(e.amount||0).toFixed(2) + '</td>'
       + '</tr>';
@@ -11833,11 +11863,11 @@ function walExportLedger() {
   if (typeof EGStore === 'undefined' || !EGStore.getFactoryLedger) return;
   var ledger = EGStore.getFactoryLedger();
   if (!ledger.length) { alert('No transactions to export.'); return; }
-  var header = 'Date,Type,Order,Label,Amount\n';
+  var header = 'Date,Type,Reference,Transaction ID,Label,Amount\n';
   var rows = ledger.map(e => {
     var d = new Date(e.ts || Date.now()).toISOString();
-    var sign = e.type === 'charge' ? '' : '-';
-    return [d, e.type||'', e.orderId||'', '"' + String(e.label||'').replace(/"/g,'""') + '"', sign + (Number(e.amount)||0).toFixed(2)].join(',');
+    var sign = (e.type === 'charge' || e.type === 'topup') ? '' : '-';
+    return [d, e.type||'', e.orderId||'', e.txnId||'', '"' + String(e.label||'').replace(/"/g,'""') + '"', sign + (Number(e.amount)||0).toFixed(2)].join(',');
   }).join('\n');
   var blob = new Blob([header + rows], { type:'text/csv' });
   var a = document.createElement('a');

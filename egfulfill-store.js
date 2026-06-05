@@ -473,8 +473,11 @@
       if (l.length > 500) l.length = 500;
       try { localStorage.setItem(this.FACTORY_LEDGER_KEY, JSON.stringify(l)); } catch(e){}
     },
-    // Credit the factory wallet when the seller pays for an order. De-dupes
-    // by orderId so re-pushing the same order doesn't double-credit.
+    // Record that a seller paid for an order. CASH-ON-HAND MODEL: this is NOT new
+    // money for the factory — the cash already arrived when the seller topped up
+    // (recordFactoryTopup credited it then). So we log the order payment for the
+    // audit trail / Charges tab but DO NOT touch the factory balance (no double
+    // count). De-duped by orderId so re-pushing the same order doesn't re-log.
     creditFactoryFromSeller: function(amount, opts) {
       var amt = parseFloat(amount) || 0;
       if (amt <= 0) return this.getFactoryBalance();
@@ -484,14 +487,12 @@
         var dup = ledger.find(function(e){ return e.type==='charge' && e.orderId===opts.orderId; });
         if (dup) return this.getFactoryBalance();
       }
-      var bal = parseFloat((this.getFactoryBalance() + amt).toFixed(2));
-      try { localStorage.setItem(this.FACTORY_BALANCE_KEY, bal.toFixed(2)); } catch(e){}
       this._appendFactoryLedger({
         type: 'charge', amount: amt, ts: _ts(),
         orderId: opts.orderId || null, label: opts.label || 'Seller payment', by: opts.by || 'system'
       });
       try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('eg-factory-balance-changed')); } catch(e){}
-      return bal;
+      return this.getFactoryBalance();
     },
     // Record a confirmed seller wallet top-up into the factory wallet (admin side):
     // credits the balance + adds a visible ledger entry. De-duped by topupId.

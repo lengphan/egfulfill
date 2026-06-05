@@ -9906,11 +9906,15 @@ function walRenderLedger() {
   tbody.innerHTML = rows.map(e => {
     var d = new Date(e.ts || Date.now());
     var when = d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    var isCredit = e.type === 'charge' || e.type === 'topup';
-    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type === 'topup' ? 'Top-up' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—'));
-    var typeColor = isCredit ? '#15803d' : (e.type === 'payout' ? '#c2410c' : '#374151');
-    var sign = isCredit ? '+' : '−';
-    var amtColor = isCredit ? '#15803d' : '#dc2626';
+    // Cash-on-hand model: only top-ups are real money in (green +). Order payments
+    // ('charge') are informational — the cash was already counted at top-up — so
+    // they're shown neutral (gray, no sign). Refunds/cancellations/payouts are out (−).
+    var isCredit = e.type === 'topup';
+    var isCharge = e.type === 'charge';
+    var typeLbl = e.type === 'cancellation' ? 'Cancellation' : (e.type === 'topup' ? 'Top-up' : (e.type === 'charge' ? 'Order payment' : (e.type ? e.type.charAt(0).toUpperCase() + e.type.slice(1) : '—')));
+    var typeColor = isCredit ? '#15803d' : (isCharge ? '#9ca3af' : (e.type === 'payout' ? '#c2410c' : '#374151'));
+    var sign = isCredit ? '+' : (isCharge ? '' : '−');
+    var amtColor = isCredit ? '#15803d' : (isCharge ? '#9ca3af' : '#dc2626');
     return '<tr style="border-top:1px solid #f3f3f1">'
       + '<td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px;font-variant-numeric:tabular-nums">' + when + '</td>'
       + '<td style="padding:11px 12px"><span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.04em">' + typeLbl + '</span></td>'
