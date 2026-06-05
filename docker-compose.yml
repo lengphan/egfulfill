@@ -47,6 +47,10 @@ services:
       # from /vqr/api/token_generate before posting balance-change transactions.
       VIETQR_USERNAME: ${VIETQR_USERNAME:-}
       VIETQR_PASSWORD: ${VIETQR_PASSWORD:-}
+      # PayPal wallet top-up (Orders API v2). Use sandbox keys to test, live in prod.
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_SECRET: ${PAYPAL_SECRET:-}
+      PAYPAL_ENV: ${PAYPAL_ENV:-sandbox}
     depends_on: [db]
     restart: unless-stopped
 

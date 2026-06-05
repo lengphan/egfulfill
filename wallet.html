@@ -774,6 +774,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>
       <select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
         <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
+        <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
       </select>
@@ -799,6 +800,11 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#6b7280">Transfer amount</span><b id="dep-vnd-preview" style="font-size:14.5px;color:#191918">₫0</b></div>
       </div>
     </div>
+    <!-- PayPal buttons (card or balance) — shown only for the PayPal method -->
+    <div id="paypal-box" style="display:none;margin-bottom:14px">
+      <div style="font-size:12.5px;color:#6b7280;margin-bottom:8px">Pay with your PayPal balance or any debit / credit card.</div>
+      <div id="paypal-btn-container"></div>
+    </div>
     <button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>Confirm Deposit
     </button>
@@ -822,6 +828,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>
       <select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'">
         <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
+        <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
       </select>
@@ -1122,8 +1129,57 @@ function vqrSyncDepositUI() {
   var amt = parseFloat((document.getElementById('modal-amount') || {}).value) || 0;
   var vnd = Math.max(0, Math.round(amt * egVqrRate() / 1000) * 1000);
   var pv = document.getElementById('dep-vnd-preview'); if (pv) pv.textContent = '₫' + vnd.toLocaleString('en-US');
+  // PayPal: show the PayPal Buttons and hide the Confirm button (PayPal has its own).
+  var isPaypal = methodEl.value === 'paypal';
+  var ppBox = document.getElementById('paypal-box'); if (ppBox) ppBox.style.display = isPaypal ? 'block' : 'none';
+  if (isPaypal && typeof ppInit === 'function') ppInit();
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
-  if (btn && btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isVqr ? 'Show VietQR code' : 'Confirm Deposit';
+  if (btn) {
+    btn.style.display = isPaypal ? 'none' : '';
+    if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isVqr ? 'Show VietQR code' : 'Confirm Deposit';
+  }
+}
+// ── PayPal top-up (Orders API v2; auto-capture) ──────────────────────────────
+var _ppRendered = false;
+function ppInit() {
+  var cont = document.getElementById('paypal-btn-container'); if (!cont || _ppRendered) return;
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/paypal/config', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+    .then(function (r) { return r.json(); })
+    .then(function (cfg) {
+      if (!cfg || !cfg.enabled || !cfg.clientId) { cont.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;text-align:center;padding:10px">PayPal isn\'t configured yet — add PAYPAL_CLIENT_ID/SECRET on the server.</div>'; return; }
+      function render() {
+        if (_ppRendered || !(window.paypal && window.paypal.Buttons)) return;
+        _ppRendered = true;
+        window.paypal.Buttons({
+          style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal', height: 42 },
+          createOrder: function () {
+            var amt = parseFloat((document.getElementById('modal-amount') || {}).value) || 0;
+            if (amt <= 0) { alert('Enter an amount first.'); return Promise.reject('no amount'); }
+            return fetch('/api/paypal/create-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('eg_token') }, body: JSON.stringify({ amount: amt }) })
+              .then(function (r) { return r.json(); }).then(function (d) { if (d.error) throw new Error(d.error); return d.id; });
+          },
+          onApprove: function (data) {
+            return fetch('/api/paypal/capture-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('eg_token') }, body: JSON.stringify({ orderID: data.orderID }) })
+              .then(function (r) { return r.json(); }).then(function (res) {
+                if (res.error || !res.ok) { alert('PayPal capture failed: ' + (res.error || 'unknown')); return; }
+                var amt = res.amount || parseFloat(document.getElementById('modal-amount').value) || 0;
+                vqrCreditWallet(amt);
+                vqrRecordDeposit(amt, res.captureId, 'PayPal');
+                closeDepositModal();
+                alert('Payment received — $' + amt.toFixed(2) + ' added to your wallet.');
+              });
+          },
+          onError: function (err) { console.warn('PayPal error', err); }
+        }).render('#paypal-btn-container');
+      }
+      if (window.paypal && window.paypal.Buttons) { render(); return; }
+      var s = document.createElement('script');
+      s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD&intent=capture';
+      s.onload = render;
+      s.onerror = function () { cont.innerHTML = '<div style="font-size:12.5px;color:#dc2626;text-align:center;padding:10px">Could not load PayPal.</div>'; };
+      document.head.appendChild(s);
+    }).catch(function () {});
 }
 function closeDepositModal() {
   document.getElementById('deposit-modal').style.display = 'none';
@@ -1239,13 +1295,14 @@ function vqrOnPaid(amountUSD, ref) {
 }
 // Record a successful top-up into the wallet's payment history (persisted) so it
 // shows in the Transactions table and the Deposits filter.
-function vqrRecordDeposit(amountUSD, ref) {
+function vqrRecordDeposit(amountUSD, ref, method) {
+  method = method || 'VietQR';
   try {
     var bal = parseFloat(localStorage.getItem('eg_balance') || '0');
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up (VietQR)', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'VietQR',
+      desc: 'Wallet top-up (' + method + ')', order: ref ? ('· ' + ref) : '', platform: 'all', method: method,
       type: 'deposit', amount: amountUSD, balance: bal
     };
     if (typeof TX !== 'undefined') TX.unshift(rec);
