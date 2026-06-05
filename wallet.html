@@ -1388,9 +1388,12 @@ function openVietQRTopUp(amountUSD) {
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d || d.error || (!d.qrCode && !d.qrLink)) throw new Error((d && d.error) || 'no qr');
-        if (d.qrLink) { _vqrPaintImg(d.qrLink); }
-        else { _vqrPaintQR(d.qrCode); }
+        if (!d || d.error) throw new Error((d && d.error) || 'no qr');
+        // Prefer the EMV QR string (render locally — no external image dependency).
+        var code = d.qrCode || (d.content && /^000201/.test(d.content) ? d.content : '');
+        if (code) { _vqrPaintQR(code); }
+        else if (d.qrLink && /^https?:\/\//i.test(d.qrLink)) { _vqrPaintImg(d.qrLink); }
+        else { console.warn('VietQR create-payment had no usable QR:', d); _vqrPaintImg(fallbackQr); }
         const a = document.getElementById('vqr-acct');
         if (a && d.vaAccount) a.textContent = d.vaAccount;   // pay the monitored VA
       })

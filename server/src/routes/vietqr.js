@@ -188,7 +188,8 @@ export function vietqrRoutes(app, requireAuth) {
         qrLink: gd.qrLink || gd.imgId || '', // optional ready-made image URL
         vaAccount: gd.vaAccount || account,
         bankCode, account, name, amount,
-        transactionRefId: gd.transactionRefId || ''
+        transactionRefId: gd.transactionRefId || '',
+        fields: Object.keys(gd)              // diagnostic: what VietQR actually returned
       };
     } catch (e) { reply.code(502); return { error: 'VietQR generate error: ' + e.message }; }
   });
