@@ -5244,6 +5244,17 @@ function opMergeLiveOrders() {
   // Skip drafts (seller-only orders that haven't been pushed to production yet).
   var liveOrders = (EGStore.getOrders ? EGStore.getOrders() : [])
     .filter(function(o) { return o.factoryStatus !== 'draft'; });
+  // Pull each order's server-stored designs into the cache once — seller uploads
+  // live server-side (order_designs), not in this browser, so the factory must
+  // hydrate them or it sees "no file".
+  try {
+    window._opDesignHydrated = window._opDesignHydrated || {};
+    liveOrders.forEach(function (o) {
+      if (!o || !o.id || window._opDesignHydrated[o.id] || !EGStore.hydrateOrderDesigns) return;
+      window._opDesignHydrated[o.id] = true;
+      EGStore.hydrateOrderDesigns(o.id).then(function (rows) { if (rows && rows.length && typeof renderOpOrders === 'function') renderOpOrders(); });
+    });
+  } catch (e) {}
   var added = false;
   var pushedMap = {};
   try { pushedMap = JSON.parse(localStorage.getItem('eg_pushed_to_board') || '{}'); } catch(e) {}

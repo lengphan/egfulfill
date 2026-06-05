@@ -4057,6 +4057,16 @@ const _wcLiveSeen = new Map(); // id → submittedAt
 function admMergeLiveOrders() {
   if (typeof EGStore === 'undefined' || !EGStore.getOrders) return;
   const live = EGStore.getOrders();
+  // Pull each order's server-stored designs into the cache once — seller uploads
+  // live server-side, so the factory must hydrate them or it sees "no file".
+  try {
+    window._admDesignHydrated = window._admDesignHydrated || {};
+    live.forEach(function (o) {
+      if (!o || !o.id || o.factoryStatus === 'draft' || window._admDesignHydrated[o.id] || !EGStore.hydrateOrderDesigns) return;
+      window._admDesignHydrated[o.id] = true;
+      EGStore.hydrateOrderDesigns(o.id).then(function (rows) { if (rows && rows.length && typeof admMergeLiveOrders === 'function') { try { if (typeof whRenderOrders === 'function') whRenderOrders(); } catch (e) {} } });
+    });
+  } catch (e) {}
   let changed = false;
   let pushedMap = {};
   try { pushedMap = JSON.parse(localStorage.getItem('eg_pushed_to_board') || '{}'); } catch(e) {}
