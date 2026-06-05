@@ -400,7 +400,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <option value="all">All Banks</option>
           <option value="pingpong">PingPong</option>
           <option value="lianlian">LianLian</option>
-          <option value="vcb">Vietcombank</option>
+          <option value="vcb">BIDV</option>
           <option value="paypal">PayPal</option>
         </select>
         <select data-eg-select onchange="setDateFilter(this.value)" style="appearance:none;-webkit-appearance:none;border:1.5px solid #c9c4bc;border-radius:8px;padding:7px 30px 7px 14px;font-size:14px;font-weight:500;font-family:inherit;background:transparent;color:#191918;outline:none;cursor:pointer;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center" onblur="this.style.borderColor='#4b5563'">
@@ -661,9 +661,9 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <span style="width:20px;height:20px;border-radius:50%;background:#e8f4fd;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="6" width="10" height="7" rx="1" stroke="#1d7ed8" stroke-width="1.4"/></svg></span>
           <span style="flex:1">LianLian</span>
         </button>
-        <button onclick="connectGateway('vcb')" title="Vietcombank — top up" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+        <button onclick="connectGateway('vcb')" title="BIDV — top up" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
           <span style="width:20px;height:20px;border-radius:50%;background:#fff0f0;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1" stroke="#dc2626" stroke-width="1.4"/></svg></span>
-          <span style="flex:1">Vietcombank</span>
+          <span style="flex:1">BIDV</span>
         </button>
         <button onclick="connectGateway('paypal')" title="PayPal — top up" style="display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1.5px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;text-align:left;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
           <span style="width:20px;height:20px;border-radius:50%;background:#e8f0fe;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M5 4h6a2.5 2.5 0 010 5H7L6 13H4l2-9z" stroke="#003087" stroke-width="1.3" stroke-linejoin="round"/></svg></span>
@@ -778,7 +778,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="margin-bottom:14px">
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>
       <select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
-        <option value="vietqr">Vietcombank</option>
+        <option value="vietqr">BIDV</option>
         <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
@@ -830,7 +830,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="margin-bottom:14px">
       <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>
       <select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'">
-        <option value="vietqr">Vietcombank</option>
+        <option value="vietqr">BIDV</option>
         <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
@@ -870,7 +870,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <select id="ab-provider" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918">
         <option value="PingPong">PingPong</option>
         <option value="LianLian">LianLian</option>
-        <option value="Vietcombank">Vietcombank</option>
+        <option value="Vietcombank">BIDV</option>
         <option value="PayPal">PayPal</option>
         <option value="Payoneer">Payoneer</option>
         <option value="Wise">Wise</option>
@@ -917,7 +917,7 @@ const STATS = {
   manual: JSON.parse(JSON.stringify(_ZP)),
 };
 const PERIOD_LABELS = { month:'Apr 2026', '7d':'Last 7 days', '30d':'Last 30 days', lastmonth:'Mar 2026', quarter:'Q2 2026' };
-const PLATFORM_LABELS = { all:'All Banks', pingpong:'PingPong', lianlian:'LianLian', vcb:'Vietcombank', paypal:'PayPal' };
+const PLATFORM_LABELS = { all:'All Banks', pingpong:'PingPong', lianlian:'LianLian', vcb:'BIDV', paypal:'PayPal' };
 
 let currentPlatform = 'all', currentPeriod = 'month', txFilter = 'all';
 
@@ -1299,9 +1299,9 @@ function submitDeposit() {
    the wallet is credited automatically. Reconciliation matches on the note, so the
    approximate USD→VND rate below only affects the suggested transfer amount. */
 const EG_VQR = {
-  bank: '970436',            // Vietcombank BIN
-  account: '0971000021199',
-  name: 'EMBROIDERY GOODS',
+  bank: '970418',            // BIDV BIN (VietQR)
+  account: '1231255899',
+  name: 'PHAN MY LINH',
   usdToVnd: 25400            // approx; QR amount only (matching is by the note)
 };
 let _vqrPoll = null;
@@ -1342,7 +1342,7 @@ function openVietQRTopUp(amountUSD) {
     + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$' + amountUSD.toFixed(2) + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer ≈ ₫' + vndStr + ' · 1 USD = ₫' + rate.toLocaleString('en-US') + '</div></div>'
     + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><img src="' + qr + '" alt="VietQR" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;background:#fff" onerror="this.style.display=\'none\'"></div>'
     + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:12px">'
-      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>Vietcombank</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b style="font-family:monospace">' + EG_VQR.account + '</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Name</span><b>' + EG_VQR.name + '</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (bắt buộc)</span><b style="font-family:monospace;color:#b45309">' + ref + '</b></div>'
@@ -1384,7 +1384,7 @@ function vqrOnPaid(amountUSD, ref) {
 // Record a successful top-up into the wallet's payment history (persisted) so it
 // shows in the Transactions table and the Deposits filter.
 function vqrRecordDeposit(amountUSD, ref, method) {
-  method = method || 'Vietcombank';
+  method = method || 'BIDV';
   try {
     var bal = parseFloat(localStorage.getItem('eg_balance') || '0');
     var now = new Date();
@@ -1434,7 +1434,7 @@ function vqrRecordPending(amountUSD, ref, topupId) {
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'Vietcombank',
+      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'BIDV',
       type: 'deposit', amount: amountUSD, balance: parseFloat(localStorage.getItem('eg_balance') || '0'),
       pending: true, ref: ref, topupId: topupId
     };
