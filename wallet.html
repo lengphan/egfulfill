@@ -703,7 +703,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div style="overflow-x:auto">
         <table class="dtable">
           <thead>
-            <tr><th>DATE</th><th>ORDER / DESCRIPTION</th><th>PLATFORM</th><th>METHOD</th><th>TYPE</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">BALANCE AFTER</th></tr>
+            <tr><th>DATE</th><th>DESCRIPTION</th><th>REFERENCE</th><th>TRANSACTION ID</th><th>METHOD</th><th>TYPE</th><th style="text-align:right">AMOUNT</th><th style="text-align:right">BALANCE AFTER</th></tr>
           </thead>
           <tbody id="tx-tbody"></tbody>
         </table>
@@ -960,7 +960,7 @@ function renderTx() {
   if (currentPlatform !== 'all') rows = rows.filter(t => t.platform === currentPlatform || t.platform === 'all');
   if (txFilter !== 'all') rows = rows.filter(t => t.type === txFilter);
   document.getElementById('tx-tbody').innerHTML = rows.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:28px;color:#9ca3af;font-size:14px">No transactions match the current filters</td></tr>`
+    ? `<tr><td colspan="8" style="text-align:center;padding:28px;color:#9ca3af;font-size:14px">No transactions match the current filters</td></tr>`
     : rows.map(t => {
       const isD = t.type === 'deposit';
       let amtColor = '#374151';
@@ -977,16 +977,18 @@ function renderTx() {
         typeBadge = `<span style="background:#f3f3f1;color:#9ca3af;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600">Rejected</span>`;
         amtStr = `<span style="text-decoration:line-through;color:#9ca3af">$${Math.abs(t.amount).toLocaleString()}</span>`; amtColor = '#9ca3af'; balCell = '<span style="color:#c4c3be">—</span>';
       }
-      const pc = PLATFORM_COLORS[t.platform] || PLATFORM_COLORS.all;
-      const [pbg, ptxt] = pc.split(':');
-      const pLabel = t.platform === 'all' ? '—' : PLATFORM_LABELS[t.platform];
-      const pBadge = t.platform !== 'all'
-        ? `<span style="background:${pbg};color:${ptxt};padding:2px 7px;border-radius:999px;font-size:12px;font-weight:600">${pLabel}</span>`
+      const refStr = t.ref || (t.order ? String(t.order).replace(/^·\s*/, '') : '');
+      const refCell = refStr
+        ? `<span style="font-family:monospace;font-size:12.5px;color:#374151">${refStr}</span>`
+        : `<span style="color:#c4c3be;font-size:13px">—</span>`;
+      const txnCell = t.txnId
+        ? `<span style="font-family:monospace;font-size:12px;color:#9ca3af">${t.txnId}</span>`
         : `<span style="color:#c4c3be;font-size:13px">—</span>`;
       return `<tr>
         <td style="font-size:13px;color:#9ca3af;white-space:nowrap">${t.date}</td>
-        <td style="max-width:260px;color:#374151;font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.desc}${t.order ? `<span style="color:#b0aaa4;font-weight:400;margin-left:5px;font-size:12.5px">${t.order}</span>` : ''}</td>
-        <td>${pBadge}</td>
+        <td style="max-width:240px;color:#374151;font-weight:500;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.desc}</td>
+        <td>${refCell}</td>
+        <td>${txnCell}</td>
         <td><span style="background:#f6f5f4;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;color:#374151">${t.method}</span></td>
         <td>${typeBadge}</td>
         <td style="font-weight:700;color:${amtColor};text-align:right;white-space:nowrap">${amtStr}</td>
@@ -1305,6 +1307,7 @@ const EG_VQR = {
   usdToVnd: 25400            // approx; QR amount only (matching is by the note)
 };
 let _vqrPoll = null;
+var _vqrRef = '';   // active top-up reference (server-issued EGxxxxxx; read by the inline button + poll)
 function vqrCreditWallet(amountUSD) {
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amountUSD).toFixed(2));
@@ -1334,11 +1337,12 @@ function _vqrPaintQR(text) {
   document.head.appendChild(s);
 }
 function openVietQRTopUp(amountUSD) {
-  // Tag the transfer note with the seller so the right wallet is credited (all
-  // top-ups land in the admin's one account; the note routes the credit).
+  // The server issues a clean sequential reference (EG000123) when it mints the QR
+  // below. Until then we show a temporary client-side ref so the modal isn't blank;
+  // it's replaced by the server's once create-payment returns.
   var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
-  var tag = (String((u.email || '').split('@')[0] || u.id || 'S').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase()) || 'S';
-  const ref = ('EG' + tag + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+  const ref = ('EG' + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14);
+  _vqrRef = ref;
   const rate = egVqrRate();
   const vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
   // Fallback only — used if the server can't mint a VA-backed QR. The reliable
@@ -1363,12 +1367,12 @@ function openVietQRTopUp(amountUSD) {
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b id="vqr-acct" style="font-family:monospace">' + EG_VQR.account + '</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Name</span><b>' + EG_VQR.name + '</b></div>'
-      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (bắt buộc)</span><b style="font-family:monospace;color:#b45309">' + ref + '</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (bắt buộc)</span><b id="vqr-ref-note" style="font-family:monospace;color:#b45309">' + ref + '</b></div>'
     + '</div>'
-    + '<div style="font-size:12px;color:#9ca3af;text-align:center;margin-bottom:10px">Scan with your banking app. The note <b style="color:#b45309;font-family:monospace">' + ref + '</b> must be kept — it confirms your top-up automatically.</div>'
+    + '<div style="font-size:12px;color:#9ca3af;text-align:center;margin-bottom:10px">Scan with your banking app. The note <b id="vqr-ref-inst" style="color:#b45309;font-family:monospace">' + ref + '</b> must be kept — it confirms your top-up automatically.</div>'
     + '<div id="vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:8px;background:#f6f5f4;border-radius:9px">'
       + '<span class="vqr-spin" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#6b7280;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Waiting for your transfer…</div>'
-    + '<button onclick="vqrIveTransferred(' + amountUSD + ',\'' + ref + '\',' + vnd + ',this)" style="margin-top:8px;width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">I\'ve transferred — notify admin</button>'
+    + '<button onclick="vqrIveTransferred(' + amountUSD + ', _vqrRef, ' + vnd + ', this)" style="margin-top:8px;width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">I\'ve transferred — notify admin</button>'
     + '</div>';
   if (!document.getElementById('vqr-spin-css')) {
     const st = document.createElement('style'); st.id = 'vqr-spin-css';
@@ -1389,6 +1393,12 @@ function openVietQRTopUp(amountUSD) {
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d || d.error) throw new Error((d && d.error) || 'no qr');
+        // Adopt the server's clean sequential reference (EG000123) everywhere.
+        if (d.note || d.ref) {
+          _vqrRef = d.note || d.ref;
+          var n1 = document.getElementById('vqr-ref-note'); if (n1) n1.textContent = _vqrRef;
+          var n2 = document.getElementById('vqr-ref-inst'); if (n2) n2.textContent = _vqrRef;
+        }
         // Prefer the EMV QR string (render locally — no external image dependency).
         var code = d.qrCode || (d.content && /^000201/.test(d.content) ? d.content : '');
         if (code) { _vqrPaintQR(code); }
@@ -1400,22 +1410,23 @@ function openVietQRTopUp(amountUSD) {
       .catch(function () { _vqrPaintImg(fallbackQr); });   // graceful degradation
   })();
 
-  // Poll for the matching transfer.
+  // Poll for the matching transfer (reads _vqrRef live — it switches to the server
+  // ref once create-payment returns). Capture VietQR's transaction id when it lands.
   if (_vqrPoll) clearInterval(_vqrPoll);
   const started = Date.now();
   const tok = localStorage.getItem('eg_token') || '';
   _vqrPoll = setInterval(function () {
     if (Date.now() - started > 15 * 60 * 1000) { clearInterval(_vqrPoll); _vqrPoll = null; return; }   // stop after 15 min
-    fetch('/api/vietqr/status?ref=' + encodeURIComponent(ref), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+    fetch('/api/vietqr/status?ref=' + encodeURIComponent(_vqrRef), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
       .then(function (r) { return r.json(); })
-      .then(function (d) { if (d && d.paid) vqrOnPaid(amountUSD, ref); })
+      .then(function (d) { if (d && d.paid) vqrOnPaid(amountUSD, _vqrRef, d.transaction && d.transaction.transactionid); })
       .catch(function () {});
   }, 4000);
 }
-function vqrOnPaid(amountUSD, ref) {
+function vqrOnPaid(amountUSD, ref, txnId) {
   if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
   vqrCreditWallet(amountUSD);
-  vqrRecordDeposit(amountUSD, ref);
+  vqrRecordDeposit(amountUSD, ref, 'BIDV', txnId);
   const s = document.getElementById('vqr-status');
   if (s) { s.style.background = '#e7f6ec'; s.style.color = '#15803d';
     s.innerHTML = '<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 8l3 3 6-7" stroke="#15803d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Payment received — $' + amountUSD.toFixed(2) + ' added'; }
@@ -1423,14 +1434,14 @@ function vqrOnPaid(amountUSD, ref) {
 }
 // Record a successful top-up into the wallet's payment history (persisted) so it
 // shows in the Transactions table and the Deposits filter.
-function vqrRecordDeposit(amountUSD, ref, method) {
+function vqrRecordDeposit(amountUSD, ref, method, txnId) {
   method = method || 'BIDV';
   try {
     var bal = parseFloat(localStorage.getItem('eg_balance') || '0');
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: method,
+      desc: 'VietQR top-up', order: '', ref: ref || '', txnId: txnId || '', platform: 'all', method: method,
       type: 'deposit', amount: amountUSD, balance: bal
     };
     if (typeof TX !== 'undefined') TX.unshift(rec);
@@ -1474,7 +1485,7 @@ function vqrRecordPending(amountUSD, ref, topupId) {
     var now = new Date();
     var rec = {
       date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-      desc: 'Wallet top-up', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'BIDV',
+      desc: 'VietQR top-up', order: '', ref: ref || '', txnId: '', platform: 'all', method: 'BIDV',
       type: 'deposit', amount: amountUSD, balance: parseFloat(localStorage.getItem('eg_balance') || '0'),
       pending: true, ref: ref, topupId: topupId
     };
@@ -1497,7 +1508,7 @@ function vqrConfirmPending(rec) {
   var amt = Number(rec.amount_usd) || 0;
   vqrCreditWallet(amt);
   var newBal = parseFloat(localStorage.getItem('eg_balance') || '0');
-  _vqrUpdateTx(function (t) { return t.pending && (t.topupId === rec.id || t.ref === rec.ref); }, { pending: false, balance: newBal });
+  _vqrUpdateTx(function (t) { return t.pending && (t.topupId === rec.id || t.ref === rec.ref); }, { pending: false, balance: newBal, txnId: rec.txn_id || '' });
   try { var d = (STATS.all[currentPeriod] || STATS.all.month); d.dep += amt; } catch (e) {}
   if (typeof renderTx === 'function') renderTx();
   if (typeof updateStats === 'function') updateStats();

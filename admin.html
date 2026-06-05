@@ -1916,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <!-- Ledger table — outline card matching the sellers page transactions -->
     <div id="bal-pane-all" class="bal-pane" style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#fff">
       <table class="dtable" style="border:none;margin:0">
-        <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Order</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
+        <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Reference</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Transaction ID</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
         <tbody id="wal-ledger-rows"></tbody>
       </table>
       <div id="wal-empty" style="display:none;padding:48px 24px;text-align:center;color:#9ca3af;font-size:13.5px;line-height:1.6">No transactions yet.<br><span style="font-size:12.5px">Charges appear when sellers push orders to production. Refunds + payouts appear when admin approves them.</span></div>
@@ -9785,7 +9785,7 @@ function admConfirmTopup(id) {
     .then(function (rec) {
       if (!rec || !rec.id) { alert('Could not confirm: ' + ((rec && rec.error) || 'error')); return; }
       // Record it in the factory wallet (credits balance + visible ledger row).
-      try { if (window.EGStore && EGStore.recordFactoryTopup) EGStore.recordFactoryTopup(rec.amount_usd, { topupId: rec.id, ref: rec.ref, label: 'Seller top-up — ' + (rec.seller_email || rec.seller_name || 'seller') }); } catch (e) {}
+      try { if (window.EGStore && EGStore.recordFactoryTopup) EGStore.recordFactoryTopup(rec.amount_usd, { topupId: rec.id, ref: rec.ref, txnId: rec.txn_id, label: 'Seller top-up — ' + (rec.seller_email || rec.seller_name || 'seller') }); } catch (e) {}
       admRenderPendingTopups();
       if (typeof walRefresh === 'function') walRefresh();
     })
@@ -9814,7 +9814,7 @@ function admReconcileTopups() {
       var changed = false;
       list.forEach(function (t) {
         if (seen[t.id]) return;
-        EGStore.recordFactoryTopup(t.amount_usd, { topupId: t.id, ref: t.ref, label: 'Seller top-up — ' + (t.seller_email || t.seller_name || 'seller') });
+        EGStore.recordFactoryTopup(t.amount_usd, { topupId: t.id, ref: t.ref, txnId: t.txn_id, label: 'Seller top-up — ' + (t.seller_email || t.seller_name || 'seller') });
         changed = true;
       });
       if (changed && typeof walRefresh === 'function') walRefresh();
@@ -9868,6 +9868,7 @@ function walRenderLedger() {
       + '<td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px;font-variant-numeric:tabular-nums">' + when + '</td>'
       + '<td style="padding:11px 12px"><span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.04em">' + typeLbl + '</span></td>'
       + '<td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">' + (e.orderId || '—') + '</td>'
+      + '<td style="font-family:monospace;font-size:12px;color:#9ca3af;padding:11px 12px">' + (e.txnId || '—') + '</td>'
       + '<td style="font-size:13px;color:#191918;padding:11px 12px">' + (e.label || '—') + '</td>'
       + '<td style="font-weight:700;color:' + amtColor + ';padding:11px 18px 11px 12px;text-align:right;font-variant-numeric:tabular-nums">' + sign + '$' + Number(e.amount||0).toFixed(2) + '</td>'
       + '</tr>';
@@ -9877,11 +9878,11 @@ function walExportLedger() {
   if (typeof EGStore === 'undefined' || !EGStore.getFactoryLedger) return;
   var ledger = EGStore.getFactoryLedger();
   if (!ledger.length) { alert('No transactions to export.'); return; }
-  var header = 'Date,Type,Order,Label,Amount\n';
+  var header = 'Date,Type,Reference,Transaction ID,Label,Amount\n';
   var rows = ledger.map(e => {
     var d = new Date(e.ts || Date.now()).toISOString();
     var sign = e.type === 'charge' ? '' : '-';
-    return [d, e.type||'', e.orderId||'', '"' + String(e.label||'').replace(/"/g,'""') + '"', sign + (Number(e.amount)||0).toFixed(2)].join(',');
+    return [d, e.type||'', e.orderId||'', e.txnId||'', '"' + String(e.label||'').replace(/"/g,'""') + '"', sign + (Number(e.amount)||0).toFixed(2)].join(',');
   }).join('\n');
   var blob = new Blob([header + rows], { type:'text/csv' });
   var a = document.createElement('a');

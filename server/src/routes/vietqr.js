@@ -104,8 +104,8 @@ export function vietqrRoutes(app, requireAuth) {
       if (String(b.transType || 'C').toUpperCase() === 'C') {
         if (matched) await q('update orders set paid=true, paid_at=now() where id=$1', [matched]).catch(() => {});
         await q(
-          "update topup_requests set status='received', confirmed_at=now() where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%'",
-          [content]
+          "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%'",
+          [content, txid]
         ).catch(() => {});
       }
       return { error: false, errorReason: null, toastMessage: 'OK', object: { reftransactionid: txid } };
@@ -164,8 +164,19 @@ export function vietqrRoutes(app, requireAuth) {
     const body = req.body || {};
     const amount = Math.round(Number(body.amount) || 0);
     if (!amount || amount < 1000) { reply.code(400); return { error: 'Invalid amount (VND)' }; }
-    // Our note (addInfo): alphanumeric, ≤ 23 chars. VietQR may prefix its own code.
-    const note = String(body.note || ('EG' + Date.now().toString(36))).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 23);
+    // Human-readable reference WE control: EG + zero-padded sequential number
+    // (e.g. EG000007). Alphanumeric so it survives the bank memo; this is the key
+    // that links the seller's wallet, the admin ledger, and the bank transfer.
+    let note;
+    try {
+      const seqRow = await q(
+        "insert into settings (key,value,updated_at) values ('topup_seq','1',now()) " +
+        "on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value"
+      );
+      note = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
+    } catch (e) {
+      note = String(body.note || ('EG' + Date.now().toString(36))).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 23);
+    }
     const bankCode = process.env.VIETQR_BANK_CODE || 'BIDV';
     const account  = process.env.VIETQR_BANK_ACCOUNT || '1231255899';
     const name     = process.env.VIETQR_ACCOUNT_NAME || 'PHAN MY LINH';

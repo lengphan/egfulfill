@@ -17,9 +17,11 @@ export function topupsRoutes(app, requireAuth) {
        ref         text,
        note        text,
        status      text not null default 'pending',   -- pending | received | rejected
+       txn_id      text,                               -- VietQR/provider transaction id (filled on credit)
        created_at  timestamptz default now(),
        confirmed_at timestamptz,
        confirmed_by uuid)`).catch(() => {});
+  q(`alter table topup_requests add column if not exists txn_id text`).catch(() => {});
 
   // Seller creates a pending top-up (after they've transferred via VietQR).
   app.post('/api/topups', { preHandler: requireAuth }, async (req) => {

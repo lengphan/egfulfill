@@ -508,7 +508,7 @@
       try { localStorage.setItem(this.FACTORY_BALANCE_KEY, bal.toFixed(2)); } catch (e) {}
       this._appendFactoryLedger({
         type: 'topup', amount: amt, ts: _ts(),
-        orderId: opts.ref || null, topupId: opts.topupId || null,
+        orderId: opts.ref || null, topupId: opts.topupId || null, txnId: opts.txnId || null,
         label: opts.label || 'Seller wallet top-up', by: opts.by || 'admin'
       });
       try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('eg-factory-balance-changed')); } catch (e) {}
