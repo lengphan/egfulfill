@@ -861,7 +861,11 @@ function dbLoad() {
   } catch(e) {}
   return DB_DEFAULTS.map(c => JSON.parse(JSON.stringify(c)));
 }
-function dbSave() { localStorage.setItem(DESIGN_STORE_KEY, JSON.stringify(DB_CARDS)); }
+function dbSave() {
+  // Dedupe by id in place — drag/re-render races can otherwise leave duplicate cards.
+  if (Array.isArray(DB_CARDS)) { var _sn={}, _dd=[]; for (var _i=0;_i<DB_CARDS.length;_i++){ var _c=DB_CARDS[_i]; if(_c&&_c.id!=null){ if(_sn[_c.id])continue; _sn[_c.id]=1; } _dd.push(_c); } if(_dd.length!==DB_CARDS.length){ DB_CARDS.length=0; for(var _j=0;_j<_dd.length;_j++)DB_CARDS.push(_dd[_j]); } }
+  try { localStorage.setItem(DESIGN_STORE_KEY, JSON.stringify(DB_CARDS)); } catch(e){}
+}
 let DB_CARDS = dbLoad();
 window.addEventListener('storage', e => {
   if (e.key !== DESIGN_STORE_KEY || !e.newValue) return;

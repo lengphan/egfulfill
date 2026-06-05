@@ -8639,6 +8639,8 @@ function udbLoad() {
   return UDB_DEFAULTS.map(c => JSON.parse(JSON.stringify(c)));
 }
 function udbSave() {
+  // Dedupe by id in place — a re-render/merge/cross-board race can otherwise persist duplicate cards.
+  if (Array.isArray(UDB_CARDS)) { var _sn={}, _dd=[]; for (var _i=0;_i<UDB_CARDS.length;_i++){ var _c=UDB_CARDS[_i]; if(_c&&_c.id!=null){ if(_sn[_c.id])continue; _sn[_c.id]=1; } _dd.push(_c); } if(_dd.length!==UDB_CARDS.length){ UDB_CARDS.length=0; for(var _j=0;_j<_dd.length;_j++)UDB_CARDS.push(_dd[_j]); } }
   const cards = Array.isArray(UDB_CARDS) ? UDB_CARDS : [];
   const liteArr = cards.map(_udbStripCard);
   try { localStorage.setItem(DESIGN_STORE_KEY, JSON.stringify(liteArr)); }
