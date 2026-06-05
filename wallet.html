@@ -773,7 +773,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="margin-bottom:14px">
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>
       <select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
-        <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
+        <option value="vietqr">Vietcombank</option>
         <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
@@ -805,9 +805,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div style="font-size:12.5px;color:#6b7280;margin-bottom:8px">Pay with your PayPal balance or any debit / credit card.</div>
       <div id="paypal-btn-container"></div>
     </div>
-    <button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>Confirm Deposit
-    </button>
+    <button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Pay Now</button>
     <div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#374151;text-decoration:underline;text-decoration-color:#c4c3be;text-underline-offset:3px;font-weight:600">Go to Wallet →</a></div>
   </div>
 </div>
@@ -827,7 +825,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="margin-bottom:14px">
       <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>
       <select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'">
-        <option value="vietqr">Vietcombank — VietQR (scan to pay)</option>
+        <option value="vietqr">Vietcombank</option>
         <option value="paypal">PayPal — card or balance</option>
         <option value="pingpong">PingPong (Connected)</option>
         <option value="bank">Bank Transfer (manual)</option>
@@ -960,12 +958,20 @@ function renderTx() {
     ? `<tr><td colspan="7" style="text-align:center;padding:28px;color:#9ca3af;font-size:14px">No transactions match the current filters</td></tr>`
     : rows.map(t => {
       const isD = t.type === 'deposit';
-      const amtColor = '#374151';
-      const amtStr = (isD ? '+' : '–') + '$' + Math.abs(t.amount).toLocaleString();
+      let amtColor = '#374151';
+      let amtStr = (isD ? '+' : '–') + '$' + Math.abs(t.amount).toLocaleString();
       const balColor = '#374151';
-      const typeBadge = isD
+      let typeBadge = isD
         ? `<span style="background:#f0ede9;color:#374151;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600">Deposit</span>`
         : `<span style="background:#f0ede9;color:#374151;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600">Charge</span>`;
+      let balCell = `${t.balance < 0 ? '–' : ''}$${Math.abs(t.balance).toLocaleString()}`;
+      if (t.pending) {
+        typeBadge = `<span style="background:#fef3c7;color:#b45309;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:700">Pending</span>`;
+        amtStr = '$' + Math.abs(t.amount).toLocaleString(); amtColor = '#b45309'; balCell = '<span style="color:#c4c3be">—</span>';
+      } else if (t.rejected) {
+        typeBadge = `<span style="background:#f3f3f1;color:#9ca3af;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:600">Rejected</span>`;
+        amtStr = `<span style="text-decoration:line-through;color:#9ca3af">$${Math.abs(t.amount).toLocaleString()}</span>`; amtColor = '#9ca3af'; balCell = '<span style="color:#c4c3be">—</span>';
+      }
       const pc = PLATFORM_COLORS[t.platform] || PLATFORM_COLORS.all;
       const [pbg, ptxt] = pc.split(':');
       const pLabel = t.platform === 'all' ? '—' : PLATFORM_LABELS[t.platform];
@@ -979,7 +985,7 @@ function renderTx() {
         <td><span style="background:#f6f5f4;border-radius:5px;padding:3px 8px;font-size:12px;font-weight:600;color:#374151">${t.method}</span></td>
         <td>${typeBadge}</td>
         <td style="font-weight:700;color:${amtColor};text-align:right;white-space:nowrap">${amtStr}</td>
-        <td style="font-weight:600;color:${balColor};text-align:right;white-space:nowrap">${t.balance < 0 ? '–' : ''}$${Math.abs(t.balance).toLocaleString()}</td>
+        <td style="font-weight:600;color:${balColor};text-align:right;white-space:nowrap">${balCell}</td>
       </tr>`;
     }).join('');
 }
@@ -1136,7 +1142,7 @@ function vqrSyncDepositUI() {
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   if (btn) {
     btn.style.display = isPaypal ? 'none' : '';
-    if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isVqr ? 'Show VietQR code' : 'Confirm Deposit';
+    if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = 'Pay Now';
   }
 }
 // ── PayPal top-up (Orders API v2; auto-capture) ──────────────────────────────
@@ -1326,32 +1332,80 @@ function vqrIveTransferred(amountUSD, ref, vnd, btn) {
   fetch('/api/topups', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ amount: amountUSD, vnd: vnd, ref: ref, note: ref, name: (u.name || u.email || '') }) })
     .then(function (r) { return r.json(); })
     .then(function (rec) {
-      var s = document.getElementById('vqr-status');
-      if (s) { s.style.background = '#fef6e7'; s.style.color = '#b45309';
-        s.innerHTML = '<span class="vqr-spin" style="width:14px;height:14px;border:2px solid #f3d9a6;border-top-color:#b45309;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Sent to admin — waiting for confirmation…'; }
-      if (btn) btn.style.display = 'none';
-      if (rec && rec.id) vqrPollTopup(rec.id, amountUSD, ref);
+      if (!rec || rec.error) { if (btn) { btn.disabled = false; btn.textContent = "I've transferred — notify admin"; } alert('Could not notify admin: ' + ((rec && rec.error) || 'error')); return; }
+      // Record a PENDING row in the seller's history immediately + close the popup.
+      vqrRecordPending(amountUSD, ref, rec.id);
+      closeVietQR();
+      walToast('Top-up sent — pending admin confirmation');
     })
     .catch(function (e) { if (btn) { btn.disabled = false; btn.textContent = "I've transferred — notify admin"; } alert('Could not notify admin: ' + e.message); });
 }
-function vqrPollTopup(id, amountUSD, ref) {
-  if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
-  var tok = localStorage.getItem('eg_token'); var started = Date.now();
-  _vqrPoll = setInterval(function () {
-    if (Date.now() - started > 30 * 60 * 1000) { clearInterval(_vqrPoll); _vqrPoll = null; return; }
-    fetch('/api/topups', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
-      .then(function (r) { return r.json(); })
-      .then(function (list) {
-        if (!Array.isArray(list)) return;
-        var rec = list.find(function (x) { return x.id === id; });
-        if (rec && rec.status === 'received') { vqrOnPaid(amountUSD, ref); }
-        else if (rec && rec.status === 'rejected') {
-          clearInterval(_vqrPoll); _vqrPoll = null;
-          var s = document.getElementById('vqr-status'); if (s) { s.style.background = '#fef2f2'; s.style.color = '#dc2626'; s.textContent = '✕ Top-up was rejected by admin'; }
-        }
-      }).catch(function () {});
-  }, 5000);
+// Small non-blocking toast.
+function walToast(msg, ok) {
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:' + (ok === false ? '#dc2626' : '#191918') + ';color:#fff;padding:11px 20px;border-radius:9px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.22);font-family:inherit';
+  t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3200);
 }
+// Record a pending top-up row (no balance change yet).
+function vqrRecordPending(amountUSD, ref, topupId) {
+  try {
+    var now = new Date();
+    var rec = {
+      date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      desc: 'Wallet top-up (VietQR)', order: ref ? ('· ' + ref) : '', platform: 'all', method: 'VietQR',
+      type: 'deposit', amount: amountUSD, balance: parseFloat(localStorage.getItem('eg_balance') || '0'),
+      pending: true, ref: ref, topupId: topupId
+    };
+    if (typeof TX !== 'undefined') TX.unshift(rec);
+    var saved = []; try { saved = JSON.parse(localStorage.getItem('eg_wallet_tx') || '[]'); } catch (e) {}
+    saved.unshift(rec); localStorage.setItem('eg_wallet_tx', JSON.stringify(saved.slice(0, 200)));
+    if (typeof renderTx === 'function') renderTx();
+  } catch (e) {}
+}
+// Patch matching TX rows in memory + storage.
+function _vqrUpdateTx(matchFn, patch) {
+  try { (typeof TX !== 'undefined' ? TX : []).forEach(function (t) { if (matchFn(t)) Object.assign(t, patch); }); } catch (e) {}
+  try {
+    var saved = JSON.parse(localStorage.getItem('eg_wallet_tx') || '[]');
+    saved.forEach(function (t) { if (matchFn(t)) Object.assign(t, patch); });
+    localStorage.setItem('eg_wallet_tx', JSON.stringify(saved.slice(0, 200)));
+  } catch (e) {}
+}
+function vqrConfirmPending(rec) {
+  var amt = Number(rec.amount_usd) || 0;
+  vqrCreditWallet(amt);
+  var newBal = parseFloat(localStorage.getItem('eg_balance') || '0');
+  _vqrUpdateTx(function (t) { return t.pending && (t.topupId === rec.id || t.ref === rec.ref); }, { pending: false, balance: newBal });
+  try { var d = (STATS.all[currentPeriod] || STATS.all.month); d.dep += amt; } catch (e) {}
+  if (typeof renderTx === 'function') renderTx();
+  if (typeof updateStats === 'function') updateStats();
+  walToast('Top-up confirmed — $' + amt.toFixed(2) + ' added');
+}
+function vqrRejectPending(rec) {
+  _vqrUpdateTx(function (t) { return t.pending && (t.topupId === rec.id || t.ref === rec.ref); }, { pending: false, rejected: true });
+  if (typeof renderTx === 'function') renderTx();
+  walToast('A top-up was rejected by admin', false);
+}
+// Reconcile pending rows against the server (covers background + after reloads).
+function vqrReconcile() {
+  var tok = localStorage.getItem('eg_token'); if (!tok) return;
+  var saved = []; try { saved = JSON.parse(localStorage.getItem('eg_wallet_tx') || '[]'); } catch (e) {}
+  if (!saved.some(function (t) { return t.pending; })) return;
+  fetch('/api/topups', { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.json(); })
+    .then(function (list) {
+      if (!Array.isArray(list)) return;
+      var byId = {}; list.forEach(function (x) { byId[x.id] = x; });
+      saved.forEach(function (t) {
+        if (!t.pending) return;
+        var rec = byId[t.topupId]; if (!rec) return;
+        if (rec.status === 'received') vqrConfirmPending(rec);
+        else if (rec.status === 'rejected') vqrRejectPending(rec);
+      });
+    }).catch(function () {});
+}
+setInterval(vqrReconcile, 8000);
+document.addEventListener('DOMContentLoaded', vqrReconcile);
 
 // On load: pull the admin's shared rate, and restore persisted top-up history.
 (function () {
@@ -1440,8 +1494,16 @@ window._wdValidate = _wdValidate;
 
 /* ── Gateways ── */
 function connectGateway(gw) {
-  const n = { lianlian:'LianLian Pay', vcb:'Vietcombank', paypal:'PayPal' };
-  alert(`Redirecting to ${n[gw]} to authorize the connection…`);
+  // PayPal & Vietcombank have real top-up flows — open Add Funds with that method
+  // preselected instead of a placeholder redirect.
+  if (gw === 'paypal' || gw === 'vcb') {
+    var pop = document.getElementById('wallet-settings-pop'); if (pop) pop.style.display = 'none';
+    openDepositModal();
+    var m = document.getElementById('modal-method'); if (m) m.value = (gw === 'vcb' ? 'vietqr' : 'paypal');
+    if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
+    return;
+  }
+  alert((gw === 'lianlian' ? 'LianLian Pay' : gw) + ' integration is coming soon. Contact support to request it.');
 }
 function openAddMethod() { alert('Additional gateways coming soon. Contact support to request one.'); }
 
