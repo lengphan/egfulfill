@@ -52,6 +52,11 @@ services:
       VIETQR_API_BASE: ${VIETQR_API_BASE:-https://api.vietqr.org}
       VIETQR_API_USERNAME: ${VIETQR_API_USERNAME:-}
       VIETQR_API_PASSWORD: ${VIETQR_API_PASSWORD:-}
+      # Receiving (linked) bank account VietQR mints the VA-backed payment QR for.
+      # Must match the account linked in your VietQR connection so callbacks fire.
+      VIETQR_BANK_CODE: ${VIETQR_BANK_CODE:-BIDV}
+      VIETQR_BANK_ACCOUNT: ${VIETQR_BANK_ACCOUNT:-1231255899}
+      VIETQR_ACCOUNT_NAME: ${VIETQR_ACCOUNT_NAME:-PHAN MY LINH}
       # PayPal wallet top-up (Orders API v2). Use sandbox keys to test, live in prod.
       PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
       PAYPAL_SECRET: ${PAYPAL_SECRET:-}

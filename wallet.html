@@ -1317,6 +1317,22 @@ function closeVietQR() {
   const m = document.getElementById('vqr-modal'); if (m) m.style.display = 'none';
   document.body.style.overflow = '';
 }
+function _vqrPaintImg(url) {
+  var box = document.getElementById('vqr-qrbox'); if (!box) return;
+  box.innerHTML = '<img src="' + url + '" alt="VietQR" style="width:218px;height:218px;border-radius:9px" onerror="this.parentNode.textContent=\'QR unavailable — use account details below\'">';
+}
+function _vqrPaintQR(text) {
+  var box = document.getElementById('vqr-qrbox'); if (!box || !text) return;
+  var imgFallback = function () { _vqrPaintImg('https://api.qrserver.com/v1/create-qr-code/?size=218x218&data=' + encodeURIComponent(text)); };
+  var render = function () { try { box.innerHTML = ''; new QRCode(box, { text: text, width: 218, height: 218, correctLevel: QRCode.CorrectLevel.M }); } catch (e) { imgFallback(); } };
+  if (window.QRCode) { render(); return; }
+  var s = document.getElementById('vqr-qrlib');
+  if (s) { s.addEventListener('load', render); return; }
+  s = document.createElement('script'); s.id = 'vqr-qrlib';
+  s.src = 'https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js';
+  s.onload = render; s.onerror = imgFallback;
+  document.head.appendChild(s);
+}
 function openVietQRTopUp(amountUSD) {
   // Tag the transfer note with the seller so the right wallet is credited (all
   // top-ups land in the admin's one account; the note routes the credit).
@@ -1325,7 +1341,9 @@ function openVietQRTopUp(amountUSD) {
   const ref = ('EG' + tag + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
   const rate = egVqrRate();
   const vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
-  const qr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-qr_only.png'
+  // Fallback only — used if the server can't mint a VA-backed QR. The reliable
+  // path below asks VietQR for a monitored-VA QR so callbacks always fire.
+  const fallbackQr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-qr_only.png'
     + '?amount=' + vnd + '&addInfo=' + encodeURIComponent(ref) + '&accountName=' + encodeURIComponent(EG_VQR.name);
   let m = document.getElementById('vqr-modal');
   if (!m) {
@@ -1340,10 +1358,10 @@ function openVietQRTopUp(amountUSD) {
     + '<div style="position:relative;background:#fff;border-radius:16px;width:380px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:16px;font-weight:700;color:#191918">Top Up</div><button onclick="closeVietQR()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
     + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$' + amountUSD.toFixed(2) + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer ≈ ₫' + vndStr + ' · 1 USD = ₫' + rate.toLocaleString('en-US') + '</div></div>'
-    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><img src="' + qr + '" alt="VietQR" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;background:#fff" onerror="this.style.display=\'none\'"></div>'
+    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><div id="vqr-qrbox" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12.5px;gap:8px"><span class="vqr-spin" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#6b7280;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Generating secure QR…</div></div>'
     + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:12px">'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
-      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b style="font-family:monospace">' + EG_VQR.account + '</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b id="vqr-acct" style="font-family:monospace">' + EG_VQR.account + '</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Name</span><b>' + EG_VQR.name + '</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (bắt buộc)</span><b style="font-family:monospace;color:#b45309">' + ref + '</b></div>'
     + '</div>'
@@ -1358,6 +1376,26 @@ function openVietQRTopUp(amountUSD) {
     document.head.appendChild(st);
   }
   m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+
+  // Ask the server to mint a VA-backed QR (VietQR monitors that VA → guaranteed
+  // callback). Fall back to the generic transfer QR if the call fails.
+  (function mintQR() {
+    const tok0 = localStorage.getItem('eg_token') || '';
+    fetch('/api/vietqr/create-payment', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, tok0 ? { Authorization: 'Bearer ' + tok0 } : {}),
+      body: JSON.stringify({ amount: vnd, note: ref })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || d.error || (!d.qrCode && !d.qrLink)) throw new Error((d && d.error) || 'no qr');
+        if (d.qrLink) { _vqrPaintImg(d.qrLink); }
+        else { _vqrPaintQR(d.qrCode); }
+        const a = document.getElementById('vqr-acct');
+        if (a && d.vaAccount) a.textContent = d.vaAccount;   // pay the monitored VA
+      })
+      .catch(function () { _vqrPaintImg(fallbackQr); });   // graceful degradation
+  })();
 
   // Poll for the matching transfer.
   if (_vqrPoll) clearInterval(_vqrPoll);

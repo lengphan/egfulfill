@@ -153,6 +153,46 @@ export function vietqrRoutes(app, requireAuth) {
     return { ok: true, rate };
   });
 
+  // ── Mint a VA-backed payment QR (production-reliable callbacks) ──────────────
+  //   Instead of a generic img.vietqr.io transfer QR, we ask VietQR to generate a
+  //   QR tied to a virtual account it MONITORS. A payment to that VA is guaranteed
+  //   to fire the transaction-sync callback → the wallet auto-credits. The receiving
+  //   account is our linked bank account (env VIETQR_BANK_*). Returns the QR string
+  //   (qrCode), an optional image link (qrLink), the VA, and the full content the
+  //   poll should match on.  Body: { amount: <VND>, note: <our ref/addInfo> }
+  app.post('/api/vietqr/create-payment', { preHandler: requireAuth }, async (req, reply) => {
+    const body = req.body || {};
+    const amount = Math.round(Number(body.amount) || 0);
+    if (!amount || amount < 1000) { reply.code(400); return { error: 'Invalid amount (VND)' }; }
+    // Our note (addInfo): alphanumeric, ≤ 23 chars. VietQR may prefix its own code.
+    const note = String(body.note || ('EG' + Date.now().toString(36))).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 23);
+    const bankCode = process.env.VIETQR_BANK_CODE || 'BIDV';
+    const account  = process.env.VIETQR_BANK_ACCOUNT || '1231255899';
+    const name     = process.env.VIETQR_ACCOUNT_NAME || 'PHAN MY LINH';
+    let token;
+    try { token = await vqOutboundToken(); }
+    catch (e) { reply.code(502); return { error: 'VietQR auth failed: ' + e.message }; }
+    const orderId = ('EG' + Date.now().toString(36)).toUpperCase().slice(0, 13);
+    try {
+      const gr = await fetch(VQ_API_BASE + '/vqr/api/qr/generate-customer', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankCode, bankAccount: account, userBankName: name, content: note, amount, orderId, qrType: 0, transType: 'C' })
+      });
+      const gd = await gr.json().catch(() => ({}));
+      if (!gr.ok) { reply.code(502); return { error: 'VietQR generate failed: ' + JSON.stringify(gd).slice(0, 300) }; }
+      return {
+        ok: true,
+        content: gd.content || note,        // full addInfo (may carry VietQR's VA prefix)
+        note,                                // our ref — what the wallet polls on
+        qrCode: gd.qrCode || '',             // EMVCo QR string (render client-side)
+        qrLink: gd.qrLink || gd.imgId || '', // optional ready-made image URL
+        vaAccount: gd.vaAccount || account,
+        bankCode, account, name, amount,
+        transactionRefId: gd.transactionRefId || ''
+      };
+    } catch (e) { reply.code(502); return { error: 'VietQR generate error: ' + e.message }; }
+  });
+
   // ── Self-test: run VietQR's 3-step sandbox flow (get-token → generate QR →
   //    test-callback) and confirm the callback reached our transaction-sync. Staff only.
   //    Usage: /api/vietqr/selftest?bankCode=MB&account=0369053640&name=LE THI MAI HUONG&amount=10000
