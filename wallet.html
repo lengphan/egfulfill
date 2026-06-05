@@ -1394,8 +1394,8 @@ function openVietQRTopUp(amountUSD) {
         if (code) { _vqrPaintQR(code); }
         else if (d.qrLink && /^https?:\/\//i.test(d.qrLink)) { _vqrPaintImg(d.qrLink); }
         else { console.warn('VietQR create-payment had no usable QR:', d); _vqrPaintImg(fallbackQr); }
-        const a = document.getElementById('vqr-acct');
-        if (a && d.vaAccount) a.textContent = d.vaAccount;   // pay the monitored VA
+        // Keep showing the real BIDV account in the details row — the QR carries the
+        // monitored VA internally, so scanning still routes correctly + auto-confirms.
       })
       .catch(function () { _vqrPaintImg(fallbackQr); });   // graceful degradation
   })();
