@@ -10,6 +10,7 @@ import { etsyRoutes } from './routes/etsy.js';
 import { usersRoutes } from './routes/users.js';
 import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
+import { vietqrRoutes } from './routes/vietqr.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
@@ -59,6 +60,7 @@ etsyRoutes(app, requireAuth, requireStaff);
 usersRoutes(app, requireAdmin);
 uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);
+vietqrRoutes(app, requireAuth);   // /vqr/* are PUBLIC (VietQR server-to-server); /api/vietqr/* need auth
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

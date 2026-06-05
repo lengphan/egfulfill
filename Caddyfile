@@ -10,6 +10,11 @@ your-domain.com {
 		reverse_proxy api:3000
 	}
 
+	# VietQR balance-change callbacks (server-to-server: token_generate + transaction-sync)
+	handle /vqr/* {
+		reverse_proxy api:3000
+	}
+
 	# Everything else → the static frontend (clean URLs: /orders → orders.html)
 	handle {
 		root * /srv

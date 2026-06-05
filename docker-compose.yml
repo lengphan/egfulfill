@@ -40,7 +40,13 @@ services:
       USPS_ACCOUNT_NUMBER: ${USPS_ACCOUNT_NUMBER:-}
       USPS_ACCOUNT_TYPE: ${USPS_ACCOUNT_TYPE:-EPS}
       USPS_SCOPE: ${USPS_SCOPE:-}
+      USPS_MANIFEST_MID: ${USPS_MANIFEST_MID:-}
       USPS_MOCK: ${USPS_MOCK:-}
+      # VietQR auto-reconciliation — the Username/Password you enter on the VietQR
+      # portal ("khách hàng cung cấp"); VietQR uses them (Basic Auth) to get a token
+      # from /vqr/api/token_generate before posting balance-change transactions.
+      VIETQR_USERNAME: ${VIETQR_USERNAME:-}
+      VIETQR_PASSWORD: ${VIETQR_PASSWORD:-}
     depends_on: [db]
     restart: unless-stopped
 
