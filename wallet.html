@@ -1162,7 +1162,7 @@ function openVietQRTopUp(amountUSD) {
   const ref = ('EG' + tag + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
   const rate = egVqrRate();
   const vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
-  const qr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-compact2.png'
+  const qr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-qr_only.png'
     + '?amount=' + vnd + '&addInfo=' + encodeURIComponent(ref) + '&accountName=' + encodeURIComponent(EG_VQR.name);
   let m = document.getElementById('vqr-modal');
   if (!m) {
