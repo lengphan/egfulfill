@@ -3,6 +3,8 @@
 // create the intent and read its status. Works with test keys (pk_test/sk_test).
 //
 // .env:  STRIPE_SECRET_KEY=sk_...   STRIPE_PUBLISHABLE_KEY=pk_...
+import { q } from '../db.js';
+
 const SK = process.env.STRIPE_SECRET_KEY || '';
 const PK = process.env.STRIPE_PUBLISHABLE_KEY || '';
 
@@ -48,7 +50,25 @@ export function stripeRoutes(app, requireAuth) {
       if (!id) { reply.code(400); return { error: 'id required' }; }
       const pi = await stripe('/payment_intents/' + encodeURIComponent(id));
       const ok = pi.status === 'succeeded';
-      return { ok, amount: (Number(pi.amount_received) || 0) / 100, status: pi.status };
+      const amount = (Number(pi.amount_received) || 0) / 100;
+      if (!ok) return { ok, amount, status: pi.status };
+      // Real money in → record it like any top-up so the factory (admin+warehouse)
+      // is credited via the same reconcile path. Idempotent per PaymentIntent: clean
+      // sequential EG reference + the Stripe id as the transaction id.
+      let ref = null;
+      try {
+        const ex = await q('select ref from topup_requests where txn_id=$1 limit 1', [id]);
+        if (ex.rows[0]) { ref = ex.rows[0].ref; }
+        else {
+          const seqRow = await q("insert into settings (key,value,updated_at) values ('topup_seq','1',now()) on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value");
+          ref = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
+          await q(
+            "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,'Card top-up','received',$5, now())",
+            [req.user.sub, req.user.email || null, amount, ref, id]
+          );
+        }
+      } catch (e) { app.log.error('stripe topup record failed: ' + e.message); }
+      return { ok, amount, status: pi.status, ref, txnId: id };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }

@@ -1178,7 +1178,7 @@ function cardPay() {
       .then(function (r) { return r.json(); }).then(function (v) {
         if (v && v.ok) {
           var amt = v.amount || _cardAmount;
-          vqrCreditWallet(amt); vqrRecordDeposit(amt, _stripePI, 'Card');
+          vqrCreditWallet(amt); vqrRecordDeposit(amt, (v.ref || _stripePI), 'Card', (v.txnId || _stripePI));
           closeCardModal();
           walToast('Payment received — $' + amt.toFixed(2) + ' added');
         } else {
