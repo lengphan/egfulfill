@@ -3,6 +3,8 @@
 // credited + recorded. Works with sandbox keys for testing, live keys in prod.
 //
 // .env:  PAYPAL_CLIENT_ID=...  PAYPAL_SECRET=...  PAYPAL_ENV=sandbox|live
+import { q } from '../db.js';
+
 const CID = process.env.PAYPAL_CLIENT_ID || '';
 const SEC = process.env.PAYPAL_SECRET || '';
 const ENV = (process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
@@ -64,7 +66,24 @@ export function paypalRoutes(app, requireAuth) {
         && d.purchase_units[0].payments.captures && d.purchase_units[0].payments.captures[0];
       const ok = r.ok && d.status === 'COMPLETED' && cap && cap.status === 'COMPLETED';
       if (!ok) { reply.code(400); return { error: 'Capture not completed: ' + JSON.stringify(d).slice(0, 300) }; }
-      return { ok: true, amount: Number(cap.amount && cap.amount.value) || 0, captureId: cap.id, status: d.status };
+      const amount = Number(cap.amount && cap.amount.value) || 0;
+      // Real money in → record it like any top-up so the factory (admin+warehouse) is
+      // credited via the same reconcile path. Idempotent per capture: clean sequential
+      // EG reference + the PayPal capture id as the transaction id.
+      let ref = null;
+      try {
+        const ex = await q('select ref from topup_requests where txn_id=$1 limit 1', [cap.id]);
+        if (ex.rows[0]) { ref = ex.rows[0].ref; }
+        else {
+          const seqRow = await q("insert into settings (key,value,updated_at) values ('topup_seq','1',now()) on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value");
+          ref = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
+          await q(
+            "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,'PayPal top-up','received',$5, now())",
+            [req.user.sub, req.user.email || null, amount, ref, cap.id]
+          );
+        }
+      } catch (e) { app.log.error('paypal topup record failed: ' + e.message); }
+      return { ok: true, amount, captureId: cap.id, status: d.status, ref, txnId: cap.id };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }

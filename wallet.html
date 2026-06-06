@@ -1258,7 +1258,7 @@ function ppInit() {
                 if (res.error || !res.ok) { alert('PayPal capture failed: ' + (res.error || 'unknown')); return; }
                 var amt = res.amount || parseFloat(document.getElementById('modal-amount').value) || 0;
                 vqrCreditWallet(amt);
-                vqrRecordDeposit(amt, res.captureId, 'PayPal');
+                vqrRecordDeposit(amt, (res.ref || res.captureId), 'PayPal', (res.txnId || res.captureId));
                 closeDepositModal();
                 alert('Payment received — $' + amt.toFixed(2) + ' added to your wallet.');
               });
