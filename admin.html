@@ -8652,6 +8652,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
               </div>
               <div>
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Customer Note</div>
+                <div id="xfom-customer-note" style="font-size:13px;color:#9ca3af">No customer note</div>
+              </div>
+              <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Production Notes</div>
                 <div id="xfom-notes" style="margin-bottom:8px;font-size:13px;color:#9ca3af">No notes yet</div>
                 <div style="display:flex;gap:8px">
@@ -8811,8 +8815,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const computedTotal = items.reduce((s, it) => s + _xfomUnitPrice(it) * (it.qty || it.quantity || 1), 0);
     const total = (typeof o?.total === 'number') ? o.total : (computedTotal || o?.total || 0);
     document.getElementById('xfom-total').textContent = '$' + (typeof total === 'number' ? total.toFixed(2) : total);
-    // Notes
-    const notes = o?.notes || [];
+    // Customer note (read-only) — buyer's personalization from the items.
+    try {
+      const cnEl = document.getElementById('xfom-customer-note');
+      if (cnEl) {
+        const pers = (items || []).map(function (it) { return it.personalization || it.note || ''; }).filter(Boolean);
+        if (pers.length) { cnEl.innerHTML = pers.map(function (p) { return '<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fde7cf;border-radius:7px;font-size:13px;color:#9a3412;margin-bottom:5px">' + String(p).replace(/</g, '&lt;') + '</div>'; }).join(''); cnEl.style.display = ''; }
+        else { cnEl.innerHTML = '<span style="color:#9ca3af;font-size:13px">No customer note</span>'; cnEl.style.display = ''; }
+      }
+    } catch (e) {}
+    // Production notes — read the server-synced order notes so every board sees them.
+    let notes = o?.notes || [];
+    try { const _eg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_eg && Array.isArray(_eg.notes) && _eg.notes.length) notes = _eg.notes; } catch (e) {}
     const notesEl = document.getElementById('xfom-notes');
     if (notes.length) {
       notesEl.innerHTML = notes.map(n => `<div style="padding:7px 10px;background:#f9f8f6;border-radius:7px;font-size:13px;margin-bottom:5px"><strong>${n.by || 'Note'}:</strong> ${n.text || n}</div>`).join('');
@@ -8934,7 +8948,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const txt = (inp?.value || '').trim();
     if (!txt || !_xfomNum) return;
     const o = _xfomFindOrder(_xfomNum);
-    if (o) { o.notes = o.notes || []; o.notes.push({ by: 'You', text: txt, ts: Date.now() }); }
+    var _role = (typeof window !== 'undefined' && (window.XFOM_ROLE || window.XOC_ROLE)) ? String(window.XFOM_ROLE || window.XOC_ROLE) : 'factory';
+    var _note = { by: _role.charAt(0).toUpperCase() + _role.slice(1), text: txt, ts: Date.now() };
+    // Persist to the EGStore order's notes (server-synced) so operator/warehouse/admin
+    // all see the same production notes — not just the local board copy.
+    try {
+      if (typeof EGStore !== 'undefined' && EGStore.getOrders && EGStore.update) {
+        var _eg = (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; });
+        var _egId = (_eg && _eg.id) || (o && o.id) || _xfomNum;
+        var _notes = (_eg && Array.isArray(_eg.notes)) ? _eg.notes.slice() : ((o && Array.isArray(o.notes)) ? o.notes.slice() : []);
+        _notes.push(_note); EGStore.update(_egId, { notes: _notes });
+        if (o) o.notes = _notes;
+      } else if (o) { o.notes = o.notes || []; o.notes.push(_note); }
+    } catch (e) { if (o) { o.notes = o.notes || []; o.notes.push(_note); } }
     // Sync to the cross-board timeline as an internal entry so admin and
     // warehouse see this operator-added note, but the seller does not.
     try {
