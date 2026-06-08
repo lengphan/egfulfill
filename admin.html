@@ -8706,14 +8706,19 @@ document.addEventListener('DOMContentLoaded', function() {
     badge.className = 'badge';
     const _admStyleMap = { in_review:'color:#7c3aed', awaiting_scan:'color:#c2410c', scanned:'color:#0891b2', printing:'color:#1d4ed8', packing:'color:#1d4ed8', packed:'color:#0e7490', shipped:'color:#15803d', flagged:'color:#dc2626', exception:'color:#dc2626', escalated:'color:#dc2626', cancelled:'color:#9ca3af', refunded:'color:#9ca3af', on_hold:'color:#c2410c', oos:'color:#c2410c', backorder:'color:#c2410c', rush:'color:#92400e' };
     badge.style.cssText = 'font-size:14px;font-weight:700;background:transparent;padding:0;' + (_admStyleMap[status] || 'color:#374151');
-    // Address
-    const addr = (o && (o.addr || o.address)) || {};
+    // Address — resolve via the shared ship-to resolver (Etsy order.address /
+    // formatted / customer.shipTo), falling back to any structured addr object.
     const addrEl = document.getElementById('xfom-addr');
-    if (addr.name || addr.line1 || addr.street) {
-      addrEl.innerHTML = '<strong>' + (addr.name || o?.customer || '') + '</strong><br>' +
+    const t = (typeof _whOrderShipTo === 'function') ? (_whOrderShipTo(_xfomNum) || {}) : {};
+    const addr = (o && typeof o.address === 'object' ? o.address : {}) || {};
+    if (t.zip || t.street) {
+      addrEl.innerHTML = '<strong>' + (t.name || (o && o.customer) || '') + '</strong><br>' +
+        (t.street || '') + '<br>' + [t.city, t.state, t.zip].filter(Boolean).join(', ');
+    } else if (addr.name || addr.line1 || addr.street) {
+      addrEl.innerHTML = '<strong>' + (addr.name || (o && o.customer) || '') + '</strong><br>' +
         (addr.line1 || addr.street || '') + (addr.line2 ? '<br>' + addr.line2 : '') + '<br>' +
         [addr.city, addr.state, addr.zip].filter(Boolean).join(', ') + (addr.country ? '<br>' + addr.country : '');
-    } else if (o?.customer) {
+    } else if (o && o.customer) {
       addrEl.innerHTML = '<strong>' + o.customer + '</strong><br><span style="color:#9ca3af">No saved address</span>';
     } else {
       addrEl.innerHTML = '<span style="color:#9ca3af">No address on file</span>';
