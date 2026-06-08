@@ -42,6 +42,10 @@ services:
       USPS_SCOPE: ${USPS_SCOPE:-}
       USPS_MANIFEST_MID: ${USPS_MANIFEST_MID:-}
       USPS_MOCK: ${USPS_MOCK:-}
+      # Third-party shipping aggregators (discounted USPS + UPS labels via API,
+      # no USPS EPS/scope approval needed). Set either or both; rates merge.
+      EASYPOST_API_KEY: ${EASYPOST_API_KEY:-}
+      SHIPPO_API_TOKEN: ${SHIPPO_API_TOKEN:-}
       # VietQR auto-reconciliation — the Username/Password you enter on the VietQR
       # portal ("khách hàng cung cấp"); VietQR uses them (Basic Auth) to get a token
       # from /vqr/api/token_generate before posting balance-change transactions.
