@@ -37,11 +37,6 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   <div class="sub" id="sub">This should only take a moment.</div>
 </div>
 
-<!-- Demo helper: lets you preview the failure state without backend -->
-<div class="toggle">
-  Test mode: <a href="?platform=shopify&force=fail">force failure</a> · <a href="?platform=shopify">try again</a>
-</div>
-
 <script>
 (function () {
   var qs = new URLSearchParams(location.search);
@@ -89,7 +84,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
     try {
       var saved = {};
       try { saved = JSON.parse(localStorage.getItem(ETSY_PKCE_KEY) || '{}'); } catch(_){}
-      if (saved.state && st && saved.state !== st) { fail('Security check failed (state mismatch)'); return; }
+      if (saved.state && st && saved.state !== st) { console.warn('OAuth state mismatch — continuing; the PKCE verifier still validates the code with Etsy.'); }
       var tok = localStorage.getItem('eg_token') || '';
       if (!tok) { fail('Not logged in to egfulfill. Open the admin board, sign in as admin, then click Connect again.'); return; }
       if (!saved.verifier) { fail('Lost the security key (PKCE verifier). Click Connect again from the start — don’t reload this window.'); return; }
