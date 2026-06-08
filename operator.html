@@ -7563,7 +7563,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           }
         }
       } catch(e){}
-      return it.thumb || it.img || '';
+      return it.thumb || it.img || it.sellerImg || '';
     }
     function _xfomDesign(it){
       const sku = it.sku || it.SKU || '';
