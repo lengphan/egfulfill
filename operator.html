@@ -2934,8 +2934,9 @@ function selectShipment(row, order, tracking, name, addr, carrier, weight, cost,
   const fake = document.getElementById('sh-d-fakebar');
   const s = (window.EGUSPS && EGUSPS.getShipmentLabel) ? EGUSPS.getShipmentLabel(window.opCurrentShipTracking) : null;
   const lbl = s && s.label;
-  if (prev && lbl && (lbl.labelHtml || lbl.labelImage)) {
-    if (lbl.labelHtml) prev.innerHTML = '<div style="transform:scale(.82);transform-origin:top center;display:flex;justify-content:center">' + lbl.labelHtml + '</div>';
+  if (prev && lbl && (lbl.labelHtml || lbl.labelImage || lbl.labelUrl)) {
+    if (lbl.labelUrl) prev.innerHTML = '<iframe src="' + lbl.labelUrl + '" style="width:100%;height:320px;border:0;background:#fff"></iframe>';
+    else if (lbl.labelHtml) prev.innerHTML = '<div style="transform:scale(.82);transform-origin:top center;display:flex;justify-content:center">' + lbl.labelHtml + '</div>';
     else if (/PDF/i.test(lbl.imageType || '')) prev.innerHTML = '<iframe src="data:application/pdf;base64,' + lbl.labelImage + '" style="width:100%;height:300px;border:0;background:#fff"></iframe>';
     else prev.innerHTML = '<img src="data:image/png;base64,' + lbl.labelImage + '" style="max-width:100%;border:1px solid #e5e4e0">';
     prev.style.display = '';
@@ -5997,7 +5998,7 @@ function opNormShip(d) {
     cost:     d.cost || '—',
     date:     d.date || 'Just now',
     status:   d.status === 'shipped' ? 'In transit' : (d.status || 'Awaiting pickup'),
-    hasLabel: !!(d.label && (d.label.labelHtml || d.label.labelImage))
+    hasLabel: !!(d.label && (d.label.labelHtml || d.label.labelImage || d.label.labelUrl))
   };
 }
 // Real shipments come from the shared EGUSPS store; the seed is a display-only

@@ -375,7 +375,7 @@
   }
   function openSavedLabel(key) {
     var s = getShipmentLabel(key);
-    if (!s || !s.label || (!s.label.labelHtml && !s.label.labelImage)) { alert('No saved label image for ' + (key || '') + '.'); return; }
+    if (!s || !s.label || (!s.label.labelHtml && !s.label.labelImage && !s.label.labelUrl)) { alert('No saved label image for ' + (key || '') + '.'); return; }
     try { openLabel(s.label, s.tracking); } catch (e) { alert('Could not open the label.'); }
   }
 
@@ -394,7 +394,7 @@
       body.innerHTML = list.slice(0, 50).map(function (s) {
         var order = s.orderNum || '';
         var orderCell = order ? '<span style="font-weight:600">#' + order + '</span>' : '<span style="color:#9ca3af">Manual</span>';
-        var hasLbl = s.label && (s.label.labelHtml || s.label.labelImage);
+        var hasLbl = s.label && (s.label.labelHtml || s.label.labelImage || s.label.labelUrl);
         var trkClean = (s.tracking || '').replace(/\s/g, '');
         var svcShort = s.service ? String(s.service).replace(/^USPS /, '') : '';
         var carrierTxt = s.carrier || 'USPS';
@@ -437,8 +437,9 @@
     var fake = document.getElementById('sh-d-fakebar');
     var sh = getShipmentLabel(window.opCurrentShipTracking);
     var lbl = sh && sh.label;
-    if (prev && lbl && (lbl.labelHtml || lbl.labelImage)) {
-      if (lbl.labelHtml) prev.innerHTML = '<div style="transform:scale(.82);transform-origin:top center;display:flex;justify-content:center">' + lbl.labelHtml + '</div>';
+    if (prev && lbl && (lbl.labelHtml || lbl.labelImage || lbl.labelUrl)) {
+      if (lbl.labelUrl) prev.innerHTML = '<iframe src="' + lbl.labelUrl + '" style="width:100%;height:320px;border:0;background:#fff"></iframe>';
+      else if (lbl.labelHtml) prev.innerHTML = '<div style="transform:scale(.82);transform-origin:top center;display:flex;justify-content:center">' + lbl.labelHtml + '</div>';
       else if (/PDF/i.test(lbl.imageType || '')) prev.innerHTML = '<iframe src="data:application/pdf;base64,' + lbl.labelImage + '" style="width:100%;height:300px;border:0;background:#fff"></iframe>';
       else prev.innerHTML = '<img src="data:image/png;base64,' + lbl.labelImage + '" style="max-width:100%;border:1px solid #e5e4e0">';
       prev.style.display = ''; if (fake) fake.style.display = 'none';

@@ -98,7 +98,7 @@ async function shRates(to, from, pc) {
 async function shBuy(rateObjectId) {
   const r = await fetch(SH_BASE + '/transactions/', {
     method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rate: rateObjectId, label_file_type: 'PDF', async: false })
+    body: JSON.stringify({ rate: rateObjectId, label_file_type: 'PDF_4x6', async: false })
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || d.status !== 'SUCCESS') {
