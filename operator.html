@@ -3818,8 +3818,11 @@ function renderOpOrders() {
     const st = o.flagged ? 'flagged' : o.status;
     const badge = `<span style="font-size:12.5px;font-weight:600;white-space:nowrap;${OP_STATUS_STYLE[st]||'background:transparent;color:#374151'}">${OP_STATUS_MAP[st]||st}</span>`;
     const srcBadge = `<div style="font-size:12px;color:#c4c2be;font-weight:400;margin-top:2px">${window.egOrderIds?egOrderIds(o).source:(o.source||'Manual')}</div>`;
-    const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : '';
     const isExp = opExpandedRows.has(o.num);
+    // Expanded parent row reads a touch darker than the bright collapsed rows so the
+    // open order + its detail panel feel like one cohesive block (action buttons are
+    // transparent so they inherit this too). Active/selected tints take precedence.
+    const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : isExp ? '#fafaf9' : '';
     const mainRow = `<tr data-num="${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select'))opToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s${rowBg?`;background:${rowBg}`:''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="toggleOrderSelect('${o.num}',this.checked)"/></td>
       <td data-col="order">
@@ -3848,14 +3851,15 @@ function renderOpOrders() {
       <td data-col="tracking" style="font-size:12.5px;color:#9ca3af;display:${opColVisible('tracking')?'':'none'}">${window.EGTracking ? EGTracking.renderCell({ id: o.num, source: o.source, tracking: o.tracking, trackingLabelUrl: o.trackingLabelUrl, trackingCarrier: o.trackingCarrier }) : (o.tracking ? `<span style="font-family:monospace;color:#374151">${o.tracking}</span>` : '—')}</td>
       <td data-col="actions" style="white-space:nowrap;overflow:visible">
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
-          <button title="Chat with Seller" onclick="event.stopPropagation();xOrderChatOpen('${o.num}',{subtitle:'${(o.customer||'').replace(/'/g,"\\'")} · ${(o.store||'').replace(/'/g,"\\'")}'})" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3h12a1 1 0 011 1v7a1 1 0 01-1 1H9l-3 2v-2H2a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M4.5 7h7M4.5 9.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
-          <button title="Full Details" onclick="event.stopPropagation();openFullOrderModal('${o.num}')" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 2h4v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2L8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+          <button title="Chat with Seller" onclick="event.stopPropagation();xOrderChatOpen('${o.num}',{subtitle:'${(o.customer||'').replace(/'/g,"\\'")} · ${(o.store||'').replace(/'/g,"\\'")}'})" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:transparent;color:#374151;cursor:pointer;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='transparent'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3h12a1 1 0 011 1v7a1 1 0 01-1 1H9l-3 2v-2H2a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M4.5 7h7M4.5 9.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+          ${window.EGDesignTools ? EGDesignTools.pushButtonInline(o) : ''}
+          <button title="Full Details" onclick="event.stopPropagation();openFullOrderModal('${o.num}')" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:transparent;color:#374151;cursor:pointer;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='transparent'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 2h4v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2L8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
           <button title="More actions" onclick="event.stopPropagation();opRowMenuOpen(event,'${o.num}')" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;flex-shrink:0;transition:border-color .15s,background .15s;font-family:inherit" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="3" r="1.3" fill="currentColor"/><circle cx="7" cy="7" r="1.3" fill="currentColor"/><circle cx="7" cy="11" r="1.3" fill="currentColor"/></svg></button>
         </div>
       </td>
     </tr>`;
     const detailRow = `<tr id="op-detail-${o.num}" style="display:${isExp?'table-row':'none'}">
-      <td colspan="10" style="padding:0;border-bottom:1px solid #f0ede9;background:#fff">
+      <td colspan="10" style="padding:0;border-bottom:1px solid #f0ede9;background:#fafaf9">
         ${o.itemList.map((it, ei) => {
           const sep = ei < o.itemList.length - 1 ? 'border-bottom:1px solid #e8e7e4' : '';
           const tBg  = OP_PT_BG[it.printType]  || '#f3f4f6';
@@ -3867,7 +3871,10 @@ function renderOpOrders() {
           // overlaid at the seller's saved designPos. Falls back gracefully if
           // either layer is missing. The file-uploaded link below still opens
           // the RAW design (transparent artwork) — different layer, same data.
-          const prodImg = (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
+          // Listing image first; once a base product is picked for this "new" item
+          // the chosen blank takes over (design composite then overlays on top).
+          const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
+          const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null) || (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
           const thumb = opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 40);
           // Pushed-to-board state (greyed out when already sent)
           // Push action lives inside the product zoom modal now; the row only
@@ -3879,11 +3886,14 @@ function renderOpOrders() {
             : '';
           // File link → opens preview popup. Either a real raw-design file OR a composite-only
           // legacy order earns the link (so the operator can still preview/push).
-          const _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+          let _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+          if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, it.sku)) _custFile = '';
+          // EMB item with the buyer's artwork → auto-match thread colours (once).
+          if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, it.sku, it.printType, it.customerFile || it.designSrc);
           const _hasDesign = !!(it.file || it.thumb || _custFile);
           const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
           const fileLink = _custFile
-            ? '<a href="'+_custFile+'" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>'
+            ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, it.sku, _custFile) : '<a href="'+_custFile+'" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>')
             : (_hasDesign
                 ? (_fileIsFilename
                     ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">'+it.file+'</a>'
@@ -4018,7 +4028,6 @@ function renderOpOrders() {
             ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
           </div>`;
         }).join('')}
-        ${window.EGDesignTools ? EGDesignTools.pushButton(o) : ''}
       </td>
     </tr>`;
     return mainRow + detailRow;
@@ -5330,6 +5339,13 @@ function opMergeLiveOrders() {
         designUrl: it.designUrl || null,
         designPos: it.designPos || null,
         sellerImg: it.img || null,
+        // Carry the marketplace listing image + the buyer's uploaded file through
+        // to the row so the inline "Listing ↗" / "Customer file ↗" links and the
+        // listing-image thumbnail render for synced orders (not just order detail).
+        img: it.img || null,
+        designSrc: it.customerFile || (/^https?:\/\//i.test(String(it.designSrc || '')) ? it.designSrc : null),
+        customerFile: it.customerFile || null,
+        personalization: it.personalization || null,
         status: _mappedStatus, printType: it.printType || 'dtg', qty: it.qty || 1
       };
     });
@@ -7571,6 +7587,9 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
        approvals column on the right uses the *bare* design only. */
     function _xfomMockup(it){
       const sku = it.sku || it.SKU || '';
+      // If a base product was picked for this item, that chosen blank's image wins
+      // — keeps the order-detail image in sync with the line-item picker.
+      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage(_xfomNum, sku); if (_pi) return _pi; } } catch(e){}
       try {
         if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
           const base = String(sku).split('-')[0];
@@ -7745,20 +7764,38 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     }
     const designs = (o && (o.designs || items.filter(it => it.sku || it.printType))) || [];
     const desEl = document.getElementById('xfom-designs');
-    if (designs.length) {
-      desEl.innerHTML = designs.map(d => {
+    // Consolidate items that share the SAME artwork into ONE approval card, so a
+    // single design isn't repeated once per size/sku. Group by the resolved design
+    // image (falls back to name+method). Each card lists every item it covers and
+    // keeps its own board-assignment dropdown — nothing is dropped, just merged.
+    const _daGroups = [], _daIdx = {};
+    designs.forEach(d => {
+      const ds = _xfomDesign(d);
+      const key = ds || ((d.name || d.product || '') + '|' + (d.printType || d.printedType || ''));
+      if (_daIdx[key] == null) { _daIdx[key] = _daGroups.length; _daGroups.push({ design: ds, rep: d, items: [] }); }
+      _daGroups[_daIdx[key]].items.push(d);
+    });
+    if (_daGroups.length) {
+      desEl.innerHTML = _daGroups.map(g => {
+        const d = g.rep;
         // Design approvals column shows the *bare* design (what the seller
         // uploaded) — no mockup overlay, so the operator can review artwork
         // on its own. Falls back to a tech-tag placeholder when no design is
         // attached yet.
-        const designSrc = _xfomDesign(d);
+        const designSrc = g.design;
+        const _skus = g.items.map(x => x.sku).filter(Boolean);
+        const _n = g.items.length;
+        const _badge = _n > 1 ? `<span style="font-size:10.5px;font-weight:700;color:#6b7280;background:#eeece7;border-radius:5px;padding:1px 6px;margin-left:6px">×${_n}</span>` : '';
+        const _sub = _n > 1
+          ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">Covers ${_n} items: ${_skus.join(', ')}</div>`
+          : `<div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>`;
         return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
           <div style="width:42px;height:42px;background:#fff;border:1px solid #f0ede9;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">
             ${designSrc ? `<img src="${designSrc}" style="max-width:100%;max-height:100%;object-fit:contain;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=&quot;font-size:10px;color:#9ca3af&quot;>'+(\`${d.printType || d.printedType || 'ART'}\`)+'</span>'"/>` : `<span style="font-size:10px;color:#9ca3af">${d.printType || d.printedType || 'ART'}</span>`}
           </div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}</div>
-            <div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>
+            <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}${_badge}</div>
+            ${_sub}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
             <select class="select" style="font-size:12px;padding:4px 6px">
@@ -8926,18 +8963,18 @@ function _thumbFor(c) {
   if (c.order && c.sku && typeof EGStore !== 'undefined') {
     if (EGStore.getRawDesign) {
       const raw = EGStore.getRawDesign(c.order, c.sku);
-      if (raw && String(raw).startsWith('data:')) return raw;
+      if (raw && /^(data:|https?:)/i.test(String(raw))) return raw;
     }
     if (EGStore.getCachedImage) {
       const comp = EGStore.getCachedImage(c.order, c.sku);
-      if (comp && String(comp).startsWith('data:')) return comp;
+      if (comp && /^(data:|https?:)/i.test(String(comp))) return comp;
     }
   }
   if (c.thumb_ref && typeof EGStore !== 'undefined' && EGStore.getCachedImageByRef) {
     const cached = EGStore.getCachedImageByRef(c.thumb_ref);
-    if (cached && String(cached).startsWith('data:')) return cached;
+    if (cached && /^(data:|https?:)/i.test(String(cached))) return cached;
   }
-  if (c.thumb && String(c.thumb).startsWith('data:')) return c.thumb;
+  if (c.thumb && /^(data:|https?:)/i.test(String(c.thumb))) return c.thumb;
   return '';
 }
 function udbCardHtml(c) {

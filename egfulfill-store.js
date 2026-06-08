@@ -2681,7 +2681,10 @@
         // the role-specific _thumbFor() helper, so we don't need thumb_ref on the card itself.
         var thumbRef = null;
         var placeholder = 'https://placehold.co/120x120/f4f2ef/9ca3af?text=' + encodeURIComponent((opts.board||'').toUpperCase());
-        if (opts.thumb && String(opts.thumb).startsWith('data:')) {
+        // Cache the pushed artwork as the item's raw design so the board card
+        // resolves a preview. Accept a data: blob OR a real http(s) image (e.g. an
+        // Etsy listing / customer-uploaded file) — but never a placehold.co stub.
+        if (opts.thumb && /^(data:|https?:)/i.test(String(opts.thumb)) && String(opts.thumb).indexOf('placehold.co') === -1) {
           this.cacheRawDesign(opts.orderNum, opts.sku, opts.thumb);
         }
         // Pull any specs/notes captured in the preview modal so the designer sees them on the card

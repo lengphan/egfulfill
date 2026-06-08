@@ -198,16 +198,159 @@
     return null;
   }
 
-  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); }
+  // Image of the base product the operator picked for a still-"new" item, looked
+  // up from the catalog by the stored product name. Empty until a product is
+  // chosen — boards use it to SWAP the line thumbnail off the marketplace listing
+  // image and onto the chosen blank (over which the design composite then sits).
+  function setupProductImage(orderNum, sku) {
+    var s = getItemSetup(orderNum, sku);
+    if (!s || !s.product) return '';
+    var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+    for (var i = 0; i < prods.length; i++) {
+      var p = prods[i];
+      if (String(p.name || p.sku || p.id) === String(s.product)) return p.img || p.image || '';
+    }
+    return '';
+  }
+
+  // Re-render the current board's order table (whichever global render fn it
+  // exposes) so a setup change is reflected immediately — e.g. the thumbnail
+  // swapping off the listing image onto the chosen product blank. Boards track
+  // row expansion in persistent state, so this keeps an open row open.
+  function refreshBoard() {
+    ['renderOpOrders', 'whRenderOrders', 'admRenderOrders', 'renderOrders'].forEach(function (fn) {
+      try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {}
+    });
+  }
+
+  // ── Auto thread-colour matching for embroidery items ───────────────────────
+  // Etsy-synced EMB items arrive with the buyer's artwork but no thread codes.
+  // Run the dominant-colour → nearest-stocked-thread match ONCE per item (guarded
+  // so re-renders don't re-run it), then persist via setItemThreadColors so every
+  // board shows the chips. etsystatic images go through our same-origin proxy so
+  // the colour-analysis canvas isn't tainted (cross-origin → getImageData throws).
+  var _tmAttempted = {};
+  function etsyImgProxy(url) { return '/api/etsy/img-proxy?url=' + encodeURIComponent(url); }
+  function autoThreadMatch(orderNum, sku, method, designUrl) {
+    if (!/EMB/i.test(String(method || ''))) return;
+    designUrl = String(designUrl || '');
+    // Only real artwork — an http(s) upload or a data: image. Guards against the
+    // designSrc enum values ('design-lab'/'template') the seller UI sometimes uses.
+    if (!/^https?:\/\//i.test(designUrl) && !/^data:image\//i.test(designUrl)) return;
+    if (!(window.EGStore && EGStore.matchThreadColors && EGStore.setItemThreadColors)) return;
+    try { var ex = EGStore.getItemThreadColors && EGStore.getItemThreadColors(orderNum, sku); if (ex && ex.length) return; } catch (e) {}
+    var key = orderNum + '|' + sku;
+    if (_tmAttempted[key]) return;
+    _tmAttempted[key] = 1;
+    var src = /(^|\.)etsystatic\.com/i.test(String(designUrl)) ? etsyImgProxy(designUrl) : designUrl;
+    try {
+      EGStore.matchThreadColors(src, function (threads) {
+        if (threads && threads.length) { try { EGStore.setItemThreadColors(orderNum, sku, threads); } catch (e) {} refreshBoard(); }
+      });
+    } catch (e) {}
+  }
+
+  // Resolve the catalog product the operator picked for an item (by stored name).
+  function chosenProduct(orderNum, sku) {
+    var s = getItemSetup(orderNum, sku);
+    if (!s || !s.product) return null;
+    var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+    for (var i = 0; i < prods.length; i++) { if (String(prods[i].name || prods[i].sku || prods[i].id) === String(s.product)) return prods[i]; }
+    return null;
+  }
+  // Unit price for a chosen product + item — base (per-size if set, else base/price)
+  // plus the print-method add-on. Mirrors the boards' _xfomUnitPrice so totals agree.
+  function productUnitPrice(product, it) {
+    var base = null, sz = String((it && it.size) || '').trim().toLowerCase();
+    if (Array.isArray(product.sizePrices)) {
+      var row = product.sizePrices.find(function (r) { return r.size != null && String(r.size).toLowerCase() === sz; });
+      if (row && row.price != null) { var ap = parseFloat(row.price); if (!isNaN(ap) && ap > 0) base = ap; }
+    }
+    if (base == null) base = parseFloat(product.basePrice) || parseFloat(product.price) || 0;
+    var add = 0, tech = String((it && (it.tech || it.printType)) || '').toUpperCase();
+    if (tech && product.methodPrices) {
+      var k = /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL' : /LSR|LASER/.test(tech) ? 'LSR' : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
+      var mp = parseFloat(product.methodPrices[k] != null ? product.methodPrices[k] : product.methodPrices[tech]);
+      if (!isNaN(mp) && mp > 0) add = mp;
+    }
+    return base + add;
+  }
+  // Push the chosen product's unit price onto the order line item so the order
+  // detail + item-derived totals stay in sync. NEVER overwrites the order's own
+  // total (keeps the marketplace sale price) or the listing image.
+  function syncItemToProduct(orderNum, sku) {
+    try {
+      var p = chosenProduct(orderNum, sku);
+      if (!p) return;
+      var o = findOrder(orderNum);
+      if (!o || !Array.isArray(o.items)) return;
+      var it = o.items.find(function (i) { return String(i.sku) === String(sku); });
+      if (!it) return;
+      var price = productUnitPrice(p, it);
+      if (price > 0) { it.price = price; it.unitPrice = price; }
+      if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+    } catch (e) {}
+  }
+
+  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); syncItemToProduct(orderNum, sku); refreshBoard(); }
   function onSetPrint(orderNum, sku, val) {
     setItemSetupField(orderNum, sku, 'printType', val);
     try {
       var o = findOrder(orderNum);
       if (o && Array.isArray(o.items)) {
         var it = o.items.find(function (i) { return String(i.sku) === String(sku); });
-        if (it) { it.printType = val; it.tech = val; if (EGStore.update) EGStore.update(o.id, { items: o.items }); }
+        if (it) {
+          it.printType = val; it.tech = val; if (EGStore.update) EGStore.update(o.id, { items: o.items });
+          // Method add-on can change the unit price → re-sync the line item.
+          syncItemToProduct(orderNum, sku);
+          // Picking EMB on a method-less item → kick off thread matching now.
+          if (/EMB/i.test(String(val))) {
+            var du = it.customerFile || it.designSrc || (EGStore.getRawDesign && EGStore.getRawDesign(orderNum, sku)) || '';
+            autoThreadMatch(orderNum, sku, val, du);
+          }
+        }
       }
     } catch (e) {}
+  }
+
+  // ── Customer-uploaded file (marketplace) → adopt as the item's design, or
+  //    dismiss it and upload your own. Dismissal is per order|sku, persisted so
+  //    it survives re-render/re-sync. "Use as design" caches the buyer's file URL
+  //    as the item's raw design (EGStore.cacheRawDesign), so it drives the mockup
+  //    + thread match + downloads exactly like a seller-uploaded design. ────────
+  var CF_DISMISS_KEY = 'eg_custfile_dismissed';
+  function cfDismissed() { try { return JSON.parse(localStorage.getItem(CF_DISMISS_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function isCustomerFileDismissed(orderNum, sku) { return !!cfDismissed()[orderNum + '|' + sku]; }
+  function dismissCustomerFile(orderNum, sku) {
+    try { var m = cfDismissed(); m[orderNum + '|' + sku] = 1; localStorage.setItem(CF_DISMISS_KEY, JSON.stringify(m)); } catch (e) {}
+    refreshBoard();
+    // Open the upload flow so they can drop in their own artwork right away.
+    var name = ''; try { var o = findOrder(orderNum); if (o && o.items) { var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (it) name = it.name || ''; } } catch (e) {}
+    upload(orderNum, sku, name, '');
+  }
+  function isCustomerFileAdopted(orderNum, sku, url) {
+    try { return !!(window.EGStore && EGStore.getRawDesign && EGStore.getRawDesign(orderNum, sku) === url); } catch (e) { return false; }
+  }
+  function adoptCustomerFile(orderNum, sku, url) {
+    if (!url) return;
+    try { if (window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(orderNum, sku, url); } catch (e) {}
+    refreshBoard();
+    document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
+  }
+  // Inline cluster for the DESIGN cell: the file link + Use / dismiss controls.
+  // Returns '' when dismissed (caller falls back to its normal no-file state).
+  function customerFileControls(orderNum, sku, url) {
+    if (!url || isCustomerFileDismissed(orderNum, sku)) return '';
+    var on = jsAttr(orderNum), sk = jsAttr(sku), u = jsAttr(url);
+    var link = '<a href="' + esc(url) + '" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>';
+    var mini = 'font-size:10.5px;font-weight:700;line-height:1;padding:2px 6px;border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap';
+    if (isCustomerFileAdopted(orderNum, sku, url)) {
+      return '<span style="display:inline-flex;align-items:center;gap:6px">' + link
+        + '<span title="Using the customer\'s file as the design" style="' + mini + ';background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;cursor:default">✓ in use</span></span>';
+    }
+    return '<span style="display:inline-flex;align-items:center;gap:6px">' + link
+      + '<button onclick="event.stopPropagation();EGDesignTools.adoptCustomerFile(\'' + on + '\',\'' + sk + '\',\'' + u + '\')" title="Use this file as the design" style="' + mini + ';background:#191918;color:#fff;border:1px solid #191918">Use</button>'
+      + '<button onclick="event.stopPropagation();EGDesignTools.dismissCustomerFile(\'' + on + '\',\'' + sk + '\')" title="Dismiss &amp; upload your own" style="' + mini + ';background:#fff;color:#9ca3af;border:1px solid #e5e4e0">✕</button></span>';
   }
 
   function actBtn(label, onclick) {
@@ -225,7 +368,7 @@
     var name = it.name || '';
     var tech = it.type || it.printType || it.tech || '';
     var btns = actBtn('↑ Upload', "EGDesignTools.upload('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')")
-      + actBtn('Templates', "EGDesignTools.templates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')")
+      + actBtn('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
       + actBtn('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')");
     var pickers = '';
     if (isNewOrder(o)) {
@@ -257,6 +400,18 @@
       + '<button class="btn btn-dk" style="font-size:12px;padding:6px 16px" onclick="EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')">Push</button></div>';
   }
 
+  // Compact "Push" for the PARENT order row's action cluster — sits beside the
+  // Full Details (↗) button. 32px tall to line up with the icon buttons there.
+  // Only renders while the order is still new. event.stopPropagation keeps the
+  // row from toggling its expansion when Push is clicked.
+  function pushButtonInline(o) {
+    if (!isNewOrder(o)) return '';
+    var num = (o && (o.num || o.id)) || '';
+    return '<button title="Push to production" onclick="event.stopPropagation();EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')" '
+      + 'style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;flex-shrink:0;font-family:inherit;font-size:12.5px;font-weight:600;transition:background .15s" '
+      + 'onmouseover="this.style.background=\'#000\'" onmouseout="this.style.background=\'#191918\'">Push</button>';
+  }
+
   function pushToProduction(orderNum) {
     var o = findOrder(orderNum);
     var id = o ? o.id : orderNum;
@@ -270,11 +425,109 @@
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
   }
 
+  // ── Searchable Templates dropdown (ported from the seller orders page) ───────
+  // Same saved-template store the seller uses; lets the factory apply a saved
+  // design to a line item without leaving the board. The full-page templates()
+  // flow above is kept intact — this is just the quick inline picker.
+  var _tplCtx = null;
+  function _loadTemplates() {
+    var legacy = [], meta = [], blobs = {};
+    try { legacy = JSON.parse(localStorage.getItem('eg_design_templates') || '[]'); } catch (e) {}
+    try { meta = JSON.parse(localStorage.getItem('eg_templates') || '[]'); } catch (e) {}
+    try { blobs = JSON.parse(localStorage.getItem('eg_templates_blob') || '{}'); } catch (e) {}
+    if (!Array.isArray(legacy)) legacy = [];
+    if (!Array.isArray(meta)) meta = [];
+    if (!blobs || typeof blobs !== 'object') blobs = {};
+    var enriched = meta.map(function (m) {
+      if (!m || m.id == null) return m; var b = blobs[m.id]; if (!b) return m;
+      return Object.assign({}, m, { compositeImg: m.compositeImg || b.compositeImg || '', designOnlyImg: m.designOnlyImg || b.designOnlyImg || '', layers: m.layers || b.layers || [] });
+    });
+    var byId = {};
+    enriched.forEach(function (t) { if (t && t.id != null) byId[String(t.id)] = t; });
+    legacy.forEach(function (t) { if (t && t.id != null && !byId[String(t.id)]) byId[String(t.id)] = t; });
+    return Object.keys(byId).map(function (k) { return byId[k]; });
+  }
+  function _tplTechOf(t) { if (t && t.tech) return t.tech; if (t && t.method) return /emb/i.test(t.method) ? 'EMB' : /sub/i.test(t.method) ? 'SUB' : /scr/i.test(t.method) ? 'SCR' : 'DTG'; return 'DTG'; }
+  function _tplPanel() {
+    var p = document.getElementById('egt-tpl-panel');
+    if (!p) {
+      p = document.createElement('div'); p.id = 'egt-tpl-panel';
+      p.style.cssText = 'position:fixed;background:#fff;border:1.5px solid #e5e4e0;border-radius:12px;width:310px;z-index:10095;box-shadow:0 8px 32px rgba(0,0,0,.13);overflow:hidden;display:none;font-family:Inter,system-ui,sans-serif';
+      p.innerHTML = '<div style="padding:9px 12px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:8px">'
+        + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#9ca3af" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>'
+        + '<input id="egt-tpl-search" placeholder="Search templates…" style="border:none;outline:none;font-size:13.5px;flex:1;font-family:inherit;background:transparent" oninput="EGDesignTools._filterTemplates(this.value)"/>'
+        + '<span onclick="EGDesignTools._closeTemplates()" style="cursor:pointer;color:#9ca3af;font-size:17px;line-height:1">&times;</span></div>'
+        + '<div id="egt-tpl-list" style="max-height:300px;overflow:auto;padding:4px"></div>';
+      document.body.appendChild(p);
+      document.addEventListener('mousedown', function (e) { if (p.style.display !== 'none' && !p.contains(e.target)) closeTemplates(); }, true);
+    }
+    return p;
+  }
+  function openTemplates(orderNum, sku, name, ev) {
+    _tplCtx = { orderNum: orderNum, sku: sku, name: name };
+    var p = _tplPanel(); p.style.display = 'block'; p.style.transform = '';
+    var rect = null; try { var el = ev && (ev.currentTarget || ev.target); if (el && el.getBoundingClientRect) rect = el.getBoundingClientRect(); } catch (e) {}
+    if (rect) {
+      var top = rect.bottom + 6, left = rect.left;
+      if (left + 310 > window.innerWidth - 20) left = window.innerWidth - 330;
+      if (top + 340 > window.innerHeight - 10) top = Math.max(10, rect.top - 346);
+      p.style.top = top + 'px'; p.style.left = left + 'px';
+    } else { p.style.top = '90px'; p.style.left = '50%'; p.style.transform = 'translateX(-50%)'; }
+    var s = document.getElementById('egt-tpl-search'); if (s) s.value = '';
+    filterTemplates('');
+    setTimeout(function () { var si = document.getElementById('egt-tpl-search'); if (si) si.focus(); }, 50);
+  }
+  function closeTemplates() { var p = document.getElementById('egt-tpl-panel'); if (p) p.style.display = 'none'; }
+  function filterTemplates(q) {
+    var list = document.getElementById('egt-tpl-list'); if (!list) return;
+    var all = _loadTemplates();
+    if (!all.length) { list.innerHTML = '<div style="padding:24px 18px;text-align:center;font-size:13px;color:#9ca3af;line-height:1.5">No templates saved yet.<br><a href="design-maker.html" target="_blank" style="color:#191918;font-weight:600;text-decoration:underline">Open Design Maker</a> and save one.</div>'; return; }
+    var ql = (q || '').toLowerCase();
+    var results = ql ? all.filter(function (t) { return (t.name || '').toLowerCase().indexOf(ql) >= 0 || (t.productName || '').toLowerCase().indexOf(ql) >= 0 || _tplTechOf(t).toLowerCase().indexOf(ql) >= 0; }) : all;
+    if (!results.length) { list.innerHTML = '<div style="padding:18px;text-align:center;font-size:13px;color:#9ca3af">No templates match “' + esc(q) + '”</div>'; return; }
+    list.innerHTML = results.map(function (t) {
+      var tech = _tplTechOf(t);
+      var techBg = tech === 'DTG' ? '#ede9fe' : tech === 'EMB' ? '#dcfce7' : tech === 'SUB' ? '#dbeafe' : '#f0ede9';
+      var techFg = tech === 'DTG' ? '#7c3aed' : tech === 'EMB' ? '#15803d' : tech === 'SUB' ? '#1d4ed8' : '#374151';
+      var thumbSrc = t.designOnlyImg || t.compositeImg || t.productImg || '';
+      var thumb = thumbSrc ? '<img src="' + esc(thumbSrc) + '" style="width:34px;height:34px;object-fit:cover;border-radius:8px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:34px;height:34px;background:#f0ede9;border-radius:8px;flex-shrink:0"></div>';
+      return '<div onclick="EGDesignTools._applyTemplate(\'' + jsAttr(String(t.id)) + '\')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;cursor:pointer;border-radius:8px" onmouseover="this.style.background=\'#fafaf9\'" onmouseout="this.style.background=\'transparent\'">'
+        + thumb
+        + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.name || 'Untitled template') + '</div>'
+        + '<div style="margin-top:2px"><span style="background:' + techBg + ';color:' + techFg + ';padding:1px 5px;border-radius:4px;font-weight:700;font-size:10.5px">' + tech + '</span></div></div></div>';
+    }).join('');
+  }
+  function applyTemplate(tplId) {
+    var t = _loadTemplates().find(function (x) { return String(x.id) === String(tplId); });
+    var ctx = _tplCtx; closeTemplates();
+    if (!t || !ctx) return;
+    var designImg = t.designOnlyImg || t.compositeImg || t.productImg || '';
+    try {
+      var o = findOrder(ctx.orderNum);
+      if (o && Array.isArray(o.items)) {
+        var it = o.items.find(function (i) { return String(i.sku) === String(ctx.sku); });
+        if (it) {
+          it.designSrc = 'template'; it.designTemplateId = t.id;
+          if (designImg) { it.designUrl = designImg; if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, it.sku, designImg); }
+          var tech = _tplTechOf(t);
+          if (tech) { it.printType = tech; it.tech = tech; setItemSetupField(ctx.orderNum, ctx.sku, 'printType', tech); }
+          if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+          syncItemToProduct(ctx.orderNum, ctx.sku);
+        }
+      }
+    } catch (e) {}
+    refreshBoard();
+    document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: ctx.orderNum, sku: ctx.sku } }));
+  }
+
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, pushButton: pushButton, pushToProduction: pushToProduction,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, isNewOrder: isNewOrder, getItemSetup: getItemSetup,
+    itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
+    adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
+    autoThreadMatch: autoThreadMatch,
+    openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate,
     PRINT_METHODS: PRINT_METHODS
   };
 })();

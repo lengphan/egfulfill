@@ -4252,6 +4252,12 @@ function whMergeLiveOrders() {
         designUrl: it.designUrl || null,
         designPos: it.designPos || null,
         sellerImg: it.img || null,
+        // Listing image + buyer's uploaded file → row, so the inline "Listing ↗" /
+        // "Customer file ↗" links + listing thumbnail render for synced orders.
+        img: it.img || null,
+        designSrc: it.customerFile || (/^https?:\/\//i.test(String(it.designSrc || '')) ? it.designSrc : null),
+        customerFile: it.customerFile || null,
+        personalization: it.personalization || null,
         // Carry printType (lowercase) so EGStore.methodLabel + the metaRow's EMB
         // detection read the seller's chosen method — without it they default to
         // DTG and the download link resolves the wrong deliverable type.
@@ -5927,7 +5933,7 @@ function whRenderOrders() {
     const PRINT_TYPE_COL = {DTG:'#7c3aed', Sublimation:'#c2410c', Embroidery:'#15803d'};
 
     const itemCount = o.itemList?.length || expandItems.length || 1;
-    const mainRow = `<tr id="wh-row-${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select')&&!e.target.closest('a'))whToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s;${isActive?'background:#faf9f7;border-left:2px solid #111827;':''}">
+    const mainRow = `<tr id="wh-row-${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select')&&!e.target.closest('a'))whToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s;${isActive?'background:#faf9f7;border-left:2px solid #111827;':(whExpandedRows.has(o.num)?'background:#fafaf9;':'')}">
       <td onclick="event.stopPropagation()" style="width:32px"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="whToggleOrder('${o.num}',this.checked)"/></td>
       <td data-col="order">
         ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};return '<div style="font-size:14.25px;font-weight:700;color:#191918">'+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11.25px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
@@ -5977,8 +5983,9 @@ function whRenderOrders() {
             <button onclick="event.stopPropagation();whResolveException('${o.num}')" title="Resolve Exception" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#dcfce7;border:1.5px solid #bbf7d0;color:#15803d;cursor:pointer;flex-shrink:0;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <button onclick="event.stopPropagation();whEscalateException('${o.num}')" title="Escalate" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;background:#fef2f2;border:1.5px solid #fecaca;color:#dc2626;cursor:pointer;flex-shrink:0;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 9V4M6 3v.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
           ` : ''}
-          <button onclick="openReviewModal('${o.num}');event.stopPropagation()" title="View Details" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;color:#374151;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 2h4v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2L8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
-          <button onclick="whRowMenuOpen(event,'${o.num}')" title="More actions" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;color:#374151;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='#fff'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="13" r="1.3" fill="currentColor"/></svg></button>
+          ${window.EGDesignTools ? EGDesignTools.pushButtonInline(o) : ''}
+          <button onclick="openReviewModal('${o.num}');event.stopPropagation()" title="View Details" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:transparent;cursor:pointer;color:#374151;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='transparent'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 2h4v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2L8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+          <button onclick="whRowMenuOpen(event,'${o.num}')" title="More actions" style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;border:1.5px solid #e5e4e0;background:transparent;cursor:pointer;color:#374151;flex-shrink:0;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.background='#f9f8f7'" onmouseout="this.style.borderColor='#e5e4e0';this.style.background='transparent'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="13" r="1.3" fill="currentColor"/></svg></button>
         </div>
       </td>
     </tr>`;
@@ -6002,11 +6009,14 @@ function whRenderOrders() {
             const iid = it.id || String(ei);
             const typePill = `<span style="font-size:11.25px;font-weight:700;background:${tBg};color:${tFg};border-radius:4px;padding:1px 7px">${tLbl}</span>`;
             // Clickable file link → opens shared preview popup. Composite-only legacy orders still get a link.
-            const _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+            let _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
+            if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, it.sku)) _custFile = '';
+            // EMB item with the buyer's artwork → auto-match thread colours (once).
+            if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, it.sku, it.printType, it.customerFile || it.designSrc);
             const _hasDesign = !!(it.file || it.thumb || _custFile);
             const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
             const fileLink = _custFile
-              ? `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`
+              ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, it.sku, _custFile) : `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`)
               : (_hasDesign
                   ? (_fileIsFilename
                       ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
@@ -6022,7 +6032,10 @@ function whRenderOrders() {
             // Avatar = live composite: catalog mockup + raw design overlay
             // positioned per the seller's designPos. Clicking still opens the
             // zoom modal (raw design when present, mockup otherwise).
-            const prodImg = (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
+            // Listing image first; once a base product is picked the chosen blank
+            // takes over (design composite then overlays on top).
+            const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
+            const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null) || (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
             const _designSrc = it.designUrl || ((it.file && String(it.file).startsWith('data:')) ? it.file : '');
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
             const _overlay = _designSrc
@@ -6136,7 +6149,6 @@ function whRenderOrders() {
               ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
             </div>`;
           }).join('')}
-          ${window.EGDesignTools ? EGDesignTools.pushButton(o) : ''}
         </div>
       </td>
     </tr>` : '';
@@ -6245,6 +6257,10 @@ function whToggleDetail(num) {
   row.style.display = open ? 'none' : 'table-row';
   if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
   if (open) whExpandedRows.delete(num); else whExpandedRows.add(num);
+  // Darken the parent row while expanded so it + its detail read as one block.
+  // Skip the active row (it carries its own #faf9f7 + accent border).
+  const prow = document.getElementById('wh-row-' + num);
+  if (prow && !prow.style.borderLeftWidth) prow.style.background = open ? '' : '#fafaf9';
 }
 
 function whUpdateItemStatus(orderNum, idx, val) {
@@ -10103,18 +10119,18 @@ function _thumbFor(c) {
   if (c.order && c.sku && typeof EGStore !== 'undefined') {
     if (EGStore.getRawDesign) {
       const raw = EGStore.getRawDesign(c.order, c.sku);
-      if (raw && String(raw).startsWith('data:')) return raw;
+      if (raw && /^(data:|https?:)/i.test(String(raw))) return raw;
     }
     if (EGStore.getCachedImage) {
       const comp = EGStore.getCachedImage(c.order, c.sku);
-      if (comp && String(comp).startsWith('data:')) return comp;
+      if (comp && /^(data:|https?:)/i.test(String(comp))) return comp;
     }
   }
   if (c.thumb_ref && typeof EGStore !== 'undefined' && EGStore.getCachedImageByRef) {
     const cached = EGStore.getCachedImageByRef(c.thumb_ref);
-    if (cached && String(cached).startsWith('data:')) return cached;
+    if (cached && /^(data:|https?:)/i.test(String(cached))) return cached;
   }
-  if (c.thumb && String(c.thumb).startsWith('data:')) return c.thumb;
+  if (c.thumb && /^(data:|https?:)/i.test(String(c.thumb))) return c.thumb;
   return '';
 }
 function udbCardHtml(c) {
@@ -10770,6 +10786,9 @@ function whPrintLabel(num) {
     function _xfomComposite(it){
       const sku = it.sku || '';
       try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) { const live = EGStore.getCachedImage((o && o.id) || _xfomNum, sku); if (live) return live; } } catch(e){}
+      // A base product picked on the line item wins over the sku-match below, so the
+      // order-detail image follows the picker.
+      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage((o && o.id) || _xfomNum, sku); if (_pi) return _pi; } } catch(e){}
       try {
         if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
           const base = String(sku).split('-')[0];

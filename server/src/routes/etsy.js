@@ -8,7 +8,7 @@ const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
 // (the shared secret is NOT needed for the PKCE token exchange, only here).
 const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
 const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
-const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html';
+const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://www.egful.store/oauth-callback.html';
 // shops_r/shops_w are needed to READ shipping profiles (and shop-level data) and to
 // create them — without shops_r, /shops/{id}/shipping-profiles returns 403 and Etsy
 // publish fails ("shipping_profile_id required"). Adding a scope requires the user
@@ -137,7 +137,7 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   // 10/sec, 10k/day). We only call the image API for items that have no image yet.
   const existing = {};
   if (hasItems.rowCount) {
-    const ex = await q('select sku, img, design_src, personalization from order_items where order_id=$1', [id]);
+    const ex = await q('select sku, img, design_src, personalization, print_type from order_items where order_id=$1', [id]);
     for (const r of ex.rows) existing[String(r.sku || '')] = r;
   }
   for (const tr of (rc.transactions || [])) {
@@ -155,15 +155,22 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
       }
     }
     const variant = vparts.join(', ') || null;
+    // Method detection — embroidery listings ("Custom Embroidered…", "Monogrammed…")
+    // come in as 'EMB' so the factory boards run thread-colour matching automatically
+    // (the boards otherwise default a method-less item to DTG). Everything else is
+    // left null → the board's DTG default + manual picker still apply.
+    const method = /embroider|embroidered|embroidery|monogram/i.test(String(tr.title || '') + ' ' + (variant || '')) ? 'EMB' : null;
     const exItem = existing[String(tr.sku || '')];
     if (!hasItems.rowCount) {
       const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);   // first import → fetch once
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization, method]
       );
     } else if (exItem) {
+      // Backfill the method on re-sync if a prior import stored it without one.
+      if (method && !exItem.print_type) await q(`update order_items set print_type=$1 where order_id=$2 and sku is not distinct from $3 and (print_type is null or print_type='')`, [method, id, tr.sku || null]);
       // Existing item — only hit the image API if it still has no image.
       if (!exItem.img) {
         const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);
@@ -288,6 +295,29 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     keystring: KEYSTRING, redirect_uri: REDIRECT_URI, scopes: SCOPES,
     configured: !!KEYSTRING
   }));
+
+  // Same-origin image proxy for Etsy's public CDN. The factory boards run canvas
+  // colour analysis (thread matching) on the buyer's uploaded artwork — but a
+  // remote cross-origin image taints the canvas and getImageData() throws. Loading
+  // it through THIS endpoint makes it same-origin, so the canvas stays readable.
+  // Locked to *.etsystatic.com (no auth needed: it only re-serves public Etsy
+  // images, so there's no SSRF surface).
+  app.get('/api/etsy/img-proxy', async (req, reply) => {
+    const url = req.query && req.query.url;
+    if (!url) { reply.code(400); return { error: 'url required' }; }
+    let host;
+    try { host = new URL(url).hostname; } catch (e) { reply.code(400); return { error: 'bad url' }; }
+    if (!/(^|\.)etsystatic\.com$/i.test(host)) { reply.code(403); return { error: 'host not allowed' }; }
+    try {
+      const r = await fetch(url);
+      if (!r.ok) { reply.code(502); return { error: 'upstream ' + r.status }; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      reply.header('Content-Type', r.headers.get('content-type') || 'image/jpeg');
+      reply.header('Access-Control-Allow-Origin', '*');
+      reply.header('Cache-Control', 'public, max-age=86400');
+      return reply.send(buf);
+    } catch (e) { reply.code(502); return { error: e.message }; }
+  });
 
   // Lightweight connection check for ANY logged-in user (sellers publish to the
   // shop connected on the admin side). No tokens leaked — just names.

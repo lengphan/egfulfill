@@ -837,11 +837,11 @@ function _thumbFor(c) {
   if (c.order && c.sku && typeof EGStore !== 'undefined') {
     if (EGStore.getRawDesign) {
       const raw = EGStore.getRawDesign(c.order, c.sku);
-      if (raw && String(raw).startsWith('data:')) return raw;
+      if (raw && /^(data:|https?:)/i.test(String(raw))) return raw;
     }
     if (EGStore.getCachedImage) {
       const comp = EGStore.getCachedImage(c.order, c.sku);
-      if (comp && String(comp).startsWith('data:')) return comp;
+      if (comp && /^(data:|https?:)/i.test(String(comp))) return comp;
     }
   }
   if (c.thumb_ref && typeof EGStore !== 'undefined' && EGStore.getCachedImageByRef) {
