@@ -3066,10 +3066,11 @@
     },
     selClear: function(){ this._sel = {}; this._rerender(); },
     _barcode: function(sku){
-      var bars=''; var s=String(sku||'');
+      var bars=''; var s=String(sku||'') || '0';
+      // Flex bars stretch to fill the full label width (no narrow clipped strip).
       for (var i=0;i<s.length;i++){ var w = 1 + (s.charCodeAt(i) % 4); var gap = (s.charCodeAt(i) % 2) ? 2 : 1;
-        bars += '<span style="display:inline-block;width:'+w+'px;height:34px;background:#191918;margin-right:'+gap+'px"></span>'; }
-      return '<div style="white-space:nowrap;line-height:0;margin:4px 0">'+bars+'</div>';
+        bars += '<span style="flex:'+w+';background:#191918"></span><span style="flex:'+gap+';background:#fff"></span>'; }
+      return '<div style="display:flex;align-items:stretch;width:100%;height:46px;margin:8px 0">'+bars+'</div>';
     },
     // Print SKU labels (bulk for the selection, or a single SKU). Opens a modal
     // preview at the recommended size with a Print button.
@@ -3080,12 +3081,13 @@
       var list = rows.filter(function(r){ return want.indexOf(r.sku) !== -1; });
       if(!list.length) return;
       var labels = list.map(function(r){
-        return '<div style="border:1.5px solid #d1d5db;border-radius:8px;padding:12px 14px;width:230px;background:#fff;page-break-inside:avoid">'
-          + '<div style="font-size:13px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r.name||'Product')+'</div>'
-          + '<div style="font-size:11.5px;color:#6b7280;margin-bottom:2px">'+(r.variant||'')+'</div>'
+        var brand = String(r.name||'Product').trim().split(/\s+/)[0] || 'Product';     // brand only, no long clipped name
+        var variant = String(r.variant||'').replace(/\s*\/\s*/g,' ').trim();           // "Black / 3XL" → "Black 3XL"
+        return '<div style="border:1.5px solid #d1d5db;border-radius:8px;padding:14px 16px;width:230px;background:#fff;page-break-inside:avoid;text-align:center">'
+          + '<div style="font-size:16px;font-weight:800;color:#191918;line-height:1.1">'+brand+'</div>'
+          + (variant ? '<div style="font-size:13px;color:#374151;font-weight:600;margin-top:2px">'+variant+'</div>' : '')
+          + '<div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918;letter-spacing:.04em;margin-top:6px">'+r.sku+'</div>'
           + EGInventory._barcode(r.sku)
-          + '<div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918;letter-spacing:.04em">'+r.sku+'</div>'
-          + '<div style="font-size:10px;color:#9ca3af;margin-top:3px">Label size: '+EGInventory._recSize(r)+'</div>'
           + '</div>';
       }).join('');
       var ov = document.getElementById('eg-inv-label-ov');
