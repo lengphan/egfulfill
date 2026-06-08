@@ -4881,9 +4881,15 @@ function _whOrderShipTo(num) {
   var name = '', street = '', city = '', state = '', zip = '', items = null, egId = (eg && eg.id) || num;
   if (eg) {
     name = (eg.customer && (eg.customer.name || (typeof eg.customer === 'string' ? eg.customer : ''))) || '';
-    var a = eg.address || {};
-    if (a && (a.line1 || a.zip || a.city)) { street = [a.line1, a.line2].filter(Boolean).join(', '); city = a.city || ''; state = a.state || ''; zip = a.zip || ''; }
-    else if (eg.customer && eg.customer.shipTo) { var s = eg.customer.shipTo; street = [s.street, s.apt].filter(Boolean).join(', '); city = s.city || ''; state = s.state || ''; zip = s.zip || ''; if (!name) name = s.name || ''; }
+    var a = eg.address;
+    var P = function (s) { return (window.EGUSPS && EGUSPS.parseAddressBlock) ? EGUSPS.parseAddressBlock(String(s || '').replace(/,\s*/g, '\n')) : {}; };
+    if (typeof a === 'string' && a.trim()) { var ps = P(a); street = ps.street || ''; city = ps.city || ''; state = ps.state || ''; zip = ps.zip || ''; if (!name) name = ps.name || ''; }
+    else if (a && typeof a === 'object') {
+      street = [a.line1 || a.street1 || a.street, a.line2 || a.apt || a.street2].filter(Boolean).join(', ');
+      city = a.city || ''; state = a.state || ''; zip = a.zip || a.zipCode || a.postalCode || '';
+      if (!zip && (a.formatted || a.formatted_address)) { var pf = P(a.formatted || a.formatted_address); if (!name) name = pf.name || name; street = street || pf.street || ''; city = city || pf.city || ''; state = state || pf.state || ''; zip = pf.zip || ''; }
+    }
+    if (!zip && eg.customer && eg.customer.shipTo) { var s = eg.customer.shipTo; street = street || [s.street, s.apt].filter(Boolean).join(', '); city = city || s.city || ''; state = state || s.state || ''; zip = s.zip || ''; if (!name) name = s.name || ''; }
     if (eg.items && eg.items.length) items = eg.items;
   }
   if (!zip) { var rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
