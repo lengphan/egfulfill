@@ -1137,7 +1137,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <div style="flex:1"></div>
       <button class="btn" style="font-size:13.25px;padding:5px 14px" onclick="whBulkStartWorking()">Start</button>
       <button class="btn" style="font-size:13.25px;padding:5px 14px" onclick="whBulkApprove()">Approve</button>
-      <button class="btn" onclick="whScanBulkSelected()" style="font-size:13.25px;padding:5px 12px">Scan</button>
+      <button class="btn" onclick="whScanBulkSelected()" style="font-size:13.25px;padding:5px 12px" title="Add selected to Awaiting Scan">Scan</button>
+      <button class="btn" onclick="whBulkPrintLabels()" style="font-size:13.25px;padding:5px 12px" title="Buy + print USPS labels for all selected">Print Labels</button>
       <button id="wh-bulk-genlabel-btn" class="btn btn-out" style="font-size:13.25px;padding:5px 12px;background:transparent;display:none" onclick="whBulkGenerateLabels()">Labels</button>
       <button id="wh-bulk-prescan-btn" class="btn btn-out" style="font-size:13.25px;padding:5px 12px;background:transparent;display:none" onclick="whBulkPreScanLabels()">Prescan</button>
       <button id="wh-bulk-push-btn" class="btn btn-out" style="font-size:13.25px;padding:5px 12px;background:transparent;display:none" onclick="whBulkPushDesigns()">Push</button>
@@ -5364,6 +5365,68 @@ function whScanBulkSelected() {
     whShowToast(done ? ('Scanned ' + done + ' order' + (done>1?'s':'') + ' → Scanned') : 'No Awaiting-Scan orders in the selection', done ? '#16a34a' : '#dc2626');
   }
 }
+// Resolve an order's ship-to into {name,street,city,state,zip,egId,contents}.
+function _whOrderShipTo(num) {
+  var o = (WH_ORDERS || []).find(x => x.num === num); if (!o) return null;
+  var name = '', street = '', csz = '', egId = num, items = null;
+  var rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
+  if (rd) { name = rd.name || ''; street = rd.line || ''; csz = [rd.city, rd.state].filter(Boolean).join(', '); }
+  if (typeof EGStore !== 'undefined' && EGStore.getOrders) {
+    try { var eg = (EGStore.getOrders() || []).find(x => x.id === num);
+      if (eg) { egId = eg.id;
+        if (!name && eg.customer) { name = eg.customer.name || ''; var sh = eg.customer.shipTo || {}; street = [sh.street, sh.apt].filter(Boolean).join(', '); csz = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
+        if (eg.items && eg.items.length) items = eg.items; } } catch (e) {}
+  }
+  if (!street) { name = name || o.customer || ''; var ap = (o.addr || '').split(', '); street = ap[0] || ''; csz = csz || ap.slice(1).join(', ') || ''; }
+  if (!items) items = (o.items && o.items.length) ? o.items : (o.itemList || []);
+  var c = (window.EGUSPS && EGUSPS.parseCityStateZip) ? EGUSPS.parseCityStateZip(csz) : { city: '', state: '', zip: '' };
+  return { name: name, street: street, city: c.city, state: c.state, zip: c.zip, egId: egId,
+           contents: (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items) : '' };
+}
+// Bulk-buy + print USPS labels for every selected order (auto cheapest USPS).
+async function whBulkPrintLabels() {
+  var toast = (typeof whShowToast === 'function') ? whShowToast : function () {};
+  if (!window.EGUSPS) { toast('Label tool not loaded', '#dc2626'); return; }
+  var from = EGUSPS.getOrigin && EGUSPS.getOrigin();
+  if (!from || !from.zip || !from.street) { toast('Set your return address first — create one label, then bulk-print', '#dc2626'); return; }
+  var nums = [...whSelectedOrders];
+  if (!nums.length) { toast('No orders selected', '#dc2626'); return; }
+  toast('Buying ' + nums.length + ' label' + (nums.length > 1 ? 's' : '') + '…', '#111827');
+  var tok = localStorage.getItem('eg_token') || '';
+  var labels = [], failed = 0;
+  for (var i = 0; i < nums.length; i++) {
+    var num = nums[i], to = _whOrderShipTo(num);
+    if (!to || !to.zip || !to.street) { failed++; continue; }
+    try {
+      var res = await fetch('/api/usps/label', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ to: to, from: { name: from.name, street: from.street, street2: from.street2, city: from.city, state: from.state, zip: from.zip },
+          weightOz: 8, mailClass: 'USPS_GROUND_ADVANTAGE', orderId: to.egId || num, contents: to.contents, refNo: num }) }).then(function (r) { return r.json(); });
+      if (!res || res.error || (!res.labelUrl && !res.labelImage && !res.labelHtml)) { failed++; continue; }
+      var tracking = res.trackingNumber || '';
+      labels.push({ num: num, url: res.labelUrl || '' });
+      try { EGUSPS.recordShipment({ tracking: tracking, orderNum: num, orderId: to.egId || num, recipient: to.name,
+        recipientAddr: [to.street, [to.city, [to.state, to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+        carrier: res.carrier || 'USPS', service: res.service || '', date: (new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        status: 'shipped', cost: res.cost || null, provider: res.provider || '', manual: false, label: { labelUrl: res.labelUrl || '', imageType: 'PDF' } }); } catch (e) {}
+      try { var o = WH_ORDERS.find(function (x) { return x.num === num; }); if (o) { o.tracking = tracking; o.status = 'shipped'; }
+        if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(to.egId || num, { tracking: tracking, factoryStatus: 'shipped', carrier: res.carrier || 'USPS' }); } catch (e) {}
+    } catch (e) { failed++; }
+  }
+  if (typeof whRenderOrders === 'function') whRenderOrders();
+  if (typeof whUpdateTabCounts === 'function') whUpdateTabCounts();
+  if (typeof renderRecentShipments === 'function') renderRecentShipments();
+  if (typeof whClearSelect === 'function') whClearSelect();
+  if (labels.length) {
+    var w = window.open('', '_blank');
+    if (w) {
+      var body = labels.map(function (l) { return l.url ? '<div style="page-break-after:always"><iframe src="' + l.url + '" style="width:100%;height:6in;border:0"></iframe></div>' : ''; }).join('');
+      w.document.write('<html><head><title>Labels (' + labels.length + ')</title></head><body style="margin:0">' + body + '</body></html>');
+      w.document.close();
+    }
+  }
+  toast(labels.length + ' label' + (labels.length !== 1 ? 's' : '') + ' created' + (failed ? (' · ' + failed + ' failed') : ''), labels.length ? '#16a34a' : '#dc2626');
+}
+window.whBulkPrintLabels = whBulkPrintLabels;
 // Start Printing — move a Scanned order to Printing (warehouse decides when to release to floor).
 function whStartPrintingAllow(o) {
   // Replacements skip the scan step — they're allowed to advance straight
