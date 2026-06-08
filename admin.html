@@ -4871,24 +4871,30 @@ function whScanBulkSelected() {
   if (typeof renderScanHistory === 'function') renderScanHistory();
   admShowToast(done ? ('Scanned ' + done + ' order' + (done>1?'s':'') + ' → Scanned') : 'No Awaiting-Scan orders in the selection', done ? '#16a34a' : '#dc2626');
 }
-// Resolve an order's ship-to into {name,street,city,state,zip,egId,contents} — same
-// extraction whOpenLabelModal uses (REV_ORDER_DETAIL → EGStore → o.addr).
+// Resolve an order's ship-to into {name,street,city,state,zip,egId,contents}. Reads
+// the EGStore order's structured address (Etsy: order.address {line1,line2,city,
+// state,zip}; seller: customer.shipTo), then falls back to REV_ORDER_DETAIL / o.addr.
 function _whOrderShipTo(num) {
-  var o = (WH_ORDERS || []).find(x => x.num === num); if (!o) return null;
-  var name = '', street = '', csz = '', egId = num, items = null;
-  var rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
-  if (rd) { name = rd.name || ''; street = rd.line || ''; csz = [rd.city, rd.state].filter(Boolean).join(', '); }
-  if (typeof EGStore !== 'undefined' && EGStore.getOrders) {
-    try { var eg = (EGStore.getOrders() || []).find(x => x.id === num);
-      if (eg) { egId = eg.id;
-        if (!name && eg.customer) { name = eg.customer.name || ''; var sh = eg.customer.shipTo || {}; street = [sh.street, sh.apt].filter(Boolean).join(', '); csz = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
-        if (eg.items && eg.items.length) items = eg.items; } } catch (e) {}
+  var o = (WH_ORDERS || []).find(x => x.num === num) || null;
+  var eg = null;
+  try { if (typeof EGStore !== 'undefined' && EGStore.getOrders) eg = (EGStore.getOrders() || []).find(x => x.id === num || (o && o.id && x.id === o.id)); } catch (e) {}
+  var name = '', street = '', city = '', state = '', zip = '', items = null, egId = (eg && eg.id) || num;
+  if (eg) {
+    name = (eg.customer && (eg.customer.name || (typeof eg.customer === 'string' ? eg.customer : ''))) || '';
+    var a = eg.address || {};
+    if (a && (a.line1 || a.zip || a.city)) { street = [a.line1, a.line2].filter(Boolean).join(', '); city = a.city || ''; state = a.state || ''; zip = a.zip || ''; }
+    else if (eg.customer && eg.customer.shipTo) { var s = eg.customer.shipTo; street = [s.street, s.apt].filter(Boolean).join(', '); city = s.city || ''; state = s.state || ''; zip = s.zip || ''; if (!name) name = s.name || ''; }
+    if (eg.items && eg.items.length) items = eg.items;
   }
-  if (!street) { name = name || o.customer || ''; var ap = (o.addr || '').split(', '); street = ap[0] || ''; csz = csz || ap.slice(1).join(', ') || ''; }
-  if (!items) items = (o.items && o.items.length) ? o.items : (o.itemList || []);
-  var c = (window.EGUSPS && EGUSPS.parseCityStateZip) ? EGUSPS.parseCityStateZip(csz) : { city: '', state: '', zip: '' };
-  return { name: name, street: street, city: c.city, state: c.state, zip: c.zip, egId: egId,
-           contents: (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items) : '' };
+  if (!zip) { var rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
+    if (rd) { name = name || rd.name || ''; street = street || rd.line || ''; var c2 = (window.EGUSPS && EGUSPS.parseCityStateZip) ? EGUSPS.parseCityStateZip([rd.city, rd.state].filter(Boolean).join(', ')) : {}; city = city || c2.city || rd.city || ''; state = state || c2.state || rd.state || ''; zip = zip || c2.zip || ''; } }
+  if (!zip && o) {
+    if (o.shipTo && o.shipTo.zip) { var t = o.shipTo; name = name || o.customer || ''; street = street || [t.street, t.apt].filter(Boolean).join(', '); city = city || t.city || ''; state = state || t.state || ''; zip = t.zip || ''; }
+    else if (o.addr) { name = name || o.customer || ''; var p = (window.EGUSPS && EGUSPS.parseAddressBlock) ? EGUSPS.parseAddressBlock('X\n' + String(o.addr).replace(/, /g, '\n')) : null; if (p) { street = street || p.street; city = city || p.city; state = state || p.state; zip = zip || p.zip; } }
+  }
+  if (!items && o) items = (o.items && o.items.length) ? o.items : (o.itemList || []);
+  return { name: name, street: street, city: city, state: state, zip: zip, egId: egId,
+           contents: (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items || []) : '' };
 }
 // Bulk-buy + print USPS labels for every selected order (auto cheapest USPS), record
 // each shipment, mark shipped, and open one print sheet with all labels.
@@ -9144,26 +9150,14 @@ window.renderRecentShipments = function() {
 <script>
 // ── Unified Create Shipping Label modal (shared with warehouse) ──
 function whOpenLabelModal(num) {
-  const o = (WH_ORDERS || []).find(x => x.num === num);
-  if (!o || !window.EGUSPS) return;
-  // Extract ship-to (REV_ORDER_DETAIL → EGStore → o.addr), then open the shared
-  // EGUSPS label modal (real USPS call + saved Ship-From origin).
-  let name = '', street = '', csz = '', egId = num;
-  const rd = (typeof REV_ORDER_DETAIL !== 'undefined') ? REV_ORDER_DETAIL[num] : null;
-  if (rd) { name = rd.name || ''; street = rd.line || ''; csz = [rd.city, rd.state].filter(Boolean).join(', '); }
-  if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
-    try {
-      const eg = (EGStore.getOrders() || []).find(x => x.id === num);
-      if (eg) { egId = eg.id; if (eg.customer) { name = eg.customer.name || ''; const sh = eg.customer.shipTo || {}; street = [sh.street, sh.apt].filter(Boolean).join(', '); csz = [sh.city, [sh.state, sh.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); } }
-    } catch (e) {}
-  }
-  if (!street) { name = name || o.customer || ''; const ap = (o.addr || '').split(', '); street = ap[0] || ''; csz = csz || ap.slice(1).join(', ') || ''; }
-  let items = (o.items && o.items.length) ? o.items : (o.itemList && o.itemList.length ? o.itemList : null);
-  if (!items) { try { const eg = (EGStore.getOrders() || []).find(x => x.id === num); if (eg && eg.items && eg.items.length) items = eg.items; } catch (e) {} }
-  const contents = (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items || []) : '';
+  if (!window.EGUSPS) return;
+  var o = (WH_ORDERS || []).find(x => x.num === num) || {};
+  var t = _whOrderShipTo(num) || {};   // robust resolver (Etsy order.address, seller shipTo, …)
   EGUSPS.openLabelModal({
-    orderNum: num, orderId: egId, toName: name, toStreet: street, toCSZ: csz,
-    seller: o.seller || o.store || 'Seller', contents: contents,
+    orderNum: num, orderId: t.egId || num,
+    toName: t.name, toStreet: t.street,
+    toCSZ: [t.city, [t.state, t.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+    seller: o.seller || o.store || 'Seller', contents: t.contents,
     onDone: function (tracking) {
       try { if (o) { o.tracking = tracking; o.status = 'shipped'; o.label = Object.assign({}, o.label, { state: 'label_ready', tracking_number: tracking }); } } catch (e) {}
       if (typeof admMergeLiveOrders === 'function') admMergeLiveOrders();
