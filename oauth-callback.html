@@ -66,7 +66,13 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       if (!cfg || !cfg.keystring) { fail('Etsy app is not configured on the server yet'); return; }
       var verifier = randStr();
       var st = randStr().slice(0,24);
-      localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier: verifier, state: st }));
+      // Capture the admin token now (from this window, or the opener that launched
+      // the popup — same origin) and stash it, so it survives the Etsy round-trip
+      // even if the returning popup's localStorage looks empty.
+      var tok0 = '';
+      try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
+      localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier: verifier, state: st, token: tok0 }));
       var ch = await challenge(verifier);
       var redirect = cfg.redirect_uri || (location.origin + '/oauth-callback.html');
       location.href = 'https://www.etsy.com/oauth/connect'
@@ -85,7 +91,11 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var saved = {};
       try { saved = JSON.parse(localStorage.getItem(ETSY_PKCE_KEY) || '{}'); } catch(_){}
       if (saved.state && st && saved.state !== st) { console.warn('OAuth state mismatch — continuing; the PKCE verifier still validates the code with Etsy.'); }
-      var tok = localStorage.getItem('eg_token') || '';
+      // Token: this window → the one stashed at start → the opener (same origin).
+      var tok = '';
+      try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok) tok = saved.token || '';
+      if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
       if (!tok) { fail('Not logged in to egfulfill. Open the admin board, sign in as admin, then click Connect again.'); return; }
       if (!saved.verifier) { fail('Lost the security key (PKCE verifier). Click Connect again from the start — don’t reload this window.'); return; }
       var res = await fetch('/api/etsy/exchange', {
