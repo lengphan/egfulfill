@@ -253,9 +253,8 @@
   function pushButton(o) {
     if (!isNewOrder(o)) return '';
     var num = (o && (o.num || o.id)) || '';
-    return '<div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:10px 16px 4px 28px" onclick="event.stopPropagation()">'
-      + '<span style="font-size:11.5px;color:#9ca3af">Pick a blank + print method per item, then</span>'
-      + '<button class="btn btn-dk" style="font-size:12px;padding:6px 16px" onclick="EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')">Push to production →</button></div>';
+    return '<div style="display:flex;justify-content:flex-end;align-items:center;padding:6px 16px 4px 28px" onclick="event.stopPropagation()">'
+      + '<button class="btn btn-dk" style="font-size:12px;padding:6px 16px" onclick="EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')">Push</button></div>';
   }
 
   function pushToProduction(orderNum) {
