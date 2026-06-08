@@ -133,9 +133,13 @@
       // SHIP TO — single paste box (auto-validates with USPS on blur)
       + '<div><div style="display:flex;align-items:baseline;justify-content:space-between"><div style="' + LB + '">Ship to <span style="font-weight:400;text-transform:none;color:#9ca3af">— paste name + address</span></div><span id="egusps-to-val" style="font-size:11px;font-weight:700"></span></div>'
       + '<textarea id="egusps-to" onblur="EGUSPS._validate(\'to\')" style="' + TA + '" placeholder="Jane Doe&#10;123 Main St, Apt 4&#10;Austin, TX 78701"></textarea></div>'
-      // SHIP FROM — single paste box (remembered, auto-validates on blur)
-      + '<div><div style="display:flex;align-items:baseline;justify-content:space-between"><div style="' + LB + '">Ship from <span style="font-weight:400;text-transform:none;color:#9ca3af">— return address, remembered</span></div><span id="egusps-from-val" style="font-size:11px;font-weight:700"></span></div>'
-      + '<textarea id="egusps-from" onblur="EGUSPS._validate(\'from\')" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea></div>'
+      // SHIP FROM — collapsed inline summary; click to expand the editable address.
+      + '<div><div style="' + LB + '">Ship from</div>'
+      + '<div id="egusps-from-bar" onclick="EGUSPS._toggleFrom()" style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;cursor:pointer;background:#faf9f7">'
+      +   '<span id="egusps-from-summary" style="font-size:13px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">Set return address</span>'
+      +   '<span style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span id="egusps-from-val" style="font-size:11px;font-weight:700"></span><svg id="egusps-from-chev" width="12" height="12" viewBox="0 0 12 12" fill="none" style="transition:transform .15s"><path d="M2.5 4.5l3.5 3 3.5-3" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'
+      + '</div>'
+      + '<textarea id="egusps-from" onblur="EGUSPS._validate(\'from\');EGUSPS._syncFromSummary()" style="' + TA + ';display:none;margin-top:8px" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea></div>'
       // PACKAGE
       + '<div style="' + HD + '">PACKAGE</div>'
       + '<div style="display:grid;grid-template-columns:1.3fr .7fr 1fr;gap:10px">'
@@ -208,6 +212,7 @@
     if (!opts.toText && opts.toCSZ) toText = [opts.toName, [opts.toStreet, opts.toApt].filter(Boolean).join(', '), opts.toCSZ].filter(Boolean).join('\n');
     setv('egusps-to', toText);
     setv('egusps-from', addrToText(getOrigin() || {}));
+    _toggleFrom(false); _syncFromSummary();   // collapsed inline summary by default
     // Header "+ New Label" passes no order → leave everything blank but the ship-from.
     setv('egusps-ref1', opts.orderNum || '');
     setv('egusps-ref2', opts.seller || (opts.orderNum ? 'Seller' : ''));
@@ -440,7 +445,29 @@
     } else { if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; } if (fake) fake.style.display = ''; }
   }
 
+  // Ship-from collapsed summary: one-line preview of the return address.
+  function _syncFromSummary() {
+    if (!_modal) return;
+    var ta = _modal.querySelector('#egusps-from'), sum = _modal.querySelector('#egusps-from-summary');
+    if (!ta || !sum) return;
+    var raw = String(ta.value || '').trim();
+    if (!raw) { sum.textContent = 'Set return address'; sum.style.color = '#9ca3af'; return; }
+    var a = parseAddressBlock(raw);
+    var line = [a.name, [a.street, a.street2].filter(Boolean).join(' '), [a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+    sum.textContent = line || raw.replace(/\n/g, ' · ');
+    sum.style.color = '#374151';
+  }
+  function _toggleFrom(force) {
+    if (!_modal) return;
+    var ta = _modal.querySelector('#egusps-from'), chev = _modal.querySelector('#egusps-from-chev');
+    if (!ta) return;
+    var open = (typeof force === 'boolean') ? force : (ta.style.display === 'none');
+    ta.style.display = open ? 'block' : 'none';
+    if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+    if (open) { try { ta.focus(); } catch (e) {} }
+  }
   window.EGUSPS = {
+    _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,
     createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate,
