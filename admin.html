@@ -8628,8 +8628,10 @@ document.addEventListener('DOMContentLoaded', function() {
               <div id="xfom-num" style="font-size:16px;font-weight:700;color:#191918">#FF-0000</div>
               <div id="xfom-sub" style="font-size:13px;color:#9ca3af;margin-top:1px">—</div>
             </div>
-            <div style="display:flex;align-items:center;gap:14px">
+            <div style="display:flex;align-items:center;gap:10px;position:relative">
               <span id="xfom-badge" class="badge b-new" style="font-size:12.5px">New</span>
+              <button onclick="var m=document.getElementById('xfom-actions-menu');m.style.display=(m.style.display==='block'?'none':'block')" title="Actions" style="background:none;border:1px solid #e5e4e0;border-radius:7px;width:30px;height:28px;cursor:pointer;color:#374151;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background='none'">⋮</button>
+              <div id="xfom-actions-menu" style="display:none;position:absolute;top:38px;right:34px;width:230px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:40"></div>
               <button onclick="xfomClose()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:25px;line-height:1;padding:0 4px">×</button>
             </div>
           </div>
@@ -8894,8 +8896,9 @@ document.addEventListener('DOMContentLoaded', function() {
       html += '<button class="btn btn-out" onclick="xfomRefund()"' + (!isCancelled ? ' disabled title="Cancel the order first" style="opacity:.45;cursor:not-allowed"' : '') + '>Mark Refunded</button>';
     }
     html += '<button class="btn btn-out" style="color:#dc2626;border-color:#fecaca" onclick="xfomFlag()">⚑ Flag</button>';
-    html += '<button class="btn btn-dk" onclick="xfomSave()">Save Changes</button>';
-    wrap.innerHTML = html;
+    var _menu = document.getElementById('xfom-actions-menu');
+    if (_menu) { _menu.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px;padding:8px;align-items:stretch">' + html + '</div>'; _menu.onclick = function (e) { if (e.target && e.target.closest && e.target.closest('button')) _menu.style.display = 'none'; }; }
+    wrap.innerHTML = '<button class="btn btn-dk" onclick="xfomSave()">Save Changes</button>';
   }
   window.xfomChat = function(){ if (typeof xOrderChatOpen === 'function' && _xfomNum) xOrderChatOpen(_xfomNum); else alert('Open chat with seller for #' + _xfomNum); };
   window.xfomPushToBoard = function(){ if (typeof opSendToDesignStudio === 'function' && _xfomNum) opSendToDesignStudio(_xfomNum); else alert('Push #' + _xfomNum + ' to design board'); };
