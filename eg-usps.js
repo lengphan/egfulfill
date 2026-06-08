@@ -49,6 +49,8 @@
     var inner;
     if (res.labelHtml) {
       inner = '<div style="display:flex;justify-content:center;padding:18px;background:#f4f2ef">' + res.labelHtml + '</div>';
+    } else if (res.labelUrl) {
+      inner = '<iframe src="' + res.labelUrl + '" style="width:100%;height:62vh;border:0;background:#fff"></iframe>';
     } else if (res.labelImage && /PDF/.test(t)) {
       inner = '<iframe src="data:application/pdf;base64,' + res.labelImage + '" style="width:100%;height:62vh;border:0;background:#fff"></iframe>';
     } else if (res.labelImage && /(PNG|JPG|JPEG|GIF)/.test(t)) {
@@ -87,6 +89,7 @@
       try { var w = window.open('', '_blank'); if (w) { w.document.write('<title>Label ' + (tracking || '') + '</title><body style="margin:0;display:flex;justify-content:center;padding:24px;background:#fff" onload="window.print()">' + res.labelHtml + '</body>'); w.document.close(); } } catch (e) {}
       return;
     }
+    if (res.labelUrl) { try { window.open(res.labelUrl, '_blank'); } catch (e) {} return; }
     if (!res.labelImage) return;
     var mime = /PDF/.test(t) ? 'application/pdf' : (/ZPL/.test(t) ? 'text/plain' : 'image/png');
     var ext = /PDF/.test(t) ? 'pdf' : (/ZPL/.test(t) ? 'zpl' : 'png');
@@ -213,6 +216,78 @@
     var v2 = _modal.querySelector('#egusps-from-val'); if (v2) v2.textContent = '';
     _valCache = {};
     _modal.style.display = 'flex';
+  }
+  // ── Aggregator (EasyPost / Shippo) rate-shop + buy ────────────────────────────
+  var _shipCfg = null, _rateModal = null;
+  function _ensureShipCfg() {
+    if (_shipCfg) return Promise.resolve(_shipCfg);
+    return fetch('/api/shipping/config', { headers: { Authorization: 'Bearer ' + token() } })
+      .then(function (r) { return r.json(); }).then(function (c) { _shipCfg = c || { enabled: false }; return _shipCfg; })
+      .catch(function () { _shipCfg = { enabled: false }; return _shipCfg; });
+  }
+  function _toShipAddr(a) {
+    a = a || {};
+    return { name: a.name || '', street1: a.street || '', street2: a.street2 || '', city: a.city || '', state: a.state || '', zip: a.zip || '', country: 'US', phone: a.phone || '' };
+  }
+  function _fetchRates(to, from, parcel) {
+    return fetch('/api/shipping/rates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+      body: JSON.stringify({ to: _toShipAddr(to), from: _toShipAddr(from), parcel: parcel })
+    }).then(function (r) { return r.json(); });
+  }
+  function _buyRate(rateToken) {
+    return fetch('/api/shipping/label', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+      body: JSON.stringify({ rateToken: rateToken })
+    }).then(function (r) { return r.json(); });
+  }
+  function _showRatePicker(rates, ctx) {
+    if (!_rateModal) {
+      _rateModal = document.createElement('div');
+      _rateModal.id = 'egusps-rates';
+      _rateModal.style.cssText = 'display:none;position:fixed;inset:0;z-index:10075;background:rgba(0,0,0,.5);align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+      _rateModal.addEventListener('click', function (e) { if (e.target === _rateModal) _rateModal.style.display = 'none'; });
+      document.body.appendChild(_rateModal);
+    }
+    var rows = rates.map(function (rt, i) {
+      var days = (rt.days != null) ? (rt.days + ' day' + (rt.days === 1 ? '' : 's')) : '—';
+      var cheap = i === 0;
+      return '<button data-tok="' + encodeURIComponent(rt.token) + '" class="egusps-rate-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;padding:11px 14px;border:1px solid ' + (cheap ? '#16a34a' : '#e5e4e0') + ';border-radius:10px;background:' + (cheap ? '#f0fdf4' : '#fff') + ';cursor:pointer;font-family:inherit;margin-bottom:8px">'
+        + '<div><div style="font-size:13.5px;font-weight:700;color:#191918">' + (rt.carrier || '') + ' · ' + (rt.service || '') + (cheap ? ' <span style="color:#16a34a;font-size:10.5px;font-weight:800">CHEAPEST</span>' : '') + '</div><div style="font-size:12px;color:#9ca3af;margin-top:1px">' + days + ' · via ' + rt.provider + '</div></div>'
+        + '<div style="font-size:15px;font-weight:800;color:#191918">$' + Number(rt.amount).toFixed(2) + '</div></button>';
+    }).join('');
+    _rateModal.innerHTML =
+      '<div style="background:#fff;border-radius:14px;width:440px;max-width:95vw;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+      + '<div style="padding:14px 18px;border-bottom:1px solid #e5e4e0;display:flex;align-items:center;justify-content:space-between"><div style="font-size:15px;font-weight:700;color:#191918">Choose a rate</div><button id="egusps-rate-x" style="background:none;border:none;font-size:23px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
+      + '<div style="padding:14px 16px">' + (rows || '<div style="color:#9ca3af;font-size:13px;text-align:center;padding:20px">No rates available.</div>') + '</div></div>';
+    _rateModal.style.display = 'flex';
+    _rateModal.querySelector('#egusps-rate-x').onclick = function () { _rateModal.style.display = 'none'; };
+    Array.prototype.forEach.call(_rateModal.querySelectorAll('.egusps-rate-row'), function (b) {
+      b.onclick = function () { _finishWithBuy(decodeURIComponent(b.getAttribute('data-tok')), ctx, b); };
+    });
+  }
+  function _finishWithBuy(rateToken, ctx, btnEl) {
+    if (btnEl) { btnEl.disabled = true; btnEl.style.opacity = '.6'; }
+    _buyRate(rateToken).then(function (buy) {
+      if (!buy || buy.error || !buy.ok) { alert('Label purchase failed: ' + ((buy && buy.error) || 'unknown')); if (btnEl) { btnEl.disabled = false; btnEl.style.opacity = '1'; } return; }
+      if (_rateModal) _rateModal.style.display = 'none';
+      var to = ctx.to, tracking = buy.tracking || '';
+      var res = { labelUrl: buy.labelUrl, imageType: 'PDF', trackingNumber: tracking };
+      try { openLabel(res, tracking); } catch (e) {}
+      try { if (window.EGStore && EGStore.update && (_ctx.orderId || _ctx.orderNum)) EGStore.update(_ctx.orderId || _ctx.orderNum, { tracking: tracking, factoryStatus: 'shipped', carrier: buy.carrier || '' }); } catch (e) {}
+      recordShipment({
+        tracking: tracking,
+        orderNum: (_ctx && _ctx.orderNum) || '', orderId: (_ctx && _ctx.orderId) || '',
+        recipient: to.name || '',
+        recipientAddr: [[to.street, to.street2].filter(Boolean).join(', '), [to.city, [to.state, to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+        carrier: buy.carrier || '', service: buy.service || '', date: _todayStr(), status: 'shipped',
+        cost: buy.cost || null, provider: buy.provider || '',
+        manual: !(_ctx && _ctx.orderNum),
+        label: { labelUrl: buy.labelUrl || '', imageType: 'PDF' }
+      });
+      if (_modal) _modal.style.display = 'none';
+      if (_ctx && typeof _ctx.onDone === 'function') { try { _ctx.onDone(tracking, res); } catch (e) {} }
+    }).catch(function (e) { alert('Label purchase failed: ' + e.message); if (btnEl) { btnEl.disabled = false; btnEl.style.opacity = '1'; } });
   }
   async function generateFromModal() {
     var to = parseAddressBlock(getv('egusps-to'));
