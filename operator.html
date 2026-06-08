@@ -7472,6 +7472,10 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
                 </div>
               </div>
               <div>
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Customer Note</div>
+                <div id="xfom-customer-note" style="font-size:13px;color:#9ca3af">No customer note</div>
+              </div>
+              <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Production Notes</div>
                 <div id="xfom-notes" style="margin-bottom:8px;font-size:13px;color:#9ca3af">No notes yet</div>
                 <div style="display:flex;gap:8px">
@@ -7532,7 +7536,22 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     badge.style.cssText = 'font-size:14px;font-weight:700;' + ((typeof OP_STATUS_STYLE !== 'undefined' && OP_STATUS_STYLE[canon]) || 'background:transparent;color:#374151');
     const addr = (o && (o.addr || o.address)) || {};
     const addrEl = document.getElementById('xfom-addr');
-    if (typeof addr === 'string') {
+    var _t = null;
+    try {
+      var _eg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null;
+      if (_eg) {
+        var _a = _eg.address, _nm = (_eg.customer && (_eg.customer.name || (typeof _eg.customer === 'string' ? _eg.customer : ''))) || '';
+        var _P = function (s) { return (window.EGUSPS && EGUSPS.parseAddressBlock) ? EGUSPS.parseAddressBlock(String(s || '').replace(/,\s*/g, '\n')) : {}; };
+        var _st = '', _c = '', _s = '', _z = '';
+        if (typeof _a === 'string' && _a.trim()) { var _ps = _P(_a); _st = _ps.street; _c = _ps.city; _s = _ps.state; _z = _ps.zip; }
+        else if (_a && typeof _a === 'object') { _st = [_a.line1 || _a.street1 || _a.street, _a.line2 || _a.apt || _a.street2].filter(Boolean).join(', '); _c = _a.city || ''; _s = _a.state || ''; _z = _a.zip || _a.zipCode || ''; if (!_z && (_a.formatted || _a.formatted_address)) { var _pf = _P(_a.formatted || _a.formatted_address); _st = _st || _pf.street; _c = _c || _pf.city; _s = _s || _pf.state; _z = _pf.zip; } }
+        if (!_z && _eg.customer && _eg.customer.shipTo) { var _sh = _eg.customer.shipTo; _st = _st || [_sh.street, _sh.apt].filter(Boolean).join(', '); _c = _c || _sh.city; _s = _s || _sh.state; _z = _sh.zip; }
+        if (_z || _st) _t = { name: _nm, street: _st, city: _c, state: _s, zip: _z };
+      }
+    } catch (e) {}
+    if (_t) {
+      addrEl.innerHTML = '<strong>' + (_t.name || (o && o.customer) || '') + '</strong><br>' + (_t.street || '') + '<br>' + [_t.city, _t.state, _t.zip].filter(Boolean).join(', ');
+    } else if (typeof addr === 'string') {
       addrEl.innerHTML = '<strong>' + (o?.customer || '') + '</strong><br>' + addr;
     } else if (addr.name || addr.line1 || addr.street) {
       addrEl.innerHTML = '<strong>' + (addr.name || o?.customer || '') + '</strong><br>' +
@@ -7707,7 +7726,15 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     const computedTotal = items.reduce((s, it) => s + _xfomUnitPrice(it) * (it.qty || it.quantity || 1), 0);
     const total = (typeof o?.total === 'number') ? o.total : (computedTotal || o?.total || 0);
     document.getElementById('xfom-total').textContent = '$' + (typeof total === 'number' ? total.toFixed(2) : total);
-    const notes = o?.notes || [];
+    try {
+      const cnEl = document.getElementById('xfom-customer-note');
+      if (cnEl) {
+        const pers = (items || []).map(function (it) { return it.personalization || it.note || ''; }).filter(Boolean);
+        cnEl.innerHTML = pers.length ? pers.map(function (p) { return '<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fde7cf;border-radius:7px;font-size:13px;color:#9a3412;margin-bottom:5px">' + String(p).replace(/</g, '&lt;') + '</div>'; }).join('') : '<span style="color:#9ca3af;font-size:13px">No customer note</span>';
+      }
+    } catch (e) {}
+    let notes = o?.notes || [];
+    try { const _eg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_eg && Array.isArray(_eg.notes) && _eg.notes.length) notes = _eg.notes; } catch (e) {}
     const notesEl = document.getElementById('xfom-notes');
     if (notes.length) {
       notesEl.innerHTML = notes.map(n => `<div style="padding:7px 10px;background:#f9f8f6;border-radius:7px;font-size:13px;margin-bottom:5px"><strong>${n.by || 'Note'}:</strong> ${n.text || n}</div>`).join('');
@@ -7872,7 +7899,17 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     const txt = (inp?.value || '').trim();
     if (!txt || !_xfomNum) return;
     const o = _xfomFindOrder(_xfomNum);
-    if (o) { o.notes = o.notes || []; o.notes.push({ by: 'You', text: txt, ts: Date.now() }); }
+    var _role = (typeof window !== 'undefined' && (window.XFOM_ROLE || window.XOC_ROLE)) ? String(window.XFOM_ROLE || window.XOC_ROLE) : 'factory';
+    var _note = { by: _role.charAt(0).toUpperCase() + _role.slice(1), text: txt, ts: Date.now() };
+    try {
+      if (typeof EGStore !== 'undefined' && EGStore.getOrders && EGStore.update) {
+        var _eg = (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; });
+        var _egId = (_eg && _eg.id) || (o && o.id) || _xfomNum;
+        var _notes = (_eg && Array.isArray(_eg.notes)) ? _eg.notes.slice() : ((o && Array.isArray(o.notes)) ? o.notes.slice() : []);
+        _notes.push(_note); EGStore.update(_egId, { notes: _notes });
+        if (o) o.notes = _notes;
+      } else if (o) { o.notes = o.notes || []; o.notes.push(_note); }
+    } catch (e) { if (o) { o.notes = o.notes || []; o.notes.push(_note); } }
     // Sync to the cross-board timeline as an internal entry so admin and
     // warehouse see this operator-added note, but the seller does not.
     try {
