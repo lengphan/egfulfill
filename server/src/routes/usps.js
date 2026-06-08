@@ -13,6 +13,17 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
+import { shippingEnabled, aggregatorBuyCheapest } from './shipping.js';
+
+// Map a USPS mailClass to a service-name hint for the aggregator rate filter.
+function _svcPref(mc) {
+  mc = String(mc || '').toUpperCase();
+  if (mc.includes('PRIORITY') && mc.includes('EXPRESS')) return 'Express';
+  if (mc.includes('PRIORITY')) return 'Priority';
+  if (mc.includes('GROUND')) return 'Ground Advantage';
+  if (mc.includes('FIRST')) return 'First';
+  return '';
+}
 
 const KEY    = process.env.USPS_CONSUMER_KEY || '';
 const SECRET = process.env.USPS_CONSUMER_SECRET || '';
@@ -126,6 +137,20 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       const to = b.to || {}, from = b.from || {};
       if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
       if (!from.zip || !from.street) { reply.code(400); return { error: 'Sender (from) street + ZIP are required' }; }
+      // PREFERRED PATH — when a shipping aggregator (Shippo/EasyPost) is configured,
+      // buy a REAL label through it (test keys → real design, watermarked, no charge).
+      // Restricted to USPS here so a UPS test-account gap can't fail the buy.
+      if (shippingEnabled()) {
+        try {
+          const buy = await aggregatorBuyCheapest(to, from,
+            { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
+            { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
+          if (buy && buy.tracking) {
+            if (b.orderId) { try { await q(`update orders set tracking=$1, carrier=$2, factory_status='shipped', status='shipped' where id=$3`, [buy.tracking, buy.carrier || 'USPS', b.orderId]); } catch (e2) {} }
+            return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider };
+          }
+        } catch (e2) { /* fall through to USPS-direct / mock */ }
+      }
       // TEST MODE — when USPS_MOCK is set, skip OAuth/payment and return a SAMPLE
       // label so the whole flow (modal → label → tracking → seller sync) can be
       // tested before USPS enables the Payments scope. Set USPS_MOCK= (empty) for real.

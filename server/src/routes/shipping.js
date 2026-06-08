@@ -106,6 +106,29 @@ async function shBuy(rateObjectId) {
   };
 }
 
+// Is any aggregator configured?
+export function shippingEnabled() { return !!(EP_KEY || SH_TOKEN); }
+
+// Rate-shop and buy the cheapest label — reused by /api/usps/label so EVERY label
+// path produces a real label. opts: { carrierPref, servicePref } (substring filters).
+export async function aggregatorBuyCheapest(to, from, pc, opts) {
+  if (!EP_KEY && !SH_TOKEN) return null;
+  opts = opts || {};
+  const T = addr(to), F = addr(from), P = parcel(pc);
+  const jobs = [];
+  if (EP_KEY) jobs.push(epRates(T, F, P).catch(() => []));
+  if (SH_TOKEN) jobs.push(shRates(T, F, P).catch(() => []));
+  let all = (await Promise.all(jobs)).flat();
+  if (!all.length) return null;
+  if (opts.carrierPref) { const w = String(opts.carrierPref).toLowerCase(); const f = all.filter((r) => (r.carrier || '').toLowerCase().includes(w)); if (f.length) all = f; }
+  if (opts.servicePref) { const w = String(opts.servicePref).toLowerCase(); const f = all.filter((r) => (r.service || '').toLowerCase().includes(w)); if (f.length) all = f; }
+  all.sort((a, c) => a.amount - c.amount);
+  const t = dec(all[0].token);
+  if (t && t.p === 'ep') return await epBuy(t.s, t.r);
+  if (t && t.p === 'sh') return await shBuy(t.r);
+  return null;
+}
+
 export function shippingRoutes(app, requireAuth, requireStaff) {
   const guard = { preHandler: requireStaff };
 
