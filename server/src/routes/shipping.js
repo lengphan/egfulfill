@@ -22,13 +22,19 @@ const shAuth = () => 'ShippoToken ' + SH_TOKEN;
 function enc(obj) { return Buffer.from(JSON.stringify(obj)).toString('base64'); }
 function dec(tok) { try { return JSON.parse(Buffer.from(String(tok || ''), 'base64').toString('utf8')); } catch (e) { return null; } }
 
-// Normalize an address from the frontend → provider shape.
-function addr(a) {
+// USPS requires the SENDER to have a phone or email. The label modal doesn't collect
+// them, so default the sender's contact (override via env).
+const SHIP_FROM_PHONE = process.env.SHIP_FROM_PHONE || '5555555555';
+const SHIP_FROM_EMAIL = process.env.SHIP_FROM_EMAIL || 'fulfillment@egful.store';
+
+// Normalize an address from the frontend → provider shape. isSender → fill the
+// contact defaults USPS demands on the from address.
+function addr(a, isSender) {
   a = a || {};
   return {
     name: a.name || '', street1: a.street1 || a.street || '', street2: a.street2 || '',
     city: a.city || '', state: a.state || '', zip: a.zip || '', country: a.country || 'US',
-    phone: a.phone || '', email: a.email || ''
+    phone: a.phone || (isSender ? SHIP_FROM_PHONE : ''), email: a.email || (isSender ? SHIP_FROM_EMAIL : '')
   };
 }
 function parcel(p) {
@@ -114,7 +120,7 @@ export function shippingEnabled() { return !!(EP_KEY || SH_TOKEN); }
 export async function aggregatorBuyCheapest(to, from, pc, opts) {
   if (!EP_KEY && !SH_TOKEN) return null;
   opts = opts || {};
-  const T = addr(to), F = addr(from), P = parcel(pc);
+  const T = addr(to), F = addr(from, true), P = parcel(pc);
   const jobs = [];
   if (EP_KEY) jobs.push(epRates(T, F, P).catch(() => []));
   if (SH_TOKEN) jobs.push(shRates(T, F, P).catch(() => []));
@@ -149,7 +155,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   app.post('/api/shipping/rates', guard, async (req, reply) => {
     if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
     const b = req.body || {};
-    const to = addr(b.to), from = addr(b.from), pc = parcel(b.parcel || b);
+    const to = addr(b.to), from = addr(b.from, true), pc = parcel(b.parcel || b);
     if (!to.zip || !to.street1) { reply.code(400); return { error: 'Recipient street + ZIP required' }; }
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
     const jobs = [];
@@ -170,7 +176,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       if (!t) {
         // No token → rate-shop and pick the cheapest.
         if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured' }; }
-        const to = addr(b.to), from = addr(b.from), pc = parcel(b.parcel || b);
+        const to = addr(b.to), from = addr(b.from, true), pc = parcel(b.parcel || b);
         if (!to.zip || !to.street1 || !from.zip || !from.street1) { reply.code(400); return { error: 'Sender + recipient street + ZIP required' }; }
         const jobs = [];
         if (EP_KEY) jobs.push(epRates(to, from, pc).catch(() => []));
