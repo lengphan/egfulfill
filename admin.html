@@ -3126,7 +3126,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div id="adm-platform-body" style="display:flex;flex-direction:column;gap:18px"></div>
           <!-- VietQR exchange rate (admin-set, shared with every seller's top-up) -->
           <div style="border:1px solid #e5e4e0;border-radius:12px;padding:16px 18px;margin-top:18px">
-            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">VietQR Exchange Rate</div>
+            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Exchange Rate</div>
             <div style="font-size:13px;color:#6b7280;margin-bottom:12px">USD → VND rate for seller wallet top-ups. The scan-to-pay QR converts at this rate; sellers see it read-only.</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <span style="font-size:13.5px;color:#374151;font-weight:600">1 USD = ₫</span>
@@ -3152,6 +3152,29 @@ document.addEventListener('DOMContentLoaded', function(){
             }catch(e){ if(msg){msg.textContent='Error: '+e.message;msg.style.color='#dc2626';} }
           }
           document.addEventListener('DOMContentLoaded', admLoadVqrRate);
+          </script>
+          <!-- Return / Ship-From address — used as the sender on every shipping label -->
+          <div style="border:1px solid #e5e4e0;border-radius:12px;padding:16px 18px;margin-top:18px">
+            <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Return / Ship-From Address</div>
+            <div style="font-size:13px;color:#6b7280;margin-bottom:12px">The sender address printed on every shipping label (also the USPS-required phone/email). Saved on this device.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:560px">
+              <input id="adm-ship-name" class="input" placeholder="Business / sender name" style="grid-column:1/3"/>
+              <input id="adm-ship-street" class="input" placeholder="Street address" style="grid-column:1/3"/>
+              <input id="adm-ship-street2" class="input" placeholder="Suite / unit (optional)" style="grid-column:1/3"/>
+              <input id="adm-ship-city" class="input" placeholder="City"/>
+              <div style="display:flex;gap:10px"><input id="adm-ship-state" class="input" placeholder="ST" style="width:84px"/><input id="adm-ship-zip" class="input" placeholder="ZIP" style="flex:1"/></div>
+              <input id="adm-ship-phone" class="input" placeholder="Phone"/>
+              <input id="adm-ship-email" class="input" placeholder="Email"/>
+            </div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+              <button class="btn btn-dk" style="font-size:13px" onclick="admSaveShipFrom()">Save address</button>
+              <span id="adm-ship-msg" style="font-size:12.5px;font-weight:600"></span>
+            </div>
+          </div>
+          <script>
+          function admLoadShipFrom(){ try{ var o=(window.EGUSPS&&EGUSPS.getOrigin&&EGUSPS.getOrigin())||{}; var set=function(id,v){var e=document.getElementById(id);if(e)e.value=v||'';}; set('adm-ship-name',o.name); set('adm-ship-street',o.street); set('adm-ship-street2',o.street2); set('adm-ship-city',o.city); set('adm-ship-state',o.state); set('adm-ship-zip',o.zip); set('adm-ship-phone',o.phone); set('adm-ship-email',o.email); }catch(e){} }
+          function admSaveShipFrom(){ var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';}; var o={name:g('adm-ship-name'),street:g('adm-ship-street'),street2:g('adm-ship-street2'),city:g('adm-ship-city'),state:g('adm-ship-state'),zip:g('adm-ship-zip'),phone:g('adm-ship-phone'),email:g('adm-ship-email')}; var msg=document.getElementById('adm-ship-msg'); if(!o.street||!o.zip){ if(msg){msg.textContent='Street + ZIP required';msg.style.color='#dc2626';} return; } try{ if(window.EGUSPS&&EGUSPS.setOrigin) EGUSPS.setOrigin(o); if(msg){msg.textContent='Saved ✓';msg.style.color='#15803d';} }catch(e){ if(msg){msg.textContent='Error: '+e.message;msg.style.color='#dc2626';} } }
+          document.addEventListener('DOMContentLoaded', admLoadShipFrom);
           </script>
         </div>
         <!-- Users (admin-only) -->
