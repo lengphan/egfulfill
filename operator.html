@@ -4028,6 +4028,7 @@ function renderOpOrders() {
             ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
           </div>`;
         }).join('')}
+        ${window.EGDesignTools ? EGDesignTools.addItemButton(o) : ''}
       </td>
     </tr>`;
     return mainRow + detailRow;
@@ -4532,7 +4533,13 @@ function opZoomProduct(orderNum, itemIdx) {
   // Zoom shows a LIVE composite: catalog mockup as background + raw design
   // overlaid at the seller's saved designPos. Mirrors the row avatar so the
   // operator sees exactly what the seller positioned — not a pre-baked thumb.
-  var mockupSrc = ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null)
+  // Same priority as the inline row thumbnail (opItemCompositeThumb's prodImg) so
+  // the zoom shows EXACTLY the same image: picked base product → marketplace
+  // listing image → catalog sku match → seller image → placeholder.
+  var _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, it.sku) : '';
+  var mockupSrc = (_picked && /^(https?:|data:)/.test(_picked) ? _picked : null)
+    || (it.img && /^(https?:|data:)/.test(String(it.img)) ? it.img : null)
+    || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null)
     || it.sellerImg || it.thumb
     || ('https://placehold.co/320x320/' + tBg.replace('#','') + '/' + tFg.replace('#','') + '?text=' + encodeURIComponent(tLbl));
   var designSrc = it.designUrl || ((it.file && String(it.file).startsWith('data:')) ? it.file : '');
@@ -4580,6 +4587,12 @@ function opZoomProduct(orderNum, itemIdx) {
   var pushHtml = _pushed
     ? '<span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:6px;background:#e5e4e0;color:#9ca3af;font-size:12px;font-weight:700;flex-shrink:0;white-space:nowrap" title="On ' + _pushed.board.toUpperCase() + ' board">✓ ' + _pushed.board.toUpperCase() + '</span>'
     : '<button onclick="event.stopPropagation();opShowPushMenu(\'' + orderNum + '\',\'' + (it.sku||'').replace(/\'/g,"\\\'") + '\',\'' + (it.name||'').replace(/\'/g,"\\\'") + '\',this)" style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;background:#fff;color:#191918;border:1.5px solid #191918;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background .12s" onmouseover="this.style.background=\'#f6f5f4\'" onmouseout="this.style.background=\'#fff\'">Push <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></button>';
+  // Buyer's marketplace upload → a link inside the zoom so the operator can pull
+  // up the exact file the customer sent (separate from the deliverable download).
+  var _custUrl = it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? String(it.designSrc) : '');
+  var custFileLink = _custUrl
+    ? '<a href="' + _custUrl + '" target="_blank" onclick="event.stopPropagation()" style="margin-top:10px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #c4b5fd;background:#faf5ff;font-size:13.5px;font-weight:600;color:#7c3aed;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;box-sizing:border-box">Customer-uploaded file ↗</a>'
+    : '';
   overlay.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
     + '<div style="position:relative;width:100%;aspect-ratio:1;border-radius:9px;border:1px solid #e5e4e0;background:#fff;overflow:hidden">'
       + '<img src="' + mockupSrc + '" style="width:100%;height:100%;object-fit:contain;display:block"/>'
@@ -4594,6 +4607,7 @@ function opZoomProduct(orderNum, itemIdx) {
     + '</div>'
     + threadBlock
     + fileLabel
+    + custFileLink
     + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
     + '</div>';
   document.body.appendChild(overlay);

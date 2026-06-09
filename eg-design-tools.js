@@ -218,9 +218,26 @@
   // swapping off the listing image onto the chosen product blank. Boards track
   // row expansion in persistent state, so this keeps an open row open.
   function refreshBoard() {
+    // Capture which order-detail rows are open so a re-render doesn't COLLAPSE
+    // them mid-interaction (some boards toggle detail via direct DOM, not a
+    // persisted set). We restore them right after the render.
+    var openIds = [];
+    try {
+      document.querySelectorAll('[id^="op-detail-"],[id^="wh-detail-"]').forEach(function (el) {
+        if (el.style && el.style.display && el.style.display !== 'none') openIds.push(el.id.replace(/^(op|wh)-detail-/, ''));
+      });
+    } catch (e) {}
     ['renderOpOrders', 'whRenderOrders', 'admRenderOrders', 'renderOrders'].forEach(function (fn) {
       try { if (typeof window[fn] === 'function') window[fn](); } catch (e) {}
     });
+    try {
+      openIds.forEach(function (id) {
+        var el = document.getElementById('op-detail-' + id) || document.getElementById('wh-detail-' + id);
+        if (el) el.style.display = 'table-row';
+        var chev = document.getElementById('op-chevron-' + id) || document.getElementById('wh-chevron-' + id);
+        if (chev) chev.style.transform = 'rotate(180deg)';
+      });
+    } catch (e) {}
   }
 
   // ── Auto thread-colour matching for embroidery items ───────────────────────
@@ -367,9 +384,21 @@
     var sku = it.sku || '';
     var name = it.name || '';
     var tech = it.type || it.printType || it.tech || '';
-    var btns = actBtn('↑ Upload', "EGDesignTools.upload('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')")
+    // Auto-darken Upload once a design is attached (raw design cached, an adopted
+    // customer file, or an uploaded file on the item) — mirrors the seller's
+    // active-state design button. Clicking still re-opens upload to replace it.
+    var _hasDesign = false;
+    try { _hasDesign = !!(window.EGStore && EGStore.getRawDesign && EGStore.getRawDesign(num, sku)); } catch (e) {}
+    if (!_hasDesign && (it.file || it.designUrl || it.thumb)) _hasDesign = true;
+    var _upOnclick = "EGDesignTools.upload('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')";
+    var uploadBtn = _hasDesign
+      ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">↑ Uploaded ✓</button>'
+      : actBtn('↑ Upload', _upOnclick);
+    var btns = uploadBtn
       + actBtn('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
-      + actBtn('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')");
+      + actBtn('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')")
+      // Place = quick move/resize/remove-bg on the attached design (only once there is one).
+      + (_hasDesign ? actBtn('Place', "EGDesignTools.placeDesign('" + jsAttr(num) + "','" + jsAttr(sku) + "')") : '');
     var pickers = '';
     if (isNewOrder(o)) {
       var setup = getItemSetup(num, sku);
@@ -390,6 +419,31 @@
         + '<select title="Print method" style="' + sel + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>';
     }
     return '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end" onclick="event.stopPropagation()">' + pickers + btns + '</div>';
+  }
+
+  // ── Inline "+ Add item" (factory boards) — mirrors the seller's add-item on the
+  //    orders table. Pushes a placeholder line item the operator then configures
+  //    with the Product / Method pickers + Upload/Templates. Persists via
+  //    EGStore.update so it survives re-sync/hydrate. Only while the order is new.
+  function addItem(orderNum) {
+    try {
+      var o = findOrder(orderNum);
+      if (!o) return;
+      o.items = Array.isArray(o.items) ? o.items : [];
+      var sku = 'NEW-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      o.items.push({ sku: sku, name: 'New item', qty: 1, printType: '' });
+      if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+    } catch (e) {}
+    refreshBoard();
+  }
+  function addItemButton(o) {
+    if (!isNewOrder(o)) return '';
+    var num = (o && (o.num || o.id)) || '';
+    return '<div style="padding:4px 14px 10px 28px" onclick="event.stopPropagation()">'
+      + '<button onclick="EGDesignTools.addItem(\'' + jsAttr(num) + '\')" title="Add another line item to this order" '
+      + 'style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#191918;background:transparent;border:1px dashed #c4c3be;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s" '
+      + 'onmouseover="this.style.borderColor=\'#191918\';this.style.background=\'#fff\'" onmouseout="this.style.borderColor=\'#c4c3be\';this.style.background=\'transparent\'">'
+      + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button></div>';
   }
 
   // Per-order "Push to production" — only while the order is new.
@@ -457,7 +511,8 @@
         + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="#9ca3af" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>'
         + '<input id="egt-tpl-search" placeholder="Search templates…" style="border:none;outline:none;font-size:13.5px;flex:1;font-family:inherit;background:transparent" oninput="EGDesignTools._filterTemplates(this.value)"/>'
         + '<span onclick="EGDesignTools._closeTemplates()" style="cursor:pointer;color:#9ca3af;font-size:17px;line-height:1">&times;</span></div>'
-        + '<div id="egt-tpl-list" style="max-height:300px;overflow:auto;padding:4px"></div>';
+        + '<div id="egt-tpl-list" style="max-height:300px;overflow:auto;padding:4px"></div>'
+        + '<div style="padding:8px 12px;border-top:1px solid #f3f3f1"><a onclick="EGDesignTools._templatesPage()" style="font-size:12.5px;color:#191918;font-weight:600;cursor:pointer;text-decoration:none">Browse all product templates →</a></div>';
       document.body.appendChild(p);
       document.addEventListener('mousedown', function (e) { if (p.style.display !== 'none' && !p.contains(e.target)) closeTemplates(); }, true);
     }
@@ -478,6 +533,9 @@
     setTimeout(function () { var si = document.getElementById('egt-tpl-search'); if (si) si.focus(); }, 50);
   }
   function closeTemplates() { var p = document.getElementById('egt-tpl-panel'); if (p) p.style.display = 'none'; }
+  // Open the board's full product-templates page (in-board overlay) for the
+  // current item, carrying its order+sku context — same page the board owns.
+  function openTemplatesPage() { var c = _tplCtx; closeTemplates(); if (c) templates(c.orderNum, c.sku, c.name); }
   function filterTemplates(q) {
     var list = document.getElementById('egt-tpl-list'); if (!list) return;
     var all = _loadTemplates();
@@ -520,14 +578,117 @@
     document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: ctx.orderNum, sku: ctx.sku } }));
   }
 
+  // ── Quick-place design modal (move / resize / remove background) — ported from
+  //    the seller's qp modal, made self-contained for the factory boards. Reads
+  //    the item from EGStore, persists designPos + bg-removed artwork, refreshes
+  //    every board surface. Trigger: the "Place" item action (shown once a design
+  //    is attached). ─────────────────────────────────────────────────────────
+  var _qpCur = null;
+  function _qpDesignUrl(o, it) {
+    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(o.id, it.sku); if (r) return r; } } catch (e) {}
+    return it.designUrl || (it.file && String(it.file).indexOf('data:') === 0 ? it.file : '') || '';
+  }
+  function _qpMockupUrl(o, it) {
+    var picked = setupProductImage(o.num || o.id, it.sku); if (picked) return picked;
+    if (it.img && /^(https?:|data:)/.test(String(it.img))) return it.img;
+    try { if (window.EGStore && EGStore.imageForSku) { var m = EGStore.imageForSku(it.sku, it.name); if (m) return m; } } catch (e) {}
+    return it.sellerImg || it.thumb || '';
+  }
+  function placeDesign(orderNum, sku) {
+    var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
+    var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (!it) return;
+    var design = _qpDesignUrl(o, it);
+    if (!design) { alert('Attach a design first (Upload / Templates / Design Maker), then Place it.'); return; }
+    if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
+    _qpCur = { orderNum: orderNum, sku: sku };
+    _qpEnsureModal();
+    document.getElementById('egqp-title').textContent = '#' + (o.num || o.id) + ' — ' + (it.name || it.sku || 'Design');
+    document.getElementById('egqp-stage').style.backgroundImage = (function () { var mk = _qpMockupUrl(o, it); return mk ? 'url("' + mk + '")' : 'none'; })();
+    var wrap = document.getElementById('egqp-wrap');
+    document.getElementById('egqp-design').src = design;
+    wrap.style.left = (it.designPos.x || 25) + '%'; wrap.style.top = (it.designPos.y || 25) + '%';
+    wrap.style.width = (it.designPos.w || 50) + '%'; wrap.style.height = (it.designPos.h || 50) + '%';
+    document.getElementById('egqp-modal').style.display = 'flex';
+  }
+  function _qpEnsureModal() {
+    var m = document.getElementById('egqp-modal'); if (m) return m;
+    m = document.createElement('div'); m.id = 'egqp-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10120;display:none;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
+    m.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:480px;overflow:hidden">'
+      + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egqp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools._qpClose()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;font-size:16px;line-height:1">&times;</button></div>'
+      + '<div style="padding:18px;display:flex;justify-content:center"><div id="egqp-stage" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
+      + '<button id="egqp-rmbg" onclick="event.stopPropagation();EGDesignTools._qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
+      + '<div id="egqp-wrap" style="position:absolute;cursor:grab"><img id="egqp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egqp-handle" style="position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
+      + '</div></div>'
+      + '<div style="padding:0 18px 16px;display:flex;align-items:center;gap:8px"><div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools._qpClose()" class="btn btn-out" style="font-size:13px">Cancel</button><button onclick="EGDesignTools._qpSave()" class="btn btn-dk" style="font-size:13px">Save</button></div></div>'
+      + '</div>';
+    m.addEventListener('click', function (e) { if (e.target === m) qpClose(); });
+    document.body.appendChild(m);
+    _qpAttach();
+    return m;
+  }
+  function qpClose() { var m = document.getElementById('egqp-modal'); if (m) m.style.display = 'none'; _qpCur = null; }
+  function qpSave() {
+    if (!_qpCur) { qpClose(); return; }
+    try {
+      var o = findOrder(_qpCur.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(_qpCur.sku); });
+      var wrap = document.getElementById('egqp-wrap');
+      if (it && wrap) { it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 }; if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); }
+    } catch (e) {}
+    qpClose(); refreshBoard();
+  }
+  function qpRemoveBg() {
+    if (!_qpCur) return;
+    var o = findOrder(_qpCur.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(_qpCur.sku); });
+    var dEl = document.getElementById('egqp-design'); if (!o || !it || !dEl || !dEl.src) return;
+    var btn = document.getElementById('egqp-rmbg'); if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    var img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        var w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return;
+        var c = document.createElement('canvas'); c.width = w; c.height = h; var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+        var data; try { data = ctx.getImageData(0, 0, w, h); } catch (e) { alert('This image can’t be processed in-browser (cross-origin). Upload it through Upload first.'); return; }
+        var d = data.data; var px = function (x, y) { var i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+        var cs = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)]; var bg = [0, 0, 0]; cs.forEach(function (p) { bg[0] += p[0]; bg[1] += p[1]; bg[2] += p[2]; }); bg = bg.map(function (v) { return v / 4; });
+        var tol = 46, removed = 0;
+        for (var i = 0; i < d.length; i += 4) { var dr = d[i] - bg[0], dg = d[i + 1] - bg[1], db = d[i + 2] - bg[2]; if (Math.sqrt(dr * dr + dg * dg + db * db) < tol) { d[i + 3] = 0; removed++; } }
+        if (!removed) { alert('No uniform background detected.'); return; }
+        ctx.putImageData(data, 0, 0); var out = c.toDataURL('image/png');
+        dEl.src = out; it.designUrl = out;
+        try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, it.sku, out); } catch (e) {}
+        refreshBoard();
+      } finally { if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
+    };
+    img.onerror = function () { if (btn) { btn.disabled = false; btn.style.opacity = ''; } };
+    img.src = dEl.src;
+  }
+  function _qpAttach() {
+    var stage = document.getElementById('egqp-stage'); var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
+    function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
+    function down(e) {
+      var wrap = document.getElementById('egqp-wrap'); var handle = document.getElementById('egqp-handle');
+      if (e.target === handle) mode = 'resize'; else if (e.target === wrap || wrap.contains(e.target)) { mode = 'drag'; wrap.style.cursor = 'grabbing'; } else return;
+      sx = e.clientX; sy = e.clientY; startX = parseFloat(wrap.style.left) || 0; startY = parseFloat(wrap.style.top) || 0; startW = parseFloat(wrap.style.width) || 50; startH = parseFloat(wrap.style.height) || 50; e.preventDefault();
+    }
+    function mv(e) {
+      if (!mode) return; var wrap = document.getElementById('egqp-wrap'); var dd = pct(e.clientX - sx, e.clientY - sy);
+      if (mode === 'drag') { wrap.style.left = Math.max(0, Math.min(100 - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(0, Math.min(100 - startH, startY + dd.y)) + '%'; }
+      else { wrap.style.width = Math.max(8, Math.min(100 - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(100 - startY, startH + dd.y)) + '%'; }
+    }
+    function up() { if (mode === 'drag') { var wrap = document.getElementById('egqp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; }
+    stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  }
+
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    addItem: addItem, addItemButton: addItemButton,
+    placeDesign: placeDesign, _qpClose: qpClose, _qpSave: qpSave, _qpRemoveBg: qpRemoveBg,
     onSetProduct: onSetProduct, onSetPrint: onSetPrint, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
-    openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate,
+    openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage,
     PRINT_METHODS: PRINT_METHODS
   };
 })();

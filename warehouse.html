@@ -4597,17 +4597,23 @@ function whZoomThumb(src, orderNum, sku, name) {
   // exactly what the seller positioned, not a pre-baked or raw-only image.
   const _zo = (typeof WH_ORDERS !== 'undefined') ? WH_ORDERS.find(function(x){ return x.num === orderNum; }) : null;
   const _zit = _zo && Array.isArray(_zo.itemList) ? _zo.itemList.find(function(x){ return x.sku === sku; }) : null;
+  // Use the SAME image the row thumbnail resolved (passed in as `src`) so the zoom
+  // matches the inline composite exactly. A picked base product still wins.
   let _mockupSrc = src;
   let _designOverlay = '';
   if (_zit) {
-    _mockupSrc = ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(_zit.sku, _zit.name) : null)
-      || _zit.sellerImg || src;
+    const _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, _zit.sku) : '';
+    if (_picked && /^(https?:|data:)/.test(_picked)) _mockupSrc = _picked;
     const _designSrc = _zit.designUrl || ((_zit.file && String(_zit.file).startsWith('data:')) ? _zit.file : '');
     const _pos = _zit.designPos || { x:25, y:25, w:50, h:50 };
     if (_designSrc) {
       _designOverlay = '<img src="' + _designSrc + '" style="position:absolute;left:' + _pos.x + '%;top:' + _pos.y + '%;width:' + _pos.w + '%;height:' + _pos.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>';
     }
   }
+  const _whCustUrl = _zit && (_zit.customerFile || (_zit.designSrc && /^https?:\/\//i.test(String(_zit.designSrc)) ? String(_zit.designSrc) : ''));
+  const whCustFileLink = _whCustUrl
+    ? '<a href="' + _whCustUrl + '" target="_blank" onclick="event.stopPropagation()" style="margin-top:10px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #c4b5fd;background:#faf5ff;font-size:13.5px;font-weight:600;color:#7c3aed;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;box-sizing:border-box">Customer-uploaded file ↗</a>'
+    : '';
   // Push button (or pushed-status chip) for the zoom modal header row.
   let _whPushed = null;
   try { _whPushed = (JSON.parse(localStorage.getItem('eg_pushed_to_board')||'{}'))[orderNum+'|'+(sku||'')] || null; } catch(e) {}
@@ -4627,6 +4633,7 @@ function whZoomThumb(src, orderNum, sku, name) {
     + whPushHtml
     + '</div>'
     + threadBlock
+    + whCustFileLink
     + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
     + '</div>';
   document.body.appendChild(overlay);
@@ -6149,6 +6156,7 @@ function whRenderOrders() {
               ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
             </div>`;
           }).join('')}
+          ${window.EGDesignTools ? EGDesignTools.addItemButton(o) : ''}
         </div>
       </td>
     </tr>` : '';

@@ -2800,6 +2800,16 @@
           } else {
             if (self.cacheRawDesign) self.cacheRawDesign(opts.orderNum, opts.sku, dataUrl);
             if (self.cacheImage)     self.cacheImage(opts.orderNum, opts.sku, dataUrl);
+            // Embroidery item → auto-match thread colours on the uploaded artwork
+            // so the board's THREADS chips populate. The data URL is local, so the
+            // colour-analysis canvas isn't tainted. Only writes when matches found.
+            if (/EMB/i.test(String(opts.tech || '')) && self.matchThreadColors && self.setItemThreadColors) {
+              self.matchThreadColors(dataUrl, function (threads) {
+                if (!threads || !threads.length) return;
+                self.setItemThreadColors(opts.orderNum, opts.sku, threads);
+                try { localStorage.setItem('eg_design_ping', String(Date.now())); window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch (e) {}
+              });
+            }
           }
           var card = self.getDesignCard ? self.getDesignCard(opts.orderNum, opts.sku) : null;
           if (!card && self.pushToDesignBoard) {
