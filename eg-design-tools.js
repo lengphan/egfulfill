@@ -309,7 +309,7 @@
     } catch (e) {}
   }
 
-  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); syncItemToProduct(orderNum, sku); refreshBoard(); }
+  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); syncItemToProduct(orderNum, sku); refreshBoard(); document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } })); }
   function onSetPrint(orderNum, sku, val) {
     setItemSetupField(orderNum, sku, 'printType', val);
     try {
@@ -328,6 +328,7 @@
         }
       }
     } catch (e) {}
+    document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
   }
 
   // ── Customer-uploaded file (marketplace) → adopt as the item's design, or
@@ -398,6 +399,7 @@
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
     } catch (e) {}
     refreshBoard();
+    document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
   }
   // Remove a line item (New orders only) — keeps at least one, confirms first.
   function removeItem(orderNum, sku) {
