@@ -522,7 +522,7 @@
   function pushButtonInline(o) {
     if (!isNewOrder(o)) return '';
     var num = (o && (o.num || o.id)) || '';
-    return '<button title="Push to production" onclick="event.stopPropagation();EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')" '
+    return '<button id="egdt-push-' + jsAttr(num) + '" title="Push to production" onclick="event.stopPropagation();EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')" '
       + 'style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;flex-shrink:0;font-family:inherit;font-size:12.5px;font-weight:600;transition:background .15s" '
       + 'onmouseover="this.style.background=\'#000\'" onmouseout="this.style.background=\'#191918\'">Push</button>';
   }
@@ -556,7 +556,15 @@
         var r = itemSetupComplete(orderNum, o, it);
         if (!r.ok) problems.push('• ' + (it.name || it.sku || 'Item') + ' — needs ' + r.miss.join(' + '));
       });
-      if (problems.length) { alert('Can’t push to production yet — finish setting up these items first:\n\n' + problems.join('\n')); refreshBoard(); return; }
+      // Not ready → no popup. Pulse the Push button (and the incomplete items'
+      // Upload buttons already pulse) so it's clear what's missing, and silently
+      // refuse the submission.
+      if (problems.length) {
+        _ensurePulseCss();
+        var btn = document.getElementById('egdt-push-' + orderNum);
+        if (btn) { btn.classList.remove('egdt-pulse'); void btn.offsetWidth; btn.classList.add('egdt-pulse'); setTimeout(function () { if (btn) btn.classList.remove('egdt-pulse'); }, 2600); }
+        return;
+      }
     }
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
   }

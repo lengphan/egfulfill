@@ -3823,6 +3823,11 @@ function renderOpOrders() {
     // open order + its detail panel feel like one cohesive block (action buttons are
     // transparent so they inherit this too). Active/selected tints take precedence.
     const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : isExp ? '#fafaf9' : '';
+    // Parent-row product preview: the first item's listing image + title (what the
+    // customer ordered). The listing image lives here; item rows start blank.
+    const _fIt = (o.itemList && o.itemList[0]) || {};
+    const _pTitle = (_fIt.listing || _fIt.name || '').replace(/"/g,'&quot;');
+    const _pImg = (_fIt.img && /^(https?:|data:)/.test(String(_fIt.img))) ? _fIt.img : (_fIt.sellerImg && /^(https?:|data:)/.test(String(_fIt.sellerImg)) ? _fIt.sellerImg : '');
     const mainRow = `<tr data-num="${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select'))opToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s${rowBg?`;background:${rowBg}`:''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="toggleOrderSelect('${o.num}',this.checked)"/></td>
       <td data-col="order">
@@ -3833,10 +3838,15 @@ function renderOpOrders() {
         ${srcBadge}
       </td>
       <td data-col="items">
-        <div style="display:flex;align-items:center;gap:5px">
-          <span style="font-size:13.5px;font-weight:600;color:#374151">${o.itemCount}</span>
-          <span style="font-size:12.5px;color:#9ca3af">${o.itemCount===1?'item':'items'}</span>
-          <span id="op-chevron-${o.num}" style="font-size:12px;color:#9ca3af;line-height:1;transition:transform .2s;display:inline-block;margin-left:2px;transform:${isExp?'rotate(180deg)':''}"">▾</span>
+        <div style="display:flex;align-items:center;gap:9px">
+          ${_pImg ? `<img src="${_pImg}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0;background:#f6f5f4" onerror="this.style.visibility='hidden'">` : `<div style="width:34px;height:34px;border-radius:7px;background:#f0ede9;flex-shrink:0"></div>`}
+          <div style="min-width:0">
+            ${_pTitle ? `<div title="${_pTitle}" style="font-size:13px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">${_pTitle}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:5px">
+              <span style="font-size:12.5px;color:#9ca3af">${o.itemCount} ${o.itemCount===1?'item':'items'}</span>
+              <span id="op-chevron-${o.num}" style="font-size:12px;color:#9ca3af;line-height:1;transition:transform .2s;display:inline-block;transform:${isExp?'rotate(180deg)':''}">▾</span>
+            </div>
+          </div>
         </div>
       </td>
       <td data-col="status">${badge}</td>
@@ -3874,8 +3884,15 @@ function renderOpOrders() {
           // Listing image first; once a base product is picked for this "new" item
           // the chosen blank takes over (design composite then overlays on top).
           const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
-          const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null) || (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
-          const thumb = opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 40);
+          const _isNewSetup = !!(window.EGDesignTools && EGDesignTools.isNewOrder(o));
+          const _pickedBlank = (window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup(o.num, it.sku).product || '') : '';
+          // Item thumbnail stays BLANK until a base blank is chosen (the listing image
+          // now lives on the parent row). Once picked → blank + design composite.
+          const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
+            || (_isNewSetup ? '' : ((it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
+          const thumb = (_isNewSetup && !_pickedProdImg)
+            ? '<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d4c9a8;margin-right:10px;background:#fbf8ef"></div>'
+            : opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 40);
           // Pushed-to-board state (greyed out when already sent)
           // Push action lives inside the product zoom modal now; the row only
           // shows the pushed-status pill so operators can still tell at a glance.
@@ -4019,7 +4036,7 @@ function renderOpOrders() {
             <input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">
             ${thumb}
             <div style="flex:1;min-width:0;margin-right:12px">
-              <div onclick="event.stopPropagation();this.style.whiteSpace=(this.style.whiteSpace==='normal'?'nowrap':'normal')" title="Click to expand full title" style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer">${it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
+              <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_isNewSetup ? (_pickedBlank ? _pickedBlank : '<span style="color:#d4a017;font-style:italic">Pick a blank</span>') : it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
               <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                 ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
               </div>
