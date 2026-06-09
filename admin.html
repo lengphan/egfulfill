@@ -5580,8 +5580,8 @@ function whApproveOrder() {
 }
 
 function downloadWHOrderTemplate() {
-  const header = ['Order_Number','Store_Name','Customer_Name','Customer_Email','Ship_Address','Ship_City','Ship_State','Ship_Zip','Ship_Country','Carrier','Item_Name','Item_SKU','Item_Qty','Print_Type','Design_File','Order_Notes'];
-  const example = ['FF-9001','My Store','Jane Doe','jane@email.com','123 Main St','Los Angeles','CA','90001','US','USPS Priority','Gildan Hoodie Black/S','BLK-GLD-SM','1','DTG','front-design.png','Rush order'];
+  const header = ['Order_Number','Store_Name','Customer_Name','Customer_Email','Ship_Address','Ship_City','Ship_State','Ship_Zip','Ship_Country','Carrier','Product_Title','Item_Name','Item_SKU','Item_Qty','Print_Type','Design_File','Order_Notes'];
+  const example = ['FF-9001','My Store','Jane Doe','jane@email.com','123 Main St','Los Angeles','CA','90001','US','USPS Priority','Custom Embroidered Hoodie with Name','Gildan Hoodie Black/S','BLK-GLD-SM','1','DTG','front-design.png','Rush order'];
   const content = [header.join(','), example.map(v => '"'+v+'"').join(',')].join('\n');
   downloadCSV('wh_order_import_template.csv', content);
 }
