@@ -4624,6 +4624,7 @@ function whZoomThumb(src, orderNum, sku, name) {
     + '<div style="position:relative;width:100%;aspect-ratio:1;border-radius:9px;border:1px solid #e5e4e0;background:#fff;overflow:hidden">'
       + '<img src="' + _mockupSrc + '" style="width:100%;height:100%;object-fit:contain;display:block"/>'
       + _designOverlay
+      + ((_zit && _zit.img && /^(https?:|data:)/.test(String(_zit.img))) ? '<a href="' + _zit.img + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open the marketplace listing image in a new tab" style="position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.08)">Listing ↗</a>' : '')
     + '</div>'
     + '<div style="margin-top:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">'
     + '<div style="flex:1;min-width:0">'
@@ -6151,7 +6152,7 @@ function whRenderOrders() {
               <div style="flex:1;min-width:0;margin-right:12px">
                 <div onclick="event.stopPropagation();this.style.whiteSpace=(this.style.whiteSpace==='normal'?'nowrap':'normal')" title="Click to expand full title" style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer">${it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
                 <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
-                  ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}${(it.img && /^(https?:|data:)/.test(it.img)) ? ('<a href="' + it.img + '" target="_blank" onclick="event.stopPropagation()" title="View Etsy listing image" style="font-size:11px;color:#9ca3af;text-decoration:underline;white-space:nowrap;flex-shrink:0">Listing ↗</a>') : ''}
+                  ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
                 </div>
               </div>
               <div class="eg-item-fs-slot" style="position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center">${_fsEl}</div>

@@ -411,6 +411,12 @@
     refreshBoard();
   }
 
+  function _ensurePulseCss() {
+    if (document.getElementById('egdt-pulse-css')) return;
+    var st = document.createElement('style'); st.id = 'egdt-pulse-css';
+    st.textContent = '@keyframes egdtPulse{0%{box-shadow:0 0 0 0 rgba(212,160,23,.5)}70%{box-shadow:0 0 0 6px rgba(212,160,23,0)}100%{box-shadow:0 0 0 0 rgba(212,160,23,0)}}.egdt-pulse{animation:egdtPulse 1.6s ease-out infinite;border-color:#d4a017!important;color:#9a7410!important}';
+    document.head.appendChild(st);
+  }
   function actBtn(label, onclick) {
     return '<button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="' + onclick + '">' + label + '</button>';
   }
@@ -430,11 +436,15 @@
     // active-state design button. Clicking still re-opens upload to replace it.
     var _hasDesign = false;
     try { _hasDesign = !!(window.EGStore && EGStore.getRawDesign && EGStore.getRawDesign(num, sku)); } catch (e) {}
-    if (!_hasDesign && (it.file || it.designUrl || it.thumb)) _hasDesign = true;
+    if (!_hasDesign && (it.file || it.designUrl || it.thumb || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))))) _hasDesign = true;
     var _upOnclick = "EGDesignTools.uploadPanel('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')";
+    // Pulse the Upload button while a NEW order's item still has no design — a
+    // gold "needs upload" cue, like the seller side. Injected once.
+    _ensurePulseCss();
+    var _pulse = (isNewOrder(o) && !_hasDesign) ? ' egdt-pulse' : '';
     var uploadBtn = _hasDesign
       ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">Uploaded</button>'
-      : actBtn('↑ Upload', _upOnclick);
+      : '<button class="btn btn-out' + _pulse + '" style="font-size:11px;padding:3px 9px;white-space:nowrap" title="Upload a design" onclick="' + _upOnclick + '">↑ Upload</button>';
     var btns = uploadBtn
       + actBtn('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
       + actBtn('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')")
@@ -517,15 +527,36 @@
       + 'onmouseover="this.style.background=\'#000\'" onmouseout="this.style.background=\'#191918\'">Push</button>';
   }
 
+  // True once an item has everything needed to enter production: a base product
+  // (picked, or its sku already maps to a catalog product), a print method, and a
+  // design (uploaded / adopted / template / customer file).
+  function itemSetupComplete(orderNum, o, it) {
+    var s = getItemSetup((o && o.num) || orderNum, it.sku) || {};
+    var hasProduct = !!s.product;
+    if (!hasProduct) { try { hasProduct = !!chosenProduct(orderNum, it.sku); } catch (e) {} }
+    if (!hasProduct) { try { var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : []; var base = String(it.sku || '').split('-')[0]; hasProduct = prods.some(function (p) { return (Array.isArray(p.variantSkus) && p.variantSkus.some(function (v) { return v && v.sku === it.sku; })) || (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()); }); } catch (e) {} }
+    var hasMethod = !!(s.printType || it.printType || it.tech);
+    var hasDesign = false;
+    try { hasDesign = !!(window.EGStore && EGStore.getRawDesign && o && EGStore.getRawDesign(o.id, it.sku)); } catch (e) {}
+    if (!hasDesign && (it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))))) hasDesign = true;
+    var miss = [];
+    if (!hasProduct) miss.push('product');
+    if (!hasMethod) miss.push('method');
+    if (!hasDesign) miss.push('design');
+    return { ok: !miss.length, miss: miss };
+  }
+  function itemNeedsDesign(orderNum, o, it) { return !itemSetupComplete(orderNum, o, it).ok; }
+
   function pushToProduction(orderNum) {
     var o = findOrder(orderNum);
     var id = o ? o.id : orderNum;
     if (o && Array.isArray(o.items) && o.items.length) {
-      var miss = o.items.filter(function (it) {
-        var s = getItemSetup(o.num || orderNum, it.sku) || {};
-        return !(s.printType || it.printType || it.tech);
+      var problems = [];
+      o.items.forEach(function (it) {
+        var r = itemSetupComplete(orderNum, o, it);
+        if (!r.ok) problems.push('• ' + (it.name || it.sku || 'Item') + ' — needs ' + r.miss.join(' + '));
       });
-      if (miss.length && !window.confirm(miss.length + ' item(s) have no print method selected yet. Push to production anyway?')) return;
+      if (problems.length) { alert('Can’t push to production yet — finish setting up these items first:\n\n' + problems.join('\n')); refreshBoard(); return; }
     }
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
   }
