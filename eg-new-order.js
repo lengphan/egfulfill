@@ -199,6 +199,8 @@
     var pid = 'noi-' + Date.now();
     var popts = BLANK_CATALOG.map(function (p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
     var html = '<div class="no-item-row" id="' + pid + '" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">' +
+      '<div style="margin-bottom:7px"><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>' +
+        '<input class="no-title" type="text" placeholder="e.g. Custom Embroidered Apron with Name, Personalized Kitchen Apron" style="' + NO_IN + '"/></div>' +
       '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 56px;gap:7px;margin-bottom:7px">' +
         '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Base Product</label>' +
         '<select onchange="noSyncProduct(this)" style="' + NO_SL + '"><option value="">Select product…</option>' + popts + '</select></div>' +
@@ -270,10 +272,17 @@
       var sku   = (skuEl ? skuEl.textContent : '').trim();
       if (!productId || !sku || sku === '—') return;
       var product = BLANK_CATALOG.find(function (p) { return String(p.id) === String(productId); });
+      var titleEl = row.querySelector('.no-title');
+      var title = titleEl ? titleEl.value.trim() : '';
+      var autoTitle = ((product && product.name) || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : '');
       items.push({
         img: 'https://placehold.co/80x80/f0ede9/9ca3af?text=' + encodeURIComponent(((product && product.skuBase) || '?').substring(0, 3)),
-        listing: ((product && product.name) || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : ''),
-        name: (product && product.name) || 'Manual Item',
+        // Product/listing TITLE (what the customer ordered) — kept distinct from the
+        // base blank we fulfil with (`product`). Falls back to an auto title.
+        listing: title || autoTitle,
+        name: title || autoTitle,
+        product: (product && product.name) || '',
+        color: color, size: size,
         sku: sku, tech: tech, qty: qty
       });
     });
@@ -318,7 +327,7 @@
         EGStore.submitOrder({
           id: ord.id, seller: store, factoryStatus: 'draft',
           customer: { name: customer, email: '', shipTo: shipTo },
-          items: items.map(function (i) { return { sku: i.sku, name: i.name, qty: i.qty, tech: i.tech, img: i.img, listing: i.listing }; })
+          items: items.map(function (i) { return { sku: i.sku, name: i.name, qty: i.qty, tech: i.tech, img: i.img, listing: i.listing, product: i.product, color: i.color, size: i.size }; })
         });
       } catch (e) {}
     }

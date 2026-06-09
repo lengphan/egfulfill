@@ -5630,6 +5630,10 @@ function coRenderItems() {
     }
     // Rich catalog picker — same shape as the seller's noAddItem row.
     return `<div class="co-item-row" data-i="${i}" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">
+      <div style="margin-bottom:7px">
+        <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>
+        <input class="co-title" type="text" value="${(it.title||'').replace(/"/g,'&quot;')}" oninput="_coItems[${i}].title=this.value" placeholder="e.g. Custom Embroidered Apron with Name, Personalized Kitchen Apron" style="${NO_IN}"/>
+      </div>
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 56px;gap:7px;margin-bottom:7px">
         <div>
           <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Base Product</label>
@@ -5725,6 +5729,7 @@ function coUpdateSku(row, idx) {
   el.textContent = sku; el.style.color='#374151'; el.style.background='#f0fdf4'; el.style.borderColor='#bbf7d0';
   _coItems[idx] = Object.assign(_coItems[idx]||{}, {
     sku: sku, color: sels[1].value, size: sels[2].value, printType: tech.toLowerCase(),
+    product: p.name,   // base blank (distinct from the customer-facing Product Title)
     listing: p.name + ' — ' + [sels[1].value, sels[2].value].filter(Boolean).join(' / ')
   });
 }
@@ -5768,14 +5773,15 @@ function egWriteOrderToStore(num, store, customer, addr, items) {
   if (!window.EGStore) return;
   const PP = { dtg:24, emb:32, dtf:24, apl:28, sub:22, scr:20, lsr:26 };
   const egItems = (items||[]).map((it,i)=>({
-    name: it.name || ('Item '+(i+1)),
+    name: (it.title && it.title.trim()) || it.listing || it.name || ('Item '+(i+1)),
     sku: it.sku || '—',
     printType: (it.printType||'dtg').toLowerCase(),
     qty: parseInt(it.qty,10) || 1,
     price: PP[(it.printType||'dtg').toLowerCase()] || 24,
     color: it.color || null,
     size: it.size || null,
-    listing: it.listing || null,
+    listing: (it.title && it.title.trim()) || it.listing || null,
+    product: it.product || null,
     file: it.designFile || null
   }));
   const total = egItems.reduce((s,it)=>s+it.price*it.qty, 0);
@@ -5803,14 +5809,15 @@ function submitManualOrder() {
   const itemsStr = _coItems.map(it => (it.listing||it.name||'Item') + (it.qty > 1 ? ' ×' + it.qty : '')).join(', ');
   const newOrder = { num, customer, store, addr, items: itemsStr,
     itemList: _coItems.map((it, i) => ({
-      name: it.name || ('Item ' + (i+1)),
+      name: (it.title && it.title.trim()) || it.listing || it.name || ('Item ' + (i+1)),
       sku: it.sku || '—',
       status:'new',
       printType: (it.printType||'dtg').toLowerCase(),
       qty: it.qty || 1,
       color: it.color || null,
       size: it.size || null,
-      listing: it.listing || null,
+      listing: (it.title && it.title.trim()) || it.listing || null,
+      product: it.product || null,
       file: it.designDataUrl || null
     })),
     status:'new', carrier, total:'—', source:'manual', _ts: Date.now(), placed:'Just now', time:'Just now', note:null };
