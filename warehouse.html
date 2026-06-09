@@ -9,6 +9,7 @@
 <script src="eg-etsy.js"></script>
 <script src="eg-usps.js"></script>
 <script src="eg-design-tools.js"></script>
+<script src="eg-role-switcher.js" defer></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -4604,7 +4605,7 @@ function whZoomThumb(src, orderNum, sku, name) {
   if (_zit) {
     const _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, _zit.sku) : '';
     if (_picked && /^(https?:|data:)/.test(_picked)) _mockupSrc = _picked;
-    const _designSrc = _zit.designUrl || ((_zit.file && String(_zit.file).startsWith('data:')) ? _zit.file : '');
+    const _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(orderNum, _zit) : (_zit.designUrl || ((_zit.file && String(_zit.file).startsWith('data:')) ? _zit.file : ''));
     const _pos = _zit.designPos || { x:25, y:25, w:50, h:50 };
     if (_designSrc) {
       _designOverlay = '<img src="' + _designSrc + '" style="position:absolute;left:' + _pos.x + '%;top:' + _pos.y + '%;width:' + _pos.w + '%;height:' + _pos.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>';
@@ -4635,8 +4636,7 @@ function whZoomThumb(src, orderNum, sku, name) {
     + '</div>'
     + threadBlock
     + whCustFileLink
-    + ((orderNum && sku) ? '<button onclick="event.stopPropagation();document.body.removeChild(this.closest(\'[style*=fixed]\'));window.EGDesignTools&&EGDesignTools.placeDesign(\'' + orderNum + '\',\'' + String(sku).replace(/\'/g,"\\\'") + '\')" style="margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1.5px solid #191918;background:#fff;font-size:13.5px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 9.5V12h2.5L11 5.5 8.5 3 2 9.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Resize · Remove BG</button>' : '')
-    + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:8px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
+    + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
     + '</div>';
   document.body.appendChild(overlay);
 }
@@ -5847,7 +5847,8 @@ function rzMove(e) {
   if (!rzState) return;
   rzMoved = true;
   const delta = e.clientX - rzState.x;
-  rzState.th.style.width = Math.max(40, rzState.w + delta) + 'px';
+  const newW = Math.max(40, rzState.w + delta);
+  rzState.th.style.width = newW + 'px';
   rzState.table.style.width = (rzState.tableW + (newW - rzState.w)) + 'px';
 }
 function rzEnd() {
@@ -6057,9 +6058,12 @@ function whRenderOrders() {
             const _pickedBlank = (window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup(o.num, it.sku).product || '') : '';
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
               || (_isNewSetup ? '' : ((it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
-            let _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
-            if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
-            if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
+            let _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(o.id, it) : '';
+            if (!_designSrc) {
+              _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
+              if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
+              if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
+            }
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
             const _overlay = _designSrc
               ? `<img src="${_designSrc}" style="position:absolute;left:${_pos.x}%;top:${_pos.y}%;width:${_pos.w}%;height:${_pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
@@ -10856,11 +10860,12 @@ function whPrintLabel(num) {
               const mp = parseFloat(product.methodPrices[_k] != null ? product.methodPrices[_k] : product.methodPrices[it.tech]);
               if (!isNaN(mp) && mp > 0) _add = mp;
             }
-            return _base + _add;
+            const _resolved = _base + _add;
+            if (_resolved > 0) return _resolved;
           }
         }
       } catch(e){}
-      return parseFloat(it.price) || 0;
+      return parseFloat(it.price != null ? it.price : (it.unitPrice != null ? it.unitPrice : it.unit_price)) || 0;
     }
     if (items.length) {
       itemsEl.innerHTML = items.map(it => {
@@ -10889,8 +10894,9 @@ function whPrintLabel(num) {
       itemsEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No items in this order</div>';
     }
     const computedTotal = items.reduce((s, it) => s + _xfomUnitPrice(it) * (it.qty || it.quantity || 1), 0);
-    const total = (typeof o?.total === 'number') ? o.total : (computedTotal || o?.total || 0);
-    document.getElementById('xfom-total').textContent = '$' + (typeof total === 'number' ? total.toFixed(2) : total);
+    const _ot = (typeof o?.total === 'number' && o.total > 0) ? o.total : (parseFloat(o?.total) > 0 ? parseFloat(o.total) : 0);
+    const total = _ot || computedTotal || 0;
+    document.getElementById('xfom-total').textContent = '$' + total.toFixed(2);
     try {
       const cnEl = document.getElementById('xfom-customer-note');
       if (cnEl) {

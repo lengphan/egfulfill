@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
+<script src="eg-role-switcher.js" defer></script>
 <script defer src="eg-seller-plan.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="egfulfill-tracking.js"></script>
@@ -4879,6 +4880,9 @@ function pickThreadFromImage(ordNo, sku, ev) {
   try {
     const _safe = `${ordNo}_${String(sku).replace(/[^a-z0-9]/gi,'_')}`;
     if (typeof tpLensHide === 'function') tpLensHide(_safe);
+    // Belt-and-suspenders: kill ANY lingering lens/crosshair (the residue bug) —
+    // hide every lens + crosshair element, not just this item's, regardless of id.
+    document.querySelectorAll('[id^="tplens-"]:not([id^="tplens-wrap-"]):not([id^="tplens-img-"])').forEach(function (el) { el.style.display = 'none'; });
   } catch(e){}
   const img = ev.currentTarget;
   const rect = img.getBoundingClientRect();

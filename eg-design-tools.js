@@ -213,6 +213,20 @@
     return '';
   }
 
+  // Best design-artwork URL to overlay on the blank for the live composite,
+  // tried in priority order so the item image hydrates the moment ANY design
+  // source exists — uploaded file, cached raw design, or the buyer's
+  // marketplace upload. Returns '' when there's genuinely nothing to show.
+  function designOverlaySrc(orderNum, it) {
+    if (!it) return '';
+    if (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) return it.designUrl;
+    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(orderNum, it.sku); if (r && /^(https?:|data:)/.test(String(r))) return r; } } catch (e) {}
+    if (it.file && String(it.file).indexOf('data:') === 0) return it.file;
+    if (it.customerFile && /^(https?:|data:)/.test(String(it.customerFile))) return it.customerFile;
+    if (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) return it.designSrc;
+    return '';
+  }
+
   // Re-render the current board's order table (whichever global render fn it
   // exposes) so a setup change is reflected immediately — e.g. the thumbnail
   // swapping off the listing image onto the chosen product blank. Boards track
@@ -449,17 +463,19 @@
     var uploadBtn = _hasDesign
       ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">Uploaded</button>'
       : '<button class="btn btn-out' + _pulse + '" style="font-size:11px;padding:3px 9px;white-space:nowrap" title="Upload a design" onclick="' + _upOnclick + '">↑ Upload</button>';
-    var btns = uploadBtn
-      + actBtn('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
-      + actBtn('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')")
-      // Place = quick move/resize/remove-bg on the attached design (only once there is one).
-      + (_hasDesign ? actBtn('Place', "EGDesignTools.placeDesign('" + jsAttr(num) + "','" + jsAttr(sku) + "')") : '');
+    // Labeled meta-row layout — the editable selectors mirror the read-only
+    // METHOD · DESIGN · STOCK · THREADS row (same grey uppercase labels), so a
+    // "new" selling-mode order reads identically to an in-review one; the values
+    // just happen to be live controls. Replaces the old cluttered pill cluster.
+    var _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
+    var selSm = 'border:1px solid #e5e4e0;border-radius:6px;background:#fff;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 7px;text-overflow:ellipsis';
+    function _field(label, ctrl) { return '<div style="display:inline-flex;align-items:center;gap:7px;white-space:nowrap">' + '<span style="' + _lbl + '">' + label + '</span>' + ctrl + '</div>'; }
     var pickers = '';
     if (isNewOrder(o)) {
       var setup = getItemSetup(num, sku);
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
       var curProd = setup.product || '', matched = false;
-      var prodOpts = '<option value="">Product…</option>';
+      var prodOpts = '<option value="">Pick a blank…</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
         var s = curProd && String(curProd) === String(v); if (s) matched = true;
@@ -469,28 +485,39 @@
       var curPt = (setup.printType || tech || '').toString().toUpperCase();
       var ptOpts = '<option value="">Method…</option>';
       PRINT_METHODS.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
-      // Seller-style layout: Product · Color · Size grouped in ONE rounded pill
-      // (borderless selects + dot separators), then Method as a separate pill —
-      // far less cluttered than four standalone dropdowns.
       var vo = variantOptions(num, sku, it);
       var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
       var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
-      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 1px;text-overflow:ellipsis';
-      var grp = 'display:inline-flex;align-items:center;border:1px solid #e5e4e0;border-radius:999px;background:#fff;padding:2px 9px;gap:2px;max-width:300px';
-      var dot = '<span style="color:#d1ceca;font-weight:700;flex-shrink:0">·</span>';
-      var methodPill = 'border:1px solid #e5e4e0;border-radius:999px;background:#fff;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 12px';
-      pickers = '<div style="' + grp + '" title="Base product · Color · Size">'
-        + '<select style="' + selIn + ';max-width:140px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>'
-        + dot + '<select style="' + selIn + ';max-width:80px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>'
-        + dot + '<select style="' + selIn + ';max-width:62px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>'
-        + '</div>'
-        + '<select title="Print method" style="' + methodPill + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>';
+      pickers = _field('Product', '<select title="Base product" style="' + selSm + ';max-width:150px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>')
+        + _field('Color', '<select title="Colour" style="' + selSm + ';max-width:92px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>')
+        + _field('Size', '<select title="Size" style="' + selSm + ';max-width:72px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>')
+        + _field('Method', '<select title="Print method" style="' + selSm + ';max-width:92px" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>');
     }
+    // DESIGN field carries the Upload control; Templates + Design Maker fold into
+    // a compact ⋯ overflow menu so the row stays uncluttered.
+    var designField = _field('Design', uploadBtn);
+    var moreBtn = '<button title="More — Templates · Design Maker" onclick="EGDesignTools._moreMenu(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'' + jsAttr(name) + '\',this,event)" style="background:#fff;border:1px solid #e5e4e0;border-radius:6px;cursor:pointer;color:#6b7280;padding:2px 8px 4px;font-size:14px;line-height:1;font-family:inherit;flex-shrink:0" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#6b7280\'">⋯</button>';
     // Delete (trash) — only while New, keeps ≥1 item.
     var delBtn = isNewOrder(o)
       ? '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
       : '';
-    return '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end" onclick="event.stopPropagation()">' + pickers + btns + delBtn + '</div>';
+    return '<div style="display:flex;gap:16px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + moreBtn + delBtn + '</div>';
+  }
+
+  // Compact ⋯ overflow menu for an item's secondary actions (Templates, Design
+  // Maker) — keeps the labeled meta-row from getting busy. Closes on outside click.
+  function _moreMenu(num, sku, name, btn, ev) {
+    if (ev) ev.stopPropagation();
+    var old = document.getElementById('egdt-more-menu'); if (old) { old.remove(); return; }
+    var r = btn.getBoundingClientRect();
+    var m = document.createElement('div'); m.id = 'egdt-more-menu';
+    m.style.cssText = 'position:fixed;z-index:10140;background:#fff;border:1px solid #e5e4e0;border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:5px;min-width:152px;font-family:Inter,system-ui,sans-serif';
+    m.style.top = (r.bottom + 5) + 'px'; m.style.left = Math.max(8, r.right - 152) + 'px';
+    var item = function (label, onclick) { return '<button onclick="' + onclick + ';var _mm=document.getElementById(\'egdt-more-menu\');if(_mm)_mm.remove()" style="display:block;width:100%;text-align:left;background:none;border:none;cursor:pointer;font-size:13px;color:#374151;padding:7px 10px;border-radius:6px;font-family:inherit" onmouseover="this.style.background=\'#f6f5f4\'" onmouseout="this.style.background=\'none\'">' + label + '</button>'; };
+    m.innerHTML = item('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
+      + item('Design Maker', "EGDesignTools.designMaker('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "')");
+    document.body.appendChild(m);
+    setTimeout(function () { document.addEventListener('click', function _c() { var _mm = document.getElementById('egdt-more-menu'); if (_mm) _mm.remove(); document.removeEventListener('click', _c); }); }, 0);
   }
 
   // ── Inline "+ Add item" (factory boards) — mirrors the seller's add-item on the
@@ -674,108 +701,6 @@
     document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: ctx.orderNum, sku: ctx.sku } }));
   }
 
-  // ── Quick-place design modal (move / resize / remove background) — ported from
-  //    the seller's qp modal, made self-contained for the factory boards. Reads
-  //    the item from EGStore, persists designPos + bg-removed artwork, refreshes
-  //    every board surface. Trigger: the "Place" item action (shown once a design
-  //    is attached). ─────────────────────────────────────────────────────────
-  var _qpCur = null;
-  function _qpDesignUrl(o, it) {
-    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(o.id, it.sku); if (r) return r; } } catch (e) {}
-    return it.designUrl || (it.file && String(it.file).indexOf('data:') === 0 ? it.file : '') || '';
-  }
-  function _qpMockupUrl(o, it) {
-    var picked = setupProductImage(o.num || o.id, it.sku); if (picked) return picked;
-    if (it.img && /^(https?:|data:)/.test(String(it.img))) return it.img;
-    try { if (window.EGStore && EGStore.imageForSku) { var m = EGStore.imageForSku(it.sku, it.name); if (m) return m; } } catch (e) {}
-    return it.sellerImg || it.thumb || '';
-  }
-  function placeDesign(orderNum, sku) {
-    var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
-    var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (!it) return;
-    // Open even with no design yet — the stage shows the blank so the composite is
-    // visible; resize/move/remove-bg act on the design once one is attached.
-    var design = _qpDesignUrl(o, it) || '';
-    if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
-    _qpCur = { orderNum: orderNum, sku: sku };
-    _qpEnsureModal();
-    document.getElementById('egqp-title').textContent = '#' + (o.num || o.id) + ' — ' + (it.name || it.sku || 'Design');
-    document.getElementById('egqp-stage').style.backgroundImage = (function () { var mk = _qpMockupUrl(o, it); return mk ? 'url("' + mk + '")' : 'none'; })();
-    var wrap = document.getElementById('egqp-wrap');
-    document.getElementById('egqp-design').src = design;
-    wrap.style.left = (it.designPos.x || 25) + '%'; wrap.style.top = (it.designPos.y || 25) + '%';
-    wrap.style.width = (it.designPos.w || 50) + '%'; wrap.style.height = (it.designPos.h || 50) + '%';
-    document.getElementById('egqp-modal').style.display = 'flex';
-  }
-  function _qpEnsureModal() {
-    var m = document.getElementById('egqp-modal'); if (m) return m;
-    m = document.createElement('div'); m.id = 'egqp-modal';
-    m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10120;display:none;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
-    m.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:480px;overflow:hidden">'
-      + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egqp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools._qpClose()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;font-size:16px;line-height:1">&times;</button></div>'
-      + '<div style="padding:18px;display:flex;justify-content:center"><div id="egqp-stage" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
-      + '<button id="egqp-rmbg" onclick="event.stopPropagation();EGDesignTools._qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-      + '<div id="egqp-wrap" style="position:absolute;cursor:grab"><img id="egqp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egqp-handle" style="position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
-      + '</div></div>'
-      + '<div style="padding:0 18px 16px;display:flex;align-items:center;gap:8px"><div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools._qpClose()" class="btn btn-out" style="font-size:13px">Cancel</button><button onclick="EGDesignTools._qpSave()" class="btn btn-dk" style="font-size:13px">Save</button></div></div>'
-      + '</div>';
-    m.addEventListener('click', function (e) { if (e.target === m) qpClose(); });
-    document.body.appendChild(m);
-    _qpAttach();
-    return m;
-  }
-  function qpClose() { var m = document.getElementById('egqp-modal'); if (m) m.style.display = 'none'; _qpCur = null; }
-  function qpSave() {
-    if (!_qpCur) { qpClose(); return; }
-    try {
-      var o = findOrder(_qpCur.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(_qpCur.sku); });
-      var wrap = document.getElementById('egqp-wrap');
-      if (it && wrap) { it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 }; if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); }
-    } catch (e) {}
-    qpClose(); refreshBoard();
-  }
-  function qpRemoveBg() {
-    if (!_qpCur) return;
-    var o = findOrder(_qpCur.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(_qpCur.sku); });
-    var dEl = document.getElementById('egqp-design'); if (!o || !it || !dEl || !dEl.src) return;
-    var btn = document.getElementById('egqp-rmbg'); if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
-    var img = new Image(); img.crossOrigin = 'anonymous';
-    img.onload = function () {
-      try {
-        var w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return;
-        var c = document.createElement('canvas'); c.width = w; c.height = h; var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
-        var data; try { data = ctx.getImageData(0, 0, w, h); } catch (e) { alert('This image can’t be processed in-browser (cross-origin). Upload it through Upload first.'); return; }
-        var d = data.data; var px = function (x, y) { var i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-        var cs = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)]; var bg = [0, 0, 0]; cs.forEach(function (p) { bg[0] += p[0]; bg[1] += p[1]; bg[2] += p[2]; }); bg = bg.map(function (v) { return v / 4; });
-        var tol = 46, removed = 0;
-        for (var i = 0; i < d.length; i += 4) { var dr = d[i] - bg[0], dg = d[i + 1] - bg[1], db = d[i + 2] - bg[2]; if (Math.sqrt(dr * dr + dg * dg + db * db) < tol) { d[i + 3] = 0; removed++; } }
-        if (!removed) { alert('No uniform background detected.'); return; }
-        ctx.putImageData(data, 0, 0); var out = c.toDataURL('image/png');
-        dEl.src = out; it.designUrl = out;
-        try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, it.sku, out); } catch (e) {}
-        refreshBoard();
-      } finally { if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
-    };
-    img.onerror = function () { if (btn) { btn.disabled = false; btn.style.opacity = ''; } };
-    img.src = dEl.src;
-  }
-  function _qpAttach() {
-    var stage = document.getElementById('egqp-stage'); var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
-    function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
-    function down(e) {
-      var wrap = document.getElementById('egqp-wrap'); var handle = document.getElementById('egqp-handle');
-      if (e.target === handle) mode = 'resize'; else if (e.target === wrap || wrap.contains(e.target)) { mode = 'drag'; wrap.style.cursor = 'grabbing'; } else return;
-      sx = e.clientX; sy = e.clientY; startX = parseFloat(wrap.style.left) || 0; startY = parseFloat(wrap.style.top) || 0; startW = parseFloat(wrap.style.width) || 50; startH = parseFloat(wrap.style.height) || 50; e.preventDefault();
-    }
-    function mv(e) {
-      if (!mode) return; var wrap = document.getElementById('egqp-wrap'); var dd = pct(e.clientX - sx, e.clientY - sy);
-      if (mode === 'drag') { wrap.style.left = Math.max(0, Math.min(100 - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(0, Math.min(100 - startH, startY + dd.y)) + '%'; }
-      else { wrap.style.width = Math.max(8, Math.min(100 - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(100 - startY, startH + dd.y)) + '%'; }
-    }
-    function up() { if (mode === 'drag') { var wrap = document.getElementById('egqp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; }
-    stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
-  }
-
   // ── Right-side upload panel (seller-style) — replaces the bare file picker. ──
   // Pre-populates with the customer's marketplace upload (or current design), lets
   // you replace it, remove its background, and shows the live thread match for EMB
@@ -803,7 +728,12 @@
     var s = _up; if (!s) return; var p = document.getElementById('egup-panel');
     var hasImg = !!s.src;
     var preview = hasImg
-      ? '<div style="position:relative;width:100%;aspect-ratio:1;border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#f6f5f4 center/contain no-repeat;background-image:url(\'' + s.src + '\')"></div>'
+      ? ('<div id="egup-lwrap" onmousemove="EGDesignTools._upLensMove(event)" onmouseleave="EGDesignTools._upLensHide()" style="position:relative;width:100%;aspect-ratio:1;border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#f6f5f4">'
+          + '<img id="egup-limg" src="' + _upCanvasSrc(s.src) + '" crossorigin="anonymous" onmouseenter="EGDesignTools._upLensShow()" onclick="EGDesignTools._upPick(event)" style="width:100%;height:100%;object-fit:contain;display:block;cursor:crosshair"/>'
+          + '<div id="egup-lens" style="position:absolute;width:90px;height:90px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.08);background-repeat:no-repeat;background-color:#fff;pointer-events:none;display:none;z-index:2"></div>'
+          + '<div id="egup-cross" style="position:absolute;width:14px;height:14px;border:1.5px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;display:none;z-index:4"></div>'
+          + '</div>'
+          + '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center">Hover to magnify · click the artwork to sample a thread colour</div>')
       : '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border:1.5px dashed #c4c3be;border-radius:10px;cursor:pointer;color:#9ca3af;font-size:13px;gap:8px;text-align:center"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Click to choose a file</label>';
     document.getElementById('egup-ov').classList.add('on');
     p.innerHTML = '<div style="padding:16px 18px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between"><div style="min-width:0"><div style="font-size:15px;font-weight:700;color:#191918">Design</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.name) + '</div></div><button onclick="EGDesignTools._upClose()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:19px;line-height:1">&times;</button></div>'
@@ -815,8 +745,51 @@
       + '<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #f0ede9;padding:14px 18px;display:flex;gap:8px"><button onclick="EGDesignTools._upClose()" class="btn btn-out" style="flex:1;font-size:13.5px">Cancel</button><button onclick="EGDesignTools._upSave()" class="btn btn-dk" style="flex:1;font-size:13.5px;' + (hasImg ? '' : 'opacity:.5;pointer-events:none') + '">Use this design</button></div>';
     _upThreads();
   }
+  // ── Magnifier lens + click-to-sample-thread on the panel preview (ported from
+  //    the seller's pickThreadFromImage/tpLens*). Hover = 3× zoom loupe; click =
+  //    sample the pixel → nearest in-stock thread → add a chip. ─────────────────
+  function _upLensShow() { var l = document.getElementById('egup-lens'), c = document.getElementById('egup-cross'); if (l) l.style.display = 'block'; if (c) c.style.display = 'block'; }
+  function _upLensHide() { document.querySelectorAll('#egup-lens,#egup-cross').forEach(function (el) { el.style.display = 'none'; }); }
+  function _upLensMove(ev) {
+    var wrap = document.getElementById('egup-lwrap'), img = document.getElementById('egup-limg'), lens = document.getElementById('egup-lens'), cross = document.getElementById('egup-cross');
+    if (!wrap || !img || !lens) return;
+    var wr = wrap.getBoundingClientRect(), ir = img.getBoundingClientRect();
+    var wx = ev.clientX - wr.left, wy = ev.clientY - wr.top, ix = ev.clientX - ir.left, iy = ev.clientY - ir.top;
+    if (ix < 0 || iy < 0 || ix > ir.width || iy > ir.height) { _upLensHide(); return; }
+    _upLensShow();
+    var sz = 90, zoom = 3;
+    if (!lens.style.backgroundImage) { lens.style.backgroundImage = 'url("' + img.src + '")'; lens.style.backgroundSize = (ir.width * zoom) + 'px ' + (ir.height * zoom) + 'px'; }
+    lens.style.left = (wx - sz / 2) + 'px'; lens.style.top = (wy - sz / 2) + 'px';
+    var bgX = -(ix * zoom - sz / 2), bgY = -(iy * zoom - sz / 2), offX = ir.left - wr.left, offY = ir.top - wr.top;
+    lens.style.backgroundPosition = (bgX + offX * zoom) + 'px ' + (bgY + offY * zoom) + 'px';
+    if (cross) { cross.style.left = wx + 'px'; cross.style.top = wy + 'px'; }
+  }
+  function _upPulse(x, y, bg) { var dot = document.createElement('div'); dot.style.cssText = 'position:fixed;width:22px;height:22px;border:2px solid #fff;border-radius:50%;background:' + bg + ';box-shadow:0 2px 8px rgba(0,0,0,.4);pointer-events:none;z-index:10140;transform:translate(-50%,-50%);left:' + x + 'px;top:' + y + 'px;transition:transform .55s cubic-bezier(.22,1,.36,1),opacity .55s'; document.body.appendChild(dot); requestAnimationFrame(function () { dot.style.transform = 'translate(-50%,-50%) scale(1.9)'; dot.style.opacity = '0'; }); setTimeout(function () { dot.remove(); }, 580); }
+  function _upPick(ev) {
+    ev.stopPropagation();
+    _upLensHide();
+    try { document.querySelectorAll('#egup-lens,#egup-cross').forEach(function (el) { el.style.display = 'none'; }); } catch (e) {}
+    var s = _up; if (!s) return;
+    var img = document.getElementById('egup-limg'); if (!img || !img.naturalWidth) return;
+    var rect = img.getBoundingClientRect(), cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
+    try {
+      var cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+      var px = Math.max(0, Math.min(img.naturalWidth - 1, Math.round((cx / rect.width) * img.naturalWidth)));
+      var py = Math.max(0, Math.min(img.naturalHeight - 1, Math.round((cy / rect.height) * img.naturalHeight)));
+      var d; try { d = ctx.getImageData(px, py, 1, 1).data; } catch (e) { return; }
+      if (d[3] < 30) return;
+      if (!(window.EGStore && EGStore.nearestThread)) return;
+      var t = EGStore.nearestThread(d[0], d[1], d[2]); if (!t) return;
+      _upPulse(ev.clientX, ev.clientY, 'rgb(' + d[0] + ',' + d[1] + ',' + d[2] + ')');
+      s.threads = s.threads || [];
+      if (s.threads.some(function (x) { return x.code === t.code; })) return;
+      s.threads.push({ code: t.code, name: t.name, hex: t.hex });
+      var box = document.getElementById('egup-threads'); if (box) box.innerHTML = _upThreadChips(s.threads);
+    } catch (e) {}
+  }
   function _upThreadChips(threads) {
-    return '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Thread colours · ' + threads.length + '</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+    return '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Thread colours · ' + threads.length + ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#c4c3be">· click the artwork to add</span></div><div style="display:flex;flex-wrap:wrap;gap:6px">'
       + threads.map(function (t) { return '<div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:12px;font-weight:600;color:#191918"><span style="width:16px;height:16px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span><span style="font-family:monospace">' + (t.code || '—') + '</span>' + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '') + '</div>'; }).join('') + '</div>';
   }
   function _upThreads() {
@@ -863,7 +836,7 @@
       if (o && window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(o.id, s.sku, s.src);
       if (it) { it.designUrl = s.src; if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); }
       if (o && window.EGStore && EGStore.getDesignCard && EGStore.pushToDesignBoard) { var card = EGStore.getDesignCard(o.id, s.sku); if (!card) EGStore.pushToDesignBoard({ orderNum: o.id, sku: s.sku, board: (s.tech || 'dtg').toLowerCase(), name: s.name, thumb: s.src, byRole: 'Factory' }); }
-      if (/EMB/i.test(s.tech) && s.threads && s.threads.length && window.EGStore && EGStore.setItemThreadColors) EGStore.setItemThreadColors(o.id, s.sku, s.threads);
+      if (s.threads && s.threads.length && window.EGStore && EGStore.setItemThreadColors) EGStore.setItemThreadColors(o.id, s.sku, s.threads);
       document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: s.orderNum, sku: s.sku } }));
     } catch (e) {}
     _upClose(); refreshBoard();
@@ -875,12 +848,12 @@
     // new-order setup
     itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
-    placeDesign: placeDesign, _qpClose: qpClose, _qpSave: qpSave, _qpRemoveBg: qpRemoveBg,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
+    _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
-    openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage,
+    openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,
     PRINT_METHODS: PRINT_METHODS
   };
 })();
