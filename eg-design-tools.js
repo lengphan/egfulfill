@@ -414,7 +414,7 @@
   function _ensurePulseCss() {
     if (document.getElementById('egdt-pulse-css')) return;
     var st = document.createElement('style'); st.id = 'egdt-pulse-css';
-    st.textContent = '@keyframes egdtPulse{0%{box-shadow:0 0 0 0 rgba(212,160,23,.5)}70%{box-shadow:0 0 0 6px rgba(212,160,23,0)}100%{box-shadow:0 0 0 0 rgba(212,160,23,0)}}.egdt-pulse{animation:egdtPulse 1.6s ease-out infinite;border-color:#d4a017!important;color:#9a7410!important}';
+    st.textContent = '@keyframes egdtPulse{0%,100%{box-shadow:0 0 0 1px rgba(25,25,24,.28)}50%{box-shadow:0 0 0 2.5px rgba(25,25,24,.95)}}.egdt-pulse{animation:egdtPulse 1.3s ease-in-out infinite;border-color:#191918!important}';
     document.head.appendChild(st);
   }
   function actBtn(label, onclick) {
