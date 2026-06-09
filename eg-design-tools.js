@@ -689,8 +689,9 @@
   function placeDesign(orderNum, sku) {
     var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
     var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (!it) return;
-    var design = _qpDesignUrl(o, it);
-    if (!design) { alert('Attach a design first (Upload / Templates / Design Maker), then Place it.'); return; }
+    // Open even with no design yet — the stage shows the blank so the composite is
+    // visible; resize/move/remove-bg act on the design once one is attached.
+    var design = _qpDesignUrl(o, it) || '';
     if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
     _qpCur = { orderNum: orderNum, sku: sku };
     _qpEnsureModal();

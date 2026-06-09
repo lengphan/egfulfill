@@ -4629,7 +4629,8 @@ function opZoomProduct(orderNum, itemIdx) {
     + threadBlock
     + fileLabel
     + custFileLink
-    + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:10px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
+    + '<button onclick="event.stopPropagation();document.body.removeChild(this.closest(\'[style*=fixed]\'));window.EGDesignTools&&EGDesignTools.placeDesign(\'' + orderNum + '\',\'' + (it.sku||'').replace(/\'/g,"\\\'") + '\')" style="margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1.5px solid #191918;background:#fff;font-size:13.5px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:7px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 9.5V12h2.5L11 5.5 8.5 3 2 9.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Resize · Remove BG</button>'
+    + '<button onclick="document.body.removeChild(this.closest(\'[style*=fixed]\'))" style="margin-top:8px;width:100%;padding:8px;border-radius:8px;border:1.5px solid #e5e4e0;background:#fff;font-size:13.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Close</button>'
     + '</div>';
   document.body.appendChild(overlay);
 }
