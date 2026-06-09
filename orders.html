@@ -5745,7 +5745,7 @@ const CSV_HEADERS = [
   'Order Number','Ship Name','Ship Email',
   'Ship Address 1','Ship Address 2','Ship City','Ship State','Ship Zip',
   'Store Name',
-  'Item SKU','Item Quantity','Print Type',
+  'Product Title','Item SKU','Item Quantity','Print Type',
   'Shipping Service','Internal Notes'
 ];
 
@@ -6182,7 +6182,7 @@ async function generateXLSX() {
       'ORD-SHOPIFY-8821','Jane Smith','jane.smith@email.com',
       '42 Maple Street','Apt 3B','Portland','OR','97201',
       'Main Store',
-      'G5000-WHT-L','1','DTG',
+      'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
       'USPS Priority Mail','Gift wrap requested'
     ];
     const ws1 = XLSX.utils.aoa_to_sheet([CSV_HEADERS, example]);
@@ -6254,7 +6254,7 @@ function downloadUploadTemplate() {
     'ORD-SHOPIFY-8821','Jane Smith','jane.smith@email.com',
     '42 Maple Street','Apt 3B','Portland','OR','97201',
     'Main Store',
-    'G5000-WHT-L','1','DTG',
+    'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
     'USPS Priority Mail','Gift wrap requested'
   ];
   const csv = [_csvRow(CSV_HEADERS), _csvRow(example)].join('\n');
@@ -6468,7 +6468,9 @@ function doImportOrders(opts) {
     const cleanId = String(key).replace(/^#/, '');
     const incomingItems = rows.map(r => ({
       sku:  r.item_sku || '',
-      name: r.item_name || r.item_sku || 'Item',
+      // Product Title (what the customer ordered) → the item title/listing.
+      name: r.product_title || r.item_name || r.item_sku || 'Item',
+      listing: r.product_title || r.item_name || '',
       qty:  Math.max(1, parseInt(r.item_quantity) || 1),
       tech: (r.print_type || '').toUpperCase(),
       color: r.item_color || '',
