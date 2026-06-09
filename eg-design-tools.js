@@ -370,6 +370,47 @@
       + '<button onclick="event.stopPropagation();EGDesignTools.dismissCustomerFile(\'' + on + '\',\'' + sk + '\')" title="Dismiss &amp; upload your own" style="' + mini + ';background:#fff;color:#9ca3af;border:1px solid #e5e4e0">✕</button></span>';
   }
 
+  // ── Color / Size variant pickers (mirrors the seller's inline variant logic) ──
+  var _DEF_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'One Size'];
+  var _DEF_COLORS = ['White', 'Black', 'Navy', 'Heather Gray', 'Light Pink', 'Light Blue', 'Forest Green', 'Red'];
+  function _extractSize(sku) { if (!sku) return ''; var m = String(sku).toUpperCase().match(/-(XS|S|M|L|XL|2XL|3XL|4XL|OS)\b/); return m ? (m[1] === 'OS' ? 'One Size' : m[1]) : ''; }
+  function _extractColor(sku) { if (!sku) return ''; var abbr = { WHT: 'White', WHI: 'White', BLK: 'Black', NVY: 'Navy', GRY: 'Heather Gray', LPK: 'Light Pink', LBL: 'Light Blue', RED: 'Red', GRN: 'Forest Green', PNK: 'Pink', PUR: 'Purple', GLD: 'Gold', SND: 'Sand', NAT: 'Natural', CRM: 'Cream' }; var m = String(sku).toUpperCase().match(/-([A-Z]{2,4})-/); return m ? (abbr[m[1]] || (m[1].charAt(0) + m[1].slice(1).toLowerCase())) : ''; }
+  function variantOptions(orderNum, sku, it) {
+    var colors = [], sizes = [];
+    try {
+      var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+      var p = chosenProduct(orderNum, sku);
+      if (!p) { var base = String(sku || '').split('-')[0]; p = prods.find(function (x) { return (Array.isArray(x.variantSkus) && x.variantSkus.some(function (v) { return v && v.sku === sku; })) || (x.sku && base && x.sku.toUpperCase() === base.toUpperCase()); }); }
+      if (p && Array.isArray(p.variantSkus)) { var sc = {}, ss = {}; p.variantSkus.forEach(function (v) { if (!v) return; if (v.color && !sc[v.color]) { sc[v.color] = 1; colors.push(v.color); } if (v.size && !ss[v.size]) { ss[v.size] = 1; sizes.push(v.size); } }); }
+    } catch (e) {}
+    var curC = (it && it.color) || _extractColor(sku), curS = (it && it.size) || _extractSize(sku);
+    if (!colors.length) colors = _DEF_COLORS.slice();
+    if (!sizes.length) sizes = _DEF_SIZES.slice();
+    if (curC && colors.indexOf(curC) < 0) colors.unshift(curC);
+    if (curS && sizes.indexOf(curS) < 0) sizes.unshift(curS);
+    return { colors: colors, sizes: sizes, curColor: curC, curSize: curS };
+  }
+  function onSetVariant(orderNum, sku, key, value) {
+    try {
+      var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
+      var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (!it) return;
+      it[key] = value;
+      if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+    } catch (e) {}
+    refreshBoard();
+  }
+  // Remove a line item (New orders only) — keeps at least one, confirms first.
+  function removeItem(orderNum, sku) {
+    try {
+      var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
+      if (o.items.length <= 1) { alert('An order must have at least one item.'); return; }
+      if (!window.confirm('Remove this item from the order?')) return;
+      o.items = o.items.filter(function (i) { return String(i.sku) !== String(sku); });
+      if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+    } catch (e) {}
+    refreshBoard();
+  }
+
   function actBtn(label, onclick) {
     return '<button class="btn btn-out" style="font-size:11px;padding:3px 9px;white-space:nowrap" onclick="' + onclick + '">' + label + '</button>';
   }
@@ -415,10 +456,20 @@
       var ptOpts = '<option value="">Method…</option>';
       PRINT_METHODS.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
       var sel = 'font-size:11px;padding:3px 6px;border:1px solid #e5e4e0;border-radius:6px;background:#fff;color:#191918;font-family:inherit;max-width:150px';
+      // Color + Size pickers (matches the seller's Product · Color · Size · Method row).
+      var vo = variantOptions(num, sku, it);
+      var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
+      var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
       pickers = '<select title="Base product" style="' + sel + '" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>'
+        + '<select title="Color" style="' + sel + ';max-width:120px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>'
+        + '<select title="Size" style="' + sel + ';max-width:90px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>'
         + '<select title="Print method" style="' + sel + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>';
     }
-    return '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end" onclick="event.stopPropagation()">' + pickers + btns + '</div>';
+    // Delete (trash) — only while New, keeps ≥1 item.
+    var delBtn = isNewOrder(o)
+      ? '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+      : '';
+    return '<div style="display:flex;gap:6px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end" onclick="event.stopPropagation()">' + pickers + btns + delBtn + '</div>';
   }
 
   // ── Inline "+ Add item" (factory boards) — mirrors the seller's add-item on the
@@ -685,7 +736,7 @@
     itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     placeDesign: placeDesign, _qpClose: qpClose, _qpSave: qpSave, _qpRemoveBg: qpRemoveBg,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage,
