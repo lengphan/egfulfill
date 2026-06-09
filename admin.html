@@ -4223,6 +4223,7 @@ let whDateFrom = null, whDateTo = null;   // filter by real marketplace order da
 let whSelectedOrders = new Set();
 let whCurrentOrder = null;
 let whExpandedCards = new Set();
+let admExpandedRows = new Set();   // expanded order-detail rows, re-applied after each render
 
 // Canonical factory flow: in_review → awaiting_scan → scanned → printing → shipped (+ flagged)
 const WH_STATUS_BADGE = {
@@ -4511,7 +4512,9 @@ function whRenderOrders() {
             // takes over (design composite then overlays on top).
             const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null) || (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
-            const _designSrc = it.designUrl || ((it.file && String(it.file).startsWith('data:')) ? it.file : '');
+            let _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
+            if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
+            if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
             const _overlay = _designSrc
               ? `<img src="${_designSrc}" style="position:absolute;left:${_pos.x}%;top:${_pos.y}%;width:${_pos.w}%;height:${_pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
@@ -4621,6 +4624,7 @@ function whRenderOrders() {
     return mainRow + detailRow;
   }).join('') || '<tr><td colspan="10" style="text-align:center;padding:24px;color:#9ca3af;font-size:14px">No orders match the current filter</td></tr>';
   admApplyColOrder();
+  admReapplyExpanded();
 }
 
 let admColOrder = ['order','time','seller','customer','items','carrier','tracking','status','actions'];
@@ -5176,9 +5180,21 @@ function whToggleDetail(num) {
   const open = row.style.display !== 'none';
   row.style.display = open ? 'none' : 'table-row';
   if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
+  // Track expansion so a re-render (storage event, live merge, etc.) re-applies it
+  // instead of collapsing the row mid-task.
+  if (open) admExpandedRows.delete(num); else admExpandedRows.add(num);
   // Darken the parent row while expanded (skip the active row — it has its own tint).
   const prow = document.getElementById('adm-row-' + num);
   if (prow && !prow.style.borderLeftWidth) prow.style.background = open ? '' : '#fafaf9';
+}
+// Re-show every expanded detail row + chevron after a render. Called at the end of
+// whRenderOrders so admin keeps rows open like warehouse does.
+function admReapplyExpanded() {
+  admExpandedRows.forEach(function (num) {
+    var r = document.getElementById('wh-detail-' + num); if (r) r.style.display = 'table-row';
+    var ch = document.getElementById('wh-chevron-' + num); if (ch) ch.style.transform = 'rotate(180deg)';
+    var prow = document.getElementById('adm-row-' + num); if (prow && !prow.style.borderLeftWidth) prow.style.background = '#fafaf9';
+  });
 }
 
 function whUpdateItemStatus(orderNum, idx, val) {
@@ -8906,8 +8922,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const _sub = _n > 1
           ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">Covers ${_n} items: ${_skus.join(', ')}</div>`
           : `<div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>`;
+        // Resolve the real design image (uploaded/adopted/customer file) so the card
+        // mirrors the artwork — updates live because the xfom re-renders on eg-design-updated.
+        let _daImg = '';
+        try {
+          if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const r = EGStore.getRawDesign((o && o.id) || _xfomNum, d.sku); if (r && /^(https?:|data:)/.test(String(r))) _daImg = r; }
+          if (!_daImg && EGStore.getCachedImage) { const c = EGStore.getCachedImage((o && o.id) || _xfomNum, d.sku); if (c && /^(https?:|data:)/.test(String(c))) _daImg = c; }
+        } catch (e) {}
+        if (!_daImg) _daImg = d.customerFile || (d.designSrc && /^https?:\/\//i.test(String(d.designSrc)) ? d.designSrc : '') || d.designUrl || '';
+        const _daThumb = _daImg
+          ? `<img src="${_daImg}" style="width:42px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid #f0ede9" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=&quot;width:42px;height:42px;background:#f0ede9;border-radius:6px;flex-shrink:0&quot;></div>')">`
+          : `<div style="width:42px;height:42px;background:#f0ede9;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#9ca3af">${d.printType || d.printedType || 'ART'}</div>`;
         return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-        <div style="width:42px;height:42px;background:#f0ede9;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#9ca3af">${d.printType || d.printedType || 'ART'}</div>
+        ${_daThumb}
         <div style="flex:1;min-width:0">
           <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}${_badge}</div>
           ${_sub}

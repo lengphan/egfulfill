@@ -769,16 +769,25 @@
       + '<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #f0ede9;padding:14px 18px;display:flex;gap:8px"><button onclick="EGDesignTools._upClose()" class="btn btn-out" style="flex:1;font-size:13.5px">Cancel</button><button onclick="EGDesignTools._upSave()" class="btn btn-dk" style="flex:1;font-size:13.5px;' + (hasImg ? '' : 'opacity:.5;pointer-events:none') + '">Use this design</button></div>';
     _upThreads();
   }
+  function _upThreadChips(threads) {
+    return '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Thread colours · ' + threads.length + '</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+      + threads.map(function (t) { return '<div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:12px;font-weight:600;color:#191918"><span style="width:16px;height:16px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span><span style="font-family:monospace">' + (t.code || '—') + '</span>' + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '') + '</div>'; }).join('') + '</div>';
+  }
   function _upThreads() {
     var s = _up; var box = document.getElementById('egup-threads'); if (!box || !s) return;
-    if (!/EMB/i.test(s.tech) || !s.src || !(window.EGStore && EGStore.matchThreadColors)) { box.innerHTML = ''; return; }
-    box.innerHTML = '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Thread match</div><div style="font-size:12.5px;color:#9ca3af;margin-top:6px">Matching…</div>';
+    if (!/EMB/i.test(s.tech)) { box.innerHTML = ''; return; }
+    // Show the threads ALREADY matched for this item (same ones on the board's
+    // composite) right away, so the panel never looks empty; then refine with a
+    // live re-match against the current image.
+    var stored = [];
+    try { if (window.EGStore && EGStore.getItemThreadColors) stored = EGStore.getItemThreadColors(s.orderNum, s.sku) || []; } catch (e) {}
+    if (stored.length) { s.threads = stored; box.innerHTML = _upThreadChips(stored); }
+    else box.innerHTML = '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Thread match</div><div style="font-size:12.5px;color:#9ca3af;margin-top:6px">Matching…</div>';
+    if (!s.src || !(window.EGStore && EGStore.matchThreadColors)) { if (!stored.length) box.innerHTML = ''; return; }
     EGStore.matchThreadColors(_upCanvasSrc(s.src), function (threads) {
       if (!_up || _up !== s) return;
-      s.threads = threads || [];
-      if (!s.threads.length) { box.innerHTML = '<div style="margin-top:18px;font-size:12px;color:#9ca3af">No thread colours detected (image may not be readable in-browser).</div>'; return; }
-      box.innerHTML = '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Thread colours · ' + s.threads.length + '</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
-        + s.threads.map(function (t) { return '<div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:12px;font-weight:600;color:#191918"><span style="width:16px;height:16px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span><span style="font-family:monospace">' + (t.code || '—') + '</span>' + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '') + '</div>'; }).join('') + '</div>';
+      if (threads && threads.length) { s.threads = threads; box.innerHTML = _upThreadChips(threads); }
+      else if (!stored.length) { box.innerHTML = '<div style="margin-top:18px;font-size:12px;color:#9ca3af">No thread colours detected (image may not be readable in-browser).</div>'; }
     });
   }
   function _upFile(f) { if (!f || !_up) return; var rd = new FileReader(); rd.onload = function (ev) { _up.src = ev.target.result; _up.fromCustomer = false; _upRender(); }; rd.readAsDataURL(f); }

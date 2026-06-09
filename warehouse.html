@@ -6043,7 +6043,9 @@ function whRenderOrders() {
             // takes over (design composite then overlays on top).
             const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null) || (it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg';
-            const _designSrc = it.designUrl || ((it.file && String(it.file).startsWith('data:')) ? it.file : '');
+            let _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
+            if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
+            if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
             const _overlay = _designSrc
               ? `<img src="${_designSrc}" style="position:absolute;left:${_pos.x}%;top:${_pos.y}%;width:${_pos.w}%;height:${_pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`

@@ -4507,7 +4507,8 @@ function opItemCompositeThumb(orderNum, itemIdx, it, prodImg, tBg, size) {
   var mockup = prodImg || it.sellerImg || it.thumb || '';
   // Design overlay: prefer the raw design (transparent artwork). Skip composite
   // blobs that already have the mockup baked in — using those would double-paint.
-  var designSrc = it.designUrl || '';
+  var designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
+  if (!designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { var _rd = EGStore.getRawDesign(orderNum, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) designSrc = _rd; } } catch (e) {} }
   if (!designSrc && it.file && String(it.file).startsWith('data:')) designSrc = it.file;
   var pos = it.designPos || { x: 25, y: 25, w: 50, h: 50 };
   var hasDesign = !!designSrc;
@@ -7631,7 +7632,9 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           if (live) return live;
         }
       } catch(e){}
-      return it.designUrl || '';
+      // Fall back to the buyer's marketplace upload so a synced order's design
+      // approval shows the customer artwork even before a design is attached.
+      return it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
     }
     function _xfomCompositeHTML(it){
       const mockup = _xfomMockup(it);
