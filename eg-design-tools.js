@@ -431,9 +431,9 @@
     var _hasDesign = false;
     try { _hasDesign = !!(window.EGStore && EGStore.getRawDesign && EGStore.getRawDesign(num, sku)); } catch (e) {}
     if (!_hasDesign && (it.file || it.designUrl || it.thumb)) _hasDesign = true;
-    var _upOnclick = "EGDesignTools.upload('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')";
+    var _upOnclick = "EGDesignTools.uploadPanel('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "','" + jsAttr(tech) + "')";
     var uploadBtn = _hasDesign
-      ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">↑ Uploaded ✓</button>'
+      ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">Uploaded</button>'
       : actBtn('↑ Upload', _upOnclick);
     var btns = uploadBtn
       + actBtn('Templates', "EGDesignTools.openTemplates('" + jsAttr(num) + "','" + jsAttr(sku) + "','" + jsAttr(name) + "',event)")
@@ -730,12 +730,98 @@
     stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
 
+  // ── Right-side upload panel (seller-style) — replaces the bare file picker. ──
+  // Pre-populates with the customer's marketplace upload (or current design), lets
+  // you replace it, remove its background, and shows the live thread match for EMB
+  // items. "Use this design" caches it as the item's design + persists threads.
+  var _up = null;
+  function _upCanvasSrc(url) { if (/^data:/i.test(String(url))) return url; if (/(^|\.)etsystatic\.com/i.test(String(url))) return '/api/etsy/img-proxy?url=' + encodeURIComponent(url); return url; }
+  function uploadPanel(orderNum, sku, name, tech) {
+    var o = findOrder(orderNum);
+    var it = o && Array.isArray(o.items) ? o.items.find(function (i) { return String(i.sku) === String(sku); }) : null;
+    var initial = '';
+    try { if (window.EGStore && EGStore.getRawDesign && o) { var r = EGStore.getRawDesign(o.id, sku); if (r) initial = r; } } catch (e) {}
+    var custFile = it ? (it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? String(it.designSrc) : '')) : '';
+    if (!initial && it) initial = custFile || it.designUrl || '';
+    _up = { orderNum: orderNum, sku: sku, name: name || (it && it.name) || sku, tech: String(tech || (it && it.printType) || '').toUpperCase(), src: initial, fromCustomer: !!(initial && initial === custFile), threads: [] };
+    _upEnsure(); _upRender();
+    var p = document.getElementById('egup-panel'); p.style.display = 'block'; setTimeout(function () { p.classList.add('open'); }, 10);
+  }
+  function _upEnsure() {
+    if (document.getElementById('egup-panel')) return;
+    if (!document.getElementById('egup-css')) { var st = document.createElement('style'); st.id = 'egup-css'; st.textContent = '#egup-ov{position:fixed;inset:0;background:rgba(25,25,24,.28);z-index:10125;display:none}#egup-ov.on{display:block}#egup-panel{position:fixed;top:0;right:-480px;bottom:0;width:440px;max-width:92vw;background:#fff;border-left:1px solid #e5e4e0;z-index:10130;box-shadow:-8px 0 32px rgba(0,0,0,.12);transition:right .28s cubic-bezier(.22,1,.36,1);overflow-y:auto;font-family:Inter,system-ui,sans-serif}#egup-panel.open{right:0}'; document.head.appendChild(st); }
+    var ov = document.createElement('div'); ov.id = 'egup-ov'; ov.onclick = function () { _upClose(); }; document.body.appendChild(ov);
+    var p = document.createElement('div'); p.id = 'egup-panel'; p.style.display = 'none'; document.body.appendChild(p);
+  }
+  function _upRender() {
+    var s = _up; if (!s) return; var p = document.getElementById('egup-panel');
+    var hasImg = !!s.src;
+    var preview = hasImg
+      ? '<div style="position:relative;width:100%;aspect-ratio:1;border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#f6f5f4 center/contain no-repeat;background-image:url(\'' + s.src + '\')"></div>'
+      : '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border:1.5px dashed #c4c3be;border-radius:10px;cursor:pointer;color:#9ca3af;font-size:13px;gap:8px;text-align:center"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Click to choose a file</label>';
+    document.getElementById('egup-ov').classList.add('on');
+    p.innerHTML = '<div style="padding:16px 18px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between"><div style="min-width:0"><div style="font-size:15px;font-weight:700;color:#191918">Design</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.name) + '</div></div><button onclick="EGDesignTools._upClose()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:19px;line-height:1">&times;</button></div>'
+      + '<div style="padding:18px">'
+      + (s.fromCustomer && hasImg ? '<div style="font-size:12px;font-weight:600;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:7px;padding:7px 10px;margin-bottom:12px">Customer-uploaded file — review &amp; use, or replace it below.</div>' : '')
+      + preview
+      + '<div style="display:flex;gap:8px;margin-top:12px"><label style="flex:1;text-align:center;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/>' + (hasImg ? 'Replace file' : 'Choose file') + '</label>' + (hasImg ? '<button onclick="EGDesignTools._upRemoveBg()" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff;font-family:inherit">Remove BG</button>' : '')
+      + '</div><div id="egup-threads"></div></div>'
+      + '<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #f0ede9;padding:14px 18px;display:flex;gap:8px"><button onclick="EGDesignTools._upClose()" class="btn btn-out" style="flex:1;font-size:13.5px">Cancel</button><button onclick="EGDesignTools._upSave()" class="btn btn-dk" style="flex:1;font-size:13.5px;' + (hasImg ? '' : 'opacity:.5;pointer-events:none') + '">Use this design</button></div>';
+    _upThreads();
+  }
+  function _upThreads() {
+    var s = _up; var box = document.getElementById('egup-threads'); if (!box || !s) return;
+    if (!/EMB/i.test(s.tech) || !s.src || !(window.EGStore && EGStore.matchThreadColors)) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Thread match</div><div style="font-size:12.5px;color:#9ca3af;margin-top:6px">Matching…</div>';
+    EGStore.matchThreadColors(_upCanvasSrc(s.src), function (threads) {
+      if (!_up || _up !== s) return;
+      s.threads = threads || [];
+      if (!s.threads.length) { box.innerHTML = '<div style="margin-top:18px;font-size:12px;color:#9ca3af">No thread colours detected (image may not be readable in-browser).</div>'; return; }
+      box.innerHTML = '<div style="margin-top:18px;font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Thread colours · ' + s.threads.length + '</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
+        + s.threads.map(function (t) { return '<div style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:12px;font-weight:600;color:#191918"><span style="width:16px;height:16px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span><span style="font-family:monospace">' + (t.code || '—') + '</span>' + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '') + '</div>'; }).join('') + '</div>';
+    });
+  }
+  function _upFile(f) { if (!f || !_up) return; var rd = new FileReader(); rd.onload = function (ev) { _up.src = ev.target.result; _up.fromCustomer = false; _upRender(); }; rd.readAsDataURL(f); }
+  function _upRemoveBg() {
+    var s = _up; if (!s || !s.src) return;
+    var img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        var w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return;
+        var c = document.createElement('canvas'); c.width = w; c.height = h; var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+        var data; try { data = ctx.getImageData(0, 0, w, h); } catch (e) { alert('This image can’t be processed in-browser (cross-origin).'); return; }
+        var d = data.data; var px = function (x, y) { var i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+        var cs = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)]; var bg = [0, 0, 0]; cs.forEach(function (q) { bg[0] += q[0]; bg[1] += q[1]; bg[2] += q[2]; }); bg = bg.map(function (v) { return v / 4; });
+        var tol = 46, removed = 0;
+        for (var i = 0; i < d.length; i += 4) { var dr = d[i] - bg[0], dg = d[i + 1] - bg[1], db = d[i + 2] - bg[2]; if (Math.sqrt(dr * dr + dg * dg + db * db) < tol) { d[i + 3] = 0; removed++; } }
+        if (!removed) { alert('No uniform background detected.'); return; }
+        ctx.putImageData(data, 0, 0); _up.src = c.toDataURL('image/png'); _up.fromCustomer = false; _upRender();
+      } catch (e) {}
+    };
+    img.onerror = function () {};
+    img.src = _upCanvasSrc(s.src);
+  }
+  function _upSave() {
+    var s = _up; if (!s || !s.src) return;
+    try {
+      var o = findOrder(s.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(s.sku); });
+      if (o && window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(o.id, s.sku, s.src);
+      if (it) { it.designUrl = s.src; if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); }
+      if (o && window.EGStore && EGStore.getDesignCard && EGStore.pushToDesignBoard) { var card = EGStore.getDesignCard(o.id, s.sku); if (!card) EGStore.pushToDesignBoard({ orderNum: o.id, sku: s.sku, board: (s.tech || 'dtg').toLowerCase(), name: s.name, thumb: s.src, byRole: 'Factory' }); }
+      if (/EMB/i.test(s.tech) && s.threads && s.threads.length && window.EGStore && EGStore.setItemThreadColors) EGStore.setItemThreadColors(o.id, s.sku, s.threads);
+      document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: s.orderNum, sku: s.sku } }));
+    } catch (e) {}
+    _upClose(); refreshBoard();
+  }
+  function _upClose() { var p = document.getElementById('egup-panel'); var ov = document.getElementById('egup-ov'); if (p) p.classList.remove('open'); if (ov) ov.classList.remove('on'); _up = null; setTimeout(function () { if (p) p.style.display = 'none'; }, 280); }
+
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     placeDesign: placeDesign, _qpClose: qpClose, _qpSave: qpSave, _qpRemoveBg: qpRemoveBg,
+    uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
