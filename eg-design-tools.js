@@ -467,15 +467,22 @@
       var curPt = (setup.printType || tech || '').toString().toUpperCase();
       var ptOpts = '<option value="">Method…</option>';
       PRINT_METHODS.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
-      var sel = 'font-size:11px;padding:3px 6px;border:1px solid #e5e4e0;border-radius:6px;background:#fff;color:#191918;font-family:inherit;max-width:150px';
-      // Color + Size pickers (matches the seller's Product · Color · Size · Method row).
+      // Seller-style layout: Product · Color · Size grouped in ONE rounded pill
+      // (borderless selects + dot separators), then Method as a separate pill —
+      // far less cluttered than four standalone dropdowns.
       var vo = variantOptions(num, sku, it);
       var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
       var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
-      pickers = '<select title="Base product" style="' + sel + '" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>'
-        + '<select title="Color" style="' + sel + ';max-width:120px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>'
-        + '<select title="Size" style="' + sel + ';max-width:90px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>'
-        + '<select title="Print method" style="' + sel + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>';
+      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 1px;text-overflow:ellipsis';
+      var grp = 'display:inline-flex;align-items:center;border:1px solid #e5e4e0;border-radius:999px;background:#fff;padding:2px 9px;gap:2px;max-width:300px';
+      var dot = '<span style="color:#d1ceca;font-weight:700;flex-shrink:0">·</span>';
+      var methodPill = 'border:1px solid #e5e4e0;border-radius:999px;background:#fff;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 12px';
+      pickers = '<div style="' + grp + '" title="Base product · Color · Size">'
+        + '<select style="' + selIn + ';max-width:140px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>'
+        + dot + '<select style="' + selIn + ';max-width:80px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>'
+        + dot + '<select style="' + selIn + ';max-width:62px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>'
+        + '</div>'
+        + '<select title="Print method" style="' + methodPill + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>';
     }
     // Delete (trash) — only while New, keeps ≥1 item.
     var delBtn = isNewOrder(o)
@@ -558,15 +565,10 @@
         var r = itemSetupComplete(orderNum, o, it);
         if (!r.ok) problems.push('• ' + (it.name || it.sku || 'Item') + ' — needs ' + r.miss.join(' + '));
       });
-      // Not ready → no popup. Pulse the Push button (and the incomplete items'
-      // Upload buttons already pulse) so it's clear what's missing, and silently
-      // refuse the submission.
-      if (problems.length) {
-        _ensurePulseCss();
-        var btn = document.getElementById('egdt-push-' + orderNum);
-        if (btn) { btn.classList.remove('egdt-pulse'); void btn.offsetWidth; btn.classList.add('egdt-pulse'); setTimeout(function () { if (btn) btn.classList.remove('egdt-pulse'); }, 2600); }
-        return;
-      }
+      // Not ready → no popup, and DON'T pulse the Push button. The incomplete
+      // items' own action buttons pulse (Upload / pickers) to show what's missing.
+      // Re-render so those pulses are showing, then silently refuse.
+      if (problems.length) { refreshBoard(); return; }
     }
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
   }
