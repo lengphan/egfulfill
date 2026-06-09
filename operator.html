@@ -3822,7 +3822,9 @@ function renderOpOrders() {
     // Expanded parent row reads a touch darker than the bright collapsed rows so the
     // open order + its detail panel feel like one cohesive block (action buttons are
     // transparent so they inherit this too). Active/selected tints take precedence.
-    const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : isExp ? '#fafaf9' : '';
+    // Parent row stays bright (white) even when expanded; the item detail area
+    // below carries the darker background for clear parent→item hierarchy.
+    const rowBg = isActive ? '#f0f9ff' : isSel ? '#f8faff' : '';
     // Parent-row product preview: the first item's listing image + title (what the
     // customer ordered). The listing image lives here; item rows start blank.
     const _fIt = (o.itemList && o.itemList[0]) || {};
@@ -4032,7 +4034,7 @@ function renderOpOrders() {
           const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
           const _fsLabelOp = (_fs === 'working' && !_orderDone) ? 'Working' : '';
           const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#191918;white-space:nowrap;display:inline-block${_fsLabelOp?'':';display:none'}">${_fsLabelOp}</span>`;
-          return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 28px;${sep}">
+          return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;${sep}">
             <input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">
             ${thumb}
             <div style="flex:1;min-width:0;margin-right:12px">
