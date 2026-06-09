@@ -1064,8 +1064,11 @@ function renderOrders(ordersOverride) {
       const DS_ACT = '#374151';
       const dsBtnStyle = (type) => { const a = ITEM_DESIGN_SEL[dsKey]===type; return `display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1.5px solid ${a?DS_ACT:'#e5e4e0'};background:${a?DS_ACT:'#fff'};color:${a?'#fff':'#6b7280'};cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;text-decoration:none`; };
       const upFile = UP_STATE[o.no]?.[item.sku]?.state === 'ok' ? UP_STATE[o.no][item.sku].file : null;
+      // Nudge the Upload button while this item still has no design (uniform cue with
+      // the factory boards — same pickNudge animation).
+      const _needsDesign = needsSetup && !ITEM_DESIGN_SEL[dsKey] && !upFile;
       const designBtns = () => `
-        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${item.sku}')" style="${dsBtnStyle('upload')}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
+        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${item.sku}')" style="${dsBtnStyle('upload')}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
         <button id="dsb-${o.no}-${escSku}-template" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','template');openDTpl(event,'${o.no}','${item.sku}')" style="${dsBtnStyle('template')}">Templates</button>
         <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a>`;
 

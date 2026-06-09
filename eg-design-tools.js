@@ -416,7 +416,9 @@
   function _ensurePulseCss() {
     if (document.getElementById('egdt-pulse-css')) return;
     var st = document.createElement('style'); st.id = 'egdt-pulse-css';
-    st.textContent = '@keyframes egdtPulse{0%,100%{box-shadow:0 0 0 1px rgba(25,25,24,.28)}50%{box-shadow:0 0 0 2.5px rgba(25,25,24,.95)}}.egdt-pulse{animation:egdtPulse 1.3s ease-in-out infinite;border-color:#191918!important}';
+    // Uniform "needs attention" cue across seller + factory: the seller's pickNudge
+    // (a gentle horizontal nudge). Same animation everywhere, look + function alike.
+    st.textContent = '@keyframes egdtPulse{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}.egdt-pulse{animation:egdtPulse 1.2s ease-in-out infinite;border-color:#191918!important}';
     document.head.appendChild(st);
   }
   function actBtn(label, onclick) {
