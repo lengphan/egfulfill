@@ -511,6 +511,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Show / Hide</div>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="order" checked onchange="toggleCol('order')" style="accent-color:#111827"> Order</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="image" checked onchange="toggleCol('image')" style="accent-color:#111827"> Product Image</label>
+            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="title" checked onchange="toggleCol('title')" style="accent-color:#111827"> Product Title</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="items" checked onchange="toggleCol('items')" style="accent-color:#111827"> Items</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="delivery" checked onchange="toggleCol('delivery')" style="accent-color:#111827"> Delivery</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="store" checked onchange="toggleCol('store')" style="accent-color:#111827"> Store</label>
@@ -542,6 +543,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <col data-col="order">
             <col data-col="customer">
             <col data-col="image">
+            <col data-col="title">
             <col data-col="items">
             <col data-col="status">
             <col data-col="store">
@@ -554,16 +556,17 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <thead>
             <tr>
               <th data-col="check" style="width:36px;min-width:36px;padding:9px 0;text-align:center;overflow:visible"><input type="checkbox" id="check-all" onchange="toggleAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></th>
-              <th data-col="order" style="min-width:120px" onmousedown="rzCapture(event)" onclick="sortBy('order')"><span class="th-label">ORDER<span class="sort-arrow" data-sort="order"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="order" style="min-width:104px" onmousedown="rzCapture(event)" onclick="sortBy('order')"><span class="th-label">ORDER<span class="sort-arrow" data-sort="order"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="customer" style="min-width:110px" onmousedown="rzCapture(event)" onclick="sortBy('customer')"><span class="th-label">CUSTOMER<span class="sort-arrow" data-sort="customer"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="image" style="min-width:84px" onmousedown="rzCapture(event)"><span class="th-label">PRODUCT IMAGE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="title" style="min-width:150px" onmousedown="rzCapture(event)"><span class="th-label">PRODUCT TITLE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="items" style="min-width:64px" onmousedown="rzCapture(event)" onclick="sortBy('items')"><span class="th-label">ITEMS<span class="sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="status" style="min-width:90px" onmousedown="rzCapture(event)" onclick="sortBy('status')"><span class="th-label">STATUS<span class="sort-arrow" data-sort="status"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="store" style="min-width:110px" onmousedown="rzCapture(event)" onclick="sortBy('store')"><span class="th-label">STORE<span class="sort-arrow" data-sort="store"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="total" style="min-width:64px" onmousedown="rzCapture(event)" onclick="sortBy('total')"><span class="th-label">TOTAL<span class="sort-arrow" data-sort="total"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="time" style="min-width:96px" onmousedown="rzCapture(event)" onclick="sortBy('time')"><span class="th-label">TIME<span class="sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="delivery" style="min-width:150px" onmousedown="rzCapture(event)" onclick="sortBy('delivery')"><span class="th-label">DELIVERY<span class="sort-arrow" data-sort="delivery"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="tracking" style="min-width:150px" onmousedown="rzCapture(event)" onclick="sortBy('tracking')"><span class="th-label">TRACKING<span class="sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="delivery" style="min-width:90px" onmousedown="rzCapture(event)" onclick="sortBy('delivery')"><span class="th-label">DELIVERY<span class="sort-arrow" data-sort="delivery"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="tracking" style="min-width:128px" onmousedown="rzCapture(event)" onclick="sortBy('tracking')"><span class="th-label">TRACKING<span class="sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="actions" style="width:110px;min-width:110px;position:sticky;right:0;background:#fafaf9;z-index:3;box-shadow:-4px 0 8px rgba(0,0,0,.04)">ACTIONS</th>
             </tr>
           </thead>
@@ -969,6 +972,7 @@ function renderOrders(ordersOverride) {
       </td>
       <td data-col="customer"><span style="font-weight:500;color:#191918">${o.cust}</span></td>
       <td data-col="image" style="padding:6px 8px">${orderRowImg(o)}</td>
+      <td data-col="title">${orderRowTitle(o)}</td>
       <td data-col="items">
         <span style="display:flex;align-items:center;gap:4px;color:#374151">
           <strong>${totalQty}</strong>
@@ -1139,7 +1143,7 @@ function renderOrders(ordersOverride) {
     }).join('');
 
     rows.push(`<tr class="exp-row" id="exp-${o.no}" style="display:${isExp?'table-row':'none'}">
-      <td colspan="12" style="padding:0;background:#fff">
+      <td colspan="13" style="padding:0;background:#fff">
         <div style="background:#fff;padding:8px 20px 12px 60px">
           ${expItemsHtml}
           ${needsSetup ? `<button onclick="event.stopPropagation();orderAddInlineItem(${o.no})" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#191918;background:transparent;border:1px dashed #c4c3be;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#191918';this.style.background='#fff'" onmouseout="this.style.borderColor='#c4c3be';this.style.background='transparent'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button>` : ''}
@@ -1945,7 +1949,7 @@ function applyColVis() {
   });
 }
 
-let COL_ORDER = ['check','order','customer','image','items','status','store','total','time','delivery','tracking','actions'];
+let COL_ORDER = ['check','order','customer','image','title','items','status','store','total','time','delivery','tracking','actions'];
 let _dragColFrom = null;
 function initColDrag() {
   const table = document.getElementById('orders-table');
@@ -2697,6 +2701,14 @@ function orderRowImg(o) {
   if (!src) return '<div style="width:64px;height:64px;border-radius:8px;background:#f0ede9;border:1px solid #e5e4e0"></div>';
   const esc = src.replace(/'/g, "\\'");
   return `<img src="${src.replace(/"/g, '&quot;')}" onclick="event.stopPropagation();zoomImg('${esc}')" title="Click to view" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid #e5e4e0;cursor:pointer;background:#f6f5f4;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''" onerror="this.style.visibility='hidden'">`;
+}
+// Parent order-row product title — first item's listing/title, ellipsised.
+function orderRowTitle(o) {
+  const it0 = (o && o.itemsList && o.itemsList[0]) || null;
+  const t = it0 ? String(it0.listing || it0.name || '') : '';
+  if (!t) return '<span style="color:#d1d5db">—</span>';
+  const more = (o.itemsList && o.itemsList.length > 1) ? ' <span style="color:#9ca3af;font-weight:400">+' + (o.itemsList.length - 1) + '</span>' : '';
+  return `<div title="${t.replace(/"/g, '&quot;')}" style="max-width:240px;font-size:13.25px;color:#191918;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t}${more}</div>`;
 }
 function itemCompositeThumb(o, item, size) {
   size = size || 36;
