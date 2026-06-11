@@ -130,8 +130,9 @@
       var now = Date.now(), FRESH = 5 * 60 * 1000;
       var keep = local.filter(function (o) {
         if (!o || o.id == null || ids[o.id]) return false;            // server already has it
-        var ts = o._pendingSync || o.submittedAt || o.createdAt || 0;
-        return ts && (now - ts) < FRESH;                              // freshly created, not yet synced
+        if (o._pendingSync) return true;                              // un-synced — NEVER drop until the server confirms it
+        var ts = o.submittedAt || o.createdAt || 0;
+        return ts && (now - ts) < FRESH;                              // freshly created, sync still plausibly in flight
       });
       localStorage.setItem(KEY, JSON.stringify(incoming.concat(keep)));
     } catch (e) {
@@ -140,11 +141,86 @@
     try { window.dispatchEvent(new Event('eg-orders-changed')); } catch (e) {}
     try { window.dispatchEvent(new StorageEvent('storage', { key: KEY })); } catch (e) {}
   }
+  // ── Durable order sync ────────────────────────────────────────────────────
+  // A manual seller order is written to localStorage first, then POSTed. If that
+  // POST fails (API restarting during a deploy, network blip, …) the order would
+  // be local-only and the next hydrate's writeCache would eventually drop it —
+  // silent data loss. So we MARK every order as _pendingSync on POST and only
+  // CLEAR the flag once the server confirms it. writeCache keeps any flagged
+  // order forever (see above), and retrySync() re-POSTs them on every poll until
+  // they land. Result: a seller never loses an order they created.
+  function markPending(id, val) {
+    try {
+      var list = JSON.parse(localStorage.getItem(KEY) || '[]') || [];
+      var changed = false;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === id) {
+          if (val) list[i]._pendingSync = val; else delete list[i]._pendingSync;
+          changed = true; break;
+        }
+      }
+      if (changed) localStorage.setItem(KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+  function pushOrder(order) {
+    if (!order || order.id == null) return Promise.resolve();
+    markPending(order.id, Date.now());                                // protect it until the server confirms
+    return api('/orders', { method: 'POST', body: leanOrder(order) }).then(function (r) {
+      if (r && !r.error) markPending(order.id, null);                 // confirmed server-side → safe to drop locally
+      return r;                                                       // on error: leave flag set; retrySync() retries
+    });
+  }
+  function retrySync() {
+    if (!token()) return;
+    var list;
+    try { list = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { return; }
+    list.forEach(function (o) {
+      // Only re-push our own (non-Etsy) orders still awaiting confirmation.
+      if (o && o.id != null && o._pendingSync && String(o.id).indexOf('etsy-') !== 0) pushOrder(o);
+    });
+  }
+  // Durable status/tracking/timeline PATCH. Same problem as create: a fire-and-
+  // forget PATCH lost during an API restart silently drops the update. So we
+  // ACCUMULATE pending patches per order in localStorage (later fields override
+  // earlier — patches set absolute values, so re-sending is idempotent), attempt
+  // the PATCH, and clear only the fields the server confirmed. retryPatches()
+  // re-sends anything still outstanding on every hydrate/poll.
+  var PATCH_KEY = 'eg_pending_patches';
+  function readPatches() { try { return JSON.parse(localStorage.getItem(PATCH_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function writePatches(m) { try { localStorage.setItem(PATCH_KEY, JSON.stringify(m)); } catch (e) {} }
+  function flushPatch(orderId, sent) {
+    return api('/orders/' + encodeURIComponent(orderId), { method: 'PATCH', body: sent }).then(function (r) {
+      if (!r || r.error) return r;                                    // failed → leave queued for retry
+      var m = readPatches(), cur = m[orderId];
+      if (cur) {                                                      // drop only fields unchanged since we sent them
+        Object.keys(sent).forEach(function (k) {
+          if (JSON.stringify(cur[k]) === JSON.stringify(sent[k])) delete cur[k];
+        });
+        if (Object.keys(cur).length === 0) delete m[orderId]; else m[orderId] = cur;
+        writePatches(m);
+      }
+      return r;
+    });
+  }
+  function pushPatch(orderId, patch) {
+    if (orderId == null) return Promise.resolve();
+    var m = readPatches();
+    m[orderId] = Object.assign(m[orderId] || {}, patch || {});
+    writePatches(m);
+    return flushPatch(orderId, Object.assign({}, m[orderId]));
+  }
+  function retryPatches() {
+    if (!token()) return;
+    var m = readPatches();
+    Object.keys(m).forEach(function (id) { flushPatch(id, Object.assign({}, m[id])); });
+  }
   function hydrate() {
     if (!token()) return Promise.resolve();
     return api('/orders').then(function (r) {
       if (r.error) { console.warn('[egstore-api] hydrate failed:', r.error.message); return; }
       writeCache((r.data || []).map(dbToOrder));
+      retrySync();                                                    // recover any order whose POST never landed
+      retryPatches();                                                 // recover any status/tracking update that never landed
     });
   }
   // The /api/orders POST only stores scalar fields + a few item columns — it
@@ -179,14 +255,14 @@
       var res = origAdd.apply(EGStore, arguments);
       try {
         var saved = (EGStore.getOrders() || []).find(function (o) { return o.id === ((res && res.id) || (order && order.id)); }) || order;
-        api('/orders', { method: 'POST', body: leanOrder(saved) });
+        pushOrder(saved);
       } catch (e) {}
       return res;
     };
     var origUpdate = EGStore.update;
     if (typeof origUpdate === 'function') EGStore.update = function (orderId, patch) {
       var res = origUpdate.apply(EGStore, arguments);
-      try { api('/orders/' + encodeURIComponent(orderId), { method: 'PATCH', body: patch }); } catch (e) {}
+      try { pushPatch(orderId, patch); } catch (e) {}
       return res;
     };
     // submitOrder is the path EVERY manual/imported seller order takes — it
@@ -199,7 +275,7 @@
       var res = origSubmit.apply(EGStore, arguments);
       try {
         var saved = res || (opts && opts.id && (EGStore.getOrders() || []).find(function (o) { return o.id === opts.id; }));
-        if (saved && saved.id) api('/orders', { method: 'POST', body: leanOrder(saved) });
+        if (saved && saved.id) pushOrder(saved);
       } catch (e) {}
       return res;
     };
