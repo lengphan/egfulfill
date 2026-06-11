@@ -49,8 +49,14 @@
     return;
   }
 
+  // DEV ONLY — the role switcher (eg-role-switcher.js) sets eg_devview so one
+  // logged-in account can hop across every board while testing. The server still
+  // enforces real role permissions on /api, so this only relaxes client routing.
+  // To remove: delete this block + eg-role-switcher.js + its <script> tags.
+  var devView = false; try { devView = localStorage.getItem('eg_devview') === '1'; } catch (e) {}
+
   // Signed in but on the wrong kind of page → send to their own dashboard.
-  var authorized = level === 'any' ? true : (level === 'staff' ? isStaff : user.role === 'seller');
+  var authorized = devView || (level === 'any' ? true : (level === 'staff' ? isStaff : user.role === 'seller'));
   if (!authorized) { go(DASH[user.role] || 'seller-login.html'); return; }
   // authorized → allow the page to render.
 })();

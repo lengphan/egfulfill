@@ -53,7 +53,9 @@
                : (p.method ? [String(p.method).toUpperCase()] : (p.type ? [String(p.type).toUpperCase()] : ['DTG']));
     var colorCodes = Object.assign({}, p.colorCodes);
     colors.forEach(function (c) { if (!colorCodes[c]) colorCodes[c] = String(c).replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase() || 'CLR'; });
-    return { id: p.id, name: p.name, skuBase: p.sku || p.skuBase || ('SKU-' + p.id), printTypes: printTypes, colors: colors, sizes: sizes, colorCodes: colorCodes };
+    return { id: p.id, name: p.name, skuBase: p.sku || p.skuBase || ('SKU-' + p.id), printTypes: printTypes, colors: colors, sizes: sizes, colorCodes: colorCodes,
+             // Blank's image — the row photo comes ONLY from the selected blank.
+             img: p.mockup || p.img || p.thumb || '', colorImages: (p.colorImages && typeof p.colorImages === 'object') ? p.colorImages : null };
   }
   function syncBlankCatalog() {
     try {
@@ -276,7 +278,8 @@
       var title = titleEl ? titleEl.value.trim() : '';
       var autoTitle = ((product && product.name) || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : '');
       items.push({
-        img: 'https://placehold.co/80x80/f0ede9/9ca3af?text=' + encodeURIComponent(((product && product.skuBase) || '?').substring(0, 3)),
+        // Photo comes ONLY from the selected blank (per-color image when available).
+        img: (product && ((product.colorImages && product.colorImages[color]) || product.img)) || '',
         // Product/listing TITLE (what the customer ordered) — kept distinct from the
         // base blank we fulfil with (`product`). Falls back to an auto title.
         listing: title || autoTitle,

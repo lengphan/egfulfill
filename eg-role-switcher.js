@@ -1,5 +1,5 @@
 /* eg-role-switcher.js — quick role/board switcher (no data wiping).
-   A small floating widget (bottom-left) that lets you hop between the role
+   A small floating widget (top-center) that lets you hop between the role
    surfaces — Seller · Operator · Warehouse · Designer · Admin — WITHOUT logging
    out and back in, and WITHOUT clearing any state.
 
@@ -20,11 +20,11 @@
   window.__egRoleSwitcher = true;
 
   var ROLES = [
-    { key: 'seller',    label: 'Seller',    page: 'orders.html',    emoji: '🛍️' },
-    { key: 'operator',  label: 'Operator',  page: 'operator.html',  emoji: '🎨' },
-    { key: 'warehouse', label: 'Warehouse', page: 'warehouse.html', emoji: '📦' },
-    { key: 'designer',  label: 'Designer',  page: 'designer.html',  emoji: '✏️' },
-    { key: 'admin',     label: 'Admin',     page: 'admin.html',     emoji: '⚙️' }
+    { key: 'seller',    label: 'Seller',    page: 'orders.html' },
+    { key: 'operator',  label: 'Operator',  page: 'operator.html' },
+    { key: 'warehouse', label: 'Warehouse', page: 'warehouse.html' },
+    { key: 'designer',  label: 'Designer',  page: 'designer.html' },
+    { key: 'admin',     label: 'Admin',     page: 'admin.html' }
   ];
   // Pages that belong to the seller surface but aren't orders.html.
   var SELLER_PAGES = /^(orders|dashboard|wallet|stores|analytics|design-lab|design-maker|products-dash|settings|chat|fulfillment|apidocs|seller)\.html$/i;
@@ -40,7 +40,7 @@
     location.href = role.page;
   }
   function fullSignOut() {
-    try { localStorage.removeItem('eg_token'); localStorage.removeItem('eg_user'); } catch (e) {}
+    try { localStorage.removeItem('eg_token'); localStorage.removeItem('eg_user'); localStorage.removeItem('eg_devview'); } catch (e) {}
     location.href = 'login.html';
   }
 
@@ -50,12 +50,12 @@
     if (!host) {
       host = document.createElement('div');
       host.id = 'egrs-host';
-      host.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:100000;font-family:Inter,system-ui,sans-serif';
+      host.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:100000;font-family:Inter,system-ui,sans-serif';
       document.body.appendChild(host);
     }
     var pill = '<button id="egrs-pill" style="display:inline-flex;align-items:center;gap:8px;background:#191918;color:#fff;border:none;border-radius:999px;padding:8px 14px 8px 11px;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);font-family:inherit">'
-      + '<span style="font-size:13px">🧪</span><span style="opacity:.7;font-weight:500">View as</span><span>' + (current ? current.label : '—') + '</span>'
-      + '<span style="opacity:.6;font-size:10px">' + (open ? '▾' : '▴') + '</span></button>';
+      + '<span style="opacity:.7;font-weight:500">View as</span><span>' + (current ? current.label : '—') + '</span>'
+      + '<span style="opacity:.6;font-size:10px">' + (open ? '▴' : '▾') + '</span></button>';
 
     var menu = '';
     if (open) {
@@ -63,15 +63,14 @@
         var isCur = current && r.key === current.key;
         return '<button data-role="' + r.key + '" class="egrs-role" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:' + (isCur ? '#f4f2ef' : '#fff') + ';border:none;border-radius:8px;padding:9px 11px;font-size:13px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit" '
           + 'onmouseover="this.style.background=\'#f4f2ef\'" onmouseout="this.style.background=\'' + (isCur ? '#f4f2ef' : '#fff') + '\'">'
-          + '<span style="font-size:15px;width:20px;text-align:center">' + r.emoji + '</span>'
           + '<span style="flex:1">' + r.label + '</span>'
           + (isCur ? '<span style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">here</span>' : '<span style="color:#c4c3be">→</span>')
           + '</button>';
       }).join('');
-      menu = '<div id="egrs-menu" style="position:absolute;left:0;bottom:46px;width:240px;background:#fff;border:1px solid #e5e4e0;border-radius:13px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:7px;animation:egrsUp .14s ease">'
+      menu = '<div id="egrs-menu" style="position:absolute;left:50%;margin-left:-120px;top:46px;width:240px;background:#fff;border:1px solid #e5e4e0;border-radius:13px;box-shadow:0 12px 40px rgba(0,0,0,.18);padding:7px;animation:egrsUp .14s ease">'
         + '<div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:6px 8px 4px">Jump to board</div>'
         + rows
-        + '<button id="egrs-signout" style="display:block;width:100%;text-align:left;background:none;border:none;border-radius:8px;padding:8px 11px;margin-top:4px;border-top:1px solid #f0ede9;font-size:12.5px;font-weight:600;color:#dc2626;cursor:pointer;font-family:inherit" onmouseover="this.style.background=\'#fff5f5\'" onmouseout="this.style.background=\'none\'">⏻ Full sign out</button>'
+        + '<button id="egrs-signout" style="display:block;width:100%;text-align:left;background:none;border:none;border-radius:8px;padding:8px 11px;margin-top:4px;border-top:1px solid #f0ede9;font-size:12.5px;font-weight:600;color:#dc2626;cursor:pointer;font-family:inherit" onmouseover="this.style.background=\'#fff5f5\'" onmouseout="this.style.background=\'none\'">Full sign out</button>'
         + '<div style="font-size:10.5px;color:#b0aead;padding:4px 10px 6px;line-height:1.4">Nothing is wiped — the same orders &amp; statuses carry across boards so you can follow the flow. (Reset lives in Admin → Settings.)</div>'
         + '</div>';
     }
@@ -92,9 +91,12 @@
   });
 
   function boot() {
+    // Mark this browser as "dev view" so eg-guard.js lets this one account hop
+    // across every board. Cleared on Full sign out. (Dev-only; remove with this file.)
+    try { localStorage.setItem('eg_devview', '1'); } catch (e) {}
     if (!document.getElementById('egrs-css')) {
       var st = document.createElement('style'); st.id = 'egrs-css';
-      st.textContent = '@keyframes egrsUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}';
+      st.textContent = '@keyframes egrsUp{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}';
       document.head.appendChild(st);
     }
     render();

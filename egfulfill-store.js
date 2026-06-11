@@ -928,6 +928,51 @@
       location.reload();
     },
 
+    // Surgical reset for re-testing the order flow. Unlike clearAll() (full wipe),
+    // this removes ONLY the test data you added manually — manual orders (FF-*),
+    // design cards, catalog products + categories, per-order chats, and the
+    // order-flow routing state (board pushes, warehouse intake, operator sync).
+    // It KEEPS everything else: Etsy-synced orders (etsy-*), login session,
+    // balance/wallet, templates, integration keys, and all UI prefs. Seed demo
+    // orders are left in whatever state they're already in (eg_hide_seed untouched).
+    // Pass {showSeed:true} to also un-hide the baked-in demo orders.
+    clearTestData: function(opts) {
+      opts = opts || {};
+      var removed = [];
+
+      // 1) Orders — drop manual FF-* only; keep Etsy (etsy-*) and any other source.
+      try {
+        var orders = JSON.parse(localStorage.getItem('egfulfill_orders') || '[]');
+        if (Array.isArray(orders)) {
+          var kept = orders.filter(function(o){ return !/^FF-/i.test(String((o && o.id) || '')); });
+          var dropped = orders.length - kept.length;
+          if (kept.length) localStorage.setItem('egfulfill_orders', JSON.stringify(kept));
+          else localStorage.removeItem('egfulfill_orders');
+          if (dropped > 0) removed.push(dropped + ' manual order(s) (FF-*)');
+        }
+      } catch (e) {}
+
+      // 2) Cards, products, categories, chats, and order-flow routing state.
+      var wipeKeys = [
+        'egfulfill_design_cards',                                            // design cards
+        'eg_catalog_products', 'eg_catalog_products_blob', 'eg_product_categories', // products
+        'eg_order_chats',                                                    // per-order chats
+        'eg_pushed_to_board', 'eg_wh_incoming', 'egfulfill_op_sync',         // flow routing
+        'eg_seller_orders_used'                                              // seller order counter
+      ];
+      wipeKeys.forEach(function(k){
+        if (localStorage.getItem(k) !== null) { localStorage.removeItem(k); removed.push(k); }
+      });
+
+      // Optional: bring baked-in demo orders back into view.
+      if (opts.showSeed) localStorage.removeItem('eg_hide_seed');
+
+      console.log('[EGStore.clearTestData] KEPT Etsy orders, login, balance, keys & prefs. REMOVED:', removed);
+      if (!opts.silent) alert('Test data cleared — removed:\n• ' + (removed.join('\n• ') || '(nothing found)')
+        + '\n\nKept: Etsy orders, login, balance, keys, UI prefs.\nReloading…');
+      setTimeout(function(){ location.reload(); }, opts.silent ? 100 : 0);
+    },
+
     _toast: function(msg) {
       var t = document.createElement('div');
       t.textContent = msg;
