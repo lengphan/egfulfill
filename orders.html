@@ -11,7 +11,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
-<script src="eg-role-switcher.js" defer></script>
 <script defer src="eg-seller-plan.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="egfulfill-tracking.js"></script>
@@ -4247,6 +4246,19 @@ function noAddItem() {
   const pid = 'noi-' + Date.now();
   const popts = BLANK_CATALOG.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   const html = `<div class="no-item-row" id="${pid}" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">
+    <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:8px">
+      <div style="flex-shrink:0">
+        <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Image</label>
+        <label class="no-img-zone" data-img="" style="width:54px;height:54px;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:9px;line-height:1.2;text-align:center;overflow:hidden;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d5d0'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">
+          <input type="file" accept="image/*" style="display:none" onchange="noPickImg(this.files&&this.files[0],this.closest('.no-img-zone'))"/>
+          <span class="no-img-ph">＋<br>Image</span>
+        </label>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>
+        <input class="no-title" type="text" placeholder="e.g. Custom Embroidered Apron with Name, Personalized Kitchen Apron" style="${NO_IN}"/>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr 56px;gap:7px;margin-bottom:7px">
       <div>
         <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Base Product</label>
@@ -4284,6 +4296,24 @@ function noAddItem() {
     </div>
   </div>`;
   document.getElementById('no-items-list').insertAdjacentHTML('beforeend', html);
+}
+// Manual-order image drop-zone: read the dropped/selected file → data URL,
+// preview it as the zone background, and stash it on data-img for submit.
+function noPickImg(file, zone) {
+  if (!file || !zone || !/^image\//.test(file.type)) return;
+  const r = new FileReader();
+  r.onload = e => {
+    zone.dataset.img = e.target.result;
+    zone.style.backgroundImage = "url('" + e.target.result + "')";
+    const ph = zone.querySelector('.no-img-ph'); if (ph) ph.style.display = 'none';
+    zone.style.borderStyle = 'solid'; zone.style.borderColor = '#e5e4e0';
+  };
+  r.readAsDataURL(file);
+}
+function noDropImg(ev, zone) {
+  ev.preventDefault(); zone.style.borderColor = '#d8d5d0';
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (f) noPickImg(f, zone);
 }
 function noSyncProduct(sel) {
   const row = sel.closest('.no-item-row');
@@ -4403,10 +4433,16 @@ function submitNewOrder() {
     if (!_itemImg) {
       _itemImg = 'https://placehold.co/80x80/f0ede9/9ca3af?text=' + encodeURIComponent((product?.skuBase || '?').substring(0,3));
     }
+    // Seller-entered Product Title + uploaded Product Image (drop-zone) take
+    // priority; fall back to the blank's catalog image / auto-generated title.
+    const _sellerTitle = (row.querySelector('.no-title')?.value || '').trim();
+    const _imgZone = row.querySelector('.no-img-zone');
+    const _uploadedImg = (_imgZone && _imgZone.dataset.img) ? _imgZone.dataset.img : '';
+    const _autoTitle = (product?.name || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : '');
     items.push({
-      img: _itemImg,
-      listing: (product?.name || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : ''),
-      name: product?.name || 'Manual Item',
+      img: _uploadedImg || _itemImg,
+      listing: _sellerTitle || _autoTitle,
+      name: _sellerTitle || (product?.name || 'Manual Item'),
       blank: product?.name || '',
       sku: sku,
       tech: tech,
