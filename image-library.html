@@ -4,7 +4,7 @@
   <script src="eg-guard.js"></script>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Design Lab – EGFULFILL</title>
+<title>Image Library – EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -388,74 +388,33 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 
   <div style="padding:24px 32px 48px;max-width:1600px;margin:0 auto;width:100%">
 
+    <!-- Breadcrumb -->
+    <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:#9ca3af;margin-bottom:14px" class="fi">
+      <a href="design-lab.html" style="color:#9ca3af;text-decoration:none;transition:color .15s" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'">Design Lab</a>
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5l3 3.5-3 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span style="color:#374151;font-weight:600">Image Library</span>
+    </div>
     <!-- Page header -->
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:32px" class="fi">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px" class="fi">
       <div>
-        
-        <h1 style="font-size:1.3rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0">Welcome to Design Lab <svg width="16" height="16" viewBox="0 0 18 18" fill="none" style="display:inline-block;vertical-align:-2px;margin-left:1px"><path d="M9 2l1.3 4.2a2 2 0 001.5 1.5L16 9l-4.2 1.3a2 2 0 00-1.5 1.5L9 16l-1.3-4.2a2 2 0 00-1.5-1.5L2 9l4.2-1.3a2 2 0 001.5-1.5z" fill="#191918"/></svg></h1>
+        <h1 style="font-size:1.3rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 4px">Image Library</h1>
+        <div style="font-size:14px;color:#9ca3af;max-width:560px;line-height:1.55">Your uploaded design images. Copy an image link or design ID to drop straight into an import sheet.</div>
       </div>
       <a href="design-maker.html" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:9px;background:#111827;color:#fff;font-size:14px;font-weight:600;text-decoration:none;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background='#111827'">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        New Product
+        Upload Design
       </a>
     </div>
 
-    <!-- Three entry paths -->
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:40px" class="fi" style="animation-delay:.05s">
-
-      <!-- Row 1, left: Upload & design -->
-      <a href="design-maker.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M13.5 2.5l2 2-9 9-2.5.5.5-2.5 9-9z" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 15.5h14" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Upload & Design</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Start with your artwork. Upload a file, place it on a blank, generate a mockup, and publish.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Open editor
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-      </a>
-
-      <!-- Row 1, right: Use a template -->
-      <a href="product-templates.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2.5" stroke="#374151" stroke-width="1.3"/><path d="M6 6h6M6 9h6M6 12h4" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Use a Template</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Start from a saved product setup. Apply a fresh design to something you've already configured.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          View product templates
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-      </a>
-
-      <!-- Row 2, left: Image Library — your uploaded design images + copyable links / IDs -->
-      <a href="image-library.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><rect x="2" y="2.5" width="14" height="13" rx="2.5" stroke="#374151" stroke-width="1.3"/><circle cx="6.2" cy="6.5" r="1.4" stroke="#374151" stroke-width="1.3"/><path d="M2.5 13l4-4 3.2 3 2.3-2.2 3.5 3.4" stroke="#374151" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Image Library</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Your uploaded design images — copy each image link or design ID to drop straight into an import sheet.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Open library
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-      </a>
-
-      <!-- Row 2, right: Browse catalog -->
-      <a href="products-dash.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L16 5.5v7L9 16.5 2 12.5v-7L9 1.5z" stroke="#374151" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5v15M2 5.5l7 4 7-4" stroke="#374151" stroke-width="1.3"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Browse Catalog</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Browse blanks
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-      </a>
-
+    <!-- How-to hint -->
+    <div style="display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid #e5e4e0;border-radius:11px;padding:13px 15px;margin-bottom:22px" class="fi">
+      <svg width="17" height="17" viewBox="0 0 18 18" fill="none" style="flex-shrink:0;margin-top:1px"><circle cx="9" cy="9" r="7.3" stroke="#7a92c4" stroke-width="1.3"/><path d="M9 8v4M9 5.6h.01" stroke="#7a92c4" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <div style="font-size:13px;color:#6b7280;line-height:1.6">Copy a design's <b style="color:#374151">Image link</b> or <b style="color:#374151">Design ID</b> and paste it into the <b style="color:#374151">Product Image</b> column of your import sheet — orders will pull the artwork automatically on import.</div>
     </div>
+
+    <!-- Library grid -->
+    <div id="il-state" style="font-size:13.5px;color:#9ca3af;margin-bottom:16px" class="fi">Loading your uploads…</div>
+    <div id="il-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:14px;margin-bottom:44px"></div>
 
   </div>
 </div>
@@ -629,5 +588,67 @@ document.addEventListener('click',function(e){
 <script src="eg-new-order.js"></script>
 <script>window.XOC_ROLE = "seller";</script>
 <script src="eg-order-chat.js"></script>
+<script>
+/* ── Image Library — the seller's server-stored design uploads (/api/design_library).
+   Each card exposes a copyable Image link + Design ID for import sheets. ── */
+(function () {
+  var LIB = '/api/design_library';
+  function tok() { try { return localStorage.getItem('eg_token') || ''; } catch (e) { return ''; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+  window.ilCopy = function (text, btn) {
+    var done = function () { if (!btn) return; var o = btn.textContent; btn.textContent = 'Copied'; btn.style.color = '#15803d'; setTimeout(function () { btn.textContent = o; btn.style.color = ''; }, 1200); };
+    try { navigator.clipboard.writeText(text).then(done, done); } catch (e) {
+      var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e2) {} t.remove(); done();
+    }
+  };
+  window.ilDelete = function (id) {
+    if (!confirm('Remove this image from your library?')) return;
+    fetch(LIB + '/' + encodeURIComponent(id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok() } })
+      .then(function () { ilLoad(); }).catch(function () {});
+  };
+
+  var CPB = 'flex-shrink:0;font-size:11.5px;font-weight:600;font-family:inherit;color:#374151;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:6px;padding:4px 9px;cursor:pointer;transition:border-color .12s';
+  var FIELD = 'flex:1;min-width:0;font-size:11.5px;font-family:monospace;color:#374151;background:#f6f5f4;border-radius:6px;padding:5px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  var LBL = 'font-size:10px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.05em;width:38px;flex-shrink:0';
+
+  function card(d) {
+    var did = 'DL-' + d.id;
+    var link = location.origin + LIB + '/' + d.id;
+    var thumb = d.thumb || '';
+    var bg = thumb ? "background:#f6f5f4 url('" + String(thumb).replace(/'/g, "%27") + "') center/cover no-repeat" : 'background:#f0ede9';
+    return '<div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;overflow:hidden">'
+      + '<div style="position:relative;aspect-ratio:1;' + bg + ';border-bottom:1px solid #f0ede9">'
+      +   '<button onclick="ilDelete(' + d.id + ')" title="Remove" style="position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:50%;background:rgba(25,25,24,.7);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
+      + '</div>'
+      + '<div style="padding:12px 13px">'
+      +   '<div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px" title="' + esc(d.name) + '">' + (esc(d.name) || 'Untitled') + '</div>'
+      +   '<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="' + LBL + '">ID</span><code style="' + FIELD + '">' + esc(did) + '</code><button onclick="ilCopy(\'' + did + '\',this)" style="' + CPB + '" onmouseover="this.style.borderColor=\'#9ca3af\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">Copy</button></div>'
+      +   '<div style="display:flex;align-items:center;gap:7px"><span style="' + LBL + '">Link</span><code style="' + FIELD + '" title="' + esc(link) + '">' + esc(link) + '</code><button onclick="ilCopy(\'' + link.replace(/'/g, "\\'") + '\',this)" style="' + CPB + '" onmouseover="this.style.borderColor=\'#9ca3af\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">Copy</button></div>'
+      + '</div></div>';
+  }
+
+  window.ilLoad = function () {
+    var st = document.getElementById('il-state'), grid = document.getElementById('il-grid');
+    if (!st || !grid) return;
+    if (!tok()) { st.textContent = 'Sign in to see your uploads.'; return; }
+    st.textContent = 'Loading your uploads…'; grid.innerHTML = '';
+    fetch(LIB, { headers: { Authorization: 'Bearer ' + tok() } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        rows = rows || [];
+        if (!rows.length) {
+          st.innerHTML = 'No images yet. Upload artwork in <a href="design-maker.html" style="color:#191918;font-weight:600;text-decoration:underline">Design Maker</a> and it appears here automatically.';
+          return;
+        }
+        st.textContent = rows.length + ' image' + (rows.length === 1 ? '' : 's') + ' in your library';
+        grid.innerHTML = rows.map(card).join('');
+      })
+      .catch(function () { st.textContent = 'Could not load your library.'; });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ilLoad); else ilLoad();
+})();
+</script>
 </body>
 </html>
