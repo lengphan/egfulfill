@@ -1075,8 +1075,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <th data-col="seller" draggable="true" ondragstart="admDragColStart(event,'seller')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'seller')" onclick="admSortBy('seller')" onmousedown="rzCapture(event)" style="width:160px;min-width:80px"><span class="th-label">Seller / Source<span class="sort-arrow adm-sort-arrow" data-sort="seller"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="items" draggable="true" ondragstart="admDragColStart(event,'items')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'items')" onclick="admSortBy('items')" onmousedown="rzCapture(event)" style="width:80px;min-width:50px"><span class="th-label">Items<span class="sort-arrow adm-sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="status" draggable="true" ondragstart="admDragColStart(event,'status')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'status')" onclick="admSortBy('status')" onmousedown="rzCapture(event)" style="width:110px;min-width:70px"><span class="th-label">Status<span class="sort-arrow adm-sort-arrow" data-sort="status"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="carrier" draggable="true" ondragstart="admDragColStart(event,'carrier')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'carrier')" onclick="admSortBy('carrier')" onmousedown="rzCapture(event)" style="cursor:pointer;width:120px;min-width:80px"><span class="th-label">Carrier · Total <span class="sort-arrow adm-sort-arrow" data-sort="carrier"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="time" draggable="true" ondragstart="admDragColStart(event,'time')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'time')" onclick="admSortBy('time')" onmousedown="rzCapture(event)" style="cursor:pointer;width:90px;min-width:60px"><span class="th-label">Time <span class="sort-arrow desc adm-sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+            <th data-col="age" draggable="true" ondragstart="admDragColStart(event,'age')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'age')" onclick="admSortBy('age')" onmousedown="rzCapture(event)" style="cursor:pointer;width:70px;min-width:48px"><span class="th-label">Age <span class="sort-arrow desc adm-sort-arrow" data-sort="age"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="customer" draggable="true" ondragstart="admDragColStart(event,'customer')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'customer')" onclick="admSortBy('customer')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Customer<span class="sort-arrow adm-sort-arrow" data-sort="customer"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="tracking" draggable="true" ondragstart="admDragColStart(event,'tracking')" ondragover="admDragColOver(event)" ondragleave="admDragColLeave(event)" ondragend="admDragColEnd(event)" ondrop="admDragColDrop(event,'tracking')" onclick="admSortBy('tracking')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Tracking<span class="sort-arrow adm-sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="actions" style="width:240px"><span class="th-label">Actions</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
@@ -4261,6 +4260,15 @@ const ADM_STATUS_TAB = {
 function admCanonStatus(s) { return ADM_STATUS_TAB[s] || s; }
 // One consistent "real order date" format for every order: marketplace date for
 // synced orders, upload time for manual orders (both stored in _ts).
+// Compact "age since placed" for the Age column (full timestamp lives in the detail window).
+function admOrderAge(o) {
+  const ts = o && o._ts ? o._ts : 0;
+  if (!ts) return '<span style="color:#c4c3be">—</span>';
+  const hr = Math.floor((Date.now() - ts) / 3600000);
+  const txt = hr < 24 ? hr + 'hr' : Math.floor(hr / 24) + 'd';
+  const color = hr < 2 ? '#9ca3af' : hr < 8 ? '#6b7280' : hr < 24 ? '#374151' : '#b45309';
+  return '<span style="font-weight:600;color:' + color + '">' + txt + '</span>';
+}
 function whFmtOrderDate(o) {
   const ts = o && o._ts ? o._ts : 0;
   if (!ts) return o && (o.placed || o.time) ? (o.placed || o.time) : '—';
@@ -4442,11 +4450,7 @@ function whRenderOrders() {
         </div>
       </td>
       <td data-col="status"><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-      <td data-col="carrier">
-        <div style="font-size:13px;color:#374151">${o.carrier||'—'}</div>
-        <div style="font-size:12px;color:#9ca3af;margin-top:1px">${o.total||''}</div>
-      </td>
-      <td data-col="time" style="font-size:13px;color:#6b7280;white-space:nowrap">${whFmtOrderDate(o)}</td>
+      <td data-col="age" style="font-size:13px;white-space:nowrap">${admOrderAge(o)}</td>
       <td data-col="customer">
         <div style="font-size:13.5px;font-weight:600;color:#191918">${o.customer||'—'}</div>
       </td>
@@ -4644,9 +4648,9 @@ function whRenderOrders() {
   admReapplyExpanded();
 }
 
-let admColOrder = ['order','time','seller','customer','items','carrier','tracking','status','actions'];
+let admColOrder = ['order','age','seller','customer','items','tracking','status','actions'];
 let admDragColIdx = null;
-let admSortCol = 'time';
+let admSortCol = 'age';
 let admSortDir = 'desc';
 function admSortBy(col) {
   if (rzMoved) return;

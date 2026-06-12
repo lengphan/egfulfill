@@ -1110,8 +1110,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
             <!-- List view columns -->
             <div id="wh-col-list-opts">
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="seller" checked onchange="whToggleCol('seller')" style="accent-color:#111827"> Seller</label>
-              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="carrier" checked onchange="whToggleCol('carrier')" style="accent-color:#111827"> Carrier</label>
-              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="time" checked onchange="whToggleCol('time')" style="accent-color:#111827"> Time</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="age" checked onchange="whToggleCol('age')" style="accent-color:#111827"> Age</label>
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="customer" checked onchange="whToggleCol('customer')" style="accent-color:#111827"> Customer</label>
               <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.75px"><input type="checkbox" data-whcol="tracking" checked onchange="whToggleCol('tracking')" style="accent-color:#111827"> Tracking</label>
             </div>
@@ -1156,8 +1155,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
             <th data-col="seller" draggable="true" ondragstart="whDragColStart(event,'seller')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'seller')" onclick="whSortBy('seller')" onmousedown="rzCapture(event)" style="width:150px;min-width:80px"><span class="th-label">Seller / Source<span class="sort-arrow wh-sort-arrow" data-sort="seller"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="items" draggable="true" ondragstart="whDragColStart(event,'items')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'items')" onclick="whSortBy('items')" onmousedown="rzCapture(event)" style="width:80px;min-width:50px"><span class="th-label">Items<span class="sort-arrow wh-sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="status" draggable="true" ondragstart="whDragColStart(event,'status')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'status')" onclick="whSortBy('status')" onmousedown="rzCapture(event)" style="width:110px;min-width:70px"><span class="th-label">Status<span class="sort-arrow wh-sort-arrow" data-sort="status"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="carrier" draggable="true" ondragstart="whDragColStart(event,'carrier')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'carrier')" onclick="whSortBy('carrier')" onmousedown="rzCapture(event)" style="cursor:pointer;width:120px;min-width:80px"><span class="th-label">Carrier · Total <span class="sort-arrow wh-sort-arrow" data-sort="carrier"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="time" draggable="true" ondragstart="whDragColStart(event,'time')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'time')" onclick="whSortBy('time')" onmousedown="rzCapture(event)" style="cursor:pointer;width:90px;min-width:60px"><span class="th-label">Time <span class="sort-arrow desc wh-sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+            <th data-col="age" draggable="true" ondragstart="whDragColStart(event,'age')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'age')" onclick="whSortBy('age')" onmousedown="rzCapture(event)" style="cursor:pointer;width:70px;min-width:48px"><span class="th-label">Age <span class="sort-arrow desc wh-sort-arrow" data-sort="age"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="customer" draggable="true" ondragstart="whDragColStart(event,'customer')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'customer')" onclick="whSortBy('customer')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Customer<span class="sort-arrow wh-sort-arrow" data-sort="customer"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="tracking" draggable="true" ondragstart="whDragColStart(event,'tracking')" ondragover="whDragColOver(event)" ondrop="whDragColDrop(event,'tracking')" onclick="whSortBy('tracking')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Tracking<span class="sort-arrow wh-sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="actions" style="width:210px"><span class="th-label">Actions</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
@@ -4402,7 +4400,7 @@ let whStatusFilter = 'all';
 let whStoreFilter = 'all';
 let whPerPage = 25;   // rows per page in the orders table ('all' = no paging)
 let whPage = 1;
-let whSortCol = 'time';
+let whSortCol = 'age';
 let whSortDir = 'desc';
 let whDateFilter = 'all';
 let whSelectedOrders = new Set();
@@ -4482,6 +4480,15 @@ const WH_STATUS_TAB = {
 function whCanonStatus(s) { return WH_STATUS_TAB[s] || s; }
 // One consistent "real order date" format: marketplace date for synced orders,
 // upload time for manual orders (both stored in _ts).
+// Compact "age since placed" for the Age column (full timestamp lives in the detail window).
+function whOrderAge(o) {
+  const ts = o && o._ts ? o._ts : 0;
+  if (!ts) return '<span style="color:#c4c3be">—</span>';
+  const hr = Math.floor((Date.now() - ts) / 3600000);
+  const txt = hr < 24 ? hr + 'hr' : Math.floor(hr / 24) + 'd';
+  const color = hr < 2 ? '#9ca3af' : hr < 8 ? '#6b7280' : hr < 24 ? '#374151' : '#b45309';
+  return '<span style="font-weight:600;color:' + color + '">' + txt + '</span>';
+}
 function whFmtOrderDate(o) {
   const ts = o && o._ts ? o._ts : 0;
   if (!ts) return o && (o.placed || o.time) ? (o.placed || o.time) : '—';
@@ -5629,7 +5636,7 @@ function whPushDesign(orderNum, itemId, target) {
   whExpandedRows.add(orderNum);
   const r = document.getElementById('wh-detail-' + orderNum); if (r) r.style.display = 'table-row';
 }
-let whColOrder = ['order','time','seller','customer','items','carrier','tracking','status','actions'];
+let whColOrder = ['order','age','seller','customer','items','tracking','status','actions'];
 let whDragColIdx = null;
 function whDragColStart(e,colName){
   whDragColIdx = whColOrder.indexOf(colName);
@@ -5971,11 +5978,7 @@ function whRenderOrders() {
       <td data-col="status">
         <span class="badge ${badgeClass}">${badgeLabel}</span>
       </td>
-      <td data-col="carrier">
-        <div style="font-size:13.25px;color:#374151">${o.carrier||'—'}</div>
-        <div style="font-size:12.25px;color:#9ca3af;margin-top:1px">${o.total||''}</div>
-      </td>
-      <td data-col="time" style="font-size:13.25px;color:#6b7280;white-space:nowrap">${whFmtOrderDate(o)}</td>
+      <td data-col="age" style="font-size:13.25px;white-space:nowrap">${whOrderAge(o)}</td>
       <td data-col="customer">
         <div style="font-size:13.75px;font-weight:600;color:#191918">${o.customer}</div>
       </td>
