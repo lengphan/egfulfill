@@ -7569,10 +7569,9 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             </div>
             <div style="overflow-y:auto;padding:18px 18px;display:flex;flex-direction:column;gap:14px">
               <div>
-                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Design Approvals</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">Per-design board assignment</div>
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Costs</div>
               </div>
-              <div id="xfom-designs"></div>
+              <div id="xfom-costs"></div>
               <div style="margin-top:6px;padding-top:14px;border-top:1px solid #f0ede9">
                 <div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Order History</div>
                 <div id="xfom-history" style="display:flex;flex-direction:column;gap:8px;font-size:11.75px"></div>
@@ -7835,50 +7834,23 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     } else {
       notesEl.innerHTML = '<span style="color:#9ca3af">No notes yet</span>';
     }
-    const designs = (o && (o.designs || items.filter(it => it.sku || it.printType))) || [];
-    const desEl = document.getElementById('xfom-designs');
-    // Consolidate items that share the SAME artwork into ONE approval card, so a
-    // single design isn't repeated once per size/sku. Group by the resolved design
-    // image (falls back to name+method). Each card lists every item it covers and
-    // keeps its own board-assignment dropdown — nothing is dropped, just merged.
-    const _daGroups = [], _daIdx = {};
-    designs.forEach(d => {
-      const ds = _xfomDesign(d);
-      const key = ds || ((d.name || d.product || '') + '|' + (d.printType || d.printedType || ''));
-      if (_daIdx[key] == null) { _daIdx[key] = _daGroups.length; _daGroups.push({ design: ds, rep: d, items: [] }); }
-      _daGroups[_daIdx[key]].items.push(d);
-    });
-    if (_daGroups.length) {
-      desEl.innerHTML = _daGroups.map(g => {
-        const d = g.rep;
-        // Design approvals column shows the *bare* design (what the seller
-        // uploaded) — no mockup overlay, so the operator can review artwork
-        // on its own. Falls back to a tech-tag placeholder when no design is
-        // attached yet.
-        const designSrc = g.design;
-        const _skus = g.items.map(x => x.sku).filter(Boolean);
-        const _n = g.items.length;
-        const _badge = _n > 1 ? `<span style="font-size:10.5px;font-weight:700;color:#6b7280;background:#eeece7;border-radius:5px;padding:1px 6px;margin-left:6px">×${_n}</span>` : '';
-        const _sub = _n > 1
-          ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">Covers ${_n} items: ${_skus.join(', ')}</div>`
-          : `<div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>`;
-        return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-          <div style="width:42px;height:42px;background:#fff;border:1px solid #f0ede9;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">
-            ${designSrc ? `<img src="${designSrc}" style="max-width:100%;max-height:100%;object-fit:contain;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=&quot;font-size:10px;color:#9ca3af&quot;>'+(\`${d.printType || d.printedType || 'ART'}\`)+'</span>'"/>` : `<span style="font-size:10px;color:#9ca3af">${d.printType || d.printedType || 'ART'}</span>`}
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}${_badge}</div>
-            ${_sub}
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-            <select class="select" style="font-size:12px;padding:4px 6px">
-              <option>DTG Board</option><option>DTF Board</option><option>EMB Board</option>
-            </select>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      desEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No designs to approve</div>';
+    // Costs panel (replaces the old Design Approvals board-assignment list).
+    // Subtotal = live blank cost (Σ resolved unit × qty, same resolver as the line
+    // items); Shipping appears once a USPS label is bought (its cost is stored on
+    // o.total alongside a tracking #); Total = grand total.
+    const costsEl = document.getElementById('xfom-costs');
+    if (costsEl) {
+      const _csub = computedTotal || 0;
+      const _cship = (o && o.tracking && parseFloat(o.total) > 0) ? parseFloat(o.total) : 0;
+      const _cgrand = _csub + _cship;
+      const _crow = (lbl, val, strong) => '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0">'
+        + '<span style="color:#9ca3af">' + lbl + '</span>'
+        + '<span style="' + (strong ? 'font-weight:800;color:#191918;font-size:15px' : 'color:#374151;font-weight:600') + '">' + val + '</span></div>';
+      costsEl.innerHTML =
+        _crow('Subtotal · ' + items.length + ' item' + (items.length === 1 ? '' : 's'), '$' + _csub.toFixed(2))
+        + _crow('Shipping', _cship > 0 ? '$' + _cship.toFixed(2) : '<span style="color:#c4c3be">—</span>')
+        + '<div style="border-top:1px solid #e5e4e0;margin:8px 0 5px"></div>'
+        + _crow('Total', '$' + _cgrand.toFixed(2), true);
     }
     _xfomRenderHistory(num);
     _xfomRenderFooter();

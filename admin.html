@@ -8769,10 +8769,9 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div style="overflow-y:auto;padding:18px 18px;display:flex;flex-direction:column;gap:14px">
               <div>
-                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Design Approvals</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:2px">Per-design board assignment</div>
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Costs</div>
               </div>
-              <div id="xfom-designs"></div>
+              <div id="xfom-costs"></div>
             </div>
           </div>
           <div style="padding:12px 22px;border-top:1px solid #f3f3f1;display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="btn btn-out" onclick="xfomClose()">Close</button><div id="xfom-footer-actions" style="margin-left:auto;display:flex;gap:8px"></div></div>
@@ -8938,52 +8937,20 @@ document.addEventListener('DOMContentLoaded', function() {
       notesEl.innerHTML = '<span style="color:#9ca3af">No notes yet</span>';
     }
     // Design approvals
-    const designs = (o && (o.designs || (items.filter(it => it.sku || it.printType)))) || [];
-    const desEl = document.getElementById('xfom-designs');
-    // Consolidate items that share the SAME design into ONE approval card (group
-    // by name+method) so one design isn't repeated per size/sku. Each card lists
-    // the items it covers and keeps its board dropdown — nothing dropped, just merged.
-    const _daGroups = [], _daIdx = {};
-    designs.forEach(d => {
-      const key = (d.name || d.product || '') + '|' + (d.printType || d.printedType || '');
-      if (_daIdx[key] == null) { _daIdx[key] = _daGroups.length; _daGroups.push({ rep: d, items: [] }); }
-      _daGroups[_daIdx[key]].items.push(d);
-    });
-    if (_daGroups.length) {
-      desEl.innerHTML = _daGroups.map(g => {
-        const d = g.rep;
-        const _skus = g.items.map(x => x.sku).filter(Boolean);
-        const _n = g.items.length;
-        const _badge = _n > 1 ? `<span style="font-size:10.5px;font-weight:700;color:#6b7280;background:#eeece7;border-radius:5px;padding:1px 6px;margin-left:6px">×${_n}</span>` : '';
-        const _sub = _n > 1
-          ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">Covers ${_n} items: ${_skus.join(', ')}</div>`
-          : `<div style="font-size:11.5px;color:#9ca3af">${d.sku || ''}</div>`;
-        // Resolve the real design image (uploaded/adopted/customer file) so the card
-        // mirrors the artwork — updates live because the xfom re-renders on eg-design-updated.
-        let _daImg = '';
-        try {
-          if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const r = EGStore.getRawDesign((o && o.id) || _xfomNum, d.sku); if (r && /^(https?:|data:)/.test(String(r))) _daImg = r; }
-          if (!_daImg && EGStore.getCachedImage) { const c = EGStore.getCachedImage((o && o.id) || _xfomNum, d.sku); if (c && /^(https?:|data:)/.test(String(c))) _daImg = c; }
-        } catch (e) {}
-        if (!_daImg) _daImg = d.customerFile || (d.designSrc && /^https?:\/\//i.test(String(d.designSrc)) ? d.designSrc : '') || d.designUrl || '';
-        const _daThumb = _daImg
-          ? `<img src="${_daImg}" style="width:42px;height:42px;border-radius:6px;object-fit:cover;flex-shrink:0;border:1px solid #f0ede9" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<div style=&quot;width:42px;height:42px;background:#f0ede9;border-radius:6px;flex-shrink:0&quot;></div>')">`
-          : `<div style="width:42px;height:42px;background:#f0ede9;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#9ca3af">${d.printType || d.printedType || 'ART'}</div>`;
-        return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:10px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
-        ${_daThumb}
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13.5px;font-weight:600;color:#191918">${d.name || d.product || 'Design'}${_badge}</div>
-          ${_sub}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-          <select class="select" style="font-size:12px;padding:4px 6px">
-            <option>DTG Board</option><option>EMB Board</option><option>SUB Board</option><option>SCR Board</option>
-          </select>
-        </div>
-      </div>`;
-      }).join('');
-    } else {
-      desEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No designs to approve</div>';
+    // Costs panel (replaces the old Design Approvals board-assignment list).
+    const costsEl = document.getElementById('xfom-costs');
+    if (costsEl) {
+      const _csub = computedTotal || 0;
+      const _cship = (o && o.tracking && parseFloat(o.total) > 0) ? parseFloat(o.total) : 0;
+      const _cgrand = _csub + _cship;
+      const _crow = (lbl, val, strong) => '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:5px 0">'
+        + '<span style="color:#9ca3af">' + lbl + '</span>'
+        + '<span style="' + (strong ? 'font-weight:800;color:#191918;font-size:15px' : 'color:#374151;font-weight:600') + '">' + val + '</span></div>';
+      costsEl.innerHTML =
+        _crow('Subtotal · ' + items.length + ' item' + (items.length === 1 ? '' : 's'), '$' + _csub.toFixed(2))
+        + _crow('Shipping', _cship > 0 ? '$' + _cship.toFixed(2) : '<span style="color:#c4c3be">—</span>')
+        + '<div style="border-top:1px solid #e5e4e0;margin:8px 0 5px"></div>'
+        + _crow('Total', '$' + _cgrand.toFixed(2), true);
     }
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
