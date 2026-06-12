@@ -4118,6 +4118,21 @@ function odmRemoveDesign(ordNo, sku) {
       }
     }
   } catch(e) { console.warn('[orders] EGStore hydrate failed', e); }
+  // 0b. Re-attach inline-added items to LIVE orders. The parse-time rehydrate pass
+  //     only saw demo orders (live orders are merged in just above), so without this
+  //     an item the seller added inline — and any design they attached to it via a
+  //     design-maker round trip — silently vanishes on the next load. Idempotent:
+  //     skips items whose SKU is already present.
+  try {
+    const _inlineMap = JSON.parse(localStorage.getItem(EG_NEW_ITEMS_KEY) || '{}');
+    ORDERS.forEach(function(o){
+      const list = _inlineMap[o.id];
+      if (!Array.isArray(list) || !list.length) return;
+      o.itemsList = Array.isArray(o.itemsList) ? o.itemsList : [];
+      const present = new Set(o.itemsList.map(function(it){ return it && it.sku; }).filter(Boolean));
+      list.forEach(function(it){ if (it && it.sku && !present.has(it.sku)) o.itemsList.push(it); });
+    });
+  } catch(e){}
   // 1. Restore previously edited blank/tech values for any item
   try {
     const edits = JSON.parse(localStorage.getItem(EG_EDIT_KEY) || '{}');
