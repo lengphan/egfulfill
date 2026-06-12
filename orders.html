@@ -2323,7 +2323,7 @@ function openDetailModal(ordNo) {
     // one labeled button reflecting the current state. Click opens the
     // slide-in action panel with all the choices. Source state from the
     // existing UP_STATE map (uploaded design) + item.designId hints.
-    const _hasUpload = !!(UP_STATE[o.no] && UP_STATE[o.no][item.sku] && UP_STATE[o.no][item.sku].dataUrl);
+    const _hasUpload = !!(UP_STATE[o.no] && UP_STATE[o.no][itemDK(item)] && UP_STATE[o.no][itemDK(item)].dataUrl);
     let designLabel, designIcon, designColor, designBg, designBorder;
     if (_hasUpload) {
       designLabel = 'Design attached'; designColor = '#15803d'; designBg = '#f0fdf4'; designBorder = '#86efac';
@@ -5626,11 +5626,14 @@ function uploadAll() {
   const ordNo = UP_CURRENT_ORD;
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  const items = Array.isArray(UP_FILTER_SKU) ? o.itemsList.filter(i => UP_FILTER_SKU.includes(i.sku))
-              : UP_FILTER_SKU ? o.itemsList.filter(i => i.sku === UP_FILTER_SKU)
+  assignDesignKeys(o.itemsList);
+  // UP_FILTER_SKU is a per-line DESIGN KEY, so filter by itemDK — NOT raw sku
+  // (raw sku matches every same-SKU sibling and wrongly demands a file for them).
+  const items = Array.isArray(UP_FILTER_SKU) ? o.itemsList.filter(i => UP_FILTER_SKU.includes(itemDK(i)))
+              : UP_FILTER_SKU ? o.itemsList.filter(i => itemDK(i) === UP_FILTER_SKU)
               : o.itemsList;
   // If single item and still idle, trigger the file picker
-  if (items.length === 1 && (UP_STATE[ordNo]?.[items[0].sku]?.state || 'idle') === 'idle') {
+  if (items.length === 1 && (UP_STATE[ordNo]?.[itemDK(items[0])]?.state || 'idle') === 'idle') {
     const safeId = `${ordNo}_${itemDK(items[0]).replace(/[^a-z0-9]/gi,'_')}`;
     document.querySelector(`#dz-${safeId} input[type=file]`)?.click();
     return;
