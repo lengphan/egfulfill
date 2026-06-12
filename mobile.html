@@ -9,11 +9,14 @@
 <meta name="apple-mobile-web-app-title" content="EG Floor">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <title>EG Floor — Warehouse</title>
 <style>
   :root{
-    --bg:#f4f2ef; --card:#ffffff; --bd:#e5e4e0; --dk:#111827; --gold:#d4a017;
-    --tx:#191918; --mut:#6b6b68; --red:#c0392b; --amber:#b8860b; --green:#1e7a46;
+    --bg:#f4f2ef; --card:#ffffff; --bd:#e5e4e0; --dk:#1a1917;
+    --tx:#191918; --mut:#6b6b68; --red:#c0392b; --warn:#6b7280; --green:#1e7a46;
+    --cream:#f3eee2;                 /* wordmark / accents on the dark bar */
     --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.05);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -33,11 +36,11 @@
     padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
     display:flex;align-items:center;gap:10px;
   }
-  header.bar .logo{font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:18px;letter-spacing:-.3px}
-  header.bar .logo b{color:var(--gold)}
-  header.bar .who{margin-left:auto;font-size:11px;text-align:right;line-height:1.3;opacity:.85}
+  header.bar .logo{font-family:'Fraunces',Georgia,serif;font-weight:900;font-optical-sizing:auto;font-size:21px;letter-spacing:-.2px;color:var(--cream)}
+  header.bar .logo .floor{font-family:-apple-system,'Segoe UI',sans-serif;font-weight:500;font-size:12px;letter-spacing:.2px;opacity:.5;margin-left:1px}
+  header.bar .who{margin-left:auto;font-size:11px;text-align:right;line-height:1.3;opacity:.9}
   header.bar .who span{display:block}
-  header.bar .who .role{color:var(--gold);text-transform:uppercase;letter-spacing:.5px;font-weight:700;font-size:9px}
+  header.bar .who .role{color:var(--cream);opacity:.75;text-transform:uppercase;letter-spacing:.5px;font-weight:700;font-size:9px}
   header.bar .out{font-size:11px;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 9px;color:#fff}
 
   main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -55,9 +58,9 @@
     flex:1;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
     color:var(--mut);font-size:10px;font-weight:600;letter-spacing:.2px;position:relative;
   }
-  nav.tabs button svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none}
+  nav.tabs button svg{width:23px;height:23px;fill:currentColor}
   nav.tabs button.on{color:var(--dk)}
-  nav.tabs button.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:26px;height:2.5px;background:var(--gold);border-radius:0 0 3px 3px}
+  nav.tabs button.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:26px;height:2.5px;background:var(--dk);border-radius:0 0 3px 3px}
   nav.tabs button .dot{position:absolute;top:6px;right:calc(50% - 18px);min-width:15px;height:15px;border-radius:8px;background:var(--red);color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px}
   nav.tabs button .dot.show{display:flex}
 
@@ -76,18 +79,18 @@
   .stocknum .n{font-size:21px;font-weight:800;line-height:1}
   .stocknum .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-top:2px}
   .stocknum.low .n{color:var(--red)}
-  .stocknum.warn .n{color:var(--amber)}
+  .stocknum.warn .n{color:var(--warn)}
 
   .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.3px;
     text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid transparent}
   .b-new{background:#eef2ff;color:#3949ab;border-color:#dfe4ff}
-  .b-queue{background:#fff7e6;color:#b8860b;border-color:#ffe8bf}
+  .b-queue{background:#eef0f2;color:#4b5563;border-color:#dde1e6}
   .b-prod{background:#e8f0fe;color:#1a56c4;border-color:#d3e2fd}
-  .b-qc{background:#f3e8ff;color:#7e3ff2;border-color:#e9d5ff}
+  .b-qc{background:#e6f6fb;color:#0e7490;border-color:#c9eaf3}
   .b-packed{background:#e6f7ee;color:#1e7a46;border-color:#c8ecd6}
   .b-shipped{background:#eef0f2;color:#374151;border-color:#dde1e6}
   .b-low{background:#fdecea;color:#c0392b;border-color:#f7c9c4}
-  .b-warn{background:#fdf3e0;color:#b8860b;border-color:#f3e0b8}
+  .b-warn{background:#f1f1ef;color:#6b7280;border-color:#e2e1dc}
 
   /* ── Search box ──────────────────────────────────────────── */
   .search{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--bd);
@@ -107,20 +110,20 @@
   .reticle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
   .reticle .box{width:74%;max-width:300px;aspect-ratio:1.4;border-radius:18px;
     box-shadow:0 0 0 100vmax rgba(0,0,0,.42);border:2px solid rgba(255,255,255,.5);position:relative}
-  .reticle .box .corner{position:absolute;width:26px;height:26px;border:3px solid var(--gold)}
+  .reticle .box .corner{position:absolute;width:26px;height:26px;border:3px solid var(--cream)}
   .reticle .box .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:12px 0 0 0}
   .reticle .box .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 12px 0 0}
   .reticle .box .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 12px}
   .reticle .box .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 12px 0}
-  .reticle .box .laser{position:absolute;left:8%;right:8%;height:2px;background:var(--gold);box-shadow:0 0 8px var(--gold);top:50%;animation:scanline 2.4s ease-in-out infinite}
+  .reticle .box .laser{position:absolute;left:8%;right:8%;height:2px;background:var(--cream);box-shadow:0 0 10px rgba(243,238,226,.9);top:50%;animation:scanline 2.4s ease-in-out infinite}
   @keyframes scanline{0%,100%{top:14%}50%{top:86%}}
   .scanhint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#fff;font-size:12.5px;text-shadow:0 1px 3px #000;font-weight:600}
   .scanpanel{padding:16px 14px}
   .scanstart{background:var(--dk);color:#fff;width:100%;padding:15px;border-radius:13px;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px}
-  .scanstart svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none}
+  .scanstart svg{width:20px;height:20px;fill:currentColor}
   .manual{display:flex;gap:8px;margin-top:12px}
   .manual input{flex:1;border:1px solid var(--bd);border-radius:11px;padding:13px;font-size:15px;outline:none;background:var(--card)}
-  .manual button{background:var(--gold);color:#fff;border-radius:11px;padding:0 18px;font-weight:700;font-size:14px}
+  .manual button{background:var(--dk);color:var(--cream);border-radius:11px;padding:0 18px;font-weight:700;font-size:14px}
   .scanlog{margin-top:8px}
   .scanlog .row{margin-bottom:8px}
 
@@ -159,8 +162,7 @@
   /* ── Login ───────────────────────────────────────────────── */
   #login{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;
     justify-content:center;padding:30px 26px calc(env(safe-area-inset-bottom) + 30px)}
-  #login .brand{font-family:Georgia,serif;font-weight:700;font-size:30px;text-align:center;margin-bottom:5px;letter-spacing:-.5px}
-  #login .brand b{color:var(--gold)}
+  #login .brand{font-family:'Fraunces',Georgia,serif;font-weight:900;font-optical-sizing:auto;font-size:38px;text-align:center;margin-bottom:6px;letter-spacing:-.5px;color:var(--tx)}
   #login .tag{text-align:center;color:var(--mut);font-size:12.5px;margin-bottom:30px;letter-spacing:.3px}
   #login label{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;display:block;margin:0 2px 6px}
   #login input{width:100%;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:16px;outline:none;background:var(--card);margin-bottom:15px}
@@ -182,7 +184,7 @@
 
 <!-- ═══ LOGIN ═══ -->
 <div id="login">
-  <div class="brand">eg<b>fulfill</b></div>
+  <div class="brand">egfulfill</div>
   <div class="tag">Floor App · Warehouse &amp; Admin</div>
   <label>Email</label>
   <input id="lg-email" type="email" autocomplete="username" inputmode="email" placeholder="you@warehouse.com">
@@ -196,7 +198,7 @@
 <!-- ═══ APP ═══ -->
 <div id="app" style="display:none">
   <header class="bar">
-    <div class="logo">eg<b>fulfill</b> <span style="opacity:.5;font-weight:400;font-size:12px">Floor</span></div>
+    <div class="logo">egfulfill<span class="floor">Floor</span></div>
     <div class="who">
       <span class="role" id="hd-role">—</span>
       <span id="hd-name">—</span>
@@ -214,7 +216,7 @@
       </div>
       <div class="scanpanel">
         <button class="scanstart" id="scanbtn">
-          <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M3 12h18"/></svg>
+          <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
           <span id="scanbtntxt">Start camera scan</span>
         </button>
         <div class="manual">
@@ -259,20 +261,20 @@
 
   <nav class="tabs">
     <button data-tab="scan" class="on">
-      <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M3 12h18"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
       Scan
     </button>
     <button data-tab="inv">
-      <svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>
+      <svg viewBox="0 0 16 16"><path d="M7.32 1.6a1.5 1.5 0 011.36 0l4.5 2.25L8 6.55 2.82 3.85l4.5-2.25z"/><path d="M1.7 5.1L7.3 8v6.2l-5.04-2.52a1 1 0 01-.56-.9V5.1z"/><path d="M14.3 5.1v5.68a1 1 0 01-.56.9L8.7 14.2V8L14.3 5.1z"/></svg>
       Inventory
     </button>
     <button data-tab="ord">
-      <svg viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 0 1 1 1v15l-3-2-3 2-3-2-3 2V5a1 1 0 0 1 1-1z"/><path d="M9 8h6M9 12h6"/></svg>
+      <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>
       Orders
     </button>
     <button data-tab="low">
       <span class="dot" id="low-dot">0</span>
-      <svg viewBox="0 0 24 24"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M8 1.7c.54 0 1.04.29 1.3.76l5.45 9.64c.53.94-.14 2.1-1.3 2.1H2.55c-1.16 0-1.83-1.16-1.3-2.1L6.7 2.46c.26-.47.76-.76 1.3-.76zm-.8 3.9a.8.8 0 011.6 0l-.22 3.05a.58.58 0 01-1.16 0L7.2 5.6zM8 10.5a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>
       Low Stock
     </button>
   </nav>
@@ -537,42 +539,79 @@ function fmtAddr(o){
   return parts.length ? parts.join('<br>') : '';
 }
 
-/* ════════ SCAN ════════ */
+/* ════════ SCAN ════════
+   Real camera barcode/QR scanning on every phone:
+   • Android Chrome → the fast native BarcodeDetector path.
+   • iOS Safari (no BarcodeDetector) → lazy-load ZXing and decode the camera
+     stream in-page. Both call onScan() with the decoded value.
+   Manual typing stays as a last-resort fallback (camera denied / no network). */
 var scanStream=null, scanRAF=null, detector=null, scanning=false, lastHit='', lastHitAt=0;
+var zxingReader=null, zxingControls=null, _zxingP=null;
 function supportsBarcode(){ return ('BarcodeDetector' in window); }
+
 function startScan(){
   if (scanning) return;
-  if (!supportsBarcode()){
-    toast('Live scan unavailable on this browser — type the code');
-    $('scaninput').focus();
-    return;
-  }
-  navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } }).then(function(stream){
-    scanStream=stream; var v=$('cam'); v.srcObject=stream; v.play();
-    $('scanwrap').style.display='flex';
-    $('scanbtntxt').textContent='Stop camera';
-    scanning=true;
-    try{ detector = new window.BarcodeDetector(); }catch(e){ detector=new window.BarcodeDetector({formats:['qr_code','code_128','ean_13','code_39','upc_a','upc_e','codabar']}); }
-    tick();
-  }).catch(function(err){
-    toast('Camera blocked — type the code instead');
-    $('scaninput').focus();
-  });
+  if (supportsBarcode()) startNativeScan();
+  else startZxingScan();
+}
+
+// Android / Chromium — native BarcodeDetector over our own camera stream.
+function startNativeScan(){
+  $('scanhint').textContent='Starting camera…';
+  navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } } }).then(function(stream){
+    scanStream=stream; var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
+    try{ detector=new window.BarcodeDetector({ formats:['qr_code','code_128','ean_13','ean_8','code_39','code_93','upc_a','upc_e','itf','codabar','data_matrix','aztec','pdf417'] }); }
+    catch(e){ try{ detector=new window.BarcodeDetector(); }catch(e2){ detector=null; } }
+    if(!detector){ if(scanStream){scanStream.getTracks().forEach(function(t){t.stop();});scanStream=null;} startZxingScan(); return; }
+    $('scanwrap').style.display='flex'; $('scanbtntxt').textContent='Stop camera'; $('scanhint').textContent='Point at a barcode or QR code';
+    scanning=true; tick();
+  }).catch(function(){ scanning=false; $('scanhint').textContent='Point at a barcode or QR code'; toast('Camera blocked — allow camera access, or type the code'); $('scaninput').focus(); });
 }
 function tick(){
   if(!scanning) return;
   var v=$('cam');
   if (v.readyState>=2 && detector){
-    detector.detect(v).then(function(codes){
-      if (codes && codes.length){ onScan(codes[0].rawValue); }
-    }).catch(function(){});
+    detector.detect(v).then(function(codes){ if (codes && codes.length) onScan(codes[0].rawValue); }).catch(function(){});
   }
   scanRAF = requestAnimationFrame(tick);
 }
+
+// iOS Safari & anything without BarcodeDetector — ZXing decodes the live camera.
+function loadZxing(){
+  if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) return Promise.resolve();
+  if (_zxingP) return _zxingP;
+  _zxingP = new Promise(function(res,rej){
+    var s=document.createElement('script');
+    s.src='https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js';
+    s.async=true; s.onload=res; s.onerror=function(){ _zxingP=null; rej(new Error('load failed')); };
+    document.head.appendChild(s);
+  });
+  return _zxingP;
+}
+function startZxingScan(){
+  scanning=true; $('scanwrap').style.display='flex'; $('scanhint').textContent='Loading scanner…'; $('scanbtntxt').textContent='Stop camera';
+  loadZxing().then(function(){
+    if(!scanning) return;                          // user hit Stop while loading
+    zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+    return zxingReader.decodeFromConstraints({ video:{ facingMode:{ ideal:'environment' } } }, $('cam'), function(result){
+      if (result) onScan(result.getText ? result.getText() : (result.text || ''));
+    });
+  }).then(function(controls){
+    if(!scanning){ if(controls&&controls.stop) controls.stop(); return; }
+    zxingControls = controls; $('scanhint').textContent='Point at a barcode or QR code';
+  }).catch(function(){
+    stopScan(); toast('Could not start the camera scanner — type the code'); $('scaninput').focus();
+  });
+}
+
 function stopScan(){
   scanning=false;
-  if(scanRAF) cancelAnimationFrame(scanRAF);
-  if(scanStream){ scanStream.getTracks().forEach(function(t){t.stop();}); scanStream=null; }
+  if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF=null; }
+  if(zxingControls){ try{ zxingControls.stop(); }catch(e){} zxingControls=null; }
+  if(zxingReader){ try{ zxingReader.reset && zxingReader.reset(); }catch(e){} zxingReader=null; }
+  if(scanStream){ scanStream.getTracks().forEach(function(t){ t.stop(); }); scanStream=null; }
+  detector=null;
+  var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
   $('scanwrap').style.display='none';
   $('scanbtntxt').textContent='Start camera scan';
 }
