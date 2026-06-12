@@ -436,7 +436,7 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
         <!-- Product photo mockup -->
         <img id="product-img" src="images/1822_fm.jpg"
              style="height:560px;width:auto;display:block;background:transparent;filter:drop-shadow(0 3px 16px rgba(17,24,39,.08))"
-             draggable="false" onload="repositionOverlay()"/>
+             draggable="false" onload="if(typeof repositionOverlay==='function')repositionOverlay()"/>
 
         <!-- Print area label + boundary (repositioned by JS) -->
         <div id="print-area-label" style="display:none"></div>
