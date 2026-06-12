@@ -4167,7 +4167,11 @@ function odmRemoveDesign(ordNo, sku) {
       const o = ORDERS.find(x => x.id === a.ordId);
       if (!o) return;
       assignDesignKeys(o.itemsList);
-      const item = (a.dk && o.itemsList.find(i => itemDK(i) === a.dk)) || o.itemsList.find(i => i.sku === a.sku);
+      // Match ONLY by the per-line design key when one was recorded — do NOT fall back
+      // to a same-SKU sibling. A STALE "#1" assignment (from when the order briefly had
+      // two same-SKU items) would otherwise re-tag the wrong line — e.g. mark an item
+      // the seller UPLOADED as design-lab. No matching line → skip the stale entry.
+      const item = a.dk ? o.itemsList.find(i => itemDK(i) === a.dk) : o.itemsList.find(i => i.sku === a.sku);
       if (!item) return;
       if (!item.designSrc) item.designSrc = a.designSrc || 'design-lab';
       // item.img is intentionally left as the uploaded product image.

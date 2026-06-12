@@ -3262,11 +3262,13 @@ async function pushToProduction(){
       const map = JSON.parse(localStorage.getItem(KEY) || '{}');
       // Key by the per-line DESIGN KEY (dk) so two same-SKU items stay independent.
       var _dk = ctx.dk || ctx.sku;
+      // NOTE: do NOT store previewImg here — it's a multi-MB data URL that bloated
+      // localStorage (and is unused: the composite is rendered from the cached design).
       map[ctx.ordId + '|' + _dk] = {
-        ordId: ctx.ordId, sku: ctx.sku, dk: _dk, designSrc: 'design-lab',
-        previewImg: previewImg || null,
-        ts: Date.now(),
+        ordId: ctx.ordId, sku: ctx.sku, dk: _dk, designSrc: 'design-lab', ts: Date.now(),
       };
+      // Drop any legacy previewImg payloads already sitting in the map (reclaims space).
+      try { Object.keys(map).forEach(function (k) { if (map[k] && map[k].previewImg) delete map[k].previewImg; }); } catch (e) {}
       localStorage.setItem(KEY, JSON.stringify(map));
     } catch(e) {}
     var _dk = ctx.dk || ctx.sku;
