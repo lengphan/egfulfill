@@ -4161,6 +4161,17 @@ function odmRemoveDesign(ordNo, sku) {
       if (!item.designSrc) item.designSrc = a.designSrc || 'design-lab';
       // item.img is intentionally left as the uploaded product image.
     });
+    // Pull the just-attached design(s) from the server into the cache so the item
+    // thumbnail shows the artwork after a design-maker round trip — the in-memory
+    // cache is cleared on reload; the design itself lives server-side (order_designs).
+    window.__egDesignsHydrated = window.__egDesignsHydrated || {};
+    const _toHydrate = {};
+    Object.values(assigned).forEach(a => { if (a && a.ordId) _toHydrate[a.ordId] = 1; });
+    Object.keys(_toHydrate).forEach(oid => {
+      if (window.__egDesignsHydrated[oid] || !window.EGStore || !EGStore.hydrateOrderDesigns) return;
+      window.__egDesignsHydrated[oid] = true;
+      EGStore.hydrateOrderDesigns(oid).then(rows => { if (rows && rows.length) { try { renderOrders(); } catch(e){} } });
+    });
   } catch(e) {}
   try {
     const params = new URLSearchParams(location.search);
