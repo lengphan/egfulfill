@@ -606,7 +606,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="padding:20px 24px">
       <!-- Label preview -->
       <div style="border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden;margin-bottom:16px;background:#f6f5f4;display:flex;align-items:center;justify-content:center;min-height:200px">
-        <img src="images/usps-label-sample.png" style="max-width:100%;max-height:260px;object-fit:contain" onerror="this.outerHTML='<div style=padding:40px;text-align:center><svg width=48 height=48 viewBox=0 0 48 48 fill=none style=margin:0 auto 12px;display:block><rect x=4 y=4 width=40 height=40 rx=4 stroke=#e5e4e0 stroke-width=2/><path d=M12 20h24M12 28h16 stroke=#e5e4e0 stroke-width=2 stroke-linecap=round/></svg><div style=font-size:14px;color:#9ca3af;font-weight:500>USPS Label Preview</div><div style=font-size:12.5px;color:#c4c3be;margin-top:4px>4×6 thermal label</div></div>'"/>
+        <img src="images/usps-label-sample.png" style="max-width:100%;max-height:260px;object-fit:contain" onerror="pmLabelFallback(this)"/>
       </div>
       <div style="background:#f6f5f4;border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;gap:16px">
         <div><div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Carrier</div><div style="font-size:14px;font-weight:600;color:#191918">USPS Priority</div></div>
@@ -1832,6 +1832,12 @@ function openPrintModal(no) {
   document.getElementById('print-modal').style.display = 'flex';
 }
 function closePrintModal() { document.getElementById('print-modal').style.display = 'none'; }
+// Label-preview placeholder when the sample image is missing. In a JS context the SVG
+// attributes can be properly quoted (the old inline onerror left them unquoted, which
+// produced the console "<svg> viewBox / <path> d: Expected number" parse errors).
+function pmLabelFallback(img) {
+  img.outerHTML = '<div style="padding:40px;text-align:center"><svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 12px;display:block"><rect x="4" y="4" width="40" height="40" rx="4" stroke="#e5e4e0" stroke-width="2"/><path d="M12 20h24M12 28h16" stroke="#e5e4e0" stroke-width="2" stroke-linecap="round"/></svg><div style="font-size:14px;color:#9ca3af;font-weight:500">USPS Label Preview</div><div style="font-size:12.5px;color:#c4c3be;margin-top:4px">4×6 thermal label</div></div>';
+}
 
 function toggleAll(cb){document.querySelectorAll('.row-chk').forEach(c=>c.checked=cb.checked);updateSel();}
 function updateSel(){const n=document.querySelectorAll('.row-chk:checked').length;document.getElementById('sel-count').textContent=n+' selected';document.getElementById('bulk-bar').style.display=n>0?'flex':'none';}
