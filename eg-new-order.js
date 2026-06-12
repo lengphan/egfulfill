@@ -196,33 +196,77 @@
   }
   function noAddItem() {
     syncBlankCatalog();
-    var NO_SL = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
     var NO_IN = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
+    var NO_SM = 'border:1.5px solid #e5e4e0;border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
     var pid = 'noi-' + Date.now();
     var popts = BLANK_CATALOG.map(function (p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
-    var html = '<div class="no-item-row" id="' + pid + '" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">' +
-      '<div style="margin-bottom:7px"><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>' +
-        '<input class="no-title" type="text" placeholder="e.g. Custom Embroidered Apron with Name, Personalized Kitchen Apron" style="' + NO_IN + '"/></div>' +
-      '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 56px;gap:7px;margin-bottom:7px">' +
-        '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Base Product</label>' +
-        '<select onchange="noSyncProduct(this)" style="' + NO_SL + '"><option value="">Select product…</option>' + popts + '</select></div>' +
-        '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Color</label>' +
-        '<select onchange="noUpdateSku(this.closest(\'.no-item-row\'))" style="' + NO_SL + ';color:#d1d5db" disabled><option>—</option></select></div>' +
-        '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Size</label>' +
-        '<select onchange="noUpdateSku(this.closest(\'.no-item-row\'))" style="' + NO_SL + ';color:#d1d5db" disabled><option>—</option></select></div>' +
-        '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Qty</label>' +
-        '<input type="number" min="1" value="1" style="' + NO_IN + ';text-align:center"/></div>' +
-      '</div>' +
-      '<div style="display:flex;align-items:center;gap:7px">' +
-        '<div style="flex-shrink:0"><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Print Type</label>' +
-        '<select style="' + NO_SL + ';color:#d1d5db;width:auto;min-width:90px" disabled><option>—</option></select></div>' +
-        '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Auto SKU</label>' +
-        '<div class="no-sku" style="font-family:monospace;font-size:12.5px;color:#9ca3af;padding:5px 9px;background:#f0ede9;border-radius:6px;border:1.5px solid #f0ede9;line-height:1.5">—</div></div>' +
-        '<div style="flex-shrink:0;padding-top:17px"><button onclick="this.closest(\'.no-item-row\').remove()" style="background:none;border:none;cursor:pointer;color:#d1d5db;padding:4px;border-radius:5px;display:flex;align-items:center;transition:color .12s" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#d1d5db\'">' +
-        '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>' +
-      '</div>' +
-    '</div>';
+    var lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px';
+    var html =
+      '<div class="no-item-row" id="' + pid + '" style="position:relative;border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">' +
+        '<button onclick="this.closest(\'.no-item-row\').remove()" title="Remove item" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:#d1d5db;padding:2px;border-radius:4px;line-height:0;z-index:1;transition:color .12s" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#d1d5db\'">' +
+          '<svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>' +
+        '<div style="display:flex;align-items:stretch;gap:10px">' +
+          // Product image: auto-filled from the selected blank, drag/click to override.
+          '<label class="no-img-zone" data-img="" style="width:80px;height:80px;align-self:flex-start;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#d8d5d0\'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">' +
+            '<input type="file" accept="image/*" style="display:none" onchange="noPickImg(this.files&&this.files[0],this.closest(\'.no-img-zone\'))"/>' +
+            '<span class="no-img-ph">＋<br>Image</span>' +
+          '</label>' +
+          '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:7px">' +
+            '<div><label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>' +
+              '<input class="no-title" type="text" placeholder="e.g. Custom Embroidered Apron with Name" style="' + NO_IN + '"/></div>' +
+            '<div style="display:grid;grid-template-columns:1.7fr 1fr .9fr 1.1fr .65fr;gap:6px">' +
+              '<div><label style="' + lbl + '">Base Product</label>' +
+                '<select onchange="noSyncProduct(this)" style="' + NO_SM + '"><option value="">Select…</option>' + popts + '</select></div>' +
+              '<div><label style="' + lbl + '">Color</label>' +
+                '<select onchange="noUpdateSku(this.closest(\'.no-item-row\'))" style="' + NO_SM + ';color:#d1d5db" disabled><option>—</option></select></div>' +
+              '<div><label style="' + lbl + '">Size</label>' +
+                '<select onchange="noUpdateSku(this.closest(\'.no-item-row\'))" style="' + NO_SM + ';color:#d1d5db" disabled><option>—</option></select></div>' +
+              '<div><label style="' + lbl + '">Print Type</label>' +
+                '<select onchange="noUpdateSku(this.closest(\'.no-item-row\'))" style="' + NO_SM + ';color:#d1d5db" disabled><option>—</option></select></div>' +
+              '<div><label style="' + lbl + '">Qty</label>' +
+                '<input type="number" min="1" value="1" style="' + NO_SM + ';text-align:center;padding-left:4px;padding-right:4px"/></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="no-sku" style="display:none">—</div>' +
+      '</div>';
     document.getElementById('no-items-list').insertAdjacentHTML('beforeend', html);
+  }
+  // Auto-fill the row's image box from the selected blank (per-color image when
+  // available). A user upload (data-img set) always wins and is never overwritten.
+  function noSetProductImg(row) {
+    var zone = row.querySelector('.no-img-zone');
+    if (!zone || zone.dataset.img) return;
+    var sels = row.querySelectorAll('select');
+    var p = BLANK_CATALOG.find(function (x) { return String(x.id) === String(sels[0] && sels[0].value); });
+    var color = sels[1] ? sels[1].value : '';
+    var src = p ? ((p.colorImages && p.colorImages[color]) || p.img || '') : '';
+    var ph = zone.querySelector('.no-img-ph');
+    if (src) {
+      zone.style.backgroundImage = "url('" + src + "')";
+      zone.style.borderStyle = 'solid'; zone.style.borderColor = '#e5e4e0';
+      if (ph) ph.style.display = 'none';
+    } else {
+      zone.style.backgroundImage = 'none';
+      zone.style.borderStyle = 'dashed'; zone.style.borderColor = '#d8d5d0';
+      if (ph) ph.style.display = '';
+    }
+  }
+  function noPickImg(file, zone) {
+    if (!file || !zone || !/^image\//.test(file.type)) return;
+    var r = new FileReader();
+    r.onload = function (e) {
+      zone.dataset.img = e.target.result;
+      zone.style.backgroundImage = "url('" + e.target.result + "')";
+      var ph = zone.querySelector('.no-img-ph'); if (ph) ph.style.display = 'none';
+      zone.style.borderStyle = 'solid'; zone.style.borderColor = '#e5e4e0';
+    };
+    r.readAsDataURL(file);
+  }
+  function noDropImg(ev, zone) {
+    ev.preventDefault(); zone.style.borderColor = '#d8d5d0';
+    var f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (f) noPickImg(f, zone);
   }
   function noSyncProduct(sel) {
     var row = sel.closest('.no-item-row');
@@ -231,7 +275,7 @@
     var p = BLANK_CATALOG.find(function (x) { return String(x.id) === String(sel.value); });
     if (!p) {
       [colorSel, sizeSel, printSel].forEach(function (s) { s.innerHTML = '<option>—</option>'; s.disabled = true; s.style.color = '#d1d5db'; });
-      row.querySelector('.no-sku').textContent = '—'; return;
+      row.querySelector('.no-sku').textContent = '—'; noSetProductImg(row); return;
     }
     colorSel.innerHTML = p.colors.map(function (c) { return '<option>' + c + '</option>'; }).join('');
     colorSel.disabled = false; colorSel.style.color = '#374151';
@@ -250,6 +294,7 @@
     var el = row.querySelector('.no-sku');
     el.textContent = p.skuBase + '-' + colorCode + '-' + sizeCode;
     el.style.color = '#374151'; el.style.background = '#f0fdf4'; el.style.borderColor = '#bbf7d0';
+    noSetProductImg(row);   // refresh the image when color (per-color photo) changes
   }
   function saveNewOrderDraft() {
     var f = document.getElementById('no-fname');
@@ -278,8 +323,8 @@
       var title = titleEl ? titleEl.value.trim() : '';
       var autoTitle = ((product && product.name) || 'Manual Item') + (color || size ? ' — ' + [color, size].filter(Boolean).join(' / ') : '');
       items.push({
-        // Photo comes ONLY from the selected blank (per-color image when available).
-        img: (product && ((product.colorImages && product.colorImages[color]) || product.img)) || '',
+        // A user upload (image drop-zone) wins; else the selected blank's per-color photo.
+        img: (((row.querySelector('.no-img-zone') || {}).dataset || {}).img) || (product && ((product.colorImages && product.colorImages[color]) || product.img)) || '',
         // Product/listing TITLE (what the customer ordered) — kept distinct from the
         // base blank we fulfil with (`product`). Falls back to an auto title.
         listing: title || autoTitle,
@@ -390,6 +435,8 @@
   expose('noAddItem', noAddItem);
   expose('noSyncProduct', noSyncProduct);
   expose('noUpdateSku', noUpdateSku);
+  expose('noPickImg', noPickImg);
+  expose('noDropImg', noDropImg);
   expose('saveNewOrderDraft', saveNewOrderDraft);
   expose('submitNewOrder', submitNewOrder);
   expose('noParsePastedAddr', noParsePastedAddr);

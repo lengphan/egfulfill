@@ -22,6 +22,7 @@ create table if not exists orders (
   seller_id       uuid references users(id) on delete set null,
   store           text,
   source          text default 'manual',
+  seq             integer,
   customer        jsonb default '{}',
   address         jsonb default '{}',
   status          text default 'new',

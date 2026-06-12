@@ -41,7 +41,21 @@
       }
     }
   }
+  function _identity(u) { return String((u && (u.id || u.sub || u.email)) || ''); }
   function setSession(d) {
+    // Account switch hygiene: if a DIFFERENT account signs in on this browser, purge
+    // the previous account's local order/thread caches. Otherwise the new (e.g. just-
+    // registered) seller would inherit the old account's orders — and per-seller
+    // numbering wouldn't restart at #1. Same account re-login keeps everything.
+    if (d && d.user) {
+      try {
+        var prev = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+        if (prev && _identity(prev) && _identity(prev) !== _identity(d.user)) {
+          ['egfulfill_orders', 'eg_pending_patches', 'eg_thread_match', 'eg_thread_colors', 'eg_order_seq']
+            .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+        }
+      } catch (e) {}
+    }
     if (d && d.token) _safeSet(TOKEN_KEY, d.token);
     if (d && d.user)  _safeSet(USER_KEY, JSON.stringify(d.user));
   }
@@ -105,7 +119,7 @@
              personalization: it.personalization, img: it.img, designPos: it.design_pos };
   }
   function dbToOrder(r) {
-    return { id: r.id, store: r.store, seller: r.store, source: r.source,
+    return { id: r.id, seq: r.seq != null ? Number(r.seq) : null, store: r.store, seller: r.store, source: r.source,
              customer: r.customer || {}, address: r.address || {},
              status: r.status, factoryStatus: r.factory_status,
              total: Number(r.total) || 0, profit: Number(r.profit) || 0,
@@ -231,7 +245,7 @@
   function leanOrder(o) {
     if (!o) return o;
     var lean = {};
-    ['id', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
+    ['id', 'seq', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
       .forEach(function (k) { if (o[k] !== undefined) lean[k] = o[k]; });
     if (Array.isArray(o.items)) {
       lean.items = o.items.map(function (it) {

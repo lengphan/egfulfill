@@ -510,8 +510,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div id="col-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;min-width:168px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">
             <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Show / Hide</div>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="order" checked onchange="toggleCol('order')" style="accent-color:#111827"> Order</label>
-            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="image" checked onchange="toggleCol('image')" style="accent-color:#111827"> Product Image</label>
-            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="title" checked onchange="toggleCol('title')" style="accent-color:#111827"> Product Title</label>
+            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="image" checked onchange="toggleCol('image')" style="accent-color:#111827"> Image</label>
+            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="title" checked onchange="toggleCol('title')" style="accent-color:#111827"> Title</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="items" checked onchange="toggleCol('items')" style="accent-color:#111827"> Items</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="delivery" checked onchange="toggleCol('delivery')" style="accent-color:#111827"> Delivery</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" data-col="store" checked onchange="toggleCol('store')" style="accent-color:#111827"> Store</label>
@@ -556,17 +556,17 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <thead>
             <tr>
               <th data-col="check" style="width:36px;min-width:36px;padding:9px 0;text-align:center;overflow:visible"><input type="checkbox" id="check-all" onchange="toggleAll(this)" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></th>
-              <th data-col="order" style="min-width:104px" onmousedown="rzCapture(event)" onclick="sortBy('order')"><span class="th-label">ORDER<span class="sort-arrow" data-sort="order"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="order" style="min-width:74px" onmousedown="rzCapture(event)" onclick="sortBy('order')"><span class="th-label">ORDER<span class="sort-arrow" data-sort="order"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="customer" style="min-width:110px" onmousedown="rzCapture(event)" onclick="sortBy('customer')"><span class="th-label">CUSTOMER<span class="sort-arrow" data-sort="customer"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="image" style="min-width:84px" onmousedown="rzCapture(event)"><span class="th-label">PRODUCT IMAGE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="title" style="min-width:150px" onmousedown="rzCapture(event)"><span class="th-label">PRODUCT TITLE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="items" style="min-width:64px" onmousedown="rzCapture(event)" onclick="sortBy('items')"><span class="th-label">ITEMS<span class="sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="image" style="min-width:64px" onmousedown="rzCapture(event)"><span class="th-label">IMAGE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="title" style="min-width:150px" onmousedown="rzCapture(event)"><span class="th-label">TITLE</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="items" style="min-width:56px" onmousedown="rzCapture(event)" onclick="sortBy('items')"><span class="th-label">ITEMS<span class="sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="status" style="min-width:90px" onmousedown="rzCapture(event)" onclick="sortBy('status')"><span class="th-label">STATUS<span class="sort-arrow" data-sort="status"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="store" style="min-width:110px" onmousedown="rzCapture(event)" onclick="sortBy('store')"><span class="th-label">STORE<span class="sort-arrow" data-sort="store"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="total" style="min-width:64px" onmousedown="rzCapture(event)" onclick="sortBy('total')"><span class="th-label">TOTAL<span class="sort-arrow" data-sort="total"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="time" style="min-width:96px" onmousedown="rzCapture(event)" onclick="sortBy('time')"><span class="th-label">TIME<span class="sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="time" style="min-width:86px" onmousedown="rzCapture(event)" onclick="sortBy('time')"><span class="th-label">TIME<span class="sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="delivery" style="min-width:90px" onmousedown="rzCapture(event)" onclick="sortBy('delivery')"><span class="th-label">DELIVERY<span class="sort-arrow" data-sort="delivery"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-              <th data-col="tracking" style="min-width:128px" onmousedown="rzCapture(event)" onclick="sortBy('tracking')"><span class="th-label">TRACKING<span class="sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+              <th data-col="tracking" style="min-width:176px" onmousedown="rzCapture(event)" onclick="sortBy('tracking')"><span class="th-label">TRACKING<span class="sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
               <th data-col="actions" style="width:110px;min-width:110px;position:sticky;right:0;background:#fafaf9;z-index:3;box-shadow:-4px 0 8px rgba(0,0,0,.04)">ACTIONS</th>
             </tr>
           </thead>
@@ -967,7 +967,7 @@ function renderOrders(ordersOverride) {
     rows.push(`<tr class="main-row${isAction?' action-row':''}" onclick="toggleExp(${o.no})" style="${rowBg ? rowBg+';' : ''}cursor:pointer">
       <td data-col="check" onclick="event.stopPropagation()" style="width:36px;padding:10px 0;text-align:center;overflow:visible"><input type="checkbox" class="row-chk" data-id="${o.id}" data-status="${o.status}" onchange="updateSel()" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></td>
       <td data-col="order">
-        <div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918">#${o.id}</div>
+        <div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918">#${o.seq != null ? o.seq : o.id}</div>
         <div style="font-family:monospace;font-size:11.5px;color:#9ca3af;margin-top:2px">${o.platId||'—'}</div>
       </td>
       <td data-col="customer"><span style="font-weight:500;color:#191918">${o.cust}</span></td>
@@ -4035,6 +4035,7 @@ function odmRemoveDesign(ordNo, sku) {
         ORDERS.unshift({
           no: nextNo + counter++,
           id: lo.id,
+          seq: lo.seq != null ? lo.seq : null,   // per-seller display number (#1, #2…)
           platId: 'MA-' + String(lo.id).slice(-5),
           cust: (lo.customer && lo.customer.name) || 'Customer',
           // Delivery cell falls back through: service from import → service from label gen → 'Standard'
@@ -4273,7 +4274,7 @@ function noAddItem() {
       <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
     <div style="display:flex;align-items:stretch;gap:10px">
-      <label class="no-img-zone" data-img="" style="width:90px;align-self:stretch;min-height:86px;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d5d0'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">
+      <label class="no-img-zone" data-img="" style="width:80px;height:80px;align-self:flex-start;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d5d0'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">
         <input type="file" accept="image/*" style="display:none" onchange="noPickImg(this.files&&this.files[0],this.closest('.no-img-zone'))"/>
         <span class="no-img-ph">＋<br>Image</span>
       </label>
@@ -4477,9 +4478,16 @@ function submitNewOrder() {
   const today = new Date();
   const fmtDate = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
   const customer = (fname + ' ' + lname).trim();
+  // Per-seller display number (#1, #2…) assigned up front so the new row shows the
+  // friendly number instantly; the server persists it and hydrate echoes it back.
+  const _sellerSeq = (typeof EGStore !== 'undefined' && EGStore.nextSellerSeq) ? EGStore.nextSellerSeq() : null;
   const ord = {
     no: nextNo,
-    id: 'FF-' + (7000 + nextNo),
+    // Use the store's monotonic allocator so the id never recycles (the old
+    // `7000 + nextNo` derived from the resettable demo seed, so it handed out
+    // FF-7012 on every fresh page and inherited the prior order's cached threads).
+    id: (typeof EGStore !== 'undefined' && EGStore.nextOrderId) ? EGStore.nextOrderId() : ('FF-' + (7000 + nextNo)),
+    seq: _sellerSeq,
     platId: platPfx + '-' + Math.floor(10000 + Math.random()*90000),
     cust: customer,
     del: del,
@@ -4516,6 +4524,7 @@ function submitNewOrder() {
     try {
       EGStore.submitOrder({
         id: ord.id,
+        seq: ord.seq,
         seller: ord.store,
         factoryStatus: 'draft',
         customer: {

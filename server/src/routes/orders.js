@@ -7,6 +7,9 @@ import { isStaff } from '../auth.js';
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
+  // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
+  // globally-unique PK; this is just the friendly number the seller sees.
+  q('alter table orders add column if not exists seq integer').catch(() => {});
   // Correct any orders a prior (too-loose, source-based) backfill mis-flagged:
   // ONLY real Etsy imports (etsy- id) are factory orders; everything else (manual
   // seller orders) must be factory_order=false so the seller keeps seeing them.
@@ -57,16 +60,18 @@ export function ordersRoutes(app, requireAuth) {
     // conflict), guaranteeing manual orders stay visible to the seller even if a
     // prior run mis-flagged them.
     await q(
-      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, factory_order)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, false)
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, factory_order)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, false)
        on conflict (id) do update set
          store=excluded.store, customer=excluded.customer, address=excluded.address,
          status=excluded.status, factory_status=excluded.factory_status,
          total=excluded.total, profit=excluded.profit, delivery=excluded.delivery,
-         carrier=excluded.carrier, tracking=excluded.tracking, factory_order=false`,
+         carrier=excluded.carrier, tracking=excluded.tracking,
+         seq=coalesce(orders.seq, excluded.seq), factory_order=false`,
       [o.id, req.user.sub, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
-       o.delivery || null, o.carrier || null, o.tracking || null]
+       o.delivery || null, o.carrier || null, o.tracking || null,
+       (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null]
     );
     if (Array.isArray(o.items)) {
       await q('delete from order_items where order_id=$1', [o.id]);

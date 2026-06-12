@@ -50,10 +50,40 @@
     if (s < 86400) return Math.floor(s/3600) + 'h ago';
     return Math.floor(s/86400) + 'd ago';
   }
-  function _nextId(orders) {
-    var used = orders.map(function(o){ return parseInt((o.id||'').replace('FF-',''))||0; });
-    var max = used.length ? Math.max.apply(null, used) : _seq;
-    return 'FF-' + (max + 1);
+  // Short, stable per-account tag derived from the logged-in user. Namespacing the
+  // order id by account makes the PK globally unique: two different sellers can
+  // never mint the same id (the old scheme gave EVERY seller's first order FF-7012,
+  // so a second seller's POST collided and 403'd → silent loss).
+  function _hashTag(s) {
+    var h = 0; s = String(s);
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return ((h >>> 0).toString(36)) || 'x';   // full 32-bit entropy — varies with every char
+  }
+  function _acctTag() {
+    try {
+      var u = JSON.parse(localStorage.getItem('eg_user') || 'null');
+      var raw = (u && (u.id || u.sub || u.email || u.name)) || '';
+      if (raw) return _hashTag(raw);
+    } catch (e) {}
+    return 'anon';
+  }
+  function _nextId() {
+    // Globally-unique technical id (the DB primary key) — NOT what the seller sees.
+    // account tag + millisecond timestamp + random suffix → unique with no server
+    // coordination, across accounts AND devices, and never recycled (so it can't
+    // inherit a dead order's orphaned per-item caches). Seller sees `seq`, not this.
+    var rand = Math.floor(Math.random() * 1e8).toString(36);
+    return 'FF-' + _acctTag() + '-' + Date.now().toString(36) + '-' + rand;
+  }
+  // Per-SELLER display number ("#1, #2, …") — restarts at 1 for every account
+  // because it's computed only from THIS seller's own (non-marketplace) orders.
+  // Separate from the unique id above; this is the friendly number the seller sees.
+  function _nextSellerSeq(orders) {
+    var max = 0;
+    (orders || []).forEach(function(o){
+      if (o && String(o.id || '').indexOf('etsy-') !== 0 && typeof o.seq === 'number' && o.seq > max) max = o.seq;
+    });
+    return max + 1;
   }
 
   // Assumed gross margin used to derive profit from revenue when an explicit
@@ -310,8 +340,16 @@
         _save(orders);
         return existing;
       }
+      // Brand-new order: an id can collide with a wiped/recycled one whose per-item
+      // caches still linger. Purge them so this order starts clean (no stale threads).
+      this.clearItemCaches(id);
+      // Per-seller display number — caller may pass one (so the optimistic UI row
+      // matches), else assign the next for this account. Marketplace orders get none.
+      var seq = (opts.seq != null) ? opts.seq
+              : (String(id).indexOf('etsy-') === 0 ? null : _nextSellerSeq(orders));
       var order = {
         id: id,
+        seq: seq,
         seller: opts.seller || 'My Store',
         salesChannel: opts.salesChannel || '',
         customer: opts.customer || { name: 'Customer', email: '' },
@@ -876,7 +914,7 @@
         var liveTag = '<span style="font-size:11.25px;background:#dcfce7;color:#15803d;padding:1px 5px;border-radius:4px;font-weight:600;margin-left:4px">Live</span>';
         return '<tr id="eg-seller-row-'+o.id+'" class="main-row" style="background:#f0fdf4">'
           +'<td style="padding:10px 6px;text-align:center"><input type="checkbox" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></td>'
-          +'<td><div style="font-family:monospace;font-size:13.25px;font-weight:700;color:#15803d"><a href="order-detail.html?id='+o.id+'" style="color:#15803d;text-decoration:none">'+o.id+'</a>'+liveTag+'</div><div style="font-family:monospace;font-size:11.75px;color:#9ca3af;margin-top:2px">—</div></td>'
+          +'<td><div style="font-family:monospace;font-size:13.25px;font-weight:700;color:#15803d"><a href="order-detail.html?id='+o.id+'" style="color:#15803d;text-decoration:none">'+(o.seq != null ? '#'+o.seq : o.id)+'</a>'+liveTag+'</div><div style="font-family:monospace;font-size:11.75px;color:#9ca3af;margin-top:2px">—</div></td>'
           +'<td><span style="font-weight:500;color:#191918">'+o.customer.name+'</span></td>'
           +'<td><span style="display:flex;align-items:center;gap:4px;color:#374151"><strong>'+o.items.length+'</strong><span style="color:#9ca3af;font-size:13.25px">item'+(o.items.length!==1?'s':'')+'</span></span></td>'
           +'<td style="font-size:13.75px;color:#374151">Standard</td>'
@@ -2280,6 +2318,24 @@
     },
     getItemThreadMatch: function(orderId, sku){
       try { var m = JSON.parse(localStorage.getItem(this.THREAD_MATCH_KEY) || '{}'); return m[orderId+'|'+sku] || []; } catch(e){ return []; }
+    },
+    // Public id allocator so every create path shares ONE monotonic source — never
+    // the resettable demo-seed math that recycled ids (see _nextId).
+    nextOrderId: function(){ return _nextId(_load()); },
+    // Next per-seller display number for THIS account (1, 2, 3 …).
+    nextSellerSeq: function(){ return _nextSellerSeq(_load()); },
+    // Purge every per-item cache (thread match + thread colors) for an order id.
+    // Called when a brand-new order takes an id, so a fresh order can never inherit
+    // a previous (same-id) order's orphaned threads — the "stale threads, no photo" bug.
+    clearItemCaches: function(orderId){
+      if (!orderId) return;
+      [this.THREAD_MATCH_KEY, this.THREAD_COLORS_KEY].forEach(function(K){
+        try {
+          var m = JSON.parse(localStorage.getItem(K) || '{}'), changed = false;
+          Object.keys(m).forEach(function(k){ if (k.indexOf(orderId + '|') === 0){ delete m[k]; changed = true; } });
+          if (changed) localStorage.setItem(K, JSON.stringify(m));
+        } catch(e){}
+      });
     },
     // Repeat-order memory: remember the threads chosen for a SKU (and its base) so
     // a future order with the same SKU can pre-fill without re-uploading.
