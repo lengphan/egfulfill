@@ -3,7 +3,7 @@
    offline and shows the last screen. API calls (/api/*) are NEVER cached —
    they go straight to the network so inventory/orders are always live; the
    page itself falls back to its in-memory data when the network is down. */
-const SHELL = 'eg-floor-shell-v1';
+const SHELL = 'eg-floor-shell-v2';
 const ASSETS = [
   'mobile.html',
   'manifest.webmanifest',
