@@ -20,9 +20,13 @@
   // cache, design/image blobs, label blobs, templates) can blow past the ~5MB
   // localStorage quota and make even setItem('eg_token', …) throw — which would
   // block login. So prune those caches and retry before giving up.
-  var _ESSENTIAL = { eg_token: 1, eg_user: 1, eg_ship_origin: 1 };
+  // egfulfill_orders is ESSENTIAL — never evict the seller's orders to free space
+  // (doing so was literally deleting orders when design-image bloat filled the quota).
+  var _ESSENTIAL = { eg_token: 1, eg_user: 1, eg_ship_origin: 1, egfulfill_orders: 1, eg_pending_patches: 1 };
   function _pruneStorage(aggressive) {
-    var bigPrefixes = ['egfulfill_orders', 'eg_shipments', 'eg_templates', 'eg_design', 'eg_img', 'eg_raw', 'eg_cache', 'eg_order_designs'];
+    // Disposable, regenerable caches (design galleries, image/raw blobs, templates,
+    // label blobs) — drop these FIRST so essential data survives. NOT egfulfill_orders.
+    var bigPrefixes = ['eg_design_uploads', 'eg_image_cache', 'eg_design_raw', 'eg_thumb', 'eg_shipments', 'eg_templates', 'eg_design', 'eg_img', 'eg_raw', 'eg_cache', 'eg_order_designs'];
     for (var i = localStorage.length - 1; i >= 0; i--) {
       var key = localStorage.key(i);
       if (!key || _ESSENTIAL[key]) continue;

@@ -38,9 +38,35 @@
     catch(e) { return []; }
   }
   function _save(orders) {
-    localStorage.setItem(KEY, JSON.stringify(orders));
+    _safeWrite(KEY, JSON.stringify(orders));
     // Notify same-tab stat renderers (cross-tab is covered by the native 'storage' event).
     try { window.dispatchEvent(new Event('eg-orders-changed')); } catch(e){}
+  }
+  // Persist that NEVER loses the order list to a full quota. On QuotaExceededError
+  // (usually design-image bloat), drop disposable/regenerable caches — never the
+  // orders — then retry. Images live on the server, so dropping their local cache
+  // is safe; the order list is the source of truth on the client and must survive.
+  function _safeWrite(key, val) {
+    try { localStorage.setItem(key, val); return true; } catch (e) {}
+    var disposable = ['eg_design_uploads','eg_image_cache','eg_design_raw','eg_thumb',
+                      'eg_img','eg_raw','eg_cache','eg_templates_blob','eg_order_designs','eg_shipments'];
+    for (var i = 0; i < disposable.length; i++) {
+      try { localStorage.removeItem(disposable[i]); } catch (e2) {}
+      try { localStorage.setItem(key, val); return true; } catch (e3) {}
+    }
+    // Last resort: drop the largest non-essential keys until the write fits.
+    try {
+      var keys = Object.keys(localStorage).filter(function (k) {
+        return k !== key && k !== 'eg_token' && k !== 'eg_user' && k !== 'eg_pending_patches';
+      });
+      keys.sort(function (a, b) { return (localStorage.getItem(b) || '').length - (localStorage.getItem(a) || '').length; });
+      for (var j = 0; j < keys.length; j++) {
+        try { localStorage.removeItem(keys[j]); } catch (e4) {}
+        try { localStorage.setItem(key, val); return true; } catch (e5) {}
+      }
+    } catch (e6) {}
+    console.warn('[EGStore] could not persist ' + key + ' — quota exhausted');
+    return false;
   }
   function _ts() { return Date.now(); }
   function _timeAgo(ts) {

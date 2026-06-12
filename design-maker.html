@@ -1652,14 +1652,15 @@ window.addEventListener('storage', function(e){ if (e.key === DM_TPL_KEY) dmRend
 // name + size so the same file doesn't pile up after multiple uses.
 const DM_UPLOADS_KEY = 'eg_design_uploads';
 const DM_UPLOADS_CAP = 20;
-function dmLoadUploads() {
-  try { return JSON.parse(localStorage.getItem(DM_UPLOADS_KEY) || '[]'); }
-  catch(e) { return []; }
-}
-function dmSaveUploadsList(list) {
-  try { localStorage.setItem(DM_UPLOADS_KEY, JSON.stringify(list)); }
-  catch(e) { console.warn('uploads save failed', e); }
-}
+// The re-add gallery is kept IN MEMORY only — never localStorage. Each entry holds a
+// full multi-MB image data URL; 20 of them blow the ~5MB localStorage quota, after
+// which the order list can't save and orders silently vanish. The artwork itself
+// persists server-side (order_designs), so a session-only gallery is the right call.
+// One-time cleanup: purge the legacy localStorage key so old bloat is reclaimed.
+try { localStorage.removeItem(DM_UPLOADS_KEY); } catch(e) {}
+let _dmUploadsMem = [];
+function dmLoadUploads() { return _dmUploadsMem.slice(); }
+function dmSaveUploadsList(list) { _dmUploadsMem = (list || []).slice(0, DM_UPLOADS_CAP); }
 function dmTrackUpload(name, src) {
   if (!src) return;
   const list = dmLoadUploads();
