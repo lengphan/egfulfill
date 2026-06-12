@@ -1937,7 +1937,7 @@ function applyColVis() {
   });
 }
 
-let COL_ORDER = ['check','order','store','customer','image','title','status','total','tracking','actions'];
+let COL_ORDER = ['check','order','store','status','customer','image','title','total','tracking','actions'];
 let _dragColFrom = null;
 function initColDrag() {
   const table = document.getElementById('orders-table');
@@ -4831,6 +4831,24 @@ function openUploadPanel(ordNo, filterSku) {
   UP_FILTER_SKU = filterIsArray ? (filterSku.length ? filterSku.slice() : null) : (filterSku || null);
   UP_CURRENT_ORD = ordNo;
   renderUploadItems(o, UP_FILTER_SKU);
+  // Re-fetch the saved design(s) from the server (order_designs) so the preview
+  // survives a hard refresh — the artwork lives server-side, not in localStorage.
+  // Don't clobber a fresh in-session upload; only restore items still 'idle'.
+  if (typeof EGStore !== 'undefined' && EGStore.hydrateOrderDesigns) {
+    EGStore.hydrateOrderDesigns(o.id).then(function (rows) {
+      if (!rows || !rows.length) return;
+      var restored = false;
+      rows.forEach(function (d) {
+        if (!d || !d.sku) return;
+        var st = UP_STATE[ordNo] && UP_STATE[ordNo][d.sku];
+        if (st && (st.state || 'idle') === 'idle') {
+          st.state = 'ok'; st.dataUrl = d.data; st.file = d.name || 'design';
+          restored = true;
+        }
+      });
+      if (restored && UP_CURRENT_ORD === ordNo) renderUploadItems(o, UP_FILTER_SKU);
+    });
+  }
   const submitLabel = (filterIsArray && filterSku.length > 1) ? ` Upload ${filterSku.length} Files`
                     : (filterIsString || (filterIsArray && filterSku.length === 1)) ? ' Upload File'
                     : ' Upload All Files';
