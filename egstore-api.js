@@ -119,7 +119,7 @@
              personalization: it.personalization, img: it.img, designPos: it.design_pos };
   }
   function dbToOrder(r) {
-    return { id: r.id, seq: r.seq != null ? Number(r.seq) : null, store: r.store, seller: r.store, source: r.source,
+    return { id: r.id, seq: r.seq != null ? Number(r.seq) : null, meta: r.meta || {}, store: r.store, seller: r.store, source: r.source,
              customer: r.customer || {}, address: r.address || {},
              status: r.status, factoryStatus: r.factory_status,
              total: Number(r.total) || 0, profit: Number(r.profit) || 0,
@@ -245,7 +245,7 @@
   function leanOrder(o) {
     if (!o) return o;
     var lean = {};
-    ['id', 'seq', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
+    ['id', 'seq', 'meta', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
       .forEach(function (k) { if (o[k] !== undefined) lean[k] = o[k]; });
     // Seller manual orders keep the recipient address on customer.shipTo, not the
     // server's `address` column — so without this the factory boards see no address.

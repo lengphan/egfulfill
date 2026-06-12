@@ -10,6 +10,9 @@ export function ordersRoutes(app, requireAuth) {
   // Per-seller display number ("#1, #2 …" for manual orders). The id stays the
   // globally-unique PK; this is just the friendly number the seller sees.
   q('alter table orders add column if not exists seq integer').catch(() => {});
+  // Free-form editable order info (notes, priority, gift message, …) kept on the
+  // seller's order-detail panel. One jsonb bag so new fields don't need migrations.
+  q(`alter table orders add column if not exists meta jsonb default '{}'`).catch(() => {});
   // Correct any orders a prior (too-loose, source-based) backfill mis-flagged:
   // ONLY real Etsy imports (etsy- id) are factory orders; everything else (manual
   // seller orders) must be factory_order=false so the seller keeps seeing them.
@@ -60,18 +63,20 @@ export function ordersRoutes(app, requireAuth) {
     // conflict), guaranteeing manual orders stay visible to the seller even if a
     // prior run mis-flagged them.
     await q(
-      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, factory_order)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, false)
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false)
        on conflict (id) do update set
          store=excluded.store, customer=excluded.customer, address=excluded.address,
          status=excluded.status, factory_status=excluded.factory_status,
          total=excluded.total, profit=excluded.profit, delivery=excluded.delivery,
          carrier=excluded.carrier, tracking=excluded.tracking,
-         seq=coalesce(orders.seq, excluded.seq), factory_order=false`,
+         seq=coalesce(orders.seq, excluded.seq),
+         meta=coalesce(excluded.meta, orders.meta), factory_order=false`,
       [o.id, req.user.sub, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
-       (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null]
+       (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
+       (o.meta && typeof o.meta === 'object') ? o.meta : {}]
     );
     if (Array.isArray(o.items)) {
       await q('delete from order_items where order_id=$1', [o.id]);
@@ -90,7 +95,7 @@ export function ordersRoutes(app, requireAuth) {
   // Patch status/tracking/etc.
   app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req) => {
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
-                  carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes' };
+                  carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta' };
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     if (!sets.length) return { ok: true };

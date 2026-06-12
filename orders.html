@@ -2164,6 +2164,20 @@ function _recomputeOrderTotal(o) {
 window._recomputeOrderTotal = _recomputeOrderTotal;
 const ODM_TECH_LBL = {DTG:'Direct to Garment',EMB:'Embroidery',APL:'Applique',LSR:'Laser'};
 
+// Persist the editable order-detail fields (priority / gift / notes) into o.meta.
+// EGStore.update writes localStorage AND PATCHes the server `meta` column, so the
+// edits survive a refresh/sync. Debounced lightly via the native change event.
+function odmSaveMeta(ordNo) {
+  const o = ORDERS.find(x => x.no === ordNo);
+  if (!o) return;
+  const wrap = document.getElementById('odm-extra');
+  if (!wrap) return;
+  const meta = Object.assign({}, (o.meta && typeof o.meta === 'object') ? o.meta : {});
+  wrap.querySelectorAll('[data-meta]').forEach(el => { meta[el.dataset.meta] = (el.value || '').trim(); });
+  o.meta = meta;
+  if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { meta: meta });
+  if (typeof ordToast === 'function') ordToast('Saved', '#15803d');
+}
 function openDetailModal(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
@@ -2427,6 +2441,29 @@ function openDetailModal(ordNo) {
     <div style="${INF}"><span style="color:#9ca3af">Tracking</span><span style="text-align:right">${_trkCell}</span></div>
     <div style="${INF}"><span style="color:#9ca3af">Order total</span><span><strong style="color:#191918">$${o.total}</strong></span></div>
     <div style="${INF}"><span style="color:#9ca3af">Platform fees</span><span>$${platformFee}</span></div>`;
+
+  // Editable order details (notes / priority / gift message). Persisted in o.meta
+  // → EGStore.update → server `meta` column, so they survive a refresh / sync.
+  const _meta = (o.meta && typeof o.meta === 'object') ? o.meta : {};
+  const _esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+  const LBL = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:4px';
+  const FLD = 'width:100%;box-sizing:border-box;border:1px solid #e5e4e0;border-radius:7px;padding:7px 9px;font-size:13px;font-family:inherit;color:#374151;background:#fff;outline:none';
+  const _prio = _meta.priority || 'normal';
+  const _opt = (v, t) => `<option value="${v}"${_prio === v ? ' selected' : ''}>${t}</option>`;
+  document.getElementById('odm-extra').innerHTML = `
+    <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Details</div>
+    <div style="margin-bottom:11px">
+      <label style="${LBL}">Priority</label>
+      <select onchange="odmSaveMeta(${ordNo})" data-meta="priority" style="${FLD};cursor:pointer">${_opt('normal','Normal')}${_opt('rush','Rush')}${_opt('hold','On hold')}</select>
+    </div>
+    <div style="margin-bottom:11px">
+      <label style="${LBL}">Gift message</label>
+      <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift note…" style="${FLD}"/>
+    </div>
+    <div>
+      <label style="${LBL}">Notes</label>
+      <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="3" placeholder="Internal notes for this order…" style="${FLD};resize:vertical;line-height:1.5">${_esc(_meta.note)}</textarea>
+    </div>`;
 
   // Action button
   const btn = document.getElementById('odm-action-btn');
@@ -4026,6 +4063,8 @@ function odmRemoveDesign(ordNo, sku) {
           no: nextNo + counter++,
           id: lo.id,
           seq: lo.seq != null ? lo.seq : null,   // per-seller display number (#1, #2…)
+          meta: (lo.meta && typeof lo.meta === 'object') ? lo.meta : {},   // editable order details
+
           platId: 'MA-' + String(lo.id).slice(-5),
           cust: (lo.customer && lo.customer.name) || 'Customer',
           // Delivery cell falls back through: service from import → service from label gen → 'Standard'
@@ -7109,9 +7148,10 @@ function confirmImport() {
       <div style="overflow-y:auto;padding:22px 26px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:26px">
         <div>
           <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Ship To</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:22px;align-items:start">
             <div id="odm-address" style="font-size:14px;color:#374151;line-height:1.55"></div>
-            <div id="odm-info" style="font-size:13px;color:#6b7280;line-height:1.75;border-left:1px solid #f0ede9;padding-left:22px"></div>
+            <div id="odm-info" style="font-size:13px;color:#6b7280;line-height:1.75;border-left:1px solid #f0ede9;padding-left:20px"></div>
+            <div id="odm-extra" style="border-left:1px solid #f0ede9;padding-left:20px"></div>
           </div>
         </div>
         <div>

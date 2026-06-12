@@ -23,6 +23,7 @@ create table if not exists orders (
   store           text,
   source          text default 'manual',
   seq             integer,
+  meta            jsonb default '{}',
   customer        jsonb default '{}',
   address         jsonb default '{}',
   status          text default 'new',
