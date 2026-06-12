@@ -944,6 +944,8 @@ function renderOrders(ordersOverride) {
   if (typeof renderOrdersPagination === 'function') renderOrdersPagination(_page, _totalPages);
   const rows = [];
   _pageRows.forEach((o, idx) => {
+   const _rowsMark = rows.length;   // roll-back point so one bad order can't wipe the whole table
+   try {
     assignDesignKeys(o.itemsList);   // per-line design key so same-SKU items don't share artwork
     const sc = SC[o.status] || SC.new;
     /* Tracking cell: delegate to the shared EGTracking helper.
@@ -1139,6 +1141,10 @@ function renderOrders(ordersOverride) {
         </div>
       </td>
     </tr>`);
+   } catch (_e) {
+     rows.length = _rowsMark;   // drop this order's partial rows; keep all the others
+     console.warn('[orders] row render failed for', o && o.id, _e);
+   }
   });
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = rows.join('');
