@@ -221,17 +221,37 @@
       if (!order) return '—';
       // Direct flat string takes precedence (legacy seed data uses this)
       if (typeof order.address === 'string' && order.address.trim()) return order.address.trim();
-      var s = order.customer && order.customer.shipTo;
+      // Etsy/DB orders carry a pre-formatted address string on the object.
+      if (order.address && typeof order.address === 'object' && order.address.formatted)
+        return String(order.address.formatted).replace(/\s*\n\s*/g, ', ').trim() || '—';
+      var s = this.getShipTo(order);
       if (!s) return '—';
       var line1 = [s.street, s.apt].filter(Boolean).join(' ');
       var line2 = [s.city, [s.state, s.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
       var full  = [line1, line2].filter(Boolean).join(', ');
       return full || '—';
     },
-    // Same data but as a structured object (for label-form auto-fill).
+    // Normalize whatever address shape an order carries into a structured object.
+    // Sources, in priority order: the seller's customer.shipTo ({street,apt,city,
+    // state,zip}); the server/etsy `address` object ({line1,line2,city,state,zip});
+    // returns null only when there's genuinely no address.
     getShipTo: function(order) {
       if (!order) return null;
-      if (order.customer && order.customer.shipTo) return order.customer.shipTo;
+      var c = order.customer || {};
+      var s = c.shipTo;
+      if (s && (s.street || s.city || s.zip)) {
+        return { name: s.name || c.name || '', street: s.street || '', apt: s.apt || s.street2 || '',
+                 city: s.city || '', state: s.state || '', zip: s.zip || '' };
+      }
+      var a = order.address;
+      if (a && typeof a === 'object') {
+        var street = a.street || a.line1 || '';
+        var apt    = a.apt || a.line2 || a.street2 || '';
+        if (street || a.city || a.zip) {
+          return { name: a.name || c.name || '', street: street, apt: apt,
+                   city: a.city || '', state: a.state || '', zip: a.zip || '' };
+        }
+      }
       return null;
     },
 

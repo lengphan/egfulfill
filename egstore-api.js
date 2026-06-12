@@ -247,6 +247,17 @@
     var lean = {};
     ['id', 'seq', 'seller', 'store', 'source', 'customer', 'address', 'status', 'factoryStatus', 'total', 'profit', 'delivery', 'carrier', 'tracking', 'timeline', 'notes']
       .forEach(function (k) { if (o[k] !== undefined) lean[k] = o[k]; });
+    // Seller manual orders keep the recipient address on customer.shipTo, not the
+    // server's `address` column — so without this the factory boards see no address.
+    // Map it across whenever `address` is missing/empty.
+    var _empty = !lean.address || (typeof lean.address === 'object' && !Object.keys(lean.address).length);
+    if (_empty && o.customer && o.customer.shipTo) {
+      var sh = o.customer.shipTo;
+      if (sh && (sh.street || sh.city || sh.zip)) {
+        lean.address = { name: o.customer.name || '', street: sh.street || '', apt: sh.apt || '',
+                         city: sh.city || '', state: sh.state || '', zip: sh.zip || '' };
+      }
+    }
     if (Array.isArray(o.items)) {
       lean.items = o.items.map(function (it) {
         it = it || {};
