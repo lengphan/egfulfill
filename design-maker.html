@@ -1166,6 +1166,7 @@ function setTool(btn, tool){
 function triggerUpload(){ document.getElementById('file-input').click(); }
 // Preselect the Upload panel on entry + init undo/redo button states.
 document.addEventListener('DOMContentLoaded', function(){
+  if (typeof dmHydrateLibrary === 'function') dmHydrateLibrary();   // pull saved uploads from the server
   var u = document.getElementById('dm-tool-upload'); if (u) setTool(u, 'upload');
   if (typeof dmUpdateUndoButtons === 'function') dmUpdateUndoButtons();
 });
@@ -1658,23 +1659,45 @@ const DM_UPLOADS_CAP = 20;
 // persists server-side (order_designs), so a session-only gallery is the right call.
 // One-time cleanup: purge the legacy localStorage key so old bloat is reclaimed.
 try { localStorage.removeItem(DM_UPLOADS_KEY); } catch(e) {}
+// In-memory session cache, backed by the SERVER library (/api/design_library) so the
+// gallery persists across sessions/devices without ever touching localStorage.
 let _dmUploadsMem = [];
+const DM_LIB_URL = '/api/design_library';
+function _dmTok() { try { return localStorage.getItem('eg_token') || ''; } catch(e) { return ''; } }
 function dmLoadUploads() { return _dmUploadsMem.slice(); }
 function dmSaveUploadsList(list) { _dmUploadsMem = (list || []).slice(0, DM_UPLOADS_CAP); }
+// Pull the seller's saved uploads from the server on load.
+function dmHydrateLibrary() {
+  const tok = _dmTok(); if (!tok) return;
+  fetch(DM_LIB_URL, { headers: { Authorization: 'Bearer ' + tok } })
+    .then(r => r.ok ? r.json() : [])
+    .then(rows => {
+      _dmUploadsMem = (rows || []).map(d => ({ id: d.id, name: d.name || 'Untitled', src: d.data, ts: d.created_at }))
+                                   .slice(0, DM_UPLOADS_CAP);
+      if (typeof dmRenderUploads === 'function') dmRenderUploads();
+    })
+    .catch(() => {});
+}
 function dmTrackUpload(name, src) {
   if (!src) return;
-  const list = dmLoadUploads();
-  // Dedupe by src (data URLs are exact matches; URLs match exactly).
-  const existing = list.findIndex(u => u.src === src);
-  if (existing >= 0) list.splice(existing, 1);
-  list.unshift({ id: 'U' + Date.now(), name: name || 'Untitled', src, ts: new Date().toISOString() });
-  dmSaveUploadsList(list.slice(0, DM_UPLOADS_CAP));
-  dmRenderUploads();
-}
-function dmDeleteUpload(id) {
-  const list = dmLoadUploads().filter(u => u.id !== id);
+  const list = dmLoadUploads().filter(u => u.src !== src);   // dedupe by src
+  const entry = { id: 'U' + Date.now(), name: name || 'Untitled', src, ts: new Date().toISOString() };
+  list.unshift(entry);
   dmSaveUploadsList(list);
   dmRenderUploads();
+  // Persist to the server library (the image lives server-side, not localStorage).
+  const tok = _dmTok(); if (!tok) return;
+  fetch(DM_LIB_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ name: entry.name, data: src }) })
+    .then(r => r.ok ? r.json() : null)
+    .then(rec => { if (rec && rec.id != null) entry.id = rec.id; })   // swap temp id for the server id
+    .catch(() => {});
+}
+function dmDeleteUpload(id) {
+  _dmUploadsMem = _dmUploadsMem.filter(u => String(u.id) !== String(id));
+  dmRenderUploads();
+  const tok = _dmTok();
+  if (!tok || String(id).indexOf('U') === 0) return;   // temp/local id never reached the server
+  fetch(DM_LIB_URL + '/' + encodeURIComponent(id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok } }).catch(() => {});
 }
 function dmUseUpload(id) {
   const u = dmLoadUploads().find(u => u.id === id);

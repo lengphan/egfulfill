@@ -16,6 +16,7 @@ import { paypalRoutes } from './routes/paypal.js';
 import { stripeRoutes } from './routes/stripe.js';
 import { passwordResetRoutes } from './routes/password-reset.js';
 import { shippingRoutes } from './routes/shipping.js';
+import { designLibraryRoutes } from './routes/design_library.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
@@ -91,6 +92,7 @@ paypalRoutes(app, requireAuth);   // PayPal card/balance wallet top-up (auto-cap
 stripeRoutes(app, requireAuth);   // Stripe card wallet top-up (Payment Element)
 passwordResetRoutes(app, requireAuth, requireStaff);   // forgot/reset (admin-mediated + email link)
 shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate-shop + labels
+designLibraryRoutes(app, requireAuth);                 // per-seller "my uploads" design gallery (server-side, not localStorage)
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })
