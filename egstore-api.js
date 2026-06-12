@@ -152,6 +152,21 @@
         var ts = o.submittedAt || o.createdAt || 0;
         return ts && (now - ts) < FRESH;                              // freshly created, sync still plausibly in flight
       });
+      // The server intentionally doesn't store the per-item product/listing IMAGE
+      // (a multi-MB upload would bloat the orders payload + slow every load). So a
+      // naive overwrite drops item.img and the row falls back to a blank tee. Carry
+      // the locally-held item.img onto the matching server item so it survives hydrate.
+      var localById = {};
+      local.forEach(function (o) { if (o && o.id != null) localById[o.id] = o; });
+      incoming.forEach(function (o) {
+        var lo = localById[o.id];
+        if (!lo || !Array.isArray(o.items) || !Array.isArray(lo.items)) return;
+        o.items.forEach(function (it) {
+          if (!it || (it.img != null && it.img !== '')) return;
+          var m = lo.items.find(function (x) { return x && x.sku === it.sku && x.img; });
+          if (m && m.img) it.img = m.img;
+        });
+      });
       localStorage.setItem(KEY, JSON.stringify(incoming.concat(keep)));
     } catch (e) {
       try { localStorage.setItem(KEY, JSON.stringify(incoming)); } catch (_) {}
