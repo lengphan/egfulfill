@@ -1055,10 +1055,15 @@ function renderOrders(ordersOverride) {
         UP_STATE[o.no][itemDK(item)] = { state: 'ok', file: { name: 'Customer upload' }, dataUrl: item.customerFile, fromCustomer: true };
       }
       if (!ITEM_DESIGN_SEL[dsKey]) {
+        // A real seller UPLOAD wins over a stale design-lab/template flag — uploading
+        // is the explicit latest action, so the item shouldn't keep showing Design Lab
+        // just because it was toggled earlier. (A customer marketplace file doesn't win.)
+        const _up = UP_STATE[o.no]?.[itemDK(item)];
         // designSrc is an enum ('design-lab'/'template'); ignore URL values that
         // can arrive on synced orders so a customer file isn't mis-tagged.
-        if (item.designSrc && !/^https?:\/\//i.test(String(item.designSrc))) ITEM_DESIGN_SEL[dsKey] = item.designSrc === 'design-lab' ? 'lab' : 'template';
-        else if (UP_STATE[o.no]?.[itemDK(item)]?.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
+        if (_up && _up.state === 'ok' && !_up.fromCustomer) ITEM_DESIGN_SEL[dsKey] = 'upload';
+        else if (item.designSrc && !/^https?:\/\//i.test(String(item.designSrc))) ITEM_DESIGN_SEL[dsKey] = item.designSrc === 'design-lab' ? 'lab' : 'template';
+        else if (_up && _up.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
       }
       const DS_ACT = '#374151';
       const dsBtnStyle = (type) => { const a = ITEM_DESIGN_SEL[dsKey]===type; return `display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1.5px solid ${a?DS_ACT:'#e5e4e0'};background:${a?DS_ACT:'#fff'};color:${a?'#fff':'#6b7280'};cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;text-decoration:none`; };
