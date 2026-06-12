@@ -1378,18 +1378,19 @@ function pickDesign(ordNo, escSku, type) {
     try {
       const KEY = 'eg_design_lab_assigned';
       const map = JSON.parse(localStorage.getItem(KEY) || '{}');
-      const mk = o.id + '|' + item.sku;
-      if (item.designSrc) map[mk] = { ordId: o.id, sku: item.sku, designSrc: item.designSrc, ts: Date.now() };
+      const mk = o.id + '|' + itemDK(item);
+      if (item.designSrc) map[mk] = { ordId: o.id, sku: item.sku, dk: itemDK(item), designSrc: item.designSrc, ts: Date.now() };
       else delete map[mk];
       localStorage.setItem(KEY, JSON.stringify(map));
     } catch(e) {}
     // Re-render the row so the status badge updates immediately
     setTimeout(renderOrders, 60);
   }
-  // Stash context so design-maker.html knows which order/item to return to
+  // Stash context so design-maker.html knows which order/item to return to.
+  // dk = per-line design key so the artwork lands on THIS item only.
   if (type === 'lab' && ITEM_DESIGN_SEL[key] === 'lab' && o && item) {
     sessionStorage.setItem('eg_design_context', JSON.stringify({
-      ordNo: ordNo, ordId: o.id, sku: item.sku, escSku: escSku,
+      ordNo: ordNo, ordId: o.id, sku: item.sku, dk: itemDK(item), escSku: escSku,
       customer: o.cust, blank: item.blank||'', tech: item.tech||''
     }));
   }
@@ -1405,7 +1406,7 @@ function accessDesign(ordNo, escSku) {
     openUploadPanel(ordNo, itemDK(item));
   } else if (item.designSrc === 'design-lab') {
     sessionStorage.setItem('eg_design_context', JSON.stringify({
-      ordNo: ordNo, ordId: o.id, sku: item.sku, escSku: escSku,
+      ordNo: ordNo, ordId: o.id, sku: item.sku, dk: itemDK(item), escSku: escSku,
       customer: o.cust, blank: item.blank||'', tech: item.tech||''
     }));
     window.location.href = 'design-maker.html';
@@ -4123,17 +4124,21 @@ function odmRemoveDesign(ordNo, sku) {
       Object.assign(item, fields);
     });
   } catch(e) {}
-  // 2. Apply design-lab assignments — also swap the line-item thumbnail to the composite mockup
-  //    (blank product + design overlay) captured by design-maker on Attach.
+  // 2. Apply design-lab assignments to the RIGHT line item only. The design overlay
+  //    is rendered by itemCompositeThumb (blank mockup + cached raw design), so we do
+  //    NOT touch item.img — the parent row keeps the seller's uploaded product photo,
+  //    not the blank+design composite. Match by per-line design key so two same-SKU
+  //    items don't both pick up one item's design.
   try {
     const assigned = JSON.parse(localStorage.getItem('eg_design_lab_assigned') || '{}');
     Object.values(assigned).forEach(a => {
       const o = ORDERS.find(x => x.id === a.ordId);
       if (!o) return;
-      const item = o.itemsList.find(i => i.sku === a.sku);
+      assignDesignKeys(o.itemsList);
+      const item = (a.dk && o.itemsList.find(i => itemDK(i) === a.dk)) || o.itemsList.find(i => i.sku === a.sku);
       if (!item) return;
       if (!item.designSrc) item.designSrc = a.designSrc || 'design-lab';
-      if (a.previewImg) item.img = a.previewImg;     // composite mockup with design overlaid
+      // item.img is intentionally left as the uploaded product image.
     });
   } catch(e) {}
   try {

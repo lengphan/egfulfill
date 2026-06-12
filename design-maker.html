@@ -3223,24 +3223,27 @@ async function pushToProduction(){
     try {
       const KEY = 'eg_design_lab_assigned';
       const map = JSON.parse(localStorage.getItem(KEY) || '{}');
-      map[ctx.ordId + '|' + ctx.sku] = {
-        ordId: ctx.ordId, sku: ctx.sku, designSrc: 'design-lab',
+      // Key by the per-line DESIGN KEY (dk) so two same-SKU items stay independent.
+      var _dk = ctx.dk || ctx.sku;
+      map[ctx.ordId + '|' + _dk] = {
+        ordId: ctx.ordId, sku: ctx.sku, dk: _dk, designSrc: 'design-lab',
         previewImg: previewImg || null,
         ts: Date.now(),
       };
       localStorage.setItem(KEY, JSON.stringify(map));
     } catch(e) {}
-    // 4) Cache the COMPOSITE for the line-item thumbnail.
+    var _dk = ctx.dk || ctx.sku;
+    // 4) Cache the COMPOSITE for the line-item thumbnail (factory rows), keyed by design key.
     if (previewImg && typeof EGStore !== 'undefined' && EGStore.cacheImage) {
       try {
-        const res = EGStore.cacheImage(ctx.ordId, ctx.sku, previewImg);
+        const res = EGStore.cacheImage(ctx.ordId, _dk, previewImg);
         if (res && res.ok === false) console.warn('cacheImage failed:', res.error);
       } catch(e) { console.warn('cacheImage threw:', e); }
     }
     // 5) Cache the RAW design for the file preview popup + download + push-to-board.
     if (rawDesignImg && typeof EGStore !== 'undefined' && EGStore.cacheRawDesign) {
       try {
-        const res = EGStore.cacheRawDesign(ctx.ordId, ctx.sku, rawDesignImg);
+        const res = EGStore.cacheRawDesign(ctx.ordId, _dk, rawDesignImg);
         if (res && res.ok === false) console.warn('cacheRawDesign failed:', res.error);
       } catch(e) { console.warn('cacheRawDesign threw:', e); }
     }
