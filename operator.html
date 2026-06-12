@@ -1016,8 +1016,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <div id="op-col-menu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:200;background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:8px 12px;width:170px;box-shadow:0 4px 20px rgba(0,0,0,.1)" onclick="event.stopPropagation()">
             <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Show / Hide</div>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="seller" checked onchange="opToggleCol('seller',this.checked)" style="accent-color:#111827"> Seller / Source</label>
-            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="carrier" checked onchange="opToggleCol('carrier',this.checked)" style="accent-color:#111827"> Carrier · Total</label>
-            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="time" checked onchange="opToggleCol('time',this.checked)" style="accent-color:#111827"> Time</label>
+            <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="age" checked onchange="opToggleCol('age',this.checked)" style="accent-color:#111827"> Age</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="customer" checked onchange="opToggleCol('customer',this.checked)" style="accent-color:#111827"> Customer</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px"><input type="checkbox" data-opcol="tracking" checked onchange="opToggleCol('tracking',this.checked)" style="accent-color:#111827"> Tracking</label>
           </div>
@@ -1050,8 +1049,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
             <th data-col="seller" draggable="true" ondragstart="opDragColStart(event,'seller')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'seller')" onclick="opSortBy('seller')" onmousedown="rzCapture(event)" style="width:150px;min-width:80px"><span class="th-label">Seller / Source<span class="sort-arrow op-sort-arrow" data-sort="seller"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="items" draggable="true" ondragstart="opDragColStart(event,'items')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'items')" onclick="opSortBy('items')" onmousedown="rzCapture(event)" style="width:80px;min-width:50px"><span class="th-label">Items<span class="sort-arrow op-sort-arrow" data-sort="items"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="status" draggable="true" ondragstart="opDragColStart(event,'status')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'status')" onclick="opSortBy('status')" onmousedown="rzCapture(event)" style="width:110px;min-width:70px"><span class="th-label">Status<span class="sort-arrow op-sort-arrow" data-sort="status"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="carrier" draggable="true" ondragstart="opDragColStart(event,'carrier')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'carrier')" onclick="opSortBy('carrier')" onmousedown="rzCapture(event)" style="cursor:pointer;width:120px;min-width:80px"><span class="th-label">Carrier · Total <span class="sort-arrow op-sort-arrow" data-sort="carrier"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
-            <th data-col="time" draggable="true" ondragstart="opDragColStart(event,'time')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'time')" onclick="opSortBy('time')" onmousedown="rzCapture(event)" style="cursor:pointer;width:90px;min-width:60px"><span class="th-label">Time <span class="sort-arrow desc op-sort-arrow" data-sort="time"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
+            <th data-col="age" draggable="true" ondragstart="opDragColStart(event,'age')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'age')" onclick="opSortBy('age')" onmousedown="rzCapture(event)" style="cursor:pointer;width:70px;min-width:48px"><span class="th-label">Age <span class="sort-arrow desc op-sort-arrow" data-sort="age"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="customer" draggable="true" ondragstart="opDragColStart(event,'customer')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'customer')" onclick="opSortBy('customer')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Customer<span class="sort-arrow op-sort-arrow" data-sort="customer"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="tracking" draggable="true" ondragstart="opDragColStart(event,'tracking')" ondragover="opDragColOver(event)" ondragleave="opDragColLeave(event)" ondragend="opDragColEnd(event)" ondrop="opDragColDrop(event,'tracking')" onclick="opSortBy('tracking')" onmousedown="rzCapture(event)" style="width:130px;min-width:80px"><span class="th-label">Tracking<span class="sort-arrow op-sort-arrow" data-sort="tracking"></span></span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
             <th data-col="actions" style="width:190px"><span class="th-label">Actions</span><div class="col-rz" onmousedown="rzStart(event,this)"></div></th>
@@ -3669,6 +3667,16 @@ const OP_STATUS_MAP = {
   qc:            'Printing',
   packed:        'Printing',
 };
+// Compact "age since placed" for the Age column (replaces the Time column; the full
+// timestamp lives in the order-detail window). Darkens as it ages; >24h → days.
+function opOrderAge(o) {
+  var ts = o && o._ts ? o._ts : 0;
+  if (!ts) return '<span style="color:#c4c3be">—</span>';
+  var hr = Math.floor((Date.now() - ts) / 3600000);
+  var txt = hr < 24 ? hr + 'hr' : Math.floor(hr / 24) + 'd';
+  var color = hr < 2 ? '#9ca3af' : hr < 8 ? '#6b7280' : hr < 24 ? '#374151' : '#b45309';
+  return '<span style="font-weight:600;color:' + color + '">' + txt + '</span>';
+}
 function opFmtOrderDate(o) {
   var ts = o && o._ts ? o._ts : 0;
   if (!ts) return o && (o.placed || o.time) ? (o.placed || o.time) : '—';
@@ -3852,11 +3860,7 @@ function renderOpOrders() {
         </div>
       </td>
       <td data-col="status">${badge}</td>
-      <td data-col="carrier" style="display:${opColVisible('carrier')?'':'none'}">
-        <div style="font-size:13px;color:#374151">${o.carrier}</div>
-        <div style="font-size:12px;color:#9ca3af;margin-top:1px">${o.total}</div>
-      </td>
-      <td data-col="time" style="font-size:13px;color:#6b7280;white-space:nowrap;display:${opColVisible('time')?'':'none'}">${opFmtOrderDate(o)}</td>
+      <td data-col="age" style="font-size:13px;white-space:nowrap;display:${opColVisible('age')?'':'none'}">${opOrderAge(o)}</td>
       <td data-col="customer" style="display:${opColVisible('customer')?'':'none'}">
         <div style="font-size:13.5px;font-weight:600;color:#374151">${o.customer}</div>
       </td>
@@ -4061,9 +4065,9 @@ function renderOpOrders() {
 }
 
 // Column drag-to-reorder
-let opColOrder = ['order','time','seller','customer','items','carrier','tracking','status','actions'];
+let opColOrder = ['order','age','seller','customer','items','tracking','status','actions'];
 let opDragColIdx = null;
-let opSortCol = 'time';
+let opSortCol = 'age';
 let opSortDir = 'desc';
 // Build ship-to data for an order (FOM_ADDR_DATA → EGStore → OP_ORDERS fallback).
 function opLabelData(num) {
