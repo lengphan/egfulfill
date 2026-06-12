@@ -196,8 +196,8 @@
   }
   function noAddItem() {
     syncBlankCatalog();
-    var NO_IN = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
-    var NO_SM = 'border:1.5px solid #e5e4e0;border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
+    var NO_IN = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
+    var NO_SM = 'border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
     var pid = 'noi-' + Date.now();
     var popts = BLANK_CATALOG.map(function (p) { return '<option value="' + p.id + '">' + p.name + '</option>'; }).join('');
     var lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px';
@@ -207,7 +207,7 @@
           '<svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>' +
         '<div style="display:flex;align-items:stretch;gap:10px">' +
           // Product image: auto-filled from the selected blank, drag/click to override.
-          '<label class="no-img-zone" data-img="" style="width:80px;height:80px;align-self:flex-start;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#d8d5d0\'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">' +
+          '<label class="no-img-zone" data-img="" style="align-self:stretch;flex-shrink:0;width:80px;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#d8d5d0\'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">' +
             '<input type="file" accept="image/*" style="display:none" onchange="noPickImg(this.files&&this.files[0],this.closest(\'.no-img-zone\'))"/>' +
             '<span class="no-img-ph">＋<br>Image</span>' +
           '</label>' +
@@ -231,6 +231,19 @@
         '<div class="no-sku" style="display:none">—</div>' +
       '</div>';
     document.getElementById('no-items-list').insertAdjacentHTML('beforeend', html);
+    noSquareImg(document.getElementById(pid));
+  }
+  // Size the image box into a true square equal to the right-side column's height,
+  // so it covers the title + fields while staying square (CSS aspect-ratio collapses
+  // inside flex, so we measure once after layout).
+  function noSquareImg(row) {
+    if (!row) return;
+    var zone = row.querySelector('.no-img-zone');
+    if (!zone) return;
+    requestAnimationFrame(function () {
+      var h = zone.offsetHeight;
+      if (h > 0) { zone.style.width = h + 'px'; }
+    });
   }
   // Auto-fill the row's image box from the selected blank (per-color image when
   // available). A user upload (data-img set) always wins and is never overwritten.

@@ -4265,8 +4265,8 @@ function noSyncChannel() {
 function noAddItem() {
   syncBlankCatalog();
   const NO_SL = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 8px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
-  const NO_IN = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
-  const NO_SM = 'border:1.5px solid #e5e4e0;border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
+  const NO_IN = 'border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 9px;font-size:13px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
+  const NO_SM = 'border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 6px;font-size:12px;font-family:inherit;outline:none;color:#374151;background:#fff;box-sizing:border-box;width:100%';
   const pid = 'noi-' + Date.now();
   const popts = BLANK_CATALOG.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
   const html = `<div class="no-item-row" id="${pid}" style="position:relative;border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">
@@ -4274,7 +4274,7 @@ function noAddItem() {
       <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
     <div style="display:flex;align-items:stretch;gap:10px">
-      <label class="no-img-zone" data-img="" style="width:80px;height:80px;align-self:flex-start;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d5d0'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">
+      <label class="no-img-zone" data-img="" style="align-self:stretch;flex-shrink:0;width:80px;border:1.5px dashed #d8d5d0;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background-color:#fff;background-position:center;background-size:cover;background-repeat:no-repeat;color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;flex-shrink:0;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d5d0'" ondrop="noDropImg(event,this)" title="Drop or click to upload a product image">
         <input type="file" accept="image/*" style="display:none" onchange="noPickImg(this.files&&this.files[0],this.closest('.no-img-zone'))"/>
         <span class="no-img-ph">＋<br>Image</span>
       </label>
@@ -4310,6 +4310,10 @@ function noAddItem() {
     <div class="no-sku" style="display:none">—</div>
   </div>`;
   document.getElementById('no-items-list').insertAdjacentHTML('beforeend', html);
+  // Size the image box into a true square equal to the right column's height
+  // (CSS aspect-ratio collapses inside flex, so measure once after layout).
+  const _z = document.getElementById(pid).querySelector('.no-img-zone');
+  requestAnimationFrame(() => { const h = _z.offsetHeight; if (h > 0) _z.style.width = h + 'px'; });
 }
 // Manual-order image drop-zone: read the dropped/selected file → data URL,
 // preview it as the zone background, and stash it on data-img for submit.
