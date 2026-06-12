@@ -4480,6 +4480,19 @@ const WH_STATUS_TAB = {
 function whCanonStatus(s) { return WH_STATUS_TAB[s] || s; }
 // One consistent "real order date" format: marketplace date for synced orders,
 // upload time for manual orders (both stored in _ts).
+// Full-screen image lightbox — click any order/listing image to check it large.
+function whZoomImg(src) {
+  if (!src) return;
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.82);z-index:10000;display:flex;align-items:center;justify-content:center;padding:32px;cursor:zoom-out;font-family:inherit';
+  ov.onclick = function () { ov.remove(); };
+  var img = document.createElement('img'); img.src = src;
+  img.style.cssText = 'max-width:92vw;max-height:92vh;border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,.5);object-fit:contain;background:#fff';
+  ov.appendChild(img); document.body.appendChild(ov);
+  var esc = function (e) { if (e.key === 'Escape') { ov.remove(); document.removeEventListener('keydown', esc); } };
+  document.addEventListener('keydown', esc);
+}
+window.whZoomImg = whZoomImg;
 // Compact "age since placed" for the Age column (full timestamp lives in the detail window).
 function whOrderAge(o) {
   const ts = o && o._ts ? o._ts : 0;
@@ -5965,7 +5978,7 @@ function whRenderOrders() {
       </td>
       <td data-col="items">
         <div style="display:flex;align-items:center;gap:9px">
-          ${_pImg ? `<img src="${_pImg}" style="width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0;background:#f6f5f4" onerror="this.style.visibility='hidden'">` : `<div style="width:34px;height:34px;border-radius:7px;background:#f0ede9;flex-shrink:0"></div>`}
+          ${_pImg ? `<img src="${_pImg}" onclick="event.stopPropagation();whZoomImg(this.src)" title="Click to enlarge — check the listing image" style="width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0;background:#f6f5f4;cursor:zoom-in;transition:box-shadow .12s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''" onerror="this.style.visibility='hidden'">` : `<div style="width:34px;height:34px;border-radius:7px;background:#f0ede9;flex-shrink:0"></div>`}
           <div style="min-width:0">
             ${_pTitle ? `<div title="${_pTitle}" style="font-size:13px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${_pTitle}</div>` : ''}
             <div style="display:flex;align-items:center;gap:5px">
