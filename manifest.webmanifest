@@ -1,0 +1,17 @@
+{
+  "name": "EG Floor — Warehouse & Admin",
+  "short_name": "EG Floor",
+  "description": "Scan-first warehouse companion for EGFULFILL: inventory lookup, order quick-check, barcode scan, and a low-stock dashboard.",
+  "start_url": "mobile.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f2ef",
+  "theme_color": "#111827",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
