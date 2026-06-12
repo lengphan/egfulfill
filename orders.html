@@ -944,6 +944,7 @@ function renderOrders(ordersOverride) {
   if (typeof renderOrdersPagination === 'function') renderOrdersPagination(_page, _totalPages);
   const rows = [];
   _pageRows.forEach((o, idx) => {
+    assignDesignKeys(o.itemsList);   // per-line design key so same-SKU items don't share artwork
     const sc = SC[o.status] || SC.new;
     /* Tracking cell: delegate to the shared EGTracking helper.
        It handles all three states (pending pull / loading / loaded) and only
@@ -1047,24 +1048,24 @@ function renderOrders(ordersOverride) {
       // Priority: in-memory selection → item.designSrc → live UP_STATE upload.
       // Pre-fill the drop-zone with the buyer's marketplace upload so it reads
       // as "already uploaded" (customer files arrive attached to synced orders).
-      if (item.customerFile && !(UP_STATE[o.no] && UP_STATE[o.no][item.sku])) {
+      if (item.customerFile && !(UP_STATE[o.no] && UP_STATE[o.no][itemDK(item)])) {
         UP_STATE[o.no] = UP_STATE[o.no] || {};
-        UP_STATE[o.no][item.sku] = { state: 'ok', file: { name: 'Customer upload' }, dataUrl: item.customerFile, fromCustomer: true };
+        UP_STATE[o.no][itemDK(item)] = { state: 'ok', file: { name: 'Customer upload' }, dataUrl: item.customerFile, fromCustomer: true };
       }
       if (!ITEM_DESIGN_SEL[dsKey]) {
         // designSrc is an enum ('design-lab'/'template'); ignore URL values that
         // can arrive on synced orders so a customer file isn't mis-tagged.
         if (item.designSrc && !/^https?:\/\//i.test(String(item.designSrc))) ITEM_DESIGN_SEL[dsKey] = item.designSrc === 'design-lab' ? 'lab' : 'template';
-        else if (UP_STATE[o.no]?.[item.sku]?.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
+        else if (UP_STATE[o.no]?.[itemDK(item)]?.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
       }
       const DS_ACT = '#374151';
       const dsBtnStyle = (type) => { const a = ITEM_DESIGN_SEL[dsKey]===type; return `display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1.5px solid ${a?DS_ACT:'#e5e4e0'};background:${a?DS_ACT:'#fff'};color:${a?'#fff':'#6b7280'};cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;text-decoration:none`; };
-      const upFile = UP_STATE[o.no]?.[item.sku]?.state === 'ok' ? UP_STATE[o.no][item.sku].file : null;
+      const upFile = UP_STATE[o.no]?.[itemDK(item)]?.state === 'ok' ? UP_STATE[o.no][itemDK(item)].file : null;
       // Nudge the Upload button while this item still has no design (uniform cue with
       // the factory boards — same pickNudge animation).
       const _needsDesign = needsSetup && !ITEM_DESIGN_SEL[dsKey] && !upFile;
       const designBtns = () => `
-        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${item.sku}')" style="${dsBtnStyle('upload')}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
+        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${dsBtnStyle('upload')}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
         <button id="dsb-${o.no}-${escSku}-template" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','template');openDTpl(event,'${o.no}','${item.sku}')" style="${dsBtnStyle('template')}">Templates</button>
         <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a>`;
 
@@ -1109,7 +1110,7 @@ function renderOrders(ordersOverride) {
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
         <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 286px 112px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
-          <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
+          <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
             <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.listing||item.name}">${item.listing||item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></div>
@@ -1399,9 +1400,9 @@ function accessDesign(ordNo, escSku) {
   if (!o) return;
   const item = o.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (!item) return;
-  const upState = UP_STATE[ordNo]?.[item.sku];
+  const upState = UP_STATE[ordNo]?.[itemDK(item)];
   if (upState?.state === 'ok') {
-    openUploadPanel(ordNo, item.sku);
+    openUploadPanel(ordNo, itemDK(item));
   } else if (item.designSrc === 'design-lab') {
     sessionStorage.setItem('eg_design_context', JSON.stringify({
       ordNo: ordNo, ordId: o.id, sku: item.sku, escSku: escSku,
@@ -1420,7 +1421,7 @@ function clearDesign(ordNo, escSku) {
   if (!item) return;
   item.designSrc = undefined;
   ITEM_DESIGN_SEL[ordNo+'_'+escSku] = null;
-  if (UP_STATE[ordNo]) UP_STATE[ordNo][item.sku] = { state:'idle', file:null };
+  if (UP_STATE[ordNo]) UP_STATE[ordNo][itemDK(item)] = { state:'idle', file:null };
   try {
     const map = JSON.parse(localStorage.getItem('eg_design_lab_assigned') || '{}');
     delete map[o.id + '|' + item.sku];
@@ -1610,7 +1611,7 @@ function updatePushBtn(ordNo) {
     btn.onmouseout  = function(){ this.style.background='#191918'; };
     btn.innerHTML = uploadIconLight + `Upload Image (${checked.length})`;
     btn.title = `Upload designs for ${checked.length} selected item${checked.length>1?'s':''}`;
-    const skus = checked.map(c => c.getAttribute('data-sku'));
+    const skus = checked.map(c => c.getAttribute('data-dk') || c.getAttribute('data-sku'));
     btn.onclick = (e) => { e.stopPropagation(); openUploadPanel(ordNo, skus); };
   }
 }
@@ -1618,10 +1619,11 @@ function pushOrderToProduction(ordNo, btn) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
   // Only Design is required to push. Blank/Print type are nice-to-have and can be filled by factory roles.
+  assignDesignKeys(o.itemsList);
   const missingDesign = [];
   const missingItems = [];
   o.itemsList.forEach(item => {
-    const hasDesign = !!(UP_STATE[ordNo]?.[item.sku]?.state === 'ok' || item.designSrc);
+    const hasDesign = !!(UP_STATE[ordNo]?.[itemDK(item)]?.state === 'ok' || item.designSrc);
     if (!hasDesign) {
       const name = item.listing || item.name || item.sku;
       missingDesign.push(name.length > 22 ? name.slice(0,22)+'…' : name);
@@ -2181,6 +2183,7 @@ function odmSaveMeta(ordNo) {
 function openDetailModal(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
+  assignDesignKeys(o.itemsList);   // per-line design keys for same-SKU items
   // Pull this order's server-stored designs into the local cache, then refresh
   // the modal + rows so uploaded artwork shows even after a refresh / new device.
   // Guarded to hydrate once per order id so the re-open below can't loop.
@@ -2239,7 +2242,7 @@ function openDetailModal(ordNo) {
     const ptStyle = PT_STYLES[pt] || PT_STYLES.DTG;
     const stKey = (item.status || o.status || 'new').toLowerCase();
     const stLbl = STATUS_LBL[stKey] || ((item.status || o.status || 'New').charAt(0).toUpperCase() + (item.status || o.status || 'New').slice(1));
-    const previewSrc = (UP_STATE[o.no]?.[item.sku]?.dataUrl) || item.img || 'https://placehold.co/52x52/f6f5f4/c4c3be?text=?';
+    const previewSrc = (UP_STATE[o.no]?.[itemDK(item)]?.dataUrl) || item.img || 'https://placehold.co/52x52/f6f5f4/c4c3be?text=?';
     const qtyDisabled = needsSetup ? '' : 'disabled style="opacity:.4;cursor:not-allowed"';
     const xVis = needsSetup ? '' : 'display:none';
     // Newly-added rows render with a SKU lookup input where the product name would
@@ -2288,9 +2291,9 @@ function openDetailModal(ordNo) {
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload');odmSlideOpen('upload',${o.no},'${item.sku.replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Upload artwork"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template');odmSlideOpen('template',${o.no},'${item.sku.replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab');odmSlideOpen('lab',${o.no},'${item.sku.replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Upload artwork"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
       </div>`;
     // Per-item economics: ONE big line total at the top-right of the item
     // card. The Unit/Qty/Line breakdown strip below the dashed divider has
@@ -2302,7 +2305,7 @@ function openDetailModal(ordNo) {
     // attached. Renders as its own row below the main item grid so it
     // doesn't clutter the per-item economics anymore.
     const embRowHtml = (typeof EGStore !== 'undefined' && EGStore.getItemEmbFile) ? (function(){
-      const emb = EGStore.getItemEmbFile(o.id, item.sku);
+      const emb = EGStore.getItemEmbFile(o.id, itemDK(item));
       if (!emb) return '';
       const price = EGStore.getEmbFilePrice();
       const paid = EGStore.hasSellerPaidForEmb(o.id, item.sku);
@@ -2591,7 +2594,7 @@ function odmSlideApplyTpl(tplId) {
     item.designPos = item.designPos || { x: 22, y: 22, w: 56, h: 56 };
     try {
       if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) {
-        EGStore.cacheRawDesign(o.id, item.sku, designImg);
+        EGStore.cacheRawDesign(o.id, itemDK(item), designImg);
       }
     } catch(e) {}
   }
@@ -2699,11 +2702,30 @@ function _itemMockupURL(item) {
   if (fallback && !/placehold\.co/i.test(fallback)) return fallback;
   return fallback;
 }
+// Per-line DESIGN KEY. Two line items can share a blank SKU (e.g. two different
+// products both on G5000-COPY-WHT-S) yet need DIFFERENT artwork. Design state
+// (UP_STATE, raw/image caches, thread matches, server order_designs) is keyed by
+// this key, NOT the raw SKU: the first item with a SKU keeps the bare SKU (so old
+// single-design data still resolves), each later duplicate gets a hidden "#n"
+// slot. The displayed SKU is never changed; the slot is internal only.
+function itemDK(item) { return (item && item._dk) || (item && item.sku) || ''; }
+function assignDesignKeys(items) {
+  if (!Array.isArray(items)) return;
+  const seen = {};
+  items.forEach(it => {
+    if (!it) return;
+    const base = String(it.sku || '');
+    const n = seen[base] || 0;
+    it._dk = n === 0 ? base : base + '#' + n;
+    seen[base] = n + 1;
+  });
+}
 function _itemDesignURL(o, item) {
   // Priority: live upload state → item.designUrl → EGStore raw design (cached
   // by design-maker's pushToProduction so the row thumbnail overlays the design
   // on the blank even after a full navigation round-trip).
-  const fromUp = UP_STATE[o.no] && UP_STATE[o.no][item.sku] && UP_STATE[o.no][item.sku].dataUrl;
+  const _dk = itemDK(item);
+  const fromUp = UP_STATE[o.no] && UP_STATE[o.no][_dk] && UP_STATE[o.no][_dk].dataUrl;
   if (fromUp) return fromUp;
   // Seller's own design wins; otherwise show the buyer's marketplace upload
   // (Etsy "Upload Your Logo", etc.) on the blank until they replace it.
@@ -2711,7 +2733,7 @@ function _itemDesignURL(o, item) {
   if (item.customerFile) return item.customerFile;
   try {
     if (typeof EGStore !== 'undefined' && EGStore.getRawDesign && o.id) {
-      const raw = EGStore.getRawDesign(o.id, item.sku);
+      const raw = EGStore.getRawDesign(o.id, _dk);
       if (raw) return raw;
     }
   } catch(e) {}
@@ -2748,7 +2770,7 @@ function itemCompositeThumb(o, item, size) {
     ? `<img src="${design}" style="position:absolute;left:${pos.x}%;top:${pos.y}%;width:${pos.w}%;height:${pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
     : '';
   const bg = mockup ? `background:#f6f5f4 url('${mockup.replace(/'/g, "%27")}') center/cover no-repeat` : `background:#f6f5f4`;
-  const skuJs = String(item.sku).replace(/'/g, "\\'");
+  const skuJs = String(itemDK(item)).replace(/'/g, "\\'");
   // Lock drag/resize once the order leaves setup (new / action). Past that
   // point the factory has the design and any reposition is meaningless —
   // clicking the avatar just opens a zoom view, never the editor.
@@ -2769,7 +2791,8 @@ function itemCompositeThumb(o, item, size) {
 let _qpCurrent = null;
 function openQuickPositionModal(orderNo, sku, viewOnly) {
   const o = ORDERS.find(x => x.no === orderNo); if (!o) return;
-  const item = o.itemsList.find(i => i.sku === sku); if (!item) return;
+  assignDesignKeys(o.itemsList);
+  const item = o.itemsList.find(i => itemDK(i) === sku) || o.itemsList.find(i => i.sku === sku); if (!item) return;
   const mockup = _itemMockupURL(item);
   const design = _itemDesignURL(o, item);
   if (!design) return;
@@ -2924,7 +2947,7 @@ function qpRemoveBg() {
       // Persist on the item + the shared design cache so it survives reloads and
       // shows on the factory boards' composites.
       item.designUrl = out;
-      try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, item.sku, out); } catch(e){}
+      try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, itemDK(item), out); } catch(e){}
       _qpSyncEverywhere();
       if (typeof toast === 'function') toast('Background removed');
     } finally {
@@ -4843,16 +4866,19 @@ window.addEventListener('storage', function(e) { if (e.key === EG_RV_KEY) render
 function openUploadPanel(ordNo, filterSku) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  // Init state — only seed missing items (don't wipe restored uploads from localStorage)
+  assignDesignKeys(o.itemsList);   // ensure per-line design keys exist
+  // Init state — only seed missing items (don't wipe restored uploads from localStorage).
+  // Keyed by the per-line DESIGN KEY (itemDK), so two same-SKU items stay independent.
   if (!UP_STATE[ordNo]) UP_STATE[ordNo] = {};
   o.itemsList.forEach(item => {
-    if (!UP_STATE[ordNo][item.sku]) UP_STATE[ordNo][item.sku] = { state: 'idle', file: null };
+    const dk = itemDK(item);
+    if (!UP_STATE[ordNo][dk]) UP_STATE[ordNo][dk] = { state: 'idle', file: null };
   });
-  // Normalize filter: support single SKU string, array of SKUs, or null
+  // Normalize filter: support single design-key string, array of keys, or null
   const filterIsArray = Array.isArray(filterSku);
   const filterIsString = typeof filterSku === 'string' && filterSku;
-  const items = filterIsArray ? o.itemsList.filter(i => filterSku.includes(i.sku))
-              : filterIsString ? o.itemsList.filter(i => i.sku === filterSku)
+  const items = filterIsArray ? o.itemsList.filter(i => filterSku.includes(itemDK(i)))
+              : filterIsString ? o.itemsList.filter(i => itemDK(i) === filterSku)
               : o.itemsList;
   const item1 = items[0];
   if (filterIsArray && filterSku.length > 1) {
@@ -4916,26 +4942,27 @@ function renderUploadItems(o, filterSku) {
   // for every same-SKU sibling — exactly the bug the seller reported.
   let items;
   if (Array.isArray(filterSku)) {
-    items = o.itemsList.filter(i => filterSku.includes(i.sku));
+    items = o.itemsList.filter(i => filterSku.includes(itemDK(i)));
   } else if (filterSku) {
-    items = o.itemsList.filter(i => i.sku === filterSku).slice(0, 1);
+    items = o.itemsList.filter(i => itemDK(i) === filterSku).slice(0, 1);
   } else {
     items = o.itemsList;
   }
   // Update bottom button label based on current state
   const btn = document.getElementById('up-submit-btn');
   if (btn) {
-    const allOk = items.every(i => UP_STATE[o.no]?.[i.sku]?.state === 'ok');
-    const anyIdle = items.some(i => (UP_STATE[o.no]?.[i.sku]?.state || 'idle') === 'idle');
+    const allOk = items.every(i => UP_STATE[o.no]?.[itemDK(i)]?.state === 'ok');
+    const anyIdle = items.some(i => (UP_STATE[o.no]?.[itemDK(i)]?.state || 'idle') === 'idle');
     const icon = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 9V2M3.5 5l3-3 3 3" stroke="white" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 11h10" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg> ';
     if (filterSku && anyIdle) btn.innerHTML = icon + 'Choose File';
     else if (allOk) btn.innerHTML = icon + 'Confirm & Submit';
     else btn.innerHTML = icon + (filterSku ? 'Upload File' : 'Upload All Files');
   }
   wrap.innerHTML = items.map(item => {
-    const s = UP_STATE[o.no]?.[item.sku] || { state:'idle', file:null };
-    const stateHtml = upStateHtml(item.sku, o.no, s);
-    return `<div class="up-item" id="upitem-${o.no}-${item.sku.replace(/[^a-z0-9]/gi,'_')}">
+    const dk = itemDK(item);
+    const s = UP_STATE[o.no]?.[dk] || { state:'idle', file:null };
+    const stateHtml = upStateHtml(dk, o.no, s);
+    return `<div class="up-item" id="upitem-${o.no}-${dk.replace(/[^a-z0-9]/gi,'_')}">
       <div class="up-item-head">
         <span class="tech-badge tech-${item.tech}" style="width:26px;height:26px;font-size:9px">${item.tech}</span>
         <div style="flex:1;min-width:0">
@@ -5599,11 +5626,11 @@ function uploadAll() {
               : o.itemsList;
   // If single item and still idle, trigger the file picker
   if (items.length === 1 && (UP_STATE[ordNo]?.[items[0].sku]?.state || 'idle') === 'idle') {
-    const safeId = `${ordNo}_${items[0].sku.replace(/[^a-z0-9]/gi,'_')}`;
+    const safeId = `${ordNo}_${itemDK(items[0]).replace(/[^a-z0-9]/gi,'_')}`;
     document.querySelector(`#dz-${safeId} input[type=file]`)?.click();
     return;
   }
-  const allOk = items.every(item => UP_STATE[ordNo]?.[item.sku]?.state === 'ok');
+  const allOk = items.every(item => UP_STATE[ordNo]?.[itemDK(item)]?.state === 'ok');
   if (!allOk) { alert('Please upload a file for each item before submitting.'); return; }
   closeUploadPanel();
 }
@@ -5739,7 +5766,7 @@ function applyDTpl(tplId) {
     item.designPos = item.designPos || { x: 22, y: 22, w: 56, h: 56 };
     try {
       if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) {
-        EGStore.cacheRawDesign(o.id, item.sku, designImg);
+        EGStore.cacheRawDesign(o.id, itemDK(item), designImg);
       }
     } catch(e) {}
   }

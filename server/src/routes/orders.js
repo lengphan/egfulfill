@@ -28,7 +28,9 @@ export function ordersRoutes(app, requireAuth) {
   // List
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
     const join = `left join order_items i on i.order_id = o.id`;
-    const agg  = `coalesce(json_agg(i.*) filter (where i.id is not null), '[]') as items`;
+    // ORDER BY i.id keeps line-item order stable across every board, so the per-line
+    // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
+    const agg  = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
     if (isStaff(req.user)) {
       // Staff (admin/operator/warehouse/designer) see every order, including the
       // factory-synced Etsy orders.
