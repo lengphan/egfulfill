@@ -10,19 +10,29 @@ export function designLibraryRoutes(app, requireAuth) {
        seller_id   uuid references users(id) on delete cascade,
        name        text,
        data        text,
+       thumb       text,
        created_at  timestamptz default now()
      )`).catch(() => {});
+  q('alter table design_library add column if not exists thumb text').catch(() => {});
   q('create index if not exists design_library_seller_idx on design_library(seller_id, created_at desc)').catch(() => {});
 
   const CAP = 30; // keep the N most-recent uploads per seller
 
-  // List this seller's recent uploads (newest first).
+  // List this seller's recent uploads — LIGHTWEIGHT: only the small thumbnail, never
+  // the full multi-MB data URL (returning 30 full images made Design Maker crawl on
+  // load). The full image is fetched on demand from GET /:id when re-added.
   app.get('/api/design_library', { preHandler: requireAuth }, async (req) => {
     const r = await q(
-      'select id, name, data, created_at from design_library where seller_id=$1 order by created_at desc limit $2',
+      'select id, name, coalesce(thumb, left(data, 0)) as thumb, created_at from design_library where seller_id=$1 order by created_at desc limit $2',
       [req.user.sub, CAP]
     );
     return r.rows;
+  });
+
+  // Full image data for one upload (fetched only when the seller re-adds it).
+  app.get('/api/design_library/:id', { preHandler: requireAuth }, async (req) => {
+    const r = await q('select data from design_library where id=$1 and seller_id=$2', [req.params.id, req.user.sub]);
+    return r.rows[0] || { data: null };
   });
 
   // Save an upload. Dedupe by (seller, name) — matches the client's re-use dedupe —
@@ -32,8 +42,8 @@ export function designLibraryRoutes(app, requireAuth) {
     if (!b.data) { reply.code(400); return { error: 'data required' }; }
     if (b.name) await q('delete from design_library where seller_id=$1 and name=$2', [req.user.sub, b.name]).catch(() => {});
     const r = await q(
-      'insert into design_library (seller_id, name, data) values ($1,$2,$3) returning id, name, data, created_at',
-      [req.user.sub, b.name || 'Untitled', b.data]
+      'insert into design_library (seller_id, name, data, thumb) values ($1,$2,$3,$4) returning id, name, thumb, created_at',
+      [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null]
     );
     await q(
       `delete from design_library where seller_id=$1 and id not in (

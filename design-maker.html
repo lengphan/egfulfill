@@ -1672,7 +1672,8 @@ function dmHydrateLibrary() {
   fetch(DM_LIB_URL, { headers: { Authorization: 'Bearer ' + tok } })
     .then(r => r.ok ? r.json() : [])
     .then(rows => {
-      _dmUploadsMem = (rows || []).map(d => ({ id: d.id, name: d.name || 'Untitled', src: d.data, ts: d.created_at }))
+      // src = the small thumbnail for display; full image fetched on demand (dmUseUpload).
+      _dmUploadsMem = (rows || []).map(d => ({ id: d.id, name: d.name || 'Untitled', src: d.thumb || '', full: null, ts: d.created_at }))
                                    .slice(0, DM_UPLOADS_CAP);
       if (typeof dmRenderUploads === 'function') dmRenderUploads();
     })
@@ -1682,15 +1683,21 @@ function dmTrackUpload(name, src) {
   if (!src) return;
   const list = dmLoadUploads().filter(u => u.src !== src);   // dedupe by src
   const entry = { id: 'U' + Date.now(), name: name || 'Untitled', src, ts: new Date().toISOString() };
+  entry.full = src;   // keep the full image in-session so re-use is instant
   list.unshift(entry);
   dmSaveUploadsList(list);
   dmRenderUploads();
-  // Persist to the server library (the image lives server-side, not localStorage).
+  // Persist to the server library (image lives server-side, not localStorage). Send a
+  // small thumbnail too so the gallery LIST stays lightweight — returning 30 full
+  // images made Design Maker crawl on load. Full data is fetched on re-add.
   const tok = _dmTok(); if (!tok) return;
-  fetch(DM_LIB_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ name: entry.name, data: src }) })
-    .then(r => r.ok ? r.json() : null)
-    .then(rec => { if (rec && rec.id != null) entry.id = rec.id; })   // swap temp id for the server id
-    .catch(() => {});
+  const mkThumb = (typeof EGStore !== 'undefined' && EGStore.downscaleDataUrl) ? Promise.resolve(EGStore.downscaleDataUrl(src)).catch(() => src) : Promise.resolve(src);
+  mkThumb.then(thumb => {
+    fetch(DM_LIB_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ name: entry.name, data: src, thumb: thumb || src }) })
+      .then(r => r.ok ? r.json() : null)
+      .then(rec => { if (rec && rec.id != null) entry.id = rec.id; })   // swap temp id for the server id
+      .catch(() => {});
+  });
 }
 function dmDeleteUpload(id) {
   _dmUploadsMem = _dmUploadsMem.filter(u => String(u.id) !== String(id));
@@ -1702,8 +1709,14 @@ function dmDeleteUpload(id) {
 function dmUseUpload(id) {
   const u = dmLoadUploads().find(u => u.id === id);
   if (!u) return;
-  dmAddImageLayer(u.src, u.name);
-  toast('Added: ' + u.name);
+  if (u.full) { dmAddImageLayer(u.full, u.name); toast('Added: ' + u.name); return; }
+  // Server entry — only a thumbnail is loaded; fetch the full image on demand.
+  const tok = _dmTok();
+  fetch(DM_LIB_URL + '/' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + tok } })
+    .then(r => r.ok ? r.json() : null)
+    .then(rec => { if (rec && rec.data) { dmAddImageLayer(rec.data, u.name); toast('Added: ' + u.name); } else toast('Could not load that image'); })
+    .catch(() => toast('Could not load that image'));
+  return;
 }
 function dmRenderUploads() {
   const wrap = document.getElementById('uploads-list'); if (!wrap) return;
