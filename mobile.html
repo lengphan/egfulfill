@@ -102,22 +102,32 @@
   .empty{text-align:center;color:var(--mut);font-size:13px;padding:46px 20px;line-height:1.6}
   .empty svg{width:38px;height:38px;stroke:var(--bd);stroke-width:1.6;fill:none;display:block;margin:0 auto 10px}
 
-  /* ── Scan view ───────────────────────────────────────────── */
-  #v-scan{padding:0;height:100%}
-  .scanwrap{position:relative;background:#000;height:62vh;min-height:300px;overflow:hidden;display:flex;align-items:center;justify-content:center}
-  .scanwrap video{width:100%;height:100%;object-fit:cover}
+  /* ── Scan overlay (full-screen camera, square reticle) ───── */
+  #scan-ov{position:fixed;inset:0;z-index:80;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+  #scan-ov.on{display:flex}
+  #scan-ov video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .reticle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-  .reticle .box{width:74%;max-width:300px;aspect-ratio:1.4;border-radius:18px;
-    box-shadow:0 0 0 100vmax rgba(0,0,0,.42);border:2px solid rgba(255,255,255,.5);position:relative}
-  .reticle .box .corner{position:absolute;width:26px;height:26px;border:3px solid var(--cream)}
-  .reticle .box .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:12px 0 0 0}
-  .reticle .box .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 12px 0 0}
-  .reticle .box .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 12px}
-  .reticle .box .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 12px 0}
-  .reticle .box .laser{position:absolute;left:8%;right:8%;height:2px;background:var(--cream);box-shadow:0 0 10px rgba(243,238,226,.9);top:50%;animation:scanline 2.4s ease-in-out infinite}
-  @keyframes scanline{0%,100%{top:14%}50%{top:86%}}
-  .scanhint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#fff;font-size:12.5px;text-shadow:0 1px 3px #000;font-weight:600}
-  .scanpanel{padding:16px 14px}
+  .reticle .box{width:78%;max-width:330px;aspect-ratio:1;border-radius:22px;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.32);position:relative}
+  .reticle .box .corner{position:absolute;width:30px;height:30px;border:3px solid var(--cream)}
+  .reticle .box .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
+  .reticle .box .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 14px 0 0}
+  .reticle .box .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 14px}
+  .reticle .box .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
+  /* smooth one-way sweep with fade — no bounce */
+  .reticle .box .laser{position:absolute;left:7%;right:7%;height:2.5px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--cream),transparent);box-shadow:0 0 12px rgba(243,238,226,.8);top:8%;animation:sweep 2.6s cubic-bezier(.45,0,.55,1) infinite}
+  @keyframes sweep{0%{top:8%;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:92%;opacity:0}}
+  .scan-close{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:92;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:20px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .scanhint{position:absolute;left:0;right:0;text-align:center;color:#fff;font-size:13.5px;text-shadow:0 1px 4px #000;font-weight:600;top:calc(env(safe-area-inset-top) + 20px);padding:0 60px}
+  .scan-bottom{position:absolute;left:0;right:0;bottom:0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);background:linear-gradient(transparent,rgba(0,0,0,.75) 42%);z-index:81}
+  .scan-manual{display:flex;gap:8px}
+  .scan-manual input{flex:1;border:none;border-radius:11px;padding:13px;font-size:15px;outline:none;background:rgba(255,255,255,.96)}
+  .scan-manual button{background:var(--cream);color:var(--dk);border:none;border-radius:11px;padding:0 18px;font-weight:800;font-size:14px}
+  .scanlog{max-height:30vh;overflow-y:auto;margin-bottom:10px}
+  .scanlog .row{margin-bottom:8px}
+  /* Scan CTA (top of Inventory / Orders) */
+  .scan-cta{width:100%;background:var(--dk);color:var(--cream);padding:15px;border-radius:14px;font-size:15.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px;border:none;font-family:inherit;cursor:pointer;margin-bottom:12px;-webkit-tap-highlight-color:transparent}
+  .scan-cta svg{width:20px;height:20px;fill:currentColor}
   /* Stock In / Out mode toggles */
   .scanmode{display:flex;gap:10px;margin-bottom:12px}
   .sm{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:15px 8px;border-radius:14px;border:2px solid var(--bd);background:#fff;font-weight:800;font-size:15px;color:var(--mut);font-family:inherit;cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent}
@@ -127,13 +137,21 @@
   .modebar{font-size:13px;font-weight:700;text-align:center;padding:10px;border-radius:11px;margin-bottom:12px;display:none}
   .modebar.in{display:block;background:#e6f7ee;color:var(--green)}
   .modebar.out{display:block;background:#fdecea;color:var(--red)}
-  .scanstart{background:var(--dk);color:#fff;width:100%;padding:15px;border-radius:13px;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px}
-  .scanstart svg{width:20px;height:20px;fill:currentColor}
-  .manual{display:flex;gap:8px;margin-top:12px}
-  .manual input{flex:1;border:1px solid var(--bd);border-radius:11px;padding:13px;font-size:15px;outline:none;background:var(--card)}
-  .manual button{background:var(--dk);color:var(--cream);border-radius:11px;padding:0 18px;font-weight:700;font-size:14px}
-  .scanlog{margin-top:8px}
-  .scanlog .row{margin-bottom:8px}
+  /* Order-sheet item card + per-item Start button */
+  .oitem{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:11px 12px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .oitem .item{background:none;border:none;border-radius:0;padding:0;margin:0;box-shadow:none}
+  .item-start{display:block;width:100%;margin-top:11px;padding:13px;border-radius:11px;font-size:15px;font-weight:800;border:none;font-family:inherit;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+  .item-start.go{background:var(--dk);color:var(--cream)}
+  .item-start.go:active{opacity:.85}
+  .item-start.state{background:#eef0f2;color:#4b5563;cursor:default;font-weight:700;font-size:13.5px}
+  /* Photo lightbox (composite mockup) */
+  #photo-lb{position:fixed;inset:0;z-index:95;background:rgba(10,10,9,.93);display:none;align-items:center;justify-content:center;padding:22px}
+  #photo-lb.on{display:flex}
+  .comp-lg{position:relative;width:min(86vw,420px);aspect-ratio:1;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .comp-lg .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .comp-lg .ov{position:absolute;left:17%;top:17%;width:66%;height:66%;object-fit:contain}
+  /* Item composite is tappable */
+  .item .comp{cursor:zoom-in}
 
   /* ── Detail sheet ────────────────────────────────────────── */
   .sheet-bg{position:fixed;inset:0;background:rgba(20,20,18,.42);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -217,34 +235,17 @@
   </header>
 
   <main>
-    <!-- SCAN -->
-    <section class="view on" id="v-scan">
-      <div class="scanwrap" id="scanwrap" style="display:none">
-        <video id="cam" playsinline muted></video>
-        <div class="reticle"><div class="box"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="laser"></div></div></div>
-        <div class="scanhint" id="scanhint">Point at a barcode or QR code</div>
-      </div>
-      <div class="scanpanel">
-        <div class="scanmode">
-          <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> Stock In</button>
-          <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Stock Out</button>
-        </div>
-        <div class="modebar" id="modebar"></div>
-        <button class="scanstart" id="scanbtn">
-          <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
-          <span id="scanbtntxt">Start camera scan</span>
-        </button>
-        <div class="manual">
-          <input id="scaninput" placeholder="…or type SKU / order #" autocomplete="off" autocapitalize="characters" enterkeyhint="search">
-          <button id="scango">Find</button>
-        </div>
-        <div class="scanlog" id="scanlog"></div>
-      </div>
-    </section>
-
     <!-- INVENTORY -->
-    <section class="view" id="v-inv">
-      <div class="vtitle">Inventory</div>
+    <section class="view on" id="v-inv">
+      <button class="scan-cta" onclick="startScanFor('inventory')">
+        <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
+        Scan barcode
+      </button>
+      <div class="scanmode">
+        <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> Stock In</button>
+        <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Stock Out</button>
+      </div>
+      <div class="modebar" id="modebar"></div>
       <div class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="inv-q" placeholder="Search SKU or name" autocomplete="off" enterkeyhint="search">
@@ -256,7 +257,10 @@
 
     <!-- ORDERS -->
     <section class="view" id="v-ord">
-      <div class="vtitle">Order check</div>
+      <button class="scan-cta" onclick="startScanFor('orders')">
+        <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
+        Scan order QR
+      </button>
       <div class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="ord-q" placeholder="Search order #, customer, tracking" autocomplete="off" enterkeyhint="search">
@@ -266,20 +270,10 @@
       <div id="ord-list"></div>
     </section>
 
-    <!-- LOW STOCK -->
-    <section class="view" id="v-low">
-      <div class="vtitle">Low stock</div>
-      <div class="pull" id="low-meta"></div>
-      <div id="low-list"></div>
-    </section>
   </main>
 
   <nav class="tabs">
-    <button data-tab="scan" class="on">
-      <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
-      Scan
-    </button>
-    <button data-tab="inv">
+    <button data-tab="inv" class="on">
       <svg viewBox="0 0 16 16"><path d="M7.32 1.6a1.5 1.5 0 011.36 0l4.5 2.25L8 6.55 2.82 3.85l4.5-2.25z"/><path d="M1.7 5.1L7.3 8v6.2l-5.04-2.52a1 1 0 01-.56-.9V5.1z"/><path d="M14.3 5.1v5.68a1 1 0 01-.56.9L8.7 14.2V8L14.3 5.1z"/></svg>
       Inventory
     </button>
@@ -287,12 +281,28 @@
       <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>
       Orders
     </button>
-    <button data-tab="low">
-      <span class="dot" id="low-dot">0</span>
-      <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M8 1.7c.54 0 1.04.29 1.3.76l5.45 9.64c.53.94-.14 2.1-1.3 2.1H2.55c-1.16 0-1.83-1.16-1.3-2.1L6.7 2.46c.26-.47.76-.76 1.3-.76zm-.8 3.9a.8.8 0 011.6 0l-.22 3.05a.58.58 0 01-1.16 0L7.2 5.6zM8 10.5a.95.95 0 100 1.9.95.95 0 000-1.9z"/></svg>
-      Low Stock
-    </button>
   </nav>
+</div>
+
+<!-- SCAN OVERLAY (full-screen camera, square reticle) -->
+<div id="scan-ov">
+  <video id="cam" playsinline muted></video>
+  <div class="reticle"><div class="box"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="laser"></div></div></div>
+  <button class="scan-close" onclick="stopScan()" aria-label="Close scanner">✕</button>
+  <div class="scanhint" id="scanhint">Point at the QR / barcode</div>
+  <div class="scan-bottom">
+    <div class="scanlog" id="scanlog"></div>
+    <div class="scan-manual">
+      <input id="scaninput" placeholder="…or type SKU / order #" autocomplete="off" autocapitalize="characters" enterkeyhint="search">
+      <button id="scango">Find</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO LIGHTBOX (composite mockup) -->
+<div id="photo-lb" onclick="closePhoto()">
+  <div id="photo-lb-stage"></div>
+  <button class="scan-close" onclick="event.stopPropagation();closePhoto()" aria-label="Close">✕</button>
 </div>
 
 <!-- DETAIL SHEET -->
@@ -392,8 +402,7 @@ function loadAll(quiet){
 function go(tab){
   document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===tab); });
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
-  $('v-'+tab).classList.add('on');
-  if (tab!=='scan') stopScan();
+  var v=$('v-'+tab); if(v) v.classList.add('on');
   $('app').querySelector('main').scrollTop=0;
 }
 document.querySelectorAll('nav.tabs button').forEach(function(b){ b.onclick=function(){ go(b.dataset.tab); }; });
@@ -460,10 +469,11 @@ $('ord-clr').onclick=function(){ $('ord-q').value=''; renderOrders(); $('ord-q')
 
 /* ════════ LOW STOCK VIEW ════════ */
 function renderLow(){
+  if(!$('low-list')) return;   // Low-stock tab was removed — nothing to render
   var low = INV.filter(function(r){ return stockState(r)!=='ok'; });
   low.sort(function(a,b){ return (avail(a)-reorderAt(a)) - (avail(b)-reorderAt(b)); }); // most-deficit first
   var dot=$('low-dot'); var crit=low.filter(function(r){return stockState(r)==='low';}).length;
-  dot.textContent=crit; dot.classList.toggle('show', crit>0);
+  if(dot){ dot.textContent=crit; dot.classList.toggle('show', crit>0); }
   $('low-meta').textContent = low.length+' item'+(low.length===1?'':'s')+' at or near reorder';
   if(!low.length){ $('low-list').innerHTML = emptyHtml('Everything is above reorder level 🎉','check'); return; }
   $('low-list').innerHTML = low.map(function(r){
@@ -531,21 +541,25 @@ function openOrder(id){
   $('sh-s').textContent = '';
   $('sh-status').innerHTML = statusBadge(st);
   var addr = fmtAddr(o);
+  var startable = isStartable(st);
+  var startBtn = startable
+    ? '<button class="item-start go" data-oid="'+esc(String(o.id))+'" onclick="startOrder(this.dataset.oid)">▶ Start production</button>'
+    : '<div class="item-start state">'+statusLabel(st)+'</div>';
   var items = (o.items||[]).map(function(i){
     // Composite = the design overlaid on the blank product (same idea as the boards).
     var blank = (i.img && /^(https?:|data:)/.test(String(i.img))) ? i.img : '';
     var design = (i.design_src && /^(https?:|data:)/.test(String(i.design_src))) ? i.design_src : '';
     var thumb;
     if (blank || design) {
-      thumb = '<div class="comp">'+
+      thumb = '<div class="comp" data-blank="'+esc(blank)+'" data-design="'+esc(design)+'" onclick="openPhoto(this.dataset.blank,this.dataset.design)">'+
         (blank?'<img class="bg" src="'+esc(blank)+'" onerror="this.style.display=\'none\'">':'')+
         (design?'<img class="ov" src="'+esc(design)+'" onerror="this.style.display=\'none\'">':(blank?'':'<img class="bg" src="'+esc(design)+'">'))+
       '</div>';
     } else { thumb = '<div class="ph">no img</div>'; }
     var meta = [i.color,i.size,i.variant,i.print_type||i.tech].filter(Boolean).map(esc).join(' · ');
-    return '<div class="item">'+thumb+'<div class="ib"><div class="n">'+esc(i.name||i.sku||'Item')+'</div>'+
+    return '<div class="oitem"><div class="item">'+thumb+'<div class="ib"><div class="n">'+esc(i.name||i.sku||'Item')+'</div>'+
       '<div class="m">'+(i.sku?'<span class="sku">'+esc(i.sku)+'</span>':'')+(meta?(i.sku?' · ':'')+meta:'')+'</div></div>'+
-      '<div class="q">×'+(Number(i.qty)||1)+'</div></div>';
+      '<div class="q">×'+(Number(i.qty)||1)+'</div></div>'+startBtn+'</div>';
   }).join('');
   $('sh-body').innerHTML =
     '<div class="seclabel" style="margin-top:0">Name &amp; address</div>'+
@@ -559,6 +573,38 @@ function openOrder(id){
     '<div class="seclabel">Items ('+ordItemsCount(o)+')</div>'+ (items||'<div class="empty" style="padding:20px">No line items</div>');
   openSheet();
 }
+// Production status helpers for the order sheet's per-item Start button.
+function isStartable(s){ s=String(s||'').toLowerCase(); return ['new','queued','queue','action','in_review','awaiting','awaiting_scan','received',''].indexOf(s)>=0; }
+function statusLabel(s){ s=String(s||'').toLowerCase();
+  if (['printing','working','production','in_production','printed'].indexOf(s)>=0) return '● In production';
+  if (s==='qc') return '● In QC';
+  if (s==='packed') return '● Packed — ready to ship';
+  if (['shipped','delivered','fulfilled'].indexOf(s)>=0) return '✓ Shipped';
+  if (s==='cancelled') return 'Cancelled';
+  return '● ' + (s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '));
+}
+// Start the order → move it into production (PATCH), optimistic + re-render.
+function startOrder(id){
+  var o = ORD.find(function(x){ return String(x.id)===String(id); }); if(!o) return;
+  o.factory_status='printing'; o.status='printing';
+  if (navigator.vibrate) navigator.vibrate(50);
+  toast('Started — moved to production');
+  api('/orders/'+encodeURIComponent(id), { method:'PATCH', body:{ factoryStatus:'printing', status:'printing' } })
+    .then(function(res){ if(!res||!res.ok) toast('Couldn’t sync — will retry on refresh'); })
+    .catch(function(){ toast('Offline — not synced yet'); });
+  openOrder(id);     // re-render the sheet with the live status
+  renderOrders();    // refresh the orders list
+}
+// Tap an item photo → full composite (design overlaid on the blank) lightbox.
+function openPhoto(blank, design){
+  if(!blank && !design){ toast('No mockup for this item yet'); return; }
+  $('photo-lb-stage').innerHTML = '<div class="comp-lg">'+
+    (blank?'<img class="bg" src="'+esc(blank)+'">':'')+
+    (design?'<img class="ov" src="'+esc(design)+'">':(blank?'':'<img class="bg" src="'+esc(design)+'">'))+
+  '</div>';
+  $('photo-lb').classList.add('on');
+}
+function closePhoto(){ $('photo-lb').classList.remove('on'); }
 function kv(k,v){ return '<div class="k">'+esc(k)+'</div><div class="v">'+v+'</div>'; }
 function fmtAddr(o){
   var c=o.customer||{}, a=o.address||c.shipTo||{};
@@ -580,23 +626,30 @@ var scanStream=null, scanRAF=null, detector=null, scanning=false, lastHit='', la
 var zxingReader=null, zxingControls=null, _zxingP=null;
 function supportsBarcode(){ return ('BarcodeDetector' in window); }
 
-function startScan(){
+var scanContext = 'inventory';   // 'inventory' (In/Out + lookup) | 'orders' (lookup only)
+function startScanFor(ctx){
+  scanContext = ctx || 'inventory';
+  $('scanlog').innerHTML = '';
+  $('scan-ov').classList.add('on');
+  _setScanHint();
   if (scanning) return;
   if (supportsBarcode()) startNativeScan();
   else startZxingScan();
 }
+function _setScanHint(){
+  $('scanhint').textContent = scanContext==='orders' ? 'Point at an order QR code'
+    : (scanMode==='in' ? 'Scan to add stock (+1)' : scanMode==='out' ? 'Scan to remove stock (−1)' : 'Point at the barcode / QR');
+}
 
 // Android / Chromium — native BarcodeDetector over our own camera stream.
 function startNativeScan(){
-  $('scanhint').textContent='Starting camera…';
   navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } } }).then(function(stream){
     scanStream=stream; var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
     try{ detector=new window.BarcodeDetector({ formats:['qr_code','code_128','ean_13','ean_8','code_39','code_93','upc_a','upc_e','itf','codabar','data_matrix','aztec','pdf417'] }); }
     catch(e){ try{ detector=new window.BarcodeDetector(); }catch(e2){ detector=null; } }
     if(!detector){ if(scanStream){scanStream.getTracks().forEach(function(t){t.stop();});scanStream=null;} startZxingScan(); return; }
-    $('scanwrap').style.display='flex'; $('scanbtntxt').textContent='Stop camera'; $('scanhint').textContent='Point at a barcode or QR code';
-    scanning=true; tick();
-  }).catch(function(){ scanning=false; $('scanhint').textContent='Point at a barcode or QR code'; toast('Camera blocked — allow camera access, or type the code'); $('scaninput').focus(); });
+    scanning=true; _setScanHint(); tick();
+  }).catch(function(){ scanning=false; toast('Camera blocked — allow camera access, or type the code'); $('scaninput').focus(); });
 }
 function tick(){
   if(!scanning) return;
@@ -620,7 +673,7 @@ function loadZxing(){
   return _zxingP;
 }
 function startZxingScan(){
-  scanning=true; $('scanwrap').style.display='flex'; $('scanhint').textContent='Loading scanner…'; $('scanbtntxt').textContent='Stop camera';
+  scanning=true; $('scanhint').textContent='Loading scanner…';
   loadZxing().then(function(){
     if(!scanning) return;                          // user hit Stop while loading
     zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
@@ -629,7 +682,7 @@ function startZxingScan(){
     });
   }).then(function(controls){
     if(!scanning){ if(controls&&controls.stop) controls.stop(); return; }
-    zxingControls = controls; $('scanhint').textContent='Point at a barcode or QR code';
+    zxingControls = controls; _setScanHint();
   }).catch(function(){
     stopScan(); toast('Could not start the camera scanner — type the code'); $('scaninput').focus();
   });
@@ -643,10 +696,8 @@ function stopScan(){
   if(scanStream){ scanStream.getTracks().forEach(function(t){ t.stop(); }); scanStream=null; }
   detector=null;
   var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
-  $('scanwrap').style.display='none';
-  $('scanbtntxt').textContent='Start camera scan';
+  $('scan-ov').classList.remove('on');
 }
-$('scanbtn').onclick=function(){ scanning ? stopScan() : startScan(); };
 $('scango').onclick=function(){ var v=$('scaninput').value.trim(); if(v){ resolveCode(v); $('scaninput').value=''; } };
 $('scaninput').addEventListener('keydown', function(e){ if(e.key==='Enter') $('scango').click(); });
 
@@ -659,7 +710,7 @@ function setScanMode(m){
   var bar=$('modebar'); bar.className = 'modebar' + (scanMode!=='lookup' ? ' '+scanMode : '');
   bar.textContent = scanMode==='in' ? 'Scan a product barcode to ADD 1 to stock'
                   : scanMode==='out' ? 'Scan a product barcode to REMOVE 1 from stock' : '';
-  if (scanning) $('scanhint').textContent = scanMode==='in' ? 'Scan to add stock (+1)' : scanMode==='out' ? 'Scan to remove stock (−1)' : 'Point at a barcode or QR code';
+  if (scanning) _setScanHint();
 }
 function adjustStock(sku, delta){
   var r = INV.find(function(x){ return String(x.sku)===String(sku); });
@@ -686,7 +737,6 @@ function onScan(val){
   lastHit=val; lastHitAt=now;
   if (navigator.vibrate) navigator.vibrate(60);
   $('scanhint').textContent='✓ '+val;
-  if (scanMode==='lookup') logScan(val);   // In/Out modes log via adjustStock instead
   resolveCode(val);
 }
 function logScan(val){
@@ -714,11 +764,12 @@ function resolveCode(val){
   var r = matchCode(val);
   if (!r){ toast('No SKU or order matches "'+val+'"'); return; }
   if (r.kind==='sku'){
-    if (scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
-    if (scanMode==='out') { adjustStock(r.row.sku, -1); return; }
-    openSku(r.row.sku);
+    // In/Out only apply to inventory scanning — they adjust stock and KEEP scanning.
+    if (scanContext==='inventory' && scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
+    if (scanContext==='inventory' && scanMode==='out') { adjustStock(r.row.sku, -1); return; }
+    stopScan(); openSku(r.row.sku);   // look-up → close camera, open the sheet
   } else {
-    openOrder(r.row.id);   // orders have no stock — always just open them
+    stopScan(); openOrder(r.row.id);
   }
 }
 
