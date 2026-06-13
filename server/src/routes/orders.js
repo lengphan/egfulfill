@@ -80,31 +80,44 @@ export function ordersRoutes(app, requireAuth) {
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
        (o.meta && typeof o.meta === 'object') ? o.meta : {}]
     );
-    if (Array.isArray(o.items)) {
-      await q('delete from order_items where order_id=$1', [o.id]);
-      for (const it of o.items) {
-        await q(
-          `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-          [o.id, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
-           it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null]
-        );
-      }
-    }
+    if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
     return { ok: true, id: o.id };
   });
 
-  // Patch status/tracking/etc.
+  // Replace an order's line items wholesale. Carries the factory-chosen blank +
+  // its composite image (it.img / it.blank) so a scanned order shows the right
+  // mockup on the mobile app — the boards persist these when an operator picks a
+  // base blank for a still-"new" item.
+  async function replaceItems(orderId, items) {
+    await q('delete from order_items where order_id=$1', [orderId]);
+    for (const it of items) {
+      await q(
+        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
+         it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
+         it.img || null, it.blank || null]
+      );
+    }
+  }
+
+  // Patch status/tracking/etc. Staff may also replace the line items (used when a
+  // factory board picks a base blank → the chosen mockup must reach mobile scan).
   app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req) => {
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
                   carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta' };
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
-    if (!sets.length) return { ok: true };
+    const body = req.body || {};
+    const wantsItems = isStaff(req.user) && Array.isArray(body.items);
+    if (!sets.length && !wantsItems) return { ok: true };
     // sellers may only patch their own orders; staff any
-    let where = `id=$${n}`; vals.push(req.params.id);
-    if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(req.user.sub); }
-    await q(`update orders set ${sets.join(',')} where ${where}`, vals);
+    if (sets.length) {
+      let where = `id=$${n}`; vals.push(req.params.id);
+      if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(req.user.sub); }
+      await q(`update orders set ${sets.join(',')} where ${where}`, vals);
+    }
+    if (wantsItems) await replaceItems(req.params.id, body.items);
     return { ok: true };
   });
 

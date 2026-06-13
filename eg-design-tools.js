@@ -346,7 +346,32 @@
       if (!it) return;
       var price = productUnitPrice(p, it);
       if (price > 0) { it.price = price; it.unitPrice = price; }
+      // Carry the chosen blank's identity + its catalog image onto the line item
+      // (a SEPARATE field — never the marketplace listing image). This is what
+      // makes the composite rehydrate everywhere the order is read, including the
+      // mobile app after a barcode scan, where the blank is the mockup background.
+      var blankImg = setupProductImage(orderNum, sku);
+      it.blank = p.name || p.sku || p.id || it.blank || '';
+      if (blankImg) it.img = blankImg;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+      pushItemsToApi(o);
+    } catch (e) {}
+  }
+
+  // Persist the order's line items to the server so factory-chosen blanks reach
+  // the mobile app. Fire-and-forget PATCH (staff token); harmless if offline or
+  // standalone — the board still works off localStorage.
+  function pushItemsToApi(o) {
+    try {
+      if (!o || !o.id || !Array.isArray(o.items)) return;
+      var tok = localStorage.getItem('eg_token');
+      if (!tok) return;
+      var base = (window.EGAuth && window.EGAuth.API_BASE) || '';
+      fetch(base + '/api/orders/' + encodeURIComponent(o.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+        body: JSON.stringify({ items: o.items })
+      }).catch(function () {});
     } catch (e) {}
   }
 
@@ -359,6 +384,7 @@
         var it = findItemByKey(o, sku);
         if (it) {
           it.printType = val; it.tech = val; if (EGStore.update) EGStore.update(o.id, { items: o.items });
+          pushItemsToApi(o);
           // Method add-on can change the unit price → re-sync the line item.
           syncItemToProduct(orderNum, sku);
           // Picking EMB on a method-less item → kick off thread matching now.
@@ -439,6 +465,7 @@
       var it = findItemByKey(o, sku); if (!it) return;
       it[key] = value;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+      pushItemsToApi(o);
     } catch (e) {}
     refreshBoard();
     document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
@@ -518,10 +545,17 @@
       var vo = variantOptions(num, sku, it);
       var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
       var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
-      pickers = _field('Product', '<select title="Base product" style="' + selSm + ';max-width:150px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>')
-        + _field('Color', '<select title="Colour" style="' + selSm + ';max-width:92px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>')
-        + _field('Size', '<select title="Size" style="' + selSm + ';max-width:72px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>')
-        + _field('Method', '<select title="Print method" style="' + selSm + ';max-width:92px" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>');
+      // One unified box — Product · Color · Size · Method on a single line,
+      // dot-separated, mirroring the seller-side variation pill. The selects are
+      // borderless/transparent so they read as one continuous control.
+      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;max-width:160px';
+      var _dot = '<span style="color:#c4c3be;font-weight:700;padding:0 3px;flex-shrink:0">·</span>';
+      pickers = '<div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:3px 10px;background:#fff;max-width:100%;overflow:hidden">'
+        + '<select title="Base product" style="' + selIn + ';max-width:150px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
+        + '<select title="Colour" style="' + selIn + ';max-width:96px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>' + _dot
+        + '<select title="Size" style="' + selIn + ';max-width:74px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>' + _dot
+        + '<select title="Print method" style="' + selIn + ';max-width:96px" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>'
+        + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
     // a compact ⋯ overflow menu so the row stays uncluttered.
