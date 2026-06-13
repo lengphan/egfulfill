@@ -7567,6 +7567,10 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
               </div>
             </div>
             <div style="overflow-y:auto;padding:18px 18px;display:flex;flex-direction:column;gap:14px">
+              <div style="text-align:center;padding-bottom:14px;border-bottom:1px solid #f0ede9">
+                <div id="xfom-qr" style="width:152px;height:152px;margin:0 auto;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #f0ede9;border-radius:10px"></div>
+                <div style="font-size:11px;color:#9ca3af;margin-top:8px;font-weight:600;letter-spacing:.02em">Scan to open this order</div>
+              </div>
               <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Costs</div>
               </div>
@@ -7606,6 +7610,13 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     const o = _xfomFindOrder(num);
     document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(num == null ? '' : num).replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
+    // Unique order QR (encodes the order id) — scannable on the mobile app to open it.
+    (function(id){ var el=document.getElementById('xfom-qr'); if(!el) return; el.innerHTML='';
+      var draw=function(){ try{ new QRCode(el,{text:String(id),width:150,height:150,colorDark:'#191918',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M}); }catch(e){} };
+      if(window.QRCode){ draw(); return; }
+      if(!window.__qrLoad){ window.__qrLoad=1; var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js'; document.head.appendChild(s); }
+      var n=0, iv=setInterval(function(){ if(window.QRCode){ clearInterval(iv); draw(); } else if(++n>50){ clearInterval(iv); el.innerHTML='<div style="font-size:11px;color:#c4c3be">QR offline</div>'; } },100);
+    })(num);
     const badge = document.getElementById('xfom-badge');
     const status = (o?.status || 'new').toLowerCase();
     const canon = (typeof opCanonStatus === 'function') ? opCanonStatus(status) : status;
