@@ -10752,14 +10752,11 @@ function whPrintLabel(num) {
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Items</div>
                 <div id="xfom-items" style="display:flex;flex-direction:column;gap:9px"></div>
               </div>
-              <div>
-                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Additional Fees</div>
-                <div id="xfom-fees" style="font-size:13px;color:#9ca3af;padding:6px 0">No additional fees</div>
-                <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid #e5e4e0">
-                  <div style="font-size:13.5px;color:#6b7280">Order Total:</div>
-                  <div id="xfom-total" style="font-size:16px;font-weight:700;color:#191918">$0.00</div>
-                </div>
+              <div id="xfom-gift-wrap" style="display:none">
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Gift Message</div>
+                <div id="xfom-gift" style="font-size:13px;color:#374151;background:#fff8f0;border:1px solid #f3e2c7;border-radius:8px;padding:10px 13px;line-height:1.5">—</div>
               </div>
+              <div id="xfom-total" style="display:none"></div>
               <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Customer Note</div>
                 <div id="xfom-customer-note" style="font-size:13px;color:#9ca3af">No customer note</div>
@@ -10801,7 +10798,7 @@ function whPrintLabel(num) {
     xfomEnsure();
     _xfomNum = num;
     const o = _xfomFindOrder(num);
-    document.getElementById('xfom-num').textContent = '#' + num;
+    document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(num == null ? '' : num).replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
     const badge = document.getElementById('xfom-badge');
     const status = (o?.status || 'new').toLowerCase();
@@ -10812,7 +10809,7 @@ function whPrintLabel(num) {
     badge.className = 'badge';
     const _whStyleMap = { in_review:'color:#7c3aed', awaiting_scan:'color:#c2410c', scanned:'color:#0891b2', printing:'color:#1d4ed8', packing:'color:#1d4ed8', packed:'color:#0e7490', shipped:'color:#15803d', flagged:'color:#dc2626', exception:'color:#dc2626', cancelled:'color:#9ca3af', refunded:'color:#9ca3af', oos:'color:#c2410c', backorder:'color:#c2410c' };
     badge.style.cssText = 'font-size:14px;font-weight:700;background:transparent;padding:0;' + (_whStyleMap[status] || 'color:#374151');
-    const addr = (o && typeof o.address === 'object' ? o.address : {}) || {};
+    const addr = (o && [o.address, o.addr, o.shipTo, (o.customer && o.customer.shipTo)].find(function (a) { return a && typeof a === 'object'; })) || (o && typeof o.address === 'string' ? o.address : {}) || {};
     const addrEl = document.getElementById('xfom-addr');
     const t = (typeof _whOrderShipTo === 'function') ? (_whOrderShipTo(_xfomNum) || {}) : {};
     if (t.zip || t.street) {
@@ -10919,6 +10916,13 @@ function whPrintLabel(num) {
         const pers = (items || []).map(function (it) { return it.personalization || it.note || ''; }).filter(Boolean);
         cnEl.innerHTML = pers.length ? pers.map(function (p) { return '<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fde7cf;border-radius:7px;font-size:13px;color:#9a3412;margin-bottom:5px">' + String(p).replace(/</g, '&lt;') + '</div>'; }).join('') : '<span style="color:#9ca3af;font-size:13px">No customer note</span>';
       }
+    } catch (e) {}
+    // Gift message synced from the seller side (o.meta.gift). Row only shows when set.
+    try {
+      const gw = document.getElementById('xfom-gift-wrap'), gEl = document.getElementById('xfom-gift');
+      let _gift = (o && o.meta && o.meta.gift) || '';
+      if (!_gift) { try { const _egg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_egg && _egg.meta && _egg.meta.gift) _gift = _egg.meta.gift; } catch (e) {} }
+      if (gw && gEl) { if (_gift) { gEl.textContent = _gift; gw.style.display = ''; } else { gw.style.display = 'none'; } }
     } catch (e) {}
     let notes = o?.notes || [];
     try { const _eg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_eg && Array.isArray(_eg.notes) && _eg.notes.length) notes = _eg.notes; } catch (e) {}

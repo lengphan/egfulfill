@@ -7549,14 +7549,11 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Items</div>
                 <div id="xfom-items" style="display:flex;flex-direction:column;gap:9px"></div>
               </div>
-              <div>
-                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Additional Fees</div>
-                <div id="xfom-fees" style="font-size:13px;color:#9ca3af;padding:6px 0">No additional fees</div>
-                <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid #e5e4e0">
-                  <div style="font-size:13.5px;color:#6b7280">Order Total:</div>
-                  <div id="xfom-total" style="font-size:16px;font-weight:700;color:#191918">$0.00</div>
-                </div>
+              <div id="xfom-gift-wrap" style="display:none">
+                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Gift Message</div>
+                <div id="xfom-gift" style="font-size:13px;color:#374151;background:#fff8f0;border:1px solid #f3e2c7;border-radius:8px;padding:10px 13px;line-height:1.5">—</div>
               </div>
+              <div id="xfom-total" style="display:none"></div>
               <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Customer Note</div>
                 <div id="xfom-customer-note" style="font-size:13px;color:#9ca3af">No customer note</div>
@@ -7608,7 +7605,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     // whether THIS order's xfom modal is currently open and trigger a refresh.
     window.__xfomOrderNum = num;
     const o = _xfomFindOrder(num);
-    document.getElementById('xfom-num').textContent = '#' + num;
+    document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(num == null ? '' : num).replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
     const badge = document.getElementById('xfom-badge');
     const status = (o?.status || 'new').toLowerCase();
@@ -7619,7 +7616,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     badge.textContent = (typeof OP_STATUS_MAP !== 'undefined' && OP_STATUS_MAP[canon]) ? OP_STATUS_MAP[canon] : (status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g,' '));
     badge.className = 'badge';
     badge.style.cssText = 'font-size:14px;font-weight:700;' + ((typeof OP_STATUS_STYLE !== 'undefined' && OP_STATUS_STYLE[canon]) || 'background:transparent;color:#374151');
-    const addr = (o && (o.addr || o.address)) || {};
+    const addr = (o && (o.addr || o.address || o.shipTo || (o.customer && o.customer.shipTo))) || {};
     const addrEl = document.getElementById('xfom-addr');
     var _t = null;
     try {
@@ -7828,6 +7825,13 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         const pers = (items || []).map(function (it) { return it.personalization || it.note || ''; }).filter(Boolean);
         cnEl.innerHTML = pers.length ? pers.map(function (p) { return '<div style="padding:7px 10px;background:#fff7ed;border:1px solid #fde7cf;border-radius:7px;font-size:13px;color:#9a3412;margin-bottom:5px">' + String(p).replace(/</g, '&lt;') + '</div>'; }).join('') : '<span style="color:#9ca3af;font-size:13px">No customer note</span>';
       }
+    } catch (e) {}
+    // Gift message synced from the seller side (o.meta.gift). Row only shows when set.
+    try {
+      const gw = document.getElementById('xfom-gift-wrap'), gEl = document.getElementById('xfom-gift');
+      let _gift = (o && o.meta && o.meta.gift) || '';
+      if (!_gift) { try { const _egg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_egg && _egg.meta && _egg.meta.gift) _gift = _egg.meta.gift; } catch (e) {} }
+      if (gw && gEl) { if (_gift) { gEl.textContent = _gift; gw.style.display = ''; } else { gw.style.display = 'none'; } }
     } catch (e) {}
     let notes = o?.notes || [];
     try { const _eg = (typeof EGStore !== 'undefined' && EGStore.getOrders) ? (EGStore.getOrders() || []).find(function (x) { return x.id === (o && o.id) || x.id === _xfomNum; }) : null; if (_eg && Array.isArray(_eg.notes) && _eg.notes.length) notes = _eg.notes; } catch (e) {}
