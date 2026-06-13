@@ -552,10 +552,6 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="4" r="1.5"/><rect x="6" y="3.1" width="8.4" height="1.8" rx=".9"/><circle cx="3" cy="8" r="1.5"/><rect x="6" y="7.1" width="8.4" height="1.8" rx=".9"/><circle cx="3" cy="12" r="1.5"/><rect x="6" y="11.1" width="8.4" height="1.8" rx=".9"/></svg>
       Activity Log
     </a>
-    <a class="ni" href="#design-studio" data-section="design-studio">
-      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.4 2.2c.16-.5.87-.5 1.03 0l.86 2.6a1.4 1.4 0 00.9.9l2.6.86c.5.16.5.87 0 1.03l-2.6.86a1.4 1.4 0 00-.9.9l-.86 2.6c-.16.5-.87.5-1.03 0l-.86-2.6a1.4 1.4 0 00-.9-.9l-2.6-.86c-.5-.16-.5-.87 0-1.03l2.6-.86a1.4 1.4 0 00.9-.9l.86-2.6z"/><path d="M12.1 9.5c.1-.32.56-.32.66 0l.33 1c.05.17.19.31.37.37l1 .33c.32.1.32.56 0 .66l-1 .33a.6.6 0 00-.37.37l-.33 1c-.1.32-.56.32-.66 0l-.33-1a.6.6 0 00-.37-.37l-1-.33c-.32-.1-.32-.56 0-.66l1-.33a.6.6 0 00.37-.37l.33-1z"/></svg>
-      Board
-    </a>
     <a class="ni" href="javascript:void(0)" onclick="window.EGDesignTools&&EGDesignTools.designLab()">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 12.5V14h1.5l7-7-1.5-1.5-7 7z"/><path d="M11.3 4.2l1.5 1.5 1.05-1.05a1.06 1.06 0 000-1.5l-.5-.5a1.06 1.06 0 00-1.5 0L11.3 4.2z"/></svg>
       Design Lab
@@ -4172,7 +4168,6 @@ function opRowMenuOpen(ev, num) {
   if (!isTerminal && !onHold) opts.push({ label: 'Put on hold',         icon: ICN.pause, fn: `opToggleHold('${num}')` });
   if (onHold)                  opts.push({ label: 'Resume from hold',    icon: ICN.play,  fn: `opToggleHold('${num}')` });
   if (!isTerminal)             opts.push({ label: 'Send to Scan',        icon: ICN.scan,  fn: `opSendToScanRow('${num}')` });
-  if (st === 'in_review')      opts.push({ label: 'Push to Design Board',icon: ICN.board, fn: `opSendToDesignStudio && opSendToDesignStudio('${num}')` });
   if (hasTracking) {
     // Already labeled — reopen the saved label.
     opts.push({ label: 'See Label', icon: ICN.print, fn: `opSeeLabel('${num}')` });
@@ -7184,7 +7179,7 @@ function opRunHdrSearch(q) {
     });
   } catch(e) {}
   // Sections
-  ['Overview','Orders','Inventory','Purchases','Products','Shipping','Chat','Design Board','Users & Roles','Wallet','Settings','API Hub','Broadcast'].forEach(label => {
+  ['Overview','Orders','Inventory','Purchases','Products','Shipping','Chat','Users & Roles','Wallet','Settings','API Hub','Broadcast'].forEach(label => {
     if (label.toLowerCase().includes(q)) {
       const slug = label.toLowerCase().replace(/&/g,'').replace(/ +/g,'-').replace('print-ship','print').replace('design-board','design-studio').replace('users-roles','users').replace('balance-payments','balance').replace('api-hub','api-hub');
       out.push({ kind:'Page', label, sub:'Jump to section', action:`showSection('${slug}');opCloseHdrSearch()` });
@@ -7945,7 +7940,6 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
       const preScan = !canonCur || canonCur === 'in_review' || canonCur === 'flagged';
       html += '<button class="btn btn-out" onclick="xfomHold()"' + (onHold ? ' style="background:#fef3c7;color:#92400e;border-color:#fde68a"' : '') + '>' + (onHold ? '✓ On Hold' : 'Hold') + '</button>';
       if (preScan) html += '<button class="btn btn-out" onclick="xfomSendToScan()">Send to Scan</button>';
-      html += '<button class="btn btn-out" onclick="xfomPushToBoard()">Push to Design Board</button>';
     }
     html += '<button class="btn btn-out" style="color:#dc2626;border-color:#fecaca" onclick="xfomFlag()">⚑ Flag</button>';
     var _menu = document.getElementById('xfom-actions-menu');
