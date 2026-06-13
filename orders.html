@@ -6641,6 +6641,13 @@ function egApiGet(path) {
   return fetch(base + path, { headers: token ? { Authorization: 'Bearer ' + token } : {} })
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); });
 }
+function egApiPost(path, body) {
+  var token = localStorage.getItem('eg_token') || '';
+  var base = window.EG_API_BASE || '';
+  var h = { 'Content-Type': 'application/json' }; if (token) h.Authorization = 'Bearer ' + token;
+  return fetch(base + path, { method: 'POST', headers: h, body: JSON.stringify(body || {}) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); });
+}
 var _gsheetConfig = null;
 function _loadGSheetConfig() {
   var panel = document.getElementById('gsheet-panel');
@@ -6650,7 +6657,7 @@ function _loadGSheetConfig() {
     if (!_gsheetConfig.enabled) { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     var link = document.getElementById('gsheet-template-link');
-    if (link) link.textContent = _gsheetConfig.templateUrl ? 'Copy template ↗' : 'Create template ↗';
+    if (link) link.textContent = _gsheetConfig.canCreate ? 'Create my sheet ↗' : (_gsheetConfig.templateUrl ? 'Copy template ↗' : 'Create template ↗');
   }).catch(function () { panel.style.display = 'none'; });   // standalone/offline → hide
 }
 function importFromGoogleSheet() {
@@ -6672,6 +6679,22 @@ function importFromGoogleSheet() {
 // its "make a copy" link; otherwise copy our exact columns (+ an example row) to the
 // clipboard and open a blank sheet for the seller to paste into cell A1.
 function createGoogleSheetTemplate() {
+  // Service account available → server creates a ready-filled sheet and we open it
+  // + prefill the import box, so the seller fills rows then clicks Load.
+  if (_gsheetConfig && _gsheetConfig.canCreate) {
+    var link = document.getElementById('gsheet-template-link'); var prev = link ? link.textContent : '';
+    if (link) link.textContent = 'Creating…';
+    var w = window.open('', '_blank');   // open synchronously to dodge popup blockers
+    egApiPost('/api/sheets/create', {}).then(function (res) {
+      if (res.ok && res.data && res.data.url) {
+        if (w) w.location = res.data.url; else window.open(res.data.url, '_blank');
+        var inp = document.getElementById('gsheet-url'); if (inp) inp.value = res.data.url;
+        _importToast('Created a ready-to-fill sheet — fill your orders there, then click Load.', 'success', 6500);
+      } else { if (w) w.close(); _importToast((res.data && res.data.error) || 'Could not create the sheet', 'error', 5500); }
+    }).catch(function () { if (w) w.close(); _importToast('Network error creating the sheet', 'error'); })
+      .finally(function () { if (link) link.textContent = prev; });
+    return;
+  }
   if (_gsheetConfig && _gsheetConfig.templateUrl) { window.open(_gsheetConfig.templateUrl, '_blank'); return; }
   var example = [
     'SAMPLE-1001', 'Jane Sample — delete this row', 'jane@example.com',
