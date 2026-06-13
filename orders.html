@@ -2334,7 +2334,7 @@ function openDetailModal(ordNo) {
     // Compact Upload / Templates / Design Lab trio — mirrors the inline expanded row
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
-    const odmBtnStyle = 'display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:7px;font-size:11.5px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;white-space:nowrap;text-decoration:none';
+    const odmBtnStyle = 'display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:7px;font-size:11.5px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;white-space:nowrap;text-decoration:none;flex-shrink:0';
     // Always show the design action trio — once an order is in production, the
     // buttons stay visible but greyed (opacity + pointer-events:none) so the UI
     // doesn't suddenly mutate into a different layout. Same shape as setup.
@@ -2395,9 +2395,9 @@ function openDetailModal(ordNo) {
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
       </div>
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;${odmPillLocked?'opacity:.85':''}">
-          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:160px">${blankOptsHtml}</select>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:nowrap">
+        <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;${odmPillLocked?'opacity:.85':''}">
+          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:132px">${blankOptsHtml}</select>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
           <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">
@@ -2408,7 +2408,7 @@ function openDetailModal(ordNo) {
             <option value="LSR"${item.tech==='LSR'?' selected':''}>Laser</option>
           </select>
         </div>
-        <div style="display:inline-flex;align-items:center;gap:8px">
+        <div style="display:inline-flex;align-items:center;gap:8px;flex-shrink:0">
           <div style="display:inline-flex;align-items:center;gap:5px">
             <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">−</button>
             <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:20px;text-align:center">${item.qty || 1}</span>
@@ -2501,7 +2501,7 @@ function openDetailModal(ordNo) {
   const _meta = (o.meta && typeof o.meta === 'object') ? o.meta : {};
   const _esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
   const LBL = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px';
-  const FLD = 'width:100%;box-sizing:border-box;border:1px solid #e5e4e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;color:#374151;background:#fff;outline:none';
+  const FLD = 'width:100%;box-sizing:border-box;height:36px;border:1px solid #e5e4e0;border-radius:7px;padding:7px 9px;font-size:13px;line-height:1.4;font-family:inherit;color:#374151;background:#fff;outline:none';
   const _prio = _meta.priority || 'normal';
   const _opt = (v, t) => `<option value="${v}"${_prio === v ? ' selected' : ''}>${t}</option>`;
   // Secondary fields live in their own compact cells (Gift · Priority · Notes).
@@ -2511,7 +2511,7 @@ function openDetailModal(ordNo) {
   const _notesEl = document.getElementById('odm-notes');
   if (_notesEl) _notesEl.innerHTML = `
     <label style="${LBL}">Notes</label>
-    <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="2" placeholder="Internal notes…" style="${FLD};resize:vertical;line-height:1.45">${_esc(_meta.note)}</textarea>`;
+    <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="1" placeholder="Internal notes…" style="${FLD};resize:vertical">${_esc(_meta.note)}</textarea>`;
   // Gift — "This is a gift" toggle + message (auto-ticks when a message exists, e.g. synced).
   const _giftEl = document.getElementById('odm-gift');
   if (_giftEl) {
@@ -7411,9 +7411,9 @@ function confirmImport() {
   <div style="background:#fff;border:1px solid #e5e4e0;border-radius:16px;width:min(1080px,95vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);position:relative;overflow:hidden">
     <!-- Header — status left, "Order #id" right -->
     <div style="padding:15px 22px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:14px">
-      <span id="odm-badge" class="badge b-new" style="font-size:13.5px;font-weight:700;padding:0">New</span>
+      <div id="odm-title" style="font-size:16px;letter-spacing:-.01em">Order #—</div>
       <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
-        <div id="odm-title" style="font-size:16px;letter-spacing:-.01em">Order #—</div>
+        <span id="odm-badge" class="badge b-new" style="font-size:13.5px;font-weight:700;padding:0">New</span>
         <button onclick="closeDetailModal()" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:6px;border-radius:7px;display:flex;align-items:center;line-height:1;transition:color .15s" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
       </div>
     </div>
