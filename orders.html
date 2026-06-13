@@ -2193,7 +2193,7 @@ function odmSaveMeta(ordNo) {
   const meta = Object.assign({}, (o.meta && typeof o.meta === 'object') ? o.meta : {});
   // Meta fields now live in two blocks: Details (priority/notes) and Gift
   // (isGift checkbox + gift message). Scan both; checkboxes save as booleans.
-  ['odm-extra', 'odm-gift'].forEach(id => {
+  ['odm-extra', 'odm-gift', 'odm-notes'].forEach(id => {
     const wrap = document.getElementById(id);
     if (!wrap) return;
     wrap.querySelectorAll('[data-meta]').forEach(el => {
@@ -2255,8 +2255,8 @@ function openDetailModal(ordNo) {
       _heroSrc = (UP_STATE[o.no]?.[itemDK(_hi)]?.dataUrl) || _itemDesignURL(o, _hi) || _hi.img || '';
     }
     _heroEl.innerHTML = _heroSrc
-      ? `<img src="${_heroSrc}" style="width:100%;height:100%;min-height:150px;max-height:230px;object-fit:cover;border-radius:12px;border:1px solid #e8e7e4;background:#f6f5f4;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=&quot;width:100%;height:100%;min-height:150px;border-radius:12px;background:#f6f5f4;border:1px solid #e8e7e4&quot;></div>'"/>`
-      : `<div style="width:100%;height:100%;min-height:150px;border-radius:12px;background:#f6f5f4;border:1px dashed #d9d6d0;display:flex;align-items:center;justify-content:center;color:#c4c3be"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.4"/><path d="M4 15l4-4 4 4 3-3 5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg></div>`;
+      ? `<img src="${_heroSrc}" style="width:150px;height:150px;object-fit:cover;border-radius:12px;border:1px solid #e8e7e4;background:#f6f5f4;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=&quot;width:150px;height:150px;border-radius:12px;background:#f6f5f4;border:1px solid #e8e7e4&quot;></div>'"/>`
+      : `<div style="width:150px;height:150px;border-radius:12px;background:#f6f5f4;border:1px dashed #d9d6d0;display:flex;align-items:center;justify-content:center;color:#c4c3be"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.4"/><path d="M4 15l4-4 4 4 3-3 5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg></div>`;
   }
 
   // Items — operator-style card: thumbnail + name/SKU/print badge + qty controls + status + ×
@@ -2480,7 +2480,7 @@ function openDetailModal(ordNo) {
   // we wire the backend. Free for Manual orders.
   const platformFee = (o.src && o.src.toLowerCase() !== 'manual') ? (parseFloat(o.total||0) * 0.05).toFixed(2) : '0.00';
   // Compact single-line rows so the right column matches the address height.
-  const INF = 'display:flex;justify-content:space-between;gap:8px;font-size:12.5px;line-height:1.5;color:#374151;padding:5px 0;border-bottom:1px solid #f4f2ef';
+  const INF = 'display:flex;justify-content:space-between;gap:8px;font-size:12.5px;line-height:1.5;color:#374151;padding:4.5px 0';
   // Tracking cell — uses EGTracking helper so TikTok-sourced orders surface the
   // "Pull tracking" link directly in the modal (matches the orders table cell).
   let _trkCell = '<span style="color:#d1d5db">—</span>';
@@ -2504,24 +2504,22 @@ function openDetailModal(ordNo) {
   const FLD = 'width:100%;box-sizing:border-box;border:1px solid #e5e4e0;border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;color:#374151;background:#fff;outline:none';
   const _prio = _meta.priority || 'normal';
   const _opt = (v, t) => `<option value="${v}"${_prio === v ? ' selected' : ''}>${t}</option>`;
+  // Secondary fields live in their own compact cells (Gift · Priority · Notes).
   document.getElementById('odm-extra').innerHTML = `
-    <div style="margin-bottom:9px">
-      <label style="${LBL}">Priority</label>
-      <select onchange="odmSaveMeta(${ordNo})" data-meta="priority" style="${FLD};cursor:pointer">${_opt('normal','Normal')}${_opt('rush','Rush')}${_opt('hold','On hold')}</select>
-    </div>
-    <div>
-      <label style="${LBL}">Notes</label>
-      <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="2" placeholder="Internal notes for this order…" style="${FLD};resize:vertical;line-height:1.45">${_esc(_meta.note)}</textarea>
-    </div>`;
-  // Gift block — "This is a gift" toggle + the gift message (synced or editable).
-  // The box auto-ticks when a gift message already exists (e.g. from a synced order).
+    <label style="${LBL}">Priority</label>
+    <select onchange="odmSaveMeta(${ordNo})" data-meta="priority" style="${FLD};cursor:pointer">${_opt('normal','Normal')}${_opt('rush','Rush')}${_opt('hold','On hold')}</select>`;
+  const _notesEl = document.getElementById('odm-notes');
+  if (_notesEl) _notesEl.innerHTML = `
+    <label style="${LBL}">Notes</label>
+    <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="2" placeholder="Internal notes…" style="${FLD};resize:vertical;line-height:1.45">${_esc(_meta.note)}</textarea>`;
+  // Gift — "This is a gift" toggle + message (auto-ticks when a message exists, e.g. synced).
   const _giftEl = document.getElementById('odm-gift');
   if (_giftEl) {
     const _isGift = !!(_meta.isGift || _meta.gift);
     _giftEl.innerHTML = `
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:9px">
-        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:15px;height:15px;accent-color:#191918;cursor:pointer;flex-shrink:0"/>
-        <span style="font-size:13px;font-weight:600;color:#191918">This is a gift</span>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px">
+        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:14px;height:14px;accent-color:#191918;cursor:pointer;flex-shrink:0"/>
+        <span style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">This is a gift</span>
       </label>
       <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift message…" style="${FLD}"/>`;
   }
@@ -7421,33 +7419,24 @@ function confirmImport() {
     </div>
     <!-- Body — hero image on the left covering the section block, ship-to pushed in -->
     <div style="display:grid;grid-template-columns:1fr 256px;flex:1;min-height:0;overflow:hidden">
-      <div style="overflow-y:auto;padding:22px 26px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:18px">
-        <div style="display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:stretch">
-          <!-- Hero product image -->
-          <div id="odm-hero" style="align-self:stretch;min-height:150px"></div>
-          <!-- Ship To / Summary, then Gift / Details below -->
-          <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-            <div style="display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(160px,1fr);gap:24px;align-items:start">
-              <div>
-                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Ship To</div>
-                <div id="odm-address" style="font-size:14px;color:#374151;line-height:1.6"></div>
-              </div>
-              <div style="border-left:1px solid #f0ede9;padding-left:22px">
-                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">Summary</div>
-                <div id="odm-info" style="font-size:13px;color:#6b7280"></div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:24px;align-items:start;border-top:1px solid #f3f3f1;padding-top:15px">
-              <div>
-                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Gift</div>
-                <div id="odm-gift"></div>
-              </div>
-              <div>
-                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Details</div>
-                <div id="odm-extra"></div>
-              </div>
-            </div>
+      <div style="overflow-y:auto;padding:22px 26px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:16px">
+        <!-- Primary: square image · Ship To · Summary — the headline order info -->
+        <div style="display:grid;grid-template-columns:150px minmax(0,1.35fr) minmax(0,1fr);gap:26px;align-items:start">
+          <div id="odm-hero" style="width:150px;height:150px;flex-shrink:0"></div>
+          <div style="min-width:0">
+            <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Ship To</div>
+            <div id="odm-address" style="font-size:14.5px;color:#374151;line-height:1.7"></div>
           </div>
+          <div style="min-width:0;border-left:1px solid #f0ede9;padding-left:24px">
+            <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">Summary</div>
+            <div id="odm-info" style="font-size:13px;color:#6b7280"></div>
+          </div>
+        </div>
+        <!-- Secondary: compact, muted — Gift · Priority · Notes. Single divider. -->
+        <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.85fr) minmax(0,1.5fr);gap:22px;align-items:start;border-top:1px solid #f0ede9;padding-top:14px">
+          <div id="odm-gift"></div>
+          <div id="odm-extra"></div>
+          <div id="odm-notes"></div>
         </div>
         <div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
