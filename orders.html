@@ -2190,10 +2190,16 @@ const ODM_TECH_LBL = {DTG:'Direct to Garment',EMB:'Embroidery',APL:'Applique',LS
 function odmSaveMeta(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  const wrap = document.getElementById('odm-extra');
-  if (!wrap) return;
   const meta = Object.assign({}, (o.meta && typeof o.meta === 'object') ? o.meta : {});
-  wrap.querySelectorAll('[data-meta]').forEach(el => { meta[el.dataset.meta] = (el.value || '').trim(); });
+  // Meta fields now live in two blocks: Details (priority/notes) and Gift
+  // (isGift checkbox + gift message). Scan both; checkboxes save as booleans.
+  ['odm-extra', 'odm-gift'].forEach(id => {
+    const wrap = document.getElementById(id);
+    if (!wrap) return;
+    wrap.querySelectorAll('[data-meta]').forEach(el => {
+      meta[el.dataset.meta] = (el.type === 'checkbox') ? !!el.checked : (el.value || '').trim();
+    });
+  });
   o.meta = meta;
   if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { meta: meta });
   if (typeof ordToast === 'function') ordToast('Saved', '#15803d');
@@ -2225,7 +2231,9 @@ function openDetailModal(ordNo) {
   ];
 
   // Header
-  document.getElementById('odm-title').textContent = '#' + o.id;
+  // "Order #<id>" — "Order" in muted bold, the id in dark bold.
+  document.getElementById('odm-title').innerHTML =
+    '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(o.id == null ? '' : o.id).replace(/[<>&]/g, '') + '</span>';
   const badge = document.getElementById('odm-badge');
   badge.className = 'badge ' + sc.cls;
   badge.textContent = sc.label;
@@ -2236,6 +2244,20 @@ function openDetailModal(ordNo) {
     + `<div>${a.a1}${a.a2?'<br>'+a.a2:''}</div>`
     + `<div>${a.city}, ${a.state} ${a.zip}</div>`
     + `<div style="color:#9ca3af">${a.country}</div>`;
+
+  // Hero image (left rail) — the order's primary product composite, same source
+  // as the line-item thumbnails so they read as the same artwork.
+  const _heroEl = document.getElementById('odm-hero');
+  if (_heroEl) {
+    const _hi = (Array.isArray(o.itemsList) && o.itemsList[0]) ? o.itemsList[0] : null;
+    let _heroSrc = '';
+    if (_hi) {
+      _heroSrc = (UP_STATE[o.no]?.[itemDK(_hi)]?.dataUrl) || _itemDesignURL(o, _hi) || _hi.img || '';
+    }
+    _heroEl.innerHTML = _heroSrc
+      ? `<img src="${_heroSrc}" style="width:100%;height:100%;min-height:150px;max-height:230px;object-fit:cover;border-radius:12px;border:1px solid #e8e7e4;background:#f6f5f4;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=&quot;width:100%;height:100%;min-height:150px;border-radius:12px;background:#f6f5f4;border:1px solid #e8e7e4&quot;></div>'"/>`
+      : `<div style="width:100%;height:100%;min-height:150px;border-radius:12px;background:#f6f5f4;border:1px dashed #d9d6d0;display:flex;align-items:center;justify-content:center;color:#c4c3be"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4z" stroke="currentColor" stroke-width="1.4"/><path d="M4 15l4-4 4 4 3-3 5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/></svg></div>`;
+  }
 
   // Items — operator-style card: thumbnail + name/SKU/print badge + qty controls + status + ×
   // Lock interactions once the order has moved beyond setup (needsSetup=false):
@@ -2298,6 +2320,17 @@ function openDetailModal(ordNo) {
     const odmPillHover = odmPillLocked ? '' : ` onmouseover="this.style.color='#000';this.style.textDecoration='underline';this.style.textDecorationColor='#c4c3be';this.style.textUnderlineOffset='3px'" onmouseout="this.style.color='${odmPillTextColor}';this.style.textDecoration='none'"`;
     const colorOptsHtml = variantOpts.colors.map(c => `<option value="${c.replace(/"/g,'&quot;')}" ${c===curColor?'selected':''}>${c}</option>`).join('');
     const sizeOptsHtml  = variantOpts.sizes.map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${s===curSize?'selected':''}>${s}</option>`).join('');
+    // Blank/base-product selector (before Color) — lets the seller pick the blank
+    // for "pick a blank" lines and shows the base product for synced/manual ones.
+    const _blankList = (typeof BLANK_CATALOG !== 'undefined') ? BLANK_CATALOG : [];
+    const _curBlankName = item.blank || '';
+    const _skuBase = String(item.sku || '').split('-')[0].toUpperCase();
+    const _blankSel = _blankList.find(p =>
+      (_curBlankName && String(p.name||'').toLowerCase() === _curBlankName.toLowerCase()) ||
+      (p.skuBase && _skuBase && String(p.skuBase).toUpperCase() === _skuBase));
+    const _blankSelId = _blankSel ? _blankSel.id : '';
+    const blankOptsHtml = `<option value="">Pick a blank…</option>` + _blankList.map(p =>
+      `<option value="${p.id}" ${String(p.id)===String(_blankSelId)?'selected':''}>${String(p.name||p.skuBase||'').replace(/</g,'&lt;')}</option>`).join('');
     // Compact Upload / Templates / Design Lab trio — mirrors the inline expanded row
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
@@ -2364,6 +2397,7 @@ function openDetailModal(ordNo) {
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;${odmPillLocked?'opacity:.85':''}">
+          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:160px">${blankOptsHtml}</select>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
           <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">
@@ -2446,7 +2480,7 @@ function openDetailModal(ordNo) {
   // we wire the backend. Free for Manual orders.
   const platformFee = (o.src && o.src.toLowerCase() !== 'manual') ? (parseFloat(o.total||0) * 0.05).toFixed(2) : '0.00';
   // Compact single-line rows so the right column matches the address height.
-  const INF = 'display:flex;justify-content:space-between;gap:8px;font-size:12px;line-height:1.55;color:#374151';
+  const INF = 'display:flex;justify-content:space-between;gap:8px;font-size:12.5px;line-height:1.5;color:#374151;padding:5px 0;border-bottom:1px solid #f4f2ef';
   // Tracking cell — uses EGTracking helper so TikTok-sourced orders surface the
   // "Pull tracking" link directly in the modal (matches the orders table cell).
   let _trkCell = '<span style="color:#d1d5db">—</span>';
@@ -2471,18 +2505,26 @@ function openDetailModal(ordNo) {
   const _prio = _meta.priority || 'normal';
   const _opt = (v, t) => `<option value="${v}"${_prio === v ? ' selected' : ''}>${t}</option>`;
   document.getElementById('odm-extra').innerHTML = `
-    <div style="margin-bottom:8px">
+    <div style="margin-bottom:9px">
       <label style="${LBL}">Priority</label>
       <select onchange="odmSaveMeta(${ordNo})" data-meta="priority" style="${FLD};cursor:pointer">${_opt('normal','Normal')}${_opt('rush','Rush')}${_opt('hold','On hold')}</select>
-    </div>
-    <div style="margin-bottom:8px">
-      <label style="${LBL}">Gift message</label>
-      <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift note…" style="${FLD}"/>
     </div>
     <div>
       <label style="${LBL}">Notes</label>
       <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="2" placeholder="Internal notes for this order…" style="${FLD};resize:vertical;line-height:1.45">${_esc(_meta.note)}</textarea>
     </div>`;
+  // Gift block — "This is a gift" toggle + the gift message (synced or editable).
+  // The box auto-ticks when a gift message already exists (e.g. from a synced order).
+  const _giftEl = document.getElementById('odm-gift');
+  if (_giftEl) {
+    const _isGift = !!(_meta.isGift || _meta.gift);
+    _giftEl.innerHTML = `
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:9px">
+        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:15px;height:15px;accent-color:#191918;cursor:pointer;flex-shrink:0"/>
+        <span style="font-size:13px;font-weight:600;color:#191918">This is a gift</span>
+      </label>
+      <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift message…" style="${FLD}"/>`;
+  }
 
   // Action button
   const btn = document.getElementById('odm-action-btn');
@@ -3372,6 +3414,28 @@ function odmSetItemTech(idx, value) {
   if (typeof renderOrders === 'function') renderOrders();
 }
 window.odmSetItemTech = odmSetItemTech;
+
+/* Set an item's blank/base product from the order-detail modal. Records the
+   chosen blank (visible + persisted). For un-configured placeholder lines
+   (NEW-… / empty sku) it also adopts the product's base SKU so the colour/size
+   options resolve to that product; a real marketplace SKU is never clobbered. */
+function odmSetBlank(idx, productId) {
+  const o = window._odmCurrentOrder;
+  if (!o || !o.itemsList || !o.itemsList[idx]) return;
+  const item = o.itemsList[idx];
+  const p = (typeof BLANK_CATALOG !== 'undefined') ? BLANK_CATALOG.find(x => String(x.id) === String(productId)) : null;
+  if (p) {
+    item.blank = p.name || '';
+    if (!item.listing) item.name = p.name || item.name;
+    if (p.skuBase && (/^NEW-/i.test(String(item.sku || '')) || !item.sku || item.sku === '—')) item.sku = p.skuBase;
+  } else {
+    item.blank = '';
+  }
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { items: o.itemsList }); } catch (e) {}
+  openDetailModal(o.no);
+  if (typeof renderOrders === 'function') renderOrders();
+}
+window.odmSetBlank = odmSetBlank;
 
 /* Order history — nested in the seller order-detail right rail. Reads from
    o.timeline (an array of {ts, label, sub, role}); if no timeline exists yet
@@ -7346,34 +7410,42 @@ function confirmImport() {
 </script>
 <!-- Order Detail Modal -->
 <div id="order-detail-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)closeDetailModal()">
-  <div style="background:#fff;border:1px solid #e5e4e0;border-radius:16px;width:min(1320px,96vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);position:relative;overflow:hidden">
-    <!-- Header -->
-    <div style="padding:16px 22px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:14px">
-      <div>
-        <div id="odm-title" style="font-size:16px;font-weight:700;color:#191918">#FF-7001</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:14px;flex-shrink:0">
-        <span id="odm-badge" class="badge b-new" style="font-size:14.5px;font-weight:700;padding:0">New</span>
+  <div style="background:#fff;border:1px solid #e5e4e0;border-radius:16px;width:min(1080px,95vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);position:relative;overflow:hidden">
+    <!-- Header — status left, "Order #id" right -->
+    <div style="padding:15px 22px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:14px">
+      <span id="odm-badge" class="badge b-new" style="font-size:13.5px;font-weight:700;padding:0">New</span>
+      <div style="display:flex;align-items:center;gap:16px;flex-shrink:0">
+        <div id="odm-title" style="font-size:16px;letter-spacing:-.01em">Order #—</div>
         <button onclick="closeDetailModal()" style="background:none;border:none;color:#9ca3af;cursor:pointer;padding:6px;border-radius:7px;display:flex;align-items:center;line-height:1;transition:color .15s" onmouseover="this.style.color='#374151'" onmouseout="this.style.color='#9ca3af'"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
       </div>
     </div>
-    <!-- Body — wider modal, more breathing room between sections -->
-    <div style="display:grid;grid-template-columns:1fr 300px;flex:1;min-height:0;overflow:hidden">
-      <!-- Left: Ship To (with full address + order info inline) + Items -->
-      <div style="overflow-y:auto;padding:22px 26px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:20px">
-        <div>
-          <div style="display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(200px,1.1fr) minmax(240px,1fr);gap:28px;align-items:start">
-            <div>
-              <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Ship To</div>
-              <div id="odm-address" style="font-size:14px;color:#374151;line-height:1.55"></div>
+    <!-- Body — hero image on the left covering the section block, ship-to pushed in -->
+    <div style="display:grid;grid-template-columns:1fr 256px;flex:1;min-height:0;overflow:hidden">
+      <div style="overflow-y:auto;padding:22px 26px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:18px">
+        <div style="display:grid;grid-template-columns:150px 1fr;gap:24px;align-items:stretch">
+          <!-- Hero product image -->
+          <div id="odm-hero" style="align-self:stretch;min-height:150px"></div>
+          <!-- Ship To / Summary, then Gift / Details below -->
+          <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+            <div style="display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(160px,1fr);gap:24px;align-items:start">
+              <div>
+                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Ship To</div>
+                <div id="odm-address" style="font-size:14px;color:#374151;line-height:1.6"></div>
+              </div>
+              <div style="border-left:1px solid #f0ede9;padding-left:22px">
+                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px">Summary</div>
+                <div id="odm-info" style="font-size:13px;color:#6b7280"></div>
+              </div>
             </div>
-            <div style="border-left:1px solid #f0ede9;padding-left:24px">
-              <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Summary</div>
-              <div id="odm-info" style="font-size:13px;color:#6b7280;line-height:1.65"></div>
-            </div>
-            <div style="border-left:1px solid #f0ede9;padding-left:24px">
-              <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Details</div>
-              <div id="odm-extra"></div>
+            <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:24px;align-items:start;border-top:1px solid #f3f3f1;padding-top:15px">
+              <div>
+                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Gift</div>
+                <div id="odm-gift"></div>
+              </div>
+              <div>
+                <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em;margin-bottom:11px">Details</div>
+                <div id="odm-extra"></div>
+              </div>
             </div>
           </div>
         </div>
