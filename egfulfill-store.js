@@ -3225,12 +3225,26 @@
       var self = this; this._allSkus().forEach(function(s){ if(on) self._sel[s]=true; else delete self._sel[s]; }); this._rerender();
     },
     selClear: function(){ this._sel = {}; this._rerender(); },
+    // Real, SCANNABLE Code128 of the SKU. Returns an <svg> placeholder that
+    // _renderBarcodes() fills via JsBarcode once the lib is loaded — the old
+    // version drew decorative bars that no scanner could ever decode.
     _barcode: function(sku){
-      var bars=''; var s=String(sku||'') || '0';
-      // Flex bars stretch to fill the full label width (no narrow clipped strip).
-      for (var i=0;i<s.length;i++){ var w = 1 + (s.charCodeAt(i) % 4); var gap = (s.charCodeAt(i) % 2) ? 2 : 1;
-        bars += '<span style="flex:'+w+';background:#191918"></span><span style="flex:'+gap+';background:#fff"></span>'; }
-      return '<div style="display:flex;align-items:stretch;width:100%;height:46px;margin:8px 0">'+bars+'</div>';
+      return '<svg class="eg-bc" data-sku="'+String(sku||'').replace(/"/g,'&quot;')+'" style="width:100%;height:46px;margin:8px 0;display:block"></svg>';
+    },
+    _ensureBarcodeLib: function(cb){
+      if (window.JsBarcode) { cb(); return; }
+      var self=this;
+      if (this._bcLoading) { var iv=setInterval(function(){ if(window.JsBarcode){ clearInterval(iv); cb(); } },80); setTimeout(function(){ clearInterval(iv); cb(); },6000); return; }
+      this._bcLoading = true;
+      var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js';
+      s.async=true; s.onload=function(){ cb(); }; s.onerror=function(){ cb(); }; document.head.appendChild(s);
+    },
+    _renderBarcodes: function(root){
+      if (!window.JsBarcode) return;
+      (root||document).querySelectorAll('.eg-bc').forEach(function(svg){
+        if (svg.getAttribute('data-done')) return;
+        try { JsBarcode(svg, svg.getAttribute('data-sku'), { format:'CODE128', displayValue:false, height:40, margin:0, width:1.9 }); svg.setAttribute('data-done','1'); } catch(e){}
+      });
     },
     // Print SKU labels (bulk for the selection, or a single SKU). Opens a modal
     // preview at the recommended size with a Print button.
@@ -3262,6 +3276,8 @@
         + '<div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid #f0ede9"><button onclick="document.getElementById(\'eg-inv-label-ov\').style.display=\'none\'" style="font-size:13px;font-weight:600;font-family:inherit;background:#fff;color:#374151;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 14px;cursor:pointer">Close</button><button onclick="EGInventory._printSheet()" style="font-size:13px;font-weight:600;font-family:inherit;background:#191918;color:#fff;border:none;border-radius:8px;padding:7px 16px;cursor:pointer">Print</button></div>'
         + '</div>';
       ov.style.display='flex';
+      var self=this;
+      this._ensureBarcodeLib(function(){ self._renderBarcodes(document.getElementById('eg-inv-label-sheet')); });
     },
     _printSheet: function(){
       var sheet = document.getElementById('eg-inv-label-sheet');

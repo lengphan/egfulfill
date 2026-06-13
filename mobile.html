@@ -714,7 +714,13 @@ function setScanMode(m){
 }
 function adjustStock(sku, delta){
   var r = INV.find(function(x){ return String(x.sku)===String(sku); });
-  if(!r){ toast('“'+sku+'” isn’t in inventory'); return; }
+  if(!r){
+    if(delta<0){ toast('“'+sku+'” isn’t in inventory yet'); return; }
+    // Stock In on an unknown SKU → receive it as a brand-new inventory item.
+    r = { sku: sku, name: sku, variant:'', in_stock:0, reserved:0, reorder_at:25, category:null };
+    INV.push(r);
+    toast('New item received: '+sku);
+  }
   var cur=Number(r.in_stock)||0;
   if (delta<0 && cur===0){ toast(r.sku+' is already at 0'); return; }
   var next=Math.max(0, cur+delta);
