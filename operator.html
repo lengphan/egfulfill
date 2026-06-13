@@ -4006,7 +4006,6 @@ function renderOpOrders() {
             metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
                 <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
                   <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
-                  <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Design</span>${_idHtml}</div>
                   <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
                   <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Threads</span>${_threadSummary}</div>
                 </div>`;
@@ -4020,7 +4019,6 @@ function renderOpOrders() {
             metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
                 <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:32px;flex-wrap:wrap;row-gap:6px">
                   <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
-                  <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Design</span>${fileLink}${dsBtn}</div>
                   <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
                   <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Threads</span>${_threadSummary}</div>
                 </div>`;
@@ -4042,7 +4040,7 @@ function renderOpOrders() {
             <input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">
             ${thumb}
             <div style="flex:1;min-width:0;margin-right:12px">
-              <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_isNewSetup ? (_pickedBlank ? _pickedBlank : '<span style="color:#d4a017;font-style:italic">Pick a blank</span>') : it.name} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
+              <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
               <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                 ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
               </div>

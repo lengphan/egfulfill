@@ -525,7 +525,10 @@
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
     // a compact ⋯ overflow menu so the row stays uncluttered.
-    var designField = _field('Design', uploadBtn);
+    // Design controls belong to the NEW/selling-mode setup only. Once the order is
+    // pushed to production (in_review onward) the row drops the Upload/Uploaded
+    // state — the design then lives solely in the click-to-zoom image lightbox.
+    var designField = isNewOrder(o) ? _field('Design', uploadBtn) : '';
     var moreBtn = '<button title="More — Templates · Design Maker" onclick="EGDesignTools._moreMenu(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'' + jsAttr(name) + '\',this,event)" style="background:#fff;border:1px solid #e5e4e0;border-radius:6px;cursor:pointer;color:#6b7280;padding:2px 8px 4px;font-size:14px;line-height:1;font-family:inherit;flex-shrink:0" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#6b7280\'">⋯</button>';
     // Delete (trash) — only while New, keeps ≥1 item.
     var delBtn = isNewOrder(o)
