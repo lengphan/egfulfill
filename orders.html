@@ -6434,11 +6434,11 @@ async function generateXLSX() {
 
     // ── Sheet 1: Orders (headers + example row) — 14 cols matching CSV_HEADERS ──
     const example = [
-      'ORD-SHOPIFY-8821','Jane Smith','jane.smith@email.com',
+      'SAMPLE-1001','Jane Sample — delete this row','jane@example.com',
       '42 Maple Street','Apt 3B','Portland','OR','97201',
       'Main Store',
       'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
-      'USPS Priority Mail','Gift wrap requested'
+      'USPS Priority Mail','Example row — safe to delete'
     ];
     const ws1 = XLSX.utils.aoa_to_sheet([CSV_HEADERS, example]);
     ws1['!cols'] = CSV_HEADERS.map(h => ({wch: Math.max(h.length + 6, 16)}));
@@ -6506,11 +6506,11 @@ async function generateXLSX() {
 
 function downloadUploadTemplate() {
   const example = [
-    'ORD-SHOPIFY-8821','Jane Smith','jane.smith@email.com',
+    'SAMPLE-1001','Jane Sample — delete this row','jane@example.com',
     '42 Maple Street','Apt 3B','Portland','OR','97201',
     'Main Store',
     'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
-    'USPS Priority Mail','Gift wrap requested'
+    'USPS Priority Mail','Example row — safe to delete'
   ];
   const csv = [_csvRow(CSV_HEADERS), _csvRow(example)].join('\n');
   const a = document.createElement('a');
@@ -6612,11 +6612,11 @@ function importFromGoogleSheet() {
 function createGoogleSheetTemplate() {
   if (_gsheetConfig && _gsheetConfig.templateUrl) { window.open(_gsheetConfig.templateUrl, '_blank'); return; }
   var example = [
-    'ORD-1001', 'Jane Smith', 'jane.smith@email.com',
+    'SAMPLE-1001', 'Jane Sample — delete this row', 'jane@example.com',
     '42 Maple Street', 'Apt 3B', 'Portland', 'OR', '97201',
     'Main Store',
     'Custom Embroidered Tee with Name', 'G5000-WHT-L', '1', 'DTG',
-    'USPS Priority Mail', 'Gift wrap requested'
+    'USPS Priority Mail', 'Example row — safe to delete'
   ];
   var tsv = [CSV_HEADERS.join('\t'), example.join('\t')].join('\n');
   // Open the blank sheet synchronously (inside the click) so it isn't popup-blocked.
@@ -6681,6 +6681,15 @@ function _canonHeader(h) {
 }
 
 // Shared parser — accepts the 2D-array shape from either CSV or XLSX.sheet_to_json.
+// The template ships with one labeled SAMPLE row to demonstrate the format. Skip
+// it on import (file OR Google Sheet) so a seller who forgets to delete it never
+// creates a junk order.
+function _isImportSampleRow(obj) {
+  const on = String(obj.order_number || '').toUpperCase().trim();
+  const nm = String(obj.ship_name || '').toLowerCase();
+  return on.startsWith('SAMPLE') || on.startsWith('EXAMPLE') || on === 'ORD-1001' || on === 'ORD-SHOPIFY-8821'
+      || nm.includes('delete this row') || nm.includes('(example') || /\bsample\b/.test(nm);
+}
 function parseImportRows(rows) {
   if (!rows || rows.length < 2) { alert('File must have a header row and at least one data row.'); return; }
   const headers = rows[0].map(_canonHeader);
@@ -6697,7 +6706,8 @@ function parseImportRows(rows) {
     if (missing.length) errs.push('Missing: ' + missing.join(', '));
     if (noItem) errs.push('No item (SKU or name)');
     return { ...obj, _rowNum: i + 2, _valid: !errs.length, _errors: errs.join('; ') };
-  });
+  }).filter(r => !_isImportSampleRow(r));     // drop the template's demo row
+  if (!_importRows.length) { alert('No order rows found — the sheet only had the header (and maybe the sample row).'); return; }
   renderImportPreview();
 }
 
