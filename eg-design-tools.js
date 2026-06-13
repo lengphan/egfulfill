@@ -531,7 +531,9 @@
     var delBtn = isNewOrder(o)
       ? '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
       : '';
-    return '<div style="display:flex;gap:16px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + moreBtn + delBtn + '</div>';
+    // Upload/Templates/Design Maker now live as tabs inside the one Design panel,
+    // so the row needs a single Design button — the ⋯ overflow menu is retired.
+    return '<div style="display:flex;gap:16px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + delBtn + '</div>';
   }
 
   // Compact ⋯ overflow menu for an item's secondary actions (Templates, Design
@@ -745,7 +747,7 @@
     try { if (window.EGStore && EGStore.getRawDesign && o) { var r = EGStore.getRawDesign(o.id, sku); if (r) initial = r; } } catch (e) {}
     var custFile = it ? (it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? String(it.designSrc) : '')) : '';
     if (!initial && it) initial = custFile || it.designUrl || '';
-    _up = { orderNum: orderNum, sku: sku, name: name || (it && it.name) || sku, tech: String(tech || (it && it.printType) || '').toUpperCase(), src: initial, fromCustomer: !!(initial && initial === custFile), threads: [] };
+    _up = { orderNum: orderNum, sku: sku, name: name || (it && it.name) || sku, tech: String(tech || (it && it.printType) || '').toUpperCase(), src: initial, fromCustomer: !!(initial && initial === custFile), threads: [], tab: 'upload' };
     _upEnsure(); _upRender();
     var p = document.getElementById('egup-panel'); p.style.display = 'block'; setTimeout(function () { p.classList.add('open'); }, 10);
   }
@@ -755,8 +757,24 @@
     var ov = document.createElement('div'); ov.id = 'egup-ov'; ov.onclick = function () { _upClose(); }; document.body.appendChild(ov);
     var p = document.createElement('div'); p.id = 'egup-panel'; p.style.display = 'none'; document.body.appendChild(p);
   }
+  // The panel now has three tabs — Upload · Templates · Design Maker — so every
+  // design source lives in ONE consistent surface (no floating popup, no ⋯ menu).
+  function _upTab(t) { if (_up) { _up.tab = t; _upRender(); } }
   function _upRender() {
     var s = _up; if (!s) return; var p = document.getElementById('egup-panel');
+    document.getElementById('egup-ov').classList.add('on');
+    var tab = s.tab || 'upload';
+    var tb = function (t, lbl) {
+      var on = t === tab;
+      return '<button onclick="EGDesignTools._upTab(\'' + t + '\')" style="flex:1;background:none;border:none;padding:11px 6px;font-size:12.5px;font-weight:' + (on ? '700' : '600') + ';color:' + (on ? '#191918' : '#9ca3af') + ';cursor:pointer;font-family:inherit;border-bottom:2px solid ' + (on ? '#191918' : 'transparent') + ';margin-bottom:-1px">' + lbl + '</button>';
+    };
+    var head = '<div style="padding:16px 18px 0;display:flex;align-items:flex-start;justify-content:space-between"><div style="min-width:0"><div style="font-size:15px;font-weight:700;color:#191918">Design</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.name) + '</div></div><button onclick="EGDesignTools._upClose()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:19px;line-height:1">&times;</button></div>';
+    var tabs = '<div style="display:flex;border-bottom:1px solid #f0ede9;margin-top:12px;padding:0 10px">' + tb('upload', 'Upload') + tb('templates', 'Templates') + tb('maker', 'Design Maker') + '</div>';
+    p.innerHTML = head + tabs + (tab === 'templates' ? _upTemplatesBody(s) : tab === 'maker' ? _upMakerBody(s) : _upUploadBody(s));
+    if (tab === 'upload') _upThreads();
+    else if (tab === 'templates') _upFilterTpl('');
+  }
+  function _upUploadBody(s) {
     var hasImg = !!s.src;
     var preview = hasImg
       ? ('<div id="egup-lwrap" onmousemove="EGDesignTools._upLensMove(event)" onmouseleave="EGDesignTools._upLensHide()" style="position:relative;width:100%;aspect-ratio:1;border:1.5px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#f6f5f4">'
@@ -766,15 +784,58 @@
           + '</div>'
           + '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center">Hover to magnify · click the artwork to sample a thread colour</div>')
       : '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border:1.5px dashed #c4c3be;border-radius:10px;cursor:pointer;color:#9ca3af;font-size:13px;gap:8px;text-align:center"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Click to choose a file</label>';
-    document.getElementById('egup-ov').classList.add('on');
-    p.innerHTML = '<div style="padding:16px 18px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between"><div style="min-width:0"><div style="font-size:15px;font-weight:700;color:#191918">Design</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.name) + '</div></div><button onclick="EGDesignTools._upClose()" style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:19px;line-height:1">&times;</button></div>'
-      + '<div style="padding:18px">'
+    return '<div style="padding:18px">'
       + (s.fromCustomer && hasImg ? '<div style="font-size:12px;font-weight:600;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:7px;padding:7px 10px;margin-bottom:12px">Customer-uploaded file — review &amp; use, or replace it below.</div>' : '')
       + preview
       + '<div style="display:flex;gap:8px;margin-top:12px"><label style="flex:1;text-align:center;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/>' + (hasImg ? 'Replace file' : 'Choose file') + '</label>' + (hasImg ? '<button onclick="EGDesignTools._upRemoveBg()" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff;font-family:inherit">Remove BG</button>' : '')
       + '</div><div id="egup-threads"></div></div>'
       + '<div style="position:sticky;bottom:0;background:#fff;border-top:1px solid #f0ede9;padding:14px 18px;display:flex;gap:8px"><button onclick="EGDesignTools._upClose()" class="btn btn-out" style="flex:1;font-size:13.5px">Cancel</button><button onclick="EGDesignTools._upSave()" class="btn btn-dk" style="flex:1;font-size:13.5px;' + (hasImg ? '' : 'opacity:.5;pointer-events:none') + '">Use this design</button></div>';
-    _upThreads();
+  }
+  // Templates tab — the saved-template list, INLINE in the panel (replaces the old
+  // floating popup). Clicking one applies it to this exact line item and closes.
+  function _upTemplatesBody(s) {
+    return '<div style="padding:14px 18px">'
+      + '<input id="egup-tpl-search" placeholder="Search templates…" oninput="EGDesignTools._upFilterTpl(this.value)" style="width:100%;box-sizing:border-box;border:1px solid #e5e4e0;border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;outline:none;margin-bottom:10px"/>'
+      + '<div id="egup-tpl-list" style="display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow:auto"></div>'
+      + '</div>';
+  }
+  function _upFilterTpl(q) {
+    var box = document.getElementById('egup-tpl-list'); if (!box) return;
+    var all = _loadTemplates();
+    if (!all.length) { box.innerHTML = '<div style="padding:26px 8px;text-align:center;font-size:13px;color:#9ca3af;line-height:1.6">No saved templates yet.<br>Make one in <b>Design Maker</b> and save it to reuse here.</div>'; return; }
+    var ql = String(q || '').toLowerCase();
+    var res = ql ? all.filter(function (t) { return String(t.name || '').toLowerCase().indexOf(ql) >= 0 || _tplTechOf(t).toLowerCase().indexOf(ql) >= 0; }) : all;
+    if (!res.length) { box.innerHTML = '<div style="padding:18px;text-align:center;font-size:13px;color:#9ca3af">No templates match.</div>'; return; }
+    box.innerHTML = res.map(function (t) {
+      var tech = _tplTechOf(t);
+      var thumb = t.designOnlyImg || t.compositeImg || t.productImg || '';
+      var th = thumb ? '<img src="' + esc(thumb) + '" style="width:38px;height:38px;object-fit:cover;border-radius:8px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:38px;height:38px;background:#f0ede9;border-radius:8px;flex-shrink:0"></div>';
+      return '<button onclick="EGDesignTools._upApplyTemplate(\'' + jsAttr(String(t.id)) + '\')" style="display:flex;align-items:center;gap:11px;padding:8px 10px;cursor:pointer;border-radius:9px;border:1px solid #e5e4e0;background:#fff;text-align:left;font-family:inherit;width:100%" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">' + th + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.name || 'Untitled template') + '</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">' + tech + '</div></div></button>';
+    }).join('');
+  }
+  function _upApplyTemplate(id) {
+    var s = _up; if (!s) return;
+    _tplCtx = { orderNum: s.orderNum, sku: s.sku, name: s.name };   // applyTemplate keys by ctx.sku (the line key)
+    applyTemplate(id);
+    _upClose();
+  }
+  // Design Maker tab — the canvas editor needs full width, so launch the existing
+  // overlay (carrying this order+line context); attaching there returns to the board.
+  function _upMakerBody(s) {
+    var hasImg = !!s.src;
+    return '<div style="padding:24px 18px;text-align:center">'
+      + (hasImg
+        ? '<img src="' + _upCanvasSrc(s.src) + '" style="width:120px;height:120px;object-fit:contain;border:1px solid #e5e4e0;border-radius:10px;background:#f6f5f4;margin:0 auto 14px;display:block"/>'
+        : '<div style="width:120px;height:120px;border:1.5px dashed #c4c3be;border-radius:10px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;color:#c4c3be"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>')
+      + '<div style="font-size:13px;color:#6b7280;line-height:1.55;margin:0 auto 16px;max-width:300px">Open the full editor to place &amp; resize the artwork on the blank, then attach it back to this item.</div>'
+      + '<button onclick="EGDesignTools._upOpenMaker()" class="btn btn-dk" style="font-size:13.5px;padding:9px 18px">Open Design Maker →</button>'
+      + '</div>';
+  }
+  function _upOpenMaker() {
+    var s = _up; if (!s) return;
+    var on = s.orderNum, sk = s.sku, nm = s.name;
+    _upClose();
+    designMaker(on, sk, nm);
   }
   // ── Magnifier lens + click-to-sample-thread on the panel preview (ported from
   //    the seller's pickThreadFromImage/tpLens*). Hover = 3× zoom loupe; click =
@@ -880,6 +941,7 @@
     itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
+    _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
     onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
