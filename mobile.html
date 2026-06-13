@@ -434,7 +434,7 @@ $('inv-clr').onclick=function(){ $('inv-q').value=''; renderInv(); $('inv-q').fo
 /* ════════ ORDERS VIEW ════════ */
 function statusBadge(s){
   s=(s||'new').toLowerCase();
-  var map={new:'b-new',queued:'b-queue',queue:'b-queue',printing:'b-prod',production:'b-prod',printed:'b-prod',qc:'b-qc',packed:'b-packed',shipped:'b-shipped',delivered:'b-shipped',fulfilled:'b-shipped'};
+  var map={new:'b-new',queued:'b-queue',queue:'b-queue',working:'b-prod',printing:'b-prod',production:'b-prod',printed:'b-prod',qc:'b-qc',packed:'b-packed',shipped:'b-shipped',delivered:'b-shipped',fulfilled:'b-shipped'};
   return '<span class="badge '+(map[s]||'b-new')+'">'+esc(s)+'</span>';
 }
 function ordName(o){
@@ -576,7 +576,7 @@ function openOrder(id){
 // Production status helpers for the order sheet's per-item Start button.
 function isStartable(s){ s=String(s||'').toLowerCase(); return ['new','queued','queue','action','in_review','awaiting','awaiting_scan','received',''].indexOf(s)>=0; }
 function statusLabel(s){ s=String(s||'').toLowerCase();
-  if (['printing','working','production','in_production','printed'].indexOf(s)>=0) return '● In production';
+  if (['printing','working','production','in_production','printed'].indexOf(s)>=0) return '● Working';
   if (s==='qc') return '● In QC';
   if (s==='packed') return '● Packed — ready to ship';
   if (['shipped','delivered','fulfilled'].indexOf(s)>=0) return '✓ Shipped';
@@ -586,13 +586,15 @@ function statusLabel(s){ s=String(s||'').toLowerCase();
 // Start the order → move it into production (PATCH), optimistic + re-render.
 function startOrder(id){
   var o = ORD.find(function(x){ return String(x.id)===String(id); }); if(!o) return;
-  o.factory_status='printing'; o.status='printing';
+  o.factory_status='working'; o.status='working';
+  // Mirror onto every line item too, so the order reads "Working" everywhere.
+  (o.items||[]).forEach(function(i){ i.status='working'; });
   if (navigator.vibrate) navigator.vibrate(50);
-  toast('Started — moved to production');
-  api('/orders/'+encodeURIComponent(id), { method:'PATCH', body:{ factoryStatus:'printing', status:'printing' } })
+  toast('Started — now working');
+  api('/orders/'+encodeURIComponent(id), { method:'PATCH', body:{ factoryStatus:'working', status:'working' } })
     .then(function(res){ if(!res||!res.ok) toast('Couldn’t sync — will retry on refresh'); })
     .catch(function(){ toast('Offline — not synced yet'); });
-  openOrder(id);     // re-render the sheet with the live status
+  openOrder(id);     // re-render the sheet — Start is gone, shows "● Working"
   renderOrders();    // refresh the orders list
 }
 // Tap an item photo → full composite (design overlaid on the blank) lightbox.
