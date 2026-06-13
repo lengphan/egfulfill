@@ -143,11 +143,16 @@
     max-height:90dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
   .sheet.on{transform:translateY(0)}
   .sheet .grip{width:38px;height:4px;background:#d6d4cf;border-radius:3px;margin:9px auto 4px;flex:0 0 auto}
-  .sheet .shead{padding:6px 18px 14px;display:flex;align-items:flex-start;gap:10px;border-bottom:1px solid var(--bd)}
+  .sheet .shead{padding:10px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bd)}
   .sheet .shead .h{flex:1;min-width:0}
   .sheet .shead .h .t{font-size:18px;font-weight:800;line-height:1.2}
   .sheet .shead .h .s{font-size:12px;color:var(--mut);margin-top:3px;font-family:ui-monospace,Menlo,monospace}
-  .sheet .shead .x{font-size:22px;color:var(--mut);flex:0 0 auto;padding:0 4px;line-height:1}
+  .sheet .shead .h .s:empty{display:none}
+  .sheet .shead #sh-status{flex:0 0 auto}
+  .sheet .shead .x{font-size:22px;color:var(--mut);flex:0 0 auto;padding:0 4px 0 6px;line-height:1;cursor:pointer}
+  .item .comp{position:relative;width:46px;height:46px;border-radius:8px;overflow:hidden;background:#f0efec;flex:0 0 auto;border:1px solid var(--bd)}
+  .item .comp .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .item .comp .ov{position:absolute;left:17%;top:17%;width:66%;height:66%;object-fit:contain}
   .sheet .sbody{overflow-y:auto;padding:16px 18px}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:14px;margin-bottom:4px}
   .kv .k{color:var(--mut);font-size:12.5px;padding-top:1px}
@@ -294,7 +299,7 @@
 <div class="sheet-bg" id="sheetbg"></div>
 <div class="sheet" id="sheet">
   <div class="grip"></div>
-  <div class="shead"><div class="h"><div class="t" id="sh-t">—</div><div class="s" id="sh-s"></div></div><button class="x" id="sh-x">✕</button></div>
+  <div class="shead"><div class="h"><div class="t" id="sh-t">—</div><div class="s" id="sh-s"></div></div><span id="sh-status"></span><button class="x" id="sh-x">✕</button></div>
   <div class="sbody" id="sh-body"></div>
 </div>
 
@@ -483,6 +488,7 @@ function openSku(sku){
   var a=avail(r), st=stockState(r), t=reorderAt(r);
   $('sh-t').textContent = r.name || r.sku;
   $('sh-s').textContent = r.sku + (r.variant?' · '+r.variant:'');
+  $('sh-status').innerHTML = '';
   var stCls = st==='low'?'red':(st==='ok'?'green':'');
   $('sh-body').innerHTML =
     '<div class="statgrid">'+
@@ -519,28 +525,37 @@ function ordersUsingSku(sku){
 function openOrder(id){
   var o = ORD.find(function(x){ return String(x.id)===String(id); });
   if(!o){ toast('Order not found'); return; }
-  $('sh-t').textContent = ordNumber(o) + ' · ' + ordName(o);
-  $('sh-s').textContent = String(o.id) + (o.source?(' · '+o.source):'');
   var st = o.factory_status || o.status || 'new';
+  // Header: "Order #id" only; the status badge moves up next to the close X.
+  $('sh-t').textContent = 'Order ' + (o.seq ? ('#'+o.seq) : ('#'+String(o.id||'')));
+  $('sh-s').textContent = '';
+  $('sh-status').innerHTML = statusBadge(st);
   var addr = fmtAddr(o);
   var items = (o.items||[]).map(function(i){
-    var img = i.design_src || i.img || '';
-    var thumb = img ? '<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">' : '<div class="ph">no img</div>';
+    // Composite = the design overlaid on the blank product (same idea as the boards).
+    var blank = (i.img && /^(https?:|data:)/.test(String(i.img))) ? i.img : '';
+    var design = (i.design_src && /^(https?:|data:)/.test(String(i.design_src))) ? i.design_src : '';
+    var thumb;
+    if (blank || design) {
+      thumb = '<div class="comp">'+
+        (blank?'<img class="bg" src="'+esc(blank)+'" onerror="this.style.display=\'none\'">':'')+
+        (design?'<img class="ov" src="'+esc(design)+'" onerror="this.style.display=\'none\'">':(blank?'':'<img class="bg" src="'+esc(design)+'">'))+
+      '</div>';
+    } else { thumb = '<div class="ph">no img</div>'; }
     var meta = [i.color,i.size,i.variant,i.print_type||i.tech].filter(Boolean).map(esc).join(' · ');
     return '<div class="item">'+thumb+'<div class="ib"><div class="n">'+esc(i.name||i.sku||'Item')+'</div>'+
       '<div class="m">'+(i.sku?'<span class="sku">'+esc(i.sku)+'</span>':'')+(meta?(i.sku?' · ':'')+meta:'')+'</div></div>'+
       '<div class="q">×'+(Number(i.qty)||1)+'</div></div>';
   }).join('');
   $('sh-body').innerHTML =
-    '<div style="margin-bottom:14px">'+statusBadge(st)+(o.tracking?'  <span class="badge b-shipped">'+esc(o.carrier||'Tracking')+'</span>':'')+'</div>'+
-    '<div class="kv">'+
-      kv('Status', esc(st))+
+    '<div class="seclabel" style="margin-top:0">Name &amp; address</div>'+
+    '<div class="card" style="padding:13px;font-size:14px;line-height:1.55">'+(addr || '<span style="color:var(--mut)">No address on file</span>')+'</div>'+
+    '<div class="kv" style="margin-top:14px">'+
       kv('Store', esc(o.store||'—'))+
       kv('Source', esc(o.source||'manual'))+
       (o.tracking?kv('Tracking', esc(o.tracking)):'')+
       (o.delivery?kv('Delivery', esc(o.delivery)):'')+
     '</div>'+
-    (addr?'<div class="seclabel">Ship to</div><div class="card" style="padding:13px;font-size:14px;line-height:1.5">'+addr+'</div>':'')+
     '<div class="seclabel">Items ('+ordItemsCount(o)+')</div>'+ (items||'<div class="empty" style="padding:20px">No line items</div>');
   openSheet();
 }
