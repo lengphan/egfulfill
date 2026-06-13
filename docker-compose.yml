@@ -79,6 +79,11 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      # Google Sheets order import (API key reads link-shared sheets) + optional
+      # service account to auto-CREATE a ready-filled sheet, + optional copy link.
+      GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}
+      GOOGLE_SERVICE_ACCOUNT: ${GOOGLE_SERVICE_ACCOUNT:-}
+      SHEETS_TEMPLATE_URL: ${SHEETS_TEMPLATE_URL:-}
     depends_on: [db]
     restart: unless-stopped
 
