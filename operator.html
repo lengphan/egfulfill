@@ -3811,13 +3811,12 @@ function renderOpOrders() {
   const info = document.getElementById('op-page-info');
   if (info) info.innerHTML = `Showing ${total ? start + 1 : 0}–${Math.min(start + perPage, total)} of <span id="op-total-count">${total}</span> orders`;
   if (typeof opRenderPagination === 'function') opRenderPagination(opPage, totalPages);
-  // Update thead visibility
+  // Update thead visibility BY data-col (never by fixed position) — columns can be
+  // drag-reordered, so positional indices point at the wrong header after a move.
   const thead = tbody.closest('table')?.querySelector('thead tr');
   if (thead) {
-    const colMap = {seller:2,carrier:5,time:6,customer:7,tracking:8};
-    Object.entries(colMap).forEach(([col, idx]) => {
-      const th = thead.children[idx];
-      if (th) th.style.display = opColVisible(col) ? '' : 'none';
+    thead.querySelectorAll('th[data-col]').forEach(th => {
+      th.style.display = opColVisible(th.dataset.col) ? '' : 'none';
     });
   }
   tbody.innerHTML = orders.map(o => {
