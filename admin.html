@@ -18,6 +18,7 @@
 <script src="egfulfill-connect.js"></script>
 <title>Admin – EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -1191,7 +1192,7 @@ document.addEventListener('DOMContentLoaded', function(){
   <div id="sku-label-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)document.getElementById('sku-label-modal').classList.add('modal-hidden')">
     <div style="background:#fff;border-radius:16px;padding:28px;width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div><div style="font-size:17px;font-weight:700;color:#191918">Print SKU Labels</div><div style="font-size:13.5px;color:#9ca3af;margin-top:2px">Select items and print barcode labels for stock</div></div>
+        <div><div style="font-size:17px;font-weight:700;color:#191918">Print SKU Labels</div><div style="font-size:13.5px;color:#9ca3af;margin-top:2px">Real Code128 barcodes — print &amp; stick, scannable on the mobile app</div></div>
         <button onclick="document.getElementById('sku-label-modal').classList.add('modal-hidden')" style="background:none;border:none;cursor:pointer;font-size:19px;color:#9ca3af;line-height:1">×</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
@@ -1204,7 +1205,7 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-out" onclick="document.getElementById('sku-label-modal').classList.add('modal-hidden')">Cancel</button>
-        <button class="btn btn-dk" onclick="alert('Sending to label printer…');document.getElementById('sku-label-modal').classList.add('modal-hidden')">Print Labels</button>
+        <button class="btn btn-dk" onclick="printSkuLabels()">Print Labels</button>
       </div>
     </div>
   </div>
@@ -7454,13 +7455,41 @@ function openSkuLabelModal(preSelectSku) {
   const list = document.getElementById('sku-label-list');
   if (list) {
     list.innerHTML = INVENTORY_ITEMS.map(item => `
-      <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:6px" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
-        <input type="checkbox" ${preSelectSku===undefined||preSelectSku===item.sku?'checked':''} style="accent-color:#111827"/>
-        <span style="font-family:monospace;font-size:13px;color:#374151">${item.sku}</span>
-        <span style="font-size:13px;color:#9ca3af;margin-left:4px">${item.name} · ${item.variant}</span>
-      </label>`).join('');
+      <label class="skl-card" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e5e4e0;border-radius:10px;cursor:pointer;background:#fff;transition:border-color .12s" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+        <input type="checkbox" class="skl-chk" data-sku="${String(item.sku).replace(/"/g,'&quot;')}" ${preSelectSku===undefined||preSelectSku===item.sku?'checked':''} style="accent-color:#111827;width:15px;height:15px;flex-shrink:0"/>
+        <div class="skl-body" style="flex:1;min-width:0;text-align:center">
+          <div style="font-size:13.5px;font-weight:700;color:#191918">${item.name||item.sku}</div>
+          ${item.variant&&item.variant!=='—'?`<div style="font-size:12px;color:#6b7280;margin-top:1px">${item.variant}</div>`:''}
+          <svg class="skl-bc" data-sku="${String(item.sku).replace(/"/g,'&quot;')}" style="max-width:100%;height:52px;margin-top:6px"></svg>
+          <div style="font-size:11px;font-family:monospace;letter-spacing:1.5px;color:#374151">${item.sku}</div>
+        </div>
+      </label>`).join('') || '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">No inventory items yet.</div>';
+    list.querySelectorAll('.skl-bc').forEach(svg => {
+      try { if (window.JsBarcode) JsBarcode(svg, svg.dataset.sku, { format:'CODE128', displayValue:false, height:44, margin:0, width:1.8 }); } catch(e){}
+    });
   }
   document.getElementById('sku-label-modal').classList.remove('modal-hidden');
+}
+// Print the checked SKU labels (real Code128) — opens a clean print sheet.
+function printSkuLabels() {
+  const checked = Array.from(document.querySelectorAll('#sku-label-modal .skl-chk:checked'));
+  if (!checked.length) { alert('Select at least one SKU to print.'); return; }
+  const numEl = document.querySelector('#sku-label-modal input[type=number]');
+  const perSku = Math.max(1, parseInt((numEl && numEl.value) || '1', 10) || 1);
+  let cards = '';
+  checked.forEach(chk => {
+    const body = chk.closest('.skl-card').querySelector('.skl-body');
+    if (body) for (let i = 0; i < perSku; i++) cards += '<div class="lbl">' + body.innerHTML + '</div>';
+  });
+  const w = window.open('', '_blank', 'width=760,height=620');
+  if (!w) { alert('Allow pop-ups to print labels.'); return; }
+  w.document.write('<!doctype html><html><head><title>SKU Labels</title><style>'
+    + '*{margin:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{padding:10px}'
+    + '.lbl{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:2in;height:1in;border:1px dashed #ccc;margin:4px;padding:5px;text-align:center;page-break-inside:avoid}'
+    + '.lbl svg{max-width:96%;height:auto}@media print{.lbl{border:none}}'
+    + '</style></head><body>' + cards + '</body></html>');
+  w.document.close();
+  setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 300);
 }
 
 function addStockItem() {
