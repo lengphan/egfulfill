@@ -4269,6 +4269,12 @@ renderOrders();
           </div>
           <textarea id="no-paste" rows="3" placeholder="Daniel Park&#10;1243 Valley View Ave&#10;Santa Fe Springs, CA 90670" oninput="noParsePastedAddr(this.value)" onpaste="setTimeout(() => noParsePastedAddr(document.getElementById('no-paste').value), 0)" onchange="noParsePastedAddr(this.value)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;font-size:13.5px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;resize:none;line-height:1.6" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"></textarea>
         </div>
+        <!-- Parsed preview — the paste box auto-fills these; the fields below stay collapsed unless a parse needs fixing -->
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#faf9f7;border:1px solid #ecebe7;border-radius:8px;padding:8px 11px;margin-bottom:10px">
+          <div id="no-addr-preview-text" style="font-size:12.5px;color:#9ca3af;line-height:1.45;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Paste the address above to auto-fill — or edit the fields manually.</div>
+          <button type="button" id="no-addr-toggle" onclick="noToggleAddrFields()" style="flex-shrink:0;font-size:11.5px;font-weight:600;color:#191918;background:none;border:none;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap">Edit fields ▾</button>
+        </div>
+        <div id="no-addr-fields" style="display:none">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div>
             <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">First Name</label>
@@ -4301,6 +4307,7 @@ renderOrders();
             <input id="no-zip" class="input" placeholder="90670" maxlength="10" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
           </div>
         </div>
+        </div><!-- /no-addr-fields -->
       </div>
 
       <!-- ITEMS -->
@@ -4345,6 +4352,16 @@ function openNewOrderModal() {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.style.borderColor = '#e5e4e0'; }
   });
+  // Collapse the address fields back down (paste box is the primary input) and
+  // wire live preview updates for manual edits (once).
+  const _af = document.getElementById('no-addr-fields');
+  if (_af) {
+    _af.style.display = 'none';
+    if (!_af.dataset.wired) { _af.dataset.wired = '1'; _af.addEventListener('input', noUpdateAddrPreview); }
+  }
+  const _at = document.getElementById('no-addr-toggle');
+  if (_at) _at.textContent = 'Edit fields ▾';
+  noUpdateAddrPreview();
   const list = document.getElementById('no-items-list');
   if (list) list.innerHTML = '';
   noAddItem();
@@ -4504,14 +4521,14 @@ function noUpdateSku(row) {
 }
 function saveNewOrderDraft() {
   const fname = document.getElementById('no-fname').value.trim();
-  if (!fname) { const f=document.getElementById('no-fname'); f.focus(); f.style.borderColor='#dc2626'; return; }
+  if (!fname) { noToggleAddrFields(true); const f=document.getElementById('no-fname'); f.focus(); f.style.borderColor='#dc2626'; return; }
   closeNewOrderModal();
 }
 function submitNewOrder() {
   // Validate recipient
   const fname = document.getElementById('no-fname').value.trim();
   const lname = document.getElementById('no-lname').value.trim();
-  if (!fname) { const f=document.getElementById('no-fname'); f.focus(); f.style.borderColor='#dc2626'; return; }
+  if (!fname) { noToggleAddrFields(true); const f=document.getElementById('no-fname'); f.focus(); f.style.borderColor='#dc2626'; return; }
   // Gather items from the rows
   const items = [];
   // Normalize "Embroidery"/"DTG Print"/etc. to the codes the inline row + detail
@@ -4709,6 +4726,32 @@ function noParsePastedAddr(raw) {
   document.getElementById('no-city').value  = city;
   document.getElementById('no-state').value = state;
   document.getElementById('no-zip').value   = zip;
+  noUpdateAddrPreview();
+}
+
+// One-line summary of the (auto-filled or hand-edited) address fields, shown so
+// the seller can eyeball the parse without the full field grid taking up space.
+function noUpdateAddrPreview() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const name   = [g('no-fname'), g('no-lname')].filter(Boolean).join(' ');
+  const street = [g('no-street'), g('no-apt')].filter(Boolean).join(' ');
+  const csz    = [g('no-city'), [g('no-state'), g('no-zip')].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const parts  = [name, street, csz].filter(Boolean);
+  const el = document.getElementById('no-addr-preview-text');
+  if (!el) return;
+  if (parts.length) { el.textContent = parts.join('  ·  '); el.style.color = '#374151'; }
+  else { el.textContent = 'Paste the address above to auto-fill — or edit the fields manually.'; el.style.color = '#9ca3af'; }
+}
+// Show/hide the individual recipient fields. forceOpen=true always reveals them
+// (used when validation needs the seller to fix a field).
+function noToggleAddrFields(forceOpen) {
+  const box = document.getElementById('no-addr-fields');
+  const btn = document.getElementById('no-addr-toggle');
+  if (!box) return;
+  const open = forceOpen === true ? true : box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? 'Hide fields ▴' : 'Edit fields ▾';
+  if (!open) noUpdateAddrPreview();   // refresh summary after manual edits collapse
 }
 
 // ── Header shared JS ──
