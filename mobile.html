@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <title>EG Floor — Warehouse</title>
 <style>
   :root{
@@ -117,6 +118,15 @@
   @keyframes scanline{0%,100%{top:14%}50%{top:86%}}
   .scanhint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#fff;font-size:12.5px;text-shadow:0 1px 3px #000;font-weight:600}
   .scanpanel{padding:16px 14px}
+  /* Stock In / Out mode toggles */
+  .scanmode{display:flex;gap:10px;margin-bottom:12px}
+  .sm{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:15px 8px;border-radius:14px;border:2px solid var(--bd);background:#fff;font-weight:800;font-size:15px;color:var(--mut);font-family:inherit;cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent}
+  .sm .sg{font-size:21px;line-height:1;font-weight:700}
+  .sm.on.sm-in{background:#e6f7ee;border-color:var(--green);color:var(--green)}
+  .sm.on.sm-out{background:#fdecea;border-color:var(--red);color:var(--red)}
+  .modebar{font-size:13px;font-weight:700;text-align:center;padding:10px;border-radius:11px;margin-bottom:12px;display:none}
+  .modebar.in{display:block;background:#e6f7ee;color:var(--green)}
+  .modebar.out{display:block;background:#fdecea;color:var(--red)}
   .scanstart{background:var(--dk);color:#fff;width:100%;padding:15px;border-radius:13px;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px}
   .scanstart svg{width:20px;height:20px;fill:currentColor}
   .manual{display:flex;gap:8px;margin-top:12px}
@@ -210,6 +220,11 @@
         <div class="scanhint" id="scanhint">Point at a barcode or QR code</div>
       </div>
       <div class="scanpanel">
+        <div class="scanmode">
+          <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> Stock In</button>
+          <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Stock Out</button>
+        </div>
+        <div class="modebar" id="modebar"></div>
         <button class="scanstart" id="scanbtn">
           <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
           <span id="scanbtntxt">Start camera scan</span>
@@ -481,8 +496,15 @@ function openSku(sku){
       kv('Variant', r.variant||'—')+
       kv('Reorder at', String(t))+
       kv('Open orders needing it', String(ordersUsingSku(r.sku)))+
+    '</div>'+
+    '<div style="margin-top:20px;padding:14px;background:var(--card);border:1px solid var(--bd);border-radius:13px;text-align:center">'+
+      '<svg id="sku-barcode" style="max-width:100%;height:62px"></svg>'+
+      '<div style="font-size:10px;color:var(--mut);margin-top:2px;letter-spacing:.5px;font-family:ui-monospace,Menlo,monospace">'+esc(r.sku)+'</div>'+
+      '<div style="font-size:10.5px;color:var(--mut);margin-top:4px">Scannable barcode · print &amp; stick on the stock</div>'+
     '</div>';
   openSheet();
+  // Render the SKU as a CODE128 barcode (what the camera scans to add/remove stock).
+  try { if (window.JsBarcode) JsBarcode('#sku-barcode', String(r.sku), { format:'CODE128', displayValue:false, height:54, margin:0, width:2 }); } catch(e){}
 }
 function ordersUsingSku(sku){
   var n=0;
@@ -613,13 +635,43 @@ $('scanbtn').onclick=function(){ scanning ? stopScan() : startScan(); };
 $('scango').onclick=function(){ var v=$('scaninput').value.trim(); if(v){ resolveCode(v); $('scaninput').value=''; } };
 $('scaninput').addEventListener('keydown', function(e){ if(e.key==='Enter') $('scango').click(); });
 
+/* ── Stock In / Out mode — scanning a product barcode adjusts its on-hand ──── */
+var scanMode = 'lookup';   // 'lookup' | 'in' | 'out'
+function setScanMode(m){
+  scanMode = (scanMode === m) ? 'lookup' : m;   // tapping the active toggle returns to look-up
+  $('sm-in').classList.toggle('on', scanMode==='in');
+  $('sm-out').classList.toggle('on', scanMode==='out');
+  var bar=$('modebar'); bar.className = 'modebar' + (scanMode!=='lookup' ? ' '+scanMode : '');
+  bar.textContent = scanMode==='in' ? 'Scan a product barcode to ADD 1 to stock'
+                  : scanMode==='out' ? 'Scan a product barcode to REMOVE 1 from stock' : '';
+  if (scanning) $('scanhint').textContent = scanMode==='in' ? 'Scan to add stock (+1)' : scanMode==='out' ? 'Scan to remove stock (−1)' : 'Point at a barcode or QR code';
+}
+function adjustStock(sku, delta){
+  var r = INV.find(function(x){ return String(x.sku)===String(sku); });
+  if(!r){ toast('“'+sku+'” isn’t in inventory'); return; }
+  var cur=Number(r.in_stock)||0;
+  if (delta<0 && cur===0){ toast(r.sku+' is already at 0'); return; }
+  var next=Math.max(0, cur+delta);
+  r.in_stock = next;                       // optimistic local update
+  renderInv(); renderLow();
+  if (navigator.vibrate) navigator.vibrate(delta>0?60:[40,40]);
+  toast((delta>0?'+1 · ':'−1 · ')+(r.name||r.sku)+' → '+next+' on hand');
+  var html='<div class="row"><div class="body"><div class="ttl">'+(delta>0?'+1  ':'−1  ')+esc(r.name||r.sku)+'</div>'+
+    '<div class="sub"><span class="sku">'+esc(r.sku)+'</span> · now '+next+' on hand</div></div>'+
+    '<span class="badge '+(delta>0?'b-packed':'b-low')+'">'+(delta>0?'IN':'OUT')+'</span></div>';
+  var log=$('scanlog'); log.innerHTML = html + log.innerHTML;
+  api('/inventory', { method:'POST', body: INV }).then(function(res){
+    if(!res || !res.ok){ toast('Couldn’t save — will sync on refresh'); }
+  }).catch(function(){ toast('Offline — change not saved yet'); });
+}
+
 function onScan(val){
   var now=Date.now();
   if (val===lastHit && now-lastHitAt<2500) return;   // debounce same code
   lastHit=val; lastHitAt=now;
   if (navigator.vibrate) navigator.vibrate(60);
   $('scanhint').textContent='✓ '+val;
-  logScan(val);
+  if (scanMode==='lookup') logScan(val);   // In/Out modes log via adjustStock instead
   resolveCode(val);
 }
 function logScan(val){
@@ -646,7 +698,13 @@ function matchCode(val){
 function resolveCode(val){
   var r = matchCode(val);
   if (!r){ toast('No SKU or order matches "'+val+'"'); return; }
-  if (r.kind==='sku') openSku(r.row.sku); else openOrder(r.row.id);
+  if (r.kind==='sku'){
+    if (scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
+    if (scanMode==='out') { adjustStock(r.row.sku, -1); return; }
+    openSku(r.row.sku);
+  } else {
+    openOrder(r.row.id);   // orders have no stock — always just open them
+  }
 }
 
 /* ════════ shared bits ════════ */
