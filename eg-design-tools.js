@@ -10,6 +10,33 @@
   if (window.EGDesignTools) return;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // ── Per-line design key (mirrors the seller's assignDesignKeys/itemDK) ────────
+  // Two line items with the SAME sku must be independent — otherwise every state
+  // lookup (setup, design, threads, customer-file) keyed by sku resolves to the
+  // first match and editing one item silently edits the others. The key is the
+  // sku for the first occurrence, then sku#1, sku#2… for repeats — identical to
+  // the seller side, so seller + factory resolve the same line to the same art.
+  function itemDK(it) { return (it && it._dk) || (it && it.sku) || ''; }
+  function assignDesignKeys(items) {
+    if (!Array.isArray(items)) return items;
+    var seen = {};
+    items.forEach(function (it) {
+      if (!it) return;
+      var base = String(it.sku || '');
+      var n = seen[base] || 0;
+      it._dk = n === 0 ? base : base + '#' + n;
+      seen[base] = n + 1;
+    });
+    return items;
+  }
+  // Find a line item by its design key (falls back to raw-sku match for callers
+  // that still pass a plain sku, so nothing breaks mid-migration).
+  function findItemByKey(o, key) {
+    if (!o || !Array.isArray(o.items)) return null;
+    assignDesignKeys(o.items);
+    return o.items.find(function (i) { return itemDK(i) === key; }) || o.items.find(function (i) { return String(i.sku) === String(key); }) || null;
+  }
   function ctxQS(orderNum, sku) {
     var q = [];
     if (orderNum) q.push('order=' + encodeURIComponent(orderNum));
@@ -193,7 +220,7 @@
     var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders() || []) : [];
     for (var i = 0; i < orders.length; i++) {
       var x = orders[i];
-      if (String(x.num) === String(orderNum) || String(x.id) === String(orderNum)) return x;
+      if (String(x.num) === String(orderNum) || String(x.id) === String(orderNum)) { assignDesignKeys(x.items); return x; }
     }
     return null;
   }
@@ -220,7 +247,7 @@
   function designOverlaySrc(orderNum, it) {
     if (!it) return '';
     if (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) return it.designUrl;
-    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(orderNum, it.sku); if (r && /^(https?:|data:)/.test(String(r))) return r; } } catch (e) {}
+    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(orderNum, itemDK(it)); if (r && /^(https?:|data:)/.test(String(r))) return r; } } catch (e) {}
     if (it.file && String(it.file).indexOf('data:') === 0) return it.file;
     if (it.customerFile && /^(https?:|data:)/.test(String(it.customerFile))) return it.customerFile;
     if (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) return it.designSrc;
@@ -315,7 +342,7 @@
       if (!p) return;
       var o = findOrder(orderNum);
       if (!o || !Array.isArray(o.items)) return;
-      var it = o.items.find(function (i) { return String(i.sku) === String(sku); });
+      var it = findItemByKey(o, sku);
       if (!it) return;
       var price = productUnitPrice(p, it);
       if (price > 0) { it.price = price; it.unitPrice = price; }
@@ -329,7 +356,7 @@
     try {
       var o = findOrder(orderNum);
       if (o && Array.isArray(o.items)) {
-        var it = o.items.find(function (i) { return String(i.sku) === String(sku); });
+        var it = findItemByKey(o, sku);
         if (it) {
           it.printType = val; it.tech = val; if (EGStore.update) EGStore.update(o.id, { items: o.items });
           // Method add-on can change the unit price → re-sync the line item.
@@ -357,7 +384,7 @@
     try { var m = cfDismissed(); m[orderNum + '|' + sku] = 1; localStorage.setItem(CF_DISMISS_KEY, JSON.stringify(m)); } catch (e) {}
     refreshBoard();
     // Open the upload flow so they can drop in their own artwork right away.
-    var name = ''; try { var o = findOrder(orderNum); if (o && o.items) { var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (it) name = it.name || ''; } } catch (e) {}
+    var name = ''; try { var o = findOrder(orderNum); var it = findItemByKey(o, sku); if (it) name = it.name || ''; } catch (e) {}
     upload(orderNum, sku, name, '');
   }
   function isCustomerFileAdopted(orderNum, sku, url) {
@@ -395,10 +422,11 @@
     try {
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
       var p = chosenProduct(orderNum, sku);
-      if (!p) { var base = String(sku || '').split('-')[0]; p = prods.find(function (x) { return (Array.isArray(x.variantSkus) && x.variantSkus.some(function (v) { return v && v.sku === sku; })) || (x.sku && base && x.sku.toUpperCase() === base.toUpperCase()); }); }
+      var realSku = (it && it.sku) || sku;
+      if (!p) { var base = String(realSku || '').split('-')[0]; p = prods.find(function (x) { return (Array.isArray(x.variantSkus) && x.variantSkus.some(function (v) { return v && v.sku === realSku; })) || (x.sku && base && x.sku.toUpperCase() === base.toUpperCase()); }); }
       if (p && Array.isArray(p.variantSkus)) { var sc = {}, ss = {}; p.variantSkus.forEach(function (v) { if (!v) return; if (v.color && !sc[v.color]) { sc[v.color] = 1; colors.push(v.color); } if (v.size && !ss[v.size]) { ss[v.size] = 1; sizes.push(v.size); } }); }
     } catch (e) {}
-    var curC = (it && it.color) || _extractColor(sku), curS = (it && it.size) || _extractSize(sku);
+    var curC = (it && it.color) || _extractColor((it && it.sku) || sku), curS = (it && it.size) || _extractSize((it && it.sku) || sku);
     if (!colors.length) colors = _DEF_COLORS.slice();
     if (!sizes.length) sizes = _DEF_SIZES.slice();
     if (curC && colors.indexOf(curC) < 0) colors.unshift(curC);
@@ -408,7 +436,7 @@
   function onSetVariant(orderNum, sku, key, value) {
     try {
       var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
-      var it = o.items.find(function (i) { return String(i.sku) === String(sku); }); if (!it) return;
+      var it = findItemByKey(o, sku); if (!it) return;
       it[key] = value;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
     } catch (e) {}
@@ -421,7 +449,8 @@
       var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
       if (o.items.length <= 1) { alert('An order must have at least one item.'); return; }
       if (!window.confirm('Remove this item from the order?')) return;
-      o.items = o.items.filter(function (i) { return String(i.sku) !== String(sku); });
+      assignDesignKeys(o.items);
+      o.items = o.items.filter(function (i) { return itemDK(i) !== sku; });   // remove ONLY this line, not every same-sku line
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
     } catch (e) {}
     refreshBoard();
@@ -446,7 +475,8 @@
   function itemActions(o, it) {
     o = o || {}; it = it || {};
     var num = o.num || o.id || '';
-    var sku = it.sku || '';
+    assignDesignKeys(o.items);            // ensure every line has a stable _dk
+    var sku = itemDK(it);                  // the per-line key (sku, sku#1, …) — drives all state below
     var name = it.name || '';
     var tech = it.type || it.printType || it.tech || '';
     // Auto-darken Upload once a design is attached (raw design cached, an adopted
@@ -569,13 +599,14 @@
   // (picked, or its sku already maps to a catalog product), a print method, and a
   // design (uploaded / adopted / template / customer file).
   function itemSetupComplete(orderNum, o, it) {
-    var s = getItemSetup((o && o.num) || orderNum, it.sku) || {};
+    var dk = itemDK(it);
+    var s = getItemSetup((o && o.num) || orderNum, dk) || {};
     var hasProduct = !!s.product;
-    if (!hasProduct) { try { hasProduct = !!chosenProduct(orderNum, it.sku); } catch (e) {} }
+    if (!hasProduct) { try { hasProduct = !!chosenProduct(orderNum, dk); } catch (e) {} }
     if (!hasProduct) { try { var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : []; var base = String(it.sku || '').split('-')[0]; hasProduct = prods.some(function (p) { return (Array.isArray(p.variantSkus) && p.variantSkus.some(function (v) { return v && v.sku === it.sku; })) || (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()); }); } catch (e) {} }
     var hasMethod = !!(s.printType || it.printType || it.tech);
     var hasDesign = false;
-    try { hasDesign = !!(window.EGStore && EGStore.getRawDesign && o && EGStore.getRawDesign(o.id, it.sku)); } catch (e) {}
+    try { hasDesign = !!(window.EGStore && EGStore.getRawDesign && o && EGStore.getRawDesign(o.id, dk)); } catch (e) {}
     if (!hasDesign && (it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))))) hasDesign = true;
     var miss = [];
     if (!hasProduct) miss.push('product');
@@ -686,10 +717,10 @@
     try {
       var o = findOrder(ctx.orderNum);
       if (o && Array.isArray(o.items)) {
-        var it = o.items.find(function (i) { return String(i.sku) === String(ctx.sku); });
+        var it = findItemByKey(o, ctx.sku);
         if (it) {
           it.designSrc = 'template'; it.designTemplateId = t.id;
-          if (designImg) { it.designUrl = designImg; if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, it.sku, designImg); }
+          if (designImg) { it.designUrl = designImg; if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, ctx.sku, designImg); }
           var tech = _tplTechOf(t);
           if (tech) { it.printType = tech; it.tech = tech; setItemSetupField(ctx.orderNum, ctx.sku, 'printType', tech); }
           if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
@@ -709,7 +740,7 @@
   function _upCanvasSrc(url) { if (/^data:/i.test(String(url))) return url; if (/(^|\.)etsystatic\.com/i.test(String(url))) return '/api/etsy/img-proxy?url=' + encodeURIComponent(url); return url; }
   function uploadPanel(orderNum, sku, name, tech) {
     var o = findOrder(orderNum);
-    var it = o && Array.isArray(o.items) ? o.items.find(function (i) { return String(i.sku) === String(sku); }) : null;
+    var it = findItemByKey(o, sku);
     var initial = '';
     try { if (window.EGStore && EGStore.getRawDesign && o) { var r = EGStore.getRawDesign(o.id, sku); if (r) initial = r; } } catch (e) {}
     var custFile = it ? (it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? String(it.designSrc) : '')) : '';
@@ -832,7 +863,7 @@
   function _upSave() {
     var s = _up; if (!s || !s.src) return;
     try {
-      var o = findOrder(s.orderNum); var it = o && o.items && o.items.find(function (i) { return String(i.sku) === String(s.sku); });
+      var o = findOrder(s.orderNum); var it = findItemByKey(o, s.sku);
       if (o && window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(o.id, s.sku, s.src);
       if (it) { it.designUrl = s.src; if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); }
       if (o && window.EGStore && EGStore.getDesignCard && EGStore.pushToDesignBoard) { var card = EGStore.getDesignCard(o.id, s.sku); if (!card) EGStore.pushToDesignBoard({ orderNum: o.id, sku: s.sku, board: (s.tech || 'dtg').toLowerCase(), name: s.name, thumb: s.src, byRole: 'Factory' }); }
@@ -854,6 +885,7 @@
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,
+    assignDesignKeys: assignDesignKeys, itemDK: itemDK,
     PRINT_METHODS: PRINT_METHODS
   };
 })();

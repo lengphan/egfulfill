@@ -4235,13 +4235,15 @@ function whMergeLiveOrders() {
       continue;
     }
     const custName = (typeof o.customer === 'object') ? (o.customer.name || 'Customer') : (o.customer || 'Customer');
+    if (window.EGDesignTools && EGDesignTools.assignDesignKeys) EGDesignTools.assignDesignKeys(o.items);
     const itemList = (o.items || []).map((it, idx) => {
-      const composite = (typeof EGStore !== 'undefined' && EGStore.getCachedImage) ? EGStore.getCachedImage(o.id, it.sku) : null;
-      const rawDesign = (typeof EGStore !== 'undefined' && EGStore.getRawDesign)   ? EGStore.getRawDesign(o.id, it.sku)   : null;
+      const _dk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : (it.sku || '');
+      const composite = (typeof EGStore !== 'undefined' && EGStore.getCachedImage) ? EGStore.getCachedImage(o.id, _dk) : null;
+      const rawDesign = (typeof EGStore !== 'undefined' && EGStore.getRawDesign)   ? EGStore.getRawDesign(o.id, _dk)   : null;
       return {
         id: 'i' + (idx+1),
         name: it.name || 'Item',
-        sku: it.sku || '—',
+        sku: it.sku || '—', _dk: _dk,
         thumb: composite || null,
         file:  rawDesign || it.fileData || it.file || null,
         color: it.color || null,
@@ -6044,13 +6046,13 @@ function whRenderOrders() {
             const typePill = `<span style="font-size:11.25px;font-weight:700;background:${tBg};color:${tFg};border-radius:4px;padding:1px 7px">${tLbl}</span>`;
             // Clickable file link → opens shared preview popup. Composite-only legacy orders still get a link.
             let _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
-            if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, it.sku)) _custFile = '';
+            if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, (it._dk||it.sku))) _custFile = '';
             // EMB item with the buyer's artwork → auto-match thread colours (once).
-            if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, it.sku, it.printType, it.customerFile || it.designSrc);
+            if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, (it._dk||it.sku), it.printType, it.customerFile || it.designSrc);
             const _hasDesign = !!(it.file || it.thumb || _custFile);
             const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
             const fileLink = _custFile
-              ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, it.sku, _custFile) : `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`)
+              ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, (it._dk||it.sku), _custFile) : `<a href="${_custFile}" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>`)
               : (_hasDesign
                   ? (_fileIsFilename
                       ? `<a href="#" onclick="event.preventDefault();event.stopPropagation();whPreviewFile2('${o.num}',${ei})" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">${it.file}</a>`
@@ -6068,15 +6070,15 @@ function whRenderOrders() {
             // zoom modal (raw design when present, mockup otherwise).
             // Listing image first; once a base product is picked the chosen blank
             // takes over (design composite then overlays on top).
-            const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, it.sku) : '';
+            const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, (it._dk||it.sku)) : '';
             const _isNewSetup = !!(window.EGDesignTools && EGDesignTools.isNewOrder(o));
-            const _pickedBlank = (window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup(o.num, it.sku).product || '') : '';
+            const _pickedBlank = (window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup(o.num, (it._dk||it.sku)).product || '') : '';
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
               || (_isNewSetup ? '' : ((it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
             let _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(o.id, it) : '';
             if (!_designSrc) {
               _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
-              if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, it.sku); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
+              if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, (it._dk||it.sku)); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
               if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
             }
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
