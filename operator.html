@@ -5670,6 +5670,12 @@ function coRenderItems() {
     }
     // Rich catalog picker — same shape as the seller's noAddItem row.
     return `<div class="co-item-row" data-i="${i}" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 13px;background:#fafaf9">
+      <div style="display:flex;align-items:stretch;gap:10px">
+      <label class="co-img-zone" data-i="${i}" style="align-self:stretch;flex-shrink:0;width:84px;border:1.5px ${it.img?'solid #e5e4e0':'dashed #d8d5d0'};border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff${it.img?` url('${String(it.img).replace(/'/g,'%27')}') center/cover no-repeat`:''};color:#c4c3be;font-size:10px;line-height:1.2;text-align:center;overflow:hidden;transition:border-color .12s" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='${it.img?'#e5e4e0':'#d8d5d0'}'" ondrop="coDropImg(event,this,${i})" title="Drop or click to upload the product image">
+        <input type="file" accept="image/*" style="display:none" onchange="coPickImg(this.files&&this.files[0],this.closest('.co-img-zone'),${i})"/>
+        ${it.img?'':'<span>＋<br>Image</span>'}
+      </label>
+      <div style="flex:1;min-width:0">
       <div style="margin-bottom:7px">
         <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Product Title <span style="color:#c4c3be;font-weight:500;text-transform:none;letter-spacing:0">— what the customer ordered</span></label>
         <input class="co-title" type="text" value="${(it.title||'').replace(/"/g,'&quot;')}" oninput="_coItems[${i}].title=this.value" placeholder="e.g. Custom Embroidered Apron with Name, Personalized Kitchen Apron" style="${NO_IN}"/>
@@ -5714,9 +5720,36 @@ function coRenderItems() {
           </button>
         </div>
       </div>
+      </div>
+      </div>
       ${it.designFile ? `<div style="margin-top:7px;padding:6px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12px;color:#15803d;font-weight:600">✓ ${it.designFile}</div>` : ''}
     </div>`;
   }).join('');
+  // Square each image drop zone to its row height (aspect-ratio collapses in flex).
+  requestAnimationFrame(() => {
+    el.querySelectorAll('.co-img-zone').forEach(z => { const h = z.offsetHeight; if (h > 0) z.style.width = h + 'px'; });
+  });
+}
+// Product-image drop zone on each create-order item — read file → data URL,
+// preview it as the zone background, stash on _coItems[i].img (used at submit).
+function coPickImg(file, zone, i) {
+  if (!file || !/^image\//.test(file.type || '')) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    _coItems[i] = Object.assign(_coItems[i]||{}, { img: ev.target.result });
+    if (zone) {
+      zone.style.background = "#fff url('" + String(ev.target.result).replace(/'/g,'%27') + "') center/cover no-repeat";
+      zone.style.border = '1.5px solid #e5e4e0';
+      const ph = zone.querySelector('span'); if (ph) ph.remove();
+    }
+  };
+  reader.readAsDataURL(file);
+}
+function coDropImg(e, zone, i) {
+  e.preventDefault();
+  if (zone) zone.style.borderColor = '#d8d5d0';
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  coPickImg(file, zone, i);
 }
 function coSyncProduct(sel, idx) {
   const row = sel.closest('.co-item-row');
