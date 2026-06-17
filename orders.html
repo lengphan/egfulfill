@@ -1366,8 +1366,11 @@ function clearFilter(which) {
   renderOrders();
 }
 
-function pickDesign(ordNo, escSku, type) {
-  const key = ordNo+'_'+escSku;
+function pickDesign(ordNo, escSku, type, dk) {
+  // `dk` (per-line design key) disambiguates same-SKU lines. The order-detail
+  // modal passes it; the inline table row omits it (its escSku is unique enough
+  // there). Without dk every same-SKU line collapses to escSku → the first item.
+  const key = ordNo+'_'+(dk||escSku);
   ITEM_DESIGN_SEL[key] = ITEM_DESIGN_SEL[key] === type ? null : type;
   ['upload','template','lab'].forEach(t => {
     const el = document.getElementById('dsb-'+ordNo+'-'+escSku+'-'+t);
@@ -1379,7 +1382,9 @@ function pickDesign(ordNo, escSku, type) {
   });
   // Persist the new choice so it survives reloads (and clear any stale design-lab assignment if user switched away)
   const o = ORDERS.find(x => x.no === ordNo);
-  const item = o?.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
+  const item = dk
+    ? o?.itemsList.find(i => itemDK(i) === dk)
+    : o?.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (o && item) {
     const newSel = ITEM_DESIGN_SEL[key];
     if (newSel === 'template')      item.designSrc = 'template';
@@ -2341,9 +2346,9 @@ function openDetailModal(ordNo) {
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Upload artwork"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Upload artwork"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
       </div>`;
     // Per-item economics: ONE big line total at the top-right of the item
     // card. The Unit/Qty/Line breakdown strip below the dashed divider has
@@ -2549,7 +2554,10 @@ function odmSlideOpen(mode, ordNo, sku) {
   if (typeof closeUploadPanel === 'function') closeUploadPanel();
   if (typeof closeDTpl === 'function') closeDTpl();
   const o = ORDERS.find(x => x.no === ordNo); if (!o) return;
-  const item = o.itemsList.find(i => i.sku === sku); if (!item) return;
+  // `sku` is the per-line design key (itemDK), NOT the raw SKU — same-SKU lines
+  // would otherwise all resolve to the first item. Match on the dk; fall back to
+  // a raw-SKU match only if keys haven't been assigned yet.
+  const item = o.itemsList.find(i => itemDK(i) === sku) || o.itemsList.find(i => i.sku === sku); if (!item) return;
   window._odmSlideTarget = { mode, ordNo, sku };
   const productName = item.listing || item.name || sku;
   const titleMap = { upload:'Upload File', template:'Pick a Template', lab:'Open in Design Lab' };
@@ -2566,7 +2574,7 @@ function odmSlideClose() {
 function odmSlideRender() {
   const t = window._odmSlideTarget; if (!t) return;
   const o = ORDERS.find(x => x.no === t.ordNo); if (!o) return;
-  const item = o.itemsList.find(i => i.sku === t.sku); if (!item) return;
+  const item = o.itemsList.find(i => itemDK(i) === t.sku) || o.itemsList.find(i => i.sku === t.sku); if (!item) return;
   const body = document.getElementById('odm-slide-body');
   const footer = document.getElementById('odm-slide-footer');
   if (t.mode === 'upload') {
@@ -2638,7 +2646,7 @@ function odmSlideApplyTpl(tplId) {
   // round-tripping through the inline onclick="..." stringification.
   const tpl = _dtplLoad().find(x => String(x.id) === String(tplId)); if (!tpl) return;
   const o = ORDERS.find(x => x.no === t.ordNo); if (!o) return;
-  const item = o.itemsList.find(i => i.sku === t.sku); if (!item) return;
+  const item = o.itemsList.find(i => itemDK(i) === t.sku) || o.itemsList.find(i => i.sku === t.sku); if (!item) return;
   item.designSrc = 'template';
   item.designTemplateId = tpl.id;
   // Prefer the DESIGN-ONLY image so the artwork overlays the seller's own
