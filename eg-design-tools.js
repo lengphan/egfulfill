@@ -548,7 +548,7 @@
       // One unified box — Product · Color · Size · Method on a single line,
       // dot-separated, mirroring the seller-side variation pill. The selects are
       // borderless/transparent so they read as one continuous control.
-      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;max-width:160px';
+      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;max-width:160px;-webkit-appearance:none;-moz-appearance:none;appearance:none';
       var _dot = '<span style="color:#c4c3be;font-weight:700;padding:0 3px;flex-shrink:0">·</span>';
       pickers = '<div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:3px 10px;background:#fff;max-width:100%;overflow:hidden">'
         + '<select title="Base product" style="' + selIn + ';max-width:150px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
