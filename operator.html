@@ -7526,7 +7526,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             </div>
             <div style="display:flex;align-items:center;gap:10px;position:relative">
               <span id="xfom-badge" class="badge b-new" style="font-size:12.5px">New</span>
-              <button onclick="var m=document.getElementById('xfom-actions-menu');m.style.display=(m.style.display==='block'?'none':'block')" title="Actions" style="background:none;border:1px solid #e5e4e0;border-radius:7px;width:30px;height:28px;cursor:pointer;color:#374151;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background='none'">⋮</button>
+              <button id="xfom-actions-btn" onclick="xfomToggleActions(event)" title="Actions" style="background:none;border:1px solid #e5e4e0;border-radius:7px;width:30px;height:28px;cursor:pointer;color:#374151;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background='none'">⋮</button>
               <div id="xfom-actions-menu" style="display:none;position:absolute;top:38px;right:34px;width:230px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.22);z-index:40"></div>
               <button onclick="xfomClose()" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:25px;line-height:1;padding:0 4px">×</button>
             </div>
@@ -7988,6 +7988,26 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     xfomClose();
   };
   window.xfomClose = function(){ const m = document.getElementById('xfom-modal'); if (m) m.classList.add('modal-hidden'); window.__xfomOrderNum = null; };
+  // Toggle the ⋮ actions panel and close it on any click outside (the menu or the
+  // ⋮ button itself). Listener is registered once per open and torn down on close.
+  window.xfomToggleActions = function(ev){
+    if (ev && ev.stopPropagation) ev.stopPropagation();
+    const m = document.getElementById('xfom-actions-menu'); if (!m) return;
+    const btn = document.getElementById('xfom-actions-btn');
+    const open = m.style.display !== 'block';
+    m.style.display = open ? 'block' : 'none';
+    if (m._closer) { document.removeEventListener('mousedown', m._closer, true); m._closer = null; }
+    if (open) {
+      const onDoc = function(e){
+        if (m.contains(e.target)) return;            // inside the menu: let the action button run
+        if (btn && btn.contains(e.target)) return;   // the ⋮ toggle handles its own open/close
+        m.style.display = 'none';
+        document.removeEventListener('mousedown', onDoc, true); m._closer = null;
+      };
+      document.addEventListener('mousedown', onDoc, true);
+      m._closer = onDoc;
+    }
+  };
   window.xfomAddNote = function() {
     const inp = document.getElementById('xfom-note-in');
     const txt = (inp?.value || '').trim();
