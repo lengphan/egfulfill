@@ -570,7 +570,10 @@
       : '';
     // Upload/Templates/Design Maker now live as tabs inside the one Design panel,
     // so the row needs a single Design button — the ⋯ overflow menu is retired.
-    return '<div style="display:flex;gap:16px;flex-shrink:0;margin-left:auto;align-items:center;flex-wrap:wrap;justify-content:flex-end;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + delBtn + '</div>';
+    // Left-packed so the controls sit right after the (capped) product title — no
+    // margin-left:auto, which previously shoved the whole group to the far edge and
+    // left a big gap. The board row caps the title width so this stays close.
+    return '<div style="display:flex;gap:14px;flex-shrink:0;align-items:center;flex-wrap:wrap;justify-content:flex-start;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + delBtn + '</div>';
   }
 
   // Compact ⋯ overflow menu for an item's secondary actions (Templates, Design

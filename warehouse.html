@@ -6180,7 +6180,7 @@ function whRenderOrders() {
             const _fsEl = _orderDone ? '' : `<button class="eg-item-fs-el" data-item-key="${_itKey}" data-order="${o.num}" data-sku="${String(it.sku).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();whCycleItemStatus(this.dataset.order, this.dataset.sku)" style="${_fsStyle}">${_fsLabel}</button>`;
             return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;background:transparent;${sep}">
               ${thumb}
-              <div style="flex:1;min-width:0;margin-right:12px">
+              <div style="${_isNewSetup ? 'flex:0 1 auto;max-width:240px' : 'flex:1'};min-width:0;margin-right:16px">
                 <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
                 <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                   ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
