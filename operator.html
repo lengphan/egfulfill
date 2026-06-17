@@ -4572,7 +4572,10 @@ function opZoomProduct(orderNum, itemIdx) {
   // Same priority as the inline row thumbnail (opItemCompositeThumb's prodImg) so
   // the zoom shows EXACTLY the same image: picked base product → marketplace
   // listing image → catalog sku match → seller image → placeholder.
-  var _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, it.sku) : '';
+  // Key the chosen-blank lookup by the per-line design key (matches the row
+  // avatar) — using raw it.sku misses the blank on same-SKU lines, so the zoom
+  // fell back to the listing/design image with no blank underneath.
+  var _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, (it._dk || it.sku)) : '';
   var mockupSrc = (_picked && /^(https?:|data:)/.test(_picked) ? _picked : null)
     || (it.img && /^(https?:|data:)/.test(String(it.img)) ? it.img : null)
     || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null)

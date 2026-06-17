@@ -4838,7 +4838,7 @@ function admZoomThumb(src, orderNum, sku, name) {
   let _mockupSrc = src;
   let _designOverlay = '';
   if (_zit) {
-    const _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, _zit.sku) : '';
+    const _picked = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(orderNum, (_zit._dk || _zit.sku)) : '';
     if (_picked && /^(https?:|data:)/.test(_picked)) _mockupSrc = _picked;
     const _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(orderNum, _zit) : (_zit.designUrl || ((_zit.file && String(_zit.file).startsWith('data:')) ? _zit.file : ''));
     const _pos = _zit.designPos || { x:25, y:25, w:50, h:50 };
