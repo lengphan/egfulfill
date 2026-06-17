@@ -9097,7 +9097,7 @@ function udbCardHtml(c) {
   const overdue=c.due&&(new Date(c.due)-new Date())/86400000<0, soon=udbIsDueSoon(c.due)&&!overdue;
   const _t = _thumbFor(c);
   const thumb=_t
-    ?`<img class="kb-card-img" src="${_t}" alt="" onerror="this.style.display='none'">`
+    ?`<img class="kb-card-img" src="${_t}" alt="" draggable="false" onerror="this.style.display='none'">`
     :`<div class="kb-card-img-ph"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" opacity=".25"><rect width="28" height="28" rx="3" fill="#9ca3af"/><path d="M4 21l7-9 5 6 3-4L23 21H4z" fill="#fff"/><circle cx="19" cy="9" r="3" fill="#fff"/></svg></div>`;
   return `<div class="kb-card" data-id="${c.id}" draggable="true"
     ondragstart="udbDragStart(event,${c.id})"
