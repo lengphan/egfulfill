@@ -4548,8 +4548,10 @@ function whRenderOrders() {
             const _pickedProdImg = (window.EGDesignTools && EGDesignTools.setupProductImage) ? EGDesignTools.setupProductImage(o.num, (it._dk||it.sku)) : '';
             const _isNewSetup = !!(window.EGDesignTools && EGDesignTools.isNewOrder(o));
             const _pickedBlank = (window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup(o.num, (it._dk||it.sku)).product || '') : '';
+            const _custImg = (it.img && /^(https?:|data:)/.test(String(it.img))) ? it.img : '';
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
-              || (_isNewSetup ? '' : ((it.img && /^(https?:|data:)/.test(it.img) ? it.img : null) || ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
+              || _custImg
+              || (_isNewSetup ? '' : (((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
             let _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(o.id, it) : '';
             if (!_designSrc) {
               _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
@@ -4560,7 +4562,7 @@ function whRenderOrders() {
             const _overlay = _designSrc
               ? `<img src="${_designSrc}" style="position:absolute;left:${_pos.x}%;top:${_pos.y}%;width:${_pos.w}%;height:${_pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
               : '';
-            const thumb = (_isNewSetup && !_pickedProdImg)
+            const thumb = (_isNewSetup && !_pickedProdImg && !_custImg && !_designSrc)
               ? `<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d4c9a8;margin-right:10px;background:#fbf8ef"></div>`
               : `<div onclick="event.stopPropagation();admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="View product composite" style="position:relative;width:40px;height:40px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:${tBg};cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"><img src="${prodImg}" onerror="this.src='https://placehold.co/52x52/f0ede9/9ca3af?text=Item'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}</div>`;
             const _stock = whStockState(it.sku);
