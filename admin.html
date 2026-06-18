@@ -3202,7 +3202,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <button id="udb-view-toggle" class="btn btn-out" style="font-size:13px;padding:5px 12px" onclick="udbToggleView()"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="margin-right:4px;vertical-align:middle"><path d="M1.5 3h11M1.5 7h11M1.5 11h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>List</button>
         <button class="btn btn-out" style="font-size:13px;padding:5px 12px" onclick="udbOpenUpload()"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" style="margin-right:3px;vertical-align:middle"><path d="M6.5 1.5v7M4 4l2.5-2.5L9 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 9v1.5a1 1 0 001 1h8a1 1 0 001-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
         <button class="btn btn-dk" style="font-size:13px;padding:5px 12px" onclick="udbOpenNew()">+ New Card</button>
-        <div style="position:relative">
+        <div id="udb-board-menu-wrap" style="position:relative;display:none">
           <button id="udb-board-menu-btn" onclick="udbBoardMenu(event)" title="Board actions" class="btn btn-out" style="font-size:16px;padding:4px 9px;line-height:1">⋮</button>
           <div id="udb-board-menu" style="display:none;position:absolute;top:calc(100% + 5px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:9px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:5px;min-width:178px;z-index:60">
             <button onclick="udbClearBoard()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:#dc2626;padding:8px 10px;border-radius:6px;text-align:left" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Clear board…</button>
@@ -8554,6 +8554,9 @@ function udbDrop2(e,colId){
   udbRenderBoard();udbSave();
   if(oldCol!==colId && colId!=='approved') udbToast('Moved to '+udbStatLbl(colId));
 }
+// Clearing the shared board is ADMIN-only — the ⋮ menu is hidden for everyone else.
+function udbIsAdmin(){try{var u=JSON.parse(localStorage.getItem('eg_user')||'null');return !!(u&&u.role==='admin');}catch(e){return false;}}
+document.addEventListener('DOMContentLoaded',function(){if(udbIsAdmin()){var w=document.getElementById('udb-board-menu-wrap');if(w)w.style.display='';}});
 // Board-actions ⋮ menu (toolbar) — toggle + close on outside click.
 function udbBoardMenu(ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -8571,6 +8574,7 @@ function udbBoardMenu(ev){
 // staff data, so it clears the board for everyone; confirm first.
 function udbClearBoard(){
   var m=document.getElementById('udb-board-menu');if(m)m.style.display='none';
+  if(!udbIsAdmin()){alert('Only an admin can clear the board.');return;}
   if(!confirm('Remove ALL Design Board cards?\n\nThis clears the board for everyone and cannot be undone.'))return;
   try{UDB_CARDS.length=0;}catch(e){}
   try{localStorage.setItem('egfulfill_design_cards','[]');localStorage.setItem('egfulfill_design_cards_blob','{}');}catch(e){}

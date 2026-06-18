@@ -81,7 +81,7 @@ app.post('/api/auth/google', async (req, reply) => {
 // ── Data routes ──
 ordersRoutes(app, requireAuth);
 inventoryRoutes(app, requireStaff);
-designCardsRoutes(app, requireAuth, requireStaff);
+designCardsRoutes(app, requireAuth, requireStaff, requireAdmin);
 catalogRoutes(app, requireAuth, requireStaff);
 etsyRoutes(app, requireAuth, requireStaff);
 usersRoutes(app, requireAdmin);

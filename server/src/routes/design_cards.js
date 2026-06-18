@@ -4,7 +4,7 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 
-export function designCardsRoutes(app, requireAuth, requireStaff) {
+export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) {
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
     if (isStaff(req.user)) {
       const r = await q('select * from design_cards order by id');
@@ -52,10 +52,10 @@ export function designCardsRoutes(app, requireAuth, requireStaff) {
     return { ok: true, count: rows.length };
   });
 
-  // Wipe the whole Design Board (the "Clear board" action). Staff-only; the empty
-  // POST above intentionally can't do this (it skips the delete when sent []), so
-  // clearing needs its own explicit endpoint.
-  app.delete('/api/design_cards', { preHandler: requireStaff }, async () => {
+  // Wipe the whole Design Board (the "Clear board" action). ADMIN-only — it clears
+  // the shared board for everyone. The empty POST above intentionally can't do
+  // this (it skips the delete when sent []), so clearing needs its own endpoint.
+  app.delete('/api/design_cards', { preHandler: requireAdmin }, async () => {
     await q('delete from design_cards');
     return { ok: true };
   });
