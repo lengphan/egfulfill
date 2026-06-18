@@ -3202,6 +3202,12 @@ document.addEventListener('DOMContentLoaded', function(){
         <button id="udb-view-toggle" class="btn btn-out" style="font-size:13px;padding:5px 12px" onclick="udbToggleView()"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" style="margin-right:4px;vertical-align:middle"><path d="M1.5 3h11M1.5 7h11M1.5 11h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>List</button>
         <button class="btn btn-out" style="font-size:13px;padding:5px 12px" onclick="udbOpenUpload()"><svg width="12" height="12" viewBox="0 0 13 13" fill="none" style="margin-right:3px;vertical-align:middle"><path d="M6.5 1.5v7M4 4l2.5-2.5L9 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 9v1.5a1 1 0 001 1h8a1 1 0 001-1V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
         <button class="btn btn-dk" style="font-size:13px;padding:5px 12px" onclick="udbOpenNew()">+ New Card</button>
+        <div style="position:relative">
+          <button id="udb-board-menu-btn" onclick="udbBoardMenu(event)" title="Board actions" class="btn btn-out" style="font-size:16px;padding:4px 9px;line-height:1">⋮</button>
+          <div id="udb-board-menu" style="display:none;position:absolute;top:calc(100% + 5px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:9px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:5px;min-width:178px;z-index:60">
+            <button onclick="udbClearBoard()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;color:#dc2626;padding:8px 10px;border-radius:6px;text-align:left" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='none'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Clear board…</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="udb-view-board" style="display:flex;gap:12px;overflow-x:auto;min-height:280px;align-items:flex-start;padding-bottom:4px"></div>
@@ -8548,6 +8554,32 @@ function udbDrop2(e,colId){
   udbRenderBoard();udbSave();
   if(oldCol!==colId && colId!=='approved') udbToast('Moved to '+udbStatLbl(colId));
 }
+// Board-actions ⋮ menu (toolbar) — toggle + close on outside click.
+function udbBoardMenu(ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  var m=document.getElementById('udb-board-menu');if(!m)return;
+  var open=m.style.display!=='block';
+  m.style.display=open?'block':'none';
+  if(m._closer){document.removeEventListener('mousedown',m._closer,true);m._closer=null;}
+  if(open){
+    var btn=document.getElementById('udb-board-menu-btn');
+    var onDoc=function(e){if(m.contains(e.target))return;if(btn&&btn.contains(e.target))return;m.style.display='none';document.removeEventListener('mousedown',onDoc,true);m._closer=null;};
+    document.addEventListener('mousedown',onDoc,true);m._closer=onDoc;
+  }
+}
+// Wipe every card — local cache + the server (so they don't re-hydrate). Shared
+// staff data, so it clears the board for everyone; confirm first.
+function udbClearBoard(){
+  var m=document.getElementById('udb-board-menu');if(m)m.style.display='none';
+  if(!confirm('Remove ALL Design Board cards?\n\nThis clears the board for everyone and cannot be undone.'))return;
+  try{UDB_CARDS.length=0;}catch(e){}
+  try{localStorage.setItem('egfulfill_design_cards','[]');localStorage.setItem('egfulfill_design_cards_blob','{}');}catch(e){}
+  try{var tok=localStorage.getItem('eg_token');if(tok)fetch('/api/design_cards',{method:'DELETE',headers:{'Authorization':'Bearer '+tok}}).catch(function(){});}catch(e){}
+  try{if(typeof udbUpdateStats==='function')udbUpdateStats();}catch(e){}
+  try{udbRenderBoard();udbRenderList();}catch(e){}
+  if(typeof udbToast==='function')udbToast('Board cleared');
+}
+window.udbBoardMenu=udbBoardMenu;window.udbClearBoard=udbClearBoard;
 function udbRenderList(){const tbody=document.getElementById('udb-list-tbody');if(!tbody)return;tbody.innerHTML=udbGetFiltered().map(c=>{const _t=_thumbFor(c);return `<tr>${_t ? `<td style="padding:4px 8px;width:52px"><img src="${_t}" style="width:44px;height:44px;object-fit:cover;border-radius:7px;border:1px solid #e5e4e0;display:block" onerror="this.style.display='none'"></td>` : `<td style="padding:4px 8px;width:52px"><div style="width:44px;height:44px;border-radius:7px;background:#f0ede9;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" fill="none" stroke="#ccc" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div></td>`}<td><div style="font-size:13.5px;font-weight:600;color:#191918">${c.title}</div><div style="font-size:12.5px;color:#9ca3af">${c.product||''}</div></td><td><span style="font-family:monospace;font-size:13px">#${c.order||'—'}</span></td><td>${udbTypeBadge(c.type)}</td><td>${udbStatBadge(c.col)}</td><td>${c.assignee||'<span style="color:#9ca3af">Unassigned</span>'}</td><td>${udbFmtDue(c.due)}</td><td style="white-space:nowrap">${udbListBtns(c)}</td></tr>`;}).join('');}
 function udbListBtns(c){const open=`<button onclick="udbOpenCard(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;margin-right:4px">Open</button>`;if(c.col==='review')return open+`<button onclick="udbApprove(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:none;background:#16a34a;color:#fff;cursor:pointer;margin-right:4px">Approve</button><button onclick="udbReject(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #dc2626;background:#fff;color:#dc2626;cursor:pointer">Reject</button>`;return open+`<button onclick="udbAdminAssign(${c.id},prompt('Assign to:'))" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer">Assign</button>`;}
 function udbOpenCard(id){const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;const m=document.getElementById('udb-card-modal');if(!m)return;m.dataset.cardId=id;document.getElementById('ucm-title').textContent=c.title;document.getElementById('ucm-order').textContent='#'+(c.order||'—');document.getElementById('ucm-product').textContent=c.product||'';document.getElementById('ucm-type-badge').innerHTML=udbTypeBadge(c.type);document.getElementById('ucm-stat-badge').innerHTML=udbStatBadge(c.col);const priBadge=document.getElementById('ucm-pri-badge');if(priBadge)priBadge.style.display=c.priority==='high'?'':'none';const archBtn=document.getElementById('ucm-archive-btn');if(archBtn)archBtn.textContent=c.archived?'Unarchive':'Archive';const img=document.getElementById('ucm-ref-img'),ph=document.getElementById('ucm-ref-ph');{const _t=_thumbFor(c);if(_t){img.src=_t;img.style.display='block';if(ph)ph.style.display='none';}else{if(img)img.style.display='none';if(ph)ph.style.display='flex';}}const specsEl=document.getElementById('ucm-specs');if(specsEl)specsEl.innerHTML=Object.entries(c.specs||{}).length?Object.entries(c.specs).map(([k,v])=>`<div style="background:#f4f2ef;border-radius:7px;padding:7px 10px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${k}</div><input value="${String(v).replace(/"/g,'&quot;')}" onchange="udbUpdateSpec(${id},'${k}',this.value)" style="font-size:14px;font-weight:600;color:#191918;border:none;background:transparent;width:100%;outline:none;padding:0;font-family:inherit"></div>`).join(''):'<div style="color:#9ca3af;font-size:14px;padding:4px 0">No specs defined.</div>';udbRenderFiles(id);udbRenderActions(id);udbRenderHistoryList(id);m.classList.remove('modal-hidden');}

@@ -51,4 +51,12 @@ export function designCardsRoutes(app, requireAuth, requireStaff) {
     if (ids.length) await q('delete from design_cards where id <> all($1)', [ids]);
     return { ok: true, count: rows.length };
   });
+
+  // Wipe the whole Design Board (the "Clear board" action). Staff-only; the empty
+  // POST above intentionally can't do this (it skips the delete when sent []), so
+  // clearing needs its own explicit endpoint.
+  app.delete('/api/design_cards', { preHandler: requireStaff }, async () => {
+    await q('delete from design_cards');
+    return { ok: true };
+  });
 }
