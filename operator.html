@@ -9132,6 +9132,7 @@ function udbDrop2(e,colId){
   const dragIdx=UDB_CARDS.findIndex(c=>c.id===UDB_DRAG_ID);
   if(dragIdx<0){UDB_DRAG_ID=null;return;}
   const[dragCard]=UDB_CARDS.splice(dragIdx,1);
+  if(!Array.isArray(dragCard.history))dragCard.history=[];   // older/synced cards may lack it → unshift would throw and abort the drop
   const old=dragCard.col;
   dragCard.col=colId;
   if(UDB_DRAG_OVER_ID&&UDB_DRAG_OVER_ID!==UDB_DRAG_ID){

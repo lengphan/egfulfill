@@ -8519,6 +8519,7 @@ function udbDrop2(e,colId){
   const body=document.getElementById('udb-col-'+colId);if(body)body.classList.remove('drag-over');
   if(!UDB_DRAG_ID)return;
   const card=UDB_CARDS.find(c=>c.id===UDB_DRAG_ID);if(!card)return;
+  if(!Array.isArray(card.history))card.history=[];   // older/synced cards may lack it → unshift would throw and abort the drop
   const oldCol=card.col;
   const dragIdx=UDB_CARDS.indexOf(card);UDB_CARDS.splice(dragIdx,1);
   if(UDB_DRAG_OVER_ID){const refIdx=UDB_CARDS.findIndex(c=>c.id===UDB_DRAG_OVER_ID);const ins=UDB_DRAG_AFTER?refIdx+1:refIdx;UDB_CARDS.splice(ins,0,card);} else {UDB_CARDS.push(card);}
