@@ -546,7 +546,20 @@ function catLoadProducts(){
         from: typeof p.price === 'number' ? p.price : 0,
         sku:  p.sku,
         variantSkus: Array.isArray(p.variantSkus) ? p.variantSkus : [],
-        img:  p.img || '',
+        // Resolve a REAL product image — operator may have saved it under mockup /
+        // image / a per-color colorImages entry, not just `img`. Critically,
+        // getCatalogProducts() heals a missing image with a placehold.co stub, so
+        // `p.img` is always truthy; we must skip that stub and prefer a real image
+        // (this is exactly why the picker showed the "Gildan" text box while the
+        // factory, which has the real mockup, rendered the image).
+        img:  (function(){
+          var real = function(u){ return u && typeof u === 'string' && u.indexOf('placehold.co') === -1; };
+          if (real(p.mockup)) return p.mockup;
+          if (real(p.img))    return p.img;
+          if (real(p.image))  return p.image;
+          if (p.colorImages){ for (var k in p.colorImages){ if (real(p.colorImages[k])) return p.colorImages[k]; } }
+          return p.img || '';   // nothing real → fall back to the placeholder stub
+        })(),
         description: p.description || p.notes || ''
       };
     });
