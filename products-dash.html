@@ -554,11 +554,14 @@ function catLoadProducts(){
         // factory, which has the real mockup, rendered the image).
         img:  (function(){
           var real = function(u){ return u && typeof u === 'string' && u.indexOf('placehold.co') === -1; };
-          if (real(p.mockup)) return p.mockup;
-          if (real(p.img))    return p.img;
-          if (real(p.image))  return p.image;
+          // PRODUCT photos first — colour image → image → gallery → saved avatar.
+          // The mockup is the design-maker template, so it's only a LAST RESORT.
           if (p.colorImages){ for (var k in p.colorImages){ if (real(p.colorImages[k])) return p.colorImages[k]; } }
-          return p.img || '';   // nothing real → fall back to the placeholder stub
+          if (real(p.image)) return p.image;
+          if (Array.isArray(p.images)){ for (var i=0;i<p.images.length;i++){ if (real(p.images[i])) return p.images[i]; } }
+          if (real(p.img))    return p.img;
+          if (real(p.mockup)) return p.mockup;   // last resort so the row isn't blank
+          return p.img || '';   // nothing real → placeholder stub
         })(),
         description: p.description || p.notes || ''
       };

@@ -1307,11 +1307,17 @@ function npmCommit(status) {
   // staged image → mockup → front side mockup.
   const _hasImg = function(v){ return v && typeof v === 'string' && (v.startsWith('data:') || /^https?:/.test(v)) && v.indexOf('placehold.co') === -1; };
   const _firstRealCi = ciKeys.map(function(k){ return colorImages[k]; }).find(_hasImg);
+  const _extras = (typeof npmCollectExtras === 'function') ? (npmCollectExtras() || []) : [];
+  const _firstExtra = Array.isArray(_extras) ? _extras.find(_hasImg) : '';
+  // Catalog/display image = a real PRODUCT photo: main-colour image → first colour
+  // image → product gallery image. The MOCKUP is the design-maker template, so it's
+  // only a LAST RESORT (so the catalog isn't blank when no product photo exists yet).
   const avatar = (mainColor && _hasImg(colorImages[mainColor])) ? colorImages[mainColor]
                : (_firstRealCi
-                  || (_hasImg(img) ? img : '')
+                  || _firstExtra
                   || (_hasImg(_npmMockup) ? _npmMockup : '')
                   || (_npmSideMockups && _hasImg(_npmSideMockups.front) ? _npmSideMockups.front : '')
+                  || (_hasImg(img) ? img : '')
                   || '');
   const dpi = parseInt(document.getElementById('npm-dpi').value) || null;
   const printAreas = {};
