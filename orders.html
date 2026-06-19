@@ -2400,8 +2400,8 @@ function openDetailModal(ordNo) {
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
       </div>
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;row-gap:10px">
-        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:3px 11px;background:#fff;flex-shrink:0;${odmPillLocked?'opacity:.85':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap">
+        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 13px;background:#fff;flex-shrink:0;min-width:360px;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:150px">${blankOptsHtml}</select>
           <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
