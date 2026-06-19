@@ -4552,10 +4552,10 @@ function whRenderOrders() {
             const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
               || _custImg
               || (_isNewSetup ? '' : (((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
-            let _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(o.id, it) : '';
+            let _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc((o.num||o.id), it) : '';
             if (!_designSrc) {
               _designSrc = (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) ? it.designUrl : '';
-              if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign(o.id, (it._dk||it.sku)); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
+              if (!_designSrc) { try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) { const _rd = EGStore.getRawDesign((o.num||o.id), (it._dk||it.sku)); if (_rd && /^(https?:|data:)/.test(String(_rd))) _designSrc = _rd; } } catch(e){} }
               if (!_designSrc && it.file && String(it.file).startsWith('data:')) _designSrc = it.file;
             }
             const _pos = it.designPos || { x:25, y:25, w:50, h:50 };
