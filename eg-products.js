@@ -1299,8 +1299,20 @@ function npmCommit(status) {
   const fallback = name.split(' ')[0] || 'Item';
   const ciKeys = Object.keys(colorImages);
   const mainColor = (typeof npmGetMainColor === 'function') ? npmGetMainColor() : '';
-  const avatar = (mainColor && colorImages[mainColor]) ? colorImages[mainColor]
-               : (ciKeys.length ? colorImages[ciKeys[0]] : (img || _npmMockup || ''));
+  // Pick the product's display image, preferring a REAL uploaded image. A color
+  // slot can exist with an empty value (e.g. a variant colour defined but no image
+  // uploaded for it) — the old code blindly took colorImages[firstKey] even when
+  // it was '', so a real mockup upload was discarded and the product fell back to
+  // the placeholder. Now: main-colour image → first NON-EMPTY colour image →
+  // staged image → mockup → front side mockup.
+  const _hasImg = function(v){ return v && typeof v === 'string' && (v.startsWith('data:') || /^https?:/.test(v)) && v.indexOf('placehold.co') === -1; };
+  const _firstRealCi = ciKeys.map(function(k){ return colorImages[k]; }).find(_hasImg);
+  const avatar = (mainColor && _hasImg(colorImages[mainColor])) ? colorImages[mainColor]
+               : (_firstRealCi
+                  || (_hasImg(img) ? img : '')
+                  || (_hasImg(_npmMockup) ? _npmMockup : '')
+                  || (_npmSideMockups && _hasImg(_npmSideMockups.front) ? _npmSideMockups.front : '')
+                  || '');
   const dpi = parseInt(document.getElementById('npm-dpi').value) || null;
   const printAreas = {};
   Object.keys(_npmPaAreas).forEach(side => {
