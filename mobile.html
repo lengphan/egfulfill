@@ -137,6 +137,8 @@
   .modebar{font-size:13px;font-weight:700;text-align:center;padding:10px;border-radius:11px;margin-bottom:12px;display:none}
   .modebar.in{display:block;background:#e6f7ee;color:var(--green)}
   .modebar.out{display:block;background:#fdecea;color:var(--red)}
+  .scanmode-ov{margin-bottom:10px}
+  .scanmode-ov .sm{padding:11px 8px;font-size:14px;border-radius:12px}
   /* Order-sheet item card + per-item Start button */
   .oitem{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:11px 12px;margin-bottom:10px;box-shadow:var(--shadow)}
   .oitem .item{background:none;border:none;border-radius:0;padding:0;margin:0;box-shadow:none}
@@ -237,15 +239,6 @@
   <main>
     <!-- INVENTORY -->
     <section class="view on" id="v-inv">
-      <button class="scan-cta" onclick="startScanFor('inventory')">
-        <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
-        Scan barcode
-      </button>
-      <div class="scanmode">
-        <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> Stock In</button>
-        <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Stock Out</button>
-      </div>
-      <div class="modebar" id="modebar"></div>
       <div class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="inv-q" placeholder="Search SKU or name" autocomplete="off" enterkeyhint="search">
@@ -257,10 +250,6 @@
 
     <!-- ORDERS -->
     <section class="view" id="v-ord">
-      <button class="scan-cta" onclick="startScanFor('orders')">
-        <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
-        Scan order QR
-      </button>
       <div class="search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="ord-q" placeholder="Search order #, customer, tracking" autocomplete="off" enterkeyhint="search">
@@ -277,6 +266,10 @@
       <svg viewBox="0 0 16 16"><path d="M7.32 1.6a1.5 1.5 0 011.36 0l4.5 2.25L8 6.55 2.82 3.85l4.5-2.25z"/><path d="M1.7 5.1L7.3 8v6.2l-5.04-2.52a1 1 0 01-.56-.9V5.1z"/><path d="M14.3 5.1v5.68a1 1 0 01-.56.9L8.7 14.2V8L14.3 5.1z"/></svg>
       Inventory
     </button>
+    <button data-tab="scan">
+      <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
+      Scan
+    </button>
     <button data-tab="ord">
       <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>
       Orders
@@ -291,6 +284,11 @@
   <button class="scan-close" onclick="stopScan()" aria-label="Close scanner">✕</button>
   <div class="scanhint" id="scanhint">Point at the QR / barcode</div>
   <div class="scan-bottom">
+    <div class="scanmode scanmode-ov">
+      <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> Stock In</button>
+      <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Stock Out</button>
+    </div>
+    <div class="modebar" id="modebar"></div>
     <div class="scanlog" id="scanlog"></div>
     <div class="scan-manual">
       <input id="scaninput" placeholder="…or type SKU / order #" autocomplete="off" autocapitalize="characters" enterkeyhint="search">
@@ -399,8 +397,13 @@ function loadAll(quiet){
 }
 
 /* ════════ TABS ════════ */
+var lastTab = 'inv';   // remembers the real view to return to when the scanner closes
+function navHighlight(tab){ document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===tab); }); }
 function go(tab){
-  document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===tab); });
+  // The Scan tab has no page — tapping it opens the live camera straight away.
+  if (tab === 'scan'){ navHighlight('scan'); startScan(); return; }
+  lastTab = tab;
+  navHighlight(tab);
   document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
   var v=$('v-'+tab); if(v) v.classList.add('on');
   $('app').querySelector('main').scrollTop=0;
@@ -628,9 +631,9 @@ var scanStream=null, scanRAF=null, detector=null, scanning=false, lastHit='', la
 var zxingReader=null, zxingControls=null, _zxingP=null;
 function supportsBarcode(){ return ('BarcodeDetector' in window); }
 
-var scanContext = 'inventory';   // 'inventory' (In/Out + lookup) | 'orders' (lookup only)
-function startScanFor(ctx){
-  scanContext = ctx || 'inventory';
+// One unified scanner for everything — matchCode() figures out SKU vs order vs
+// tracking. The In/Out mode only affects what a SKU scan does (adjust vs look-up).
+function startScan(){
   $('scanlog').innerHTML = '';
   $('scan-ov').classList.add('on');
   _setScanHint();
@@ -638,9 +641,11 @@ function startScanFor(ctx){
   if (supportsBarcode()) startNativeScan();
   else startZxingScan();
 }
+function startScanFor(){ startScan(); }   // back-compat shim
 function _setScanHint(){
-  $('scanhint').textContent = scanContext==='orders' ? 'Point at an order QR code'
-    : (scanMode==='in' ? 'Scan to add stock (+1)' : scanMode==='out' ? 'Scan to remove stock (−1)' : 'Point at the barcode / QR');
+  $('scanhint').textContent = scanMode==='in' ? 'Scan a barcode to add stock (+1)'
+    : scanMode==='out' ? 'Scan a barcode to remove stock (−1)'
+    : 'Point at any barcode or order QR';
 }
 
 // Android / Chromium — native BarcodeDetector over our own camera stream.
@@ -699,6 +704,8 @@ function stopScan(){
   detector=null;
   var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
   $('scan-ov').classList.remove('on');
+  // The Scan tab has no page of its own — drop back to whatever was open before.
+  go(lastTab || 'inv');
 }
 $('scango').onclick=function(){ var v=$('scaninput').value.trim(); if(v){ resolveCode(v); $('scaninput').value=''; } };
 $('scaninput').addEventListener('keydown', function(e){ if(e.key==='Enter') $('scango').click(); });
@@ -772,9 +779,10 @@ function resolveCode(val){
   var r = matchCode(val);
   if (!r){ toast('No SKU or order matches "'+val+'"'); return; }
   if (r.kind==='sku'){
-    // In/Out only apply to inventory scanning — they adjust stock and KEEP scanning.
-    if (scanContext==='inventory' && scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
-    if (scanContext==='inventory' && scanMode==='out') { adjustStock(r.row.sku, -1); return; }
+    // In/Out mode adjusts stock and KEEPS scanning (rapid stock counts);
+    // Lookup mode opens the item sheet.
+    if (scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
+    if (scanMode==='out') { adjustStock(r.row.sku, -1); return; }
     stopScan(); openSku(r.row.sku);   // look-up → close camera, open the sheet
   } else {
     stopScan(); openOrder(r.row.id);
