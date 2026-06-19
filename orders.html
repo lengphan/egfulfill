@@ -2341,13 +2341,24 @@ function openDetailModal(ordNo) {
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
     const odmBtnStyle = 'display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:7px;font-size:11.5px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;white-space:nowrap;text-decoration:none;flex-shrink:0';
+    // Dark "Uploaded" state once a design is attached (uploaded here OR adopted
+    // from a customer file / chosen outside) — mirrors the factory side.
+    const _designAttached = !!(
+      (UP_STATE[o.no] && UP_STATE[o.no][itemDK(item)] && UP_STATE[o.no][itemDK(item)].dataUrl) ||
+      (item.designUrl && /^(https?:|data:)/.test(String(item.designUrl))) ||
+      item.customerFile || (item.designSrc && /^https?:\/\//i.test(String(item.designSrc)))
+    );
+    const odmUploadStyle = _designAttached
+      ? odmBtnStyle.replace('border:1.5px solid #e5e4e0;background:#fff;color:#374151', 'border:1.5px solid #191918;background:#191918;color:#fff')
+      : odmBtnStyle;
+    const odmUploadHover = _designAttached ? '' : ' onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#374151\'"';
     // Always show the design action trio — once an order is in production, the
     // buttons stay visible but greyed (opacity + pointer-events:none) so the UI
     // doesn't suddenly mutate into a different layout. Same shape as setup.
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Upload artwork"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Upload</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload artwork'}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>${_designAttached ? 'Uploaded' : 'Upload'}</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
       </div>`;
@@ -2402,13 +2413,13 @@ function openDetailModal(ordNo) {
       </div>
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap">
-        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 13px;background:#fff;flex-shrink:0;min-width:360px;${odmPillLocked?'opacity:.85':''}">
+        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 15px;background:#fff;flex-shrink:0;min-width:410px;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:150px">${blankOptsHtml}</select>
-          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <span style="color:#c4c3be;font-weight:700;padding:0 9px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
-          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <span style="color:#c4c3be;font-weight:700;padding:0 9px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:74px">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
-          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <span style="color:#c4c3be;font-weight:700;padding:0 9px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">
             <option value="DTG"${item.tech==='DTG'?' selected':''}>DTG</option>
             <option value="DTF"${item.tech==='DTF'?' selected':''}>DTF</option>
@@ -2419,9 +2430,9 @@ function openDetailModal(ordNo) {
         </div>
         <div style="display:inline-flex;align-items:center;gap:8px;flex-shrink:0">
           <div style="display:inline-flex;align-items:center;gap:5px">
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">−</button>
+            <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">−</button>
             <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:20px;text-align:center">${item.qty || 1}</span>
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:24px;height:24px;border:1px solid #e5e4e0;border-radius:5px;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">+</button>
+            <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:24px;height:24px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">+</button>
           </div>
           ${designActions}
         </div>
@@ -2526,9 +2537,9 @@ function openDetailModal(ordNo) {
   if (_giftEl) {
     const _isGift = !!(_meta.isGift || _meta.gift);
     _giftEl.innerHTML = `
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px">
-        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:14px;height:14px;accent-color:#191918;cursor:pointer;flex-shrink:0"/>
-        <span style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">This is a gift</span>
+      <label style="${LBL};display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:12px;height:12px;accent-color:#191918;cursor:pointer;flex-shrink:0;margin:0"/>
+        This is a gift
       </label>
       <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift message…" style="${FLD}"/>`;
   }
@@ -2537,6 +2548,9 @@ function openDetailModal(ordNo) {
   const btn = document.getElementById('odm-action-btn');
   btn.style.display = needsSetup ? 'inline-flex' : 'none';
   btn.onclick = () => { closeDetailModal(); pushOrderToProduction(o.no, btn); };
+  // Cancel — only while the order is still NEW (not yet pushed to production).
+  const _cancelBtn = document.getElementById('odm-cancel-btn');
+  if (_cancelBtn) _cancelBtn.style.display = (o.status === 'new') ? 'inline-flex' : 'none';
 
   document.getElementById('order-detail-modal').classList.remove('modal-hidden');
 }
@@ -2545,6 +2559,19 @@ function closeDetailModal() {
   // Also collapse the slide panel so reopening starts clean
   odmSlideClose();
 }
+// Seller-side cancel — ONLY for orders still 'new' (not pushed to production).
+// Sets status + factoryStatus to cancelled; EGStore.update PATCHes the server so
+// it reflects on the factory boards too.
+function odmCancelOrder(){
+  const o = window._odmCurrentOrder; if (!o) return;
+  if (o.status !== 'new') { alert('Only orders that haven\'t been pushed to production can be cancelled here.'); return; }
+  if (!confirm('Cancel order #' + (o.id || o.no) + '? This can\'t be undone.')) return;
+  o.status = 'cancelled';
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { factoryStatus: 'cancelled', status: 'cancelled' }); } catch(e){}
+  closeDetailModal();
+  if (typeof renderOrders === 'function') renderOrders();
+}
+window.odmCancelOrder = odmCancelOrder;
 
 /* ───────── Inline slide-in action panel (Upload / Templates / Design Lab) ─────────
    When the seller clicks one of the per-item action buttons we slide a panel in
@@ -7491,7 +7518,7 @@ function confirmImport() {
         <div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <div style="font-size:11.5px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.07em">Items</div>
-            <button id="odm-add-item-btn" class="btn btn-out" style="font-size:12.5px;padding:3px 12px" onclick="odmAddItem()">+ Add Item</button>
+            <button id="odm-add-item-btn" style="font-size:12.5px;padding:3px 4px;background:transparent;border:none;color:#191918;font-weight:600;cursor:pointer;font-family:inherit" onclick="odmAddItem()">+ Add Item</button>
             <button id="odm-escalate-btn" class="btn btn-out" style="font-size:12.5px;padding:3px 12px;color:#b45309;border-color:#fde68a;background:#fffbeb;display:none" onclick="odmEscalateForEdits()">⚑ Escalate for edits</button>
           </div>
           <div id="odm-items" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -7518,6 +7545,7 @@ function confirmImport() {
     <!-- Footer -->
     <div style="padding:12px 22px;border-top:1px solid #f3f3f1;display:flex;align-items:center;gap:8px;flex-shrink:0">
       <button onclick="closeDetailModal()" class="btn btn-out" style="font-size:14px">Close</button>
+      <button id="odm-cancel-btn" onclick="odmCancelOrder()" style="font-size:14px;padding:8px 14px;background:transparent;border:1px solid #fecaca;color:#dc2626;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;display:none">Cancel order</button>
       <div style="margin-left:auto;display:flex;gap:8px">
         <button id="odm-action-btn" class="btn btn-dk" style="font-size:14px;padding:8px 18px;display:none;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Push to Production</button>
       </div>

@@ -11099,6 +11099,8 @@ function whPrintLabel(num) {
       if (preScan) html += '<button class="btn btn-out" onclick="xfomSendToScan()">Send to Scan</button>';
       if (!preScan && !onBO && !onRepl) html += '<button class="btn btn-out" onclick="xfomReplacement()">↻ Replacement</button>';
       html += '<button class="btn btn-out" onclick="xfomBackorder()"' + (onBO ? ' style="background:#fef3c7;color:#92400e;border-color:#fde68a"' : '') + '>' + (onBO ? '✓ Backorder' : 'Send to Backorder') + '</button>';
+      const _isTerm = cur === 'cancelled' || cur === 'refunded';
+      html += '<button class="btn btn-out" onclick="xfomCancel()"' + (_isTerm ? ' disabled style="opacity:.45;cursor:not-allowed"' : '') + '>Mark Cancelled</button>';
     }
     html += '<button class="btn btn-out" style="color:#dc2626;border-color:#fecaca" onclick="xfomFlag()">⚑ Flag</button>';
     var _menu = document.getElementById('xfom-actions-menu');
@@ -11108,6 +11110,23 @@ function whPrintLabel(num) {
   window.xfomChat = function(){ if (typeof xOrderChatOpen === 'function' && _xfomNum) xOrderChatOpen(_xfomNum); else alert('Open chat with seller for #' + _xfomNum); };
   window.xfomPushToBoard = function(){ if (typeof opSendToDesignStudio === 'function' && _xfomNum) opSendToDesignStudio(_xfomNum); else alert('Push #' + _xfomNum + ' to design board'); };
   window.xfomFlag = function(){ if (typeof openFlagModal === 'function' && _xfomNum) openFlagModal(_xfomNum); else alert('Flag #' + _xfomNum); };
+  // Terminal status (cancelled/refunded): set factoryStatus + status so seller AND
+  // all factory boards converge via /api/orders hydrate, and clear each item's
+  // "working" flag so nothing lingers as in-production.
+  function whTerminateOrder(num, o, status){
+    try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(num, { factoryStatus: status, status: status }); } catch(e){}
+    try { if (typeof EGStore !== 'undefined' && EGStore.setItemFactoryStatus && o && Array.isArray(o.itemList)) { o.itemList.forEach(function(it){ if (it && it.sku) EGStore.setItemFactoryStatus(num, it.sku, ''); }); } } catch(e){}
+  }
+  window.xfomCancel = function(){
+    if (!_xfomNum) return;
+    const o = _xfomFindOrder(_xfomNum); if (!o) return;
+    if (o.status === 'cancelled' || o.status === 'refunded') { alert('Order is already ' + o.status + '.'); return; }
+    if (!confirm('Mark order ' + _xfomNum + ' as Cancelled? Production will halt and the seller will be notified.')) return;
+    o.status = 'cancelled'; o.cancelledAt = Date.now();
+    whTerminateOrder(_xfomNum, o, 'cancelled');
+    if (typeof whRenderOrders === 'function') whRenderOrders();
+    xfomClose();
+  };
   /* Warehouse-only intercepts. Both toggle the order status + sync via EGStore
      so admin/operator/seller boards pick the change up on the next poll. */
   window.xfomHold = function(){
