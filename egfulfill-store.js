@@ -3167,7 +3167,15 @@
         html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#191918;color:#fff;border-radius:10px;margin:10px 12px">'
           + '<span style="font-size:13px;font-weight:600">'+selCount+' selected</span>'
           + '<button onclick="EGInventory.printLabels()" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;font-family:inherit;background:#fff;color:#191918;border:none;border-radius:7px;padding:5px 12px;cursor:pointer"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 6V2h8v4M4 11h8v3H4zM2 6h12v5H2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Print SKU Labels</button>'
+          + '<button onclick="EGInventory.deleteSelected()" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;font-family:inherit;background:#dc2626;color:#fff;border:none;border-radius:7px;padding:5px 12px;cursor:pointer"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>'
           + '<button onclick="EGInventory.selClear()" style="font-size:12.5px;font-weight:600;font-family:inherit;background:transparent;color:#d1d5db;border:none;cursor:pointer;margin-left:auto">Clear</button>'
+          + '</div>';
+      }
+      // Always-visible bulk actions: select-all toggle + Remove all (whole list).
+      if (allSkus.length){
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 16px 0">'
+          + '<button onclick="EGInventory.selAll(true)" style="font-size:12px;font-weight:600;font-family:inherit;background:transparent;color:#6b7280;border:none;cursor:pointer;padding:2px 0">Select all</button>'
+          + '<button onclick="EGInventory.removeAll()" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;font-family:inherit;background:transparent;color:#dc2626;border:1px solid #f0c8c8;border-radius:7px;padding:4px 11px;cursor:pointer"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Remove all</button>'
           + '</div>';
       }
       html += '<div style="display:grid;grid-template-columns:'+COL+';gap:10px;padding:9px 16px;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #e5e4e0">'
@@ -3248,6 +3256,35 @@
     },
     // Print SKU labels (bulk for the selection, or a single SKU). Opens a modal
     // preview at the recommended size with a Print button.
+    // Bulk-delete inventory rows. Without args, deletes the current selection.
+    // Removes locally (the eg_inventory collection push then syncs the survivors)
+    // AND fires an explicit per-SKU server delete — that covers the "delete every
+    // row" case, where the collection push skips an empty array.
+    deleteSelected: function(skus){
+      if(!(window.EGStore && EGStore.getInventory)) return;
+      var want = (skus && skus.length) ? skus : Object.keys(this._sel);
+      if(!want.length){ return; }
+      if(!window.confirm('Delete ' + want.length + ' inventory item' + (want.length===1?'':'s') + '? This cannot be undone.')) return;
+      var keep = (EGStore.getInventory()||[]).filter(function(r){ return want.indexOf(r.sku) === -1; });
+      EGStore.setInventory(keep);
+      try {
+        var tok = localStorage.getItem('eg_token');
+        if (tok) {
+          var base = (window.EGAuth && window.EGAuth.API_BASE) || '';
+          want.forEach(function(sku){
+            fetch(base + '/api/inventory/' + encodeURIComponent(sku), { method:'DELETE', headers:{ 'Authorization':'Bearer ' + tok } }).catch(function(){});
+          });
+        }
+      } catch(e) {}
+      var self = this; want.forEach(function(s){ delete self._sel[s]; });
+      this._rerender();
+    },
+    // Wipe the whole inventory list (every SKU).
+    removeAll: function(){
+      var all = this._allSkus();
+      if(!all.length){ return; }
+      this.deleteSelected(all);
+    },
     printLabels: function(skus){
       if(!(window.EGStore && EGStore.getInventory)) return;
       var rows = EGStore.getInventory() || [];
