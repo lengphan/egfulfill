@@ -1116,21 +1116,22 @@ function renderOrders(ordersOverride) {
       const pillHaloShadow = needsPick ? ';box-shadow:0 0 0 3px rgba(201,195,186,.18)' : '';
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
-        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 286px 112px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 380px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
             <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.listing||item.name}">${item.listing||item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></div>
             <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${item.sku}</div>
           </div>
-          <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:286px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
-            <div style="flex:0 0 140px;width:140px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${autoBlank?'':'<option value="">Select blank…</option>'}${blankOpts}</select></div>
+          <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:380px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
+            <div style="flex:0 0 128px;width:128px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${autoBlank?'':'<option value="">Select blank…</option>'}${blankOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 64px;width:64px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
+            <div style="flex:0 0 60px;width:60px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 48px;width:48px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
+            <div style="flex:0 0 44px;width:44px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
+            ${variantDivider}
+            <div style="flex:0 0 92px;width:92px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type…</option>${printOpts}</select></div>
           </div>
-          <select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value)" title="Print method" style="${printPillStyle};${lockStyle};width:112px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='#e5e4e0'"><option value="">Select print…</option>${printOpts}</select>
           <span></span>
           <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:248px">${designBtns()}</div>
           <span></span>
@@ -3437,6 +3438,21 @@ function odmSetBlank(idx, productId) {
     item.blank = p.name || '';
     if (!item.listing) item.name = p.name || item.name;
     if (p.skuBase && (/^NEW-/i.test(String(item.sku || '')) || !item.sku || item.sku === '—')) item.sku = p.skuBase;
+    // Pull the chosen blank's real product image (color-specific if available) so
+    // the item thumbnail shows the blank — picking a blank alone used to leave it
+    // empty (only a later color change set item.img). Same resolution as create-order.
+    try {
+      const fullProduct = (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts)
+        ? EGStore.getCatalogProducts().find(x => String(x.id) === String(productId)) : null;
+      if (fullProduct) {
+        const _col = item.color || '';
+        let _img = '';
+        if (_col && fullProduct.colorImages && fullProduct.colorImages[_col]) _img = fullProduct.colorImages[_col];
+        else if (fullProduct.mainColor && fullProduct.colorImages && fullProduct.colorImages[fullProduct.mainColor]) _img = fullProduct.colorImages[fullProduct.mainColor];
+        else _img = fullProduct.mockup || fullProduct.img || '';
+        if (_img) item.img = _img;
+      }
+    } catch (e) {}
   } else {
     item.blank = '';
   }
