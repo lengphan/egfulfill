@@ -544,10 +544,7 @@ function openOrder(id){
   $('sh-s').textContent = '';
   $('sh-status').innerHTML = statusBadge(st);
   var addr = fmtAddr(o);
-  var startable = isStartable(st);
-  var startBtn = startable
-    ? '<button class="item-start go" data-oid="'+esc(String(o.id))+'" onclick="startOrder(this.dataset.oid)">▶ Start production</button>'
-    : '<div class="item-start state">'+statusLabel(st)+'</div>';
+  var oShipped = ['shipped','delivered','fulfilled'].indexOf(st)>=0;
   var items = (o.items||[]).map(function(i){
     // Composite = the design overlaid on the blank product (same idea as the boards).
     var blank = (i.img && /^(https?:|data:)/.test(String(i.img))) ? i.img : '';
@@ -560,10 +557,22 @@ function openOrder(id){
       '</div>';
     } else { thumb = '<div class="ph">no img</div>'; }
     var meta = [i.color,i.size,i.variant,i.print_type||i.tech].filter(Boolean).map(esc).join(' · ');
+    // Per-item production control: Working flag lives on each item, not the order.
+    var ifs = String(i.factory_status||i.factoryStatus||'').toLowerCase();
+    var perItem = oShipped
+      ? '<div class="item-start state">✓ Shipped</div>'
+      : (ifs==='working'
+          ? '<div class="item-start state">● Working</div>'
+          : '<button class="item-start go" data-oid="'+esc(String(o.id))+'" data-sku="'+esc(String(i.sku||''))+'" onclick="startItem(this.dataset.oid,this.dataset.sku)">▶ Start</button>');
     return '<div class="oitem"><div class="item">'+thumb+'<div class="ib"><div class="n">'+esc(i.name||i.sku||'Item')+'</div>'+
       '<div class="m">'+(i.sku?'<span class="sku">'+esc(i.sku)+'</span>':'')+(meta?(i.sku?' · ':'')+meta:'')+'</div></div>'+
-      '<div class="q">×'+(Number(i.qty)||1)+'</div></div>'+startBtn+'</div>';
+      '<div class="q">×'+(Number(i.qty)||1)+'</div></div>'+perItem+'</div>';
   }).join('');
+  // Once EVERY item is working, the whole order can ship.
+  var allWorking = (o.items||[]).length>0 && (o.items||[]).every(function(i){ return String(i.factory_status||i.factoryStatus||'').toLowerCase()==='working'; });
+  var shipBtn = (allWorking && !oShipped)
+    ? '<button class="item-start go" data-oid="'+esc(String(o.id))+'" style="margin-top:16px;background:var(--green)" onclick="markShipped(this.dataset.oid)">✓ Mark order shipped</button>'
+    : '';
   $('sh-body').innerHTML =
     '<div class="seclabel" style="margin-top:0">Name &amp; address</div>'+
     '<div class="card" style="padding:13px;font-size:14px;line-height:1.55">'+(addr || '<span style="color:var(--mut)">No address on file</span>')+'</div>'+
@@ -573,8 +582,30 @@ function openOrder(id){
       (o.tracking?kv('Tracking', esc(o.tracking)):'')+
       (o.delivery?kv('Delivery', esc(o.delivery)):'')+
     '</div>'+
-    '<div class="seclabel">Items ('+ordItemsCount(o)+')</div>'+ (items||'<div class="empty" style="padding:20px">No line items</div>');
+    '<div class="seclabel">Items ('+ordItemsCount(o)+')</div>'+ (items||'<div class="empty" style="padding:20px">No line items</div>') + shipBtn;
   openSheet();
+}
+// Mark ONE item as being worked. The order itself stays on the real pipeline
+// (advances to Printing on the first item), never "working". Persisted per item
+// so every board sees it.
+function startItem(orderId, sku){
+  var o = ORD.find(function(x){ return String(x.id)===String(orderId); }); if(!o) return;
+  (o.items||[]).forEach(function(i){ if(String(i.sku)===String(sku)){ i.factory_status='working'; } });
+  var st = String(o.factory_status||o.status||'').toLowerCase();
+  if (['shipped','delivered','fulfilled','cancelled','refunded','printing'].indexOf(st)<0){ o.factory_status='printing'; o.status='printing'; }
+  if (navigator.vibrate) navigator.vibrate(40);
+  api('/orders/'+encodeURIComponent(orderId)+'/item-status', { method:'POST', body:{ sku:sku, status:'working' } }).catch(function(){});
+  api('/orders/'+encodeURIComponent(orderId), { method:'PATCH', body:{ factoryStatus:o.factory_status, status:o.status } }).catch(function(){});
+  openOrder(orderId); renderOrders();
+}
+// All items worked → ship the whole order.
+function markShipped(orderId){
+  var o = ORD.find(function(x){ return String(x.id)===String(orderId); }); if(!o) return;
+  o.factory_status='shipped'; o.status='shipped';
+  if (navigator.vibrate) navigator.vibrate([40,40,40]);
+  toast('Order marked shipped');
+  api('/orders/'+encodeURIComponent(orderId), { method:'PATCH', body:{ factoryStatus:'shipped', status:'shipped' } }).catch(function(){});
+  openOrder(orderId); renderOrders();
 }
 // Production status helpers for the order sheet's per-item Start button.
 function isStartable(s){ s=String(s||'').toLowerCase(); return ['new','queued','queue','action','in_review','awaiting','awaiting_scan','received',''].indexOf(s)>=0; }
