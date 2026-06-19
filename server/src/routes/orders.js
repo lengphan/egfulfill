@@ -121,6 +121,19 @@ export function ordersRoutes(app, requireAuth) {
     return { ok: true };
   });
 
+  // Per-item production status — the warehouse "Working" flag. Staff-only. Keyed
+  // by (order, sku) to match the boards' item-status store; order_items already
+  // has factory_status and /api/orders returns it on each item, so mobile and all
+  // factory boards converge on the server instead of per-browser localStorage.
+  app.post('/api/orders/:id/item-status', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const { sku, status } = req.body || {};
+    if (!sku) { reply.code(400); return { error: 'sku required' }; }
+    await q('update order_items set factory_status=$1 where order_id=$2 and sku=$3',
+      [status || '', req.params.id, sku]);
+    return { ok: true };
+  });
+
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
   // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
   app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req) => {

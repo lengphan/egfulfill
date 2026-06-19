@@ -2523,15 +2523,55 @@
         return m[orderId + '|' + sku] || '';
       } catch(e) { return ''; }
     },
-    setItemFactoryStatus: function(orderId, sku, status) {
+    setItemFactoryStatus: function(orderId, sku, status, opts) {
       try {
         var m = JSON.parse(localStorage.getItem(this.ITEM_FACTORY_STATUS_KEY) || '{}');
         var key = orderId + '|' + sku;
         if (!status) delete m[key]; else m[key] = String(status);
         localStorage.setItem(this.ITEM_FACTORY_STATUS_KEY, JSON.stringify(m));
         try { window.dispatchEvent(new CustomEvent('eg-item-status-changed', { detail: { orderId: orderId, sku: sku, status: status || '' } })); } catch(e){}
+        // Persist to the server so every board + mobile converge (not just this
+        // browser). opts.noSync skips it — used when seeding FROM the server.
+        if (!(opts && opts.noSync)) {
+          try {
+            var tok = localStorage.getItem('eg_token');
+            if (tok) {
+              var base = (window.EGAuth && window.EGAuth.API_BASE) || '';
+              fetch(base + '/api/orders/' + encodeURIComponent(orderId) + '/item-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
+                body: JSON.stringify({ sku: sku, status: status || '' })
+              }).catch(function(){});
+            }
+          } catch(e){}
+        }
         return true;
       } catch(e) { return false; }
+    },
+    // Seed the per-item status map from orders fetched off the server (each item
+    // carries factory_status). Server is the source of truth; we only ADD/UPDATE
+    // present values (never clear a local value the server hasn't caught up on).
+    // Writes localStorage directly (noSync) so seeding can't echo back to the API.
+    seedItemFactoryStatusFromOrders: function(orders) {
+      try {
+        var m = JSON.parse(localStorage.getItem(this.ITEM_FACTORY_STATUS_KEY) || '{}');
+        var changed = false;
+        (orders || []).forEach(function(o){
+          var oid = o.id || o.num; if (!oid) return;
+          var items = o.items || o.itemList || [];
+          items.forEach(function(it){
+            if (!it || !it.sku) return;
+            var fs = it.factory_status || it.factoryStatus || '';
+            if (!fs) return;
+            var key = oid + '|' + it.sku;
+            if (m[key] !== fs) { m[key] = fs; changed = true; }
+          });
+        });
+        if (changed) {
+          localStorage.setItem(this.ITEM_FACTORY_STATUS_KEY, JSON.stringify(m));
+          try { window.dispatchEvent(new CustomEvent('eg-item-status-changed', { detail: {} })); } catch(e){}
+        }
+      } catch(e){}
     },
 
     // ── Plan tier overrides (admin-editable) ──────────────────────────────

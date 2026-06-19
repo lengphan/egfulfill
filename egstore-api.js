@@ -252,6 +252,10 @@
     return api('/orders').then(function (r) {
       if (r.error) { console.warn('[egstore-api] hydrate failed:', r.error.message); return; }
       writeCache((r.data || []).map(dbToOrder));
+      // Seed per-item production status from the server (each item carries
+      // factory_status) so the warehouse "Working" flag shows on every board +
+      // mobile, not just the browser that set it.
+      try { if (window.EGStore && EGStore.seedItemFactoryStatusFromOrders) EGStore.seedItemFactoryStatusFromOrders(r.data || []); } catch(e){}
       retrySync();                                                    // recover any order whose POST never landed
       retryPatches();                                                 // recover any status/tracking update that never landed
     });
