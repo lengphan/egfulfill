@@ -1542,6 +1542,17 @@
     // `status: 'Draft'` items are hidden from sellers; only 'Active' ones surface.
     CATALOG_PRODUCTS_KEY: 'eg_catalog_products',
     CATALOG_PRODUCTS_BLOB_KEY: 'eg_catalog_products_blob',
+    // In-memory copy of the FULL server catalog (with data-URL images), set by
+    // the sync layer on every hydrate. Base64 product photos routinely blow the
+    // ~5MB localStorage ceiling, so the blob store's quota-fallback silently
+    // drops them — meaning the seller could pull a product the server has the
+    // image for, yet localStorage keeps only the placeholder. This RAM cache is
+    // never persisted, so it can't be evicted; getCatalogProducts() prefers it
+    // for image fields so renders use the server's real photo regardless of quota.
+    _catalogMem: null,
+    setCatalogMemory: function(products) {
+      this._catalogMem = Array.isArray(products) ? products : null;
+    },
     // Split-storage save: small metadata (text fields, SKUs, variants list)
     // in CATALOG_PRODUCTS_KEY, heavy data URLs (mockup, sideMockups[*],
     // colorImages[*], extras images, img avatar) in CATALOG_PRODUCTS_BLOB_KEY
@@ -1617,6 +1628,11 @@
         // Rejoin the blob store so callers see complete product records.
         var blobs = {};
         try { blobs = JSON.parse(localStorage.getItem(this.CATALOG_PRODUCTS_BLOB_KEY) || '{}'); } catch(e){}
+        // Index the RAM cache (full server catalog) by id — authoritative for
+        // images when the local blob was dropped on quota.
+        var memMap = {};
+        (this._catalogMem || []).forEach(function(m){ if (m && m.id != null) memMap[m.id] = m; });
+        var _realImg = function(u){ return u && typeof u === 'string' && (u.startsWith('data:') || /^https?:/.test(u)) && u.indexOf('placehold.co') === -1; };
         return parsed.map(function(p){
           if (!p || p.id == null) return p;
           var b = blobs[p.id] || {};
@@ -1627,6 +1643,28 @@
           if (b.colorImages) merged.colorImages = Object.assign({}, merged.colorImages || {}, b.colorImages);
           if (Array.isArray(b.images) && Array.isArray(merged.images)) {
             b.images.forEach(function(rec){ if (rec && typeof rec.i === 'number') merged.images[rec.i] = rec.src; });
+          }
+          // RAM-cache merge — the server's real images survive localStorage quota
+          // drops here, so a fresh hydrate always renders the true product photo.
+          var mm = memMap[p.id];
+          if (mm) {
+            if (!_realImg(merged.img) && _realImg(mm.img)) merged.img = mm.img;
+            if (!merged.mockup && mm.mockup) merged.mockup = mm.mockup;
+            if (mm.colorImages && typeof mm.colorImages === 'object') {
+              var mci = Object.assign({}, merged.colorImages || {});
+              Object.keys(mm.colorImages).forEach(function(k){ if (!_realImg(mci[k]) && _realImg(mm.colorImages[k])) mci[k] = mm.colorImages[k]; });
+              merged.colorImages = mci;
+            }
+            if (mm.sideMockups && typeof mm.sideMockups === 'object') {
+              var msm = Object.assign({}, merged.sideMockups || {});
+              Object.keys(mm.sideMockups).forEach(function(k){ if (!_realImg(msm[k]) && _realImg(mm.sideMockups[k])) msm[k] = mm.sideMockups[k]; });
+              merged.sideMockups = msm;
+            }
+            if (Array.isArray(mm.images)) {
+              var mimgs = Array.isArray(merged.images) ? merged.images.slice() : [];
+              mm.images.forEach(function(src, i){ if (_realImg(src) && !_realImg(mimgs[i])) mimgs[i] = src; });
+              merged.images = mimgs;
+            }
           }
           // Heal legacy products saved before the placeholder strip fix —
           // a null/empty img means the blob was lost or never set; fall back

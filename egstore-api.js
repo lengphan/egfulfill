@@ -380,9 +380,11 @@
   // interceptor above can't see the full product. We wrap setCatalogProducts —
   // the lossless chokepoint — instead. Readable by all; writable by staff.
   var _suspendCatalog = false, _catalogTimer = null;
-  function pushCatalog() {
+  function pushCatalog(list) {
     if (!window.EGStore || !EGStore.getCatalogProducts) return;
-    var list = EGStore.getCatalogProducts() || [];
+    // Prefer the full in-memory product list handed in by the wrap (still holds
+    // data-URL images); fall back to a reassembly only when called bare (seeding).
+    list = list || EGStore.getCatalogProducts() || [];
     api('/catalog_products', { method: 'POST', body: list });
   }
   function hydrateCatalog() {
@@ -396,6 +398,10 @@
         if (local.length && isStaff()) pushCatalog();
         return;
       }
+      // Stash the FULL server catalog (data-URL images intact) in RAM first —
+      // getCatalogProducts() reads it for image fields, so even if the localStorage
+      // blob write below is dropped on quota, renders still get the real photo.
+      try { EGStore.setCatalogMemory(server); } catch (e) {}
       _suspendCatalog = true;
       try { EGStore.setCatalogProducts(server); } catch (e) {}
       _suspendCatalog = false;
@@ -440,7 +446,10 @@
       var ok = origSet(products);
       if (token() && isStaff() && !_suspendCatalog) {
         clearTimeout(_catalogTimer);
-        _catalogTimer = setTimeout(pushCatalog, 500);
+        // Capture the full in-memory list (data-URL images intact) and push THAT,
+        // not a reassembly from localStorage — the blob may already be quota-dropped.
+        var full = Array.isArray(products) ? products.slice() : products;
+        _catalogTimer = setTimeout(function () { pushCatalog(full); }, 500);
       }
       return ok;
     };
