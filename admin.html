@@ -4061,9 +4061,22 @@ function admMarkCancelled(num) {
   if (!confirm('Mark order ' + num + ' as Cancelled? Production will halt and the seller will be notified.')) return;
   o.status = 'cancelled';
   o.cancelledAt = Date.now();
-  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(num, { factoryStatus: 'cancelled' }); } catch(e) {}
+  admTerminateOrder(num, o, 'cancelled');
   whUpdateTabCounts();
   whRenderOrders();
+}
+// Push a terminal status (cancelled / refunded) so EVERY board reflects it:
+//   • factoryStatus + status → both factory boards AND the seller view update
+//     (the PATCH reaches the server, which the next /api/orders hydrate reads).
+//   • clear each item's "working" flag so per-item chips don't linger as
+//     in-production after the order is dead (also synced to the server).
+function admTerminateOrder(num, o, status) {
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(num, { factoryStatus: status, status: status }); } catch(e) {}
+  try {
+    if (typeof EGStore !== 'undefined' && EGStore.setItemFactoryStatus && o && Array.isArray(o.itemList)) {
+      o.itemList.forEach(function(it){ if (it && it.sku) EGStore.setItemFactoryStatus(num, it.sku, ''); });
+    }
+  } catch(e) {}
 }
 function admMarkRefunded(num) {
   const o = WH_ORDERS.find(x => x.num === num);
@@ -4075,7 +4088,7 @@ function admMarkRefunded(num) {
   if (!confirm('Issue refund for ' + num + ' (' + (o.total || '—') + ')? This cannot be undone.')) return;
   o.status = 'refunded';
   o.refundedAt = Date.now();
-  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(num, { factoryStatus: 'refunded' }); } catch(e) {}
+  admTerminateOrder(num, o, 'refunded');
   whUpdateTabCounts();
   whRenderOrders();
 }
