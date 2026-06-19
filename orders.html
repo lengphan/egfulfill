@@ -2400,12 +2400,15 @@ function openDetailModal(ordNo) {
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
       </div>
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:nowrap">
-        <div style="display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0;${odmPillLocked?'opacity:.85':''}">
-          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:132px">${blankOptsHtml}</select>
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
-          <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};background:transparent;border:1px solid #e5e4e0;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;row-gap:10px">
+        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:3px 11px;background:#fff;flex-shrink:0;${odmPillLocked?'opacity:.85':''}">
+          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:150px">${blankOptsHtml}</select>
+          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
+          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:74px">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
+          <span style="color:#c4c3be;font-weight:700;padding:0 4px;flex-shrink:0">·</span>
+          <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">
             <option value="DTG"${item.tech==='DTG'?' selected':''}>DTG</option>
             <option value="DTF"${item.tech==='DTF'?' selected':''}>DTF</option>
             <option value="EMB"${item.tech==='EMB'?' selected':''}>Embroidery</option>
