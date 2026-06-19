@@ -1063,7 +1063,23 @@ function dbDrop(e, colId) {
 // ══════════════════════════════════════════════════
 // RENDER BOARD
 // ══════════════════════════════════════════════════
+// Pull each card's server-stored design into the local cache so _thumbFor() can
+// resolve the real artwork (the card itself only carries a placeholder thumb).
+// Operator/warehouse/admin do this per order; the designer board never did, so
+// composites stayed blank on a fresh load. Guarded once per order id.
+function dbHydrateDesigns() {
+  if (typeof EGStore === 'undefined' || !EGStore.hydrateOrderDesigns) return;
+  window._dbDesignHydrated = window._dbDesignHydrated || {};
+  const orders = {};
+  DB_CARDS.forEach(function (c) { if (c && c.order) orders[c.order] = 1; });
+  Object.keys(orders).forEach(function (ord) {
+    if (window._dbDesignHydrated[ord]) return;
+    window._dbDesignHydrated[ord] = true;
+    try { EGStore.hydrateOrderDesigns(ord).then(function (rows) { if (rows && rows.length) { try { dbRender(); } catch (e) {} } }); } catch (e) {}
+  });
+}
 function dbRender() {
+  dbHydrateDesigns();
   const filtered = DB_FILTER === 'all' ? DB_CARDS : DB_CARDS.filter(c => c.type.toLowerCase() === DB_FILTER);
   const board = document.getElementById('db-board');
   board.innerHTML = '';
