@@ -763,8 +763,12 @@
         return;
       }
     }
-    if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
-    _egdtToast('Pushed to production');
+    // Factory push (selling-mode setup): the operator who set the order up has
+    // already done the review, so it goes straight to Awaiting Scan — matching
+    // the canonical flow (push → awaiting_scan, no manual release). The SELLER's
+    // push (orders.html) is the one that lands at In Review for operator review.
+    if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'awaiting_scan', status: 'awaiting_scan' });
+    _egdtToast('Pushed → Awaiting Scan');
   }
 
   // ── Searchable Templates dropdown (ported from the seller orders page) ───────
