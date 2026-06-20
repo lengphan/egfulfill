@@ -379,12 +379,21 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <div></div>
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="display:flex;align-items:center;background:#fff;border:1.5px solid #e5e4e0;border-radius:8px;padding:2px;gap:1px">
-          <button onclick="setDateRange(this,'7d')" style="font-size:13px;font-weight:600;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;background:#fff;color:#191918;box-shadow:inset 0 0 0 1.5px #374151;transition:all .15s">7 Days</button>
-          <button onclick="setDateRange(this,'30d')" style="font-size:13px;font-weight:600;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;background:none;color:#6b7280;transition:all .15s">30 Days</button>
-          <button onclick="setDateRange(this,'3m')" style="font-size:13px;font-weight:600;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;background:none;color:#6b7280;transition:all .15s">3 Months</button>
-          <button onclick="setDateRange(this,'ytd')" style="font-size:13px;font-weight:600;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;background:none;color:#6b7280;transition:all .15s">YTD</button>
-        </div>
+        <select id="an-platform" data-eg-select onchange="applyReportFilters()" style="border:1.5px solid #c9c4bc;border-radius:8px;padding:6px 24px 6px 11px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 7px center;color:#4b5563;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none">
+          <option value="all">All Stores</option>
+          <option value="shopify">Shopify</option>
+          <option value="etsy">Etsy</option>
+          <option value="woo">WooCommerce</option>
+          <option value="amazon">Amazon</option>
+          <option value="manual">Manual</option>
+        </select>
+        <select id="an-period" data-eg-select onchange="applyReportFilters()" style="border:1.5px solid #c9c4bc;border-radius:8px;padding:6px 24px 6px 11px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 7px center;color:#4b5563;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none">
+          <option value="month">This Month</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+          <option value="lastmonth">Last Month</option>
+          <option value="quarter">This Quarter</option>
+        </select>
         <button class="btn btn-out" onclick="exportCSV()" style="font-size:14px;padding:7px 14px">↓ Export CSV</button>
         <button class="btn btn-dk" onclick="scheduleReport()" style="font-size:14px;padding:7px 14px">⏱ Schedule Report</button>
       </div>
@@ -548,8 +557,76 @@ function restyleCharts(){
 
 // Pie chart
 const pieCtx = document.getElementById('pieChart').getContext('2d');
-new Chart(pieCtx,{type:'doughnut',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','Other'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#6366f1','#7a92c4','#10b981','#f43f5e','#8b5cf6'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}},cutout:'68%'}});
+const pieChartObj = new Chart(pieCtx,{type:'doughnut',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','Other'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#6366f1','#7a92c4','#10b981','#f43f5e','#8b5cf6'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}},cutout:'68%'}});
 
+// ── Real reports filtering — by store/platform + date range (mirrors the dashboard) ──
+function _anSet(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }
+function _anPlat(o){
+  var s = String((o && (o.source||o.salesChannel||o.platform||o.seller)) || '').toLowerCase();
+  if(/shopify/.test(s)) return 'shopify';
+  if(/etsy/.test(s)) return 'etsy';
+  if(/woo/.test(s)) return 'woo';
+  if(/amazon/.test(s)) return 'amazon';
+  if(/ebay/.test(s)) return 'ebay';
+  return 'manual';
+}
+function _anRange(period){
+  var now=new Date(), end=now.getTime(), y=now.getFullYear(), m=now.getMonth(), start;
+  if(period==='7d') start=end-7*864e5;
+  else if(period==='30d') start=end-30*864e5;
+  else if(period==='lastmonth'){ start=new Date(y,m-1,1).getTime(); end=new Date(y,m,1).getTime()-1; }
+  else if(period==='quarter'){ start=new Date(y,Math.floor(m/3)*3,1).getTime(); }
+  else { start=new Date(y,m,1).getTime(); }   // 'month'
+  return {start:start,end:end};
+}
+function applyReportFilters(){
+  var plat=(document.getElementById('an-platform')||{}).value||'all';
+  var period=(document.getElementById('an-period')||{}).value||'month';
+  var rng=_anRange(period);
+  var all=(window.EGStore && EGStore.getOrders)?(EGStore.getOrders()||[]):[];
+  var orders=all.filter(function(o){
+    if(!o||!o.id) return false;
+    var ts=o.submittedAt||o.createdAt||0;
+    if(ts && (ts<rng.start||ts>rng.end)) return false;
+    if(plat!=='all' && _anPlat(o)!==plat) return false;
+    return true;
+  });
+  var revenue=orders.reduce(function(s,o){return s+(parseFloat(o.total)||0);},0);
+  var count=orders.length;
+  var profit=orders.reduce(function(s,o){return s+(parseFloat(o.profit)||0);},0);
+  var aov=count?revenue/count:0;
+  _anSet('an-revenue','$'+Math.round(revenue).toLocaleString());
+  _anSet('an-orders',count.toLocaleString());
+  _anSet('an-aov','$'+aov.toFixed(2));
+  _anSet('an-profit','$'+Math.round(profit).toLocaleString());
+  // Revenue-over-time line: bucket by calendar day across the range (cap 31 points).
+  try{
+    var dayMs=864e5, sd=new Date(rng.start); sd.setHours(0,0,0,0);
+    var nDays=Math.min(31,Math.max(1,Math.ceil((rng.end-sd.getTime())/dayMs)));
+    var buckets={};
+    orders.forEach(function(o){ var ts=o.submittedAt||o.createdAt||0; if(!ts) return; var dk=new Date(ts); dk.setHours(0,0,0,0); buckets[dk.getTime()]=(buckets[dk.getTime()]||0)+(parseFloat(o.total)||0); });
+    var labels=[], data=[];
+    for(var i=0;i<nDays;i++){ var t=sd.getTime()+i*dayMs, dd=new Date(t); labels.push((dd.getMonth()+1)+'/'+dd.getDate()); data.push(Math.round(buckets[t]||0)); }
+    if(typeof revChartObj!=='undefined'){ revChartObj.data.labels=labels; revChartObj.data.datasets[0].data=data; revChartObj.update(); }
+  }catch(e){}
+  // Orders-per-channel bar + revenue-share pie (Shopify/Etsy/Woo/Amazon/Other).
+  try{
+    var keys=['shopify','etsy','woo','amazon','ebay'];
+    var cnt=keys.map(function(k){return orders.filter(function(o){return _anPlat(o)===k;}).length;});
+    var rev=keys.map(function(k){return orders.filter(function(o){return _anPlat(o)===k;}).reduce(function(s,o){return s+(parseFloat(o.total)||0);},0);});
+    if(typeof platChartObj!=='undefined'){ platChartObj.data.datasets[0].data=cnt; platChartObj.update(); }
+    if(typeof pieChartObj!=='undefined'){
+      var otherRev=rev[4]+orders.filter(function(o){return _anPlat(o)==='manual';}).reduce(function(s,o){return s+(parseFloat(o.total)||0);},0);
+      var tot=rev[0]+rev[1]+rev[2]+rev[3]+otherRev, pct=function(v){return tot?Math.round(v/tot*100):0;};
+      pieChartObj.data.datasets[0].data=[pct(rev[0]),pct(rev[1]),pct(rev[2]),pct(rev[3]),pct(otherRev)];
+      pieChartObj.update();
+    }
+  }catch(e){}
+}
+// Recompute once EGStore is loaded (it loads AFTER this inline script) and whenever
+// the order cache changes (e.g. a server hydrate lands).
+window.addEventListener('load', function(){ try{ applyReportFilters(); }catch(e){} });
+document.addEventListener('eg-orders-changed', function(){ try{ applyReportFilters(); }catch(e){} });
 function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
 function setDateRange(btn,range){document.querySelectorAll('[onclick^="setDateRange"]').forEach(b=>{b.style.background='none';b.style.color='#6b7280';b.style.boxShadow='none';});btn.style.background='#fff';btn.style.color='#191918';btn.style.boxShadow='inset 0 0 0 1.5px #374151';}
 function exportCSV(){alert('Exporting analytics data as CSV...');}
