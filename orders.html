@@ -1816,6 +1816,36 @@ function pulseBalanceBtn(message) {
   b.appendChild(tip);
   setTimeout(() => { b.style.animation=''; b.style.outline=''; tip.remove(); }, 4500);
 }
+// After an upload (create/import), pulse the wallet if the seller can't cover the
+// total of their not-yet-pushed orders. Reads the rendered ORDERS (each carries a
+// computed total; falls back to an items estimate) so it needs no cost argument.
+// Clicking the pulsing pill opens Add Funds IN PLACE — it never navigates away.
+function _pulseIfUnderfunded(reason){
+  try{
+    if(typeof ORDERS==='undefined') return false;
+    var bal = parseFloat(localStorage.getItem('eg_balance')||'0')||0;
+    var PENDING = ['new','draft','action'];
+    var owed = ORDERS.reduce(function(s,o){
+      if(!o || PENDING.indexOf(String(o.status||'').toLowerCase())===-1) return s;
+      var t = parseFloat(o.total)||0;
+      if(!t && Array.isArray(o.itemsList)) t = o.itemsList.reduce(function(a,i){ return a+(parseInt(i.qty,10)||1)*15; },0);
+      return s + t;
+    }, 0);
+    if(owed>0 && bal < owed){
+      pulseBalanceBtn((reason||'Low balance')+' — add $'+(owed-bal).toFixed(2)+' to fund your orders');
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+// Import does a full location.reload(); a pulse can't survive that, so the import
+// handler drops a sessionStorage flag and we fire the pulse once the page is back.
+window.addEventListener('load', function(){
+  try{
+    var _r = sessionStorage.getItem('eg_lowbal_pulse');
+    if(_r){ sessionStorage.removeItem('eg_lowbal_pulse'); setTimeout(function(){ try{ _pulseIfUnderfunded(_r); }catch(e){} }, 900); }
+  }catch(e){}
+});
 function markSel(el) {
   const ok = !!el.value;
   el.style.borderColor = ok ? '#16a34a' : '#e5e4e0';
@@ -4827,6 +4857,9 @@ function submitNewOrder() {
     } catch(e) {}
   }
   closeNewOrderModal();
+  // Just added an order — if the seller can't cover their pending orders, draw their
+  // eye to the wallet (pulse). Clicking it opens Add Funds IN PLACE (no navigation).
+  setTimeout(function(){ try { _pulseIfUnderfunded('Order added'); } catch(e){} }, 500);
 }
 // Parse a pasted address into the structured fields below.
 // Robust to: trailing country lines ("USA", "United States"), Windows CRLF, 1–5+ line pastes.
@@ -4987,9 +5020,61 @@ function togglePrefPanel(e){if(e)e.stopPropagation();const p=document.getElement
 function toggleNewMenu(e){if(e)e.stopPropagation();const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display=dd.style.display==='none'?'block':'none';}
 function closeNewMenu(){const dd=document.getElementById('new-menu-dd');if(dd)dd.style.display='none';}
 function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'){openNewOrderModal();}else{window.location='orders.html';}}
+// Polished in-place "Add Funds" modal (mirrors the wallet page). Defined here so the
+// header pill opens it ON the orders page — openQuickTopUp calls it first, so the old
+// wallet.html redirect (which dropped just-created/imported orders) never runs.
+function openDepositModal(){
+  var RATE = 27000; // VND per USD (display) — BIDV transfer estimate
+  var m = document.getElementById('_afm');
+  if(!m){
+    m = document.createElement('div'); m.id='_afm';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif';
+    var presets = [280,500,840,1000].map(function(v){
+      return '<button type="button" onclick="document.getElementById(\'_afm-amt\').value='+v+';_afmSync()" style="padding:11px 0;border:none;border-radius:9px;background:#f4f2ef;font-size:14px;font-weight:700;color:#374151;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background=\'#e9e6df\'" onmouseout="this.style.background=\'#f4f2ef\'">$'+v.toLocaleString()+'</button>';
+    }).join('');
+    m.innerHTML='<div style="background:#fff;border-radius:18px;width:430px;max-width:94vw;padding:26px 28px;box-shadow:0 24px 70px rgba(0,0,0,.28)">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><div style="font-size:20px;font-weight:800;color:#191918">Add Funds</div><button type="button" onclick="document.getElementById(\'_afm\').style.display=\'none\'" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
+      + '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px">Payment method</div>'
+      + '<select id="_afm-method" onchange="_afmSync()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:10px;padding:13px 14px;font-size:15px;font-family:inherit;outline:none;background:#fff;margin-bottom:18px;cursor:pointer"><option value="bidv">BIDV</option><option value="paypal">PayPal</option><option value="card">Debit / Credit Card</option></select>'
+      + '<div style="font-size:14px;font-weight:700;color:#374151;margin-bottom:8px">Amount (USD)</div>'
+      + '<div style="display:flex;align-items:center;border:1.5px solid #e5e4e0;border-radius:10px;padding:0 14px;margin-bottom:12px"><span style="font-size:18px;font-weight:700;color:#9ca3af">$</span><input id="_afm-amt" type="number" min="0" placeholder="0.00" oninput="_afmSync()" style="flex:1;border:none;outline:none;font-size:18px;font-weight:700;padding:13px 10px;font-family:inherit;background:transparent"/></div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+presets+'</div>'
+      + '<div id="_afm-rate" style="background:#faf9f7;border:1px solid #efeee9;border-radius:12px;padding:14px 16px;margin-bottom:18px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:13.5px;color:#6b7280">Your rate — 1 USD = ₫</span><span style="font-size:14px;font-weight:700;color:#374151;border:1px solid #e5e4e0;border-radius:7px;padding:6px 14px">'+RATE.toLocaleString()+'</span></div><div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13.5px;color:#9ca3af">Transfer amount</span><span id="_afm-vnd" style="font-size:15px;font-weight:800;color:#191918">₫0</span></div></div>'
+      + '<button type="button" onclick="_afmPayNow()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.88\'" onmouseout="this.style.opacity=\'1\'">Pay Now</button>'
+      + '<div style="text-align:center;margin-top:14px"><a href="wallet.html" style="font-size:13.5px;color:#374151;text-decoration:underline;text-underline-offset:3px">Go to Wallet &rarr;</a></div>'
+      + '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', function(ev){ if(ev.target===m) m.style.display='none'; });
+  }
+  _afmSync();
+  m.style.display='flex';
+}
+function _afmSync(){
+  var amtEl=document.getElementById('_afm-amt'), methodEl=document.getElementById('_afm-method');
+  var amt=parseFloat(amtEl&&amtEl.value)||0, method=(methodEl&&methodEl.value)||'bidv';
+  var rateBox=document.getElementById('_afm-rate'); if(rateBox) rateBox.style.display=(method==='bidv')?'block':'none';
+  var vnd=document.getElementById('_afm-vnd'); if(vnd) vnd.textContent='₫'+Math.round(amt*27000).toLocaleString();
+}
+function _afmPayNow(){
+  var el=document.getElementById('_afm-amt'), amt=parseFloat(el&&el.value)||0;
+  if(!amt||amt<=0){ if(typeof pushFailToast==='function') pushFailToast('Enter an amount greater than $0'); return; }
+  // Credit the wallet in place (standalone localStorage model, same as applyQuickFunds):
+  // write then read-back to confirm it stuck. Real Stripe/PayPal/BIDV settlement is wired
+  // server-side; this keeps the demo flow self-contained and on-page.
+  var before=parseFloat(localStorage.getItem('eg_balance')||'0')||0, target=parseFloat((before+amt).toFixed(2));
+  try{ localStorage.setItem('eg_balance', target.toFixed(2)); }catch(e){ if(typeof pushFailToast==='function') pushFailToast('Top-up failed — browser storage rejected the write'); return; }
+  var verify=parseFloat(localStorage.getItem('eg_balance')||'NaN');
+  if(isNaN(verify)||Math.abs(verify-target)>0.005){ if(typeof pushFailToast==='function') pushFailToast('Top-up didn\'t persist — balance still $'+before.toFixed(2)); return; }
+  document.querySelectorAll('#balance-val').forEach(function(x){ x.textContent='$'+verify.toFixed(2); });
+  if(typeof SELLER_BALANCE!=='undefined') SELLER_BALANCE=verify;
+  var mm=document.getElementById('_afm'); if(mm) mm.style.display='none';
+  if(typeof pushFailToast==='function') pushFailToast('Wallet topped up — new balance $'+verify.toFixed(2));
+}
 function openQuickTopUp(){
   if(typeof openDepositModal==='function'){openDepositModal();return;}
-  if(location.pathname.indexOf('wallet.html')<0){window.location.href='wallet.html?addfunds=1';return;}
+  // Stay on this page — NEVER navigate to wallet.html here: leaving orders.html
+  // mid-session can drop a just-created/imported order before it re-hydrates. Fall
+  // through to the inline _qtm modal instead (still in place, no navigation).
   let m=document.getElementById('_qtm');
   if(!m){
     m=document.createElement('div');m.id='_qtm';
@@ -7141,6 +7226,9 @@ function _afterImport(result) {
   if (result.skipped) tail.push(result.skipped + ' invalid row' + (result.skipped>1?'s':''));
   if (tail.length) msg += ' · ' + tail.join(', ');
   _importToast(msg, (dupCount||result.skipped) ? 'info' : 'success', (dupCount||result.skipped) ? 5000 : 3200);
+  // Carry a "check balance" flag across the reload so the wallet pulses AFTER the
+  // imported orders re-hydrate (a pulse can't survive location.reload()).
+  try { sessionStorage.setItem('eg_lowbal_pulse', 'Orders imported'); } catch(e){}
   setTimeout(() => { try { location.reload(); } catch(e) {} }, 800);
 }
 
