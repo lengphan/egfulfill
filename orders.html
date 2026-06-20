@@ -1521,11 +1521,11 @@ function saveItemField(ordNo, escSku, field, value) {
         const ciKeys = Object.keys(ci);
         const colorMatch = ciKeys.find(k => k === item.color)
                         || ciKeys.find(k => k.toLowerCase() === String(item.color || '').toLowerCase());
-        if (colorMatch && ci[colorMatch]) item.img = ci[colorMatch];
-        else if (ciKeys.length) item.img = ci[ciKeys[0]];
-        else if (product.mockup) item.img = product.mockup;
-        else if (product.img) item.img = product.img;
-        else item.img = 'https://placehold.co/80x80/f4f2ef/9ca3af?text=' + encodeURIComponent((product.name||'').split(/\s+/)[0] || 'Item');
+        if (colorMatch && ci[colorMatch]) item.blankImg = ci[colorMatch];
+        else if (ciKeys.length) item.blankImg = ci[ciKeys[0]];
+        else if (product.mockup) item.blankImg = product.mockup;
+        else if (product.img) item.blankImg = product.img;
+        else item.blankImg = 'https://placehold.co/80x80/f4f2ef/9ca3af?text=' + encodeURIComponent((product.name||'').split(/\s+/)[0] || 'Item');
       }
     } catch(e) {}
   }
@@ -2794,6 +2794,8 @@ function _itemMockupURL(item) {
       }
     }
   } catch (e) {}
+  // The chosen blank's catalog image (stored separately from the listing image).
+  if (item.blankImg && !/placehold\.co/i.test(String(item.blankImg))) return item.blankImg;
   // Last-resort fallback: the per-item img saved when the order was created.
   // Filters out placehold.co stubs so we don't render a generic gray placeholder
   // when a real catalog image might still be coming.
@@ -3424,7 +3426,7 @@ function odmSetVariant(idx, key, value) {
         const match = product.variantSkus.find(v => v && v.color === wantedColor && v.size === wantedSize);
         if (match && match.sku) {
           item.sku = match.sku;
-          if (product.colorImages && product.colorImages[wantedColor]) item.img = product.colorImages[wantedColor];
+          if (product.colorImages && product.colorImages[wantedColor]) item.blankImg = product.colorImages[wantedColor];
         }
       }
     }
@@ -3487,7 +3489,9 @@ function odmSetBlank(idx, productId) {
         if (_col && fullProduct.colorImages && fullProduct.colorImages[_col]) _img = fullProduct.colorImages[_col];
         else if (fullProduct.mainColor && fullProduct.colorImages && fullProduct.colorImages[fullProduct.mainColor]) _img = fullProduct.colorImages[fullProduct.mainColor];
         else _img = fullProduct.mockup || fullProduct.img || '';
-        if (_img) item.img = _img;
+        // Store on blankImg (the item-thumbnail composite reads it) — NOT item.img,
+        // which is the seller's uploaded listing/hero image and must stay intact.
+        if (_img) item.blankImg = _img;
       }
     } catch (e) {}
   } else {
@@ -4026,7 +4030,7 @@ function orderSetItemVariant(ordNo, sku, key, value) {
         const match = product.variantSkus.find(v => v && v.color === wantedColor && v.size === wantedSize);
         if (match && match.sku) {
           item.sku = match.sku;
-          if (product.colorImages && product.colorImages[wantedColor]) item.img = product.colorImages[wantedColor];
+          if (product.colorImages && product.colorImages[wantedColor]) item.blankImg = product.colorImages[wantedColor];
         }
       }
     }

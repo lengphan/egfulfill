@@ -382,7 +382,12 @@
       // mobile app after a barcode scan, where the blank is the mockup background.
       var blankImg = setupProductImage(orderNum, sku);
       it.blank = p.name || p.sku || p.id || it.blank || '';
-      if (blankImg) it.img = blankImg;
+      // Store the blank's catalog image on a SEPARATE field — NOT it.img, which
+      // is the seller's uploaded listing/hero image. Overwriting it.img made the
+      // parent hero + order-row thumbnail swap to the blank photo (and made a
+      // second same-SKU line show the first line's image). Composites resolve the
+      // blank from the catalog (or this field), so it.img stays the listing image.
+      if (blankImg) it.blankImg = blankImg;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
       pushItemsToApi(o);
     } catch (e) {}
