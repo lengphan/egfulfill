@@ -2009,7 +2009,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
      boards don't have that infrastructure). Order flows new → shipped via
      the same EGStore pipeline as a seller-pushed order. -->
 <div id="create-order-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)closeCreateOrderModal()">
-  <div class="modal" style="max-width:540px;width:540px;padding:0;overflow:hidden">
+  <div class="modal" style="max-width:700px;width:700px;padding:0;overflow:hidden">
     <div style="padding:20px 24px 16px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div style="font-size:16px;font-weight:700;color:#191918">Create New Order</div>
@@ -2028,7 +2028,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <div style="margin-bottom:10px">
         <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px">
           <label style="font-size:12.5px;font-weight:600;color:#6b7280">Paste address (optional)</label>
-          <span id="co-paste-validate" style="font-size:11.5px;font-weight:600;color:#9ca3af"></span>
+          <span id="co-paste-validate" style="font-size:10px;font-weight:500;color:#b8b3ac;letter-spacing:.02em"></span>
         </div>
         <textarea id="co-paste" rows="3" placeholder="Daniel Park&#10;1243 Valley View Ave&#10;Santa Fe Springs, CA 90670" oninput="coParsePastedAddr(this.value)" onpaste="setTimeout(() => coParsePastedAddr(document.getElementById('co-paste').value), 0)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;resize:none;line-height:1.5" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"></textarea>
       </div>
@@ -5973,8 +5973,8 @@ function coParsePastedAddr(raw) {
   }
   // Hide the paste box once parsed — saves vertical space.
   const valid = document.getElementById('co-paste-validate');
-  if (valid) valid.textContent = csz ? ('✓ Parsed · ' + city + ', ' + state + ' ' + zip) : '⚠ Could not auto-parse — please review';
-  if (valid) valid.style.color = csz ? '#15803d' : '#c2410c';
+  if (valid) valid.textContent = csz ? '✓ parsed' : 'couldn’t parse';
+  if (valid) valid.style.color = csz ? '#9aa0a6' : '#c79b86';
 }
 window.coParsePastedAddr = coParsePastedAddr;
 
@@ -7149,7 +7149,7 @@ window.whlmParsePastedAddr = function(raw) {
   var valid = document.getElementById('whlm-paste-validate');
   if (valid) {
     valid.textContent = csz ? ('✓ Parsed') : '⚠ Could not auto-parse';
-    valid.style.color = csz ? '#15803d' : '#c2410c';
+    valid.style.color = csz ? '#9aa0a6' : '#c79b86';
   }
 };
 
