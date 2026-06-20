@@ -1621,10 +1621,14 @@
     },
     getCatalogProducts: function() {
       try {
-        var raw = localStorage.getItem(this.CATALOG_PRODUCTS_KEY);
-        if (!raw) return [];
-        var parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
+        var parsed = [];
+        try { var raw = localStorage.getItem(this.CATALOG_PRODUCTS_KEY); if (raw) { var pj = JSON.parse(raw); if (Array.isArray(pj)) parsed = pj; } } catch(e){}
+        // Quota can make the metadata save fail, leaving localStorage empty. Fall back to
+        // the RAM cache (full catalog) as the product SOURCE so products still render
+        // everywhere (catalog page + order blanks) — without this a single quota failure
+        // made the entire catalog show up empty.
+        if ((!parsed || !parsed.length) && Array.isArray(this._catalogMem) && this._catalogMem.length) parsed = this._catalogMem;
+        if (!parsed.length) return [];
         // Rejoin the blob store so callers see complete product records.
         var blobs = {};
         try { blobs = JSON.parse(localStorage.getItem(this.CATALOG_PRODUCTS_BLOB_KEY) || '{}'); } catch(e){}
@@ -1680,14 +1684,20 @@
     setCatalogProducts: function(products) {
       if (!Array.isArray(products)) return false;
       var self = this;
+      // Keep the RAM cache in sync on EVERY save so a just-created product (e.g. one an
+      // operator just added) is readable immediately even if the localStorage write fails
+      // on quota — getCatalogProducts() falls back to this list.
+      this._catalogMem = products;
       var lite = products.map(function(p){ return self._stripCatalogProduct(p); });
       // 1. Metadata save — must always succeed. If quota throws, drop the
       //    blob store first (heaviest data we own) and retry.
       try { localStorage.setItem(this.CATALOG_PRODUCTS_KEY, JSON.stringify(lite)); }
       catch(e) {
-        try { localStorage.removeItem(this.CATALOG_PRODUCTS_BLOB_KEY); } catch(_){}
+        // Storage full — free the heaviest REGENERABLE caches (images/designs/blobs;
+        // they all re-hydrate from the server) and retry the small metadata write.
+        (this.CLEARABLE_CACHE_KEYS || ['eg_catalog_products_blob']).forEach(function(k){ try { localStorage.removeItem(k); } catch(_){} });
         try { localStorage.setItem(this.CATALOG_PRODUCTS_KEY, JSON.stringify(lite)); }
-        catch(e2) { console.warn('[catalog] metadata save failed', e2); return false; }
+        catch(e2) { /* still full → RAM cache (_catalogMem, set above) holds it + server re-hydrates, so the catalog still works */ return true; }
       }
       // 2. Blob save — best effort. Trim oldest entries if quota throws.
       var blobs = this._collectCatalogBlobs(products);
