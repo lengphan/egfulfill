@@ -268,6 +268,15 @@
   // exposes) so a setup change is reflected immediately — e.g. the thumbnail
   // swapping off the listing image onto the chosen product blank. Boards track
   // row expansion in persistent state, so this keeps an open row open.
+  // Lightweight shared toast so push/setup feedback is visible on every board.
+  function _egdtToast(msg) {
+    try {
+      var t = document.getElementById('egdt-toast');
+      if (!t) { t = document.createElement('div'); t.id = 'egdt-toast'; t.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#191918;color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:10050;font-family:Inter,system-ui,sans-serif;max-width:420px;line-height:1.45;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s'; document.body.appendChild(t); }
+      t.textContent = msg; t.style.opacity = '1';
+      clearTimeout(t._tmr); t._tmr = setTimeout(function () { t.style.opacity = '0'; }, 3600);
+    } catch (e) {}
+  }
   function refreshBoard() {
     // Capture which order-detail rows are open so a re-render doesn't COLLAPSE
     // them mid-interaction (some boards toggle detail via direct DOM, not a
@@ -722,7 +731,9 @@
     var hasMethod = !!(s.printType || it.printType || it.tech);
     var hasDesign = false;
     try { hasDesign = !!(window.EGStore && EGStore.getRawDesign && o && EGStore.getRawDesign(o.id, dk)); } catch (e) {}
-    if (!hasDesign && (it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))))) hasDesign = true;
+    if (!hasDesign) { try { hasDesign = !!(window.EGStore && EGStore.getCachedImage && o && EGStore.getCachedImage(o.id, dk)); } catch (e) {} }
+    if (!hasDesign) { try { hasDesign = !!(window.EGStore && EGStore.getDesignCard && o && EGStore.getDesignCard(o.id, dk)); } catch (e) {} }
+    if (!hasDesign && (it.designUrl || it.customerFile || it.file || it.thumb || it.designSrc)) hasDesign = true;
     var miss = [];
     if (!hasProduct) miss.push('product');
     if (!hasMethod) miss.push('method');
@@ -743,9 +754,17 @@
       // Not ready → no popup, and DON'T pulse the Push button. The incomplete
       // items' own action buttons pulse (Upload / pickers) to show what's missing.
       // Re-render so those pulses are showing, then silently refuse.
-      if (problems.length) { refreshBoard(); return; }
+      if (problems.length) {
+        refreshBoard();
+        // Tell the user WHY push didn't go through (it used to refuse silently,
+        // which read as "the button is broken").
+        var first = problems[0].replace(/^•\s*/, '');
+        _egdtToast(problems.length === 1 ? ('Can’t push yet — ' + first) : ('Can’t push yet — ' + problems.length + ' items need setup. ' + first + (problems.length > 1 ? ' …' : '')));
+        return;
+      }
     }
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'in_review', status: 'in_review' });
+    _egdtToast('Pushed to production');
   }
 
   // ── Searchable Templates dropdown (ported from the seller orders page) ───────
