@@ -115,7 +115,9 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
   // Address validation (USPS Addresses 3.0) — standardizes/verifies an address.
   // Only needs OAuth (no payment scope). Query: streetAddress, secondaryAddress,
   // city, state, ZIPCode. Returns the standardized address or an error.
-  app.get('/api/usps/validate-address', { preHandler: requireStaff }, async (req, reply) => {
+  // requireAuth (not requireStaff): sellers validate recipient addresses in the
+  // manual-order modal. Read-only USPS lookup, no payment scope.
+  app.get('/api/usps/validate-address', { preHandler: requireAuth }, async (req, reply) => {
     try {
       const oauth = await oauthToken();
       const qy = req.query || {};
