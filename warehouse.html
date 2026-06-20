@@ -6105,7 +6105,7 @@ function whRenderOrders() {
             // the card directly (embDataUrl / files[].previewUrl / thumb),
             // falling back to EGStore mirrors if the card's blob was purged.
             const _dcard = (typeof EGStore !== 'undefined' && EGStore.getDesignCard) ? EGStore.getDesignCard(o.num, it.sku) : null;
-            let metaRow;
+            let metaRow, _designLink = '';
             // Hoisted so the _designReady check after the if/else can read
             // whether a downloadable file actually resolved for this item.
             let _hasFile = false;
@@ -6142,6 +6142,7 @@ function whRenderOrders() {
               const _idHtml = (_approved && _hasFile)
                 ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.preventDefault();event.stopPropagation();try{EGStore&&EGStore.downloadDataUrl&&EGStore.downloadDataUrl(this.getAttribute('href'),this.getAttribute('download'));}catch(e){}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
                 : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
+              _designLink = _idHtml;
               // Thread colour swatches — moved off the name row into metaRow.
               const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
                 ? (EGStore.getItemThreadColors(o.num, it.sku) || [])
@@ -6190,17 +6191,15 @@ function whRenderOrders() {
             // control entirely — only the parent order status remains.
             const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
             const _fsEl = _orderDone ? '' : `<button class="eg-item-fs-el" data-item-key="${_itKey}" data-order="${o.num}" data-sku="${String(it.sku).replace(/"/g,'&quot;')}" onclick="event.stopPropagation();whCycleItemStatus(this.dataset.order, this.dataset.sku)" style="${_fsStyle}">${_fsLabel}</button>`;
-            return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;background:transparent;${sep}">
-              ${thumb}
-              <div style="${_isNewSetup ? 'flex:0 1 auto;max-width:240px' : 'flex:1'};min-width:0;margin-right:16px">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
-                <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
-                  ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
-                </div>
-              </div>
-              <div class="eg-item-fs-slot" style="position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center">${_fsEl}</div>
-              ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
-            </div>`;
+            const _title = `${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}`;
+            const _meta = (window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow;
+            const _statusSlot = `<div class="eg-item-fs-slot" style="position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center">${_fsEl}</div>`;
+            return (window.EGDesignTools && EGDesignTools.itemRowLayout) ? EGDesignTools.itemRowLayout({
+              setup: _isNewSetup, sep: sep, thumb: thumb, title: _title, meta: _meta, designLink: _designLink,
+              selector: EGDesignTools.itemActions(o, it, { noTrash: true }),
+              status: _statusSlot,
+              trash: EGDesignTools.itemTrash(o, it)
+            }) : '';
           }).join('')}
           ${window.EGDesignTools ? EGDesignTools.addItemButton(o) : ''}
         </div>

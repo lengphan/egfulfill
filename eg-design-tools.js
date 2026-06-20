@@ -600,6 +600,30 @@
     return '<div style="display:flex;gap:14px;flex-shrink:0;align-items:center;flex-wrap:wrap;justify-content:flex-start;row-gap:8px" onclick="event.stopPropagation()">' + pickers + designField + delBtn + '</div>';
   }
 
+  // ── Shared factory item-row layout ──────────────────────────────────────────
+  // ONE structure for every factory board (operator / warehouse / admin) so the
+  // rows never drift. Each board computes its own pieces and passes them in; the
+  // ONLY per-board difference is `status` (warehouse = Start button, others =
+  // read-only chip). Blocks, evenly arranged:
+  //   [checkbox] [thumb] [ title + sku · DESIGN-ID↓ ] [ selector+upload ] [status] [×]
+  // p: { setup, sep, checkbox, thumb, title, meta, designLink, selector, status, trash }
+  function itemRowLayout(p) {
+    p = p || {};
+    var nameBlock = '<div style="' + (p.setup ? 'flex:0 1 auto;max-width:240px' : 'flex:1') + ';min-width:0;margin-right:16px">'
+      + '<div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (p.title || '') + '</div>'
+      + '<div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">'
+        + (p.meta || '')
+        + (p.designLink ? ' <span style="color:#c4c3be;font-weight:700;padding:0 7px;flex-shrink:0">·</span>' + p.designLink : '')
+      + '</div></div>';
+    // Selector + design upload sit centered between the name and the status when
+    // the order is still in setup; locked orders just show the meta row.
+    var center = p.setup ? '<div style="flex:1;display:flex;align-items:center;justify-content:center;min-width:0">' + (p.selector || '') + '</div>' : '';
+    var trash = p.trash ? '<span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center">' + p.trash + '</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;position:relative;' + (p.sep || '') + '">'
+      + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
+      + '</div>';
+  }
+
   // Compact ⋯ overflow menu for an item's secondary actions (Templates, Design
   // Maker) — keeps the labeled meta-row from getting busy. Closes on outside click.
   function _moreMenu(num, sku, name, btn, ev) {
@@ -1002,7 +1026,7 @@
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, itemTrash: itemTrash, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,

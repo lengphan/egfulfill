@@ -3942,7 +3942,7 @@ function renderOpOrders() {
           // EXACTLY the file the operator uploaded — EMB or raster, doesn't
           // matter. No type sniffing, no EGStore composite indirection.
           const _dcard = (typeof EGStore !== 'undefined' && EGStore.getDesignCard) ? EGStore.getDesignCard(o.num, it.sku) : null;
-          let metaRow;
+          let metaRow, _designLink = '';
           if (_dcard) {
             const _dsnText = _dcard.designId || _dcard.title || 'DSN';
             const _approved = _dcard.col === 'approved' || _dcard.col === 'paid';
@@ -4001,6 +4001,7 @@ function renderOpOrders() {
             const _idHtml = (_approved && _hasFile)
               ? `<a href="${_dlUrlEsc}" download="${_dlNameEsc}" onclick="event.preventDefault();event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlNameEsc}">${_dsnText} ↓</a>`
               : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
+            _designLink = _idHtml;
           // Thread colour swatches — moved off the product-name row (was too
           // jammed) and into the metaRow as tiny dot-only swatches. Hover the
           // group to see codes + names; full chip view stays in zoom modal.
@@ -4050,18 +4051,15 @@ function renderOpOrders() {
           const _fsLabelOp = _orderDone ? '' : (_fs === 'working' ? 'Working' : 'Pending');
           const _fsColorOp = _fs === 'working' ? '#191918' : '#9ca3af';
           const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${_fsColorOp};white-space:nowrap;display:inline-block${_fsLabelOp?'':';display:none'}">${_fsLabelOp}</span>`;
-          return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;${sep}">
-            <input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">
-            ${thumb}
-            <div style="${_isNewSetup ? 'flex:0 1 auto;max-width:240px' : 'flex:1'};min-width:0;margin-right:16px">
-              <div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
-              <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
-                ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
-              </div>
-            </div>
-            ${_fsChip}
-            ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
-          </div>`;
+          const _title = `${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}`;
+          const _meta = (window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow;
+          const _chk = `<input type="checkbox" class="op-item-chk" data-order="${o.num}" onclick="event.stopPropagation()" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;accent-color:#111827;margin-right:10px">`;
+          return (window.EGDesignTools && EGDesignTools.itemRowLayout) ? EGDesignTools.itemRowLayout({
+            setup: _isNewSetup, sep: sep, checkbox: _chk, thumb: thumb, title: _title, meta: _meta, designLink: _designLink,
+            selector: EGDesignTools.itemActions(o, it, { noTrash: true }),
+            status: _fsChip,
+            trash: EGDesignTools.itemTrash(o, it)
+          }) : '';
         }).join('')}
         ${window.EGDesignTools ? EGDesignTools.addItemButton(o) : ''}
       </td>
