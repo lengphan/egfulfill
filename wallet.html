@@ -782,9 +782,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>
       <select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">
         <option value="vietqr">BIDV</option>
-        <option value="paypal">PayPal — card or balance</option>
-        <option value="pingpong">PingPong (Connected)</option>
-        <option value="bank">Bank Transfer (manual)</option>
+        <option value="paypal">PayPal</option>
+        <option value="card">Debit/Credit Card</option>
       </select>
     </div>
     <div style="margin-bottom:16px">
@@ -1285,6 +1284,16 @@ function submitDeposit() {
   // VietQR: don't credit instantly — show the scan-to-pay QR and wait for the
   // bank transfer to land (auto-confirmed via /api/vietqr/status).
   if (method === 'vietqr') { closeDepositModal(); openVietQRTopUp(amount); return; }
+  // Debit/Credit Card: hand off to the existing Stripe top-up flow, carrying
+  // the entered amount into the card modal.
+  if (method === 'card') {
+    closeDepositModal();
+    if (typeof openCardTopUp === 'function') {
+      openCardTopUp();
+      var _ca = document.getElementById('card-amount'); if (_ca) _ca.value = amount;
+    }
+    return;
+  }
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amount).toFixed(2));
   localStorage.setItem('eg_balance', bal.toFixed(2));
