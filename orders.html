@@ -2535,17 +2535,13 @@ function openDetailModal(ordNo) {
   const _notesEl = document.getElementById('odm-notes');
   if (_notesEl) _notesEl.innerHTML = `
     <label style="${LBL}">Notes</label>
-    <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="1" placeholder="Internal notes…" style="${FLD};resize:vertical">${_esc(_meta.note)}</textarea>`;
-  // Gift — "This is a gift" toggle + message (auto-ticks when a message exists, e.g. synced).
+    <textarea onchange="odmSaveMeta(${ordNo})" data-meta="note" rows="1" placeholder="Notes for the factory — e.g. white thread · center the design · no hang tag" style="${FLD};resize:vertical">${_esc(_meta.note)}</textarea>`;
+  // Gift message — a non-empty message marks the order as a gift (no separate checkbox).
   const _giftEl = document.getElementById('odm-gift');
   if (_giftEl) {
-    const _isGift = !!(_meta.isGift || _meta.gift);
     _giftEl.innerHTML = `
-      <label style="${LBL};display:flex;align-items:center;gap:6px;cursor:pointer">
-        <input type="checkbox" onchange="odmSaveMeta(${ordNo})" data-meta="isGift" ${_isGift ? 'checked' : ''} style="width:12px;height:12px;accent-color:#191918;cursor:pointer;flex-shrink:0;margin:0"/>
-        This is a gift
-      </label>
-      <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="Add a gift message…" style="${FLD}"/>`;
+      <label style="${LBL}">Gift Message</label>
+      <input type="text" onchange="odmSaveMeta(${ordNo})" data-meta="gift" value="${_esc(_meta.gift)}" placeholder="e.g. Happy Birthday, Mom! Love, Sarah" style="${FLD}"/>`;
   }
 
   // Action button
