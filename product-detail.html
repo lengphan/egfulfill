@@ -62,6 +62,7 @@ html:not([data-theme=dark]) .ni{border:1px solid transparent}
 html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
 </style>
 <script src="egfulfill-store.js"></script>
+<script src="egstore-api.js"></script>
 <script defer src="eg-seller-plan.js"></script>
 <style id="eg-outline-btns">
 /* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
@@ -464,7 +465,19 @@ var PD_NAME2HEX = { white:'#ffffff', black:'#1c1917', navy:'#1e3a5f','navy blue'
   'berry':'#831843' };
 function pdHex(name){ return PD_NAME2HEX[String(name||'').trim().toLowerCase()] || '#c8c7c2'; }
 
-var _prod = (function(){
+// Pick a REAL product photo (skip the placehold.co heal stub) — colour image →
+// gallery image → saved avatar → mockup last resort. Mirrors products-dash so the
+// detail hero matches the catalog-list thumbnail.
+function pdPickImg(p){
+  var real = function(u){ return u && typeof u === 'string' && (u.indexOf('data:') === 0 || /^https?:/.test(u)) && u.indexOf('placehold.co') === -1; };
+  if (p.colorImages){ for (var k in p.colorImages){ if (real(p.colorImages[k])) return p.colorImages[k]; } }
+  if (real(p.image)) return p.image;
+  if (Array.isArray(p.images)){ for (var i = 0; i < p.images.length; i++){ if (real(p.images[i])) return p.images[i]; } }
+  if (real(p.img)) return p.img;
+  if (real(p.mockup)) return p.mockup;
+  return p.img || '';
+}
+function pdResolveProduct(){
   if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
     var stored = EGStore.getCatalogProducts().find(function(p){ return String(p.id) === String(_pid); });
     if (stored) {
@@ -496,7 +509,7 @@ var _prod = (function(){
           {k:'SKU', v: stored.sku || '—'},
         ],
         rating: 24,
-        img: stored.img,
+        img: pdPickImg(stored),
         extraImages: stored.images || [], // operator-uploaded extra mockup angles
         _storeRecord: stored,
       };
@@ -506,7 +519,8 @@ var _prod = (function(){
   var p = PRODUCT_DATA[_pid] || DEFAULT_PRODUCT;
   if(_pname) p.name = decodeURIComponent(_pname);
   return p;
-})();
+}
+var _prod = pdResolveProduct();
 if(_pname && !_prod._storeRecord) _prod.name = decodeURIComponent(_pname);
 
 var _heroIdx = 0;
@@ -700,6 +714,23 @@ function toggleSidebar() {
 }
 
 init();
+
+// The catalog hydrates from the server asynchronously (egstore-api.js), so the
+// real product image may land AFTER this first synchronous render. Re-resolve
+// _prod and re-render the gallery when the hydrate fires its storage event —
+// preserving the buyer's current color/size selection.
+window.addEventListener('storage', function(e){
+  if (e && e.key && e.key !== 'eg_catalog_products' && e.key !== 'eg_catalog_products_blob') return;
+  var fresh = pdResolveProduct();
+  if (!fresh || !fresh._storeRecord) return;
+  if (_pname && !fresh._storeRecord) fresh.name = decodeURIComponent(_pname);
+  _prod = fresh;
+  _images = [];
+  if (_prod.img) _images.push(_prod.img);
+  if (Array.isArray(_prod.extraImages)) _prod.extraImages.forEach(function(im){ if (im && _images.indexOf(im) < 0) _images.push(im); });
+  pdRenderThumbs();
+  setHero(_heroIdx < _images.length ? _heroIdx : 0);
+});
 </script>
 <script>
 (function(){
