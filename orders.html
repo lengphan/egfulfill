@@ -5067,15 +5067,66 @@ function _afmPayNow(){
   var el=document.getElementById('_afm-amt'), amt=parseFloat(el&&el.value)||0;
   if(!amt||amt<=0){ if(typeof pushFailToast==='function') pushFailToast('Enter an amount greater than $0'); return; }
   var method=(document.getElementById('_afm-method')||{}).value||'bidv';
-  // NO instant credit — real money must actually move and confirm first. The old in-place
-  // credit was a demo shortcut with NO payment gate (entering an amount could add balance
-  // with nothing transferred). Hand off to the wallet's REAL, gated flow: BIDV = scan-to-pay
-  // QR that only credits once the bank transfer lands, card = Stripe, paypal = PayPal.
-  // Orders are persisted (_pendingSync) so navigating here never drops them; the balance
-  // changes ONLY after the payment is confirmed.
-  var wMethod=(method==='bidv')?'vietqr':method;   // wallet uses 'vietqr' for BIDV
+  // NO instant credit — money must move and the SERVER must confirm it. BIDV runs IN PLACE:
+  // the real scan-to-pay QR (same /api/vietqr endpoints the wallet uses), crediting ONLY when
+  // the server reports the transfer landed. Card / PayPal use the gateways on the wallet page,
+  // so hand those off (orders persist via _pendingSync).
+  if(method==='bidv'){ _afmStartVietQR(amt); return; }
   var mm=document.getElementById('_afm'); if(mm) mm.style.display='none';
-  window.location.href='wallet.html?addfunds=1&amount='+encodeURIComponent(amt)+'&method='+encodeURIComponent(wMethod);
+  window.location.href='wallet.html?addfunds=1&amount='+encodeURIComponent(amt)+'&method='+encodeURIComponent(method);
+}
+var _afmVqrRef='', _afmVqrPoll=null;
+function _afmStartVietQR(amountUSD){
+  var tok=localStorage.getItem('eg_token')||'';
+  var BANK='970418', ACCT='1231255899', NAME='PHAN MY LINH', RATE=27000;
+  var vnd=Math.max(1000, Math.round(amountUSD*RATE/1000)*1000);
+  var ref=('EG'+Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,14);
+  _afmVqrRef=ref;
+  var fallbackQr='https://img.vietqr.io/image/'+BANK+'-'+ACCT+'-qr_only.png?amount='+vnd+'&addInfo='+encodeURIComponent(ref)+'&accountName='+encodeURIComponent(NAME);
+  var prev=document.getElementById('_afm'); if(prev) prev.style.display='none';
+  var m=document.getElementById('_afmvqr');
+  if(!m){ m=document.createElement('div'); m.id='_afmvqr'; m.style.cssText='display:none;position:fixed;inset:0;z-index:620;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif'; document.body.appendChild(m); m.addEventListener('click',function(e){ if(e.target===m) _afmCloseVietQR(); }); }
+  m.innerHTML='<div style="background:#fff;border-radius:16px;width:380px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:17px;font-weight:800;color:#191918">Scan to pay · BIDV</div><button type="button" onclick="_afmCloseVietQR()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
+    + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918">$'+amountUSD.toFixed(2)+'</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer &asymp; &#8363;'+vnd.toLocaleString()+'</div></div>'
+    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><img id="_afm-vqr-img" src="'+fallbackQr+'" alt="VietQR" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;object-fit:contain;background:#fff" onerror="this.style.opacity=.3"/></div>'
+    + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:10px">'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b style="font-family:monospace">'+ACCT+'</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Name</span><b>'+NAME+'</b></div>'
+      + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Note (required)</span><b id="_afm-vqr-ref" style="font-family:monospace;color:#b45309">'+ref+'</b></div>'
+    + '</div>'
+    + '<div style="font-size:11.5px;color:#9ca3af;text-align:center;margin-bottom:10px">Scan with your banking app — keep the note, it confirms your top-up automatically.</div>'
+    + '<div id="_afm-vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:9px;background:#f6f5f4;border-radius:9px">Waiting for your transfer&hellip;</div>'
+    + '</div>';
+  m.style.display='flex';
+  // Ask the server for a monitored VA-backed QR (same endpoint the wallet page uses) so the
+  // bank callback always fires and the top-up auto-confirms.
+  fetch('/api/vietqr/create-payment',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({amount:vnd,note:ref})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(!d||d.error) return;
+      if(d.note||d.ref){ _afmVqrRef=d.note||d.ref; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; }
+      var qi=document.getElementById('_afm-vqr-img'); if(qi && d.qrLink && /^https?:/i.test(d.qrLink)) qi.src=d.qrLink;
+    }).catch(function(){});
+  // Poll — credit ONLY when the server confirms the matching transfer landed.
+  if(_afmVqrPoll) clearInterval(_afmVqrPoll);
+  var started=Date.now();
+  _afmVqrPoll=setInterval(function(){
+    if(Date.now()-started>15*60*1000){ clearInterval(_afmVqrPoll); _afmVqrPoll=null; return; }
+    fetch('/api/vietqr/status?ref='+encodeURIComponent(_afmVqrRef),{headers:tok?{Authorization:'Bearer '+tok}:{}})
+      .then(function(r){return r.json();}).then(function(d){ if(d&&d.paid){ clearInterval(_afmVqrPoll); _afmVqrPoll=null; _afmVqrPaid(amountUSD); } }).catch(function(){});
+  },4000);
+}
+function _afmCloseVietQR(){ if(_afmVqrPoll){clearInterval(_afmVqrPoll);_afmVqrPoll=null;} var m=document.getElementById('_afmvqr'); if(m) m.style.display='none'; }
+function _afmVqrPaid(amountUSD){
+  // Server confirmed the transfer landed — this is the ONLY path that credits the wallet.
+  var before=parseFloat(localStorage.getItem('eg_balance')||'0')||0, target=parseFloat((before+amountUSD).toFixed(2));
+  try{ localStorage.setItem('eg_balance', target.toFixed(2)); }catch(e){}
+  document.querySelectorAll('#balance-val').forEach(function(x){ x.textContent='$'+target.toFixed(2); });
+  if(typeof SELLER_BALANCE!=='undefined') SELLER_BALANCE=target;
+  var st=document.getElementById('_afm-vqr-status'); if(st){ st.style.background='#e7f6ec'; st.style.color='#15803d'; st.textContent='Payment received — $'+amountUSD.toFixed(2)+' added'; }
+  if(typeof pushFailToast==='function') pushFailToast('Wallet topped up — new balance $'+target.toFixed(2));
+  setTimeout(_afmCloseVietQR, 2200);
 }
 function openQuickTopUp(){
   if(typeof openDepositModal==='function'){openDepositModal();return;}
