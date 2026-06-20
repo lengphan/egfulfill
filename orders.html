@@ -2991,6 +2991,9 @@ function saveQuickPositionModal() {
       h: parseFloat(wrap.style.height) || 50
     };
   }
+  // Persist the items (designPos + designUrl) so the position survives a reload
+  // AND syncs to the factory boards — previously it lived only in memory.
+  try { if (o && typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { items: o.itemsList }); } catch (e) {}
   closeQuickPositionModal();
   _qpSyncEverywhere();
 }
@@ -3054,7 +3057,17 @@ function qpRemoveBg() {
       // Persist on the item + the shared design cache so it survives reloads and
       // shows on the factory boards' composites.
       item.designUrl = out;
-      try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, itemDK(item), out); } catch(e){}
+      const _dk = itemDK(item);
+      // CRITICAL: also overwrite the live upload state. _itemDesignURL reads
+      // UP_STATE FIRST, so without this the original (with background) would win
+      // again on reopen — the bg-removal looked like it didn't persist.
+      try { if (UP_STATE[o.no] && UP_STATE[o.no][_dk]) UP_STATE[o.no][_dk].dataUrl = out; } catch(e){}
+      try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _dk, out); } catch(e){}
+      // Persist to the server-backed design store so the factory boards get the
+      // bg-removed version too (not just this browser).
+      try { if (typeof EGStore !== 'undefined' && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _dk, out); } catch(e){}
+      // Persist the item (designUrl) so the bg-removed design syncs to the factory.
+      try { if (typeof EGStore !== 'undefined' && EGStore.update && o.id) EGStore.update(o.id, { items: o.itemsList }); } catch(e){}
       _qpSyncEverywhere();
       if (typeof toast === 'function') toast('Background removed');
     } finally {
