@@ -499,7 +499,21 @@
   // Full right-side action cluster for an item row. Drop-in replacement for the
   // boards' hand-written Upload/Templates/Design Maker button group, plus the
   // product + print-method pickers when the order is still "new".
-  function itemActions(o, it) {
+  // Trash button HTML — shared by itemActions (inline) and itemTrash (when a
+  // board wants to place the delete control elsewhere on the row, e.g. admin
+  // pins it to the far end). Only while New, keeps ≥1 item.
+  function _trashHtml(num, sku) {
+    return '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+  }
+  function itemTrash(o, it) {
+    o = o || {}; it = it || {};
+    var num = o.num || o.id || '';
+    assignDesignKeys(o.items);
+    var sku = itemDK(it);
+    return isNewOrder(o) ? _trashHtml(num, sku) : '';
+  }
+  function itemActions(o, it, opts) {
+    opts = opts || {};
     o = o || {}; it = it || {};
     var num = o.num || o.id || '';
     assignDesignKeys(o.items);            // ensure every line has a stable _dk
@@ -564,10 +578,9 @@
     // state — the design then lives solely in the click-to-zoom image lightbox.
     var designField = isNewOrder(o) ? _field('Design', uploadBtn) : '';
     var moreBtn = '<button title="More — Templates · Design Maker" onclick="EGDesignTools._moreMenu(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'' + jsAttr(name) + '\',this,event)" style="background:#fff;border:1px solid #e5e4e0;border-radius:6px;cursor:pointer;color:#6b7280;padding:2px 8px 4px;font-size:14px;line-height:1;font-family:inherit;flex-shrink:0" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#6b7280\'">⋯</button>';
-    // Delete (trash) — only while New, keeps ≥1 item.
-    var delBtn = isNewOrder(o)
-      ? '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
-      : '';
+    // Delete (trash) — only while New, keeps ≥1 item. A board can suppress it
+    // here (opts.noTrash) and render EGDesignTools.itemTrash(o,it) elsewhere.
+    var delBtn = (isNewOrder(o) && !opts.noTrash) ? _trashHtml(num, sku) : '';
     // Upload/Templates/Design Maker now live as tabs inside the one Design panel,
     // so the row needs a single Design button — the ⋯ overflow menu is retired.
     // Left-packed so the controls sit right after the (capped) product title — no
@@ -978,7 +991,7 @@
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,

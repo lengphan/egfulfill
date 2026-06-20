@@ -4575,7 +4575,7 @@ function whRenderOrders() {
             const _overlay = _designSrc
               ? `<img src="${_designSrc}" style="position:absolute;left:${_pos.x}%;top:${_pos.y}%;width:${_pos.w}%;height:${_pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
               : '';
-            const thumb = (_isNewSetup && !_pickedProdImg && !_custImg && !_designSrc)
+            const thumb = (_isNewSetup && !_pickedBlank)
               ? `<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d4c9a8;margin-right:10px;background:#fbf8ef"></div>`
               : `<div onclick="event.stopPropagation();admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="View product composite" style="position:relative;width:40px;height:40px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:${tBg};cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"><img src="${prodImg}" onerror="this.src='https://placehold.co/52x52/f0ede9/9ca3af?text=Item'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}</div>`;
             const _stock = whStockState(it.sku);
@@ -4658,16 +4658,32 @@ function whRenderOrders() {
             // Drop the per-item working status once the order ships / is terminal —
             // only the parent order status remains.
             const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
-            const _fsLabelAdm = (_fs === 'working' && !_orderDone) ? 'Working' : '';
+            // Per-item factory status: Working once started; otherwise surface a
+            // status for items not yet in production ('New') so every item row
+            // carries a status under the STATUS column.
+            const _fsLabelAdm = (_fs === 'working' && !_orderDone) ? 'Working'
+                              : (_isNewSetup ? 'New' : '');
             const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#191918;white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
-            return `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;${sep}">
-              ${thumb}
-              <div style="${_isNewSetup ? 'flex:0 1 auto;max-width:240px' : 'flex:1'};min-width:0;margin-right:16px">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
+            const _nameInner = `<div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
                 <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                   ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
-                </div>
+                </div>`;
+            // NEW-setup rows: name (capped left) · selector + design centered ·
+            // status under the STATUS column · trash pinned to the row's far end.
+            // In-review rows keep the original full-width meta layout.
+            return _isNewSetup
+              ? `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;position:relative;${sep}">
+              ${thumb}
+              <div style="flex:0 1 auto;max-width:240px;min-width:0;margin-right:16px">${_nameInner}</div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;min-width:0">
+                ${window.EGDesignTools ? EGDesignTools.itemActions(o, it, {noTrash:true}) : ''}
               </div>
+              ${_fsChip}
+              ${window.EGDesignTools ? '<span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center">' + EGDesignTools.itemTrash(o, it) + '</span>' : ''}
+            </div>`
+              : `<div style="display:flex;align-items:center;gap:0;padding:8px 14px 8px 44px;${sep}">
+              ${thumb}
+              <div style="flex:1;min-width:0;margin-right:16px">${_nameInner}</div>
               ${_fsChip}
               ${window.EGDesignTools ? EGDesignTools.itemActions(o, it) : ''}
             </div>`;
