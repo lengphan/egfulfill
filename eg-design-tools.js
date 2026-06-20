@@ -616,11 +616,15 @@
       // borderless/transparent so they read as one continuous control.
       var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;max-width:160px;-webkit-appearance:none;-moz-appearance:none;appearance:none';
       var _dot = '<span style="color:#c4c3be;font-weight:700;padding:0 3px;flex-shrink:0">·</span>';
+      // Fixed-width box: each variant select is LOCKED to a set width (matching the
+      // first item's tidy sizing) and clips overflow, so a long product title can no
+      // longer stretch the row. The full value is one click away in the editor.
+      var _selW = function (w) { return selIn + ';width:' + w + 'px;max-width:' + w + 'px;flex-shrink:0'; };
       pickers = '<div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:3px 10px;background:#fff;max-width:100%;overflow:hidden">'
-        + '<select title="Base product" style="' + selIn + ';max-width:150px" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
-        + '<select title="Colour" style="' + selIn + ';max-width:96px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>' + _dot
-        + '<select title="Size" style="' + selIn + ';max-width:74px" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>' + _dot
-        + '<select title="Print method" style="' + selIn + ';max-width:96px" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>'
+        + '<select title="Base product" style="' + _selW(138) + '" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
+        + '<select title="Colour" style="' + _selW(68) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>' + _dot
+        + '<select title="Size" style="' + _selW(42) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>' + _dot
+        + '<select title="Print method" style="' + _selW(86) + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>'
         + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into

@@ -286,11 +286,18 @@
         it = it || {};
         var ds = it.designSrc;
         if (typeof ds === 'string' && ds.indexOf('data:') === 0) ds = null;   // never ship a data blob
+        // Persist the load-bearing fields so an EDIT can't wipe them on the next
+        // hydrate: the chosen blank (name), the design position, and the listing/
+        // hero image. The blank PHOTO is NOT shipped (it lives in the shared
+        // catalog and resolves by SKU). Hero img is shipped only when it's a real
+        // URL — never a multi-MB data: blob — so patches stay light.
+        var heroImg = (it.img && /^https?:/.test(String(it.img))) ? it.img : null;
         return {
           sku: it.sku, name: it.name, listing: it.listing,
           printType: it.printType || it.tech, tech: it.tech,
           qty: it.qty, color: it.color, size: it.size, variant: it.variant,
-          unitPrice: it.unitPrice, designSrc: ds
+          unitPrice: it.unitPrice, designSrc: ds,
+          blank: it.blank || null, img: heroImg, designPos: it.designPos || null
         };
       });
     }

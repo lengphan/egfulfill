@@ -211,8 +211,14 @@
     // toCSZ comes pre-joined ("City, ST ZIP"); append it if provided
     if (!opts.toText && opts.toCSZ) toText = [opts.toName, [opts.toStreet, opts.toApt].filter(Boolean).join(', '), opts.toCSZ].filter(Boolean).join('\n');
     setv('egusps-to', toText);
-    setv('egusps-from', addrToText(getOrigin() || {}));
-    _toggleFrom(false); _syncFromSummary();   // collapsed inline summary by default
+    var _origin = getOrigin() || {};
+    setv('egusps-from', addrToText(_origin));
+    // No saved return address yet → EXPAND the ship-from so it's obvious it must be
+    // filled. It's required for the label and easy to miss collapsed as "Set return
+    // address" (the cause of the "Ship from needs a street…" surprise). Once the
+    // user generates once, setOrigin() remembers it and it opens collapsed after.
+    var _hasOrigin = !!(_origin && _origin.street && _origin.zip);
+    _toggleFrom(_hasOrigin ? false : true); _syncFromSummary();
     // Header "+ New Label" passes no order → leave everything blank but the ship-from.
     setv('egusps-ref1', opts.orderNum || '');
     setv('egusps-ref2', opts.seller || (opts.orderNum ? 'Seller' : ''));

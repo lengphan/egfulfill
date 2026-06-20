@@ -3902,11 +3902,17 @@ function renderOpOrders() {
           // (so a synced order's artwork shows BEFORE a blank is picked) → catalog/
           // seller fallback. Only a truly empty item shows the dashed placeholder.
           const _designSrc = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc(o.num, it) : '';
-          const _custImg = (it.img && /^(https?:|data:)/.test(String(it.img))) ? it.img : '';
+          // Cross-board chosen blank: when picked on ANOTHER board the local setup
+          // store is empty, but it.blankImg carries the blank's catalog photo — use
+          // it so the blank shows everywhere. The LISTING image (it.img) is NEVER
+          // used in the thumbnail; it belongs to the order hero only. No blank +
+          // no design → the dashed "pick a blank" placeholder (not the listing).
+          const _blankImg = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : '';
+          const _blankChosen = !!(_pickedBlank || it.blank || _pickedProdImg || _blankImg);
           const prodImg = (_pickedProdImg && /^(https?:|data:)/.test(_pickedProdImg) ? _pickedProdImg : null)
-            || _custImg
+            || _blankImg
             || (_isNewSetup ? '' : (((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
-          const thumb = (_isNewSetup && !_pickedProdImg && !_custImg && !_designSrc)
+          const thumb = (_isNewSetup && !_blankChosen && !_designSrc)
             ? '<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d4c9a8;margin-right:10px;background:#fbf8ef"></div>'
             : opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 40);
           // Pushed-to-board state (greyed out when already sent)
@@ -4086,7 +4092,7 @@ function opLabelData(num) {
   var fa = (typeof FOM_ADDR_DATA !== 'undefined') ? FOM_ADDR_DATA[num] : null;
   if (fa) { name = fa.name || ''; street = fa.line || ''; city = fa.city || ''; var sp = (fa.state || '').trim().split(/\s+/); state = (sp[0] || '').toUpperCase(); zip = sp.slice(1).join(' ') || ''; }
   if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
-    try { var eg = (EGStore.getOrders() || []).find(function (x) { return x.id === num; }); if (eg) { egId = eg.id; if (eg.customer) { name = eg.customer.name || ''; var sh = eg.customer.shipTo || {}; street = sh.street || ''; apt = sh.apt || ''; city = sh.city || ''; state = sh.state || ''; zip = sh.zip || ''; } } } catch (e) {}
+    try { var eg = (EGStore.getOrders() || []).find(function (x) { return x.id === num; }); if (eg) { egId = eg.id; var sh = (EGStore.getShipTo && EGStore.getShipTo(eg)) || (eg.customer && eg.customer.shipTo) || {}; name = sh.name || (eg.customer && eg.customer.name) || ''; street = sh.street || ''; apt = sh.apt || ''; city = sh.city || ''; state = sh.state || ''; zip = sh.zip || ''; } } catch (e) {}
   }
   if (!name) name = o.customer || '';
   var csz = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
@@ -6244,9 +6250,12 @@ function opLblOrderChange() {
   if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
     try {
       const eg = (EGStore.getOrders() || []).find(x => x.id === num);
-      if (eg && eg.customer) {
-        name = eg.customer.name || '';
-        const sh = eg.customer.shipTo || {};
+      if (eg) {
+        // getShipTo reads customer.shipTo (manual) OR address.line1/line2 (Etsy/DB)
+        // so a SYNCED order's address hydrates below the name — without it, label
+        // creation was blocked because the ship-to came up empty.
+        const sh = (EGStore.getShipTo && EGStore.getShipTo(eg)) || (eg.customer && eg.customer.shipTo) || {};
+        name   = sh.name || (eg.customer && eg.customer.name) || '';
         street = sh.street || '';
         apt    = sh.apt    || '';
         city   = sh.city   || '';
@@ -6467,9 +6476,11 @@ function plLblOrderChange() {
   if (!name && typeof EGStore !== 'undefined' && EGStore.getOrders) {
     try {
       const eg = (EGStore.getOrders() || []).find(x => x.id === num || x.id === o.num);
-      if (eg && eg.customer) {
-        name   = eg.customer.name || '';
-        const ship = eg.customer.shipTo || {};
+      if (eg) {
+        // Normalize both shapes (manual customer.shipTo / synced address.line1)
+        // so manual AND Etsy orders both fill the ship-to for label creation.
+        const ship = (EGStore.getShipTo && EGStore.getShipTo(eg)) || (eg.customer && eg.customer.shipTo) || {};
+        name   = ship.name || (eg.customer && eg.customer.name) || '';
         street = ship.street || '';
         apt    = ship.apt    || '';
         city   = ship.city   || '';

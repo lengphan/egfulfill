@@ -17,6 +17,10 @@ export function ordersRoutes(app, requireAuth) {
   // ONLY real Etsy imports (etsy- id) are factory orders; everything else (manual
   // seller orders) must be factory_order=false so the seller keeps seeing them.
   q(`update orders set factory_order = (id like 'etsy-%') where factory_order is distinct from (id like 'etsy-%')`).catch(() => {});
+  // Composite design position {x,y,w,h} per line item — persisted so the mockup
+  // overlay lands in the same spot on every board + the mobile app after a sync.
+  // schema.sql already declares it for fresh DBs; this covers older ones.
+  q('alter table order_items add column if not exists design_pos jsonb').catch(() => {});
   // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
   // the moment a seller uploads a few images → "Browser storage is full"). One row
   // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
@@ -89,14 +93,24 @@ export function ordersRoutes(app, requireAuth) {
   // mockup on the mobile app — the boards persist these when an operator picks a
   // base blank for a still-"new" item.
   async function replaceItems(orderId, items) {
+    // The seller's uploaded LISTING image (it.img) is heavy, and a lean client
+    // patch may legitimately omit it (send null) to keep the payload small. Snapshot
+    // the existing img per SKU and re-inherit it when an incoming item doesn't carry
+    // one — otherwise an edit (e.g. picking a blank, changing qty) wipes the stored
+    // picture. That wipe is the root of "the image disappears every time I edit".
+    const prev = await q('select sku, img from order_items where order_id=$1', [orderId]);
+    const imgBySku = {};
+    for (const r of prev.rows) { if (r.sku != null && r.img && !(r.sku in imgBySku)) imgBySku[r.sku] = r.img; }
     await q('delete from order_items where order_id=$1', [orderId]);
     for (const it of items) {
+      const img = (it.img != null && it.img !== '') ? it.img : (imgBySku[it.sku] || null);
+      const designPos = (it.designPos && typeof it.designPos === 'object') ? JSON.stringify(it.designPos) : null;
       await q(
-        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
          it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
-         it.img || null, it.blank || null]
+         img, it.blank || null, designPos]
       );
     }
   }

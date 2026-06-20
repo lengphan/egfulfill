@@ -1535,6 +1535,12 @@ function saveItemField(ordNo, escSku, field, value) {
     edits[k] = Object.assign({}, edits[k] || {}, { [field]: value });
     localStorage.setItem(EG_EDIT_KEY, JSON.stringify(edits));
   } catch(e) {}
+  // Push the change to the server so the chosen blank / variant / size SURVIVES the
+  // next hydrate. Without this, an upload-triggered re-hydrate overwrites the local
+  // item with the server's stale copy (blank=null) → the blank vanishes and the
+  // composite reverts to the listing image. The lean push ships blank/designPos and
+  // the blank photo resolves from the shared catalog, so this stays light.
+  try { if (window.EGStore && EGStore.update && o.id) EGStore.update(o.id, { items: o.itemsList }); } catch(e) {}
   // Re-render the orders table so the row reflects the new product name + SKU
   // immediately (the rename + variant resolution above changed both).
   if (typeof renderOrders === 'function') renderOrders();
@@ -2777,7 +2783,12 @@ function _itemMockupURL(item) {
   try {
     if (window.EGStore && EGStore.getCatalogProducts) {
       const base = String(item.sku || '').split('-')[0];
+      const blankName = String(item.blank || '');
       const product = EGStore.getCatalogProducts().find(p =>
+        // Match the chosen blank by NAME first — it.blank survives every sync,
+        // whereas the variant SKU often belongs to the marketplace listing, not the
+        // blank. This is what makes the blank photo rehydrate reliably (multi-seller).
+        (blankName && String(p.name || '') === blankName) ||
         (Array.isArray(p.variantSkus) && p.variantSkus.some(v => v && v.sku === item.sku)) ||
         (p.sku && base && p.sku.toUpperCase() === base.toUpperCase())
       );
@@ -2789,14 +2800,13 @@ function _itemMockupURL(item) {
       }
     }
   } catch (e) {}
-  // The chosen blank's catalog image (stored separately from the listing image).
+  // The chosen blank's catalog image cache (kept separate from the listing image).
   if (item.blankImg && !/placehold\.co/i.test(String(item.blankImg))) return item.blankImg;
-  // Last-resort fallback: the per-item img saved when the order was created.
-  // Filters out placehold.co stubs so we don't render a generic gray placeholder
-  // when a real catalog image might still be coming.
-  const fallback = item.img || '';
-  if (fallback && !/placehold\.co/i.test(fallback)) return fallback;
-  return fallback;
+  // NO listing-image (item.img) fallback on purpose: the item thumbnail is the
+  // BLANK + design composite, never the marketplace/manual listing photo (that
+  // belongs only to the order hero). Returning '' makes the card render its
+  // "pick a blank" placeholder instead of confusingly showing the listing image.
+  return '';
 }
 // Per-line DESIGN KEY. Two line items can share a blank SKU (e.g. two different
 // products both on G5000-COPY-WHT-S) yet need DIFFERENT artwork. Design state
@@ -2860,6 +2870,11 @@ function itemCompositeThumb(o, item, size) {
   size = size || 36;
   const mockup = _itemMockupURL(item);
   const design = _itemDesignURL(o, item);
+  // No blank resolved AND no design yet → show the empty "pick a blank" placeholder
+  // (dashed), never the listing image. The seller clicks back in to pick a blank.
+  if (!mockup && !design) {
+    return `<div title="Pick a blank to preview" style="width:${size}px;height:${size}px;border:1px dashed #d4c9a8;border-radius:7px;background:#fbf8ef;flex-shrink:0"></div>`;
+  }
   const pos = item.designPos || { x:25, y:25, w:50, h:50 };
   const escSku = item.sku.replace(/[^a-zA-Z0-9]/g, '_');
   const hasDesign = !!design;
@@ -4250,6 +4265,10 @@ function odmRemoveDesign(ordNo, sku) {
 
           platId: 'MA-' + String(lo.id).slice(-5),
           cust: (lo.customer && lo.customer.name) || 'Customer',
+          // Recipient address — manual orders keep it on customer.shipTo, synced
+          // ones on `address`. getShipTo normalizes both so the modal Ship-To shows
+          // the REAL address (not the demo fallback) for every live order, manual or synced.
+          addr: (function(){ try { var s = (window.EGStore && EGStore.getShipTo) ? EGStore.getShipTo(lo) : null; return (s && s.street) ? { line1: s.street, line2: s.apt || '', city: s.city || '', state: s.state || '', zip: s.zip || '', country: 'US' } : null; } catch(e){ return null; } })(),
           // Delivery cell falls back through: service from import → service from label gen → 'Standard'
           del: lo.service || 'Standard',
           carrier: lo.carrier || '',
