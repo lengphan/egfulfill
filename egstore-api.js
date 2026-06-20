@@ -125,7 +125,7 @@
   function dbToOrder(r) {
     return { id: r.id, seq: r.seq != null ? Number(r.seq) : null, meta: r.meta || {}, store: r.store, seller: r.store, source: r.source,
              customer: r.customer || {}, address: r.address || {},
-             status: r.status, factoryStatus: r.factory_status,
+             status: r.status, factoryStatus: r.factory_status, factoryOrder: r.factory_order === true,
              total: Number(r.total) || 0, profit: Number(r.profit) || 0,
              delivery: r.delivery, carrier: r.carrier, service: r.service, tracking: r.tracking,
              timeline: r.timeline || [], notes: r.notes || [], gates: r.gates || {},

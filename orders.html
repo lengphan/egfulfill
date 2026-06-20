@@ -4256,7 +4256,12 @@ function odmRemoveDesign(ordNo, sku) {
         if (seedIds.has(lo.id)) continue; // already in seed (or already hydrated this load)
         // Factory-synced marketplace orders (connected from the admin board) are
         // fulfilled through admin/warehouse/operator ONLY — never shown to the seller.
-        if (/^etsy-/i.test(String(lo.id)) || ['etsy','shopify','tiktok','woocommerce','amazon','ebay'].indexOf(String(lo.source || '').toLowerCase()) !== -1) continue;
+        // Hide ONLY admin-connected factory orders (the server flags these
+        // factory_order=true) and Etsy admin imports — NOT the seller's own
+        // channel-synced orders. The previous `source`-based guard wrongly hid a
+        // seller's own Shopify/Woo order the moment a hydrate stamped its source,
+        // making it "vanish" after the design-maker round-trip.
+        if (/^etsy-/i.test(String(lo.id)) || lo.factoryOrder === true) continue;
         // Convert EGStore schema → seller-table row schema
         const created = lo.submittedAt ? new Date(lo.submittedAt) : new Date();
         const fmtDate = (created.getMonth()+1) + '/' + created.getDate() + '/' + created.getFullYear();
@@ -6967,22 +6972,26 @@ function importFromGoogleSheet() {
 // its "make a copy" link; otherwise copy our exact columns (+ an example row) to the
 // clipboard and open a blank sheet for the seller to paste into cell A1.
 function createGoogleSheetTemplate() {
-  // Service account available → server creates a ready-filled sheet and we open it
-  // + prefill the import box, so the seller fills rows then clicks Load.
-  if (_gsheetConfig && _gsheetConfig.canCreate) {
-    var link = document.getElementById('gsheet-template-link'); var prev = link ? link.textContent : '';
-    if (link) link.textContent = 'Creating…';
-    var w = window.open('', '_blank');   // open synchronously to dodge popup blockers
-    egApiPost('/api/sheets/create', {}).then(function (res) {
-      if (res.ok && res.data && res.data.url) {
-        if (w) w.location = res.data.url; else window.open(res.data.url, '_blank');
-        var inp = document.getElementById('gsheet-url'); if (inp) inp.value = res.data.url;
-        _importToast('Created a ready-to-fill sheet — fill your orders there, then click Load.', 'success', 6500);
-      } else { if (w) w.close(); _importToast((res.data && res.data.error) || 'Could not create the sheet', 'error', 5500); }
-    }).catch(function () { if (w) w.close(); _importToast('Network error creating the sheet', 'error'); })
-      .finally(function () { if (link) link.textContent = prev; });
-    return;
-  }
+  // ALWAYS try the server auto-create first — the service account builds a ready-FILLED
+  // sheet (headers + sample + dropdowns) and we just open it. Only fall back to the
+  // template link / copy-paste if the server reports it isn't configured. This means a
+  // stale client config can never force the manual copy-paste flow when auto-create works.
+  var link = document.getElementById('gsheet-template-link'); var prev = link ? link.textContent : '';
+  if (link) link.textContent = 'Creating…';
+  var w = window.open('', '_blank');   // open synchronously to dodge popup blockers
+  egApiPost('/api/sheets/create', {}).then(function (res) {
+    if (res.ok && res.data && res.data.url) {
+      if (w) w.location = res.data.url; else window.open(res.data.url, '_blank');
+      var inp = document.getElementById('gsheet-url'); if (inp) inp.value = res.data.url;
+      _importToast('Created a ready-to-fill sheet — fill your orders there, then click Load.', 'success', 6500);
+      return;
+    }
+    if (w) { try { w.close(); } catch (e) {} }
+    _gsheetFallbackTemplate();   // server has no service account → graceful fallback
+  }).catch(function () { if (w) { try { w.close(); } catch (e) {} } _gsheetFallbackTemplate(); })
+    .finally(function () { if (link) link.textContent = prev; });
+}
+function _gsheetFallbackTemplate() {
   if (_gsheetConfig && _gsheetConfig.templateUrl) { window.open(_gsheetConfig.templateUrl, '_blank'); return; }
   var example = [
     'SAMPLE-1001', 'Jane Sample — delete this row', 'jane@example.com',
@@ -6992,7 +7001,6 @@ function createGoogleSheetTemplate() {
     'USPS Priority Mail', 'Example row — safe to delete'
   ];
   var tsv = [CSV_HEADERS.join('\t'), example.join('\t')].join('\n');
-  // Open the blank sheet synchronously (inside the click) so it isn't popup-blocked.
   window.open('https://sheets.new', '_blank');
   var done = function () { _importToast('Column headers copied. In the new Google Sheet, click cell A1 and paste (⌘/Ctrl+V), fill in your orders, then Share → Anyone with the link → Viewer and paste the link here.', 'info', 7500); };
   try {
