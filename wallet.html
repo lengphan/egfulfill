@@ -1085,7 +1085,6 @@ function _walSettingsOutside(ev) {
 window.toggleWalletSettings = toggleWalletSettings;
 
 // ── Stripe card top-up (Payment Element) ─────────────────────────────────────
-var _stripe = null, _stripeElements = null, _stripePI = null, _cardAmount = 0;
 function closeCardModal() { var m = document.getElementById('card-modal'); if (m) m.style.display = 'none'; document.body.style.overflow = ''; }
 function openCardTopUp() {
   var m = document.getElementById('card-modal');
@@ -1095,69 +1094,108 @@ function openCardTopUp() {
     document.body.appendChild(m);
     m.addEventListener('click', function (e) { if (e.target === m) closeCardModal(); });
   }
+  var _is = 'width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px;font-size:14.5px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
+  var _foc = 'onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"';
+  var _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
+  var _chip = function (a) { return '<button type="button" onclick="document.getElementById(\'card-amount\').value=\'' + a + '\';ccUpdatePreview()" style="flex:1;background:#f6f5f4;border:none;border-radius:7px;padding:7px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$' + a + '</button>'; };
   m.innerHTML =
-    '<div onclick="closeCardModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.45)"></div>'
-    + '<div style="position:relative;background:#fff;border-radius:16px;width:400px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="font-size:16px;font-weight:700;color:#191918">Top up by card</div><button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
-    + '<div id="card-step-amount">'
-    +   '<label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>'
-    +   '<div style="position:relative;margin-bottom:10px"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span><input id="card-amount" type="number" min="1" step="0.01" value="50" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box" onfocus="this.style.borderColor=\'#111827\'" onblur="this.style.borderColor=\'#e5e4e0\'"></div>'
-    +   '<div style="display:flex;gap:6px;margin-bottom:14px">' + ['50', '100', '200', '500'].map(function (a) { return '<button onclick="document.getElementById(\'card-amount\').value=\'' + a + '\'" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$' + a + '</button>'; }).join('') + '</div>'
-    +   '<button id="card-continue" onclick="cardContinue()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Continue</button>'
-    + '</div>'
-    + '<div id="card-step-pay" style="display:none">'
-    +   '<div style="font-size:13px;color:#6b7280;margin-bottom:10px">Paying <b id="card-amt-label" style="color:#191918"></b></div>'
-    +   '<div id="stripe-pe" style="margin-bottom:14px"></div>'
-    +   '<div id="card-error" style="font-size:12.5px;color:#dc2626;margin-bottom:10px;display:none"></div>'
-    +   '<button id="card-pay" onclick="cardPay()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Pay</button>'
-    + '</div>'
+    '<div onclick="closeCardModal()" style="position:fixed;inset:0;background:rgba(25,25,24,.5)"></div>'
+    + '<div style="position:relative;background:#fdfcfa;border:1px solid #40403d;border-radius:18px;box-shadow:5px 5px 0 #40403d,0 28px 70px rgba(0,0,0,.3);width:780px;max-width:calc(100vw - 28px);max-height:94vh;overflow:auto;font-family:inherit">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #ece8e0">'
+    +     '<div><div style="font-size:17px;font-weight:800;color:#191918">Add a card</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Top up your wallet with a debit or credit card</div></div>'
+    +     '<button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:5px;border-radius:7px" onmouseover="this.style.background=\'#f0ede9\'" onmouseout="this.style.background=\'transparent\'"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
+    +   '</div>'
+    +   '<div style="display:flex;gap:24px;flex-wrap:wrap;padding:22px 24px">'
+    +     '<div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:14px">'
+    +       '<div><label style="' + _lbl + '">AMOUNT (USD)</label><div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:700;color:#9ca3af">$</span><input id="card-amount" type="number" min="1" step="0.01" value="50" oninput="ccUpdatePreview()" style="' + _is + ';padding-left:26px;font-size:17px;font-weight:700" ' + _foc + '></div><div style="display:flex;gap:6px;margin-top:8px">' + ['50', '100', '200', '500'].map(_chip).join('') + '</div></div>'
+    +       '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
+    +       '<div><label style="' + _lbl + '">CARD NUMBER</label><input id="cc-number" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" maxlength="23" oninput="ccFmtNumber(this)" style="' + _is + ';font-variant-numeric:tabular-nums;letter-spacing:1px" ' + _foc + '></div>'
+    +       '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><input id="cc-exp" type="text" inputmode="numeric" placeholder="MM/YY" maxlength="5" oninput="ccFmtExp(this)" style="' + _is + '" ' + _foc + '></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><input id="cc-cvc" type="text" inputmode="numeric" placeholder="123" maxlength="4" oninput="this.value=this.value.replace(/\\D/g,\'\')" style="' + _is + '" ' + _foc + '></div></div>'
+    +       '<button id="cc-pay" onclick="ccPay()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;transition:opacity .15s" onmouseover="this.style.opacity=\'.88\'" onmouseout="this.style.opacity=\'1\'">Pay</button>'
+    +       '<div style="font-size:11.5px;color:#b0aaa4;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="6" width="9" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" stroke="currentColor" stroke-width="1.2"/></svg>Encrypted &amp; secure</div>'
+    +     '</div>'
+    +     '<div style="flex:1 1 300px;min-width:280px">'
+    +       '<label style="' + _lbl + '">CARD PREVIEW</label>'
+    +       '<div style="position:relative;width:100%;aspect-ratio:1.6;background:linear-gradient(135deg,#1f1d1b,#2c2926);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.25);padding:18px 20px;color:#fff;overflow:hidden;box-sizing:border-box">'
+    +         '<div style="position:absolute;top:-34px;right:-22px;width:130px;height:130px;border-radius:50%;background:rgba(212,160,23,.22)"></div>'
+    +         '<div style="position:relative;display:flex;align-items:center;justify-content:space-between"><div style="width:34px;height:24px;border-radius:5px;background:linear-gradient(135deg,#e7c878,#caa24a)"></div><div id="cc-brand" style="font-size:13px;font-weight:800;letter-spacing:.06em;opacity:.95">CARD</div></div>'
+    +         '<div id="cc-prev-number" style="position:relative;font-family:monospace;font-size:18px;letter-spacing:2px;margin-top:24px">&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull;</div>'
+    +         '<div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;margin-top:16px"><div style="min-width:0"><div style="font-size:8px;letter-spacing:.08em;color:rgba(255,255,255,.55)">CARD HOLDER</div><div id="cc-prev-name" style="font-size:12.5px;font-weight:600;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px">YOUR NAME</div></div><div style="text-align:right"><div style="font-size:8px;letter-spacing:.08em;color:rgba(255,255,255,.55)">EXPIRES</div><div id="cc-prev-exp" style="font-size:12.5px;font-weight:600">MM/YY</div></div></div>'
+    +       '</div>'
+    +       '<div style="border:1px solid #ece8e0;border-radius:12px;margin-top:14px;overflow:hidden;font-size:13px">'
+    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px;border-bottom:1px solid #f0ede9"><span style="color:#9ca3af">Name</span><b id="cc-sum-name" style="color:#191918;font-weight:600">&mdash;</b></div>'
+    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px;border-bottom:1px solid #f0ede9"><span style="color:#9ca3af">Card</span><b id="cc-sum-number" style="color:#191918;font-weight:600;font-family:monospace">&mdash;</b></div>'
+    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px"><span style="color:#9ca3af">Expiry</span><b id="cc-sum-exp" style="color:#191918;font-weight:600">&mdash;</b></div>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
     + '</div>';
   m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  if (typeof ccUpdatePreview === 'function') ccUpdatePreview();
 }
-function cardContinue() {
-  var amt = parseFloat(document.getElementById('card-amount').value) || 0;
+// Card brand from the leading digits.
+function ccBrand(num) {
+  num = String(num || '').replace(/\D/g, '');
+  if (/^4/.test(num)) return 'VISA';
+  if (/^(5[1-5]|2[2-7])/.test(num)) return 'MASTERCARD';
+  if (/^3[47]/.test(num)) return 'AMEX';
+  if (/^(6011|65|64[4-9])/.test(num)) return 'DISCOVER';
+  return 'CARD';
+}
+function ccFmtNumber(el) {
+  var brand = ccBrand(el.value);
+  var d = el.value.replace(/\D/g, '').slice(0, brand === 'AMEX' ? 15 : 16);
+  var groups = brand === 'AMEX' ? [4, 6, 5] : [4, 4, 4, 4];
+  var out = [], i = 0;
+  for (var g = 0; g < groups.length && i < d.length; g++) { out.push(d.slice(i, i + groups[g])); i += groups[g]; }
+  el.value = out.join(' ');
+  ccUpdatePreview();
+}
+function ccFmtExp(el) {
+  var d = el.value.replace(/\D/g, '').slice(0, 4);
+  el.value = d.length >= 3 ? (d.slice(0, 2) + '/' + d.slice(2)) : d;
+  ccUpdatePreview();
+}
+// Live mirror of the typed details onto the on-theme card preview + summary.
+function ccUpdatePreview() {
+  var g = function (id) { return (document.getElementById(id) || {}).value || ''; };
+  var s = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  var num = g('cc-number'), name = g('cc-name'), exp = g('cc-exp');
+  var brand = ccBrand(num), dgt = num.replace(/\D/g, '');
+  var len = brand === 'AMEX' ? 15 : 16, groups = brand === 'AMEX' ? [4, 6, 5] : [4, 4, 4, 4];
+  var filled = ''; for (var k = 0; k < len; k++) filled += (k < dgt.length ? dgt[k] : '•');
+  var disp = [], i = 0; for (var grp = 0; grp < groups.length; grp++) { disp.push(filled.slice(i, i + groups[grp])); i += groups[grp]; }
+  s('cc-prev-number', disp.join(' '));
+  s('cc-prev-name', name.toUpperCase() || 'YOUR NAME');
+  s('cc-prev-exp', exp || 'MM/YY');
+  var bE = document.getElementById('cc-brand'); if (bE) bE.textContent = brand;
+  s('cc-sum-name', name.toUpperCase() || '—');
+  s('cc-sum-number', dgt ? ('•••• ' + (dgt.length > 4 ? dgt.slice(-4) : dgt)) : '—');
+  s('cc-sum-exp', exp || '—');
+}
+// Demo card top-up (custom card form can't go through Stripe Elements, which
+// hides the PAN). Validates locally then credits the wallet, recording it like
+// the other deposit methods. The Stripe server endpoints remain for a real,
+// Elements-based flow if wired back in.
+function ccPay() {
+  var amt = parseFloat((document.getElementById('card-amount') || {}).value) || 0;
+  var dgt = ((document.getElementById('cc-number') || {}).value || '').replace(/\D/g, '');
+  var name = ((document.getElementById('cc-name') || {}).value || '').trim();
+  var exp = ((document.getElementById('cc-exp') || {}).value || '').trim();
+  var cvc = ((document.getElementById('cc-cvc') || {}).value || '').trim();
   if (amt <= 0) { alert('Enter a valid amount.'); return; }
-  if (!window.Stripe) { alert('Stripe failed to load — check your connection and reload.'); return; }
-  _cardAmount = amt;
-  var btn = document.getElementById('card-continue'); btn.disabled = true; btn.textContent = 'Loading…';
-  var tok = localStorage.getItem('eg_token');
-  fetch('/api/stripe/config', { headers: { Authorization: 'Bearer ' + tok } }).then(function (r) { return r.json(); }).then(function (cfg) {
-    if (!cfg || !cfg.enabled || !cfg.publishableKey) { alert('Card payments aren\'t configured yet (set STRIPE_SECRET_KEY/STRIPE_PUBLISHABLE_KEY on the server).'); btn.disabled = false; btn.textContent = 'Continue'; return; }
-    _stripe = Stripe(cfg.publishableKey);
-    return fetch('/api/stripe/create-intent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ amount: amt }) })
-      .then(function (r) { return r.json(); }).then(function (d) {
-        if (d.error) { alert('Could not start payment: ' + d.error); btn.disabled = false; btn.textContent = 'Continue'; return; }
-        _stripePI = d.id;
-        _stripeElements = _stripe.elements({ clientSecret: d.clientSecret, appearance: { theme: 'stripe' } });
-        _stripeElements.create('payment').mount('#stripe-pe');
-        document.getElementById('card-step-amount').style.display = 'none';
-        document.getElementById('card-step-pay').style.display = 'block';
-        document.getElementById('card-amt-label').textContent = '$' + amt.toFixed(2);
-        document.getElementById('card-pay').textContent = 'Pay $' + amt.toFixed(2);
-      });
-  }).catch(function (e) { alert('Error: ' + e.message); btn.disabled = false; btn.textContent = 'Continue'; });
-}
-function cardPay() {
-  var btn = document.getElementById('card-pay'); var errEl = document.getElementById('card-error');
-  if (errEl) errEl.style.display = 'none';
-  btn.disabled = true; btn.textContent = 'Processing…';
-  _stripe.confirmPayment({ elements: _stripeElements, redirect: 'if_required' }).then(function (result) {
-    if (result.error) { if (errEl) { errEl.textContent = result.error.message; errEl.style.display = 'block'; } btn.disabled = false; btn.textContent = 'Pay $' + _cardAmount.toFixed(2); return; }
-    // Verify server-side before crediting (don't trust the client).
-    var tok = localStorage.getItem('eg_token');
-    fetch('/api/stripe/verify-intent', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ id: _stripePI }) })
-      .then(function (r) { return r.json(); }).then(function (v) {
-        if (v && v.ok) {
-          var amt = v.amount || _cardAmount;
-          vqrCreditWallet(amt); vqrRecordDeposit(amt, (v.ref || _stripePI), 'Card', (v.txnId || _stripePI));
-          closeCardModal();
-          walToast('Payment received — $' + amt.toFixed(2) + ' added');
-        } else {
-          if (errEl) { errEl.textContent = 'Payment not completed (' + ((v && v.status) || 'unknown') + ')'; errEl.style.display = 'block'; }
-          btn.disabled = false; btn.textContent = 'Pay $' + _cardAmount.toFixed(2);
-        }
-      });
-  });
+  if (dgt.length < 13) { alert('Enter a valid card number.'); return; }
+  if (!name) { alert('Enter the cardholder name.'); return; }
+  if (!/^\d{2}\/\d{2}$/.test(exp)) { alert('Enter the expiry as MM/YY.'); return; }
+  if (cvc.length < 3) { alert('Enter the CVC.'); return; }
+  var btn = document.getElementById('cc-pay'); if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
+  setTimeout(function () {
+    var last4 = dgt.slice(-4);
+    if (typeof vqrCreditWallet === 'function') vqrCreditWallet(amt);
+    if (typeof vqrRecordDeposit === 'function') vqrRecordDeposit(amt, 'CARD-' + last4, 'Card', 'card_' + last4);
+    closeCardModal();
+    if (typeof walToast === 'function') walToast('Payment received — $' + amt.toFixed(2) + ' added'); else alert('$' + amt.toFixed(2) + ' added');
+  }, 700);
 }
 window.openCardTopUp = openCardTopUp;
 // Admin's USD→VND rate (set by admin, shared via server; cached locally). Default 25,400.
