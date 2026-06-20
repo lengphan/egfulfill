@@ -1025,6 +1025,13 @@ function renderOrders(ordersOverride) {
         return Object.keys(groups).sort().map(k => [k, groups[k]]);
       })();
       const blankOpts = BLANK_OPTS.map(([g,opts])=>`<optgroup label="${g}">${opts.map(v=>`<option value="${v}"${v===autoBlank?' selected':''}>${v}</option>`).join('')}</optgroup>`).join('');
+      // The chosen blank can be a synced/catalog product name that ISN'T in the static
+      // BLANK_OPTS list — that left the <select> rendering EMPTY ("the blank type
+      // disappeared") because nothing was selected AND the placeholder was suppressed.
+      // Always keep a placeholder, and inject the chosen blank when it's not standard.
+      const _blankInStd = !!autoBlank && BLANK_OPTS.some(g => Array.isArray(g[1]) && g[1].includes(autoBlank));
+      const _blankInjected = (autoBlank && !_blankInStd) ? `<option value="${String(autoBlank).replace(/"/g,'&quot;')}" selected>${String(autoBlank).replace(/</g,'&lt;')}</option>` : '';
+      const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Select blank…</option>${_blankInjected}${blankOpts}`;
       const printOpts = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']]
         .map(([v,l])=>`<option value="${v}"${v===item.tech?' selected':''}>${l}</option>`).join('');
 
@@ -1041,7 +1048,7 @@ function renderOrders(ordersOverride) {
       const lockStyle = needsSetup ? '' : 'pointer-events:none;cursor:default;';
       // Fixed widths per data box so every column lines up vertically across
       // rows. Ordered widest → narrowest: Blank ▸ Color ▸ Size (just fits "3XL").
-      const blankSel = (trackChange) => `<select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text;${trackChange?`itemDirtyCheck(${o.no},'${escSku}')`:''}" title="${autoBlank||''}" style="${SEL};width:160px;color:#374151;${lockStyle}">${autoBlank?'':'<option value="">Select blank…</option>'}${blankOpts}</select>`;
+      const blankSel = (trackChange) => `<select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text;${trackChange?`itemDirtyCheck(${o.no},'${escSku}')`:''}" title="${autoBlank||''}" style="${SEL};width:160px;color:#374151;${lockStyle}">${blankSelInner}</select>`;
       const printSel = (trackChange) => `<select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text;${trackChange?`itemDirtyCheck(${o.no},'${escSku}')`:''}" title="${item.tech?techLabel:''}" style="${SEL};width:140px;color:#374151;${lockStyle}"><option value="">Select type…</option>${printOpts}</select>`;
 
       const dsKey = `${o.no}_${escSku}`;
@@ -1066,13 +1073,14 @@ function renderOrders(ordersOverride) {
         else if (_up && _up.state === 'ok') ITEM_DESIGN_SEL[dsKey] = 'upload';
       }
       const DS_ACT = '#374151';
-      const dsBtnStyle = (type) => { const a = ITEM_DESIGN_SEL[dsKey]===type; return `display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1.5px solid ${a?DS_ACT:'#e5e4e0'};background:${a?DS_ACT:'#fff'};color:${a?'#fff':'#6b7280'};cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;text-decoration:none`; };
+      const _dsStyle = (a) => `display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:12px;font-weight:600;border:1.5px solid ${a?DS_ACT:'#e5e4e0'};background:${a?DS_ACT:'#fff'};color:${a?'#fff':'#6b7280'};cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;flex-shrink:0;text-decoration:none`;
+      const dsBtnStyle = (type) => _dsStyle(ITEM_DESIGN_SEL[dsKey]===type);
       const upFile = UP_STATE[o.no]?.[itemDK(item)]?.state === 'ok' ? UP_STATE[o.no][itemDK(item)].file : null;
       // Nudge the Upload button while this item still has no design (uniform cue with
       // the factory boards — same pickNudge animation).
-      const _needsDesign = needsSetup && !ITEM_DESIGN_SEL[dsKey] && !upFile;
+      const _needsDesign = needsSetup && !upFile && ITEM_DESIGN_SEL[dsKey] !== 'template' && ITEM_DESIGN_SEL[dsKey] !== 'lab';
       const designBtns = () => `
-        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${dsBtnStyle('upload')}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}">Upload</button>
+        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${_dsStyle(!!upFile)}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}" title="${upFile ? 'Design file attached' : 'Upload a design file'}">${upFile ? 'Uploaded' : 'Upload'}</button>
         <button id="dsb-${o.no}-${escSku}-template" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','template');openDTpl(event,'${o.no}','${item.sku}')" style="${dsBtnStyle('template')}">Templates</button>
         <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a>`;
 
@@ -1124,7 +1132,7 @@ function renderOrders(ordersOverride) {
             <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${item.sku}</div>
           </div>
           <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:380px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
-            <div style="flex:0 0 128px;width:128px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${autoBlank?'':'<option value="">Select blank…</option>'}${blankOpts}</select></div>
+            <div style="flex:0 0 128px;width:128px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div>
             ${variantDivider}
             <div style="flex:0 0 60px;width:60px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
             ${variantDivider}
