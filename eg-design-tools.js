@@ -346,6 +346,26 @@
   // Push the chosen product's unit price onto the order line item so the order
   // detail + item-derived totals stay in sync. NEVER overwrites the order's own
   // total (keeps the marketplace sale price) or the listing image.
+  // Display SKU for a line item: the real SKU if it has one; otherwise resolve
+  // the chosen blank's variant SKU (blank + colour + size) once picked; else
+  // 'N/A' for an unconfigured new line (placeholder NEW-xxxx). Display only —
+  // never mutates the item (changing it.sku would break the per-line design key).
+  function displaySku(o, it) {
+    if (!it) return 'N/A';
+    if (it.sku && !/^NEW-/i.test(String(it.sku))) return String(it.sku);
+    try {
+      var num = (o && (o.num || o.id)) || '';
+      var p = chosenProduct(num, itemDK(it));
+      if (p) {
+        if (Array.isArray(p.variantSkus) && it.color && it.size) {
+          var v = p.variantSkus.find(function (x) { return x && String(x.color) === String(it.color) && String(x.size) === String(it.size); });
+          if (v && v.sku) return String(v.sku);
+        }
+        if (p.sku && !/^NEW-/i.test(String(p.sku))) return String(p.sku);
+      }
+    } catch (e) {}
+    return 'N/A';
+  }
   function syncItemToProduct(orderNum, sku) {
     try {
       var p = chosenProduct(orderNum, sku);
@@ -1026,7 +1046,7 @@
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,

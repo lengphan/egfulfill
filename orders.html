@@ -2407,8 +2407,8 @@ function openDetailModal(ordNo) {
       <div style="display:grid;grid-template-columns:52px 1fr auto auto;gap:12px;align-items:center">
         ${itemCompositeThumb(o, item, 52)}
         <div style="min-width:0">
-          <div style="font-size:14px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.listing || item.name}</div>
-          <div style="font-size:11.5px;color:#9ca3af;font-family:monospace;margin-top:1px">${item.sku}</div>
+          <div style="font-size:14px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.blank || item.listing || item.name}</div>
+          <div style="font-size:11.5px;color:#9ca3af;font-family:monospace;margin-top:1px">${(item.sku && !/^NEW-/i.test(String(item.sku))) ? item.sku : 'N/A'}</div>
         </div>
         <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap">$${_lineTotal.toFixed(2)}</div>
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
@@ -2976,7 +2976,10 @@ function saveQuickPositionModal() {
   if (!_qpCurrent) { closeQuickPositionModal(); return; }
   if (_qpCurrent.locked) { closeQuickPositionModal(); return; }
   const o = ORDERS.find(x => x.no === _qpCurrent.orderNo);
-  const item = o && o.itemsList.find(i => i.sku === _qpCurrent.sku);
+  // Match by the per-line key first (two items can share one SKU; a raw-sku
+  // match always grabs the first sibling, so a resize on item #2 was lost).
+  if (o) assignDesignKeys(o.itemsList);
+  const item = o && (o.itemsList.find(i => itemDK(i) === _qpCurrent.sku) || o.itemsList.find(i => i.sku === _qpCurrent.sku));
   const wrap = document.getElementById('qp-design-wrap');
   if (item && wrap) {
     item.designPos = {
@@ -3013,7 +3016,9 @@ function qpRemoveBg() {
   if (!_qpCurrent) return;
   if (_qpCurrent.locked) { if (typeof toast === 'function') toast('Order is locked — open Design Lab to edit'); return; }
   const o = ORDERS.find(x => x.no === _qpCurrent.orderNo);
-  const item = o && o.itemsList.find(i => i.sku === _qpCurrent.sku);
+  if (o) assignDesignKeys(o.itemsList);
+  // Per-line key match (same-SKU siblings would otherwise both resolve to the first).
+  const item = o && (o.itemsList.find(i => itemDK(i) === _qpCurrent.sku) || o.itemsList.find(i => i.sku === _qpCurrent.sku));
   const dEl = document.getElementById('qp-design');
   if (!o || !item || !dEl || !dEl.src) return;
   const btn = document.getElementById('qp-rmbg');
