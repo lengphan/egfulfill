@@ -330,9 +330,14 @@
   // Resolve the catalog product the operator picked for an item (by stored name).
   function chosenProduct(orderNum, sku) {
     var s = getItemSetup(orderNum, sku);
-    if (!s || !s.product) return null;
+    var prodName = (s && s.product) || '';
+    // Cross-board persistence: the blank picked on one board is saved on the line
+    // item (it.blank) and synced, but the local setup store is per-browser. Fall
+    // back to it.blank so any board resolves the same blank without re-picking.
+    if (!prodName) { try { var _o = findOrder(orderNum); var _it = _o && findItemByKey(_o, sku); if (_it && _it.blank) prodName = _it.blank; } catch (e) {} }
+    if (!prodName) return null;
     var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
-    for (var i = 0; i < prods.length; i++) { if (String(prods[i].name || prods[i].sku || prods[i].id) === String(s.product)) return prods[i]; }
+    for (var i = 0; i < prods.length; i++) { if (String(prods[i].name || prods[i].sku || prods[i].id) === String(prodName)) return prods[i]; }
     return null;
   }
   // Unit price for a chosen product + item — base (per-size if set, else base/price)
@@ -590,7 +595,9 @@
     if (isNewOrder(o)) {
       var setup = getItemSetup(num, sku);
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
-      var curProd = setup.product || '', matched = false;
+      // Show the blank the OTHER board already picked (synced on it.blank), so the
+      // selection persists across boards instead of resetting to "Pick a blank…".
+      var curProd = setup.product || it.blank || '', matched = false;
       var prodOpts = '<option value="">Pick a blank…</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
