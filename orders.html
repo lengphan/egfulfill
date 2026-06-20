@@ -2251,14 +2251,16 @@ function openDetailModal(ordNo) {
     + `<div>${a.city}, ${a.state} ${a.zip}</div>`
     + `<div style="color:#9ca3af">${a.country}</div>`;
 
-  // Hero image (left rail) — the order's primary product composite, same source
-  // as the line-item thumbnails so they read as the same artwork.
+  // Hero image (left rail) — the order's UPLOADED product/listing image
+  // (manual-order image or synced listing photo), NOT the per-item design.
+  // Same source as the order-list row thumbnail (orderRowImg → it0.img) so the
+  // two read as the same picture. Per-item designs live on the item cards below.
   const _heroEl = document.getElementById('odm-hero');
   if (_heroEl) {
     const _hi = (Array.isArray(o.itemsList) && o.itemsList[0]) ? o.itemsList[0] : null;
     let _heroSrc = '';
     if (_hi) {
-      _heroSrc = (UP_STATE[o.no]?.[itemDK(_hi)]?.dataUrl) || _itemDesignURL(o, _hi) || _hi.img || '';
+      _heroSrc = _hi.img || o.img || '';
     }
     _heroEl.innerHTML = _heroSrc
       ? `<img src="${_heroSrc}" style="width:150px;height:150px;object-fit:cover;border-radius:12px;border:1px solid #e8e7e4;background:#f6f5f4;display:block" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=&quot;width:150px;height:150px;border-radius:12px;background:#f6f5f4;border:1px solid #e8e7e4&quot;></div>'"/>`
@@ -2358,7 +2360,7 @@ function openDetailModal(ordNo) {
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload artwork'}"><svg width="10" height="10" viewBox="0 0 13 13" fill="none"><path d="M6.5 8.5V2M4 4.5l2.5-2.5L9 4.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>${_designAttached ? 'Uploaded' : 'Upload'}</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload artwork'}">${_designAttached ? 'Uploaded' : 'Upload'}</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
       </div>`;
@@ -2412,8 +2414,10 @@ function openDetailModal(ordNo) {
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
       </div>
       <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap">
-        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 15px;background:#fff;flex-shrink:0;min-width:410px;${odmPillLocked?'opacity:.85':''}">
+      <!-- flex-wrap:wrap so the qty + design-button trio drops below the selector
+           when the modal is too narrow, instead of clipping off the right edge. -->
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px 16px;flex-wrap:wrap">
+        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 15px;background:#fff;flex:1 1 410px;min-width:360px;max-width:560px;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:150px">${blankOptsHtml}</select>
           <span style="color:#c4c3be;font-weight:700;padding:0 9px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
@@ -2465,8 +2469,8 @@ function openDetailModal(ordNo) {
   _recomputeOrderTotal(o);
   // Always show the multiplier — even at qty=1 the seller sees "× 1 item",
   // matching the per-item × N display in the items list.
-  const subBreakdown = ` <span style="color:#9ca3af;font-size:11.5px">× ${totalUnits} item${totalUnits===1?'':'s'}</span>`;
-  const shipBreakdown = totalUnits > 1 ? ` <span style="color:#9ca3af;font-size:11.5px">all items combined</span>` : '';
+  const subBreakdown = ` <span style="color:#9ca3af;font-size:11.5px">× ${totalUnits}</span>`;
+  const shipBreakdown = '';
   document.getElementById('odm-costs').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 0;font-size:13.5px">
       <span style="color:#6b7280;font-weight:400">Subtotal${subBreakdown}</span>
