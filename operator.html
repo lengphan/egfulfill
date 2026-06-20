@@ -5972,9 +5972,26 @@ function coParsePastedAddr(raw) {
     if (addrEl) addrEl.value = addrLine;
   }
   // Hide the paste box once parsed — saves vertical space.
+  // USPS-validate the parsed address (same check as the seller modal) so the
+  // badge reflects a real validation, not just a successful text-parse.
   const valid = document.getElementById('co-paste-validate');
-  if (valid) valid.textContent = csz ? '✓ parsed' : 'couldn’t parse';
-  if (valid) valid.style.color = csz ? '#9aa0a6' : '#c79b86';
+  if (valid) {
+    if (!csz) { valid.textContent = 'not verified'; valid.style.color = '#c79b86'; valid.title = ''; return; }
+    valid.textContent = 'checking…'; valid.style.color = '#c7c2bb'; valid.title = '';
+    const _zip5 = (String(zip).match(/\d{5}/) || [zip])[0];
+    const _st = street, _ci = city, _stt = state;
+    clearTimeout(window._coValTimer);
+    window._coValTimer = setTimeout(() => {
+      const _tok = localStorage.getItem('eg_token') || '';
+      const _p = new URLSearchParams({ streetAddress: _st, city: _ci, state: _stt, ZIPCode: _zip5 });
+      fetch('/api/usps/validate-address?' + _p.toString(), { headers: { Authorization: 'Bearer ' + _tok } })
+        .then(r => r.json().catch(() => ({})))
+        .then(d => { const e2 = document.getElementById('co-paste-validate'); if (!e2) return;
+          if (d && d.ok && d.address && d.address.zip) { e2.textContent = '✓ validated'; e2.style.color = '#9aa0a6'; e2.title = 'USPS: ' + [d.address.street, d.address.city, d.address.state, (d.address.zip + (d.address.zip4 ? '-' + d.address.zip4 : ''))].filter(Boolean).join(', '); }
+          else { e2.textContent = 'not verified'; e2.style.color = '#c79b86'; e2.title = (d && d.error) ? d.error : ''; } })
+        .catch(() => {});
+    }, 600);
+  }
 }
 window.coParsePastedAddr = coParsePastedAddr;
 
