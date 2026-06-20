@@ -214,7 +214,17 @@
     var a = setupAll(), k = orderNum + '|' + sku; a[k] = a[k] || {}; a[k][field] = val; setupSave(a);
   }
   function orderStatusOf(o) { return String((o && (o.factoryStatus || o.status)) || '').toLowerCase(); }
-  function isNewOrder(o) { var s = orderStatusOf(o); return s === 'new' || s === ''; }
+  // An order is in "setup mode" (blank picker + design upload + composite shown,
+  // for BOTH manual and synced/Etsy items) until it reaches production. Once it
+  // hits Printing or any later/terminal stage the line is locked. This is what
+  // lets synced Etsy items be blanked + uploaded just like manual ones, right up
+  // to the moment they go to print.
+  var EGDT_LOCKED_STATUS = {
+    printing: 1, packing: 1, packed: 1, qc: 1, quality: 1,
+    shipped: 1, delivered: 1, transit: 1, in_transit: 1, fulfilled: 1, fulfil: 1,
+    cancelled: 1, canceled: 1, refunded: 1
+  };
+  function isNewOrder(o) { var s = orderStatusOf(o); return !EGDT_LOCKED_STATUS[s]; }
 
   function findOrder(orderNum) {
     var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders() || []) : [];
@@ -503,7 +513,8 @@
   // board wants to place the delete control elsewhere on the row, e.g. admin
   // pins it to the far end). Only while New, keeps ≥1 item.
   function _trashHtml(num, sku) {
-    return '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:3px 4px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3.5h9M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M3.5 3.5l.5 8a1 1 0 001 1h4a1 1 0 001-1l.5-8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+    // Small on-theme dark × (not a bulky trash can) at the row's end.
+    return '<button title="Remove item" onclick="EGDesignTools.removeItem(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\')" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:2px 3px;flex-shrink:0;font-family:inherit;line-height:0" onmouseover="this.style.color=\'#191918\'" onmouseout="this.style.color=\'#9ca3af\'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>';
   }
   function itemTrash(o, it) {
     o = o || {}; it = it || {};

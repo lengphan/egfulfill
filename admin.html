@@ -4658,12 +4658,12 @@ function whRenderOrders() {
             // Drop the per-item working status once the order ships / is terminal —
             // only the parent order status remains.
             const _orderDone = /ship|deliver|cancel|refund|transit|fulfil/i.test(String(o.status||''));
-            // Per-item factory status: Working once started; otherwise surface a
-            // status for items not yet in production ('New') so every item row
-            // carries a status under the STATUS column.
-            const _fsLabelAdm = (_fs === 'working' && !_orderDone) ? 'Working'
-                              : (_isNewSetup ? 'New' : '');
-            const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#191918;white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
+            // Read-only mirror of warehouse's per-item status: Working once started,
+            // Pending before. Admin can't start work (that's warehouse's button) —
+            // it just reflects the state. Hidden once the order is terminal/shipped.
+            const _fsLabelAdm = _orderDone ? '' : (_fs === 'working' ? 'Working' : 'Pending');
+            const _fsColorAdm = _fs === 'working' ? '#191918' : '#9ca3af';
+            const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${_fsColorAdm};white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
             const _nameInner = `<div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_pickedBlank ? _pickedBlank : ((it.variant && String(it.variant).trim()) ? it.variant : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : (it.name||'Item')))} <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}</div>
                 <div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">
                   ${(window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + (it.sku||'') + '</span>') : metaRow}
