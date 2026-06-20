@@ -377,7 +377,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 
     <!-- Page header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div></div>
       <div style="display:flex;align-items:center;gap:8px">
         <select id="an-platform" data-eg-select onchange="applyReportFilters()" style="border:1.5px solid #c9c4bc;border-radius:8px;padding:6px 24px 6px 11px;font-size:13px;font-weight:500;font-family:inherit;background:transparent;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 fill=%22none%22%3E%3Cpath d=%22M3 5l3 3 3-3%22 stroke=%22%236b7280%22 stroke-width=%221.3%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 7px center;color:#4b5563;outline:none;cursor:pointer;-webkit-appearance:none;appearance:none">
           <option value="all">All Stores</option>
@@ -395,6 +394,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <option value="quarter">This Quarter</option>
         </select>
       </div>
+      <button class="btn btn-out" onclick="exportReport()" style="font-size:14px;padding:7px 14px;display:inline-flex;align-items:center;gap:6px"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v7M4 6l3 3 3-3M2.5 11.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Export</button>
     </div>
 
     <!-- KPI CARDS -->
@@ -625,6 +625,29 @@ function applyReportFilters(){
 // the order cache changes (e.g. a server hydrate lands).
 window.addEventListener('load', function(){ try{ applyReportFilters(); }catch(e){} });
 document.addEventListener('eg-orders-changed', function(){ try{ applyReportFilters(); }catch(e){} });
+// Export the CURRENTLY FILTERED orders (store + date) as a CSV.
+function exportReport(){
+  try {
+    var plat=(document.getElementById('an-platform')||{}).value||'all';
+    var period=(document.getElementById('an-period')||{}).value||'month';
+    var rng=_anRange(period);
+    var all=(window.EGStore && EGStore.getOrders)?(EGStore.getOrders()||[]):[];
+    var rows=[['Order','Channel','Status','Total','Profit','Date']];
+    all.forEach(function(o){
+      if(!o||!o.id) return;
+      var ts=o.submittedAt||o.createdAt||0;
+      if(ts && (ts<rng.start||ts>rng.end)) return;
+      if(plat!=='all' && _anPlat(o)!==plat) return;
+      var d=ts?new Date(ts):null;
+      rows.push([o.id, _anPlat(o), String(o.factoryStatus||o.status||''), (parseFloat(o.total)||0).toFixed(2), (parseFloat(o.profit)||0).toFixed(2), d?((d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear()):'']);
+    });
+    if(rows.length<2){ alert('No orders in the selected store/period to export.'); return; }
+    var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+    var blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download='EGFULFILL Report - '+plat+' - '+period+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+  } catch(e){ alert('Export failed: '+e.message); }
+}
 function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
 function setDateRange(btn,range){document.querySelectorAll('[onclick^="setDateRange"]').forEach(b=>{b.style.background='none';b.style.color='#6b7280';b.style.boxShadow='none';});btn.style.background='#fff';btn.style.color='#191918';btn.style.boxShadow='inset 0 0 0 1.5px #374151';}
 function exportCSV(){alert('Exporting analytics data as CSV...');}
