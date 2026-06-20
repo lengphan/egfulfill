@@ -5094,7 +5094,7 @@ function _afmStartVietQR(amountUSD){
   m.innerHTML='<div style="background:#fff;border-radius:16px;width:380px;max-width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:17px;font-weight:800;color:#191918">Scan to pay · BIDV</div><button type="button" onclick="_afmCloseVietQR()" style="background:none;border:none;font-size:22px;color:#9ca3af;cursor:pointer;line-height:1">&times;</button></div>'
     + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918">$'+amountUSD.toFixed(2)+'</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer &asymp; &#8363;'+vnd.toLocaleString()+'</div></div>'
-    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><img id="_afm-vqr-img" src="'+fallbackQr+'" alt="VietQR" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;object-fit:contain;background:#fff" onerror="this.style.opacity=.3"/></div>'
+    + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><div id="_afm-vqr-box" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#fff;color:#9ca3af;font-size:12px">Generating QR&hellip;</div></div>'
     + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:10px">'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Account</span><b style="font-family:monospace">'+ACCT+'</b></div>'
@@ -5105,13 +5105,19 @@ function _afmStartVietQR(amountUSD){
     + '<div id="_afm-vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:9px;background:#f6f5f4;border-radius:9px">Waiting for your transfer&hellip;</div>'
     + '</div>';
   m.style.display='flex';
+  _afmPaintImg(fallbackQr);   // best-effort image immediately; replaced by the local QR below
   // Ask the server for a monitored VA-backed QR (same endpoint the wallet page uses) so the
   // bank callback always fires and the top-up auto-confirms.
   fetch('/api/vietqr/create-payment',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({amount:vnd,note:ref})})
     .then(function(r){return r.json();}).then(function(d){
       if(!d||d.error) return;
       if(d.note||d.ref){ _afmVqrRef=d.note||d.ref; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; }
-      var qi=document.getElementById('_afm-vqr-img'); if(qi && d.qrLink && /^https?:/i.test(d.qrLink)) qi.src=d.qrLink;
+      // Prefer the EMV QR string, rendered LOCALLY (no external image that an ad-blocker
+      // or CSP can break — that blank-image is exactly why the QR vanished). Else a server
+      // image link; else the img.vietqr.io best-effort already painted above.
+      var code=d.qrCode || (d.content && /^000201/.test(String(d.content)) ? d.content : '');
+      if(code) _afmPaintQR(code);
+      else if(d.qrLink && /^https?:/i.test(d.qrLink)) _afmPaintImg(d.qrLink);
     }).catch(function(){});
   // Poll — credit ONLY when the server confirms the matching transfer landed.
   if(_afmVqrPoll) clearInterval(_afmVqrPoll);
@@ -5121,6 +5127,16 @@ function _afmStartVietQR(amountUSD){
     fetch('/api/vietqr/status?ref='+encodeURIComponent(_afmVqrRef),{headers:tok?{Authorization:'Bearer '+tok}:{}})
       .then(function(r){return r.json();}).then(function(d){ if(d&&d.paid){ clearInterval(_afmVqrPoll); _afmVqrPoll=null; _afmVqrPaid(amountUSD); } }).catch(function(){});
   },4000);
+}
+function _afmPaintImg(url){ var box=document.getElementById('_afm-vqr-box'); if(!box) return; box.innerHTML='<img src="'+url+'" alt="VietQR" style="width:218px;height:218px;border-radius:9px;object-fit:contain" onerror="this.parentNode.textContent=\'QR unavailable — use the account details below\'">'; }
+function _afmPaintQR(text){
+  var box=document.getElementById('_afm-vqr-box'); if(!box||!text) return;
+  var imgFallback=function(){ _afmPaintImg('https://api.qrserver.com/v1/create-qr-code/?size=218x218&data='+encodeURIComponent(text)); };
+  var render=function(){ try{ box.innerHTML=''; new QRCode(box,{text:text,width:218,height:218,correctLevel:QRCode.CorrectLevel.M}); }catch(e){ imgFallback(); } };
+  if(window.QRCode){ render(); return; }
+  var s=document.getElementById('eg-qrlib');
+  if(s){ s.addEventListener('load',render); s.addEventListener('error',imgFallback); return; }
+  s=document.createElement('script'); s.id='eg-qrlib'; s.src='https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js'; s.onload=render; s.onerror=imgFallback; document.head.appendChild(s);
 }
 function _afmCloseVietQR(){ if(_afmVqrPoll){clearInterval(_afmVqrPoll);_afmVqrPoll=null;} var m=document.getElementById('_afmvqr'); if(m) m.style.display='none'; }
 function _afmVqrPaid(amountUSD){
