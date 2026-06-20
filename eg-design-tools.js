@@ -328,13 +328,30 @@
   }
 
   // Resolve the catalog product the operator picked for an item (by stored name).
+  // Resolve a catalog product NAME from a line item's SKU (variant or base prefix match),
+  // mirroring EGStore.imageForSku. Lets the factory boards show the real product for a
+  // seller order that carries a product SKU but never set it.blank explicitly.
+  function _productNameForSku(sku){
+    try {
+      var s = String(sku || '').toUpperCase().trim(); if (!s) return '';
+      var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+      for (var i=0;i<prods.length;i++){
+        var p = prods[i]; if(!p) continue;
+        var cands = []; if (p.sku) cands.push(String(p.sku).toUpperCase().trim());
+        var va = Array.isArray(p.variantSkus) ? p.variantSkus : (Array.isArray(p.variants) ? p.variants : []);
+        for (var v=0;v<va.length;v++){ var vr=va[v], vs=vr&&(typeof vr==='string'?vr:(vr.sku||vr.SKU)); if(vs) cands.push(String(vs).toUpperCase().trim()); }
+        for (var c=0;c<cands.length;c++){ var cs=cands[c]; if(!cs) continue; if(s===cs || s.indexOf(cs+'-')===0 || cs.indexOf(s+'-')===0) return p.name || p.sku || ''; }
+      }
+    } catch(e){}
+    return '';
+  }
   function chosenProduct(orderNum, sku) {
     var s = getItemSetup(orderNum, sku);
     var prodName = (s && s.product) || '';
     // Cross-board persistence: the blank picked on one board is saved on the line
     // item (it.blank) and synced, but the local setup store is per-browser. Fall
     // back to it.blank so any board resolves the same blank without re-picking.
-    if (!prodName) { try { var _o = findOrder(orderNum); var _it = _o && findItemByKey(_o, sku); if (_it && _it.blank) prodName = _it.blank; } catch (e) {} }
+    if (!prodName) { try { var _o = findOrder(orderNum); var _it = _o && findItemByKey(_o, sku); if (_it) prodName = _it.blank || _productNameForSku(_it.sku); } catch (e) {} }
     if (!prodName) return null;
     var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
     for (var i = 0; i < prods.length; i++) { if (String(prods[i].name || prods[i].sku || prods[i].id) === String(prodName)) return prods[i]; }
@@ -597,7 +614,7 @@
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
       // Show the blank the OTHER board already picked (synced on it.blank), so the
       // selection persists across boards instead of resetting to "Pick a blank…".
-      var curProd = setup.product || it.blank || '', matched = false;
+      var curProd = setup.product || it.blank || _productNameForSku(it.sku) || '', matched = false;
       var prodOpts = '<option value="">Pick a blank…</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
