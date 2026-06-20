@@ -3425,6 +3425,12 @@ function odmSetVariant(idx, key, value) {
   if (!o || !o.itemsList[idx]) return;
   const item = o.itemsList[idx];
   item[key] = value;  // 'color' or 'size'
+  // Pin BOTH dimensions explicitly on THIS line so its displayed colour/size
+  // never re-derives from the SKU. Two same-product lines can share a SKU, and
+  // that re-derivation is what made changing one line's size appear to shift the
+  // other line's row.
+  if (item.color == null || item.color === '') item.color = _odmExtractColor(item.sku) || '';
+  if (item.size == null  || item.size === '')  item.size  = _odmExtractSize(item.sku)  || '';
   // If the catalog has a matching variantSku for the new combo, swap the SKU + thumbnail too.
   try {
     if (window.EGStore && EGStore.getCatalogProducts) {

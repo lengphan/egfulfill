@@ -238,7 +238,7 @@ function addVariantRow(color, size, stock) {
   row.className = 'npm-variant-row';
   row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1.4fr 80px 28px;gap:6px;align-items:center';
   row.innerHTML = `<input class="input npm-v-color" placeholder="Color (e.g. Black)" style="font-size:13px"
-      onfocus="npmOpenSuggest(this,'color')" oninput="npmOpenSuggest(this,'color');npmUpdateVariantSKUs();npmRefreshSizeWarnings&&npmRefreshSizeWarnings()"/>
+      onfocus="npmOpenSuggest(this,'color')" oninput="npmOpenSuggest(this,'color');npmUpdateVariantSKUs();npmRefreshSizeWarnings&&npmRefreshSizeWarnings();npmRefreshColorImageOptions&&npmRefreshColorImageOptions()"/>
     <input class="input npm-v-sizes" placeholder="Size (e.g. M)" style="font-size:13px"
       onfocus="npmOpenSuggest(this,'sizes')" oninput="npmOpenSuggest(this,'sizes');npmUpdateVariantSKUs();npmRefreshSizeWarnings&&npmRefreshSizeWarnings()"/>
     <input class="input npm-v-sku" placeholder="Auto SKU" title="Auto-generated from the product SKU + color + size" readonly style="font-size:13px;font-family:'SF Mono',monospace;background:#f4f2ef;color:#374151;cursor:default"/>
@@ -363,6 +363,8 @@ function npmBuildVariantSKUs() {
 }
 
 function npmUpdateVariantSKUs() {
+  // Keep the Color-images dropdowns in sync with the variant colours in real time.
+  if (typeof npmRefreshColorImageOptions === 'function') npmRefreshColorImageOptions();
   const base = (document.getElementById('npm-sku')?.value || '').trim().toUpperCase();
   document.querySelectorAll('#npm-variants .npm-variant-row').forEach(r => {
     const skuEl = r.querySelector('.npm-v-sku');
@@ -940,6 +942,15 @@ function _npmColorOptions(selected) {
   const colors = npmVariantColors();
   if (selected && colors.indexOf(selected) === -1) colors.unshift(selected);
   return '<option value="">Select color…</option>' + colors.map(c => '<option'+(c===selected?' selected':'')+'>'+c+'</option>').join('');
+}
+// Re-populate every Color-images "Select color" dropdown from the current
+// variant colours, in real time, preserving each row's current selection.
+function npmRefreshColorImageOptions() {
+  document.querySelectorAll('#npm-color-images .npm-ci-color').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = _npmColorOptions(cur);
+    sel.value = cur;
+  });
 }
 function addColorImageRow(color, dataUrl, isMain) {
   const row = document.createElement('div');
