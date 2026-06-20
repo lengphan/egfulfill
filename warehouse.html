@@ -10844,8 +10844,13 @@ function whPrintLabel(num) {
           <div style="display:grid;grid-template-columns:1fr 380px;gap:0;flex:1;min-height:0;overflow:hidden">
             <div style="overflow-y:auto;padding:18px 22px;border-right:1px solid #f3f3f1;display:flex;flex-direction:column;gap:16px">
               <div>
-                <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
-                <div id="xfom-addr" style="background:#f6f5f4;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6">—</div>
+                <div style="display:flex;gap:14px;align-items:stretch">
+                  <div id="xfom-hero" style="width:108px;min-height:108px;flex-shrink:0;border-radius:10px;background:#f6f5f4;border:1px solid #e8e7e4;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+                    <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
+                    <div id="xfom-addr" style="flex:1;background:#f6f5f4;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6">—</div>
+                  </div>
+                </div>
               </div>
               <div>
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Items</div>
@@ -10934,6 +10939,17 @@ function whPrintLabel(num) {
       addrEl.innerHTML = '<span style="color:#9ca3af">No address on file</span>';
     }
     const items = o?.itemList || o?.items || [];
+    // Hero = the order's listing/manual image (first item's img) shown left of
+    // Ship To. Distinct from each item card's composite thumbnail, which stays.
+    (function(){
+      var heroEl = document.getElementById('xfom-hero'); if (!heroEl) return;
+      var first = items[0] || {};
+      var src = (first.img && /^(https?:|data:)/.test(String(first.img))) ? first.img
+              : ((o && o.img && /^(https?:|data:)/.test(String(o.img))) ? o.img : '');
+      heroEl.innerHTML = src
+        ? '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentNode.innerHTML=\'\'"/>'
+        : '<div style="color:#c4c3be;font-size:10px;text-align:center;line-height:1.3">No<br>image</div>';
+    })();
     const itemsEl = document.getElementById('xfom-items');
     /* Composite thumbnail + per-tech unit price + EMB download — gives the
        warehouse the full picture of what's being shipped, not just the SKU. */
