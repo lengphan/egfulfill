@@ -2,7 +2,7 @@
 # VPS IP) and Caddy fetches a free HTTPS cert automatically.
 # No domain yet? Use `:80` instead of the domain line to test over plain HTTP.
 
-egful.store {
+egful.store, www.egful.store {
 	encode gzip
 
 	# API → the Node app
