@@ -4409,24 +4409,24 @@ renderOrders();
         </div>
         <div style="margin-bottom:10px">
           <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Street Address</label>
-          <input id="no-street" class="input" placeholder="1243 Valley View Ave" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+          <input id="no-street" class="input" oninput="noUpdateAddrPreview()" placeholder="1243 Valley View Ave" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
         </div>
         <div style="margin-bottom:10px">
           <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Apt / Suite <span style="color:#d1ceca;font-weight:400">optional</span></label>
-          <input id="no-apt" class="input" placeholder="Apt 4B" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+          <input id="no-apt" class="input" oninput="noUpdateAddrPreview()" placeholder="Apt 4B" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
         </div>
         <div style="display:grid;grid-template-columns:1fr 80px 120px;gap:10px">
           <div>
             <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">City</label>
-            <input id="no-city" class="input" placeholder="Santa Fe Springs" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+            <input id="no-city" class="input" oninput="noUpdateAddrPreview()" placeholder="Santa Fe Springs" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">State</label>
-            <input id="no-state" class="input" placeholder="CA" maxlength="2" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;text-transform:uppercase" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+            <input id="no-state" class="input" oninput="noUpdateAddrPreview()" placeholder="CA" maxlength="2" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%;text-transform:uppercase" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
           </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">ZIP Code</label>
-            <input id="no-zip" class="input" placeholder="90670" maxlength="10" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
+            <input id="no-zip" class="input" oninput="noUpdateAddrPreview()" placeholder="90670" maxlength="10" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:14px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box;width:100%" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/>
           </div>
         </div>
         </div><!-- /no-addr-fields -->
