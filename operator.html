@@ -3842,7 +3842,7 @@ function renderOpOrders() {
     // customer ordered). The listing image lives here; item rows start blank.
     const _fIt = (o.itemList && o.itemList[0]) || {};
     const _pTitle = (_fIt.listing || _fIt.name || '').replace(/"/g,'&quot;');
-    const _pImg = (_fIt.img && /^(https?:|data:)/.test(String(_fIt.img))) ? _fIt.img : (_fIt.sellerImg && /^(https?:|data:)/.test(String(_fIt.sellerImg)) ? _fIt.sellerImg : '');
+    const _pImg = (_fIt.img && /^(https?:|data:)/.test(String(_fIt.img))) ? _fIt.img : (_fIt.sellerImg && /^(https?:|data:)/.test(String(_fIt.sellerImg)) ? _fIt.sellerImg : ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? (EGStore.imageForSku(_fIt.sku, _fIt.name) || '') : ''));
     const mainRow = `<tr data-num="${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select'))opToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s${rowBg?`;background:${rowBg}`:''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="toggleOrderSelect('${o.num}',this.checked)"/></td>
       <td data-col="order">

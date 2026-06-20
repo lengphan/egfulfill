@@ -4457,7 +4457,7 @@ function whRenderOrders() {
     // Parent-row product preview (first item's listing image + title).
     const _fIt = (o.itemList && o.itemList[0]) || {};
     const _pTitle = (_fIt.listing || _fIt.name || '').replace(/"/g,'&quot;');
-    const _pImg = (_fIt.img && /^(https?:|data:)/.test(String(_fIt.img))) ? _fIt.img : (_fIt.sellerImg && /^(https?:|data:)/.test(String(_fIt.sellerImg)) ? _fIt.sellerImg : '');
+    const _pImg = (_fIt.img && /^(https?:|data:)/.test(String(_fIt.img))) ? _fIt.img : (_fIt.sellerImg && /^(https?:|data:)/.test(String(_fIt.sellerImg)) ? _fIt.sellerImg : ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? (EGStore.imageForSku(_fIt.sku, _fIt.name) || '') : ''));
     const trackingNum = o.tracking || o.label?.tracking_number || '';
     const isOnHold = o.status === 'on_hold';
     const isTerminal = o.status === 'shipped' || o.status === 'cancelled' || o.status === 'in_transit';

@@ -2843,7 +2843,8 @@ function _itemDesignURL(o, item) {
 // blank's mockup via itemCompositeThumb — those are intentionally left untouched.
 function orderRowImg(o) {
   const it0 = (o && o.itemsList && o.itemsList[0]) || null;
-  const src = (it0 && it0.img) ? String(it0.img) : '';
+  const src = (it0 && it0.img && /^(https?:|data:)/.test(String(it0.img))) ? String(it0.img)
+            : ((it0 && typeof EGStore !== 'undefined' && EGStore.imageForSku) ? (EGStore.imageForSku(it0.sku, it0.name) || '') : '');
   if (!src) return '<div style="width:64px;height:64px;border-radius:8px;background:#f0ede9;border:1px solid #e5e4e0"></div>';
   const esc = src.replace(/'/g, "\\'");
   return `<img src="${src.replace(/"/g, '&quot;')}" onclick="event.stopPropagation();zoomImg('${esc}')" title="Click to view" style="width:64px;height:64px;border-radius:8px;object-fit:cover;border:1px solid #e5e4e0;cursor:pointer;background:#f6f5f4;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''" onerror="this.style.visibility='hidden'">`;
@@ -4879,7 +4880,10 @@ function noValidateAddr() {
   clearTimeout(_noAddrValTimer);
   _noAddrValTimer = setTimeout(() => {
     const token = localStorage.getItem('eg_token') || '';
-    const p = new URLSearchParams({ streetAddress: street, secondaryAddress: apt, city, state, ZIPCode: zip });
+    // USPS wants the 5-digit ZIP in ZIPCode (the +4 here makes it reject the
+    // request → 'not verified', even though the address is perfectly valid).
+    const zip5 = (String(zip).match(/\d{5}/) || [zip])[0];
+    const p = new URLSearchParams({ streetAddress: street, secondaryAddress: apt, city, state, ZIPCode: zip5 });
     fetch('/api/usps/validate-address?' + p.toString(), { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json().catch(() => ({})))
       .then(d => {
