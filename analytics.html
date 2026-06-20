@@ -591,6 +591,7 @@ function closeNewMenu(){const dd=document.getElementById('new-menu-dd');if(dd)dd
 function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'){openNewOrderModal();}else{window.location='orders.html';}}
 function openQuickTopUp(){
   if(typeof openDepositModal==='function'){openDepositModal();return;}
+  if(location.pathname.indexOf('wallet.html')<0){window.location.href='wallet.html?addfunds=1';return;}
   let m=document.getElementById('_qtm');
   if(!m){
     m=document.createElement('div');m.id='_qtm';
