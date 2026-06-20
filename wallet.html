@@ -1063,7 +1063,20 @@ function openDepositModal() {
 // the SAME full Add Funds modal (with the payment-method selector) everywhere.
 (function () {
   function _maybeOpenAddFunds() {
-    try { if (/[?&]addfunds=1\b/.test(location.search)) setTimeout(openDepositModal, 60); } catch (e) {}
+    try {
+      if (/[?&]addfunds=1\b/.test(location.search)) setTimeout(function(){
+        openDepositModal();
+        // Prefill amount + method when another page (e.g. the orders Add Funds modal)
+        // hands off here so the seller lands on the real gated payment for their amount.
+        try {
+          var _q = new URLSearchParams(location.search);
+          var _amt = _q.get('amount'), _meth = _q.get('method');
+          var _ma = document.getElementById('modal-amount'); if (_amt && _ma) _ma.value = parseFloat(_amt) || '';
+          var _mm = document.getElementById('modal-method'); if (_meth && _mm) _mm.value = _meth;
+          if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
+        } catch (e) {}
+      }, 60);
+    } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _maybeOpenAddFunds);
   else _maybeOpenAddFunds();

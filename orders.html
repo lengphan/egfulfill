@@ -5066,17 +5066,16 @@ function _afmSync(){
 function _afmPayNow(){
   var el=document.getElementById('_afm-amt'), amt=parseFloat(el&&el.value)||0;
   if(!amt||amt<=0){ if(typeof pushFailToast==='function') pushFailToast('Enter an amount greater than $0'); return; }
-  // Credit the wallet in place (standalone localStorage model, same as applyQuickFunds):
-  // write then read-back to confirm it stuck. Real Stripe/PayPal/BIDV settlement is wired
-  // server-side; this keeps the demo flow self-contained and on-page.
-  var before=parseFloat(localStorage.getItem('eg_balance')||'0')||0, target=parseFloat((before+amt).toFixed(2));
-  try{ localStorage.setItem('eg_balance', target.toFixed(2)); }catch(e){ if(typeof pushFailToast==='function') pushFailToast('Top-up failed — browser storage rejected the write'); return; }
-  var verify=parseFloat(localStorage.getItem('eg_balance')||'NaN');
-  if(isNaN(verify)||Math.abs(verify-target)>0.005){ if(typeof pushFailToast==='function') pushFailToast('Top-up didn\'t persist — balance still $'+before.toFixed(2)); return; }
-  document.querySelectorAll('#balance-val').forEach(function(x){ x.textContent='$'+verify.toFixed(2); });
-  if(typeof SELLER_BALANCE!=='undefined') SELLER_BALANCE=verify;
+  var method=(document.getElementById('_afm-method')||{}).value||'bidv';
+  // NO instant credit — real money must actually move and confirm first. The old in-place
+  // credit was a demo shortcut with NO payment gate (entering an amount could add balance
+  // with nothing transferred). Hand off to the wallet's REAL, gated flow: BIDV = scan-to-pay
+  // QR that only credits once the bank transfer lands, card = Stripe, paypal = PayPal.
+  // Orders are persisted (_pendingSync) so navigating here never drops them; the balance
+  // changes ONLY after the payment is confirmed.
+  var wMethod=(method==='bidv')?'vietqr':method;   // wallet uses 'vietqr' for BIDV
   var mm=document.getElementById('_afm'); if(mm) mm.style.display='none';
-  if(typeof pushFailToast==='function') pushFailToast('Wallet topped up — new balance $'+verify.toFixed(2));
+  window.location.href='wallet.html?addfunds=1&amount='+encodeURIComponent(amt)+'&method='+encodeURIComponent(wMethod);
 }
 function openQuickTopUp(){
   if(typeof openDepositModal==='function'){openDepositModal();return;}
@@ -6697,8 +6696,12 @@ function tplConfirmImport() {
   }
 }
 function openSheetsTemplate() {
-  downloadUploadTemplate();
-  setTimeout(() => window.open('https://sheets.new', '_blank'), 400);
+  // No CSV download. With a service account we auto-CREATE a ready-to-fill Google
+  // Sheet (else fall back to the master template, else copy-headers into a blank
+  // sheet). createGoogleSheetTemplate() handles all three — the old
+  // downloadUploadTemplate() download is dropped per request.
+  if (typeof createGoogleSheetTemplate === 'function') { createGoogleSheetTemplate(); return; }
+  window.open('https://sheets.new', '_blank');
 }
 // Collect every real variant SKU from the seller's live catalog, deduped.
 // Sources ONLY EGStore.getCatalogProducts() — the same Active products the
