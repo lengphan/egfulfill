@@ -2403,21 +2403,25 @@ function openDetailModal(ordNo) {
     // Variant chips — single muted pill with three values inside, separated by dots.
     const chip = function(text){ return '<span style="display:inline-flex;align-items:center;padding:3px 9px;background:transparent;border:1px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#374151;white-space:nowrap">'+text+'</span>'; };
     return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:11px;position:relative">
-      <!-- ROW 1 — image · name + sku · price · × -->
-      <div style="display:grid;grid-template-columns:52px 1fr auto auto;gap:12px;align-items:center">
+      <!-- ROW 1 — image · name + sku · qty stepper · line total · × -->
+      <div style="display:grid;grid-template-columns:52px 1fr auto auto auto;gap:12px;align-items:center">
         ${itemCompositeThumb(o, item, 52)}
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.blank || item.listing || item.name}</div>
           <div style="font-size:11.5px;color:#9ca3af;font-family:monospace;margin-top:1px">${(item.sku && !/^NEW-/i.test(String(item.sku))) ? item.sku : 'N/A'}</div>
         </div>
+        <div style="display:inline-flex;align-items:center;gap:2px;border:1px solid #e5e4e0;border-radius:7px;padding:1px 4px;background:#fff;flex-shrink:0" title="Quantity">
+          <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:20px;height:22px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;font-family:inherit;color:#6b7280">−</button>
+          <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:16px;text-align:center">${item.qty || 1}</span>
+          <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:20px;height:22px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;font-family:inherit;color:#6b7280">+</button>
+        </div>
         <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap">$${_lineTotal.toFixed(2)}</div>
         <button onclick="odmRemoveItem(${idx})" style="${xVis};background:none;border:none;color:#d1d5db;cursor:pointer;font-size:19px;line-height:1;padding:0 2px;font-family:inherit" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
       </div>
-      <!-- ROW 2 — variant chips (left)  |  qty + design status pill (right) -->
-      <!-- flex-wrap:wrap so the qty + design-button trio drops below the selector
-           when the modal is too narrow, instead of clipping off the right edge. -->
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px 16px;flex-wrap:wrap">
-        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 15px;background:#fff;flex:1 1 410px;min-width:360px;max-width:560px;${odmPillLocked?'opacity:.85':''}">
+      <!-- ROW 2 — selector box + design buttons on the SAME row (qty moved to row 1).
+           flex-wrap is a fallback only when the modal is genuinely too narrow. -->
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 13px;background:#fff;flex:1 1 280px;min-width:240px;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:150px">${blankOptsHtml}</select>
           <span style="color:#c4c3be;font-weight:700;padding:0 9px;flex-shrink:0">·</span>
           <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;max-width:96px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
@@ -2432,12 +2436,7 @@ function openDetailModal(ordNo) {
             <option value="LSR"${item.tech==='LSR'?' selected':''}>Laser</option>
           </select>
         </div>
-        <div style="display:inline-flex;align-items:center;gap:8px;flex-shrink:0">
-          <div style="display:inline-flex;align-items:center;gap:5px">
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},-1)" style="width:24px;height:24px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">−</button>
-            <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:20px;text-align:center">${item.qty || 1}</span>
-            <button ${qtyDisabled} onclick="odmChangeQty(${idx},1)" style="width:24px;height:24px;border:none;background:transparent;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit;color:#374151">+</button>
-          </div>
+        <div style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0">
           ${designActions}
         </div>
       </div>
