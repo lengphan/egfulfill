@@ -4275,14 +4275,13 @@ function odmRemoveDesign(ordNo, sku) {
       for (let _i = liveOrders.length - 1; _i >= 0; _i--) {
         const lo = liveOrders[_i];
         if (seedIds.has(lo.id)) continue; // already in seed (or already hydrated this load)
-        // Factory-synced marketplace orders (connected from the admin board) are
+        // Factory-synced marketplace orders (connected from the ADMIN board) are
         // fulfilled through admin/warehouse/operator ONLY — never shown to the seller.
-        // Hide ONLY admin-connected factory orders (the server flags these
-        // factory_order=true) and Etsy admin imports — NOT the seller's own
-        // channel-synced orders. The previous `source`-based guard wrongly hid a
-        // seller's own Shopify/Woo order the moment a hydrate stamped its source,
-        // making it "vanish" after the design-maker round-trip.
-        if (/^etsy-/i.test(String(lo.id)) || lo.factoryOrder === true) continue;
+        // Gate STRICTLY on the server's factory_order flag: a seller's OWN Etsy shop
+        // now syncs seller-owned orders (etsy-* id, factory_order=FALSE) that MUST show
+        // here. The old `/^etsy-/` id check wrongly hid those too — that's why a
+        // seller's synced Etsy order "didn't appear on the seller board at all".
+        if (lo.factoryOrder === true) continue;
         // Convert EGStore schema → seller-table row schema
         const created = lo.submittedAt ? new Date(lo.submittedAt) : new Date();
         const fmtDate = (created.getMonth()+1) + '/' + created.getDate() + '/' + created.getFullYear();

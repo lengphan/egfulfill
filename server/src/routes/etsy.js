@@ -484,9 +484,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     }
     return { ok: true, id, ownedBy: isFactory ? 'factory' : 'seller' };
   });
-  // Clean up the caller's sample orders.
+  // Clean up sample orders. Staff wipe ALL of them; a seller wipes only their own.
   app.delete('/api/etsy/sample', { preHandler: requireAuth }, async (req) => {
-    const r = await q(`delete from orders where seller_id=$1 and id like 'etsy-SAMPLE-%'`, [req.user.sub]);
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const where = staff ? `id like 'etsy-SAMPLE-%'` : `seller_id=$1 and id like 'etsy-SAMPLE-%'`;
+    const params = staff ? [] : [req.user.sub];
+    await q(`delete from order_items where order_id in (select id from orders where ${where})`, params).catch(() => {});
+    const r = await q(`delete from orders where ${where}`, params);
     return { ok: true, removed: r.rowCount || 0 };
   });
 

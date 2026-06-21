@@ -42,9 +42,16 @@ export function ordersRoutes(app, requireAuth) {
     // design "slot" (1st vs 2nd same-SKU item) resolves to the same artwork everywhere.
     const agg  = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
     if (isStaff(req.user)) {
-      // Staff (admin/operator/warehouse/designer) see every order, including the
-      // factory-synced Etsy orders.
-      const r = await q(`select o.*, ${agg} from orders o ${join} group by o.id order by o.created_at desc`);
+      // Staff (factory) see factory-OWNED orders (the admin marketplace shops, which
+      // need factory setup) PLUS any SELLER order that's been PUSHED to production.
+      // A seller order sits at factory_status 'new'/'draft' while the seller is still
+      // managing it; Push moves it to 'in_review'. So until Push it stays OFF the
+      // factory boards (seller-managed). factory_order rows show regardless of status.
+      const r = await q(
+        `select o.*, ${agg} from orders o ${join}
+         where o.factory_order = true
+            or coalesce(o.factory_status, '') not in ('new', 'draft', '')
+         group by o.id order by o.created_at desc`);
       return r.rows;
     }
     // Sellers only see their OWN orders, never the admin/factory-synced ones
