@@ -7003,24 +7003,46 @@ function importFromGoogleSheet() {
 // its "make a copy" link; otherwise copy our exact columns (+ an example row) to the
 // clipboard and open a blank sheet for the seller to paste into cell A1.
 function createGoogleSheetTemplate() {
-  // ALWAYS try the server auto-create first — the service account builds a ready-FILLED
-  // sheet (headers + sample + dropdowns) and we just open it. Only fall back to the
-  // template link / copy-paste if the server reports it isn't configured. This means a
-  // stale client config can never force the manual copy-paste flow when auto-create works.
+  // Open the tab synchronously so the popup blocker doesn't eat it, then decide
+  // where to send it once we know the server config.
   var link = document.getElementById('gsheet-template-link'); var prev = link ? link.textContent : '';
-  if (link) link.textContent = 'Creating…';
-  var w = window.open('', '_blank');   // open synchronously to dodge popup blockers
-  egApiPost('/api/sheets/create', {}).then(function (res) {
-    if (res.ok && res.data && res.data.url) {
-      if (w) w.location = res.data.url; else window.open(res.data.url, '_blank');
-      var inp = document.getElementById('gsheet-url'); if (inp) inp.value = res.data.url;
-      _importToast('Created a ready-to-fill sheet — fill your orders there, then click Load.', 'success', 6500);
-      return;
+  if (link) link.textContent = 'Opening…';
+  var w = window.open('', '_blank');
+  var restore = function () { if (link) link.textContent = prev; };
+  var goTo = function (url) { if (w) { try { w.location = url; } catch (e) { window.open(url, '_blank'); } } else window.open(url, '_blank'); };
+  // The format-picker entry never ran _loadGSheetConfig (only the import panel did),
+  // so _gsheetConfig can be null here — which used to make the fallback miss the
+  // master template URL and open a BLANK sheet. Always make sure we have the config.
+  var ensureCfg = _gsheetConfig
+    ? Promise.resolve(_gsheetConfig)
+    : egApiGet('/api/sheets/config')
+        .then(function (c) { _gsheetConfig = (c.ok && c.data) ? c.data : { enabled: false, templateUrl: '' }; return _gsheetConfig; })
+        .catch(function () { _gsheetConfig = _gsheetConfig || { enabled: false, templateUrl: '' }; return _gsheetConfig; });
+  ensureCfg.then(function (cfg) {
+    cfg = cfg || {};
+    // No server auto-create (no service account), but a master template URL is set
+    // → go straight to it. This is the SHEETS_TEMPLATE_URL path.
+    if (!cfg.canCreate && cfg.templateUrl) { goTo(cfg.templateUrl); restore(); return; }
+    // Service account present → auto-CREATE a ready-filled sheet and open it.
+    if (cfg.canCreate) {
+      return egApiPost('/api/sheets/create', {}).then(function (res) {
+        if (res.ok && res.data && res.data.url) {
+          goTo(res.data.url);
+          var inp = document.getElementById('gsheet-url'); if (inp) inp.value = res.data.url;
+          _importToast('Created a ready-to-fill sheet — fill your orders there, then click Load.', 'success', 6500);
+          restore(); return;
+        }
+        // Create failed (e.g. the SA can't own Drive files) → fall back to the
+        // master template URL if set, else the copy-into-blank-sheet flow.
+        if (cfg.templateUrl) { goTo(cfg.templateUrl); restore(); return; }
+        if (w) { try { w.close(); } catch (e) {} }
+        _gsheetFallbackTemplate(); restore();
+      });
     }
+    // Neither auto-create nor a template URL → copy headers into a fresh blank sheet.
     if (w) { try { w.close(); } catch (e) {} }
-    _gsheetFallbackTemplate();   // server has no service account → graceful fallback
-  }).catch(function () { if (w) { try { w.close(); } catch (e) {} } _gsheetFallbackTemplate(); })
-    .finally(function () { if (link) link.textContent = prev; });
+    _gsheetFallbackTemplate(); restore();
+  }).catch(function () { if (w) { try { w.close(); } catch (e) {} } _gsheetFallbackTemplate(); restore(); });
 }
 function _gsheetFallbackTemplate() {
   if (_gsheetConfig && _gsheetConfig.templateUrl) { window.open(_gsheetConfig.templateUrl, '_blank'); return; }
@@ -7096,11 +7118,17 @@ function _canonHeader(h) {
 // The template ships with one labeled SAMPLE row to demonstrate the format. Skip
 // it on import (file OR Google Sheet) so a seller who forgets to delete it never
 // creates a junk order.
+//
+// IMPORTANT: only the UNTOUCHED template sample is dropped. We key off the
+// throwaway INSTRUCTION text in the sample's name ("…— delete this row" / "(example)")
+// — the one thing a seller removes the moment they fill the row in. We deliberately
+// do NOT skip on the SAMPLE-xxxx order number or a stray "sample" in the name,
+// because a seller with a single order often EDITS the sample row in place (keeping
+// the number) instead of adding a new row — and that real order must still import.
+// Editing the sample row OR deleting it both work; the data is read from row 2 on.
 function _isImportSampleRow(obj) {
-  const on = String(obj.order_number || '').toUpperCase().trim();
   const nm = String(obj.ship_name || '').toLowerCase();
-  return on.startsWith('SAMPLE') || on.startsWith('EXAMPLE') || on === 'ORD-1001' || on === 'ORD-SHOPIFY-8821'
-      || nm.includes('delete this row') || nm.includes('(example') || /\bsample\b/.test(nm);
+  return nm.includes('delete this row') || nm.includes('(example)') || nm.includes('(example row');
 }
 function parseImportRows(rows) {
   if (!rows || rows.length < 2) { alert('File must have a header row and at least one data row.'); return; }
@@ -7573,7 +7601,7 @@ async function confirmImport() {
     <div style="padding:14px 22px;border-top:1px solid #f3f3f1;display:flex;align-items:center;gap:10px;flex-shrink:0">
       <button onclick="closeTplFormat()" style="padding:8px 16px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;border:1.5px solid #e5e4e0;color:#374151;transition:border-color .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">Cancel</button>
       <div style="flex:1"></div>
-      <span style="font-size:12.5px;color:#9ca3af">22-column format · all templates are identical</span>
+      <span style="font-size:12.5px;color:#9ca3af">16-column format · all templates are identical</span>
       <button id="tpl-confirm-btn" onclick="tplConfirmImport()" style="display:none;padding:8px 18px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:#111827;color:#fff;border:none;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Import Orders →</button>
     </div>
   </div>
