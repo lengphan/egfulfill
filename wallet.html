@@ -776,6 +776,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div style="font-size:12.5px;color:#6b7280;margin-bottom:8px">Pay with your PayPal balance or any debit / credit card.</div>
       <div id="paypal-btn-container"></div>
     </div>
+    <!-- Saved-cards picker — shown only for the Debit/Credit Card method -->
+    <div id="dep-card-box" style="display:none;margin-bottom:14px"></div>
     <button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Pay Now</button>
     <div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#374151;text-decoration:underline;text-decoration-color:#c4c3be;text-underline-offset:3px;font-weight:600">Go to Wallet →</a></div>
   </div>
@@ -1429,11 +1431,40 @@ function vqrSyncDepositUI() {
   var isPaypal = methodEl.value === 'paypal';
   var ppBox = document.getElementById('paypal-box'); if (ppBox) ppBox.style.display = isPaypal ? 'block' : 'none';
   if (isPaypal && typeof ppInit === 'function') ppInit();
+  // Card: show the saved-cards picker (pick one to charge, or add a new one) so the
+  // seller can use a card they already saved instead of always re-entering one.
+  var isCard = methodEl.value === 'card';
+  var cardBox = document.getElementById('dep-card-box'); if (cardBox) cardBox.style.display = isCard ? 'block' : 'none';
+  if (isCard) _renderDepCardPicker();
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   if (btn) {
     btn.style.display = isPaypal ? 'none' : '';
     if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = 'Pay Now';
   }
+}
+// ── Saved-cards picker inside Add Funds (Debit/Credit Card method) ────────────
+var _depCardIdx = null;
+function _renderDepCardPicker(){
+  var box = document.getElementById('dep-card-box'); if (!box) return;
+  var cards = (typeof _laCards === 'function') ? _laCards() : [];
+  if (_depCardIdx == null && cards.length) _depCardIdx = 0;          // default to the default/first card
+  if (_depCardIdx != null && _depCardIdx >= cards.length) _depCardIdx = cards.length ? 0 : null;
+  var rows = cards.map(function(c, i){
+    var sel = (_depCardIdx === i);
+    return '<button type="button" onclick="_pickDepCard('+i+')" style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:1.5px solid '+(sel?'#191918':'#e5e4e0')+';border-radius:10px;padding:10px 12px;background:'+(sel?'#fafaf9':'#fff')+';cursor:pointer;font-family:inherit;margin-bottom:8px;transition:border-color .12s">'
+      + (typeof _cardBrandMark === 'function' ? _cardBrandMark(c.brand) : '')
+      + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:#191918">&bull;&bull;&bull;&bull; '+(c.last4||'••••')+'</div><div style="font-size:12px;color:#9ca3af">'+(c.name||'Card')+' · exp '+(c.exp||'—')+'</div></div>'
+      + '<span style="width:18px;height:18px;border-radius:50%;border:2px solid '+(sel?'#191918':'#d8d4cd')+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">'+(sel?'<span style="width:9px;height:9px;border-radius:50%;background:#191918"></span>':'')+'</span>'
+      + '</button>';
+  }).join('');
+  box.innerHTML = (cards.length ? '<div style="font-size:11.5px;font-weight:700;color:#9ca3af;letter-spacing:.04em;margin-bottom:9px">SAVED CARDS</div>' + rows : '<div style="font-size:13px;color:#9ca3af;padding:6px 0 10px">No saved cards yet — add one below.</div>')
+    + '<button type="button" onclick="_addNewDepCard()" style="display:flex;align-items:center;justify-content:center;gap:7px;width:100%;border:1.5px dashed #d8d4cd;background:#faf9f7;border-radius:10px;padding:11px;font-size:13.5px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#d8d4cd\'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Add a new card</button>';
+}
+function _pickDepCard(i){ _depCardIdx = i; _renderDepCardPicker(); }
+function _addNewDepCard(){
+  var amt = parseFloat((document.getElementById('modal-amount')||{}).value) || 0;
+  closeDepositModal();
+  if (typeof openCardTopUp === 'function') { openCardTopUp(); var ca = document.getElementById('card-amount'); if (ca && amt) ca.value = amt; if (typeof ccUpdatePreview === 'function') ccUpdatePreview(); }
 }
 // ── PayPal top-up (Orders API v2; auto-capture) ──────────────────────────────
 var _ppRendered = false;
@@ -1491,10 +1522,22 @@ function submitDeposit() {
   // Debit/Credit Card: hand off to the existing Stripe top-up flow, carrying
   // the entered amount into the card modal.
   if (method === 'card') {
+    var _cards = (typeof _laCards === 'function') ? _laCards() : [];
+    var _sel = (_cards.length && _depCardIdx != null) ? _cards[_depCardIdx] : null;
+    if (_sel) {
+      // Pay with the selected SAVED card (simulated top-up, same path as the full form).
+      if (typeof vqrCreditWallet === 'function') vqrCreditWallet(amount);
+      if (typeof vqrRecordDeposit === 'function') vqrRecordDeposit(amount, 'CARD-' + (_sel.last4 || ''), 'Card', 'card_' + (_sel.last4 || ''));
+      closeDepositModal();
+      if (typeof walToast === 'function') walToast('✓ $' + amount.toFixed(2) + ' added · ' + (_sel.brand || 'card') + ' ••' + (_sel.last4 || '')); else alert('Added $' + amount.toFixed(2) + ' to your wallet.');
+      return;
+    }
+    // No saved card → open the full add-a-card form, carrying the amount over.
     closeDepositModal();
     if (typeof openCardTopUp === 'function') {
       openCardTopUp();
       var _ca = document.getElementById('card-amount'); if (_ca) _ca.value = amount;
+      if (typeof ccUpdatePreview === 'function') ccUpdatePreview();
     }
     return;
   }
