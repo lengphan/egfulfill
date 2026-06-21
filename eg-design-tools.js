@@ -257,7 +257,17 @@
   function designOverlaySrc(orderNum, it) {
     if (!it) return '';
     if (it.designUrl && /^(https?:|data:)/.test(String(it.designUrl))) return it.designUrl;
-    try { if (window.EGStore && EGStore.getRawDesign) { var r = EGStore.getRawDesign(orderNum, itemDK(it)); if (r && /^(https?:|data:)/.test(String(r))) return r; } } catch (e) {}
+    // Resolve the cached/hydrated design under EITHER key: the stable line key
+    // (itemDK = lineId||_dk||sku) OR the bare SKU. Storage is inconsistent across
+    // the app — the design maker caches under _dk while the server order_designs
+    // table + several boards key by sku — so a design saved under one key was
+    // invisible on a board that looked it up by the other (blank thumbnail).
+    try {
+      if (window.EGStore && EGStore.getRawDesign) {
+        var r = EGStore.getRawDesign(orderNum, itemDK(it)) || (it.sku && EGStore.getRawDesign(orderNum, it.sku));
+        if (r && /^(https?:|data:)/.test(String(r))) return r;
+      }
+    } catch (e) {}
     if (it.file && String(it.file).indexOf('data:') === 0) return it.file;
     if (it.customerFile && /^(https?:|data:)/.test(String(it.customerFile))) return it.customerFile;
     if (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) return it.designSrc;
