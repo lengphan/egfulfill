@@ -1103,7 +1103,7 @@ function renderOrders(ordersOverride) {
       const _skuEsc = item.sku.replace(/'/g,"\\'");
       const _colorOpts = _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
       const _sizeOpts  = _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
-      const _variantSel = (key, opts, curVal, width) => `<select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','${key}',this.value)" style="${SEL};width:${width}px;color:#374151;${lockStyle}">${opts}</select>`;
+      const _variantSel = (key, opts, curVal, width) => `<select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','${key}',this.value)" style="${SEL};width:${width}px;color:#374151;${lockStyle}">${opts}</select>`;
 
       // Variant pill — blank/color/size grouped into a single bordered control
       // that reads as one logical "what product" picker. Cleaner than the old
@@ -1134,9 +1134,9 @@ function renderOrders(ordersOverride) {
           <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:380px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
             <div style="flex:0 0 128px;width:128px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 60px;width:60px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
+            <div style="flex:0 0 60px;width:60px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 44px;width:44px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${_skuEsc}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
+            <div style="flex:0 0 44px;width:44px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
             ${variantDivider}
             <div style="flex:0 0 92px;width:92px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type…</option>${printOpts}</select></div>
           </div>
@@ -4080,9 +4080,12 @@ window.odmSetItemShipping = odmSetItemShipping;
    resolves by orderNo + sku so it works without a modal context. Updates the
    item's color/size/sku/img, then triggers a full row re-render so the avatar
    composite + order total pick up the new variant. */
-function orderSetItemVariant(ordNo, sku, key, value) {
+function orderSetItemVariant(ordNo, ref, key, value) {
   const o = ORDERS.find(x => x.no === ordNo); if (!o) return;
-  const item = o.itemsList.find(i => i.sku === sku); if (!item) return;
+  // Resolve by the unique per-row id (__uid) FIRST so a size/colour change on one row
+  // never lands on another row that happens to share the same SKU (the "2nd item size
+  // changed the 1st item" bug). Fall back to the raw SKU for any legacy caller.
+  const item = o.itemsList.find(i => (i.__uid && i.__uid === ref)) || o.itemsList.find(i => i.sku === ref); if (!item) return;
   item[key] = value;
   try {
     if (window.EGStore && EGStore.getCatalogProducts) {
