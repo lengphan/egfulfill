@@ -285,7 +285,7 @@
 <div id="scan-ov">
   <video id="cam" playsinline muted></video>
   <div class="reticle"><div class="box"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="laser"></div></div></div>
-  <button class="scan-close" onclick="stopScan()" aria-label="Close scanner">✕</button>
+  <button class="scan-close" onclick="closeScan()" aria-label="Close scanner">✕</button>
   <div class="scanhint" id="scanhint">Point at the QR / barcode</div>
   <div class="scan-bottom">
     <div class="scanmode scanmode-ov">
@@ -667,6 +667,25 @@ var scanStream=null, scanRAF=null, detector=null, scanning=false, lastHit='', la
 var zxingReader=null, zxingControls=null, _zxingP=null;
 function supportsBarcode(){ return ('BarcodeDetector' in window); }
 
+// ONE camera stream for the whole session: the permission prompt appears only the
+// FIRST time the scanner opens; every re-open reuses this stream (no re-ask). It's
+// fully released when the app is backgrounded/closed so the camera doesn't stay on.
+var _camP=null;
+function getCamera(){
+  if(scanStream && scanStream.active) return Promise.resolve(scanStream);
+  if(_camP) return _camP;
+  _camP = navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } } })
+    .then(function(s){ scanStream=s; _camP=null; return s; })
+    .catch(function(e){ _camP=null; throw e; });
+  return _camP;
+}
+function releaseCam(){
+  if(scanStream){ try{ scanStream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){} scanStream=null; }
+  var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
+}
+window.addEventListener('pagehide', releaseCam);
+document.addEventListener('visibilitychange', function(){ if(document.hidden){ if(scanning) stopScan(); releaseCam(); } });
+
 // One unified scanner for everything — matchCode() figures out SKU vs order vs
 // tracking. The In/Out mode only affects what a SKU scan does (adjust vs look-up).
 function startScan(){
@@ -686,11 +705,11 @@ function _setScanHint(){
 
 // Android / Chromium — native BarcodeDetector over our own camera stream.
 function startNativeScan(){
-  navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } } }).then(function(stream){
-    scanStream=stream; var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
+  getCamera().then(function(stream){
+    var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
     try{ detector=new window.BarcodeDetector({ formats:['qr_code','code_128','ean_13','ean_8','code_39','code_93','upc_a','upc_e','itf','codabar','data_matrix','aztec','pdf417'] }); }
     catch(e){ try{ detector=new window.BarcodeDetector(); }catch(e2){ detector=null; } }
-    if(!detector){ if(scanStream){scanStream.getTracks().forEach(function(t){t.stop();});scanStream=null;} startZxingScan(); return; }
+    if(!detector){ startZxingScan(); return; }   // keep the stream; ZXing reuses it
     scanning=true; _setScanHint(); tick();
   }).catch(function(){ scanning=false; toast('Camera blocked — allow camera access, or type the code'); $('scaninput').focus(); });
 }
@@ -720,9 +739,16 @@ function startZxingScan(){
   loadZxing().then(function(){
     if(!scanning) return;                          // user hit Stop while loading
     zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-    return zxingReader.decodeFromConstraints({ video:{ facingMode:{ ideal:'environment' } } }, $('cam'), function(result){
-      if (result) onScan(result.getText ? result.getText() : (result.text || ''));
-    });
+    var onResult=function(result){ if(result) onScan(result.getText ? result.getText() : (result.text || '')); };
+    // Reuse the one warm stream when ZXing supports it (no re-prompt); else let ZXing
+    // open the camera itself.
+    if(typeof zxingReader.decodeFromStream==='function'){
+      return getCamera().then(function(stream){
+        var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
+        return zxingReader.decodeFromStream(stream, $('cam'), onResult);
+      });
+    }
+    return zxingReader.decodeFromConstraints({ video:{ facingMode:{ ideal:'environment' } } }, $('cam'), onResult);
   }).then(function(controls){
     if(!scanning){ if(controls&&controls.stop) controls.stop(); return; }
     zxingControls = controls; _setScanHint();
@@ -736,13 +762,17 @@ function stopScan(){
   if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF=null; }
   if(zxingControls){ try{ zxingControls.stop(); }catch(e){} zxingControls=null; }
   if(zxingReader){ try{ zxingReader.reset && zxingReader.reset(); }catch(e){} zxingReader=null; }
-  if(scanStream){ scanStream.getTracks().forEach(function(t){ t.stop(); }); scanStream=null; }
   detector=null;
-  var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
+  // Keep the camera stream WARM so re-opening the scanner never re-prompts — just stop
+  // rendering. The stream is fully released on pagehide / when the app is hidden.
+  var v=$('cam'); if(v){ try{ v.pause(); }catch(e){} }
+  if(scanStream && !scanStream.active) scanStream=null;
   $('scan-ov').classList.remove('on');
-  // The Scan tab has no page of its own — drop back to whatever was open before.
-  go(lastTab || 'inv');
+  // NB: does NOT navigate. go() calls stopScan(), so calling go() here recursed
+  // infinitely — that bug made every non-Scan tab tap dead. Use closeScan() to return
+  // to the last view when the user dismisses the scanner.
 }
+function closeScan(){ stopScan(); go(lastTab || 'inv'); }
 $('scango').onclick=function(){ var v=$('scaninput').value.trim(); if(v){ resolveCode(v); $('scaninput').value=''; } };
 $('scaninput').addEventListener('keydown', function(e){ if(e.key==='Enter') $('scango').click(); });
 
