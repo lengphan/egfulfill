@@ -12,6 +12,9 @@
    ============================================================================ */
 (function () {
   'use strict';
+  // Build marker — check `window.EG_SYNC_BUILD` in the console to confirm the browser
+  // is running the latest egstore-api.js (not a cached copy) after a deploy.
+  try { window.EG_SYNC_BUILD = 'edit-durability-2'; } catch (e) {}
   var API_BASE = '';                       // same-origin in production
   var TOKEN_KEY = 'eg_token', USER_KEY = 'eg_user';
 
