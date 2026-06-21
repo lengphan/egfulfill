@@ -96,7 +96,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
       if (!tok) tok = saved.token || '';
       if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
-      if (!tok) { fail('Not logged in to egfulfill. Open the admin board, sign in as admin, then click Connect again.'); return; }
+      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
       if (!saved.verifier) { fail('Lost the security key (PKCE verifier). Click Connect again from the start — don’t reload this window.'); return; }
       var res = await fetch('/api/etsy/exchange', {
         method: 'POST',

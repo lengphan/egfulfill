@@ -734,7 +734,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Link a sales channel so its orders sync into EGFULFILL automatically.</div>
           <div id="stores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>
           <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Available platforms</div>
-          <div id="connect-tiles" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:10px"></div>
+          <div id="connect-tiles" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(232px, 1fr));gap:10px"></div>
         </div>
       </div>
 
@@ -1032,8 +1032,65 @@ function showTab(name){
 // Only the two platforms we actively support get their own tile. Everything
 // else is collapsed under the dotted "Other platform" placeholder so the
 // grid doesn't promise integrations that don't exist yet.
-var PLATFORM_TILES = ['etsy','tiktok'];
-function storeMonogram(p){ return String(p||'?').trim().charAt(0).toUpperCase(); }
+var PLATFORM_TILES = ['etsy','shopify'];
+// Proper display names locally so they don't depend on egfulfill-connect.js having
+// loaded before the first render (which showed lowercase keys).
+var PLATFORM_NAMES = { etsy:'Etsy', shopify:'Shopify' };
+function _settingsTok(){ try { return localStorage.getItem('eg_token') || ''; } catch(e){ return ''; } }
+function _csToast(msg, bad){
+  if (typeof window.toast === 'function') { try { return window.toast(msg); } catch(e){} }
+  var t = document.createElement('div'); t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:'+(bad?'#b83c3c':'#191918')+';color:#fff;padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:600;z-index:9999;box-shadow:0 6px 22px rgba(0,0,0,.25)';
+  document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2600);
+}
+// Real brand mark per platform — Etsy orange, TikTok black-with-note — instead of a
+// flat beige monogram (that read as amateur / off-theme).
+function platformIcon(p, size){
+  size = size || 34; var k = String(p||'').toLowerCase();
+  var box = 'width:'+size+'px;height:'+size+'px;border-radius:'+Math.round(size*0.26)+'px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;';
+  // Real brand logos the seller dropped into /images — shown on a clean white chip.
+  var LOGOS = { etsy:'images/etsy.png', shopify:'images/shopify.png' };
+  if (LOGOS[k]) return '<span style="'+box+'background:#fff;border:1px solid #ece8e0;padding:'+Math.max(3,Math.round(size*0.15))+'px;box-sizing:border-box"><img src="'+LOGOS[k]+'" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:block"></span>';
+  if (k.indexOf('etsy') >= 0) return '<span style="'+box+'background:#F1641E;color:#fff;font-family:Georgia,\'Times New Roman\',serif;font-weight:700;font-size:'+Math.round(size*0.5)+'px;letter-spacing:-.5px">Et</span>';
+  if (k.indexOf('tiktok') >= 0) return '<span style="'+box+'background:#111;color:#fff"><svg width="'+Math.round(size*0.5)+'" height="'+Math.round(size*0.5)+'" viewBox="0 0 24 24" fill="#fff"><path d="M16.6 3c.3 2.2 1.6 3.7 3.8 3.9v2.6c-1.2 0-2.4-.3-3.5-.9v5.7c0 3.4-2.5 5.6-5.5 5.6-2.8 0-5.1-2-5.1-4.8 0-2.9 2.4-4.9 5.5-4.6v2.7c-.4-.1-.9-.1-1.3-.1-1.1.1-1.9.9-1.8 2 .1 1.1.9 1.7 2 1.6 1.1-.1 1.8-1 1.8-2.2V3h3.6z"/></svg></span>';
+  return '<span style="'+box+'background:#f3eee2;color:#191918;border:1px solid #40403d;font-weight:700;font-size:'+Math.round(size*0.42)+'px">'+String(p||'?').charAt(0).toUpperCase()+'</span>';
+}
+// The seller's REAL server-side Etsy connection (seller-scoped), merged OVER the
+// client EGConnect store so this list reflects the shop that's actually syncing.
+var _serverEtsy = null;
+function mergedConns(){
+  var conns = (window.EGConnect && EGConnect.getAll) ? Object.assign({}, EGConnect.getAll()) : {};
+  if (_serverEtsy) conns.etsy = _serverEtsy;
+  return conns;
+}
+function hydrateServerStores(){
+  var tok = _settingsTok(); if (!tok) return;
+  fetch((window.EG_API_BASE||'') + '/api/etsy/connections', { headers:{ Authorization:'Bearer '+tok } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(rows){
+      if (!Array.isArray(rows)) return;
+      var et = rows.filter(function(x){ return x.platform==='etsy'; })[0];
+      _serverEtsy = et ? { name:'Etsy', shop: et.shop_name || 'My Etsy shop',
+        connectedAt: et.created_at ? new Date(et.created_at).getTime() : Date.now(),
+        lastSync: et.last_sync_at ? new Date(et.last_sync_at).getTime() : null,
+        shopId: et.shop_id, server:true } : null;
+      renderStores();
+    }).catch(function(){});
+}
+function syncStore(key, btn){
+  var tok = _settingsTok(); if (!tok) return;
+  var prev = btn ? btn.textContent : ''; if (btn){ btn.textContent='Syncing…'; btn.disabled=true; btn.style.opacity='.6'; }
+  fetch((window.EG_API_BASE||'') + '/api/etsy/sync', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:'{}' })
+    .then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(d){
+      var n = (d && d.synced && d.synced.reduce(function(s,x){ return s + (x.orders||0); }, 0)) || 0;
+      _csToast(d && d.error ? d.error : ('Synced — '+n+' order'+(n===1?'':'s')+' pulled'), !!(d && d.error));
+      hydrateServerStores();
+    })
+    .catch(function(){ _csToast('Sync failed — try again', true); })
+    .finally(function(){ if (btn){ btn.textContent=prev; btn.disabled=false; btn.style.opacity='1'; } });
+}
+function onStoreConnected(res){ hydrateServerStores(); if (res && res.ok) _csToast('Store connected — your orders will sync automatically'); }
 function fmtAgo(ts){
   if(!ts) return 'just now';
   var s = Math.round((Date.now() - ts) / 1000);
@@ -1044,18 +1101,26 @@ function fmtAgo(ts){
 }
 function renderStores(){
   var list = document.getElementById('stores-list'); if(!list) return;
-  var conns = (window.EGConnect && EGConnect.getAll) ? EGConnect.getAll() : {};
+  var conns = mergedConns();
   var keys = Object.keys(conns);
   if (!keys.length) {
-    list.innerHTML = '<div style="font-size:13.5px;color:#9ca3af;padding:20px;text-align:center;border:1.5px dashed #d8d4cd;border-radius:10px">No stores connected yet. Pick a platform below to connect.</div>';
+    list.innerHTML = '<div style="border:1.5px dashed #d8d4cd;border-radius:12px;padding:28px 20px;text-align:center;background:#fbfaf8">'
+      + '<span style="display:inline-flex;width:44px;height:44px;border-radius:12px;background:#f3eee2;border:1px solid #e5e4e0;align-items:center;justify-content:center;margin-bottom:11px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.5 8.5h15l-1 10.5a1 1 0 01-1 .9H6.5a1 1 0 01-1-.9l-1-10.5z" stroke="#b0aaa4" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.5 8.5V6a3.5 3.5 0 017 0v2.5" stroke="#b0aaa4" stroke-width="1.5"/></svg></span>'
+      + '<div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">No stores connected yet</div>'
+      + '<div style="font-size:12.5px;color:#9ca3af">Pick a platform below to start syncing orders automatically.</div></div>';
   } else {
     list.innerHTML = keys.map(function(k){
       var c = conns[k];
-      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:10px;box-shadow:2px 2px 0 #40403d">'
-        + '<div style="width:34px;height:34px;border-radius:8px;background:#f3eee2;color:#191918;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;border:1px solid #40403d">'+storeMonogram(c.name)+'</div>'
-        + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">'+(c.shop || c.name)+'</div><div style="font-size:12.5px;color:#9ca3af">'+c.name+' · Connected '+fmtAgo(c.connectedAt)+'</div></div>'
-        + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#0d6e2e;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#0d6e2e"></span>Connected</span>'
-        + '<button onclick="disconnectStore(\''+k+'\')" style="font-size:12.5px;font-weight:600;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:6px" onmouseover="this.style.color=\'#b83c3c\'" onmouseout="this.style.color=\'#6b7280\'">Disconnect</button>'
+      var meta = (window.EGConnect && EGConnect._platforms && EGConnect._platforms[k]) || { name: c.name || k };
+      var line = c.server
+        ? ((c.name || meta.name) + ' · ' + (c.lastSync ? ('synced ' + fmtAgo(c.lastSync)) : 'awaiting first sync'))
+        : ((c.name || meta.name) + ' · connected ' + fmtAgo(c.connectedAt));
+      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:12px;box-shadow:3px 3px 0 #40403d">'
+        + platformIcon(k, 38)
+        + '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(c.shop || c.name || meta.name)+'</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+line+'</div></div>'
+        + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0d6e2e;font-weight:700;background:#eaf6ee;border:1px solid #bfe6cd;border-radius:999px;padding:3px 10px;flex-shrink:0"><span style="width:6px;height:6px;border-radius:50%;background:#0d6e2e"></span>Connected</span>'
+        + (c.server ? '<button onclick="syncStore(\''+k+'\',this)" title="Pull new orders now" style="font-size:12.5px;font-weight:700;color:#191918;background:#f4f2ef;border:1px solid #40403d;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;flex-shrink:0">Sync</button>' : '')
+        + '<button onclick="disconnectStore(\''+k+'\')" style="font-size:12.5px;font-weight:600;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 6px;flex-shrink:0" onmouseover="this.style.color=\'#b83c3c\'" onmouseout="this.style.color=\'#6b7280\'">Disconnect</button>'
         + '</div>';
     }).join('');
   }
@@ -1063,25 +1128,26 @@ function renderStores(){
 }
 function renderTiles(){
   var wrap = document.getElementById('connect-tiles'); if(!wrap) return;
-  var conns = (window.EGConnect && EGConnect.getAll) ? EGConnect.getAll() : {};
-  // Real-integration tiles (Etsy + TikTok) — flat outline, no drop shadow.
+  var conns = mergedConns();
   var tiles = PLATFORM_TILES.map(function(p){
     var meta = (window.EGConnect && EGConnect._platforms && EGConnect._platforms[p]) || { name: p };
     var already = !!conns[p];
-    var btn = already
-      ? '<span style="font-size:11.5px;color:#0d6e2e;font-weight:600;display:inline-flex;align-items:center;gap:4px"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="#0d6e2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Connected</span>'
-      : '<span style="font-size:12.5px;color:#191918;font-weight:600">Connect →</span>';
-    return '<button '+(already?'disabled':'onclick="EGConnect.start(\''+p+'\',{onComplete:renderStores})"')+' style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;background:#fff;border:1.5px solid #e5e4e0;border-radius:10px;cursor:'+(already?'default':'pointer')+';font-family:inherit;text-align:left;'+(already?'opacity:.65;':'')+'transition:border-color .14s" '+(already?'':'onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'"')+'>'
-      + '<span style="display:flex;align-items:center;gap:9px"><span style="width:28px;height:28px;border-radius:7px;background:#f3eee2;color:#191918;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:1px solid #c9c3ba;flex-shrink:0">'+storeMonogram(meta.name)+'</span><span style="font-size:13.5px;font-weight:600;color:#191918">'+meta.name+'</span></span>'
-      + btn
+    var cta = already
+      ? '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0d6e2e;font-weight:700;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="#0d6e2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Connected</span>'
+      : '<span style="display:inline-flex;align-items:center;gap:5px;background:#191918;color:#fff;font-size:12.5px;font-weight:700;border-radius:8px;padding:7px 13px;flex-shrink:0">Connect<svg width="11" height="11" viewBox="0 0 13 13" fill="none"><path d="M3 6.5h7M6.5 3l3.5 3.5-3.5 3.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    return '<button '+(already?'disabled':'onclick="EGConnect.start(\''+p+'\',{onComplete:onStoreConnected})"')
+      + ' style="display:flex;align-items:center;gap:11px;padding:13px 15px;background:#fdfcfa;border:1.5px solid #e5e4e0;border-radius:12px;cursor:'+(already?'default':'pointer')+';font-family:inherit;text-align:left;width:100%;'+(already?'opacity:.7;':'')+'transition:border-color .14s,transform .08s,box-shadow .08s" '
+      + (already?'':'onmouseover="this.style.borderColor=\'#191918\';this.style.transform=\'translateY(-1px)\';this.style.boxShadow=\'0 3px 0 #40403d\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.transform=\'none\';this.style.boxShadow=\'none\'"')+'>'
+      + platformIcon(p, 34)
+      + '<span style="flex:1;min-width:0;font-size:14px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(PLATFORM_NAMES[p] || meta.name || p)+'</span>'
+      + cta
       + '</button>';
   });
-  // Dotted "Other platform" placeholder — request access for anything not in
-  // the supported list. Clicking opens a generic connect modal with a freeform
-  // platform name field via EGConnect.start('other').
+  // Refined "Other platform" request tile — same rounded language, dashed to read
+  // as "not yet supported, ask us".
   tiles.push(
-    '<button onclick="EGConnect.start(\'other\',{onComplete:renderStores})" '
-    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;background:transparent;border:1.5px dashed #c9c3ba;border-radius:10px;cursor:pointer;font-family:inherit;color:#6b7280;font-size:13px;font-weight:600;transition:border-color .14s,color .14s,background .14s" '
+    '<button onclick="EGConnect.start(\'other\',{onComplete:onStoreConnected})" '
+    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 15px;background:transparent;border:1.5px dashed #c9c3ba;border-radius:12px;cursor:pointer;font-family:inherit;color:#6b7280;font-size:13px;font-weight:600;width:100%;transition:border-color .14s,color .14s,background .14s" '
     + 'onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\';this.style.background=\'#fafaf9\'" '
     + 'onmouseout="this.style.borderColor=\'#c9c3ba\';this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
       + '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
@@ -1091,14 +1157,21 @@ function renderTiles(){
   wrap.innerHTML = tiles.join('');
 }
 function disconnectStore(key){
-  if(!window.EGConnect) return;
-  var c = EGConnect.getConnection(key); if(!c) return;
+  var conns = mergedConns();
+  var c = conns[key]; if(!c) return;
   if(!confirm('Disconnect '+(c.shop || c.name)+'?')) return;
-  EGConnect.disconnect(key);
+  // Remove the real server-side connection (seller-scoped) when it's one.
+  if (c.server && c.shopId) {
+    var tok = _settingsTok();
+    fetch((window.EG_API_BASE||'') + '/api/etsy/connections/' + encodeURIComponent(c.shopId), { method:'DELETE', headers: tok?{Authorization:'Bearer '+tok}:{} }).catch(function(){});
+    _serverEtsy = null;
+  }
+  if (window.EGConnect && EGConnect.disconnect) EGConnect.disconnect(key);
   renderStores();
 }
 document.addEventListener('eg-connections-changed', renderStores);
 renderStores();
+hydrateServerStores();   // reflect the seller's real connected Etsy shop
 
 function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
 
