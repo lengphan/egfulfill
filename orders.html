@@ -1775,8 +1775,18 @@ function pushOrderToProduction(ordNo, btn) {
         size: it.size || null,
         designPos: it.designPos || null,
         designUrl: it.designUrl || null,
-        file: UP_STATE[o.no]?.[it.sku]?.file || null
-        // fileData intentionally omitted — operator/admin/warehouse look up the image from eg_image_cache by orderId|sku
+        // Carry the SAME stable line key + blank image the seller composited under, so
+        // the factory rebuilds the identical (blank + design) thumbnail. Without these
+        // the card avatar rendered BLANK on the boards: the design was cached under
+        // itemDK (lineId||_dk||sku) but the push looked it up by sku, and the blank
+        // image was never sent — so neither layer resolved.
+        lineId: it.lineId || null,
+        _dk: itemDK(it),
+        blank: it.blank || null,
+        blankImg: it.blankImg || null,
+        file: UP_STATE[o.no]?.[itemDK(it)]?.file || null
+        // fileData intentionally omitted — operator/admin/warehouse look up the design
+        // from eg_image_cache by orderId|_dk (now sent), falling back to designUrl.
       }))
     });
     // For every item: ask EGStore to check inventory vs qty. If short, it
