@@ -19,6 +19,9 @@ const API = 'https://api.etsy.com/v3/application';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function money(m) { return m && m.divisor ? (m.amount / m.divisor) : 0; }
+// Stable per-line id stamped at creation, so itemDK() on the client never shifts from
+// the SKU to a later-assigned id and orphans the line's design/blank.
+function genLineId() { return 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
 
 async function etsyTokenRequest(params) {
   const res = await fetch(TOKEN_URL, {
@@ -184,9 +187,9 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
     if (!hasItems.rowCount) {
       const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);   // first import → fetch once
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization, method]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization, method, genLineId()]
       );
     } else if (exItem) {
       // Backfill the method on re-sync if a prior import stored it without one.
@@ -481,9 +484,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     ];
     for (const it of items) {
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, print_type, personalization)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [id, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7]]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, print_type, personalization, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [id, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7], genLineId()]
       );
     }
     return { ok: true, id, ownedBy: isFactory ? 'factory' : 'seller' };
