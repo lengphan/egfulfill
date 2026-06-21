@@ -73,6 +73,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .edit-mode .wcard{cursor:grab;outline:2px dashed #191918;outline-offset:-2px}
 .edit-mode .wcard .drag-handle{display:flex}
 .edit-mode .wcard:hover{box-shadow:0 4px 18px rgba(84,107,171,.2)}
+/* Cards are ALWAYS draggable now (Edit Dashboard toggle removed) — surface the drag
+   handle subtly on hover so reordering stays discoverable; click still works. */
+.wcard:hover .drag-handle,.ccard:hover .ccard-handle,.sec-block:hover .sec-handle{display:flex;opacity:.4}
 .wcard.drag-over{outline:2px solid #191918 !important;box-shadow:0 0 0 4px rgba(84,107,171,.18) !important}
 .wcard.dragging{opacity:.45;transform:scale(.97)}
 
@@ -692,7 +695,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <option value="lastmonth">Last Month</option>
           <option value="quarter">This Quarter</option>
         </select>
-        <button id="edit-btn" class="btn btn-out" style="font-size:13px;padding:6px 12px" onclick="toggleEdit()">Edit Dashboard</button>
         <button class="btn btn-out" style="font-size:13px;padding:6px 12px" onclick="window.location='orders.html'">View all orders</button>
       </div>
     </div>
@@ -1953,6 +1955,11 @@ function toggleEdit() {
   document.querySelectorAll('.sec-block').forEach(s => s.draggable = editMode);
   document.querySelectorAll('.ccard').forEach(c => c.draggable = editMode);
 }
+// Cards are draggable at ALL times now (the "Edit Dashboard" toggle was removed —
+// the draggability lives on its own). editMode stays false so click handlers still
+// fire; the browser separates a click from a drag.
+function _egEnableDashDrag(){ document.querySelectorAll('.wcard, .sec-block, .ccard').forEach(function(c){ c.draggable = true; }); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _egEnableDashDrag); else _egEnableDashDrag();
 function ds(e) {
   dragging = e.currentTarget;
   setTimeout(()=>dragging.classList.add('dragging'),0);
