@@ -146,9 +146,16 @@
       var local = [];
       try { local = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { local = []; }
       var now = Date.now(), FRESH = 5 * 60 * 1000;
+      // Orders with UNCONFIRMED local edits win over the server's (stale) copy until
+      // the push lands. Otherwise editing a synced order (add item / pick blank /
+      // attach a design) reverts on the next hydrate — which then re-merges from the
+      // inline-item + design caches and is what spawned phantom rows / wiped siblings.
+      var pendingIds = {};
+      local.forEach(function (o) { if (o && o.id != null && o._pendingSync) pendingIds[o.id] = true; });
       var keep = local.filter(function (o) {
-        if (!o || o.id == null || ids[o.id]) return false;            // server already has it
-        if (o._pendingSync) return true;                              // un-synced — NEVER drop until the server confirms it
+        if (!o || o.id == null) return false;
+        if (o._pendingSync) return true;                              // unconfirmed local edits → local wins
+        if (ids[o.id]) return false;                                  // server has it (no pending) → use server's
         var ts = o.submittedAt || o.createdAt || 0;
         return ts && (now - ts) < FRESH;                              // freshly created, sync still plausibly in flight
       });
@@ -167,7 +174,10 @@
           if (m && m.img) it.img = m.img;
         });
       });
-      localStorage.setItem(KEY, JSON.stringify(incoming.concat(keep)));
+      // Drop the server's (stale) copy for any id we're keeping locally as pending,
+      // so one order never appears as two rows.
+      var base = incoming.filter(function (o) { return !(o && o.id != null && pendingIds[o.id]); });
+      localStorage.setItem(KEY, JSON.stringify(base.concat(keep)));
     } catch (e) {
       try { localStorage.setItem(KEY, JSON.stringify(incoming)); } catch (_) {}
     }
@@ -208,8 +218,10 @@
     var list;
     try { list = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { return; }
     list.forEach(function (o) {
-      // Only re-push our own (non-Etsy) orders still awaiting confirmation.
-      if (o && o.id != null && o._pendingSync && String(o.id).indexOf('etsy-') !== 0) pushOrder(o);
+      // Re-push any of OUR orders still awaiting confirmation — INCLUDING a seller's
+      // own Etsy shop orders (factory_order=false). Only the ADMIN/factory Etsy orders
+      // (factoryOrder=true) are never pushed from the seller side.
+      if (o && o.id != null && o._pendingSync && o.factoryOrder !== true) pushOrder(o);
     });
   }
   // Durable status/tracking/timeline PATCH. Same problem as create: a fire-and-
