@@ -472,13 +472,16 @@
     hydrateTemplates();
     var collKeys = isStaff() ? Object.keys(COLLECTIONS) : [];
     collKeys.forEach(hydrateCollection);
-    // Light polling for cross-board liveness (no realtime server yet). 15s.
+    // Cross-board liveness (no realtime server yet). Orders poll FAST (5s) — this is
+    // what drives live item-status across boards. The catalog + collections change
+    // rarely, so poll them on a slower interval to avoid hammering the server.
     clearInterval(window.__egApiPoll);
-    window.__egApiPoll = setInterval(function () {
-      hydrate();
+    window.__egApiPoll = setInterval(function () { hydrate(); }, 5000);
+    clearInterval(window.__egApiPollSlow);
+    window.__egApiPollSlow = setInterval(function () {
       hydrateCatalog();
       collKeys.forEach(hydrateCollection);
-    }, 15000);
+    }, 20000);
   }
   start();
   // Shared order-ID resolver so every board shows ids the same way:
