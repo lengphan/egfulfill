@@ -1319,6 +1319,32 @@ function setDashPlatform(p) {
   updateDashStats();
 }
 function setDashPeriod(v) { dashPeriod = v; updateDashStats(); }
+// Build the store-filter options from the stores that ACTUALLY appear in orders +
+// any connected platform (eg_connections), instead of the hardcoded mock list.
+var _DASH_STORE_LABELS = { shopify:'Shopify', etsy:'Etsy', woo:'WooCommerce', amazon:'Amazon', ebay:'eBay', tiktok:'TikTok', manual:'Manual' };
+function _dashPlat(o){
+  var s=String((o&&(o.source||o.salesChannel||o.platform))||'').toLowerCase();
+  if(/shopify/.test(s))return'shopify'; if(/etsy/.test(s))return'etsy'; if(/woo/.test(s))return'woo';
+  if(/amazon/.test(s))return'amazon'; if(/ebay/.test(s))return'ebay'; if(/tiktok/.test(s))return'tiktok';
+  return'manual';
+}
+function _dashSyncStores(){
+  var sel=document.getElementById('dash-platform'); if(!sel) return;
+  var cur=sel.value||'all', present={};
+  var all=(window.EGStore && EGStore.getOrders)?(EGStore.getOrders()||[]):[];
+  all.forEach(function(o){ if(o&&o.id) present[_dashPlat(o)]=true; });
+  try{ var c=JSON.parse(localStorage.getItem('eg_connections')||'{}'); Object.keys(c).forEach(function(k){ if(_DASH_STORE_LABELS[k]) present[k]=true; }); }catch(e){}
+  var order=['shopify','etsy','woo','amazon','ebay','tiktok','manual'];
+  var keys=order.filter(function(k){ return present[k]; });
+  Object.keys(present).forEach(function(k){ if(order.indexOf(k)<0) keys.push(k); });
+  if(!keys.length) keys=['manual'];
+  sel.innerHTML='<option value="all">All Stores</option>'+keys.map(function(k){ return '<option value="'+k+'">'+(_DASH_STORE_LABELS[k]||(k.charAt(0).toUpperCase()+k.slice(1)))+'</option>'; }).join('');
+  sel.value=(cur==='all'||keys.indexOf(cur)>=0)?cur:'all';
+  // Refresh the custom dropdown UI (egEnhanceSelect snapshots options once + is
+  // guarded): tear down the existing wrap, then re-enhance with the rebuilt options.
+  try{ var w=sel.closest('.eg-sel'); if(w){ w.parentNode.insertBefore(sel,w); w.remove(); sel.style.display=''; sel._egEnhanced=false; } if(typeof egEnhanceSelect==='function') egEnhanceSelect(sel); }catch(e){}
+}
+(function(){ function go(){ try{ _dashSyncStores(); }catch(e){} } if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go(); document.addEventListener('eg-orders-changed', go); })();
 
 // Speedometer-style count-up: ramps from 0 → target with cubic ease-out.
 // Reads the current el.dataset.target to dedupe consecutive identical calls

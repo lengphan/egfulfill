@@ -577,6 +577,22 @@ function _anRange(period){
   else { start=new Date(y,m,1).getTime(); }   // 'month'
   return {start:start,end:end};
 }
+// Build the store-filter options from the stores that ACTUALLY appear in orders +
+// any connected platform (eg_connections) — instead of the hardcoded mock list.
+var _AN_STORE_LABELS = { shopify:'Shopify', etsy:'Etsy', woo:'WooCommerce', amazon:'Amazon', ebay:'eBay', tiktok:'TikTok', manual:'Manual' };
+function _anSyncStores(){
+  var sel=document.getElementById('an-platform'); if(!sel) return;
+  var cur=sel.value||'all', present={};
+  var all=(window.EGStore && EGStore.getOrders)?(EGStore.getOrders()||[]):[];
+  all.forEach(function(o){ present[_anPlat(o)]=true; });
+  try{ var c=JSON.parse(localStorage.getItem('eg_connections')||'{}'); Object.keys(c).forEach(function(k){ if(_AN_STORE_LABELS[k]) present[k]=true; }); }catch(e){}
+  var order=['shopify','etsy','woo','amazon','ebay','tiktok','manual'];
+  var keys=order.filter(function(k){ return present[k]; });
+  Object.keys(present).forEach(function(k){ if(order.indexOf(k)<0) keys.push(k); });
+  if(!keys.length) keys=['manual'];
+  sel.innerHTML='<option value="all">All Stores</option>'+keys.map(function(k){ return '<option value="'+k+'">'+(_AN_STORE_LABELS[k]||(k.charAt(0).toUpperCase()+k.slice(1)))+'</option>'; }).join('');
+  sel.value=(cur==='all'||keys.indexOf(cur)>=0)?cur:'all';
+}
 function applyReportFilters(){
   var plat=(document.getElementById('an-platform')||{}).value||'all';
   var period=(document.getElementById('an-period')||{}).value||'month';
@@ -623,8 +639,8 @@ function applyReportFilters(){
 }
 // Recompute once EGStore is loaded (it loads AFTER this inline script) and whenever
 // the order cache changes (e.g. a server hydrate lands).
-window.addEventListener('load', function(){ try{ applyReportFilters(); }catch(e){} });
-document.addEventListener('eg-orders-changed', function(){ try{ applyReportFilters(); }catch(e){} });
+window.addEventListener('load', function(){ try{ _anSyncStores(); applyReportFilters(); }catch(e){} });
+document.addEventListener('eg-orders-changed', function(){ try{ _anSyncStores(); applyReportFilters(); }catch(e){} });
 // Export the CURRENTLY FILTERED orders (store + date) as a CSV.
 function exportReport(){
   try {
