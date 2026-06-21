@@ -1369,15 +1369,10 @@ function _laPaypalHtml() {
     + '</div>'
     + '<div style="font-size:12px;color:#b0aaa4;margin-top:12px;line-height:1.55">Pick an amount and you go straight to PayPal — <b style="color:#6b7280">choose your bank or card securely in the PayPal window</b>. (PayPal keeps your funding sources private, so they aren\'t shown here.)</div>';
 }
-// Log In with PayPal — navigates to paypal.com (EGPayPal). "Log in with PayPal"
-// (OAuth) is pending PayPal's live-eligibility approval, so it errors in live mode;
-// until then just enable the PayPal top-up panel directly (top-ups run through the
-// PayPal checkout window, which needs no account link). Flip window.EG_PAYPAL_OAUTH
-// = true once PayPal approves the feature for live.
+// Enable the PayPal top-up panel. Top-ups run through PayPal's own checkout window,
+// so there's no account to link first.
 function walPayPalLogin() {
-  if (window.EG_PAYPAL_OAUTH === true && window.EGPayPal && window.EGPayPal.login) {
-    EGPayPal.login('/wallet.html', function () { if (typeof connectGateway === 'function') connectGateway('paypal'); });
-  } else if (typeof connectGateway === 'function') { connectGateway('paypal'); }
+  if (typeof connectGateway === 'function') connectGateway('paypal');
 }
 function walPayPalDisconnect() {
   if (!confirm('Disconnect this PayPal account?')) return;
@@ -2113,17 +2108,5 @@ document.addEventListener('click',function(){ document.querySelectorAll('.eg-sel
 <script src="eg-new-order.js"></script>
 <script>window.XOC_ROLE = "seller";</script>
 <script src="eg-order-chat.js"></script>
-<script src="eg-paypal-connect.js" defer></script>
-<script>
-// Returning from "Log In with PayPal"? Store the linked email + refresh the panel.
-document.addEventListener('DOMContentLoaded', function () {
-  if (!(window.EGPayPal && window.EGPayPal.handleReturn)) return;
-  EGPayPal.handleReturn(function (email) {
-    try { if (email) localStorage.setItem('eg_wallet_paypal', email); } catch (e) {}
-    if (typeof walToast === 'function') walToast('✓ PayPal connected' + (email ? ' · ' + email : '')); else alert('PayPal connected' + (email ? ': ' + email : ''));
-    if (typeof openLinkedAccounts === 'function') { try { _laTab = 'paypal'; openLinkedAccounts(); } catch (e) {} }
-  }, function (msg) { if (typeof walToast === 'function') walToast('PayPal connect failed: ' + msg); else alert('PayPal connect failed: ' + msg); });
-});
-</script>
 </body>
 </html>

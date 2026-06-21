@@ -121,20 +121,8 @@
   }
 
   // ── connect (quick) ──────────────────────────────────────────────────────────
-  // "Log In with PayPal" (OAuth) is gated behind PayPal's live-eligibility review,
-  // which is still PENDING for this account — so in live mode the authorize page
-  // rejects every request. Until PayPal grants the feature, connect by PayPal email
-  // directly (payouts are sent to an email regardless). Flip EG_PAYPAL_OAUTH to true
-  // (or set window.EG_PAYPAL_OAUTH) once "Log in with PayPal" is approved for live.
-  var EG_PAYPAL_OAUTH = (typeof window !== 'undefined' && window.EG_PAYPAL_OAUTH === true);
-  function connect() {
-    if (EG_PAYPAL_OAUTH && window.EGPayPal && window.EGPayPal.login) {
-      EGPayPal.login(location.pathname, function (msg) {
-        toast('PayPal login unavailable — link by email instead', '#b45309');
-        manage('paypal', true);
-      });
-    } else { manage('paypal', true); }
-  }
+  // Connect PayPal by entering the PayPal email — payouts are sent to that email.
+  function connect() { manage('paypal', true); }
 
   function request() {
     var dest = defaultDest();
@@ -290,13 +278,6 @@
 
   function boot() {
     if (!document.getElementById('dsn-payout-card')) return;
-    // Returning from PayPal's login? Capture the linked email (or surface an error).
-    if (window.EGPayPal && window.EGPayPal.handleReturn) {
-      EGPayPal.handleReturn(function (email) {
-        var s = state(); s.paypal = { email: email || (s.paypal && s.paypal.email) || '', connected: true }; if (!s.defaultKey) s.defaultKey = 'paypal'; save(s);
-        toast('✓ PayPal connected' + (email ? ' · ' + email : ''));
-      }, function (msg) { toast('PayPal connect failed: ' + msg, '#dc2626'); });
-    }
     render();                                  // paint immediately from localStorage
     hydrate().then(function () { render(); }).catch(function () {});   // then reconcile with server
   }
