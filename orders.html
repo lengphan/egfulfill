@@ -6365,17 +6365,20 @@ function searchOrders(q) {
 
 
 /* ── Shared CSV column headers (ShipStation-compatible → maps to USPS & UPS) ── */
-// Slim 14-column import schema. Dropped fields are derivable or supplied elsewhere:
+// 16-column import schema. Dropped fields are derivable or supplied elsewhere:
 //   • Item Name / Size / Color → resolved from the product catalog via Item SKU
 //   • Sales Channel → implied by Store Name
-//   • Design File URL → designs are uploaded through Design Lab, not the spreadsheet
 //   • Order Date / Item Base Product / Ship Country → handled automatically by the system
+// "Hero Image (link or DL-ID)" → the parent-row product photo. Paste a public image
+// URL, OR a Design Library reference (e.g. DL-12, or its /api/design_library/12 link).
+// On import it resolves to the seller's uploaded artwork and becomes the order's
+// hero/listing image (item.img). Distinct from the design artwork overlay.
 const CSV_HEADERS = [
   'Order Number','Ship Name','Ship Email',
   'Ship Address 1','Ship Address 2','Ship City','Ship State','Ship Zip',
   'Store Name',
   'Product Title','Item SKU','Item Quantity','Print Type',
-  'Shipping Service','Internal Notes'
+  'Shipping Service','Internal Notes','Hero Image (link or DL-ID)'
 ];
 
 function _csvRow(r) { return r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','); }
@@ -6537,16 +6540,16 @@ function buildAndDownloadTemplate() {
     const p = BLANK_CATALOG.find(x=>String(x.id)===String(sels[0].value));
     if (!p) return;
     const sku = row.querySelector('.tpl-sku').textContent;
-    // Column order MUST mirror CSV_HEADERS (14 cols):
+    // Column order MUST mirror CSV_HEADERS (16 cols):
     // Order Number, Ship Name, Email, Addr1, Addr2, City, State, Zip, Store,
-    // SKU, Qty, Print Type, Shipping Service, Internal Notes
+    // Product Title, SKU, Qty, Print Type, Shipping Service, Internal Notes, Hero Image
     csvRows.push([
       orderNum,
       get('tpl-ship-name'), get('tpl-ship-email'),
       get('tpl-addr1'), get('tpl-addr2'), get('tpl-city'), get('tpl-state'), get('tpl-zip'),
       get('tpl-store'),
-      sku, row.querySelector('input[type=number]').value, sels[3].value,
-      get('tpl-shipping'), ''
+      p.name, sku, row.querySelector('input[type=number]').value, sels[3].value,
+      get('tpl-shipping'), '', ''
     ]);
   });
   if (!csvRows.length) { alert('No valid items selected.'); return; }
@@ -6810,13 +6813,13 @@ async function generateXLSX() {
   try {
     const wb = XLSX.utils.book_new();
 
-    // ── Sheet 1: Orders (headers + example row) — 14 cols matching CSV_HEADERS ──
+    // ── Sheet 1: Orders (headers + example row) — 16 cols matching CSV_HEADERS ──
     const example = [
       'SAMPLE-1001','Jane Sample — delete this row','jane@example.com',
       '42 Maple Street','Apt 3B','Portland','OR','97201',
       'Main Store',
       'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
-      'USPS Priority Mail','Example row — safe to delete'
+      'USPS Priority Mail','Example row — safe to delete','DL-12'
     ];
     const ws1 = XLSX.utils.aoa_to_sheet([CSV_HEADERS, example]);
     ws1['!cols'] = CSV_HEADERS.map(h => ({wch: Math.max(h.length + 6, 16)}));
@@ -6845,28 +6848,30 @@ async function generateXLSX() {
     const xlsxBuf = XLSX.write(wb, {type:'array', bookType:'xlsx'});
 
     // ── Inject data validation XML via JSZip ──
-    // Column letters match the 14-col CSV_HEADERS:
+    // Column letters match the 16-col CSV_HEADERS (Product Title at J shifted the
+    // item columns one right — these MUST stay in lock-step with CSV_HEADERS):
     //   G = Ship State        → US state dropdown (warehouse ships US-only)
-    //   J = Item SKU          → dropdown of real variant SKUs (Options sheet, col A)
-    //   K = Item Quantity     → whole number ≥ 1
-    //   L = Print Type        → DTG / SUB / EMB / SCR
-    //   M = Shipping Service  → carrier+service list
+    //   K = Item SKU          → dropdown of real variant SKUs (Options sheet, col A)
+    //   L = Item Quantity     → whole number ≥ 1
+    //   M = Print Type        → DTG / DTF / EMB / APL / LSR
+    //   N = Shipping Service  → carrier+service list
+    //   (J = Product Title, O = Internal Notes, P = Hero Image → free text, no rule)
     const zip = await JSZip.loadAsync(xlsxBuf);
     let sheetXml = await zip.file('xl/worksheets/sheet1.xml').async('string');
     const US_STATES = 'AL,AK,AZ,AR,CA,CO,CT,DE,FL,GA,HI,ID,IL,IN,IA,KS,KY,LA,ME,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,OH,OK,OR,PA,RI,SC,SD,TN,TX,UT,VT,VA,WA,WV,WI,WY,DC,PR';
     // Item SKU dropdown references the live catalog SKUs in Options!A2:A<n+1>. Only
-    // added when the catalog has at least one SKU (an empty catalog → no J dropdown,
+    // added when the catalog has at least one SKU (an empty catalog → no K dropdown,
     // so the range is never malformed). Warning style (not a hard block) lets a seller
     // type a brand-new SKU that isn't in the catalog yet.
     const skuDv = products.length
-      ? '<dataValidation type="list" sqref="J2:J2000" showDropDown="0" errorStyle="warning" showErrorMessage="1" errorTitle="SKU not in catalog" error="This SKU isn\'t in your catalog. Pick one from the Options sheet, or keep it if it\'s a new product."><formula1>Options!$A$2:$A$' + (products.length + 1) + '</formula1></dataValidation>'
+      ? '<dataValidation type="list" sqref="K2:K2000" showDropDown="0" errorStyle="warning" showErrorMessage="1" errorTitle="SKU not in catalog" error="This SKU isn\'t in your catalog. Pick one from the Options sheet, or keep it if it\'s a new product."><formula1>Options!$A$2:$A$' + (products.length + 1) + '</formula1></dataValidation>'
       : '';
     const dvList = [
       '<dataValidation type="list" sqref="G2:G2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid state" error="Use a 2-letter US state code"><formula1>"' + US_STATES + '"</formula1></dataValidation>',
       skuDv,
-      '<dataValidation type="whole" operator="greaterThanOrEqual" sqref="K2:K2000" showErrorMessage="1" errorTitle="Invalid quantity" error="Quantity must be a whole number ≥ 1"><formula1>1</formula1></dataValidation>',
-      '<dataValidation type="list" sqref="L2:L2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid print type" error="Pick one: DTG, DTF, EMB, APL, LSR"><formula1>"DTG,DTF,EMB,APL,LSR"</formula1></dataValidation>',
-      '<dataValidation type="list" sqref="M2:M2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid shipping service" error="Pick a supported service"><formula1>"USPS Priority Mail,USPS First Class,USPS Ground Advantage,UPS Ground,UPS 2nd Day Air,FedEx Ground"</formula1></dataValidation>'
+      '<dataValidation type="whole" operator="greaterThanOrEqual" sqref="L2:L2000" showErrorMessage="1" errorTitle="Invalid quantity" error="Quantity must be a whole number ≥ 1"><formula1>1</formula1></dataValidation>',
+      '<dataValidation type="list" sqref="M2:M2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid print type" error="Pick one: DTG, DTF, EMB, APL, LSR"><formula1>"DTG,DTF,EMB,APL,LSR"</formula1></dataValidation>',
+      '<dataValidation type="list" sqref="N2:N2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid shipping service" error="Pick a supported service"><formula1>"USPS Priority Mail,USPS First Class,USPS Ground Advantage,UPS Ground,UPS 2nd Day Air,FedEx Ground"</formula1></dataValidation>'
     ].filter(Boolean);
     const dvXml = '<dataValidations count="' + dvList.length + '">' + dvList.join('') + '</dataValidations>';
     sheetXml = sheetXml.replace('</worksheet>', dvXml + '</worksheet>');
@@ -6888,7 +6893,7 @@ function downloadUploadTemplate() {
     '42 Maple Street','Apt 3B','Portland','OR','97201',
     'Main Store',
     'Custom Embroidered Tee with Name','G5000-WHT-L','1','DTG',
-    'USPS Priority Mail','Example row — safe to delete'
+    'USPS Priority Mail','Example row — safe to delete','DL-12'
   ];
   const csv = [_csvRow(CSV_HEADERS), _csvRow(example)].join('\n');
   const a = document.createElement('a');
@@ -6924,6 +6929,9 @@ const COL_ALIASES = {
   item_color:['item_color','color','colour','variant_color'],
   item_size:['item_size','size','variant_size'],
   design_file_url:['design_file_url','design','design_url','artwork','art_url','design_file'],
+  // Parent-row hero/listing photo — a public image URL OR a Design Library ref
+  // (DL-12 / its link). Kept distinct from design_file_url (the printed artwork).
+  hero_image:['hero_image','hero_image_link_or_dl_id','hero','hero_img','hero_url','product_image','product_img','product_photo','listing_image','listing_img','main_image','image','image_url','img_url','photo','design_id','design_image','design_image_url'],
   internal_notes:['internal_notes','notes','note','internal_note','order_note'],
   shipping_service:['shipping_service','service','ship_method','shipping_method'],
   sales_channel:['sales_channel','channel','source']
@@ -7125,7 +7133,7 @@ function renderImportPreview() {
     <tr style="background:${r._valid?'#f0fdf4':'#fff7f7'}">
       <td style="padding:6px 10px;font-size:12.5px;color:#6b7280">${r._rowNum}</td>
       <td style="padding:6px 10px;font-size:13px;font-weight:500;color:#191918">${r.ship_name||'—'}</td>
-      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_sku||r.item_name||'—'}</td>
+      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_sku||r.item_name||'—'}${r.hero_image ? `<div style="font-size:10.5px;color:#9ca3af;margin-top:1px">hero: ${_heroLibraryId(r.hero_image) ? 'DL-'+_heroLibraryId(r.hero_image) : (_isHttpUrl(r.hero_image) ? 'image link' : 'image')}</div>` : ''}</td>
       <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.print_type||'—'}</td>
       <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_quantity||'—'}</td>
       <td style="padding:6px 10px">
@@ -7164,6 +7172,69 @@ function _itemFingerprint(it) {
     (it.color || '').toLowerCase().trim(),
     (it.size || '').toLowerCase().trim()
   ].join('|');
+}
+
+// ── Hero image resolution (import) ──────────────────────────────────────────
+// The "Hero Image (link or DL-ID)" column becomes the order's parent-row photo
+// (item.img). Two accepted forms:
+//   • a public image URL (http/https)        → used as-is (a real URL → syncs to
+//                                                the factory boards through leanOrder)
+//   • a Design Library ref: DL-12, or its     → fetched from /api/design_library and
+//     /api/design_library/12 link               downscaled to a small data URL (the
+//                                                raw upload is multi-MB → would blow
+//                                                localStorage and never sync)
+function _heroLibraryId(v) {
+  v = String(v || '').trim();
+  var m = v.match(/^DL[-\s_]?(\d+)$/i);             // DL-12 / DL 12 / DL_12 / dl12
+  if (m) return m[1];
+  m = v.match(/\/api\/design_library\/(\d+)/i);      // pasted library link
+  if (m) return m[1];
+  return null;
+}
+function _isHttpUrl(v) { return /^https?:\/\//i.test(String(v || '').trim()); }
+// Shrink any image src to a small JPEG data URL (max edge ~360px) so a hero never
+// bloats localStorage or the sync payload. Resolves to null if the image won't load.
+function _downscaleImage(src, max) {
+  max = max || 360;
+  return new Promise(function (resolve) {
+    try {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+          if (!w || !h) { resolve(src); return; }
+          var scale = Math.min(1, max / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+          var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+          c.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          resolve(c.toDataURL('image/jpeg', 0.8));
+        } catch (e) { resolve(src); }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = src;
+    } catch (e) { resolve(null); }
+  });
+}
+// Resolve every valid row's hero value to a usable img src, stored on r._hero.
+// Runs ONCE before doImportOrders so order creation can stay synchronous.
+function _resolveImportHeroes(rows) {
+  var jobs = (rows || []).filter(function (r) { return r && r._valid && r.hero_image; }).map(function (r) {
+    var raw = String(r.hero_image || '').trim();
+    var libId = _heroLibraryId(raw);
+    if (libId) {
+      return egApiGet('/api/design_library/' + libId).then(function (res) {
+        var data = res && res.ok && res.data && res.data.data;
+        if (!data) { r._heroError = 'DL-' + libId; return; }
+        return _downscaleImage(data, 360).then(function (small) { if (small) r._hero = small; else r._heroError = 'DL-' + libId; });
+      }).catch(function () { r._heroError = 'DL-' + libId; });
+    }
+    if (_isHttpUrl(raw)) { r._hero = raw; return Promise.resolve(); }            // real URL → keep as-is
+    if (/^data:image\//i.test(raw)) { return _downscaleImage(raw, 360).then(function (small) { r._hero = small || raw; }); }
+    r._heroError = raw.slice(0, 24);                                             // unrecognized reference
+    return Promise.resolve();
+  });
+  return Promise.all(jobs);
 }
 
 // Walks `_importRows` (filled by parseImportRows), groups by Order Number, and
@@ -7208,8 +7279,19 @@ function doImportOrders(opts) {
       color: r.item_color || '',
       size:  r.item_size || '',
       designUrl: r.design_file_url || '',
+      // Hero/listing photo from the "Hero Image (link or DL-ID)" column, resolved
+      // by _resolveImportHeroes (URL kept as-is, DL-ref → small data URL). Empty
+      // leaves the row to fall back to the SKU's catalog image as before.
+      img: r._hero || '',
       notes: r.internal_notes || ''
     }));
+    // The parent order row shows the FIRST item's hero. If only a later line
+    // carried one, surface it on item[0] so the provided photo still represents
+    // the order.
+    if (incomingItems.length && !incomingItems[0].img) {
+      const withHero = incomingItems.find(it => it.img);
+      if (withHero) incomingItems[0].img = withHero.img;
+    }
 
     const existing = existingIndex.get(cleanId);
     if (existing) {
@@ -7325,10 +7407,19 @@ function _afterImport(result) {
   setTimeout(() => { try { location.reload(); } catch(e) {} }, 800);
 }
 
-function confirmImport() {
+async function confirmImport() {
+  // Resolve any "Hero Image (link or DL-ID)" cells to real img srcs FIRST, so the
+  // orders are created with their parent-row photo already in place.
+  const btn = document.getElementById('import-confirm-btn');
+  let prevTxt;
+  if (btn) { prevTxt = btn.textContent; btn.textContent = 'Importing…'; btn.disabled = true; btn.style.opacity = '.6'; }
+  try { await _resolveImportHeroes(_importRows); } catch (e) {}
+  if (btn) { btn.textContent = prevTxt; btn.disabled = false; btn.style.opacity = '1'; }
+  const heroErrs = (_importRows || []).filter(r => r._heroError).length;
   const result = doImportOrders();
   closeImportModal();
   closeTplFormat();
+  if (heroErrs) _importToast(heroErrs + ' hero image' + (heroErrs > 1 ? 's' : '') + ' couldn’t be resolved — check the DL-ID or link', 'info', 4500);
   if (result.mergeCandidates && result.mergeCandidates.length) {
     _showMergeConfirm(result.mergeCandidates,
       () => {

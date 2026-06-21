@@ -289,9 +289,13 @@
         // Persist the load-bearing fields so an EDIT can't wipe them on the next
         // hydrate: the chosen blank (name), the design position, and the listing/
         // hero image. The blank PHOTO is NOT shipped (it lives in the shared
-        // catalog and resolves by SKU). Hero img is shipped only when it's a real
-        // URL — never a multi-MB data: blob — so patches stay light.
-        var heroImg = (it.img && /^https?:/.test(String(it.img))) ? it.img : null;
+        // catalog and resolves by SKU). Hero img ships when it's a real URL, OR a
+        // SMALL data: image (≤~100KB — e.g. an imported Design Library hero, already
+        // downscaled) so the factory boards show the seller's chosen photo. Big
+        // blobs are still dropped to keep the payload under the body limit.
+        var heroImg = null;
+        if (it.img && /^https?:/.test(String(it.img))) heroImg = it.img;
+        else if (it.img && /^data:image\//i.test(String(it.img)) && String(it.img).length <= 140000) heroImg = it.img;
         return {
           sku: it.sku, name: it.name, listing: it.listing,
           printType: it.printType || it.tech, tech: it.tech,
