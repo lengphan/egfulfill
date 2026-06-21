@@ -121,7 +121,17 @@
   }
 
   // ── connect (quick) ──────────────────────────────────────────────────────────
-  function connect() { manage('paypal', true); }
+  // Primary path: real "Log In with PayPal" — navigates to paypal.com to sign in.
+  // Falls back to the manual email entry in the manage modal if the server's PayPal
+  // OAuth isn't configured/reachable, so the button is never a dead end.
+  function connect() {
+    if (window.EGPayPal && window.EGPayPal.login) {
+      EGPayPal.login(location.pathname, function (msg) {
+        toast('PayPal login unavailable — link by email instead', '#b45309');
+        manage('paypal', true);
+      });
+    } else { manage('paypal', true); }
+  }
 
   function request() {
     var dest = defaultDest();
@@ -277,6 +287,13 @@
 
   function boot() {
     if (!document.getElementById('dsn-payout-card')) return;
+    // Returning from PayPal's login? Capture the linked email (or surface an error).
+    if (window.EGPayPal && window.EGPayPal.handleReturn) {
+      EGPayPal.handleReturn(function (email) {
+        var s = state(); s.paypal = { email: email || (s.paypal && s.paypal.email) || '', connected: true }; if (!s.defaultKey) s.defaultKey = 'paypal'; save(s);
+        toast('✓ PayPal connected' + (email ? ' · ' + email : ''));
+      }, function (msg) { toast('PayPal connect failed: ' + msg, '#dc2626'); });
+    }
     render();                                  // paint immediately from localStorage
     hydrate().then(function () { render(); }).catch(function () {});   // then reconcile with server
   }

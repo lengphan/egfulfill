@@ -4,11 +4,24 @@
 //
 // .env:  PAYPAL_CLIENT_ID=...  PAYPAL_SECRET=...  PAYPAL_ENV=sandbox|live
 import { q } from '../db.js';
+import jwt from 'jsonwebtoken';
 
 const CID = process.env.PAYPAL_CLIENT_ID || '';
 const SEC = process.env.PAYPAL_SECRET || '';
 const ENV = (process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
 const BASE = ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+// "Log In with PayPal" (Connect with PayPal) runs on the consumer domain, not api-m.
+const CONNECT = ENV === 'live' ? 'https://www.paypal.com' : 'https://www.sandbox.paypal.com';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+const APP_URL = (process.env.APP_URL || '').replace(/\/+$/, '');
+
+// Public origin for the OAuth return URL — APP_URL when set, else derived from the
+// proxied request (Caddy forwards x-forwarded-proto/host).
+function originOf(req) {
+  if (APP_URL) return APP_URL;
+  const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+  return proto + '://' + req.headers.host;
+}
 
 async function ppToken() {
   if (!CID || !SEC) throw new Error('Server missing PAYPAL_CLIENT_ID / PAYPAL_SECRET');
@@ -169,5 +182,59 @@ export function paypalRoutes(app, requireAuth) {
     const r = await q('insert into payout_requests (seller_id, amount_usd, destination, status) values ($1,$2,$3,$4) returning id, created_at',
       [req.user.sub, amt, String(b.account || ''), 'pending']);
     return { ok: true, id: r.rows[0].id, status: 'pending', requestedAt: r.rows[0].created_at };
+  });
+
+  // ── Log In with PayPal (Connect) — link a PayPal account via PayPal's own login ─
+  // One-time PayPal dashboard setup the creds alone can't do: in the REST app, enable
+  // "Log In with PayPal", select the email scope, and add this Return URL:
+  //   <APP_URL>/api/paypal/connect/callback   (e.g. https://egful.store/api/paypal/connect/callback)
+  //
+  // start → returns the PayPal authorize URL (the browser navigates to it). The user
+  // logs in on paypal.com and approves; PayPal redirects back to /callback with a code.
+  app.get('/api/paypal/connect/start', { preHandler: requireAuth }, async (req, reply) => {
+    if (!CID || !SEC) { reply.code(400); return { error: 'PayPal is not configured on the server (PAYPAL_CLIENT_ID / PAYPAL_SECRET).' }; }
+    const ret = String((req.query || {}).return || '/designer.html');
+    const redirectUri = originOf(req) + '/api/paypal/connect/callback';
+    // Signed, short-lived state carries WHO is connecting + WHERE to return — so the
+    // public callback (no auth header on a browser redirect) can't be forged.
+    const state = jwt.sign({ sub: req.user.sub, ret }, JWT_SECRET, { expiresIn: '15m' });
+    const url = CONNECT + '/connect?flowEntry=static'
+      + '&client_id=' + encodeURIComponent(CID)
+      + '&response_type=code'
+      + '&scope=' + encodeURIComponent('openid email')
+      + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      + '&state=' + encodeURIComponent(state);
+    return { url, redirectUri };
+  });
+
+  // callback → exchange the code for the user's verified PayPal email, store it as the
+  // connected payout account, and redirect back to the app page (public: a browser hit).
+  app.get('/api/paypal/connect/callback', async (req, reply) => {
+    const Q = req.query || {};
+    let decoded = null; try { decoded = jwt.verify(String(Q.state || ''), JWT_SECRET); } catch (e) {}
+    const ret = (decoded && decoded.ret) || '/designer.html';
+    const back = (kv) => reply.redirect(ret + (ret.indexOf('?') < 0 ? '?' : '&') + kv);
+    if (!decoded || !decoded.sub) return back('paypal=error&msg=' + encodeURIComponent('link expired — try again'));
+    if (!Q.code) return back('paypal=error&msg=' + encodeURIComponent(String(Q.error_description || Q.error || 'cancelled')));
+    try {
+      const redirectUri = originOf(req) + '/api/paypal/connect/callback';
+      const basic = Buffer.from(CID + ':' + SEC).toString('base64');
+      const tr = await fetch(BASE + '/v1/oauth2/token', {
+        method: 'POST',
+        headers: { Authorization: 'Basic ' + basic, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=authorization_code&code=' + encodeURIComponent(String(Q.code)) + '&redirect_uri=' + encodeURIComponent(redirectUri)
+      });
+      const td = await tr.json().catch(() => ({}));
+      if (!tr.ok || !td.access_token) return back('paypal=error&msg=' + encodeURIComponent('token exchange failed'));
+      const ur = await fetch(BASE + '/v1/identity/openidconnect/userinfo?schema=openid', { headers: { Authorization: 'Bearer ' + td.access_token } });
+      const ud = await ur.json().catch(() => ({}));
+      const email = ud.email || (Array.isArray(ud.emails) && ud.emails[0] && (ud.emails[0].value || ud.emails[0])) || '';
+      if (!email) return back('paypal=error&msg=' + encodeURIComponent('no email returned by PayPal'));
+      await q("delete from payout_accounts where seller_id=$1 and provider='paypal'", [decoded.sub]);
+      const ins = await q('insert into payout_accounts (seller_id, provider, handle) values ($1,$2,$3) returning id', [decoded.sub, 'paypal', email]);
+      const had = await q('select count(*)::int as n from payout_accounts where seller_id=$1', [decoded.sub]);
+      if ((had.rows[0] && had.rows[0].n) === 1) await q('update payout_accounts set is_default=true where id=$1', [ins.rows[0].id]);
+      return back('paypal=connected&email=' + encodeURIComponent(email));
+    } catch (e) { return back('paypal=error&msg=' + encodeURIComponent(e.message || 'connect failed')); }
   });
 }
