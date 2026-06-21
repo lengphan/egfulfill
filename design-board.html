@@ -424,19 +424,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="font-size:13px;color:#6b7280;margin-top:4px">All time</div>
     </div>
   </div>
-  <!-- Payout -->
-  <div class="card" style="padding:18px 20px;margin-bottom:20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <div style="font-size:15px;font-weight:700;color:#191918">Request Payout</div>
-      <span style="font-size:12.5px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #86efac;padding:2px 10px;border-radius:999px">PayPal connected</span>
-    </div>
-    <div style="display:flex;gap:10px;align-items:center">
-      <input id="dsn-payout-amt" class="input" type="number" value="" placeholder="Amount" style="max-width:180px">
-      <div style="font-size:13.5px;color:#9ca3af">→ phanmylinh04@gmail.com</div>
-      <button onclick="dbRequestPayout()" class="btn" style="background:#15803d;color:#fff;margin-left:auto">Request Payout →</button>
-    </div>
-    <div style="font-size:12.5px;color:#9ca3af;margin-top:8px">Processing time: 1–2 business days · Fee: none</div>
-  </div>
+  <!-- Payout — rendered by eg-designer-payout.js: connect PayPal, pick a payout
+       destination (PayPal / linked local bank), request a payout. The module
+       fills this container from localStorage + the API. -->
+  <div id="dsn-payout-card" class="card" style="padding:18px 20px;margin-bottom:20px"></div>
   <!-- History -->
   <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:10px">Payment History</div>
   <div class="card" style="overflow:hidden">
@@ -1145,5 +1136,6 @@ dbRender();
 <script src="eg-kb-cards.js"></script>
 <script>window.XOC_ROLE = "designer";</script>
 <script src="eg-order-chat.js"></script>
+<script src="eg-designer-payout.js" defer></script>
 </body>
 </html>

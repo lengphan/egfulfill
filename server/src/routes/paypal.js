@@ -24,6 +24,26 @@ async function ppToken() {
 }
 
 export function paypalRoutes(app, requireAuth) {
+  // Designer payout destinations (PayPal account + linked local banks) and the
+  // request log. Idempotent so fresh + existing DBs both converge.
+  q(`create table if not exists payout_accounts (
+       id          serial primary key,
+       seller_id   uuid references users(id) on delete cascade,
+       provider    text not null,                 -- 'paypal' | 'bank'
+       handle      text,                           -- paypal email OR bank account number
+       label       text,                           -- bank name (banks)
+       meta        jsonb default '{}',             -- { name, last4 }
+       is_default  boolean not null default false,
+       created_at  timestamptz default now())`).catch(() => {});
+  q('create index if not exists payout_accounts_seller_idx on payout_accounts(seller_id)').catch(() => {});
+  q(`create table if not exists payout_requests (
+       id          serial primary key,
+       seller_id   uuid references users(id) on delete cascade,
+       amount_usd  numeric not null,
+       destination text,                           -- 'paypal' | 'bank:<id>'
+       status      text not null default 'pending',
+       created_at  timestamptz default now())`).catch(() => {});
+
   // The client-id is public (it goes in the PayPal JS SDK URL); the frontend fetches it.
   app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: CID, env: ENV, enabled: !!(CID && SEC) }));
 
@@ -85,5 +105,69 @@ export function paypalRoutes(app, requireAuth) {
       } catch (e) { app.log.error('paypal topup record failed: ' + e.message); }
       return { ok: true, amount, captureId: cap.id, status: d.status, ref, txnId: cap.id };
     } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // ── Designer payout accounts (connect PayPal + linked local banks) ───────────
+  // List this designer's payout destinations.
+  app.get('/api/paypal/payout-account', { preHandler: requireAuth }, async (req) => {
+    const r = await q('select id, provider, handle, label, meta, is_default from payout_accounts where seller_id=$1 order by created_at asc', [req.user.sub]);
+    return r.rows;
+  });
+
+  // Link a PayPal account (one per designer, replaced on re-connect) or add a bank.
+  // makeDefault (or first-ever account) becomes the default destination.
+  app.post('/api/paypal/payout-account', { preHandler: requireAuth }, async (req, reply) => {
+    const b = req.body || {};
+    const provider = b.provider === 'bank' ? 'bank' : 'paypal';
+    if (provider === 'paypal' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(b.handle || ''))) { reply.code(400); return { error: 'valid PayPal email required' }; }
+    const had = await q('select count(*)::int as n from payout_accounts where seller_id=$1', [req.user.sub]);
+    const first = (had.rows[0] && had.rows[0].n) === 0;
+    let id;
+    if (provider === 'paypal') {
+      await q("delete from payout_accounts where seller_id=$1 and provider='paypal'", [req.user.sub]);
+      const ins = await q('insert into payout_accounts (seller_id, provider, handle) values ($1,$2,$3) returning id', [req.user.sub, 'paypal', b.handle]);
+      id = ins.rows[0].id;
+    } else {
+      const meta = (b.meta && typeof b.meta === 'object') ? b.meta : {};
+      const ins = await q('insert into payout_accounts (seller_id, provider, handle, label, meta) values ($1,$2,$3,$4,$5) returning id', [req.user.sub, 'bank', b.handle || '', b.label || 'Bank', meta]);
+      id = ins.rows[0].id;
+    }
+    if (b.makeDefault || first) {
+      await q('update payout_accounts set is_default=false where seller_id=$1', [req.user.sub]);
+      await q('update payout_accounts set is_default=true where seller_id=$1 and id=$2', [req.user.sub, id]);
+    }
+    return { ok: true, id, provider };
+  });
+
+  // Choose which destination is the default payout target.
+  app.post('/api/paypal/payout-account/default', { preHandler: requireAuth }, async (req) => {
+    const b = req.body || {};
+    await q('update payout_accounts set is_default=false where seller_id=$1', [req.user.sub]);
+    if (b.provider === 'paypal') await q("update payout_accounts set is_default=true where seller_id=$1 and provider='paypal'", [req.user.sub]);
+    else await q('update payout_accounts set is_default=true where seller_id=$1 and id=$2', [req.user.sub, parseInt(b.id, 10) || -1]);
+    return { ok: true };
+  });
+
+  // Remove a destination. ':id' = 'paypal' drops the PayPal link; a number drops a bank.
+  app.delete('/api/paypal/payout-account/:id', { preHandler: requireAuth }, async (req) => {
+    const id = req.params.id;
+    if (id === 'paypal') await q("delete from payout_accounts where seller_id=$1 and provider='paypal'", [req.user.sub]);
+    else await q('delete from payout_accounts where seller_id=$1 and id=$2', [req.user.sub, parseInt(id, 10) || -1]);
+    return { ok: true };
+  });
+
+  // Record a payout REQUEST. Intentionally does NOT move money — it logs a pending
+  // request that an admin releases through the existing payout flow, so there's no
+  // unguarded self-service money path. (The PayPal Payouts API call belongs on that
+  // admin release step.)
+  app.post('/api/paypal/payout', { preHandler: requireAuth }, async (req, reply) => {
+    const b = req.body || {};
+    const amt = Number(b.amount) || 0;
+    if (amt <= 0) { reply.code(400); return { error: 'invalid amount' }; }
+    const acct = await q('select count(*)::int as n from payout_accounts where seller_id=$1', [req.user.sub]);
+    if (!(acct.rows[0] && acct.rows[0].n)) { reply.code(400); return { error: 'no payout account linked' }; }
+    const r = await q('insert into payout_requests (seller_id, amount_usd, destination, status) values ($1,$2,$3,$4) returning id, created_at',
+      [req.user.sub, amt, String(b.account || ''), 'pending']);
+    return { ok: true, id: r.rows[0].id, status: 'pending', requestedAt: r.rows[0].created_at };
   });
 }
