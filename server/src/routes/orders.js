@@ -14,10 +14,12 @@ export function ordersRoutes(app, requireAuth) {
   // Free-form editable order info (notes, priority, gift message, …) kept on the
   // seller's order-detail panel. One jsonb bag so new fields don't need migrations.
   q(`alter table orders add column if not exists meta jsonb default '{}'`).catch(() => {});
-  // Correct any orders a prior (too-loose, source-based) backfill mis-flagged:
-  // ONLY real Etsy imports (etsy- id) are factory orders; everything else (manual
-  // seller orders) must be factory_order=false so the seller keeps seeing them.
-  q(`update orders set factory_order = (id like 'etsy-%') where factory_order is distinct from (id like 'etsy-%')`).catch(() => {});
+  // Classify factory_order by OWNER ROLE, not by id: an Etsy order is factory-owned
+  // ONLY when its connection owner is staff (the admin/factory shop). A seller's own
+  // Etsy shop → factory_order=false so it shows on their dashboard (seller-managed
+  // until pushed). Manual seller orders stay false. Idempotent (only fixes wrong rows).
+  q(`update orders set factory_order = (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))
+      where factory_order is distinct from (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))`).catch(() => {});
   // Composite design position {x,y,w,h} per line item — persisted so the mockup
   // overlay lands in the same spot on every board + the mobile app after a sync.
   // schema.sql already declares it for fresh DBs; this covers older ones.

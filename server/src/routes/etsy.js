@@ -107,9 +107,23 @@ async function listingImage(conn, listingId, imageId, cache) {
   return url;
 }
 
+// Is this connection owned by factory STAFF (admin/operator/…) or by a SELLER? This
+// drives factory_order: a seller's OWN shop yields seller-owned orders
+// (factory_order=false, seller-managed until pushed, then the normal pipeline); the
+// admin/factory shop keeps factory_order=true (factory-managed only).
+async function ownerIsStaff(userId) {
+  if (!userId) return true;                          // unknown owner → factory (safe default)
+  try {
+    const r = await q('select role from users where id=$1', [userId]);
+    const role = r.rows[0] && r.rows[0].role;
+    return !!role && role !== 'seller';
+  } catch (e) { return true; }
+}
+
 // Upsert one Etsy receipt into orders. Returns 'imported' or 'skipped'.
 // Re-syncs never overwrite the internal pipeline (status/factory_status) or items.
-async function importReceipt(conn, rc, connectedSec, imgCache) {
+// isFactory: true → factory-owned (admin shop); false → seller-owned (seller's shop).
+async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   const id = 'etsy-' + rc.receipt_id;
   const shipped = !!(rc.is_shipped || rc.was_shipped);
   const status = shipped ? 'shipped' : 'new';
@@ -120,9 +134,13 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
   // factory_order=true: this came from the ADMIN/factory Etsy connection, so it
   // belongs to the factory boards (admin/operator/warehouse), NOT to sellers. A
   // future seller-owned shop connection would insert these with factory_order=false.
+  // Customer's note + gift message off the receipt. Set on INSERT only (left out of
+  // the conflict update) so a seller's later edits to notes survive re-syncs.
+  const buyerNote = rc.message_from_buyer || null;
+  const meta = { source: 'etsy', isGift: !!(rc.is_gift || rc.gift_message), giftMessage: rc.gift_message || '', customerNote: buyerNote || '' };
   await q(
-    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order)
-     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), true)
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, notes, meta)
+     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12, $13)
      on conflict (id) do update set total=excluded.total,
        customer=excluded.customer, address=excluded.address,
        created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
@@ -130,7 +148,8 @@ async function importReceipt(conn, rc, connectedSec, imgCache) {
      { name: rc.name, email: rc.buyer_email || null },
      { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
        zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
-     status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso]
+     status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso,
+     !!isFactory, buyerNote, meta]
   );
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
   // Pre-load existing items so re-syncs DON'T refetch listing images (Etsy rate limit:
@@ -209,6 +228,8 @@ async function syncConnection(conn, opts = {}) {
     } catch (e) { resolved = { error: e.message }; }
   }
   const connectedSec = conn.created_at ? Math.floor(new Date(conn.created_at).getTime() / 1000) : 0;
+  // Factory shop (admin) vs seller's own shop — sets factory_order on each receipt.
+  const isFactory = await ownerIsStaff(conn.connected_by);
   // One-time: drop the pre-connection shipped backlog (full/first sync only).
   if ((full || firstSync) && connectedSec) {
     const del = await q(
@@ -225,7 +246,7 @@ async function syncConnection(conn, opts = {}) {
       const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=100&offset=${offset}&includes=Transactions${qs}`);
       const results = r.results || [];
       for (const rc of results) {
-        if ((await importReceipt(conn, rc, connectedSec, imgCache)) === 'skipped') skipped++; else orders++;
+        if ((await importReceipt(conn, rc, connectedSec, imgCache, isFactory)) === 'skipped') skipped++; else orders++;
       }
       if (results.length < 100) break;
     }
@@ -250,10 +271,12 @@ async function syncConnection(conn, opts = {}) {
 // Sync all connected Etsy shops (or just one via opts.shopId).
 async function syncAllEtsy(opts = {}) {
   if (!SHARED_SECRET) return { error: 'Server is missing ETSY_SHARED_SECRET.' };
-  const rows = (await q(
-    opts.shopId ? `select * from platform_connections where platform='etsy' and shop_id=$1`
-                : `select * from platform_connections where platform='etsy'`,
-    opts.shopId ? [opts.shopId] : [])).rows;
+  // Optional filters: shopId (one shop) and ownerId (one user's shops — sellers sync
+  // only their own). No filters → every connection (the admin auto-sync).
+  const where = ["platform='etsy'"]; const params = [];
+  if (opts.shopId) { params.push(opts.shopId); where.push(`shop_id=$${params.length}`); }
+  if (opts.ownerId) { params.push(opts.ownerId); where.push(`connected_by=$${params.length}`); }
+  const rows = (await q(`select * from platform_connections where ${where.join(' and ')}`, params)).rows;
   const summary = [];
   for (const conn of rows) {
     try { summary.push(await syncConnection(conn, opts)); }
@@ -274,12 +297,18 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
        unique (platform, shop_id))`).catch(() => {});
   // Buyer personalization text per item (added with the customer-upload feature).
   q('alter table order_items add column if not exists personalization text').catch(() => {});
-  // factory_order: orders synced from the ADMIN/factory connection belong to the
-  // factory boards, not to sellers. Sellers' GET excludes these (see orders.js).
+  // factory_order: orders from the ADMIN/factory shop belong to the factory boards;
+  // orders from a SELLER's own shop are seller-owned (factory_order=false, shown on
+  // their dashboard, seller-managed until pushed). Sellers' GET excludes factory ones.
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
-  // Backfill: real Etsy imports (etsy- id) are factory orders. Keyed on the id, not
-  // source, so a seller's manual order tagged with a marketplace source isn't caught.
-  q(`update orders set factory_order=true where id like 'etsy-%' and factory_order=false`).catch(() => {});
+  // Etsy buyer note lands in the seller-visible notes field; gift message in meta.
+  q('alter table orders add column if not exists notes text').catch(() => {});
+  // Re-classify Etsy orders by OWNER ROLE (not by id): factory_order=true only when
+  // the connection owner is staff; a seller's own Etsy orders → false. Idempotent
+  // (touches only rows whose flag is wrong), so it can't yank seller orders back to
+  // the factory on every boot the way the old id-based force-flag did.
+  q(`update orders set factory_order = (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))
+      where factory_order is distinct from (id like 'etsy-%' and exists (select 1 from users u where u.id = orders.seller_id and u.role <> 'seller'))`).catch(() => {});
 
   // Auto-sync: poll Etsy incrementally so new orders land WITHOUT anyone clicking
   // "Sync now". Incremental (min_last_modified) means each run is just a couple of
@@ -326,10 +355,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     return { connected: r.rowCount > 0, shops: r.rows.map(x => x.shop_name).filter(Boolean) };
   });
 
-  // List connected shops (no tokens leaked).
-  app.get('/api/etsy/connections', { preHandler: requireStaff }, async () => {
-    const r = await q(`select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
-                       from platform_connections where platform='etsy' order by created_at`);
+  // List connected shops (no tokens leaked). Staff see all; a seller sees only their
+  // own connected shop (drives the seller-side connect UI).
+  app.get('/api/etsy/connections', { preHandler: requireAuth }, async (req) => {
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const r = await q(
+      staff ? `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+                 from platform_connections where platform='etsy' order by created_at`
+            : `select id, platform, shop_id, shop_name, scopes, last_sync_at, created_at
+                 from platform_connections where platform='etsy' and connected_by=$1 order by created_at`,
+      staff ? [] : [req.user.sub]);
     return r.rows;
   });
 
@@ -350,7 +385,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   });
 
   // OAuth code → tokens. Called by oauth-callback.html after Etsy redirects back.
-  app.post('/api/etsy/exchange', { preHandler: requireStaff }, async (req, reply) => {
+  // requireAuth (not staff): a SELLER connects their OWN shop here — connected_by is
+  // set to the caller, so importReceipt routes their orders to them (factory_order=false).
+  app.post('/api/etsy/exchange', { preHandler: requireAuth }, async (req, reply) => {
     const { code, code_verifier, redirect_uri } = req.body || {};
     if (!KEYSTRING) { reply.code(500); return { error: 'Server missing ETSY_KEYSTRING' }; }
     if (!code || !code_verifier) { reply.code(400); return { error: 'Missing code or verifier' }; }
@@ -387,21 +424,30 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     }
   });
 
-  app.delete('/api/etsy/connections/:shop_id', { preHandler: requireStaff }, async (req) => {
-    await q(`delete from platform_connections where platform='etsy' and shop_id=$1`, [req.params.shop_id]);
+  app.delete('/api/etsy/connections/:shop_id', { preHandler: requireAuth }, async (req) => {
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    if (staff) await q(`delete from platform_connections where platform='etsy' and shop_id=$1`, [req.params.shop_id]);
+    else await q(`delete from platform_connections where platform='etsy' and shop_id=$1 and connected_by=$2`, [req.params.shop_id, req.user.sub]);
     return { ok: true };
   });
 
   // Pull orders (receipts) into our DB. Incremental by default (only what changed
   // since the last sync); pass { full: true } in the body to force a complete pull.
-  app.post('/api/etsy/sync', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/etsy/sync', { preHandler: requireAuth }, async (req, reply) => {
     if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET. Add it to the server .env and redeploy.' }; }
-    const has = await q(`select 1 from platform_connections where platform='etsy' limit 1`);
-    if (!has.rowCount) { reply.code(400); return { error: 'No Etsy shop connected' }; }
-    // One-time cleanup: purge any Etsy listings a previous version imported into
-    // the base-product catalog (they don't belong there).
-    const purged = await q(`delete from catalog_products where id like 'etsy-%'`);
-    const res = await syncAllEtsy({ full: !!(req.body && req.body.full), shopId: (req.body && req.body.shop_id) || null });
+    // Sellers sync ONLY their own shop; staff sync every connection.
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const ownerId = staff ? null : req.user.sub;
+    const has = await q(
+      ownerId ? `select 1 from platform_connections where platform='etsy' and connected_by=$1 limit 1`
+              : `select 1 from platform_connections where platform='etsy' limit 1`,
+      ownerId ? [ownerId] : []);
+    if (!has.rowCount) { reply.code(400); return { error: ownerId ? 'No Etsy shop connected to your account' : 'No Etsy shop connected' }; }
+    // One-time cleanup (staff only): purge any Etsy listings a previous version
+    // imported into the base-product catalog (they don't belong there).
+    let purged = { rowCount: 0 };
+    if (staff) purged = await q(`delete from catalog_products where id like 'etsy-%'`);
+    const res = await syncAllEtsy({ full: !!(req.body && req.body.full), shopId: (req.body && req.body.shop_id) || null, ownerId });
     return { ...res, catalog_listings_purged: purged.rowCount || 0 };
   });
 
