@@ -3365,19 +3365,30 @@ const EG_NEW_ITEMS_KEY = 'eg_inline_added_items';
     ORDERS.forEach(function(o){
       const list = map[o.id]; if (!Array.isArray(list) || !list.length) return;
       o.itemsList = Array.isArray(o.itemsList) ? o.itemsList : [];
-      const present = new Set(o.itemsList.map(function(it){ return it && it.sku; }).filter(Boolean));
-      list.forEach(function(it){ if (it && it.sku && !present.has(it.sku)) o.itemsList.push(it); });
+      // Dedup by the stable lineId first (sku can change when a blank is picked),
+      // falling back to sku for legacy entries saved before lineId existed.
+      const presentLine = new Set(o.itemsList.map(function(it){ return it && it.lineId; }).filter(Boolean));
+      const presentSku = new Set(o.itemsList.map(function(it){ return it && it.sku; }).filter(Boolean));
+      list.forEach(function(it){
+        if (!it) return;
+        if (it.lineId) { if (!presentLine.has(it.lineId)) o.itemsList.push(it); return; }
+        if (it.sku && !presentSku.has(it.sku)) o.itemsList.push(it);
+      });
     });
   } catch(e){}
 })();
 // Persist edits on an inline-added item (qty, blank pick, tech, design assignment)
 // so when the seller navigates away mid-flow and comes back, their picks survive.
 function _egPersistInlineItem(orderId, item){
-  if (!orderId || !item || !item.sku) return;
+  if (!orderId || !item || (!item.lineId && !item.sku)) return;
   try {
     const map = JSON.parse(localStorage.getItem(EG_NEW_ITEMS_KEY) || '{}');
     const list = Array.isArray(map[orderId]) ? map[orderId] : [];
-    const idx = list.findIndex(function(x){ return x && x.sku === item.sku; });
+    // Match by stable lineId first so a sku change (e.g. picking a blank turns a
+    // NEW-xxx sku into the catalog SKU) UPDATES the same entry instead of pushing a
+    // duplicate row. Fall back to sku for legacy entries with no lineId.
+    let idx = item.lineId ? list.findIndex(function(x){ return x && x.lineId === item.lineId; }) : -1;
+    if (idx < 0) idx = list.findIndex(function(x){ return x && !x.lineId && x.sku === item.sku; });
     if (idx >= 0) list[idx] = Object.assign({}, list[idx], item);
     else list.push(item);
     map[orderId] = list;
@@ -3401,6 +3412,12 @@ function orderAddInlineItem(orderNo) {
   const o = ORDERS.find(x => x.no === orderNo); if (!o) return;
   const stamp = Date.now().toString(36);
   const newItem = {
+    // Stable per-line id from BIRTH — itemDK() returns this, so the design/image
+    // cache keys never shift even when the sku changes (picking a blank) or EGStore
+    // later assigns its own line_id. Without it a fresh item is keyed by its volatile
+    // NEW-xxx sku, and the Design Lab round trip orphans the artwork (lands on the
+    // wrong sibling, or disappears) — the exact bug this fixes.
+    lineId: 'L' + stamp + '-' + Math.random().toString(36).slice(2, 9),
     img: 'https://placehold.co/80x80/f4f2ef/9ca3af?text=New',
     listing: 'New item — pick a blank',
     name: 'New item',
@@ -4349,8 +4366,15 @@ function odmRemoveDesign(ordNo, sku) {
       const list = _inlineMap[o.id];
       if (!Array.isArray(list) || !list.length) return;
       o.itemsList = Array.isArray(o.itemsList) ? o.itemsList : [];
-      const present = new Set(o.itemsList.map(function(it){ return it && it.sku; }).filter(Boolean));
-      list.forEach(function(it){ if (it && it.sku && !present.has(it.sku)) o.itemsList.push(it); });
+      // Dedup by the stable lineId first (sku can change when a blank is picked),
+      // falling back to sku for legacy entries saved before lineId existed.
+      const presentLine = new Set(o.itemsList.map(function(it){ return it && it.lineId; }).filter(Boolean));
+      const presentSku = new Set(o.itemsList.map(function(it){ return it && it.sku; }).filter(Boolean));
+      list.forEach(function(it){
+        if (!it) return;
+        if (it.lineId) { if (!presentLine.has(it.lineId)) o.itemsList.push(it); return; }
+        if (it.sku && !presentSku.has(it.sku)) o.itemsList.push(it);
+      });
     });
   } catch(e){}
   // 1. Restore previously edited blank/tech values for any item
