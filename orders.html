@@ -5066,6 +5066,22 @@ function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'
 // Polished in-place "Add Funds" modal (mirrors the wallet page). Defined here so the
 // header pill opens it ON the orders page — openQuickTopUp calls it first, so the old
 // wallet.html redirect (which dropped just-created/imported orders) never runs.
+// How much the seller is short to cover their not-yet-pushed orders (same math as
+// the low-balance pulse). >0 ⇒ underfunded; used to pre-fill the Add Funds amount.
+function _egTopUpShortfall(){
+  try{
+    if(typeof ORDERS==='undefined') return 0;
+    var bal=parseFloat(localStorage.getItem('eg_balance')||'0')||0;
+    var PENDING=['new','draft','action'];
+    var owed=ORDERS.reduce(function(s,o){
+      if(!o||PENDING.indexOf(String(o.status||'').toLowerCase())===-1) return s;
+      var t=parseFloat(o.total)||0;
+      if(!t&&Array.isArray(o.itemsList)) t=o.itemsList.reduce(function(a,i){ return a+(parseInt(i.qty,10)||1)*15; },0);
+      return s+t;
+    },0);
+    var short=owed-bal; return short>0?short:0;
+  }catch(e){ return 0; }
+}
 function openDepositModal(){
   var RATE = 27000; // VND per USD (display) — BIDV transfer estimate
   var m = document.getElementById('_afm');
@@ -5089,6 +5105,12 @@ function openDepositModal(){
     document.body.appendChild(m);
     m.addEventListener('click', function(ev){ if(ev.target===m) m.style.display='none'; });
   }
+  // When the wallet is short for the pending orders (what the low-balance pulse
+  // flags), pre-fill the amount with that shortfall — but never clobber a value the
+  // seller already typed.
+  var _short=_egTopUpShortfall();
+  var _ae=document.getElementById('_afm-amt');
+  if(_short>0 && _ae && !(parseFloat(_ae.value)>0)) _ae.value=Math.ceil(_short);
   _afmSync();
   m.style.display='flex';
 }
