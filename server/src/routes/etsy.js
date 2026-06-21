@@ -134,13 +134,14 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   // factory_order=true: this came from the ADMIN/factory Etsy connection, so it
   // belongs to the factory boards (admin/operator/warehouse), NOT to sellers. A
   // future seller-owned shop connection would insert these with factory_order=false.
-  // Customer's note + gift message off the receipt. Set on INSERT only (left out of
-  // the conflict update) so a seller's later edits to notes survive re-syncs.
-  const buyerNote = rc.message_from_buyer || null;
-  const meta = { source: 'etsy', isGift: !!(rc.is_gift || rc.gift_message), giftMessage: rc.gift_message || '', customerNote: buyerNote || '' };
+  // Customer note + gift message → the order-detail Notes + Gift Message fields
+  // (orders.html reads meta.note / meta.gift). Set on INSERT only (left out of the
+  // conflict update) so a seller's later edits to either survive re-syncs.
+  const meta = { source: 'etsy', isGift: !!(rc.is_gift || rc.gift_message),
+                 note: rc.message_from_buyer || '', gift: rc.gift_message || '' };
   await q(
-    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, notes, meta)
-     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12, $13)
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta)
+     values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12)
      on conflict (id) do update set total=excluded.total,
        customer=excluded.customer, address=excluded.address,
        created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
@@ -149,7 +150,7 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
      { line1: rc.first_line, line2: rc.second_line, city: rc.city, state: rc.state,
        zip: rc.zip, country: rc.country_iso, formatted: rc.formatted_address },
      status, status, money(rc.grandtotal), (rc.shipments && rc.shipments[0]?.tracking_code) || null, createdIso,
-     !!isFactory, buyerNote, meta]
+     !!isFactory, meta]
   );
   const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
   // Pre-load existing items so re-syncs DON'T refetch listing images (Etsy rate limit:
@@ -301,7 +302,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // orders from a SELLER's own shop are seller-owned (factory_order=false, shown on
   // their dashboard, seller-managed until pushed). Sellers' GET excludes factory ones.
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
-  // Etsy buyer note lands in the seller-visible notes field; gift message in meta.
+  // notes column is used by manual orders (the PATCH map). Etsy note/gift go into
+  // meta (meta.note / meta.gift) so the order-detail Notes + Gift Message fill in.
   q('alter table orders add column if not exists notes text').catch(() => {});
   // Re-classify Etsy orders by OWNER ROLE (not by id): factory_order=true only when
   // the connection owner is staff; a seller's own Etsy orders → false. Idempotent
@@ -449,6 +451,43 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     if (staff) purged = await q(`delete from catalog_products where id like 'etsy-%'`);
     const res = await syncAllEtsy({ full: !!(req.body && req.body.full), shopId: (req.body && req.body.shop_id) || null, ownerId });
     return { ...res, catalog_listings_purged: purged.rowCount || 0 };
+  });
+
+  // ── Test helper: inject a realistic SAMPLE Etsy order owned by the CALLER, so the
+  // seller-side experience (listing image as the hero, customer note, gift message,
+  // editable items) can be exercised without a real purchase. A seller calling it
+  // gets a seller-owned order (factory_order=false → shows on their dashboard).
+  app.post('/api/etsy/sample', { preHandler: requireAuth }, async (req) => {
+    const isFactory = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const id = 'etsy-SAMPLE-' + Date.now().toString(36);
+    const meta = { source: 'etsy', sample: true, isGift: true,
+      note: 'Please use navy thread for the embroidery — thank you! 💙',
+      gift: 'Happy Birthday, Mom! Love, Jamie' };
+    await q(
+      `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, created_at, factory_order, meta)
+       values ($1,$2,$3,'etsy',$4,$5,'new','new',$6, now(), $7, $8)`,
+      [id, req.user.sub, 'My Etsy Shop (sample)',
+       { name: 'Jamie Rivera', email: 'jamie.rivera@example.com' },
+       { line1: '742 Evergreen Terrace', line2: '', city: 'Portland', state: 'OR', zip: '97201', country: 'US', formatted: '742 Evergreen Terrace, Portland, OR 97201' },
+       42.00, isFactory, meta]
+    );
+    const items = [
+      ['EMB-APRON-NVY', 'Personalized Embroidered Linen Apron', 1, 'Navy / Embroidery', 32.00, 'https://placehold.co/600x600/6b7a4f/ffffff?text=Apron+Listing', 'EMB', 'The Rivera Kitchen'],
+      ['TEE-WHT-L', 'Custom Print Cotton Tee', 2, 'White / L', 5.00, 'https://placehold.co/600x600/efefef/333333?text=Tee+Listing', 'DTG', null]
+    ];
+    for (const it of items) {
+      await q(
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, print_type, personalization)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [id, it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7]]
+      );
+    }
+    return { ok: true, id, ownedBy: isFactory ? 'factory' : 'seller' };
+  });
+  // Clean up the caller's sample orders.
+  app.delete('/api/etsy/sample', { preHandler: requireAuth }, async (req) => {
+    const r = await q(`delete from orders where seller_id=$1 and id like 'etsy-SAMPLE-%'`, [req.user.sub]);
+    return { ok: true, removed: r.rowCount || 0 };
   });
 
   // ── Webhook receiver (real-time). Etsy POSTs here when an order event fires.
