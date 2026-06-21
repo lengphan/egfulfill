@@ -6369,16 +6369,16 @@ function searchOrders(q) {
 //   • Item Name / Size / Color → resolved from the product catalog via Item SKU
 //   • Sales Channel → implied by Store Name
 //   • Order Date / Item Base Product / Ship Country → handled automatically by the system
-// "Hero Image (link or DL-ID)" → the parent-row product photo. Paste a public image
-// URL, OR a Design Library reference (e.g. DL-12, or its /api/design_library/12 link).
-// On import it resolves to the seller's uploaded artwork and becomes the order's
+// "Image Link/ID" → the parent-row product photo. Paste a public image URL, OR a
+// Design Library reference (e.g. DL-12, or its /api/design_library/12 link). On
+// import it resolves to the seller's uploaded artwork and becomes the order's
 // hero/listing image (item.img). Distinct from the design artwork overlay.
 const CSV_HEADERS = [
   'Order Number','Ship Name','Ship Email',
   'Ship Address 1','Ship Address 2','Ship City','Ship State','Ship Zip',
   'Store Name',
   'Product Title','Item SKU','Item Quantity','Print Type',
-  'Shipping Service','Internal Notes','Hero Image (link or DL-ID)'
+  'Shipping Service','Internal Notes','Image Link/ID'
 ];
 
 function _csvRow(r) { return r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','); }
@@ -6542,7 +6542,7 @@ function buildAndDownloadTemplate() {
     const sku = row.querySelector('.tpl-sku').textContent;
     // Column order MUST mirror CSV_HEADERS (16 cols):
     // Order Number, Ship Name, Email, Addr1, Addr2, City, State, Zip, Store,
-    // Product Title, SKU, Qty, Print Type, Shipping Service, Internal Notes, Hero Image
+    // Product Title, SKU, Qty, Print Type, Shipping Service, Internal Notes, Image Link/ID
     csvRows.push([
       orderNum,
       get('tpl-ship-name'), get('tpl-ship-email'),
@@ -6855,7 +6855,7 @@ async function generateXLSX() {
     //   L = Item Quantity     → whole number ≥ 1
     //   M = Print Type        → DTG / DTF / EMB / APL / LSR
     //   N = Shipping Service  → carrier+service list
-    //   (J = Product Title, O = Internal Notes, P = Hero Image → free text, no rule)
+    //   (J = Product Title, O = Internal Notes, P = Image Link/ID → free text, no rule)
     const zip = await JSZip.loadAsync(xlsxBuf);
     let sheetXml = await zip.file('xl/worksheets/sheet1.xml').async('string');
     const US_STATES = 'AL,AK,AZ,AR,CA,CO,CT,DE,FL,GA,HI,ID,IL,IN,IA,KS,KY,LA,ME,MD,MA,MI,MN,MS,MO,MT,NE,NV,NH,NJ,NM,NY,NC,ND,OH,OK,OR,PA,RI,SC,SD,TN,TX,UT,VT,VA,WA,WV,WI,WY,DC,PR';
@@ -6931,7 +6931,7 @@ const COL_ALIASES = {
   design_file_url:['design_file_url','design','design_url','artwork','art_url','design_file'],
   // Parent-row hero/listing photo — a public image URL OR a Design Library ref
   // (DL-12 / its link). Kept distinct from design_file_url (the printed artwork).
-  hero_image:['hero_image','hero_image_link_or_dl_id','hero','hero_img','hero_url','product_image','product_img','product_photo','listing_image','listing_img','main_image','image','image_url','img_url','photo','design_id','design_image','design_image_url'],
+  hero_image:['hero_image','image_link_id','image_link','image_id','hero_image_link_or_dl_id','hero','hero_img','hero_url','product_image','product_img','product_photo','listing_image','listing_img','main_image','image','image_url','img_url','photo','design_id','design_image','design_image_url'],
   internal_notes:['internal_notes','notes','note','internal_note','order_note'],
   shipping_service:['shipping_service','service','ship_method','shipping_method'],
   sales_channel:['sales_channel','channel','source']
@@ -7133,7 +7133,7 @@ function renderImportPreview() {
     <tr style="background:${r._valid?'#f0fdf4':'#fff7f7'}">
       <td style="padding:6px 10px;font-size:12.5px;color:#6b7280">${r._rowNum}</td>
       <td style="padding:6px 10px;font-size:13px;font-weight:500;color:#191918">${r.ship_name||'—'}</td>
-      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_sku||r.item_name||'—'}${r.hero_image ? `<div style="font-size:10.5px;color:#9ca3af;margin-top:1px">hero: ${_heroLibraryId(r.hero_image) ? 'DL-'+_heroLibraryId(r.hero_image) : (_isHttpUrl(r.hero_image) ? 'image link' : 'image')}</div>` : ''}</td>
+      <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_sku||r.item_name||'—'}${r.hero_image ? `<div style="font-size:10.5px;color:#9ca3af;margin-top:1px">image: ${_heroLibraryId(r.hero_image) ? 'DL-'+_heroLibraryId(r.hero_image) : (_isHttpUrl(r.hero_image) ? 'link' : 'image')}</div>` : ''}</td>
       <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.print_type||'—'}</td>
       <td style="padding:6px 10px;font-size:12.5px;color:#374151">${r.item_quantity||'—'}</td>
       <td style="padding:6px 10px">
@@ -7175,7 +7175,7 @@ function _itemFingerprint(it) {
 }
 
 // ── Hero image resolution (import) ──────────────────────────────────────────
-// The "Hero Image (link or DL-ID)" column becomes the order's parent-row photo
+// The "Image Link/ID" column becomes the order's parent-row photo
 // (item.img). Two accepted forms:
 //   • a public image URL (http/https)        → used as-is (a real URL → syncs to
 //                                                the factory boards through leanOrder)
@@ -7279,7 +7279,7 @@ function doImportOrders(opts) {
       color: r.item_color || '',
       size:  r.item_size || '',
       designUrl: r.design_file_url || '',
-      // Hero/listing photo from the "Hero Image (link or DL-ID)" column, resolved
+      // Hero/listing photo from the "Image Link/ID" column, resolved
       // by _resolveImportHeroes (URL kept as-is, DL-ref → small data URL). Empty
       // leaves the row to fall back to the SKU's catalog image as before.
       img: r._hero || '',
@@ -7408,7 +7408,7 @@ function _afterImport(result) {
 }
 
 async function confirmImport() {
-  // Resolve any "Hero Image (link or DL-ID)" cells to real img srcs FIRST, so the
+  // Resolve any "Image Link/ID" cells to real img srcs FIRST, so the
   // orders are created with their parent-row photo already in place.
   const btn = document.getElementById('import-confirm-btn');
   let prevTxt;
