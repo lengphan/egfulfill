@@ -459,6 +459,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // gets a seller-owned order (factory_order=false → shows on their dashboard).
   app.post('/api/etsy/sample', { preHandler: requireAuth }, async (req) => {
     const isFactory = !!(req.user && req.user.role && req.user.role !== 'seller');
+    // Idempotent: clear this caller's existing sample(s) first, so repeated calls
+    // REPLACE rather than pile up duplicate "Jamie Rivera" orders.
+    await q(`delete from order_items where order_id in (select id from orders where seller_id=$1 and id like 'etsy-SAMPLE-%')`, [req.user.sub]).catch(() => {});
+    await q(`delete from orders where seller_id=$1 and id like 'etsy-SAMPLE-%'`, [req.user.sub]).catch(() => {});
     const id = 'etsy-SAMPLE-' + Date.now().toString(36);
     const meta = { source: 'etsy', sample: true, isGift: true,
       note: 'Please use navy thread for the embroidery — thank you! 💙',
