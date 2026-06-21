@@ -1369,10 +1369,13 @@ function _laPaypalHtml() {
     + '</div>'
     + '<div style="font-size:12px;color:#b0aaa4;margin-top:12px;line-height:1.55">Pick an amount and you go straight to PayPal — <b style="color:#6b7280">choose your bank or card securely in the PayPal window</b>. (PayPal keeps your funding sources private, so they aren\'t shown here.)</div>';
 }
-// Log In with PayPal — navigates to paypal.com (EGPayPal), falls back to the Add
-// Funds top-up flow if the server's PayPal OAuth isn't configured/reachable.
+// Log In with PayPal — navigates to paypal.com (EGPayPal). "Log in with PayPal"
+// (OAuth) is pending PayPal's live-eligibility approval, so it errors in live mode;
+// until then just enable the PayPal top-up panel directly (top-ups run through the
+// PayPal checkout window, which needs no account link). Flip window.EG_PAYPAL_OAUTH
+// = true once PayPal approves the feature for live.
 function walPayPalLogin() {
-  if (window.EGPayPal && window.EGPayPal.login) {
+  if (window.EG_PAYPAL_OAUTH === true && window.EGPayPal && window.EGPayPal.login) {
     EGPayPal.login('/wallet.html', function () { if (typeof connectGateway === 'function') connectGateway('paypal'); });
   } else if (typeof connectGateway === 'function') { connectGateway('paypal'); }
 }

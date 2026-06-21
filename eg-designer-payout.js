@@ -121,11 +121,14 @@
   }
 
   // ── connect (quick) ──────────────────────────────────────────────────────────
-  // Primary path: real "Log In with PayPal" — navigates to paypal.com to sign in.
-  // Falls back to the manual email entry in the manage modal if the server's PayPal
-  // OAuth isn't configured/reachable, so the button is never a dead end.
+  // "Log In with PayPal" (OAuth) is gated behind PayPal's live-eligibility review,
+  // which is still PENDING for this account — so in live mode the authorize page
+  // rejects every request. Until PayPal grants the feature, connect by PayPal email
+  // directly (payouts are sent to an email regardless). Flip EG_PAYPAL_OAUTH to true
+  // (or set window.EG_PAYPAL_OAUTH) once "Log in with PayPal" is approved for live.
+  var EG_PAYPAL_OAUTH = (typeof window !== 'undefined' && window.EG_PAYPAL_OAUTH === true);
   function connect() {
-    if (window.EGPayPal && window.EGPayPal.login) {
+    if (EG_PAYPAL_OAUTH && window.EGPayPal && window.EGPayPal.login) {
       EGPayPal.login(location.pathname, function (msg) {
         toast('PayPal login unavailable — link by email instead', '#b45309');
         manage('paypal', true);
