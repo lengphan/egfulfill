@@ -300,6 +300,28 @@
     } catch (e) {}
   }
 
+  // Live cross-board updates: when an item's factory status changes (e.g. a warehouse
+  // op presses Start on mobile — it lands here via the 15s hydrate poll) or orders
+  // re-hydrate, re-render this board so it reflects WITHOUT a manual refresh.
+  // refreshBoard preserves row expansion; the item-status event only fires on REAL
+  // changes (seedItemFactoryStatusFromOrders); we skip the repaint while the user is
+  // mid-edit so an open dropdown / typing isn't yanked away.
+  var _egLiveTmr = null;
+  function _egLiveRefresh(){
+    clearTimeout(_egLiveTmr);
+    _egLiveTmr = setTimeout(function(){
+      try {
+        var ae = document.activeElement;
+        if (ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+        refreshBoard();
+      } catch (e) {}
+    }, 400);
+  }
+  try {
+    window.addEventListener('eg-item-status-changed', _egLiveRefresh);
+    window.addEventListener('eg-orders-changed', _egLiveRefresh);
+  } catch (e) {}
+
   // ── Auto thread-colour matching for embroidery items ───────────────────────
   // Etsy-synced EMB items arrive with the buyer's artwork but no thread codes.
   // Run the dominant-colour → nearest-stocked-thread match ONCE per item (guarded
