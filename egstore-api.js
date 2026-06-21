@@ -120,7 +120,7 @@
              // Logo") — a real URL. Kept separate from designSrc (which the seller UI
              // treats as a 'design-lab'/'template' enum) so the two never collide.
              customerFile: /^https?:\/\//i.test(String(it.design_src || '')) ? it.design_src : null,
-             personalization: it.personalization, img: it.img, designPos: it.design_pos };
+             personalization: it.personalization, img: it.img, designPos: it.design_pos, lineId: it.line_id };
   }
   function dbToOrder(r) {
     return { id: r.id, seq: r.seq != null ? Number(r.seq) : null, meta: r.meta || {}, store: r.store, seller: r.store, source: r.source,
@@ -297,7 +297,8 @@
           printType: it.printType || it.tech, tech: it.tech,
           qty: it.qty, color: it.color, size: it.size, variant: it.variant,
           unitPrice: it.unitPrice, designSrc: ds,
-          blank: it.blank || null, img: heroImg, designPos: it.designPos || null
+          blank: it.blank || null, img: heroImg, designPos: it.designPos || null,
+          lineId: it.lineId || null
         };
       });
     }

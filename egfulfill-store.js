@@ -37,7 +37,18 @@
     try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
     catch(e) { return []; }
   }
+  // Stable per-line id — the SINGLE handle for everything tied to a line item
+  // (selections, design assignment, the cached design image/raw, factory status).
+  // Two items with identical SKU/colour/size each get their own, so one item's
+  // design/image can never bleed into or overwrite the other's, and reordering or a
+  // re-hydrate can't swap them (the old positional design-key did both).
+  function _lineId(){ return 'L' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9); }
+  function _ensureLineIds(items){
+    if (Array.isArray(items)) items.forEach(function(it){ if (it && !it.lineId) it.lineId = _lineId(); });
+    return items;
+  }
   function _save(orders) {
+    try { (orders||[]).forEach(function(o){ if (o) _ensureLineIds(o.items); }); } catch(e){}
     _safeWrite(KEY, JSON.stringify(orders));
     // Notify same-tab stat renderers (cross-tab is covered by the native 'storage' event).
     try { window.dispatchEvent(new Event('eg-orders-changed')); } catch(e){}
@@ -348,11 +359,12 @@
     // Patch fields on a single line item inside an order. Used by Design Lab to attach
     // the design file (and cache the composite preview) so operator/admin/warehouse can
     // display the file once the seller has finished designing.
-    updateOrderItem: function(orderId, sku, patch) {
+    updateOrderItem: function(orderId, ref, patch) {
       var orders = _load();
       var o = orders.find(function(x){ return x.id === orderId; });
       if (!o || !Array.isArray(o.items)) return null;
-      var it = o.items.find(function(x){ return x.sku === sku; });
+      // Resolve by the stable lineId first so identical-SKU siblings never collide.
+      var it = o.items.find(function(x){ return x.lineId && x.lineId === ref; }) || o.items.find(function(x){ return x.sku === ref; });
       if (!it) return null;
       Object.keys(patch || {}).forEach(function(k){ it[k] = patch[k]; });
       _save(orders);

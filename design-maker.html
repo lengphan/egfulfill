@@ -3289,7 +3289,7 @@ async function pushToProduction(){
     // 6) Tag the EGStore order's item so item.file is truthy even before the cache lookup
     //    runs, and so the "File uploaded" link shows up across factory dashboards.
     if (typeof EGStore !== 'undefined' && EGStore.updateOrderItem) {
-      try { EGStore.updateOrderItem(ctx.ordId, ctx.sku, { file: 'design-lab.png', designSrc: 'design-lab' }); } catch(e) {}
+      try { EGStore.updateOrderItem(ctx.ordId, ctx.dk || ctx.sku, { file: 'design-lab.png', designSrc: 'design-lab' }); } catch(e) {}
     }
     // 7) Stock check — if this SKU isn't stocked (or is short), file a backorder so it
     //    surfaces in the factory Purchases queue across operator/warehouse/admin.

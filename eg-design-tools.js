@@ -17,7 +17,7 @@
   // first match and editing one item silently edits the others. The key is the
   // sku for the first occurrence, then sku#1, sku#2… for repeats — identical to
   // the seller side, so seller + factory resolve the same line to the same art.
-  function itemDK(it) { return (it && it._dk) || (it && it.sku) || ''; }
+  function itemDK(it) { return (it && it.lineId) || (it && it._dk) || (it && it.sku) || ''; }
   function assignDesignKeys(items) {
     if (!Array.isArray(items)) return items;
     var seen = {};

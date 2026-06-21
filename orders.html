@@ -1008,7 +1008,8 @@ function renderOrders(ordersOverride) {
       const autoBlank = item.blank || skuToBlank(item.sku);
       // Per-item key for DOM ids + handlers — a stable unique id, NOT the SKU,
       // so two line items with the same SKU don't share selection/edit state.
-      const escSku = item.__uid || (item.__uid = 'it' + (++__ITEM_UID_SEQ));
+      if (item.lineId) item.__uid = item.lineId;   // unify the row handle on the stable lineId
+      const escSku = item.__uid || (item.__uid = item.lineId || ('it' + (++__ITEM_UID_SEQ)));
       const dot = (filled, n) => `<div class="step-dot" style="width:18px;height:18px;border-radius:50%;background:${filled?'#9ca3af':'#f0ede9'};color:${filled?'#fff':'#9ca3af'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;transition:background .2s,color .2s">${n}</div>`;
       const SEL = `border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 20px 4px 8px;font-size:13px;font-family:inherit;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c9c8c4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") no-repeat right 6px center;-webkit-appearance:none;appearance:none;cursor:pointer;outline:none;transition:border-color .15s,color .15s;text-overflow:ellipsis;white-space:nowrap;overflow:hidden`;
       // Blank options pull from the live EGStore catalog (what operator has actually
@@ -1450,10 +1451,10 @@ function clearDesign(ordNo, escSku) {
   if (UP_STATE[ordNo]) UP_STATE[ordNo][itemDK(item)] = { state:'idle', file:null };
   try {
     const map = JSON.parse(localStorage.getItem('eg_design_lab_assigned') || '{}');
-    delete map[o.id + '|' + item.sku];
+    delete map[o.id + '|' + itemDK(item)];
     localStorage.setItem('eg_design_lab_assigned', JSON.stringify(map));
     const rv = JSON.parse(localStorage.getItem(EG_RV_KEY) || '{}');
-    delete rv[o.id + '|' + item.sku];
+    delete rv[o.id + '|' + itemDK(item)];
     localStorage.setItem(EG_RV_KEY, JSON.stringify(rv));
   } catch(e){}
   renderOrders();
@@ -1539,7 +1540,7 @@ function saveItemField(ordNo, escSku, field, value) {
   }
   try {
     const edits = JSON.parse(localStorage.getItem(EG_EDIT_KEY) || '{}');
-    const k = o.id + '|' + item.sku;
+    const k = o.id + '|' + (item.lineId || item.sku);   // key edits by the stable lineId
     edits[k] = Object.assign({}, edits[k] || {}, { [field]: value });
     localStorage.setItem(EG_EDIT_KEY, JSON.stringify(edits));
   } catch(e) {}
@@ -2852,7 +2853,7 @@ function _itemMockupURL(item) {
 // this key, NOT the raw SKU: the first item with a SKU keeps the bare SKU (so old
 // single-design data still resolves), each later duplicate gets a hidden "#n"
 // slot. The displayed SKU is never changed; the slot is internal only.
-function itemDK(item) { return (item && item._dk) || (item && item.sku) || ''; }
+function itemDK(item) { return (item && item.lineId) || (item && item._dk) || (item && item.sku) || ''; }
 function assignDesignKeys(items) {
   if (!Array.isArray(items)) return;
   const seen = {};
@@ -4280,6 +4281,7 @@ function odmRemoveDesign(ordNo, sku) {
             name: derived,
             blank: it.blank || (typeof skuToBlank === 'function' ? skuToBlank(it.sku) : ''),
             sku: it.sku,
+            lineId: it.lineId,   // stable per-line id → keeps each item's design/image independent
             qty: it.qty || 1,
             tech: it.tech || '',
           };
@@ -4355,10 +4357,12 @@ function odmRemoveDesign(ordNo, sku) {
   try {
     const edits = JSON.parse(localStorage.getItem(EG_EDIT_KEY) || '{}');
     Object.entries(edits).forEach(([k, fields]) => {
-      const [ordId, sku] = k.split('|');
+      const [ordId, ref] = k.split('|');
       const o = ORDERS.find(x => x.id === ordId);
       if (!o) return;
-      const item = o.itemsList.find(i => i.sku === sku);
+      // ref is the stable lineId (new) or a raw SKU (legacy) — resolve lineId first so a
+      // saved blank/tech edit can't re-apply to an identical-SKU sibling.
+      const item = o.itemsList.find(i => (i.lineId && i.lineId === ref)) || o.itemsList.find(i => i.sku === ref);
       if (!item) return;
       Object.assign(item, fields);
     });

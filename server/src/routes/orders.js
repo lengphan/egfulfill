@@ -22,6 +22,9 @@ export function ordersRoutes(app, requireAuth) {
   // overlay lands in the same spot on every board + the mobile app after a sync.
   // schema.sql already declares it for fresh DBs; this covers older ones.
   q('alter table order_items add column if not exists design_pos jsonb').catch(() => {});
+  // Stable per-line id (client-generated) so a line item's design/image/status keys
+  // never collide between identical-SKU siblings. Preserved across replaceItems.
+  q('alter table order_items add column if not exists line_id text').catch(() => {});
   // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
   // the moment a seller uploads a few images → "Browser storage is full"). One row
   // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
@@ -108,11 +111,11 @@ export function ordersRoutes(app, requireAuth) {
       const img = (it.img != null && it.img !== '') ? it.img : (imgBySku[it.sku] || null);
       const designPos = (it.designPos && typeof it.designPos === 'object') ? JSON.stringify(it.designPos) : null;
       await q(
-        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        `insert into order_items (order_id, sku, name, print_type, qty, color, size, variant, unit_price, design_src, img, blank, design_pos, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [orderId, it.sku || null, it.name || null, it.printType || it.tech || null, it.qty || 1,
          it.color || null, it.size || null, it.variant || null, it.unitPrice || 0, it.designSrc || null,
-         img, it.blank || null, designPos]
+         img, it.blank || null, designPos, it.lineId || null]
       );
     }
   }
