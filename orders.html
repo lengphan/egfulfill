@@ -6668,22 +6668,29 @@ function tplHandleFile(file) {
     const dataRows = rows.slice(1);
     // Reuse the same column indexes as the header lookup so column position changes don't break validation
     const idx = name => headers.indexOf(name);
-    let validCount = 0, errCount = 0;
+    let validCount = 0, errCount = 0, sampleCount = 0;
     const previewLimit = 8;
+    // The template ships ONE labelled example row the importer deliberately skips
+    // (matches _isImportSampleRow). Flag it here so the preview count matches what
+    // actually imports — otherwise it read "1 valid", then import said "No order rows".
+    const _isSampleName = (nm) => /delete this row|\(example/i.test(String(nm || ''));
     const html = dataRows.slice(0, previewLimit).map((cols, i) => {
       const get = (name) => { const k = idx(name); return k >= 0 && cols[k] != null ? String(cols[k]).trim() : ''; };
-      const missing = REQUIRED_COLS.filter(c => !get(c));
-      const isValid = missing.length === 0;
-      if (isValid) validCount++; else errCount++;
       const customer = get('ship_name') || '—';
       const sku = get('item_sku') || '—';
       const printType = get('print_type') || '—';
       const qty = get('item_quantity') || '—';
-      const status = isValid
+      const isSample = _isSampleName(get('ship_name'));
+      const missing = REQUIRED_COLS.filter(c => !get(c));
+      const isValid = !isSample && missing.length === 0;
+      if (isSample) sampleCount++; else if (isValid) validCount++; else errCount++;
+      const status = isSample
+        ? '<span style="display:inline-flex;align-items:center;gap:4px;background:#f3eee2;color:#9a8c6a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">Example · skipped</span>'
+        : isValid
         ? '<span style="display:inline-flex;align-items:center;gap:4px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M2 5l2 2 3-4" stroke="#15803d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Valid</span>'
         : '<span title="Missing: ' + missing.join(', ') + '" style="display:inline-flex;align-items:center;gap:4px;background:#fee2e2;color:#dc2626;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;cursor:help"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M2 2l5 5M7 2l-5 5" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round"/></svg>Missing ' + missing.length + '</span>';
-      const rowBg = isValid ? '' : 'background:#fff7f7';
-      const errInline = isValid ? '' : `<div style="font-size:10.5px;color:#dc2626;margin-top:3px">${missing.join(', ')}</div>`;
+      const rowBg = isSample ? 'background:#fbfaf8;opacity:.65' : (isValid ? '' : 'background:#fff7f7');
+      const errInline = (isValid || isSample) ? '' : `<div style="font-size:10.5px;color:#dc2626;margin-top:3px">${missing.join(', ')}</div>`;
       return `<tr style="border-bottom:1px solid #f3f3f1;${rowBg}">
         <td style="padding:6px 10px;color:#9ca3af;vertical-align:top">${i+2}</td>
         <td style="padding:6px 10px;color:#374151;vertical-align:top">${customer}${errInline}</td>
@@ -6697,6 +6704,7 @@ function tplHandleFile(file) {
     for (let i = previewLimit; i < dataRows.length; i++) {
       const cols = dataRows[i];
       const get = (name) => { const k = idx(name); return k >= 0 && cols[k] != null ? String(cols[k]).trim() : ''; };
+      if (_isSampleName(get('ship_name'))) { sampleCount++; continue; }
       const missing = REQUIRED_COLS.filter(c => !get(c));
       if (missing.length === 0) validCount++; else errCount++;
     }
@@ -6704,6 +6712,7 @@ function tplHandleFile(file) {
     const parts = [];
     if (validCount) parts.push('<span style="color:#16a34a;font-weight:600">' + validCount + ' valid</span>');
     if (errCount)   parts.push('<span style="color:#dc2626;font-weight:600">' + errCount + ' error' + (errCount>1?'s':'') + '</span>');
+    if (sampleCount) parts.push('<span style="color:#9a8c6a;font-weight:600">' + sampleCount + ' example row skipped</span>');
     summary.innerHTML = parts.join(' &nbsp;·&nbsp; ') || '<span style="color:#9ca3af">No rows</span>';
     preview.style.display = 'block';
     if (confirmBtn) {
@@ -6711,7 +6720,10 @@ function tplHandleFile(file) {
       confirmBtn.disabled = disabled;
       confirmBtn.style.opacity = disabled ? '.5' : '1';
       confirmBtn.style.cursor = disabled ? 'not-allowed' : 'pointer';
-      confirmBtn.textContent = disabled ? 'No valid rows' : ('Import ' + validCount + ' order' + (validCount>1?'s':'') + ' →');
+      // When the only row is the template example, say so plainly instead of "No valid rows".
+      confirmBtn.textContent = disabled
+        ? (sampleCount && !errCount ? 'Add your orders — only the example row is in this file' : 'No valid rows')
+        : ('Import ' + validCount + ' order' + (validCount>1?'s':'') + ' →');
     }
   };
 
