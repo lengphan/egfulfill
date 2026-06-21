@@ -6826,7 +6826,7 @@ async function generateXLSX() {
     // ── Sheet 2: Options (valid values reference) — mirrors the 4 dropdown columns ──
     const OPT_HEADERS = ['SKU (catalog)','Print Type','Shipping Service','US State'];
     const products  = collectTemplateSkus();
-    const printTypes= ['DTG – Direct to Garment','EMB – Embroidery','APL – Applique','LSR – Laser'];
+    const printTypes= ['DTG','DTF','EMB','APL','LSR'];
     const shipping  = ['USPS Priority Mail','USPS First Class','USPS Ground Advantage','UPS Ground','UPS 2nd Day Air','FedEx Ground'];
     const states    = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR'];
     const maxLen = Math.max(products.length, printTypes.length, shipping.length, states.length);
@@ -6865,7 +6865,7 @@ async function generateXLSX() {
       '<dataValidation type="list" sqref="G2:G2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid state" error="Use a 2-letter US state code"><formula1>"' + US_STATES + '"</formula1></dataValidation>',
       skuDv,
       '<dataValidation type="whole" operator="greaterThanOrEqual" sqref="K2:K2000" showErrorMessage="1" errorTitle="Invalid quantity" error="Quantity must be a whole number ≥ 1"><formula1>1</formula1></dataValidation>',
-      '<dataValidation type="list" sqref="L2:L2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid print type" error="Pick one: DTG, SUB, EMB, SCR"><formula1>"DTG,SUB,EMB,SCR"</formula1></dataValidation>',
+      '<dataValidation type="list" sqref="L2:L2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid print type" error="Pick one: DTG, DTF, EMB, APL, LSR"><formula1>"DTG,DTF,EMB,APL,LSR"</formula1></dataValidation>',
       '<dataValidation type="list" sqref="M2:M2000" showDropDown="0" showErrorMessage="1" errorTitle="Invalid shipping service" error="Pick a supported service"><formula1>"USPS Priority Mail,USPS First Class,USPS Ground Advantage,UPS Ground,UPS 2nd Day Air,FedEx Ground"</formula1></dataValidation>'
     ].filter(Boolean);
     const dvXml = '<dataValidations count="' + dvList.length + '">' + dvList.join('') + '</dataValidations>';
