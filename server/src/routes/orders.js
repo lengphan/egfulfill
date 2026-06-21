@@ -3,6 +3,7 @@
 //   • staff   → all orders
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
+import { egBroadcast } from '../events.js';
 
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
@@ -85,6 +86,7 @@ export function ordersRoutes(app, requireAuth) {
        (o.meta && typeof o.meta === 'object') ? o.meta : {}]
     );
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
+    egBroadcast({ type: 'orders', id: o.id });
     return { ok: true, id: o.id };
   });
 
@@ -132,6 +134,7 @@ export function ordersRoutes(app, requireAuth) {
       await q(`update orders set ${sets.join(',')} where ${where}`, vals);
     }
     if (wantsItems) await replaceItems(req.params.id, body.items);
+    egBroadcast({ type: 'orders', id: req.params.id });
     return { ok: true };
   });
 
@@ -145,6 +148,7 @@ export function ordersRoutes(app, requireAuth) {
     if (!sku) { reply.code(400); return { error: 'sku required' }; }
     await q('update order_items set factory_status=$1 where order_id=$2 and sku=$3',
       [status || '', req.params.id, sku]);
+    egBroadcast({ type: 'item-status', id: req.params.id, sku: sku, status: status || '' });
     return { ok: true };
   });
 

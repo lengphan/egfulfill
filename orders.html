@@ -7018,7 +7018,7 @@ function _gsheetFallbackTemplate() {
   ];
   var tsv = [CSV_HEADERS.join('\t'), example.join('\t')].join('\n');
   window.open('https://sheets.new', '_blank');
-  var done = function () { _importToast('Column headers copied. In the new Google Sheet, click cell A1 and paste (⌘/Ctrl+V), fill in your orders, then Share → Anyone with the link → Viewer and paste the link here.', 'info', 7500); };
+  var done = function () {};   // noti box removed per request — the master template URL (SHEETS_TEMPLATE_URL) is the path now
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv).then(done, done);
     else done();

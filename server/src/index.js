@@ -18,6 +18,7 @@ import { passwordResetRoutes } from './routes/password-reset.js';
 import { shippingRoutes } from './routes/shipping.js';
 import { designLibraryRoutes } from './routes/design_library.js';
 import { sheetsRoutes } from './routes/sheets.js';
+import { addClient } from './events.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
@@ -57,6 +58,28 @@ app.post('/api/auth/login', async (req, reply) => {
   catch (e) { reply.code(400); return { error: e.message }; }
 });
 app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
+
+// ── Realtime (SSE) — one-way push so boards + mobile update the instant something
+// changes, instead of waiting for the poll. EventSource can't send headers, so the
+// JWT comes in ?token=. A heartbeat keeps proxies (Caddy) from closing the stream.
+app.get('/api/events', (req, reply) => {
+  const tok = (req.query && req.query.token) || '';
+  const user = tok ? verify(tok) : null;
+  if (!user) { reply.code(401).send({ error: 'Not signed in' }); return; }
+  reply.hijack();
+  const res = reply.raw;
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*'
+  });
+  res.write('retry: 3000\n\n:ok\n\n');
+  const remove = addClient(res);
+  const hb = setInterval(() => { try { res.write(':hb\n\n'); } catch (e) {} }, 25000);
+  req.raw.on('close', () => { clearInterval(hb); remove(); });
+});
 
 // ── Google Sign-In ──
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';

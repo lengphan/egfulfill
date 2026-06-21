@@ -463,6 +463,24 @@
     EGStore.__catalogWrapped = true;
   }
 
+  function _setOrdersPoll(ms){
+    clearInterval(window.__egApiPoll);
+    window.__egApiPoll = setInterval(function(){ hydrate(); }, ms);
+  }
+  // Realtime push (SSE). Instant updates on every change; when connected the orders
+  // poll relaxes to a slow backstop, and if the stream drops the fast 5s poll resumes.
+  function startRealtime(){
+    if (typeof EventSource === 'undefined' || !token()) return;
+    try {
+      if (window.__egSSE) { try { window.__egSSE.close(); } catch(e){} }
+      var es = new EventSource(API_BASE + '/api/events?token=' + encodeURIComponent(token()));
+      window.__egSSE = es;
+      var _t = null;
+      es.onopen = function(){ _setOrdersPoll(30000); };
+      es.onmessage = function(){ clearTimeout(_t); _t = setTimeout(function(){ hydrate(); }, 150); };
+      es.onerror = function(){ _setOrdersPoll(5000); };
+    } catch(e){}
+  }
   function start() {
     if (!token()) return;          // signed out → leave local/demo data alone
     installWrappers();
@@ -475,13 +493,13 @@
     // Cross-board liveness (no realtime server yet). Orders poll FAST (5s) — this is
     // what drives live item-status across boards. The catalog + collections change
     // rarely, so poll them on a slower interval to avoid hammering the server.
-    clearInterval(window.__egApiPoll);
-    window.__egApiPoll = setInterval(function () { hydrate(); }, 5000);
+    _setOrdersPoll(5000);
     clearInterval(window.__egApiPollSlow);
     window.__egApiPollSlow = setInterval(function () {
       hydrateCatalog();
       collKeys.forEach(hydrateCollection);
     }, 20000);
+    startRealtime();   // SSE: instant cross-board/mobile updates (poll is the fallback)
   }
   start();
   // Shared order-ID resolver so every board shows ids the same way:
