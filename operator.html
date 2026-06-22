@@ -7752,9 +7752,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
        approvals column on the right uses the *bare* design only. */
     function _xfomMockup(it){
       const sku = it.sku || it.SKU || '';
-      // If a base product was picked for this item, that chosen blank's image wins
-      // — keeps the order-detail image in sync with the line-item picker.
-      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage(_xfomNum, sku); if (_pi) return _pi; } } catch(e){}
+      // Key the chosen-blank lookup by the STABLE line key (itemDK = lineId||_dk||sku),
+      // exactly like the board row. Using the bare sku missed the blank (it's saved
+      // under the lineId), so the modal stayed on the marketplace listing image.
+      const _dk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : sku;
+      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage(_xfomNum, _dk); if (_pi) return _pi; } } catch(e){}
+      if (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) return it.blankImg;
       try {
         if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
           const base = String(sku).split('-')[0];
@@ -7768,7 +7771,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           }
         }
       } catch(e){}
-      return it.thumb || it.img || it.sellerImg || '';
+      return it.thumb || it.sellerImg || '';   // never it.img — that's the marketplace listing, not the blank
     }
     function _xfomDesign(it){
       const sku = it.sku || it.SKU || '';

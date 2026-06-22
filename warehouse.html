@@ -10975,10 +10975,14 @@ function whPrintLabel(num) {
        warehouse the full picture of what's being shipped, not just the SKU. */
     function _xfomComposite(it){
       const sku = it.sku || '';
-      try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) { const live = EGStore.getCachedImage((o && o.id) || _xfomNum, sku); if (live) return live; } } catch(e){}
+      // Key by the STABLE line key (itemDK = lineId||_dk||sku) like the board row, so
+      // the chosen blank + cached composite resolve (using the bare sku missed them).
+      const _dk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : sku;
+      try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) { const live = EGStore.getCachedImage((o && o.id) || _xfomNum, _dk); if (live) return live; } } catch(e){}
       // A base product picked on the line item wins over the sku-match below, so the
       // order-detail image follows the picker.
-      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage((o && o.id) || _xfomNum, sku); if (_pi) return _pi; } } catch(e){}
+      try { if (window.EGDesignTools && EGDesignTools.setupProductImage) { const _pi = EGDesignTools.setupProductImage((o && o.id) || _xfomNum, _dk); if (_pi) return _pi; } } catch(e){}
+      if (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) return it.blankImg;
       try {
         if (typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) {
           const base = String(sku).split('-')[0];
