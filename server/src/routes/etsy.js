@@ -402,6 +402,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       return {
         scopes: conn.scopes,
         receipt_id: rc.receipt_id,
+        // Order state — Etsy only releases the buyer's address on PAID, real sales.
+        state: { is_paid: rc.is_paid, is_shipped: rc.is_shipped, status: rc.status, receipt_type: rc.receipt_type, buyer_user_id: rc.buyer_user_id },
         // exactly the fields importReceipt maps into orders.address:
         address: { name: rc.name, first_line: rc.first_line, second_line: rc.second_line, city: rc.city, state: rc.state, zip: rc.zip, country_iso: rc.country_iso, formatted_address: rc.formatted_address },
         receipt_keys: Object.keys(rc)
