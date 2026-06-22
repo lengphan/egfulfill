@@ -1839,6 +1839,20 @@ function pulseBalanceBtn(message) {
 // total of their not-yet-pushed orders. Reads the rendered ORDERS (each carries a
 // computed total; falls back to an items estimate) so it needs no cost argument.
 // Clicking the pulsing pill opens Add Funds IN PLACE — it never navigates away.
+// What the seller's WALLET actually pays to fulfil an order — a per-item fulfilment
+// estimate (~$15/item), NOT o.total. o.total on a synced marketplace order is the
+// BUYER's retail price (they already paid Etsy), so counting it as the seller's cost
+// over-stated the balance needed and pulsed a top-up even with plenty in the wallet.
+function _egOrderFundCost(o){
+  if(!o) return 0;
+  if(Array.isArray(o.itemsList) && o.itemsList.length){
+    return o.itemsList.reduce(function(a,i){ return a + (parseInt(i&&i.qty,10)||1)*15; }, 0);
+  }
+  // No item breakdown: only manual (seller-priced) orders fall back to their total;
+  // a synced order contributes nothing rather than its buyer-retail total.
+  var isSynced = /^etsy-/i.test(String(o.id||'')) || String(o.source||'').toLowerCase()==='etsy';
+  return isSynced ? 0 : (parseFloat(o.total)||0);
+}
 function _pulseIfUnderfunded(reason){
   try{
     if(typeof ORDERS==='undefined') return false;
@@ -1846,9 +1860,7 @@ function _pulseIfUnderfunded(reason){
     var PENDING = ['new','draft','action'];
     var owed = ORDERS.reduce(function(s,o){
       if(!o || PENDING.indexOf(String(o.status||'').toLowerCase())===-1) return s;
-      var t = parseFloat(o.total)||0;
-      if(!t && Array.isArray(o.itemsList)) t = o.itemsList.reduce(function(a,i){ return a+(parseInt(i.qty,10)||1)*15; },0);
-      return s + t;
+      return s + _egOrderFundCost(o);
     }, 0);
     if(owed>0 && bal < owed){
       pulseBalanceBtn((reason||'Low balance')+' — add $'+(owed-bal).toFixed(2)+' to fund your orders');
@@ -5085,9 +5097,7 @@ function _egTopUpShortfall(){
     var PENDING=['new','draft','action'];
     var owed=ORDERS.reduce(function(s,o){
       if(!o||PENDING.indexOf(String(o.status||'').toLowerCase())===-1) return s;
-      var t=parseFloat(o.total)||0;
-      if(!t&&Array.isArray(o.itemsList)) t=o.itemsList.reduce(function(a,i){ return a+(parseInt(i.qty,10)||1)*15; },0);
-      return s+t;
+      return s + (typeof _egOrderFundCost==='function' ? _egOrderFundCost(o) : 0);
     },0);
     var short=owed-bal; return short>0?short:0;
   }catch(e){ return 0; }
