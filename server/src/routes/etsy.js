@@ -389,6 +389,26 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
+  // Diagnostic: dump the address-relevant fields of the most recent receipt EXACTLY
+  // as Etsy returns them — so we can tell whether Etsy is even sending the address
+  // (vs a parsing bug here). Also lists every key on the receipt to spot a renamed
+  // field. GET /api/etsy/raw-receipt
+  app.get('/api/etsy/raw-receipt', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+      const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
+      const rc = (r.results || [])[0] || {};
+      return {
+        scopes: conn.scopes,
+        receipt_id: rc.receipt_id,
+        // exactly the fields importReceipt maps into orders.address:
+        address: { name: rc.name, first_line: rc.first_line, second_line: rc.second_line, city: rc.city, state: rc.state, zip: rc.zip, country_iso: rc.country_iso, formatted_address: rc.formatted_address },
+        receipt_keys: Object.keys(rc)
+      };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
   // OAuth code → tokens. Called by oauth-callback.html after Etsy redirects back.
   // requireAuth (not staff): a SELLER connects their OWN shop here — connected_by is
   // set to the caller, so importReceipt routes their orders to them (factory_order=false).
