@@ -1121,21 +1121,19 @@ function openCardTopUp() {
   var _is = 'width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px;font-size:14.5px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
   var _foc = 'onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"';
   var _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
-  var _chip = function (a) { return '<button type="button" onclick="document.getElementById(\'card-amount\').value=\'' + a + '\';ccUpdatePreview();ccSyncAmount()" style="flex:1;background:#f6f5f4;border:none;border-radius:7px;padding:7px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$' + a + '</button>'; };
   m.innerHTML =
     '<div onclick="closeCardModal()" style="position:fixed;inset:0;background:rgba(25,25,24,.5)"></div>'
     + '<div style="position:relative;background:#fdfcfa;border:1px solid #40403d;border-radius:18px;box-shadow:5px 5px 0 #40403d,0 28px 70px rgba(0,0,0,.3);width:780px;max-width:calc(100vw - 28px);max-height:94vh;overflow:auto;font-family:inherit">'
     +   '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #ece8e0">'
-    +     '<div><div style="font-size:17px;font-weight:800;color:#191918">Add New Card</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Top up your wallet with a debit or credit card</div></div>'
+    +     '<div><div style="font-size:17px;font-weight:800;color:#191918">Add New Card</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Save a card — you\'ll choose the amount when you top up</div></div>'
     +     '<button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:5px;border-radius:7px" onmouseover="this.style.background=\'#f0ede9\'" onmouseout="this.style.background=\'transparent\'"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
     +   '</div>'
     +   '<div style="display:flex;gap:24px;flex-wrap:wrap;padding:22px 24px">'
     +     '<div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:14px">'
-    +       '<div><label style="' + _lbl + '">AMOUNT (USD)</label><div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:700;color:#9ca3af">$</span><input id="card-amount" type="number" min="1" step="0.01" value="50" oninput="ccUpdatePreview();ccSyncAmount()" style="' + _is + ';padding-left:26px;font-size:17px;font-weight:700" ' + _foc + '></div><div style="display:flex;gap:6px;margin-top:8px">' + ['50', '100', '200', '500'].map(_chip).join('') + '</div></div>'
     +       '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
     +       '<div><label style="' + _lbl + '">CARD DETAILS</label><div id="stripe-payment-element" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 12px;min-height:44px;background:#fff"></div></div>'
     +       '<div id="cc-error" style="display:none;font-size:12.5px;color:#dc2626;font-weight:600;line-height:1.45"></div>'
-    +       '<button id="cc-pay" onclick="ccPay()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;transition:opacity .15s" onmouseover="this.style.opacity=\'.88\'" onmouseout="this.style.opacity=\'1\'">Pay</button>'
+    +       '<button id="cc-pay" onclick="ccSaveCard()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;transition:opacity .15s" onmouseover="this.style.opacity=\'.88\'" onmouseout="this.style.opacity=\'1\'">Save Card</button>'
     +       '<div style="font-size:11.5px;color:#b0aaa4;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="6" width="9" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" stroke="currentColor" stroke-width="1.2"/></svg>Encrypted &amp; secure</div>'
     +     '</div>'
     +     '<div style="flex:1 1 300px;min-width:280px">'
@@ -1198,21 +1196,19 @@ function ccUpdatePreview() {
   s('cc-sum-number', dgt ? ('•••• ' + (dgt.length > 4 ? dgt.slice(-4) : dgt)) : '—');
   s('cc-sum-exp', exp || '—');
 }
-// Real Stripe card top-up. The card data goes straight to Stripe via the Payment
-// Element (we never see the PAN). CRITICAL: the wallet is credited ONLY after the
-// SERVER re-checks the PaymentIntent actually reached `succeeded` (/api/stripe/
-// verify-intent). The client never credits on its own — a faked client "success"
-// can't move money because the server is the gate.
-var _ccStripe = null, _ccElements = null, _ccStripeReady = false;
+// "Add New Card" SAVES a card (no charge) via a Stripe SetupIntent — the card is
+// vaulted on the seller's Stripe Customer and becomes selectable in Add Funds, where
+// the actual (gated, server-confirmed) charge happens. We never see the PAN.
+var _ccStripe = null, _ccElements = null, _ccStripeReady = false, _ccSetupCS = '';
 function _ccErr(msg) { var e = document.getElementById('cc-error'); if (e) { e.textContent = msg || ''; e.style.display = msg ? 'block' : 'none'; } }
-function ccCurrentCents() { return Math.round((parseFloat((document.getElementById('card-amount') || {}).value) || 0) * 100); }
-// Mount the Stripe Payment Element (deferred PaymentIntent — amount set at confirm).
+// Mount the Stripe Payment Element bound to a fresh SetupIntent (save-card mode).
 function ccInitStripe() {
-  _ccStripe = null; _ccElements = null; _ccStripeReady = false;
+  _ccStripe = null; _ccElements = null; _ccStripeReady = false; _ccSetupCS = '';
   var mount = document.getElementById('stripe-payment-element'); if (!mount) return;
   var payBtn = document.getElementById('cc-pay');
   if (typeof Stripe !== 'function') { _ccErr('Could not load Stripe.js.'); if (payBtn) payBtn.disabled = true; return; }
   var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+  var H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
   mount.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;padding:11px 2px">Loading secure card field…</div>';
   fetch((window.EG_API_BASE || '') + '/api/stripe/config', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
     .then(function (r) { return r.json(); })
@@ -1223,48 +1219,39 @@ function ccInitStripe() {
         if (payBtn) payBtn.disabled = true; return;
       }
       _ccStripe = Stripe(cfg.publishableKey);
-      var cents = ccCurrentCents(); if (!(cents >= 50)) cents = 5000;  // Stripe needs a positive amount to render
-      _ccElements = _ccStripe.elements({ mode: 'payment', amount: cents, currency: 'usd', paymentMethodTypes: ['card'] });
-      _ccElements.create('payment', { layout: 'tabs' }).mount('#stripe-payment-element');
-      _ccStripeReady = true; _ccErr(''); if (payBtn) payBtn.disabled = false;
+      return fetch((window.EG_API_BASE || '') + '/api/stripe/setup-intent', { method: 'POST', headers: H, body: '{}' })
+        .then(function (r) { return r.json(); })
+        .then(function (si) {
+          if (!si || si.error || !si.clientSecret) { mount.innerHTML = ''; _ccErr((si && si.error) || 'Could not start card setup.'); if (payBtn) payBtn.disabled = true; return; }
+          _ccSetupCS = si.clientSecret;
+          _ccElements = _ccStripe.elements({ clientSecret: _ccSetupCS });
+          _ccElements.create('payment', { layout: 'tabs' }).mount('#stripe-payment-element');
+          _ccStripeReady = true; _ccErr(''); if (payBtn) payBtn.disabled = false;
+        });
     })
     .catch(function () { mount.innerHTML = ''; _ccErr('Could not reach the payment server.'); if (payBtn) payBtn.disabled = true; });
 }
-// Keep the deferred PaymentIntent amount in step with the entered amount.
-function ccSyncAmount() { if (_ccElements) { var c = ccCurrentCents(); if (c >= 50) { try { _ccElements.update({ amount: c }); } catch (e) {} } } }
-async function ccPay() {
-  var amt = parseFloat((document.getElementById('card-amount') || {}).value) || 0;
+async function ccSaveCard() {
   var name = ((document.getElementById('cc-name') || {}).value || '').trim();
-  if (!(amt > 0)) { _ccErr('Enter a valid amount.'); return; }
   if (!_ccStripe || !_ccElements || !_ccStripeReady) { _ccErr('Card field isn’t ready yet — one moment.'); return; }
-  var btn = document.getElementById('cc-pay'); var label = btn ? btn.textContent : 'Pay';
-  var fail = function (msg) { _ccErr(msg || 'Payment failed.'); if (btn) { btn.disabled = false; btn.textContent = label; } };
-  if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
-  _ccErr(''); ccSyncAmount();
-  var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
-  var H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
+  var btn = document.getElementById('cc-pay'); var label = btn ? btn.textContent : 'Save Card';
+  var fail = function (msg) { _ccErr(msg || 'Could not save the card.'); if (btn) { btn.disabled = false; btn.textContent = label; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  _ccErr('');
   try {
-    // 1) validate the card field
     var sub = await _ccElements.submit();
     if (sub && sub.error) return fail(sub.error.message);
-    // 2) create the PaymentIntent server-side for this amount
-    var ci = await fetch((window.EG_API_BASE || '') + '/api/stripe/create-intent', { method: 'POST', headers: H, body: JSON.stringify({ amount: amt }) }).then(function (r) { return r.json(); });
-    if (!ci || ci.error || !ci.clientSecret) return fail((ci && ci.error) || 'Could not start the payment.');
-    // 3) confirm the card with Stripe (handles 3-D Secure challenges)
-    var conf = await _ccStripe.confirmPayment({ elements: _ccElements, clientSecret: ci.clientSecret, redirect: 'if_required', confirmParams: { return_url: location.href, payment_method_data: { billing_details: name ? { name: name } : {} } } });
+    // Vault the card (3-D Secure handled). No charge happens here.
+    var conf = await _ccStripe.confirmSetup({ elements: _ccElements, clientSecret: _ccSetupCS, redirect: 'if_required', confirmParams: { return_url: location.href, payment_method_data: { billing_details: name ? { name: name } : {} } } });
     if (conf && conf.error) return fail(conf.error.message);
-    var pi = conf && conf.paymentIntent;
-    if (!pi || !pi.id) return fail('Payment was not completed.');
-    // 4) GATE — the server re-reads the intent and only credits if it truly succeeded
-    var v = await fetch((window.EG_API_BASE || '') + '/api/stripe/verify-intent', { method: 'POST', headers: H, body: JSON.stringify({ id: pi.id }) }).then(function (r) { return r.json(); });
-    if (!v || !v.ok) return fail('Payment not confirmed (' + ((v && v.status) || 'failed') + '). Your wallet was NOT charged.');
-    // 5) server-confirmed → reflect the credit locally
-    var credited = v.amount || amt;
-    if (typeof vqrCreditWallet === 'function') vqrCreditWallet(credited);
-    if (typeof vqrRecordDeposit === 'function') vqrRecordDeposit(credited, v.ref, 'Card', v.txnId || pi.id);
+    var si = conf && conf.setupIntent;
+    if (!si || si.status !== 'succeeded') return fail('Card was not saved (' + ((si && si.status) || 'failed') + ').');
     closeCardModal();
-    if (typeof walToast === 'function') walToast('✓ Payment confirmed — $' + credited.toFixed(2) + ' added'); else alert('$' + credited.toFixed(2) + ' added');
-  } catch (e) { fail(e && e.message ? e.message : 'Payment failed.'); }
+    if (typeof walToast === 'function') walToast('✓ Card saved');
+    // Back to Add Funds with the new card available (the picker reloads from Stripe).
+    try { _depCardIdx = 0; _depStripeCards = null; } catch (e) {}
+    if (typeof openDepositModal === 'function') openDepositModal();
+  } catch (e) { fail(e && e.message ? e.message : 'Could not save the card.'); }
 }
 window.openCardTopUp = openCardTopUp;
 
@@ -1451,7 +1438,7 @@ function vqrSyncDepositUI() {
   // seller can use a card they already saved instead of always re-entering one.
   var isCard = methodEl.value === 'card';
   var cardBox = document.getElementById('dep-card-box'); if (cardBox) cardBox.style.display = isCard ? 'block' : 'none';
-  if (isCard) _renderDepCardPicker();
+  if (isCard) { if (_depStripeCards == null) _loadDepCards(); else _renderDepCardPicker(); }
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   if (btn) {
     btn.style.display = isPaypal ? 'none' : '';
@@ -1459,10 +1446,19 @@ function vqrSyncDepositUI() {
   }
 }
 // ── Saved-cards picker inside Add Funds (Debit/Credit Card method) ────────────
-var _depCardIdx = null;
+var _depCardIdx = null, _depStripeCards = null;
+// Pull the seller's saved cards from Stripe (the source of truth — never stored
+// locally) then render the picker. Cached for the modal session.
+function _loadDepCards(){
+  var tok=''; try{ tok=localStorage.getItem('eg_token')||''; }catch(e){}
+  fetch((window.EG_API_BASE||'')+'/api/stripe/cards',{ headers: tok?{Authorization:'Bearer '+tok}:{} })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ _depStripeCards = (d&&Array.isArray(d.cards))?d.cards:[]; _renderDepCardPicker(); })
+    .catch(function(){ if(_depStripeCards==null) _depStripeCards=[]; _renderDepCardPicker(); });
+}
 function _renderDepCardPicker(){
   var box = document.getElementById('dep-card-box'); if (!box) return;
-  var cards = (typeof _laCards === 'function') ? _laCards() : [];
+  var cards = Array.isArray(_depStripeCards) ? _depStripeCards : [];
   if (_depCardIdx == null && cards.length) _depCardIdx = 0;          // default to the default/first card
   if (_depCardIdx != null && _depCardIdx >= cards.length) _depCardIdx = cards.length ? 0 : null;
   var rows = cards.map(function(c, i){
@@ -1478,9 +1474,9 @@ function _renderDepCardPicker(){
 }
 function _pickDepCard(i){ _depCardIdx = i; _renderDepCardPicker(); }
 function _addNewDepCard(){
-  var amt = parseFloat((document.getElementById('modal-amount')||{}).value) || 0;
+  // Open the save-card form; after it saves it reopens Add Funds with the new card.
   closeDepositModal();
-  if (typeof openCardTopUp === 'function') { openCardTopUp(); var ca = document.getElementById('card-amount'); if (ca && amt) ca.value = amt; if (typeof ccUpdatePreview === 'function') ccUpdatePreview(); }
+  if (typeof openCardTopUp === 'function') openCardTopUp();
 }
 // ── PayPal top-up (Orders API v2; auto-capture) ──────────────────────────────
 var _ppRendered = false;
@@ -1538,18 +1534,13 @@ function submitDeposit() {
   // Debit/Credit Card: hand off to the existing Stripe top-up flow, carrying
   // the entered amount into the card modal.
   if (method === 'card') {
-    // Card top-ups are charged for real via Stripe and credited ONLY on a server-
-    // confirmed success — never credited blindly. Always hand off to the secure card
-    // form (Stripe Payment Element), carrying the entered amount over. (A saved card
-    // can't be charged silently because we don't hold a Stripe payment method for it
-    // yet — that needs card-saving via a SetupIntent, a separate step.)
-    closeDepositModal();
-    if (typeof openCardTopUp === 'function') {
-      openCardTopUp();
-      var _ca = document.getElementById('card-amount'); if (_ca && amount) _ca.value = amount;
-      if (typeof ccUpdatePreview === 'function') ccUpdatePreview();
-      if (typeof ccSyncAmount === 'function') ccSyncAmount();
-    }
+    // Charge the SELECTED saved card for this amount via Stripe — credited only on a
+    // server-confirmed success. No saved card picked → open the Add-New-Card (save)
+    // form first, then come back here to pay.
+    var _cards = Array.isArray(_depStripeCards) ? _depStripeCards : [];
+    var _sel = (_cards.length && _depCardIdx != null && _cards[_depCardIdx]) ? _cards[_depCardIdx] : null;
+    if (!_sel || !_sel.id) { closeDepositModal(); if (typeof openCardTopUp === 'function') openCardTopUp(); return; }
+    _chargeSavedCard(amount, _sel);
     return;
   }
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
@@ -1562,6 +1553,46 @@ function submitDeposit() {
   pendingFundOrders = [];
   updateUnfundedSection();
   closeDepositModal();
+}
+// Credit the wallet locally AFTER the server confirmed the charge.
+function _afterCardCredit(amount, ref, txnId){
+  amount = Number(amount) || 0;
+  if (typeof vqrCreditWallet === 'function') vqrCreditWallet(amount);
+  if (typeof vqrRecordDeposit === 'function') vqrRecordDeposit(amount, ref, 'Card', txnId);
+  if (typeof closeDepositModal === 'function') closeDepositModal();
+  if (typeof walToast === 'function') walToast('✓ Payment confirmed — $' + amount.toFixed(2) + ' added'); else alert('$' + amount.toFixed(2) + ' added');
+}
+// Charge a saved card. The server confirms the PaymentIntent; if Stripe needs a
+// 3-D Secure step it returns a clientSecret we finish on the client, then verify.
+function _chargeSavedCard(amount, card){
+  var tok=''; try{ tok=localStorage.getItem('eg_token')||''; }catch(e){}
+  var H={ 'Content-Type':'application/json', Authorization:'Bearer '+tok };
+  var btn = document.querySelector('#_afm-pay, [onclick="submitDeposit()"]');
+  if (btn){ btn.disabled=true; btn._lbl=btn.textContent; btn.textContent='Processing…'; }
+  var done=function(msg){ if(btn){ btn.disabled=false; if(btn._lbl) btn.textContent=btn._lbl; } if(msg){ if(typeof walToast==='function') walToast(msg); else alert(msg); } };
+  fetch((window.EG_API_BASE||'')+'/api/stripe/charge-saved',{ method:'POST', headers:H, body:JSON.stringify({ amount:amount, paymentMethodId:card.id }) })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok){ done(); _afterCardCredit(d.amount||amount, d.ref, d.txnId); return; }
+      if (d && d.clientSecret && typeof Stripe==='function'){
+        // 3-D Secure — finish on the client, then re-verify server-side.
+        fetch((window.EG_API_BASE||'')+'/api/stripe/config',{ headers: tok?{Authorization:'Bearer '+tok}:{} })
+          .then(function(r){ return r.json(); }).then(function(cfg){
+            if(!cfg||!cfg.publishableKey){ done('Could not verify the card.'); return; }
+            Stripe(cfg.publishableKey).handleNextAction({ clientSecret:d.clientSecret }).then(function(res){
+              if(res.error){ done('Card verification failed: '+res.error.message); return; }
+              var pi=res.paymentIntent||{};
+              fetch((window.EG_API_BASE||'')+'/api/stripe/verify-intent',{ method:'POST', headers:H, body:JSON.stringify({ id: pi.id }) })
+                .then(function(r){ return r.json(); }).then(function(v){
+                  done(); if(v&&v.ok) _afterCardCredit(v.amount||amount, v.ref, v.txnId||pi.id); else done('Payment not confirmed — your wallet was not charged.');
+                }).catch(function(){ done('Could not reach the payment server.'); });
+            });
+          }).catch(function(){ done('Could not verify the card.'); });
+        return;
+      }
+      done('Card declined: ' + ((d&&d.error) || (d&&d.status) || 'try another card'));
+    })
+    .catch(function(){ done('Could not reach the payment server.'); });
 }
 
 /* ── VietQR top-up ──────────────────────────────────────────────────────────
