@@ -399,13 +399,19 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
       const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
       const rc = (r.results || [])[0] || {};
+      // Compare with the SINGLE-receipt endpoint: if the list is shallow, this one
+      // returns the full address (then the fix is to import from here). If BOTH are
+      // null, Etsy is withholding the buyer address from this app (a permissions gate).
+      let single = {};
+      try { if (rc.receipt_id) single = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`); }
+      catch (e) { single = { error: e.message }; }
+      const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
         scopes: conn.scopes,
         receipt_id: rc.receipt_id,
-        // Order state — Etsy only releases the buyer's address on PAID, real sales.
         state: { is_paid: rc.is_paid, is_shipped: rc.is_shipped, status: rc.status, receipt_type: rc.receipt_type, buyer_user_id: rc.buyer_user_id },
-        // exactly the fields importReceipt maps into orders.address:
-        address: { name: rc.name, first_line: rc.first_line, second_line: rc.second_line, city: rc.city, state: rc.state, zip: rc.zip, country_iso: rc.country_iso, formatted_address: rc.formatted_address },
+        address_from_list: addr(rc),
+        address_from_single: single.error ? single : addr(single),
         receipt_keys: Object.keys(rc)
       };
     } catch (e) { reply.code(400); return { error: e.message }; }

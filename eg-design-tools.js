@@ -1199,11 +1199,120 @@
   }
   function _upClose() { var p = document.getElementById('egup-panel'); var ov = document.getElementById('egup-ov'); if (p) p.classList.remove('open'); if (ov) ov.classList.remove('on'); _up = null; setTimeout(function () { if (p) p.style.display = 'none'; }, 280); }
 
+  // ── Quick design positioner (factory boards) — drag/resize the design on the
+  //    blank + one-click Remove BG. Mirrors the seller's tool; writes designPos +
+  //    the (bg-removed) design back to the item, mirrors onto the board row, and
+  //    re-renders. Editable only while the order is new/in-setup.
+  var _qpF = null;
+  function openQuickPos(orderNum, key) {
+    var o = findOrder(orderNum); if (!o) return;
+    var it = findItemByKey(o, key); if (!it) return;
+    var dk = itemDK(it);
+    var design = designOverlaySrc(orderNum, it);
+    if (!design) { _egdtToast('Upload a design for this item first'); return; }
+    var blank = ''; try { blank = setupProductImage(orderNum, dk) || (/^(https?:|data:)/.test(String(it.blankImg || '')) ? it.blankImg : '') || ''; } catch (e) {}
+    if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
+    var locked = !isNewOrder(o);
+    _qpF = { num: orderNum, dk: dk, locked: locked };
+    var m = document.getElementById('egdt-qp');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'egdt-qp';
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10040;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
+      m.innerHTML = '<div style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:480px;overflow:hidden" onclick="event.stopPropagation()">'
+        + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egdt-qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div id="egdt-qp-sub" style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools.closeQuickPos()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
+        + '<div style="padding:18px;display:flex;justify-content:center"><div id="egdt-qp-stage" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
+        + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
+        + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
+        + '</div></div>'
+        + '<div style="padding:0 18px 16px;display:flex"><div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools.closeQuickPos()" style="font-size:13px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 14px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Cancel</button><button id="egdt-qp-save" onclick="EGDesignTools.saveQuickPos()" style="font-size:13px;border:none;background:#191918;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-family:inherit">Save</button></div></div>'
+        + '</div>';
+      m.addEventListener('click', function (e) { if (e.target === m) closeQuickPos(); });
+      document.body.appendChild(m);
+      _qpAttach();
+    }
+    document.getElementById('egdt-qp-title').textContent = '#' + (o.num || o.id) + ' · ' + (it.name || it.blank || dk);
+    document.getElementById('egdt-qp-sub').textContent = locked ? 'Locked — order already in production' : 'Drag to move · drag the corner to resize';
+    var stage = document.getElementById('egdt-qp-stage'); stage.style.backgroundImage = blank ? 'url("' + blank + '")' : 'none';
+    var wrap = document.getElementById('egdt-qp-wrap'), dEl = document.getElementById('egdt-qp-design');
+    dEl.src = design;
+    wrap.style.left = it.designPos.x + '%'; wrap.style.top = it.designPos.y + '%'; wrap.style.width = it.designPos.w + '%'; wrap.style.height = it.designPos.h + '%';
+    wrap.style.cursor = locked ? 'default' : 'grab';
+    document.getElementById('egdt-qp-handle').style.display = locked ? 'none' : 'block';
+    document.getElementById('egdt-qp-rmbg').style.display = locked ? 'none' : '';
+    document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
+    m.style.display = 'flex';
+  }
+  function closeQuickPos() { var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
+  function saveQuickPos() {
+    if (!_qpF || _qpF.locked) { closeQuickPos(); return; }
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), wrap = document.getElementById('egdt-qp-wrap');
+    if (it && wrap) {
+      it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
+      try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
+      pushItemsToApi(o);
+      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) bi.designPos = it.designPos; });
+    }
+    closeQuickPos(); refreshBoard();
+  }
+  function qpRemoveBg() {
+    if (!_qpF || _qpF.locked) return;
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), dEl = document.getElementById('egdt-qp-design');
+    if (!o || !it || !dEl || !dEl.src) return;
+    var btn = document.getElementById('egdt-qp-rmbg'); if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
+    var img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      try {
+        var w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return;
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+        var data; try { data = ctx.getImageData(0, 0, w, h); } catch (e) { _egdtToast('Can’t process this image in-browser'); return; }
+        var d = data.data, px = function (x, y) { var i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+        var cs = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)], bg = [0, 0, 0];
+        cs.forEach(function (p) { bg[0] += p[0]; bg[1] += p[1]; bg[2] += p[2]; }); bg = bg.map(function (v) { return v / 4; });
+        var tol = 46, removed = 0;
+        for (var i = 0; i < d.length; i += 4) { var dr = d[i] - bg[0], dg = d[i + 1] - bg[1], db = d[i + 2] - bg[2]; if (Math.sqrt(dr * dr + dg * dg + db * db) < tol) { d[i + 3] = 0; removed++; } }
+        if (!removed) { _egdtToast('No uniform background detected'); return; }
+        ctx.putImageData(data, 0, 0);
+        var out = c.toDataURL('image/png'); dEl.src = out; it.designUrl = out;
+        try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, out); } catch (e) {}
+        try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, out); } catch (e) {}
+        try { if (window.EGStore && EGStore.update && o.id) EGStore.update(o.id, { items: o.items }); } catch (e) {}
+        patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) bi.designUrl = out; });
+        refreshBoard(); _egdtToast('Background removed');
+      } finally { if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
+    };
+    img.onerror = function () { if (btn) { btn.disabled = false; btn.style.opacity = ''; } _egdtToast('Could not load image'); };
+    img.src = dEl.src;
+  }
+  function _qpAttach() {
+    var stage = document.getElementById('egdt-qp-stage');
+    var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
+    function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
+    function down(e) {
+      if (_qpF && _qpF.locked) return;
+      var wrap = document.getElementById('egdt-qp-wrap'), handle = document.getElementById('egdt-qp-handle');
+      if (e.target === handle) mode = 'resize';
+      else if (e.target === wrap || wrap.contains(e.target)) { mode = 'drag'; wrap.style.cursor = 'grabbing'; }
+      else return;
+      sx = e.clientX; sy = e.clientY; startX = parseFloat(wrap.style.left) || 0; startY = parseFloat(wrap.style.top) || 0; startW = parseFloat(wrap.style.width) || 50; startH = parseFloat(wrap.style.height) || 50;
+      e.preventDefault();
+    }
+    function mv(e) {
+      if (!mode) return;
+      var wrap = document.getElementById('egdt-qp-wrap'), dd = pct(e.clientX - sx, e.clientY - sy);
+      if (mode === 'drag') { wrap.style.left = Math.max(0, Math.min(100 - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(0, Math.min(100 - startH, startY + dd.y)) + '%'; }
+      else { wrap.style.width = Math.max(8, Math.min(100 - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(100 - startY, startH + dd.y)) + '%'; }
+    }
+    function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; }
+    stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  }
+
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
+    openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,

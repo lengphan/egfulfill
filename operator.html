@@ -4558,9 +4558,10 @@ function opItemCompositeThumb(orderNum, itemIdx, it, prodImg, tBg, size) {
   var overlay = hasDesign
     ? '<img src="' + designSrc + '" style="position:absolute;left:' + pos.x + '%;top:' + pos.y + '%;width:' + pos.w + '%;height:' + pos.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>'
     : '';
-  return '<div onclick="event.stopPropagation();opZoomProduct(\'' + orderNum + '\',' + itemIdx + ')" '
+  var _qdk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : (it.sku || '');
+  return '<div onclick="event.stopPropagation();(window.EGDesignTools&&EGDesignTools.openQuickPos)?EGDesignTools.openQuickPos(\'' + orderNum + '\',\'' + String(_qdk).replace(/'/g, "\\'") + '\'):opZoomProduct(\'' + orderNum + '\',' + itemIdx + ')" '
     + 'style="position:relative;width:' + size + 'px;height:' + size + 'px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;cursor:pointer;transition:box-shadow .15s;background:' + (tBg || '#f6f5f4') + '" '
-    + 'title="View product composite" onmouseover="this.style.boxShadow=\'0 0 0 2px #191918\'" onmouseout="this.style.boxShadow=\'\'">'
+    + 'title="Position design · Remove BG" onmouseover="this.style.boxShadow=\'0 0 0 2px #191918\'" onmouseout="this.style.boxShadow=\'\'">'
     + '<img src="' + mockup + '" onerror="this.src=\'https://placehold.co/52x52/f0ede9/9ca3af?text=Item\'" style="width:100%;height:100%;object-fit:cover;display:block"/>'
     + overlay
     + '</div>';
