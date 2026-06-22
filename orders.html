@@ -6464,9 +6464,12 @@ function _mapCatProd(p) {
   if (!sizes.length)  sizes  = ['One Size'];
   // Operator saves `method` as a "/"-joined string (e.g. "DTG Print / Embroidery").
   // Split into individual options so the seller can pick ONE per item.
+  // Keep the method's own casing (e.g. "DTG Print", "Embroidery") for the dropdown
+  // label — uppercasing it produced the shouty "DTG PRINT". Downstream code (_techCode,
+  // method matching) upper-cases internally, so the stored value casing doesn't matter.
   const printTypes = (Array.isArray(p.printTypes) && p.printTypes.length) ? p.printTypes
-             : (p.method ? String(p.method).split('/').map(s => s.trim().toUpperCase()).filter(Boolean)
-                         : (p.type ? [String(p.type).toUpperCase()] : ['DTG']));
+             : (p.method ? String(p.method).split('/').map(s => s.trim()).filter(Boolean)
+                         : (p.type ? [String(p.type)] : ['DTG']));
   const colorCodes = Object.assign({}, p.colorCodes);
   colors.forEach(c => { if (!colorCodes[c]) colorCodes[c] = String(c).replace(/[^a-zA-Z]/g,'').substring(0,3).toUpperCase() || 'CLR'; });
   // Keep the operator's real per-variant SKUs so the order item can use the

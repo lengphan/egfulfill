@@ -227,6 +227,31 @@
      sticks across re-sync/hydrate. Nothing in the existing flow changes. */
   var PRINT_METHODS = ['DTG', 'DTF', 'EMB', 'APL', 'LSR', 'SUB'];
   var PRINT_LABELS = { DTG: 'DTG', DTF: 'DTF', EMB: 'Embroidery', APL: 'Appliqué', LSR: 'Laser', SUB: 'Sublimation' };
+  // The method codes a chosen blank/product actually supports (its saved "method"
+  // string, e.g. "DTG Print / Embroidery"), so the order's Print-method dropdown
+  // offers only what THAT product can do — instead of the full fixed list. Returns
+  // null when the product/method is unknown (caller falls back to PRINT_METHODS).
+  function productMethodCodes(prodName) {
+    try {
+      if (!prodName || !window.EGStore || !EGStore.getCatalogProducts) return null;
+      var p = (EGStore.getCatalogProducts() || []).filter(function (x) { return String(x.name || x.sku || x.id) === String(prodName); })[0];
+      if (!p || !p.method) return null;
+      var codes = String(p.method).split(/\s*\/\s*/).map(function (s) {
+        var t = s.trim().toUpperCase();
+        if (/EMB/.test(t)) return 'EMB';
+        if (/APL|APPLIQ/.test(t)) return 'APL';
+        if (/LSR|LASER/.test(t)) return 'LSR';
+        if (/SUB/.test(t)) return 'SUB';
+        if (/DTF/.test(t)) return 'DTF';
+        if (/DTG|DIRECT/.test(t)) return 'DTG';
+        return null;
+      }).filter(Boolean);
+      // de-dupe, preserve order
+      var seen = {}, out = [];
+      codes.forEach(function (c) { if (!seen[c]) { seen[c] = 1; out.push(c); } });
+      return out.length ? out : null;
+    } catch (e) { return null; }
+  }
   var SETUP_KEY = 'eg_neworder_setup';
 
   function jsAttr(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
@@ -685,8 +710,14 @@
       });
       if (curProd && !matched) prodOpts += opt(curProd, curProd, true);
       var curPt = (setup.printType || tech || '').toString().toUpperCase();
+      // Offer only the chosen blank's supported methods (synced from the product's
+      // saved methods); keep the item's current method even if not listed, and fall
+      // back to the full set when no product/method is known.
+      var _pmCodes = productMethodCodes(curProd);
+      if (_pmCodes && curPt && _pmCodes.indexOf(curPt) < 0) _pmCodes = [curPt].concat(_pmCodes);
+      if (!_pmCodes) _pmCodes = PRINT_METHODS;
       var ptOpts = '<option value="">Method…</option>';
-      PRINT_METHODS.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
+      _pmCodes.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
       var vo = variantOptions(num, sku, it);
       var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
       var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
