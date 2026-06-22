@@ -61,15 +61,15 @@ function renderOpProducts() {
     <span style="font-size:12.5px;color:#9ca3af">Mockup + print specs</span>
   </div>`;
   html += filtered.map(p => `
-    <div class="card" style="overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative" onclick="openProductCard(${p.id})" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+    <div class="card" style="overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative;display:flex;flex-direction:column" onclick="openProductCard(${p.id})" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
       <button type="button" title="Duplicate product" onclick="event.stopPropagation();opCloneProduct(${p.id})" style="position:absolute;top:8px;right:8px;z-index:2;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.92);border:1px solid #e5e4e0;border-radius:7px;padding:4px 8px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;backdrop-filter:blur(3px);transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v5A1.5 1.5 0 0 0 3 9.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>Copy</button>
       <div style="background:#f0ede9;aspect-ratio:1/1;width:100%;overflow:hidden">
         <img src="${p.img}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.src='https://placehold.co/400x400/f0ede9/6b7280?text=${p.fallback}'"/>
       </div>
-      <div style="padding:12px 14px">
+      <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column">
         <div title="Click to rename" onclick="event.stopPropagation();egRenameProductCard(${p.id}, this)" style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px;cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;outline:none;transition:background .15s" onmouseover="this.style.background='#f0ede9'" onmouseout="if(this.contentEditable!=='true')this.style.background='transparent'">${p.name}</div>
         <div style="font-size:12.5px;color:#9ca3af;margin-bottom:8px">${p.variants} · ${(typeof EGStore !== 'undefined' && EGStore.formatMethod) ? EGStore.formatMethod(p.method) : p.method}</div>
-        <div style="display:flex;align-items:center;justify-content:space-between"><span class="badge ${p.status==='Active'?'b-ok':'b-queue'}">${p.status}</span><span style="font-size:13px;font-weight:600;color:#374151">$${p.price.toFixed(2)} base</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto"><span class="badge ${p.status==='Active'?'b-ok':'b-queue'}">${p.status}</span><span style="font-size:13px;font-weight:600;color:#374151">$${p.price.toFixed(2)}</span></div>
       </div>
     </div>`).join('');
   grid.innerHTML = html;
