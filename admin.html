@@ -4096,6 +4096,7 @@ window.admMarkCancelled = admMarkCancelled;
 window.admMarkRefunded  = admMarkRefunded;
 const _wcLiveSeen = new Map(); // id → submittedAt
 function admMergeLiveOrders() {
+  window.WH_ORDERS = WH_ORDERS;   // expose for EGDesignTools.patchBoardArrays (let isn't on window)
   if (typeof EGStore === 'undefined' || !EGStore.getOrders) return;
   const live = EGStore.getOrders();
   // Pull each order's server-stored designs into the cache once — seller uploads

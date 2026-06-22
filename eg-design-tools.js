@@ -37,6 +37,29 @@
     assignDesignKeys(o.items);
     return o.items.find(function (i) { return itemDK(i) === key; }) || o.items.find(function (i) { return String(i.sku) === String(key); }) || null;
   }
+  // Factory boards render from board-LOCAL arrays (OP_ORDERS / WH_ORDERS) that are
+  // SEPARATE copies of EGStore orders, rebuilt only by a 2s poll whose merge skips
+  // unchanged orders and never rebuilds an existing order's itemList. So a shared
+  // item mutation (variant / add-item / blank) writes to EGStore but the visible row
+  // never updates. Patch the matching board-local row directly so refreshBoard()
+  // reflects it immediately. `fn(row, item)` runs for each matching board row; if
+  // itemKey is given, `item` is that row's matching line (by lineId/_dk then sku).
+  function patchBoardArrays(orderId, itemKey, fn) {
+    ['OP_ORDERS', 'WH_ORDERS'].forEach(function (an) {
+      try {
+        var arr = window[an]; if (!Array.isArray(arr)) return;
+        arr.forEach(function (row) {
+          if (!row || String(row.num) !== String(orderId) || !Array.isArray(row.itemList)) return;
+          var item = null;
+          if (itemKey != null) {
+            item = row.itemList.filter(function (x) { return itemDK(x) === itemKey; })[0]
+                || row.itemList.filter(function (x) { return String(x.sku) === String(itemKey); })[0] || null;
+          }
+          fn(row, item);
+        });
+      } catch (e) {}
+    });
+  }
   function ctxQS(orderNum, sku) {
     var q = [];
     if (orderNum) q.push('order=' + encodeURIComponent(orderNum));
@@ -453,6 +476,11 @@
       if (blankImg) it.blankImg = blankImg;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
       pushItemsToApi(o);
+      // Mirror the chosen blank onto the board-local row so the title + avatar
+      // rehydrate immediately (not after the next 2s poll).
+      patchBoardArrays(o.id, sku, function (row, bi) {
+        if (bi) { bi.blank = it.blank; if (blankImg) bi.blankImg = blankImg; }
+      });
     } catch (e) {}
   }
 
@@ -564,6 +592,8 @@
       it[key] = value;
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
       pushItemsToApi(o);
+      // Mirror onto the board-local row so the colour/size shows now, not after a poll.
+      patchBoardArrays(o.id, sku, function (row, bi) { if (bi) bi[key] = value; });
     } catch (e) {}
     refreshBoard();
     document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
@@ -744,8 +774,15 @@
       if (!o) return;
       o.items = Array.isArray(o.items) ? o.items : [];
       var sku = 'NEW-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      o.items.push({ sku: sku, name: 'New item', qty: 1, printType: '' });
+      var newItem = { sku: sku, name: 'New item', qty: 1, printType: '' };
+      o.items.push(newItem);
+      // EGStore.update → _save stamps a stable lineId onto newItem; mirror the new
+      // line onto the board-local row so it appears now (the merge never adds items
+      // to an order already on the board).
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+      patchBoardArrays(o.id, null, function (row) {
+        row.itemList.push({ sku: sku, name: 'New item', qty: 1, printType: '', _dk: itemDK(newItem), lineId: newItem.lineId || null, status: row.status || 'new' });
+      });
     } catch (e) {}
     refreshBoard();
   }

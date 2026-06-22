@@ -4198,6 +4198,7 @@ let WH_ORDERS = [
 (function(){ try { if (localStorage.getItem('eg_hide_seed') === '1') { for (var i = WH_ORDERS.length - 1; i >= 0; i--) if (WH_ORDERS[i]._seed) WH_ORDERS.splice(i, 1); } } catch(e){} })();
 const _wcLiveSeen = new Map();
 function whMergeLiveOrders() {
+  window.WH_ORDERS = WH_ORDERS;   // expose for EGDesignTools.patchBoardArrays (let isn't on window)
   if (typeof EGStore === 'undefined' || !EGStore.getOrders) return;
   const live = EGStore.getOrders();
   // Pull each order's server-stored designs into the cache once — seller uploads

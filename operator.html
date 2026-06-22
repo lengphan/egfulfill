@@ -5324,6 +5324,7 @@ function bulkFlagAll() {
 // Map<id → submittedAt> — Infinity sentinel for static demo orders (never re-processed)
 var _opLiveIds = new Map(OP_ORDERS.map(function(o){ return [o.num, Infinity]; }));
 function opMergeLiveOrders() {
+  window.OP_ORDERS = OP_ORDERS;   // expose for EGDesignTools.patchBoardArrays (const isn't on window)
   if (typeof EGStore === 'undefined') return;
   // Skip drafts (seller-only orders that haven't been pushed to production yet).
   var liveOrders = (EGStore.getOrders ? EGStore.getOrders() : [])
