@@ -1478,6 +1478,28 @@
       try { if (EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
       refreshBoard();
     },
+    // Push every uploaded design to its production board. Each line routes to its own
+    // method board (DTG/DTF/EMB…). Edit All → all lines share ONE design ID; Edit Items
+    // → each line gets its own (cards key by dk). Realtime: design_cards write fires the
+    // storage event the boards already listen to.
+    sendUploadsToBoard: function (orderNum) {
+      var o = findOrder(orderNum); if (!o || !Array.isArray(o.items) || !o.items.length) return;
+      if (!(window.EGStore && EGStore.pushToDesignBoard)) return;
+      var all = (window._xfomDesignMode === 'all');
+      var sharedId = (all && EGStore.nextDesignId) ? EGStore.nextDesignId() : null;
+      var n = 0;
+      o.items.forEach(function (it) {
+        var dk = itemDK(it);
+        var board = String(it.printType || it.tech || 'dtg').toLowerCase();
+        var thumb = '';
+        try { thumb = (EGStore.getRawDesign && (EGStore.getRawDesign(o.id, dk) || EGStore.getRawDesign(orderNum, dk))) || ''; } catch (e) {}
+        EGStore.pushToDesignBoard({ orderNum: o.id, sku: it.sku, dk: dk, board: board, name: it.name || it.product || 'Design', thumb: thumb || null, byRole: 'Factory', sharedDesignId: sharedId });
+        n++;
+      });
+      try { refreshBoard(); } catch (e) {}
+      _refreshOpenXfom(orderNum);
+      if (typeof window.toast === 'function') { try { window.toast('Sent ' + n + ' design' + (n === 1 ? '' : 's') + ' to board'); } catch (e) {} }
+    },
     zoomUpload: function (html) {
       if (html == null) return;
       var ov = document.getElementById('xfom-zoom-ov');

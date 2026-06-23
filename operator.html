@@ -8006,7 +8006,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         upEl.innerHTML =
           `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9">
             <div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Uploads · ${items.length}</div>
-            <button onclick="xfomPushToBoard()" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board →</button>
+            <button onclick="EGDesignTools.sendUploadsToBoard(window._xfomNum)" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board →</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">${cells}</div>`;
       }
