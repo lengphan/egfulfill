@@ -1125,34 +1125,26 @@ function openCardTopUp() {
   var _is = 'width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px;font-size:14.5px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
   var _foc = 'onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"';
   var _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
+  var _ccBox = 'border:1.5px solid #e5e4e0;border-radius:9px;padding:12px;min-height:46px;background:#fff';
   m.innerHTML =
     '<div onclick="closeCardModal()" style="position:fixed;inset:0;background:rgba(25,25,24,.5)"></div>'
     + '<div style="position:relative;background:#fdfcfa;border:1px solid #40403d;border-radius:18px;box-shadow:5px 5px 0 #40403d,0 28px 70px rgba(0,0,0,.3);width:780px;max-width:calc(100vw - 28px);max-height:94vh;overflow:auto;font-family:inherit">'
     +   '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #ece8e0">'
-    +     '<div><div style="font-size:17px;font-weight:800;color:#191918">Add New Card</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Save a card — you\'ll choose the amount when you top up</div></div>'
+    +     '<div><div style="font-size:17px;font-weight:800;color:#191918">Add New Card</div></div>'
     +     '<button onclick="closeCardModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:5px;border-radius:7px" onmouseover="this.style.background=\'#f0ede9\'" onmouseout="this.style.background=\'transparent\'"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
     +   '</div>'
     +   '<div style="display:flex;gap:24px;flex-wrap:wrap;padding:22px 24px">'
     +     '<div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:14px">'
     +       '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
-    +       '<div><label style="' + _lbl + '">CARD DETAILS</label><div id="stripe-payment-element" style="border:1.5px solid #e5e4e0;border-radius:9px;padding:11px 12px;min-height:44px;background:#fff"></div></div>'
+    +       '<div><label style="' + _lbl + '">CARD NUMBER</label><div id="cc-num" style="' + _ccBox + '"></div></div>'
+    +       '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><div id="cc-exp-el" style="' + _ccBox + '"></div></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><div id="cc-cvc-el" style="' + _ccBox + '"></div></div></div>'
     +       '<div id="cc-error" style="display:none;font-size:12.5px;color:#dc2626;font-weight:600;line-height:1.45"></div>'
     +       '<button id="cc-pay" onclick="ccSaveCard()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;transition:opacity .15s" onmouseover="this.style.opacity=\'.88\'" onmouseout="this.style.opacity=\'1\'">Save Card</button>'
     +       '<div style="font-size:11.5px;color:#b0aaa4;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="6" width="9" height="6" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" stroke="currentColor" stroke-width="1.2"/></svg>Encrypted &amp; secure</div>'
     +     '</div>'
     +     '<div style="flex:1 1 300px;min-width:280px">'
-    +       '<label style="' + _lbl + '">CARD PREVIEW</label>'
-    +       '<div style="position:relative;width:100%;aspect-ratio:1.6;background:linear-gradient(135deg,#1f1d1b,#2c2926);border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.25);padding:18px 20px;color:#fff;overflow:hidden;box-sizing:border-box">'
-    +         '<div style="position:absolute;top:-34px;right:-22px;width:130px;height:130px;border-radius:50%;background:rgba(212,160,23,.22)"></div>'
-    +         '<div style="position:relative;display:flex;align-items:center;justify-content:space-between"><div style="width:34px;height:24px;border-radius:5px;background:linear-gradient(135deg,#e7c878,#caa24a)"></div><div id="cc-brand" style="font-size:13px;font-weight:800;letter-spacing:.06em;opacity:.95">CARD</div></div>'
-    +         '<div id="cc-prev-number" style="position:relative;font-family:monospace;font-size:18px;letter-spacing:2px;margin-top:24px">&bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull;</div>'
-    +         '<div style="position:relative;display:flex;align-items:flex-end;justify-content:space-between;margin-top:16px"><div style="min-width:0"><div style="font-size:8px;letter-spacing:.08em;color:rgba(255,255,255,.55)">CARD HOLDER</div><div id="cc-prev-name" style="font-size:12.5px;font-weight:600;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px">YOUR NAME</div></div><div style="text-align:right"><div style="font-size:8px;letter-spacing:.08em;color:rgba(255,255,255,.55)">EXPIRES</div><div id="cc-prev-exp" style="font-size:12.5px;font-weight:600">MM/YY</div></div></div>'
-    +       '</div>'
-    +       '<div style="border:1px solid #ece8e0;border-radius:12px;margin-top:14px;overflow:hidden;font-size:13px">'
-    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px;border-bottom:1px solid #f0ede9"><span style="color:#9ca3af">Name</span><b id="cc-sum-name" style="color:#191918;font-weight:600">&mdash;</b></div>'
-    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px;border-bottom:1px solid #f0ede9"><span style="color:#9ca3af">Card</span><b id="cc-sum-number" style="color:#191918;font-weight:600;font-family:monospace">&mdash;</b></div>'
-    +         '<div style="display:flex;justify-content:space-between;padding:10px 13px"><span style="color:#9ca3af">Expiry</span><b id="cc-sum-exp" style="color:#191918;font-weight:600">&mdash;</b></div>'
-    +       '</div>'
+    +       '<label style="' + _lbl + '">PREVIEW</label>'
+    +       _ccPreviewMarkup()
     +     '</div>'
     +   '</div>'
     + '</div>';
@@ -1195,7 +1187,8 @@ function ccUpdatePreview() {
   s('cc-prev-number', disp.join(' '));
   s('cc-prev-name', name.toUpperCase() || 'YOUR NAME');
   s('cc-prev-exp', exp || 'MM/YY');
-  var bE = document.getElementById('cc-brand'); if (bE) bE.textContent = brand;
+  // Brand logo is owned by the Stripe cardNumber element's change event (we can't
+  // read the PAN from JS), so don't overwrite #cc-brand here.
   s('cc-sum-name', name.toUpperCase() || '—');
   s('cc-sum-number', dgt ? ('•••• ' + (dgt.length > 4 ? dgt.slice(-4) : dgt)) : '—');
   s('cc-sum-exp', exp || '—');
@@ -1203,53 +1196,78 @@ function ccUpdatePreview() {
 // "Add New Card" SAVES a card (no charge) via a Stripe SetupIntent — the card is
 // vaulted on the seller's Stripe Customer and becomes selectable in Add Funds, where
 // the actual (gated, server-confirmed) charge happens. We never see the PAN.
-var _ccStripe = null, _ccElements = null, _ccStripeReady = false, _ccSetupCS = '';
+var _ccStripe = null, _ccElements = null, _ccStripeReady = false, _ccSetupCS = '', _ccNumEl = null;
 function _ccErr(msg) { var e = document.getElementById('cc-error'); if (e) { e.textContent = msg || ''; e.style.display = msg ? 'block' : 'none'; } }
-// Mount the Stripe Payment Element bound to a fresh SetupIntent (save-card mode).
+// Brand logo for the live preview's top-right (Visa/Mastercard PNGs; text for others).
+function _ccBrandLogo(brand) {
+  var k = String(brand || '').toUpperCase().replace(/[^A-Z]/g, '');
+  var LOGOS = { VISA: 'images/visa.png', MASTERCARD: 'images/mastercard.png' };
+  if (LOGOS[k]) return '<img src="' + LOGOS[k] + '" alt="' + k + '" style="height:26px;width:auto;max-width:62px;object-fit:contain;display:block;background:#fff;border-radius:4px;padding:3px 5px;box-sizing:border-box">';
+  return '<span style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#cfc8b9">' + (k || 'CARD') + '</span>';
+}
+// Mount three SEPARATE Stripe Elements (number / expiry / CVC) so the fields are
+// editable on screen yet the PAN never touches our JS. Used by EVERY add-card
+// surface (header wallet, Add Funds, Linked Accounts) — same #cc-num/#cc-exp-el/
+// #cc-cvc-el ids, so this one mounter serves them all. The card is validated &
+// vaulted only on Save (confirmCardSetup), against a SetupIntent fetched here.
 function ccInitStripe() {
-  _ccStripe = null; _ccElements = null; _ccStripeReady = false; _ccSetupCS = '';
-  var mount = document.getElementById('stripe-payment-element'); if (!mount) return;
+  _ccStripe = null; _ccElements = null; _ccStripeReady = false; _ccSetupCS = ''; _ccNumEl = null;
+  var mountNum = document.getElementById('cc-num'); if (!mountNum) return;
   var payBtn = document.getElementById('cc-pay');
   if (typeof Stripe !== 'function') { _ccErr('Could not load Stripe.js.'); if (payBtn) payBtn.disabled = true; return; }
   var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
   var H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok };
-  mount.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;padding:11px 2px">Loading secure card field…</div>';
+  if (payBtn) payBtn.disabled = true;
   fetch((window.EG_API_BASE || '') + '/api/stripe/config', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
     .then(function (r) { return r.json(); })
     .then(function (cfg) {
       if (!cfg || !cfg.enabled || !cfg.publishableKey) {
-        mount.innerHTML = '';
         _ccErr('Card payments aren’t configured on the server yet (STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY).');
-        if (payBtn) payBtn.disabled = true; return;
+        return;
       }
       _ccStripe = Stripe(cfg.publishableKey);
-      return fetch((window.EG_API_BASE || '') + '/api/stripe/setup-intent', { method: 'POST', headers: H, body: '{}' })
+      _ccElements = _ccStripe.elements();
+      var style = { base: { fontSize: '14.5px', color: '#191918', fontFamily: 'inherit', '::placeholder': { color: '#9ca3af' } }, invalid: { color: '#dc2626' } };
+      _ccNumEl = _ccElements.create('cardNumber', { style: style, showIcon: true });
+      var expEl = _ccElements.create('cardExpiry', { style: style });
+      var cvcEl = _ccElements.create('cardCvc', { style: style });
+      _ccNumEl.mount('#cc-num'); expEl.mount('#cc-exp-el'); cvcEl.mount('#cc-cvc-el');
+      // Live brand → preview logo; surface field-level validation as the user types.
+      _ccNumEl.on('change', function (ev) {
+        var bE = document.getElementById('cc-brand');
+        if (bE) bE.innerHTML = _ccBrandLogo(ev.brand && ev.brand !== 'unknown' ? ev.brand : '');
+        _ccErr(ev.error ? ev.error.message : '');
+      });
+      expEl.on('change', function (ev) { if (ev.error) _ccErr(ev.error.message); });
+      cvcEl.on('change', function (ev) { if (ev.error) _ccErr(ev.error.message); });
+      _ccStripeReady = true; _ccErr(''); if (payBtn) payBtn.disabled = false;
+      // SetupIntent client secret for confirmCardSetup, fetched in the background.
+      fetch((window.EG_API_BASE || '') + '/api/stripe/setup-intent', { method: 'POST', headers: H, body: '{}' })
         .then(function (r) { return r.json(); })
-        .then(function (si) {
-          if (!si || si.error || !si.clientSecret) { mount.innerHTML = ''; _ccErr((si && si.error) || 'Could not start card setup.'); if (payBtn) payBtn.disabled = true; return; }
-          _ccSetupCS = si.clientSecret;
-          _ccElements = _ccStripe.elements({ clientSecret: _ccSetupCS });
-          _ccElements.create('payment', { layout: 'tabs' }).mount('#stripe-payment-element');
-          _ccStripeReady = true; _ccErr(''); if (payBtn) payBtn.disabled = false;
-        });
+        .then(function (si) { if (si && si.clientSecret) _ccSetupCS = si.clientSecret; });
     })
-    .catch(function () { mount.innerHTML = ''; _ccErr('Could not reach the payment server.'); if (payBtn) payBtn.disabled = true; });
+    .catch(function () { _ccErr('Could not reach the payment server.'); });
+}
+// Shared vault step: validate + save the entered card against the SetupIntent.
+// Resolves { ok, card } on success or { ok:false, error } so each caller can react
+// (the card is only "usable" once Stripe confirms it here — else suggest another).
+async function _ccVaultCard(btn) {
+  var name = ((document.getElementById('cc-name') || {}).value || '').trim();
+  if (!_ccStripe || !_ccNumEl || !_ccStripeReady) return { ok: false, error: 'Card field isn’t ready yet — one moment.' };
+  if (!_ccSetupCS) return { ok: false, error: 'Still preparing secure setup — one moment, then try again.' };
+  var res = await _ccStripe.confirmCardSetup(_ccSetupCS, { payment_method: { card: _ccNumEl, billing_details: name ? { name: name } : {} } });
+  if (res && res.error) return { ok: false, error: res.error.message };
+  var si = res && res.setupIntent;
+  if (!si || si.status !== 'succeeded') return { ok: false, error: 'Card was not saved (' + ((si && si.status) || 'failed') + ').' };
+  return { ok: true, card: { name: name } };
 }
 async function ccSaveCard() {
-  var name = ((document.getElementById('cc-name') || {}).value || '').trim();
-  if (!_ccStripe || !_ccElements || !_ccStripeReady) { _ccErr('Card field isn’t ready yet — one moment.'); return; }
   var btn = document.getElementById('cc-pay'); var label = btn ? btn.textContent : 'Save Card';
-  var fail = function (msg) { _ccErr(msg || 'Could not save the card.'); if (btn) { btn.disabled = false; btn.textContent = label; } };
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  _ccErr('');
+  var fail = function (msg) { _ccErr((msg || 'Could not save the card.') + ' Try a different card.'); if (btn) { btn.disabled = false; btn.textContent = label; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; } _ccErr('');
   try {
-    var sub = await _ccElements.submit();
-    if (sub && sub.error) return fail(sub.error.message);
-    // Vault the card (3-D Secure handled). No charge happens here.
-    var conf = await _ccStripe.confirmSetup({ elements: _ccElements, clientSecret: _ccSetupCS, redirect: 'if_required', confirmParams: { return_url: location.href, payment_method_data: { billing_details: name ? { name: name } : {} } } });
-    if (conf && conf.error) return fail(conf.error.message);
-    var si = conf && conf.setupIntent;
-    if (!si || si.status !== 'succeeded') return fail('Card was not saved (' + ((si && si.status) || 'failed') + ').');
+    var r = await _ccVaultCard(btn);
+    if (!r.ok) return fail(r.error);
     closeCardModal();
     if (typeof walToast === 'function') walToast('✓ Card saved');
     // Back to Add Funds with the new card available (the picker reloads from Stripe).
@@ -1267,7 +1285,7 @@ function closeLinkedAccounts() { var m = document.getElementById('la-modal'); if
 function openLinkedAccounts() {
   var m = document.getElementById('la-modal');
   if (!m) { m = document.createElement('div'); m.id = 'la-modal'; m.style.cssText = 'display:none;position:fixed;inset:0;z-index:520;align-items:center;justify-content:center;font-family:inherit'; document.body.appendChild(m); m.addEventListener('click', function (e) { if (e.target === m) closeLinkedAccounts(); }); }
-  _laAdding = false; _laRender(); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  _laAdding = false; _laStripeCards = null; _laRender(); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
 }
 function laSelectTab(t) { _laTab = t; _laAdding = false; _laRender(); }
 function _laRender() {
@@ -1296,51 +1314,76 @@ function _cardBrandMark(brand){
   if (LOGOS[k]) return '<span style="width:42px;height:28px;border-radius:5px;background:#fff;border:1px solid #ece8e0;display:inline-flex;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;flex-shrink:0"><img src="'+LOGOS[k]+'" alt="'+k+'" style="max-width:100%;max-height:100%;object-fit:contain;display:block"></span>';
   return '<div style="width:42px;height:28px;border-radius:5px;background:linear-gradient(135deg,#1f1d1b,#2c2926);display:flex;align-items:center;justify-content:center;color:#fff;font-size:7.5px;font-weight:800;letter-spacing:.03em;flex-shrink:0">'+(brand||'CARD')+'</div>';
 }
+// Saved cards come from Stripe (the source of truth — usable for top-ups), loaded
+// once per modal open into _laStripeCards. _laCardsHtml renders a loading state
+// until the fetch returns, then re-renders.
+var _laStripeCards = null, _laCardsLoading = false;
+function _laLoadCards() {
+  if (_laCardsLoading) return; _laCardsLoading = true;
+  var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+  fetch((window.EG_API_BASE || '') + '/api/stripe/cards', { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { _laStripeCards = (d && Array.isArray(d.cards)) ? d.cards : []; })
+    .catch(function () { _laStripeCards = []; })
+    .then(function () { _laCardsLoading = false; if (_laTab === 'cards' && !_laAdding) _laRender(); });
+}
 function _laCardsHtml() {
   if (_laAdding) return _laAddCardHtml();
-  var cards = _laCards();
+  if (_laStripeCards == null) { _laLoadCards(); return '<div style="font-size:13.5px;color:#9ca3af;padding:18px 0">Loading your cards…</div>'; }
+  var cards = _laStripeCards;
   var rows = cards.map(function (c, i) {
     return '<div style="display:flex;align-items:center;gap:13px;border:1px solid #ece8e0;border-radius:12px;padding:13px 15px;margin-bottom:10px;background:#fff">'
       + _cardBrandMark(c.brand)
       + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">&bull;&bull;&bull;&bull; ' + (c.last4 || '••••') + '</div><div style="font-size:12px;color:#9ca3af">' + (c.name || 'Card') + ' · exp ' + (c.exp || '—') + '</div></div>'
       + (i === 0 ? '<span style="font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:2px 9px">Default</span>' : '')
-      + '<button onclick="laRemoveCard(' + i + ')" title="Remove" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:5px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>'
+      + '<button onclick="laRemoveCard(\'' + c.id + '\')" title="Remove" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:5px" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>'
       + '</div>';
   }).join('') || '<div style="font-size:13.5px;color:#9ca3af;padding:18px 0">No cards linked yet.</div>';
   return '<div style="font-size:13px;font-weight:700;color:#6b7280;letter-spacing:.03em;margin-bottom:12px">SAVED CARDS</div>' + rows
     + '<button onclick="laShowAddCard()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;border:1.5px dashed #d8d4cd;background:#faf9f7;border-radius:12px;padding:13px;font-size:14px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;margin-top:4px" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#d8d4cd\'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Add a new card</button>';
 }
-function laShowAddCard() { _laAdding = true; _laRender(); }
+function laShowAddCard() { _laAdding = true; _laRender(); if (typeof ccInitStripe === 'function') setTimeout(ccInitStripe, 0); }
 function laCancelAddCard() { _laAdding = false; _laRender(); }
 function _laAddCardHtml() {
   var _is = 'width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px;font-size:14.5px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
   var _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
   var _foc = 'onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"';
+  var _box = 'border:1.5px solid #e5e4e0;border-radius:9px;padding:12px;min-height:46px;background:#fff';
   return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><button onclick="laCancelAddCard()" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:13.5px;font-weight:600;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><span style="font-size:17px;line-height:1">‹</span>Cards</button></div>'
     + '<div style="display:flex;gap:24px;flex-wrap:wrap">'
     + '<div style="flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:14px">'
     + '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
-    + '<div><label style="' + _lbl + '">CARD NUMBER</label><input id="cc-number" type="text" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" oninput="ccFmtNumber(this)" style="' + _is + ';letter-spacing:1px" ' + _foc + '></div>'
-    + '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><input id="cc-exp" type="text" inputmode="numeric" placeholder="MM/YY" maxlength="5" oninput="ccFmtExp(this)" style="' + _is + '" ' + _foc + '></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><input id="cc-cvc" type="text" inputmode="numeric" placeholder="123" maxlength="4" oninput="this.value=this.value.replace(/\\D/g,\'\')" style="' + _is + '" ' + _foc + '></div></div>'
-    + '<button onclick="laSaveNewCard()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px">Save card</button>'
+    + '<div><label style="' + _lbl + '">CARD NUMBER</label><div id="cc-num" style="' + _box + '"></div></div>'
+    + '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><div id="cc-exp-el" style="' + _box + '"></div></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><div id="cc-cvc-el" style="' + _box + '"></div></div></div>'
+    + '<div id="cc-error" style="display:none;font-size:12.5px;color:#dc2626;font-weight:600;line-height:1.45"></div>'
+    + '<button id="cc-pay" onclick="laSaveNewCard()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px">Save card</button>'
     + '</div>'
     + '<div style="flex:1 1 280px;min-width:260px"><label style="' + _lbl + '">PREVIEW</label>' + _ccPreviewMarkup() + '</div>'
     + '</div>';
 }
-function laSaveNewCard() {
-  var dgt = ((document.getElementById('cc-number') || {}).value || '').replace(/\D/g, '');
-  var name = ((document.getElementById('cc-name') || {}).value || '').trim();
-  var exp = ((document.getElementById('cc-exp') || {}).value || '').trim();
-  var cvc = ((document.getElementById('cc-cvc') || {}).value || '').trim();
-  if (dgt.length < 13) { alert('Enter a valid card number.'); return; }
-  if (!name) { alert('Enter the cardholder name.'); return; }
-  if (!/^\d{2}\/\d{2}$/.test(exp)) { alert('Enter the expiry as MM/YY.'); return; }
-  if (cvc.length < 3) { alert('Enter the CVC.'); return; }
-  var cards = _laCards(); cards.push({ brand: ccBrand(dgt), last4: dgt.slice(-4), exp: exp, name: name.toUpperCase() }); _laSaveCards(cards);
-  _laAdding = false; _laRender();
-  if (typeof walToast === 'function') walToast('Card linked');
+async function laSaveNewCard() {
+  // Real Stripe validation + vaulting (same path as the Add Funds modal). Only a
+  // card Stripe confirms is saved — otherwise we ask for a different one.
+  var btn = document.getElementById('cc-pay'); var label = btn ? btn.textContent : 'Save card';
+  var fail = function (msg) { _ccErr((msg || 'Could not save the card.') + ' Try a different card.'); if (btn) { btn.disabled = false; btn.textContent = label; } };
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; } _ccErr('');
+  try {
+    var r = await _ccVaultCard(btn);
+    if (!r.ok) return fail(r.error);
+    _laStripeCards = null;   // force the list to reload the now-vaulted card
+    try { _depStripeCards = null; } catch (e) {}
+    _laAdding = false; _laRender();
+    if (typeof walToast === 'function') walToast('✓ Card saved');
+  } catch (e) { fail(e && e.message ? e.message : 'Could not save the card.'); }
 }
-function laRemoveCard(i) { var cards = _laCards(); cards.splice(i, 1); _laSaveCards(cards); _laRender(); }
+function laRemoveCard(id) {
+  if (!id) return;
+  var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+  fetch((window.EG_API_BASE || '') + '/api/stripe/cards/' + encodeURIComponent(id), { method: 'DELETE', headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+    .then(function (r) { return r.json(); })
+    .then(function () { _laStripeCards = null; try { _depStripeCards = null; } catch (e) {} _laRender(); })
+    .catch(function () { _laStripeCards = null; _laRender(); });
+}
 function _ccPreviewMarkup() {
   // Monochromatic retro card — vintage-black base, cream text, tan chip, the
   // signature beige offset shadow. No gold; on-theme with the rest of the app.

@@ -109,6 +109,16 @@ export function stripeRoutes(app, requireAuth) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
+  // Remove a saved card (detach the payment method from the customer).
+  app.delete('/api/stripe/cards/:id', { preHandler: requireAuth }, async (req, reply) => {
+    try {
+      const id = req.params.id;
+      if (!id) { reply.code(400); return { error: 'card id required' }; }
+      await stripe('/payment_methods/' + encodeURIComponent(id) + '/detach', {});
+      return { ok: true };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
   // ── Charge a SAVED card for the entered amount → credit the wallet on success.
   //    Customer is present, so 3-D Secure (requires_action) hands a clientSecret back
   //    for the client to finish; the wallet is credited only after verify-intent.
