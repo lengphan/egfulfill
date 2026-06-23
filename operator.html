@@ -7621,7 +7621,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
                   <div id="xfom-hero" style="width:108px;min-height:108px;flex-shrink:0;border-radius:10px;background:#f6f5f4;border:1px solid #e8e7e4;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
                   <div style="flex:1;min-width:0;display:flex;flex-direction:column">
                     <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
-                    <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to edit the shipping address" onmouseover="this.style.background='#fbf9f5';this.style.borderColor='#191918'" onmouseout="this.style.background='#f6f5f4';this.style.borderColor='#cfc9bf'" style="flex:1;background:#f6f5f4;border:1px dashed #cfc9bf;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">— <span style="font-size:11.5px;color:#b0aaa4;font-style:italic">· click to edit</span></div>
+                    <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to edit the shipping address" onmouseover="if(this.getAttribute('contenteditable')!=='true')this.style.borderColor='#191918'" onmouseout="if(this.getAttribute('contenteditable')!=='true')this.style.borderColor='#e5e4e0'" style="flex:1;background:transparent;border:1px solid #e5e4e0;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">—</div>
                   </div>
                 </div>
               </div>

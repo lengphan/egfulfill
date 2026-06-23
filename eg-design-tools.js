@@ -1307,38 +1307,42 @@
     stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
 
-  // ── Editable Ship To — click the address box → it becomes ONE paste area; on save
-  //    the block is parsed + USPS-validated (standardized), then written to
-  //    order.address + customer.name and persisted (PATCH). No popup, no buttons-soup.
-  function _shipBlock(o) {
-    var a = o.address || {};
-    var name = a.name || (o.customer && (o.customer.name || (typeof o.customer === 'string' ? o.customer : ''))) || '';
-    var street = [a.line1 || a.street || '', a.line2 || a.apt || ''].filter(Boolean).join(' ');
-    var csz = [a.city || '', [a.state || '', a.zip || ''].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-    return [name, street, csz].filter(Boolean).join('\n');
-  }
+  // ── Editable Ship To — click the box and it becomes editable IN PLACE (same size,
+  //    same font): the border flicks to dashed and Save/Cancel appear. On save the
+  //    text is parsed + USPS-validated, written to order.address + customer.name, and
+  //    persisted (PATCH). No popup, no textarea swap.
   function _shipDisplay(ad) {
-    return '<strong>' + esc(ad.name || '') + '</strong><br>' + esc(ad.line1 || '') + (ad.line2 ? (' ' + esc(ad.line2)) : '') + '<br>' + [ad.city, ad.state, ad.zip].filter(Boolean).join(', ');
+    var has = ad.line1 || ad.city || ad.zip;
+    return '<strong>' + esc(ad.name || '') + '</strong>' + (has ? ('<br>' + esc(ad.line1 || '') + (ad.line2 ? (' ' + esc(ad.line2)) : '') + '<br>' + [ad.city, ad.state, ad.zip].filter(Boolean).join(', ')) : '<br><span style="color:#b0aaa4">—</span>');
   }
+  function _shipEditing() { return document.querySelector('#xfom-addr[contenteditable="true"]'); }
   function editShipToInline(el, orderNum) {
-    if (!el || el.querySelector('textarea')) return;          // already editing
-    var o = findOrder(orderNum); if (!o) return;
-    el._egPrev = el.innerHTML; el.style.cursor = 'default';
-    el.innerHTML = '<textarea id="egst-ta" onclick="event.stopPropagation()" placeholder="Paste the full address —&#10;Name&#10;Street, Apt&#10;City, ST 00000" style="width:100%;min-height:84px;border:1.5px solid #191918;border-radius:8px;padding:9px 11px;font-size:13.5px;font-family:inherit;line-height:1.55;resize:vertical;outline:none;box-sizing:border-box;color:#191918;background:#fff">' + esc(_shipBlock(o)) + '</textarea>'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-top:8px"><button onclick="event.stopPropagation();EGDesignTools.saveShipTo(\'' + jsAttr(orderNum) + '\',this)" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Validate &amp; save</button><button onclick="event.stopPropagation();EGDesignTools.cancelShipTo(this)" style="background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit">Cancel</button><span id="egst-stat" style="font-size:12px;font-weight:600"></span></div>';
-    var ta = el.querySelector('#egst-ta'); if (ta) ta.focus();
+    if (!el || el.getAttribute('contenteditable') === 'true') return;   // already editing
+    if (!findOrder(orderNum)) return;
+    el._egPrev = el.innerHTML; el._egOrd = orderNum;
+    el.setAttribute('contenteditable', 'true');
+    el.style.borderStyle = 'dashed'; el.style.borderColor = '#191918'; el.style.borderWidth = '1.5px'; el.style.outline = 'none';
+    el.focus();
+    try { var rng = document.createRange(); rng.selectNodeContents(el); rng.collapse(false); var s = window.getSelection(); s.removeAllRanges(); s.addRange(rng); } catch (e) {}
+    if (!el._egBar) {
+      var bar = document.createElement('div'); bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px';
+      bar.innerHTML = '<button type="button" onclick="EGDesignTools.saveShipTo()" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Validate &amp; save</button><button type="button" onclick="EGDesignTools.cancelShipTo()" style="background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit">Cancel</button><span class="egst-stat" style="font-size:12px;font-weight:600"></span>';
+      el.parentNode.insertBefore(bar, el.nextSibling); el._egBar = bar;
+    } else el._egBar.style.display = 'flex';
   }
-  function cancelShipTo(btn) {
-    var el = btn && btn.closest('#xfom-addr'); if (!el) return;
-    if (el._egPrev != null) el.innerHTML = el._egPrev;
-    el.style.cursor = 'pointer';
+  function _shipFinish(el, html) {
+    el.removeAttribute('contenteditable');
+    el.style.borderStyle = 'solid'; el.style.borderColor = '#e5e4e0'; el.style.borderWidth = '1px';
+    if (html != null) el.innerHTML = html;
+    if (el._egBar) { el._egBar.remove(); el._egBar = null; }
   }
-  async function saveShipTo(orderNum, btn) {
-    var el = (btn && btn.closest('#xfom-addr')) || document.getElementById('xfom-addr');
-    var ta = el && el.querySelector('#egst-ta'); var stat = el && el.querySelector('#egst-stat');
-    var o = findOrder(orderNum); if (!o || !el || !ta) return;
+  function cancelShipTo() { var el = _shipEditing(); if (el) _shipFinish(el, el._egPrev); }
+  async function saveShipTo() {
+    var el = _shipEditing(); if (!el) return;
+    var o = findOrder(el._egOrd); if (!o) { _shipFinish(el, el._egPrev); return; }
+    var stat = el._egBar && el._egBar.querySelector('.egst-stat');
     var setStat = function (t, c) { if (stat) { stat.textContent = t; stat.style.color = c || '#6b7280'; } };
-    var p = (window.EGUSPS && EGUSPS.parseAddressBlock) ? EGUSPS.parseAddressBlock(ta.value || '') : {};
+    var p = (window.EGUSPS && EGUSPS.parseAddressBlock) ? EGUSPS.parseAddressBlock(el.innerText || '') : {};
     var ad = { name: p.name || '', line1: p.street || '', line2: p.street2 || p.apt || '', city: p.city || '', state: p.state || '', zip: p.zip || '' };
     // USPS validation (standardize). Best-effort: a failure still saves what was typed.
     if (p.street && p.zip) {
@@ -1360,7 +1364,8 @@
     if (ad.name) { if (o.customer && typeof o.customer === 'object') o.customer.name = ad.name; else o.customer = { name: ad.name }; }
     try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { address: ad, customer: o.customer }); } catch (e) {}
     try { var t2 = localStorage.getItem('eg_token') || ''; if (t2) fetch((window.EG_API_BASE || '') + '/api/orders/' + encodeURIComponent(o.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t2 }, body: JSON.stringify({ address: ad, customer: o.customer }) }).catch(function () {}); } catch (e) {}
-    setTimeout(function () { el.innerHTML = _shipDisplay(ad); el.style.cursor = 'pointer'; refreshBoard(); }, 850);
+    var elRef = el;
+    setTimeout(function () { _shipFinish(elRef, _shipDisplay(ad)); refreshBoard(); }, 850);
   }
 
   window.EGDesignTools = {
