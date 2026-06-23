@@ -4567,6 +4567,20 @@ function opItemCompositeThumb(orderNum, itemIdx, it, prodImg, tBg, size) {
     + '</div>';
 }
 window.opItemCompositeThumb = opItemCompositeThumb;
+// Lightbox for an uploads-gallery thumbnail — enlarges the composite (blank +
+// design) captured into window._xfomGallery at modal-render time. Click to dismiss.
+window.xfomZoomUpload = function (i) {
+  var html = (window._xfomGallery || [])[i]; if (html == null) return;
+  var ov = document.getElementById('xfom-zoom-ov');
+  if (!ov) {
+    ov = document.createElement('div'); ov.id = 'xfom-zoom-ov';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,18,16,.82);display:none;align-items:center;justify-content:center;padding:30px;cursor:zoom-out';
+    ov.onclick = function () { ov.style.display = 'none'; };
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = '<div style="position:relative;width:min(78vmin,560px);aspect-ratio:1;background:#f6f5f4;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)">' + html + '</div>';
+  ov.style.display = 'flex';
+};
 
 // Full-screen image lightbox — click any order/listing image to check it large.
 function opZoomImg(src) {
@@ -7656,6 +7670,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Costs</div>
               </div>
               <div id="xfom-costs"></div>
+              <div id="xfom-uploads" style="margin-top:6px"></div>
               <div style="margin-top:6px;padding-top:14px;border-top:1px solid #f0ede9">
                 <div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Order History</div>
                 <div id="xfom-history" style="display:flex;flex-direction:column;gap:8px;font-size:11.75px"></div>
@@ -7963,6 +7978,26 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         + _crow('Shipping', _cship > 0 ? '$' + _cship.toFixed(2) : '<span style="color:#c4c3be">—</span>')
         + '<div style="border-top:1px solid #e5e4e0;margin:8px 0 5px"></div>'
         + _crow('Total', '$' + _cgrand.toFixed(2), true);
+    }
+    // Uploads gallery — every item's artwork composited on its chosen blank, so the
+    // factory sees ALL designs (including mobile uploads, which land in EGStore the
+    // same way) at a glance without opening each item avatar. Sendable to the board.
+    const upEl = document.getElementById('xfom-uploads');
+    if (upEl) {
+      if (!items.length) { upEl.innerHTML = ''; }
+      else {
+        window._xfomGallery = items.map(it => _xfomCompositeHTML(it));
+        const cells = items.map((it, i) => {
+          const hasArt = !!_xfomDesign(it);
+          return `<button type="button" onclick="xfomZoomUpload(${i})" title="${String(it.name||it.product||it.sku||'Item').replace(/"/g,'&quot;')}" style="position:relative;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#f6f5f4;cursor:zoom-in;padding:0">${window._xfomGallery[i]}${hasArt?'':'<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>'}</button>`;
+        }).join('');
+        upEl.innerHTML =
+          `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9">
+            <div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Uploads · ${items.length}</div>
+            <button onclick="xfomPushToBoard()" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board →</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">${cells}</div>`;
+      }
     }
     _xfomRenderHistory(num);
     _xfomRenderFooter();
