@@ -1422,6 +1422,62 @@
       if (!design && it) design = it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
       return design;
     },
+    // ── Factory selling-mode design tabs (Edit Items / Edit All) ───────────────
+    // Mirrors the seller side. State lives on window (per page); xfomDesignMode resets
+    // to 'each' when a different order opens so switching tabs (re-render) keeps choice.
+    xfomDesignMode: function (orderKey) {
+      if (window._xfomDesignModeOrd !== orderKey) { window._xfomDesignMode = 'each'; window._xfomDesignModeOrd = orderKey; }
+      return window._xfomDesignMode === 'all' ? 'all' : 'each';
+    },
+    setXfomDesignMode: function (m) {
+      window._xfomDesignMode = (m === 'all') ? 'all' : 'each';
+      if (typeof window.xfomOpen === 'function' && window._xfomNum != null) window.xfomOpen(window._xfomNum);
+    },
+    designModeTabs: function () {
+      var mode = window._xfomDesignMode === 'all' ? 'all' : 'each';
+      var tab = function (m, label) { var on = (m === mode); return '<button type="button" onclick="EGDesignTools.setXfomDesignMode(\'' + m + '\')" style="flex:1;padding:8px 6px;border:none;border-radius:7px;font-size:13px;font-weight:' + (on ? '700' : '600') + ';font-family:inherit;cursor:pointer;background:' + (on ? '#fff' : 'transparent') + ';color:' + (on ? '#191918' : '#6b7280') + ';box-shadow:' + (on ? '0 1px 3px rgba(0,0,0,.1)' : 'none') + '">' + label + '</button>'; };
+      return '<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">' + tab('each', 'Edit Items') + tab('all', 'Edit All') + '</div>';
+    },
+    allModeBody: function (o) {
+      var list = (o && (o.items || o.itemList)) || [];
+      var first = list[0]; var n = list.length;
+      var comp = this.compositeHTML(o, first);
+      return '<div style="display:flex;align-items:center;gap:12px;background:#faf9f7;border:1px solid #ece8e0;border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+        + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;color:#191918">One design for all ' + n + ' items</div><div style="font-size:12px;color:#9ca3af;margin-top:1px">Upload once — applied to every item.</div></div>'
+        + '<button onclick="EGDesignTools.uploadAllDesigns(window._xfomNum)" style="flex-shrink:0;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit">' + (comp.hasArt ? 'Replace design' : 'Upload design') + '</button>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:14px;border:1px solid #e5e4e0;border-radius:8px;padding:14px 16px">'
+        + '<div style="width:72px;height:72px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1px solid #e5e4e0">' + comp.html + '</div>'
+        + '<div style="min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">' + ((first && (first.name || first.product || first.blank)) || 'Design') + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Applied to all ' + n + ' items</div></div>'
+        + '</div>';
+    },
+    uploadAllDesigns: function (orderNum) {
+      var o = findOrder(orderNum); if (!o || !Array.isArray(o.items) || !o.items.length) return;
+      if (!(window.EGStore && EGStore.openDesignUpload)) return;
+      var first = o.items[0]; var dk = itemDK(first); var self = this;
+      EGStore.openDesignUpload({
+        orderNum: orderNum, sku: first.sku, name: first.name || first.product || '', tech: first.printType || first.tech || '', byRole: 'Factory',
+        onDone: function () {
+          var data = '';
+          try { data = (EGStore.getRawDesign && (EGStore.getRawDesign(o.id, dk) || EGStore.getRawDesign(orderNum, dk))) || ''; } catch (e) {}
+          if (!data) { try { data = (EGStore.getCachedImage && (EGStore.getCachedImage(o.id, dk) || EGStore.getCachedImage(orderNum, dk))) || ''; } catch (e) {} }
+          if (data) self.applyDesignToAll(orderNum, data, 'design');
+          _refreshOpenXfom(orderNum);
+        }
+      });
+    },
+    applyDesignToAll: function (orderNum, dataUrl, fileName) {
+      var o = findOrder(orderNum); if (!o || !dataUrl || !Array.isArray(o.items)) return;
+      o.items.forEach(function (it) {
+        var dk = itemDK(it);
+        it.designUrl = dataUrl;
+        try { if (EGStore.cacheImage) EGStore.cacheImage(o.id, dk, dataUrl); } catch (e) {}
+        try { if (EGStore.cacheRawDesign) EGStore.cacheRawDesign(o.id, dk, dataUrl); } catch (e) {}
+        patchBoardArrays(o.id, dk, function (row, bi) { if (bi) bi.designUrl = dataUrl; });
+      });
+      try { if (EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
+      refreshBoard();
+    },
     zoomUpload: function (html) {
       if (html == null) return;
       var ov = document.getElementById('xfom-zoom-ov');

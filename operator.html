@@ -7853,7 +7853,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
       return parseFloat(it.price != null ? it.price : (it.unitPrice != null ? it.unitPrice : it.unit_price)) || 0;
     }
     if (items.length) {
-      itemsEl.innerHTML = items.map(it => {
+      // Selling-mode design tabs (Edit Items / Edit All) — shared with the seller side.
+      var _fOrdKey = (o && o.num != null) ? o.num : (o && o.id);
+      var _fMode = (window.EGDesignTools && EGDesignTools.xfomDesignMode) ? EGDesignTools.xfomDesignMode(_fOrdKey) : 'each';
+      var _fMulti = items.length > 1;
+      var _fTabs = (_fMulti && window.EGDesignTools && EGDesignTools.designModeTabs) ? EGDesignTools.designModeTabs() : '';
+      itemsEl.innerHTML = _fTabs + ((_fMulti && _fMode === 'all') ? EGDesignTools.allModeBody(o) : items.map(it => {
         const qty = it.qty || it.quantity || 1;
         const unit = _xfomUnitPrice(it);
         const line = unit * qty;
@@ -7933,7 +7938,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
             ${(typeof EGStore !== 'undefined' && EGStore.deliverableHTML) ? EGStore.deliverableHTML((o && o.id) || _xfomNum, it.sku, it) : _cardDownload}
           </div>
         </div>`;
-      }).join('');
+      }).join(''));
       if (typeof _xfomCollapseItems === 'function') _xfomCollapseItems('xfom-items');
     } else {
       itemsEl.innerHTML = '<div style="font-size:13px;color:#9ca3af;padding:6px 0">No items in this order</div>';
