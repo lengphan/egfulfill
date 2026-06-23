@@ -1385,14 +1385,14 @@ function laRemoveCard(id) {
     .catch(function () { _laStripeCards = null; _laRender(); });
 }
 function _ccPreviewMarkup() {
-  // Monochromatic retro card — vintage-black base, cream text, tan chip, the
-  // signature beige offset shadow. No gold; on-theme with the rest of the app.
-  return '<div style="position:relative;width:100%;aspect-ratio:1.6;background:repeating-linear-gradient(135deg,#1d1b18,#1d1b18 14px,#201d19 14px,#201d19 28px);border:1px solid #40403d;border-radius:14px;box-shadow:5px 5px 0 #c9c3ba;padding:18px 20px;color:#ece7da;overflow:hidden;box-sizing:border-box;font-family:inherit">'
+  // Monochromatic retro card — vintage-black base, cream text, GREY metallic chip,
+  // no drop-shadow. On-theme with the rest of the app.
+  return '<div style="position:relative;width:100%;aspect-ratio:1.6;background:repeating-linear-gradient(135deg,#1d1b18,#1d1b18 14px,#201d19 14px,#201d19 28px);border:1px solid #40403d;border-radius:14px;padding:18px 20px;color:#ece7da;overflow:hidden;box-sizing:border-box;font-family:inherit">'
     // subtle cream corner wash (monochromatic) in place of the gold circle
     + '<div style="position:absolute;top:-44px;right:-32px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(236,231,218,.08),transparent 68%)"></div>'
-    // chip (tan, with engraved lines) + brand
+    // chip (grey/silver metallic, with engraved lines) + brand
     + '<div style="position:relative;display:flex;align-items:center;justify-content:space-between">'
-    +   '<div style="width:38px;height:27px;border-radius:5px;background:linear-gradient(135deg,#d7d0c1,#ada592);border:1px solid rgba(0,0,0,.2);position:relative"><div style="position:absolute;inset:5px 7px;border:1px solid rgba(0,0,0,.22);border-radius:2px"></div></div>'
+    +   '<div style="width:38px;height:27px;border-radius:5px;background:linear-gradient(135deg,#dcdcda,#a6a6a3);border:1px solid rgba(0,0,0,.18);position:relative"><div style="position:absolute;inset:5px 7px;border:1px solid rgba(0,0,0,.2);border-radius:2px"></div></div>'
     +   '<div id="cc-brand" style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#cfc8b9">CARD</div>'
     + '</div>'
     // number — vintage monospace
