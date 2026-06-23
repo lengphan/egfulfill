@@ -1326,7 +1326,7 @@
     try { var rng = document.createRange(); rng.selectNodeContents(el); rng.collapse(false); var s = window.getSelection(); s.removeAllRanges(); s.addRange(rng); } catch (e) {}
     if (!el._egBar) {
       var bar = document.createElement('div'); bar.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:8px';
-      bar.innerHTML = '<button type="button" onclick="EGDesignTools.saveShipTo()" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Validate &amp; save</button><button type="button" onclick="EGDesignTools.cancelShipTo()" style="background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit">Cancel</button><span class="egst-stat" style="font-size:12px;font-weight:600"></span>';
+      bar.innerHTML = '<button type="button" onclick="EGDesignTools.saveShipTo()" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Save</button><button type="button" onclick="EGDesignTools.cancelShipTo()" style="background:#fff;border:1px solid #e5e4e0;border-radius:7px;padding:6px 12px;font-size:12.5px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit">Cancel</button><span class="egst-stat" style="font-size:12px;font-weight:600"></span>';
       el.parentNode.insertBefore(bar, el.nextSibling); el._egBar = bar;
     } else el._egBar.style.display = 'flex';
   }

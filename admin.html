@@ -8879,7 +8879,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div style="display:flex;gap:14px;align-items:stretch">
                   <div id="xfom-hero" style="width:108px;min-height:108px;flex-shrink:0;border-radius:10px;background:#f6f5f4;border:1px solid #e8e7e4;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
                   <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px"><span style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Ship To</span><button onclick="window.EGDesignTools&&EGDesignTools.editShipTo(window._xfomNum)" title="Add or fix the recipient address" style="font-size:11px;font-weight:600;color:#6b7280;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:2px 9px;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">Edit</button></div>
+                    <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
                     <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to edit the shipping address" onmouseover="if(this.getAttribute('contenteditable')!=='true')this.style.borderColor='#191918'" onmouseout="if(this.getAttribute('contenteditable')!=='true')this.style.borderColor='#e5e4e0'" style="flex:1;background:transparent;border:1px solid #e5e4e0;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">—</div>
                   </div>
                 </div>
@@ -8980,7 +8980,7 @@ document.addEventListener('DOMContentLoaded', function() {
       addrEl.innerHTML = '<span style="color:#9ca3af">No address on file</span>';
     }
     // Items
-    const items = o?.itemList || o?.items || [];
+    const items = (function(){ var raw = o?.itemList || o?.items || []; if (!Array.isArray(raw)) return []; var seen = {}, out = []; raw.forEach(function(it){ var k = it && (it.lineId || it._dk); if (k) { if (seen[k]) return; seen[k] = 1; } out.push(it); }); return out; })();   // de-dupe by stable line key so a merge that duplicated lines doesn't show "128 items"
     // Hero = the order's listing/manual image (first item's img) shown left of
     // Ship To. Distinct from each item card's composite thumbnail, which stays.
     (function(){

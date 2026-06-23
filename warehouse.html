@@ -10958,7 +10958,7 @@ function whPrintLabel(num) {
     } else {
       addrEl.innerHTML = '<span style="color:#9ca3af">No address on file</span>';
     }
-    const items = o?.itemList || o?.items || [];
+    const items = (function(){ var raw = o?.itemList || o?.items || []; if (!Array.isArray(raw)) return []; var seen = {}, out = []; raw.forEach(function(it){ var k = it && (it.lineId || it._dk); if (k) { if (seen[k]) return; seen[k] = 1; } out.push(it); }); return out; })();   // de-dupe by stable line key so a merge that duplicated lines doesn't show "128 items"
     // Hero = the order's listing/manual image (first item's img) shown left of
     // Ship To. Distinct from each item card's composite thumbnail, which stays.
     (function(){
