@@ -291,9 +291,18 @@
     var s = getItemSetup(orderNum, sku);
     if (!s || !s.product) return '';
     var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+    // COLOR-AWARE: read the item's live colour (variant changes write it onto the order
+    // item) and prefer that variant's image — so changing Color updates the avatar on
+    // the factory boards, exactly like the seller thumbnail does.
+    var color = '';
+    try { var o = findOrder(orderNum); var it = o && findItemByKey(o, sku); if (it) color = it.color || ''; } catch (e) {}
+    if (!color) color = s.color || '';
     for (var i = 0; i < prods.length; i++) {
       var p = prods[i];
-      if (String(p.name || p.sku || p.id) === String(s.product)) return p.img || p.image || '';
+      if (String(p.name || p.sku || p.id) === String(s.product)) {
+        if (color && p.colorImages && p.colorImages[color]) return p.colorImages[color];
+        return p.img || p.image || '';
+      }
     }
     return '';
   }
@@ -526,7 +535,7 @@
     } catch (e) {}
   }
 
-  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); syncItemToProduct(orderNum, sku); refreshBoard(); document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } })); }
+  function onSetProduct(orderNum, sku, val) { setItemSetupField(orderNum, sku, 'product', val); syncItemToProduct(orderNum, sku); refreshBoard(); _refreshOpenXfom(orderNum); document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } })); }
   function onSetPrint(orderNum, sku, val) {
     setItemSetupField(orderNum, sku, 'printType', val);
     try {
@@ -610,6 +619,17 @@
     if (curS && sizes.indexOf(curS) < 0) sizes.unshift(curS);
     return { colors: colors, sizes: sizes, curColor: curC, curSize: curS };
   }
+  // Re-render the OPEN factory order modal (operator/warehouse/admin all expose
+  // window.xfomOpen + window._xfomNum) so a variant/product change refreshes the
+  // item avatar to the new colour image — refreshBoard only repaints the table.
+  function _refreshOpenXfom(orderNum) {
+    try {
+      var modal = document.getElementById('xfom-modal');
+      if (modal && !modal.classList.contains('modal-hidden') && typeof window.xfomOpen === 'function') {
+        window.xfomOpen((window._xfomNum != null) ? window._xfomNum : orderNum);
+      }
+    } catch (e) {}
+  }
   function onSetVariant(orderNum, sku, key, value) {
     try {
       var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
@@ -621,6 +641,7 @@
       patchBoardArrays(o.id, sku, function (row, bi) { if (bi) bi[key] = value; });
     } catch (e) {}
     refreshBoard();
+    _refreshOpenXfom(orderNum);
     document.dispatchEvent(new CustomEvent('eg-design-updated', { detail: { orderNum: orderNum, sku: sku } }));
   }
   // Remove a line item (New orders only) — keeps at least one, confirms first.
