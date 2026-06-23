@@ -7621,7 +7621,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
                   <div id="xfom-hero" style="width:108px;min-height:108px;flex-shrink:0;border-radius:10px;background:#f6f5f4;border:1px solid #e8e7e4;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
                   <div style="flex:1;min-width:0;display:flex;flex-direction:column">
                     <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
-                    <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to add / fix the address" style="flex:1;background:#f6f5f4;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">—</div>
+                    <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to edit the shipping address" onmouseover="this.style.background='#fbf9f5';this.style.borderColor='#191918'" onmouseout="this.style.background='#f6f5f4';this.style.borderColor='#cfc9bf'" style="flex:1;background:#f6f5f4;border:1px dashed #cfc9bf;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">— <span style="font-size:11.5px;color:#b0aaa4;font-style:italic">· click to edit</span></div>
                   </div>
                 </div>
               </div>
@@ -7900,7 +7900,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.name || it.product || 'Item'}</div>
-            <div style="font-size:13px;color:#9ca3af;margin-top:2px">${it.sku || ''}${it.printType ? ' · ' + it.printType : (it.tech ? ' · ' + it.tech : '')}${(it.img && /^(https?:|data:)/.test(String(it.img))) ? ' · <a href="'+it.img+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#7c3aed;text-decoration:underline;font-weight:600">Listing ↗</a>' : ''}</div>
+            <div style="font-size:13px;color:#9ca3af;margin-top:2px">${it.sku || ''}${it.printType ? ' · ' + it.printType : (it.tech ? ' · ' + it.tech : '')}</div>
             <div style="font-size:13px;color:#6b7280;margin-top:3px"><span style="color:#9ca3af">Unit</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${unit.toFixed(2)}</strong> <span style="color:#9ca3af">× ${qty} =</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${line.toFixed(2)}</strong></div>
             ${threadChips}
             <!-- Full selling-mode setup (Product · Color · Size · Method + Upload/Templates/
