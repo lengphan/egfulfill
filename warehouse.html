@@ -10928,7 +10928,9 @@ function whPrintLabel(num) {
     _xfomNum = num; window._xfomNum = num;
     const o = _xfomFindOrder(num);
     var _oi = (o && window.egOrderIds) ? window.egOrderIds(o) : null;
-    var _onum = _oi ? (_oi.market || ('#' + _oi.eg)) : ('#' + String(num == null ? '' : num));
+    var _onum;
+    if (_oi) { _onum = _oi.market || ('#' + _oi.eg); }
+    else { var _ns = String(num == null ? '' : num), _nm = _ns.match(/^([a-z]+)-(.+)$/i); _onum = _nm ? ('#' + _nm[2]) : ('#' + _ns); }
     document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">' + _onum.replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
     // Unique order QR (encodes the order id) — scannable on the mobile app to open it.
