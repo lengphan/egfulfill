@@ -1769,11 +1769,11 @@ function openVietQRTopUp(amountUSD) {
           var n1 = document.getElementById('vqr-ref-note'); if (n1) n1.textContent = _vqrRef;
           var n2 = document.getElementById('vqr-ref-inst'); if (n2) n2.textContent = _vqrRef;
         }
-        // Prefer the EMV QR string (render locally — no external image dependency).
-        var code = d.qrCode || (d.content && /^000201/.test(d.content) ? d.content : '');
-        if (code) { _vqrPaintQR(code); }
-        else if (d.qrLink && /^https?:\/\//i.test(d.qrLink)) { _vqrPaintImg(d.qrLink); }
-        else { console.warn('VietQR create-payment had no usable QR:', d); _vqrPaintImg(fallbackQr); }
+        // ONE branded VietQR image (no separate plain local-render variant → no flicker
+        // between a logo QR and a plain one). Prefer the server's monitored-VA link;
+        // otherwise the generic BIDV QR, which still auto-confirms via the note.
+        if (d.qrLink && /^https?:\/\//i.test(d.qrLink)) { _vqrPaintImg(d.qrLink); }
+        else { console.warn('VietQR create-payment had no usable QR link:', d); _vqrPaintImg(fallbackQr); }
         // Keep showing the real BIDV account in the details row — the QR carries the
         // monitored VA internally, so scanning still routes correctly + auto-confirms.
       })
