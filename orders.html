@@ -2308,14 +2308,68 @@ function _odmAllBanner(o) {
 function _odmAllPreview(o) {
   const item = o.itemsList[0];
   const n = o.itemsList.length;
-  return `<div style="display:flex;align-items:center;gap:14px;border:1px solid #e5e4e0;border-radius:8px;padding:14px 16px">
-    ${itemCompositeThumb(o, item, 72)}
-    <div style="min-width:0">
-      <div style="font-size:14px;font-weight:600;color:#191918">${item.blank || item.listing || item.name || 'Design'}</div>
-      <div style="font-size:12.5px;color:#9ca3af;margin-top:2px">One design applied to all ${n} items</div>
+  // Blank selector (sets the SAME blank on every line) + a drop-zone on the mockup.
+  const _blankList = (typeof BLANK_CATALOG !== 'undefined') ? BLANK_CATALOG : [];
+  const allShareBlank = o.itemsList.every(it => (it.blank || '') === (item.blank || '')) ? (item.blank || '') : '';
+  const sel = _blankList.find(p => allShareBlank && String(p.name || '').toLowerCase() === allShareBlank.toLowerCase());
+  const selId = sel ? sel.id : '';
+  const blankOpts = `<option value="">Pick a blank…</option>` + _blankList.map(p => `<option value="${p.id}" ${String(p.id) === String(selId) ? 'selected' : ''}>${String(p.name || p.skuBase || '').replace(/</g, '&lt;')}</option>`).join('');
+  const mockup = (typeof _itemMockupURL === 'function') ? _itemMockupURL(item) : '';
+  const design = (typeof _itemDesignURL === 'function') ? _itemDesignURL(o, item) : '';
+  const _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
+  return `<div style="display:flex;flex-direction:column;gap:16px">
+    <div><label style="${_lbl}">BLANK · applies to all ${n} items</label>
+      <select onchange="odmSetBlankForAll(${o.no}, this.value)" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">${blankOpts}</select>
+    </div>
+    <div><label style="${_lbl}">DESIGN · drop one file (applies to all ${n})</label>
+      <div id="odm-all-drop" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d4cd'" ondrop="odmDropAll(event, ${o.no})" onclick="odmUploadAll(${o.no})" title="Drop a design or click to upload" style="position:relative;width:240px;aspect-ratio:1;margin:0 auto;border:2px dashed #d8d4cd;border-radius:12px;overflow:hidden;cursor:pointer;background:#f6f5f4${mockup ? ` url('${mockup.replace(/'/g, '%27')}') center/cover no-repeat` : ''}">
+        ${design ? `<img src="${design}" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>` : ''}
+        ${design ? '' : `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;pointer-events:none;${mockup ? 'background:rgba(255,255,255,.55)' : ''}">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span style="font-size:13px;font-weight:600">Drop design or click</span>
+        </div>`}
+      </div>
     </div>
   </div>`;
 }
+// Set the SAME blank on every line (Edit All) — mirrors odmSetBlank's resolution.
+function odmSetBlankForAll(ordNo, productId) {
+  const o = ORDERS.find(x => x.no === ordNo) || window._odmCurrentOrder;
+  if (!o || !o.itemsList) return;
+  const p = (typeof BLANK_CATALOG !== 'undefined') ? BLANK_CATALOG.find(x => String(x.id) === String(productId)) : null;
+  const full = (p && typeof EGStore !== 'undefined' && EGStore.getCatalogProducts) ? EGStore.getCatalogProducts().find(x => String(x.id) === String(productId)) : null;
+  o.itemsList.forEach(item => {
+    if (p) {
+      item.blank = p.name || '';
+      if (!item.listing) item.name = p.name || item.name;
+      if (p.skuBase && (/^NEW-/i.test(String(item.sku || '')) || !item.sku || item.sku === '—')) item.sku = p.skuBase;
+      if (full) {
+        const _col = item.color || '';
+        let _img = '';
+        if (_col && full.colorImages && full.colorImages[_col]) _img = full.colorImages[_col];
+        else if (full.mainColor && full.colorImages && full.colorImages[full.mainColor]) _img = full.colorImages[full.mainColor];
+        else _img = full.mockup || full.img || '';
+        if (_img) item.blankImg = _img;
+      }
+    } else { item.blank = ''; }
+  });
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { items: o.itemsList }); } catch (e) {}
+  openDetailModal(o.no);
+  if (typeof renderOrders === 'function') renderOrders();
+}
+// Drop a design on the Edit-All mockup → applies to EVERY line (overwrites per-item).
+function odmDropAll(event, ordNo) {
+  event.preventDefault();
+  const el = document.getElementById('odm-all-drop'); if (el) el.style.borderColor = '#d8d4cd';
+  const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+  if (!file) return;
+  const o = ORDERS.find(x => x.no === ordNo); if (!o) return;
+  UP_MODE = 'all'; UP_FILTER_SKU = null; UP_CURRENT_ORD = ordNo;
+  const reader = new FileReader();
+  reader.onload = function (e) { _upApplyDesignToAll(o, e.target.result, file.name); openDetailModal(ordNo); };
+  reader.readAsDataURL(file);
+}
+window.odmSetBlankForAll = odmSetBlankForAll; window.odmDropAll = odmDropAll;
 function odmSetDesignMode(m) {
   UP_MODE = (m === 'all') ? 'all' : 'each';
   const o = window._odmCurrentOrder;
