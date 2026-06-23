@@ -531,14 +531,23 @@
     var m = num.match(/^([a-z]+)-(.+)$/i);
     var LBL = { etsy: 'Etsy', shopify: 'Shopify', tiktok: 'TikTok', woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay' };
     var PFX = { SP: 'Shopify', ET: 'Etsy', WC: 'WooCommerce', AM: 'Amazon', TT: 'TikTok' };
-    // Synced marketplace order: primary key is "<platform>-<number>". Show just the number.
+    // EGFULFILL store number: #EG + 10-digit sequence. Clean + consistent everywhere
+    // (replaces the long FF-<tag>-<ts>-<rand> id in the UI; the raw id stays the key).
+    function egNo() {
+      var seq = (o.seq != null) ? o.seq : null;
+      if (seq == null) { var d = num.replace(/\D/g, ''); seq = d ? parseInt(d.slice(-10), 10) : 0; }
+      return 'EG' + String(seq || 0).padStart(10, '0');
+    }
+    // Synced marketplace order: show just the marketplace number (#4095550836) — the
+    // "etsy-" prefix is dropped (the platform name is its own column), and no EG
+    // subtitle (the marketplace number is the reference).
     if (m && LBL[m[1].toLowerCase()]) {
-      return { market: '#' + m[2], eg: o.egId || ('MA-' + num.slice(-5)), source: LBL[m[1].toLowerCase()] };
+      return { market: '#' + m[2], eg: '', source: LBL[m[1].toLowerCase()] };
     }
     // Seed/legacy: platId carries the marketplace id (SP-/ET-/…), num is the EG id.
-    if (plat) return { market: plat, eg: num, source: PFX[plat.slice(0, 2).toUpperCase()] || 'Etsy' };
-    // Manual order: no marketplace id — just the EGFULFILL id.
-    return { market: '', eg: num, source: 'Manual' };
+    if (plat) return { market: plat, eg: egNo(), source: PFX[plat.slice(0, 2).toUpperCase()] || 'Etsy' };
+    // Manual order → #EG + 10-digit.
+    return { market: '', eg: egNo(), source: 'Manual' };
   };
 
   window.EGStoreSync = { hydrate: hydrate, hydrateCollection: hydrateCollection, hydrateCatalog: hydrateCatalog, hydrateTemplates: hydrateTemplates, pushCatalog: pushCatalog };
