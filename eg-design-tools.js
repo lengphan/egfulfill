@@ -1369,6 +1369,34 @@
   }
 
   window.EGDesignTools = {
+    // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
+    // boards' Uploads gallery so they don't each re-implement it. Pulls the blank from
+    // setupProductImage and the design from EGStore (incl. mobile uploads). typeof
+    // guards keep it safe even where those helpers aren't in scope.
+    compositeHTML: function (o, it) {
+      var dk = (typeof itemDK === 'function') ? itemDK(it) : ((it && (it._dk || it.sku)) || '');
+      var oid = (o && o.id) || (o && o.num) || o;
+      var onum = (o && o.num) || (o && o.id) || o;
+      var blank = '';
+      try { if (typeof setupProductImage === 'function') blank = setupProductImage(onum, dk) || setupProductImage(oid, dk) || ''; } catch (e) {}
+      if (!blank && it) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
+      var design = '';
+      try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) design = EGStore.getRawDesign(oid, dk) || EGStore.getRawDesign(onum, dk) || ''; } catch (e) {}
+      if (!design) { try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) design = EGStore.getCachedImage(oid, dk) || EGStore.getCachedImage(onum, dk) || ''; } catch (e) {} }
+      if (!design && it) design = it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
+      var html = '<div style="position:relative;width:100%;height:100%">'
+        + (blank ? '<img src="' + blank + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>')
+        + (design ? '<img src="' + design + '" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
+        + '</div>';
+      return { html: html, hasArt: !!design };
+    },
+    zoomUpload: function (html) {
+      if (html == null) return;
+      var ov = document.getElementById('xfom-zoom-ov');
+      if (!ov) { ov = document.createElement('div'); ov.id = 'xfom-zoom-ov'; ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(20,18,16,.82);display:none;align-items:center;justify-content:center;padding:30px;cursor:zoom-out'; ov.onclick = function () { ov.style.display = 'none'; }; document.body.appendChild(ov); }
+      ov.innerHTML = '<div style="position:relative;width:min(78vmin,560px);aspect-ratio:1;background:#f6f5f4;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)">' + html + '</div>';
+      ov.style.display = 'flex';
+    },
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,

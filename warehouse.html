@@ -10903,6 +10903,7 @@ function whPrintLabel(num) {
                 <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Costs</div>
               </div>
               <div id="xfom-costs"></div>
+              <div id="xfom-uploads" style="margin-top:6px"></div>
             </div>
           </div>
           <div style="padding:12px 22px;border-top:1px solid #f3f3f1;display:flex;align-items:center;gap:8px;flex-shrink:0"><button class="btn btn-out" onclick="xfomClose()">Close</button><div id="xfom-footer-actions" style="margin-left:auto;display:flex;gap:8px"></div></div>
@@ -11096,6 +11097,18 @@ function whPrintLabel(num) {
         + _crow('Shipping', _cship > 0 ? '$' + _cship.toFixed(2) : '<span style="color:#c4c3be">—</span>')
         + '<div style="border-top:1px solid #e5e4e0;margin:8px 0 5px"></div>'
         + _crow('Total', '$' + _cgrand.toFixed(2), true);
+    }
+    // Uploads gallery — all item composites (blank+design, incl. mobile uploads) at a
+    // glance + Send to board. Additive; uses the shared EGDesignTools helpers.
+    var _wuEl = document.getElementById('xfom-uploads');
+    if (_wuEl) {
+      if (!items.length) { _wuEl.innerHTML = ''; }
+      else {
+        var _wComps = items.map(function (it) { return (window.EGDesignTools && EGDesignTools.compositeHTML) ? EGDesignTools.compositeHTML(o, it) : { html: '', hasArt: false }; });
+        window._xfomGallery = _wComps.map(function (c) { return c.html; });
+        var _wCells = _wComps.map(function (c, i) { return '<button type="button" onclick="EGDesignTools.zoomUpload(window._xfomGallery[' + i + '])" title="' + String(items[i].name || items[i].product || items[i].sku || 'Item').replace(/"/g, '&quot;') + '" style="position:relative;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#f6f5f4;cursor:zoom-in;padding:0">' + c.html + (c.hasArt ? '' : '<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>') + '</button>'; }).join('');
+        _wuEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9"><div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Uploads · ' + items.length + '</div><button onclick="xfomPushToBoard()" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board →</button></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">' + _wCells + '</div>';
+      }
     }
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
