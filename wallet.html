@@ -238,6 +238,8 @@ html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!impo
 input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
 .btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
 .ni:focus{outline:none!important;box-shadow:none!important}
+/* Keep autofilled inputs WHITE (Chrome paints a pale-yellow/blue autofill bg by default) */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active{-webkit-box-shadow:0 0 0 1000px #fff inset!important;box-shadow:0 0 0 1000px #fff inset!important;-webkit-text-fill-color:#191918!important;transition:background-color 9999s ease-in-out 0s}
 </style>
 <style id="eg-select-css">
 .eg-sel{position:relative;display:inline-flex}
@@ -1202,7 +1204,7 @@ function _ccErr(msg) { var e = document.getElementById('cc-error'); if (e) { e.t
 function _ccBrandLogo(brand) {
   var k = String(brand || '').toUpperCase().replace(/[^A-Z]/g, '');
   var LOGOS = { VISA: 'images/visa.png', MASTERCARD: 'images/mastercard.png' };
-  if (LOGOS[k]) return '<img src="' + LOGOS[k] + '" alt="' + k + '" style="height:26px;width:auto;max-width:62px;object-fit:contain;display:block;background:#fff;border-radius:4px;padding:3px 5px;box-sizing:border-box">';
+  if (LOGOS[k]) return '<img src="' + LOGOS[k] + '" alt="' + k + '" style="height:34px;width:auto;max-width:80px;object-fit:contain;display:block">';
   return '<span style="font-size:13px;font-weight:800;letter-spacing:.12em;color:#cfc8b9">' + (k || 'CARD') + '</span>';
 }
 // Mount three SEPARATE Stripe Elements (number / expiry / CVC) so the fields are
