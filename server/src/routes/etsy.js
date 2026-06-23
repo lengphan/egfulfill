@@ -405,6 +405,17 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       let single = {};
       try { if (rc.receipt_id) single = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`); }
       catch (e) { single = { error: e.message }; }
+      // Test the x-api-key theory: refetch the SAME receipt with x-api-key = keystring
+      // ALONE (the Etsy-v3-correct value) instead of our "keystring:shared_secret".
+      let keyOnly = {};
+      try {
+        if (rc.receipt_id) {
+          const tok = await validToken(conn);
+          const res = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': KEYSTRING, Authorization: 'Bearer ' + tok } });
+          keyOnly = await res.json().catch(() => ({}));
+          if (!res.ok) keyOnly = { http: res.status, body: keyOnly };
+        }
+      } catch (e) { keyOnly = { error: e.message }; }
       const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
         scopes: conn.scopes,
@@ -412,6 +423,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         state: { is_paid: rc.is_paid, is_shipped: rc.is_shipped, status: rc.status, receipt_type: rc.receipt_type, buyer_user_id: rc.buyer_user_id },
         address_from_list: addr(rc),
         address_from_single: single.error ? single : addr(single),
+        address_keystring_only: keyOnly.error || keyOnly.http ? keyOnly : addr(keyOnly),
         receipt_keys: Object.keys(rc)
       };
     } catch (e) { reply.code(400); return { error: e.message }; }
