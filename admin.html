@@ -8946,7 +8946,9 @@ document.addEventListener('DOMContentLoaded', function() {
     xfomEnsure();
     _xfomNum = num; window._xfomNum = num;
     const o = _xfomFindOrder(num);
-    document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(num == null ? '' : num).replace(/[<>&]/g, '') + '</span>';
+    var _oi = (o && window.egOrderIds) ? window.egOrderIds(o) : null;
+    var _onum = _oi ? (_oi.market || ('#' + _oi.eg)) : ('#' + String(num == null ? '' : num));
+    document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">' + _onum.replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
     // Unique order QR (encodes the order id) — scannable on the mobile app to open it.
     (function(id){ var el=document.getElementById('xfom-qr'); if(!el) return; el.innerHTML='';
@@ -9899,7 +9901,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
       const isExp = rExpanded.has(o.id);
       rows.push(
         '<tr class="main-row" onclick="toggleRExp(\''+o.id+'\')" style="'+rowBg+'cursor:pointer">'
-        + '<td data-col="order"><div style="font-size:14px;font-weight:700;color:#191918">#'+(o.num||o.id)+'</div>'
+        + '<td data-col="order"><div style="font-size:14px;font-weight:700;color:#191918">'+(window.egOrderIds?((window.egOrderIds(o).market)||('#'+window.egOrderIds(o).eg)):('#'+(o.num||o.id)))+'</div>'
           + (o.platId?'<div style="font-size:12px;color:#9ca3af;margin-top:2px">'+o.platId+'</div>':'')
           + '</td>'
         + '<td data-col="customer"><div style="display:flex;align-items:center;gap:7px"><div style="width:24px;height:24px;border-radius:50%;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#374151;flex-shrink:0">'+initials+'</div><span style="font-weight:500;color:#191918">'+o.cust+'</span></div></td>'
