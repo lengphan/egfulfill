@@ -1086,10 +1086,10 @@ function renderOrders(ordersOverride) {
       // Nudge the Upload button while this item still has no design (uniform cue with
       // the factory boards — same pickNudge animation).
       const _needsDesign = needsSetup && !upFile && ITEM_DESIGN_SEL[dsKey] !== 'template' && ITEM_DESIGN_SEL[dsKey] !== 'lab';
+      // ONE button (Upload / Uploaded) — opens the upload panel where Templates +
+      // Design Lab are also offered. Consolidated to cut row clutter (factory-style).
       const designBtns = () => `
-        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${_dsStyle(!!upFile)}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}" title="${upFile ? 'Design file attached' : 'Upload a design file'}">${upFile ? 'Uploaded' : 'Upload'}</button>
-        <button id="dsb-${o.no}-${escSku}-template" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','template');openDTpl(event,'${o.no}','${item.sku}')" style="${dsBtnStyle('template')}">Templates</button>
-        <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a>`;
+        <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${_dsStyle(!!upFile)}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}" title="${upFile ? 'Design file attached' : 'Upload, pick a template, or open Design Lab'}">${upFile ? 'Uploaded' : 'Upload'}</button>`;
 
 
       /* Pre-designed items: show locked badge ONLY after the order has left "new/action" setup state.
@@ -2291,7 +2291,7 @@ function odmSaveMeta(ordNo) {
 var ODM_MODE_ORD = null;
 function _odmDesignTabs() {
   const tab = (m, label) => { const on = (m === 'all') === (UP_MODE === 'all'); return `<button type="button" onclick="event.stopPropagation();odmSetDesignMode('${m}')" style="flex:1;padding:8px 6px;border:none;border-radius:7px;font-size:13px;font-weight:${on?'700':'600'};font-family:inherit;cursor:pointer;background:${on?'#fff':'transparent'};color:${on?'#191918':'#6b7280'};box-shadow:${on?'0 1px 3px rgba(0,0,0,.1)':'none'};transition:all .12s">${label}</button>`; };
-  return `<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">${tab('each','Edit each item')}${tab('all','Edit all at once')}</div>`;
+  return `<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">${tab('each','Edit Items')}${tab('all','Edit All')}</div>`;
 }
 function _odmAllBanner(o) {
   const dk = itemDK(o.itemsList[0]);
@@ -2471,11 +2471,11 @@ function openDetailModal(ordNo) {
     // buttons stay visible but greyed (opacity + pointer-events:none) so the UI
     // doesn't suddenly mutate into a different layout. Same shape as setup.
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
+    // ONE button (Upload / Uploaded) — opens the slide-in where Templates + Design
+    // Lab are also offered. Consolidated to cut clutter (matches the factory side).
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload artwork'}">${_designAttached ? 'Uploaded' : 'Upload'}</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload, pick a template, or open Design Lab'}">${_designAttached ? 'Uploaded' : 'Upload'}</button>
       </div>`;
     // Per-item economics: ONE big line total at the top-right of the item
     // card. The Unit/Qty/Line breakdown strip below the dashed divider has
@@ -2733,6 +2733,11 @@ function odmSlideRender() {
         </div>
       </div>
       ${typeof upStateHtml === 'function' ? upStateHtml(t.sku, t.ordNo, s) : '<div style="color:#9ca3af">Upload unavailable.</div>'}
+      <div style="display:flex;align-items:center;justify-content:center;gap:13px;padding-top:4px;font-size:12px">
+        <button onclick="odmSlideOpen('template',${t.ordNo},'${t.sku}')" style="background:none;border:none;color:#6b7280;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:2px">Pick a template</button>
+        <span style="color:#d8d4cd">·</span>
+        <a href="design-maker.html" style="color:#6b7280;font-weight:600;text-decoration:underline;text-underline-offset:2px">Open Design Lab</a>
+      </div>
     </div>`;
     const ok = s.state === 'ok';
     footer.innerHTML = `<button onclick="odmSlideClose()" class="btn btn-out" style="font-size:13.5px;flex:1">Cancel</button>
@@ -5432,7 +5437,7 @@ let UP_MODE = 'each';   // 'each' = one design per item; 'all' = one design appl
 // selling-mode upload later — there the design add/check flow is the same.
 function _upModeTabs(o) {
   const t = (m, label) => '<button type="button" onclick="upSetMode(\'' + m + '\')" style="flex:1;padding:8px 6px;border:none;border-radius:7px;font-size:13px;font-weight:' + (UP_MODE === m ? '700' : '600') + ';font-family:inherit;cursor:pointer;background:' + (UP_MODE === m ? '#fff' : 'transparent') + ';color:' + (UP_MODE === m ? '#191918' : '#6b7280') + ';box-shadow:' + (UP_MODE === m ? '0 1px 3px rgba(0,0,0,.1)' : 'none') + ';transition:all .12s">' + label + '</button>';
-  return '<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">' + t('each', 'Edit each item') + t('all', 'Edit all at once') + '</div>';
+  return '<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">' + t('each', 'Edit Items') + t('all', 'Edit All') + '</div>';
 }
 function _upAllBanner(o) {
   return '<div style="background:#fbf7ec;border:1px solid #ecdfbd;border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:#7a6a3f;line-height:1.5">One design will be applied to <b>all ' + o.itemsList.length + ' items</b>. You can still reposition each item later from its order row.</div>';
