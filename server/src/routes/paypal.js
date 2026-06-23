@@ -54,20 +54,33 @@ export function paypalRoutes(app, requireAuth) {
   // 1) Create an order for the entered amount (USD).
   app.post('/api/paypal/create-order', { preHandler: requireAuth }, async (req, reply) => {
     try {
-      const amt = Number((req.body || {}).amount) || 0;
+      const body = req.body || {};
+      const amt = Number(body.amount) || 0;
       if (amt <= 0) { reply.code(400); return { error: 'Invalid amount' }; }
       const tok = await ppToken();
+      // For the full-page redirect flow the client passes its own return/cancel URLs
+      // (same-origin wallet page). PayPal sends the buyer there with ?token=<orderId>
+      // appended after they approve, where we capture. application_context is optional;
+      // without it the SDK popup flow still works, so only attach it when URLs are given.
+      const order = {
+        intent: 'CAPTURE',
+        purchase_units: [{ amount: { currency_code: 'USD', value: amt.toFixed(2) }, description: 'EGFULFILL wallet top-up' }]
+      };
+      if (body.returnUrl && body.cancelUrl) {
+        order.application_context = {
+          brand_name: 'EGFULFILL', user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING',
+          return_url: String(body.returnUrl), cancel_url: String(body.cancelUrl)
+        };
+      }
       const r = await fetch(BASE + '/v2/checkout/orders', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          intent: 'CAPTURE',
-          purchase_units: [{ amount: { currency_code: 'USD', value: amt.toFixed(2) }, description: 'EGFULFILL wallet top-up' }]
-        })
+        body: JSON.stringify(order)
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.id) { reply.code(400); return { error: 'PayPal create failed: ' + JSON.stringify(d).slice(0, 300) }; }
-      return { id: d.id };
+      const approve = (d.links || []).find(l => l.rel === 'approve' || l.rel === 'payer-action');
+      return { id: d.id, approveUrl: approve ? approve.href : null };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
