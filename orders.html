@@ -2302,6 +2302,20 @@ function _odmAllBanner(o) {
     <button onclick="event.stopPropagation();odmUploadAll(${o.no})" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit">${attached?'Replace design':'Upload design'}</button>
   </div>`;
 }
+// 'Edit All' mode shows ONE shared preview avatar (not every item row) — the design
+// applies to all items, so a single composite is enough. Per-item variants stay on
+// the 'Edit Items' tab.
+function _odmAllPreview(o) {
+  const item = o.itemsList[0];
+  const n = o.itemsList.length;
+  return `<div style="display:flex;align-items:center;gap:14px;border:1px solid #e5e4e0;border-radius:8px;padding:14px 16px">
+    ${itemCompositeThumb(o, item, 72)}
+    <div style="min-width:0">
+      <div style="font-size:14px;font-weight:600;color:#191918">${item.blank || item.listing || item.name || 'Design'}</div>
+      <div style="font-size:12.5px;color:#9ca3af;margin-top:2px">One design applied to all ${n} items</div>
+    </div>
+  </div>`;
+}
 function odmSetDesignMode(m) {
   UP_MODE = (m === 'all') ? 'all' : 'each';
   const o = window._odmCurrentOrder;
@@ -2397,7 +2411,7 @@ function openDetailModal(ordNo) {
   const _odmAllMode = _odmMulti && UP_MODE === 'all';
   document.getElementById('odm-items').innerHTML =
     (_odmMulti ? _odmDesignTabs() : '') + (_odmAllMode ? _odmAllBanner(o) : '') +
-    o.itemsList.map((item, idx) => {
+    (_odmAllMode ? _odmAllPreview(o) : o.itemsList.map((item, idx) => {
     const pt = (item.tech || 'DTG').toUpperCase();
     const ptStyle = PT_STYLES[pt] || PT_STYLES.DTG;
     const stKey = (item.status || o.status || 'new').toLowerCase();
@@ -2555,7 +2569,7 @@ function openDetailModal(ordNo) {
       </div>
       ${embRowHtml}
     </div>`;
-  }).join('');
+  }).join(''));
   // Header buttons reflect lock state
   document.getElementById('odm-add-item-btn').style.display = needsSetup ? '' : 'none';
   document.getElementById('odm-escalate-btn').style.display = needsSetup ? 'none' : '';
@@ -2905,10 +2919,13 @@ function _itemMockupURL(item) {
         (p.sku && base && p.sku.toUpperCase() === base.toUpperCase())
       );
       if (product) {
+        // Prefer the SIMPLE flat mockup (the technical-sketch blank shown on the
+        // products page + Design Lab) so the order thumbnail matches that clean look.
+        // Fall back to the per-color photo, then any catalog image.
+        if (product.mockup) return product.mockup;
         const color = item.color || (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || product.mainColor;
         if (color && product.colorImages && product.colorImages[color]) return product.colorImages[color];
-        const fromCat = product.mockup || product.img || '';
-        if (fromCat) return fromCat;
+        if (product.img) return product.img;
       }
     }
   } catch (e) {}
