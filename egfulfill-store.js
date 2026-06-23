@@ -1347,8 +1347,11 @@
       try {
         var cards = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
         if (!Array.isArray(cards)) return null;
+        // Match the passed key against the line key (dk) OR sku, so a card keyed by dk
+        // is found whether the caller passes a dk or a bare sku.
         var exact = cards.find(function(c){
-          return String(c.order) === String(orderNum) && String(c.sku||'') === String(sku||'');
+          if (String(c.order) !== String(orderNum)) return false;
+          return String(c.dk||'') === String(sku||'') || String(c.sku||'') === String(sku||'');
         });
         if (exact) return exact;
         // Pass 2: same order, sku-less card.
@@ -2978,8 +2981,12 @@
           action: 'Pushed to ' + (opts.board||'').toUpperCase() + ' board',
           detail: '#' + opts.orderNum + ' · ' + (opts.sku||'')
         };
+        // Identity is the LINE key (dk = lineId) when provided, so two same-SKU lines
+        // get their OWN card + design ID (Edit Items). Falls back to sku for legacy callers.
+        var _lineKey = opts.dk || opts.sku || '';
         var existing = cards.find(function(c){
-          return String(c.order) === String(opts.orderNum) && String(c.sku||'') === String(opts.sku||'');
+          if (String(c.order) !== String(opts.orderNum)) return false;
+          return String(c.dk || c.sku || '') === String(_lineKey);
         });
         var card;
         if (existing) {
@@ -2996,11 +3003,13 @@
           }
           card = existing;
         } else {
-          // New card — assign an auto Design ID and use it as the canonical title.
-          var dsnId = this.nextDesignId();
+          // New card — assign a Design ID. Edit All passes a shared id (opts.sharedDesignId)
+          // so every line shows ONE id; otherwise mint a fresh per-line id.
+          var dsnId = opts.sharedDesignId || this.nextDesignId();
           card = {
             id: nextId, col: 'incoming',
             sku: opts.sku || '',
+            dk: opts.dk || '',
             designId: dsnId,
             title: dsnId,
             order: opts.orderNum,

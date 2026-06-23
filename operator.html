@@ -4937,7 +4937,7 @@ function opSendToDesignStudio(type, name, sku, orderNum) {
     const order = OP_ORDERS.find(function(x){ return x.num === orderNum; });
     const it = order?.itemList?.find(function(x){ return x.sku === sku; });
     const card = EGStore.pushToDesignBoard({
-      orderNum: orderNum, sku: sku, board: type,
+      orderNum: orderNum, sku: sku, dk: (it && (it.lineId || it._dk)) || sku, board: type,
       name: name || it?.name || 'Design',
       // Prefer raw design (clean file for designer). Fall back to the composite so the card
       // always has a thumbnail — without this, raw-less orders push as empty placeholder cards.
