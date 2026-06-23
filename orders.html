@@ -2283,6 +2283,37 @@ function odmSaveMeta(ordNo) {
   if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { meta: meta });
   if (typeof ordToast === 'function') ordToast('Saved', '#15803d');
 }
+// ── Detail-modal design mode: "Edit each item" vs "Edit all at once" ──────────
+// Mirrors the bulk Upload panel's tabs so a multi-item order's designs can be
+// managed without leaving the order modal. 'all' reuses the SAME machinery as the
+// list flow (UP_MODE + processFile → _upApplyDesignToAll). ODM_MODE_ORD remembers
+// which order the mode applies to so a re-render doesn't reset the user's choice.
+var ODM_MODE_ORD = null;
+function _odmDesignTabs() {
+  const tab = (m, label) => { const on = (m === 'all') === (UP_MODE === 'all'); return `<button type="button" onclick="event.stopPropagation();odmSetDesignMode('${m}')" style="flex:1;padding:8px 6px;border:none;border-radius:7px;font-size:13px;font-weight:${on?'700':'600'};font-family:inherit;cursor:pointer;background:${on?'#fff':'transparent'};color:${on?'#191918':'#6b7280'};box-shadow:${on?'0 1px 3px rgba(0,0,0,.1)':'none'};transition:all .12s">${label}</button>`; };
+  return `<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">${tab('each','Edit each item')}${tab('all','Edit all at once')}</div>`;
+}
+function _odmAllBanner(o) {
+  const dk = itemDK(o.itemsList[0]);
+  const attached = !!(UP_STATE[o.no] && UP_STATE[o.no][dk] && UP_STATE[o.no][dk].dataUrl);
+  const n = o.itemsList.length;
+  return `<div style="display:flex;align-items:center;gap:12px;background:#faf9f7;border:1px solid #ece8e0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+    <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;color:#191918">One design for all ${n} items</div><div style="font-size:12px;color:#9ca3af;margin-top:1px">Upload once — it's applied to every item in this order.</div></div>
+    <button onclick="event.stopPropagation();odmUploadAll(${o.no})" style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit">${attached?'Replace design':'Upload design'}</button>
+  </div>`;
+}
+function odmSetDesignMode(m) {
+  UP_MODE = (m === 'all') ? 'all' : 'each';
+  const o = window._odmCurrentOrder;
+  if (o) openDetailModal(o.no);
+}
+function odmUploadAll(ordNo) {
+  const o = ORDERS.find(x => x.no === ordNo); if (!o || !o.itemsList.length) return;
+  const dk = itemDK(o.itemsList[0]);
+  UP_MODE = 'all'; UP_FILTER_SKU = null; UP_CURRENT_ORD = ordNo;
+  pickDesign(ordNo, String(o.itemsList[0].sku || '').replace(/[^a-zA-Z0-9]/g, '_'), 'upload', dk);
+  odmSlideOpen('upload', ordNo, dk);
+}
 function openDetailModal(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
@@ -2357,7 +2388,16 @@ function openDetailModal(ordNo) {
   };
   // Stash currently-open order so item-action helpers can mutate the right record.
   window._odmCurrentOrder = o;
-  document.getElementById('odm-items').innerHTML = o.itemsList.map((item, idx) => {
+  // Design mode (Edit each / Edit all at once) for multi-item orders. Reset to
+  // 'each' only when opening a DIFFERENT order, so switching tabs (which re-renders)
+  // keeps the choice. UP_FILTER_SKU=null → 'all' targets every item in the order.
+  if (ODM_MODE_ORD !== o.no) { UP_MODE = 'each'; ODM_MODE_ORD = o.no; }
+  UP_CURRENT_ORD = o.no; UP_FILTER_SKU = null;
+  const _odmMulti = o.itemsList.length > 1;
+  const _odmAllMode = _odmMulti && UP_MODE === 'all';
+  document.getElementById('odm-items').innerHTML =
+    (_odmMulti ? _odmDesignTabs() : '') + (_odmAllMode ? _odmAllBanner(o) : '') +
+    o.itemsList.map((item, idx) => {
     const pt = (item.tech || 'DTG').toUpperCase();
     const ptStyle = PT_STYLES[pt] || PT_STYLES.DTG;
     const stKey = (item.status || o.status || 'new').toLowerCase();
@@ -2510,7 +2550,7 @@ function openDetailModal(ordNo) {
           </select>
         </div>
         <div style="display:inline-flex;align-items:center;gap:6px;flex-shrink:0">
-          ${designActions}
+          ${_odmAllMode ? '<span style="font-size:11.5px;color:#9ca3af;font-weight:600">One design for all ↑</span>' : designActions}
         </div>
       </div>
       ${embRowHtml}
