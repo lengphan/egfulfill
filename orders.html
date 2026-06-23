@@ -5396,10 +5396,14 @@ function upSetMode(m) {
   const o = ORDERS.find(x => x.no === UP_CURRENT_ORD);
   if (o) renderUploadItems(o, UP_FILTER_SKU);
 }
-// Apply one uploaded design to every line item (the "Edit all at once" mode).
+// Apply one uploaded design to every item in the current upload set (the "Edit all
+// at once" mode) — that's the selected items when a subset is being uploaded, else all.
 function _upApplyDesignToAll(o, dataUrl, fileName) {
   if (!o || !dataUrl) return;
-  o.itemsList.forEach(function (it) {
+  var targets = Array.isArray(UP_FILTER_SKU)
+    ? o.itemsList.filter(function (it) { return UP_FILTER_SKU.includes(itemDK(it)); })
+    : o.itemsList;
+  targets.forEach(function (it) {
     var dk = itemDK(it);
     UP_STATE[o.no][dk] = { state: 'ok', file: fileName, dataUrl: dataUrl };
     it.designUrl = dataUrl;
@@ -5510,10 +5514,11 @@ function renderUploadItems(o, filterSku) {
   } else {
     items = o.itemsList;
   }
-  // Multi-item full order → show the Each/All tabs; "all" mode renders ONE card and
-  // the upload propagates to every item (processFile → _upApplyDesignToAll).
-  const _upMulti = !filterSku && o.itemsList.length > 1;
-  if (_upMulti && UP_MODE === 'all') items = o.itemsList.slice(0, 1);
+  // Multi-item upload (whole order OR 2+ selected items) → show the Each/All tabs;
+  // "all" mode renders ONE card and the upload propagates to every item in this set
+  // (processFile → _upApplyDesignToAll).
+  const _upMulti = (!filterSku || (Array.isArray(filterSku) && filterSku.length > 1)) && o.itemsList.length > 1;
+  if (_upMulti && UP_MODE === 'all') items = items.slice(0, 1);
   // Update bottom button label based on current state
   const btn = document.getElementById('up-submit-btn');
   if (btn) {
@@ -6147,8 +6152,8 @@ function processFile(file, sku, ordNo) {
     const cur = UP_STATE[ordNo]?.[sku];
     if (!cur || cur.state !== 'uploading' || cur.file !== file.name) return;
     UP_STATE[ordNo][sku] = { state:'ok', file: file.name, dataUrl: UP_STATE[ordNo]?.[sku]?.dataUrl || null };
-    // "Edit all at once" mode → apply this design to every line item.
-    if (UP_MODE === 'all' && !UP_FILTER_SKU) _upApplyDesignToAll(o, UP_STATE[ordNo][sku].dataUrl, file.name);
+    // "Edit all at once" mode → apply this design to every item in the upload set.
+    if (UP_MODE === 'all') _upApplyDesignToAll(o, UP_STATE[ordNo][sku].dataUrl, file.name);
     // Record the upload in the order's history — include the file extension so
     // the seller can see at a glance what format the factory received.
     if (typeof pushOrderEvent === 'function') {
