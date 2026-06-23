@@ -5380,6 +5380,35 @@ function rzEnd() {
 ══════════════════════════════════════════════ */
 let UP_FILTER_SKU = null;
 let UP_CURRENT_ORD = null;
+let UP_MODE = 'each';   // 'each' = one design per item; 'all' = one design applied to every item
+// Design-mode tabs for a full multi-item order. Kept deliberately small + self-
+// contained (UP_MODE + _upApplyDesignToAll) so the same shape ports to the factory's
+// selling-mode upload later — there the design add/check flow is the same.
+function _upModeTabs(o) {
+  const t = (m, label) => '<button type="button" onclick="upSetMode(\'' + m + '\')" style="flex:1;padding:8px 6px;border:none;border-radius:7px;font-size:13px;font-weight:' + (UP_MODE === m ? '700' : '600') + ';font-family:inherit;cursor:pointer;background:' + (UP_MODE === m ? '#fff' : 'transparent') + ';color:' + (UP_MODE === m ? '#191918' : '#6b7280') + ';box-shadow:' + (UP_MODE === m ? '0 1px 3px rgba(0,0,0,.1)' : 'none') + ';transition:all .12s">' + label + '</button>';
+  return '<div style="display:flex;gap:4px;background:#f0ede9;border-radius:9px;padding:4px;margin-bottom:14px">' + t('each', 'Edit each item') + t('all', 'Edit all at once') + '</div>';
+}
+function _upAllBanner(o) {
+  return '<div style="background:#fbf7ec;border:1px solid #ecdfbd;border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:#7a6a3f;line-height:1.5">One design will be applied to <b>all ' + o.itemsList.length + ' items</b>. You can still reposition each item later from its order row.</div>';
+}
+function upSetMode(m) {
+  UP_MODE = (m === 'all') ? 'all' : 'each';
+  const o = ORDERS.find(x => x.no === UP_CURRENT_ORD);
+  if (o) renderUploadItems(o, UP_FILTER_SKU);
+}
+// Apply one uploaded design to every line item (the "Edit all at once" mode).
+function _upApplyDesignToAll(o, dataUrl, fileName) {
+  if (!o || !dataUrl) return;
+  o.itemsList.forEach(function (it) {
+    var dk = itemDK(it);
+    UP_STATE[o.no][dk] = { state: 'ok', file: fileName, dataUrl: dataUrl };
+    it.designUrl = dataUrl;
+    try { if (typeof EGStore !== 'undefined' && EGStore.cacheImage) EGStore.cacheImage(o.id, dk, dataUrl); } catch (e) {}
+    try { if (typeof EGStore !== 'undefined' && EGStore.cacheRawDesign) EGStore.cacheRawDesign(o.id, dk, dataUrl); } catch (e) {}
+  });
+  try { if (typeof EGStore !== 'undefined' && EGStore.update) EGStore.update(o.id, { items: o.itemsList }); } catch (e) {}
+  saveUpState();
+}
 
 function setEgRvItem(ordId, sku, data) {
   const st = getEgRv();
@@ -5427,6 +5456,7 @@ function openUploadPanel(ordNo, filterSku) {
   // renderUploadItems helper handles all three.
   UP_FILTER_SKU = filterIsArray ? (filterSku.length ? filterSku.slice() : null) : (filterSku || null);
   UP_CURRENT_ORD = ordNo;
+  UP_MODE = 'each';   // default to per-item each time the panel opens
   renderUploadItems(o, UP_FILTER_SKU);
   // Re-fetch the saved design(s) from the server (order_designs) so the preview
   // survives a hard refresh — the artwork lives server-side, not in localStorage.
@@ -5480,6 +5510,10 @@ function renderUploadItems(o, filterSku) {
   } else {
     items = o.itemsList;
   }
+  // Multi-item full order → show the Each/All tabs; "all" mode renders ONE card and
+  // the upload propagates to every item (processFile → _upApplyDesignToAll).
+  const _upMulti = !filterSku && o.itemsList.length > 1;
+  if (_upMulti && UP_MODE === 'all') items = o.itemsList.slice(0, 1);
   // Update bottom button label based on current state
   const btn = document.getElementById('up-submit-btn');
   if (btn) {
@@ -5490,7 +5524,7 @@ function renderUploadItems(o, filterSku) {
     else if (allOk) btn.innerHTML = icon + 'Confirm & Submit';
     else btn.innerHTML = icon + (filterSku ? 'Upload File' : 'Upload All Files');
   }
-  wrap.innerHTML = items.map(item => {
+  wrap.innerHTML = (_upMulti ? _upModeTabs(o) : '') + (_upMulti && UP_MODE === 'all' ? _upAllBanner(o) : '') + items.map(item => {
     const dk = itemDK(item);
     const s = UP_STATE[o.no]?.[dk] || { state:'idle', file:null };
     const stateHtml = upStateHtml(dk, o.no, s);
@@ -6113,6 +6147,8 @@ function processFile(file, sku, ordNo) {
     const cur = UP_STATE[ordNo]?.[sku];
     if (!cur || cur.state !== 'uploading' || cur.file !== file.name) return;
     UP_STATE[ordNo][sku] = { state:'ok', file: file.name, dataUrl: UP_STATE[ordNo]?.[sku]?.dataUrl || null };
+    // "Edit all at once" mode → apply this design to every line item.
+    if (UP_MODE === 'all' && !UP_FILTER_SKU) _upApplyDesignToAll(o, UP_STATE[ordNo][sku].dataUrl, file.name);
     // Record the upload in the order's history — include the file extension so
     // the seller can see at a glance what format the factory received.
     if (typeof pushOrderEvent === 'function') {
