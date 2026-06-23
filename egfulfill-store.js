@@ -995,7 +995,7 @@
         var liveTag = '<span style="font-size:11.25px;background:#dcfce7;color:#15803d;padding:1px 5px;border-radius:4px;font-weight:600;margin-left:4px">Live</span>';
         return '<tr id="eg-seller-row-'+o.id+'" class="main-row" style="background:#f0fdf4">'
           +'<td style="padding:10px 6px;text-align:center"><input type="checkbox" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></td>'
-          +'<td><div style="font-family:monospace;font-size:13.25px;font-weight:700;color:#15803d"><a href="order-detail.html?id='+o.id+'" style="color:#15803d;text-decoration:none">'+(o.seq != null ? '#'+o.seq : o.id)+'</a>'+liveTag+'</div><div style="font-family:monospace;font-size:11.75px;color:#9ca3af;margin-top:2px">—</div></td>'
+          +'<td><div style="font-family:monospace;font-size:13.25px;font-weight:700;color:#15803d"><a href="order-detail.html?id='+o.id+'" style="color:#15803d;text-decoration:none">'+(window.egOrderIds ? (function(){var i=window.egOrderIds(o); return i.market||('#'+i.eg);})() : (o.seq != null ? '#'+o.seq : o.id))+'</a>'+liveTag+'</div><div style="font-family:monospace;font-size:11.75px;color:#9ca3af;margin-top:2px">—</div></td>'
           +'<td><span style="font-weight:500;color:#191918">'+o.customer.name+'</span></td>'
           +'<td><span style="display:flex;align-items:center;gap:4px;color:#374151"><strong>'+o.items.length+'</strong><span style="color:#9ca3af;font-size:13.25px">item'+(o.items.length!==1?'s':'')+'</span></span></td>'
           +'<td style="font-size:13.75px;color:#374151">Standard</td>'

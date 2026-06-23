@@ -826,6 +826,13 @@ function saveUpState() {
 /* ── Time formatter ── */
 // Compact "age since created" shown as a 3rd line under the order id (the Time
 // column was removed). Darkens as it ages so stale orders stand out; >24h → days.
+// Standardized order number for the UI: manual → #EG0000000000, synced → #<market
+// number> (no etsy- prefix). Delegates to the shared egOrderIds formatter.
+function egOrderNo(o) {
+  var i = (window.egOrderIds) ? window.egOrderIds(o) : null;
+  if (!i) return '#' + (o.seq != null ? o.seq : o.id);
+  return i.market || ('#' + i.eg);
+}
 function orderAge(iso) {
   if (!iso) return { txt: '—', color: '#c4c3be' };
   const ms = Date.now() - (Date.parse(iso) || Date.now());
@@ -971,8 +978,7 @@ function renderOrders(ordersOverride) {
     rows.push(`<tr class="main-row${isAction?' action-row':''}" onclick="toggleExp(${o.no})" style="${rowBg ? rowBg+';' : ''}cursor:pointer">
       <td data-col="check" onclick="event.stopPropagation()" style="width:36px;padding:10px 0;text-align:center;overflow:visible"><input type="checkbox" class="row-chk" data-id="${o.id}" data-status="${o.status}" onchange="updateSel()" style="width:14px;height:14px;cursor:pointer;accent-color:#111827"/></td>
       <td data-col="order">
-        <div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918">#${o.seq != null ? o.seq : o.id}</div>
-        <div style="font-family:monospace;font-size:11.5px;color:#9ca3af;margin-top:2px">${o.platId||'—'}</div>
+        <div style="font-family:monospace;font-size:13px;font-weight:700;color:#191918">${egOrderNo(o)}</div>
         <div style="font-family:monospace;font-size:11px;font-weight:600;margin-top:2px;color:${orderAge(o.time).color}" title="Time since created">${orderAge(o.time).txt}</div>
       </td>
       <td data-col="customer"><span style="font-weight:500;color:#191918">${o.cust}</span></td>
@@ -2306,7 +2312,7 @@ function openDetailModal(ordNo) {
   // Header
   // "Order #<id>" — "Order" in muted bold, the id in dark bold.
   document.getElementById('odm-title').innerHTML =
-    '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(o.id == null ? '' : o.id).replace(/[<>&]/g, '') + '</span>';
+    '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">' + String(egOrderNo(o)).replace(/[<>&]/g, '') + '</span>';
   const badge = document.getElementById('odm-badge');
   badge.className = 'badge ' + sc.cls;
   badge.textContent = sc.label;
