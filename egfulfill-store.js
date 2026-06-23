@@ -34,7 +34,14 @@
   }
 
   function _load() {
-    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
+    try {
+      var arr = JSON.parse(localStorage.getItem(KEY) || '[]');
+      // Collapse any duplicate line items on the way out, so a corrupted order
+      // (e.g. one that ballooned to 128 identical rows) reads back clean even
+      // before its next save. _dedupeItems is hoisted (declared below).
+      if (Array.isArray(arr)) arr.forEach(function(o){ if (o && Array.isArray(o.items)) o.items = _dedupeItems(o.items); });
+      return arr;
+    }
     catch(e) { return []; }
   }
   // Stable per-line id — the SINGLE handle for everything tied to a line item
@@ -47,8 +54,24 @@
     if (Array.isArray(items)) items.forEach(function(it){ if (it && !it.lineId) it.lineId = _lineId(); });
     return items;
   }
+  // Self-heal duplicate line items. A bug elsewhere could re-append the same item
+  // (we saw one order balloon to 128 identical rows) and replaceItems on the server
+  // faithfully persists whatever the client sends — so collapse duplicates HERE, on
+  // every write, keeping the first occurrence of each lineId. Items without a lineId
+  // are left untouched (one gets assigned right after); legit distinct items keep
+  // distinct lineIds, so nothing real is ever merged.
+  function _dedupeItems(items){
+    if (!Array.isArray(items)) return items;
+    var seen = {}, out = [];
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i], k = it && it.lineId;
+      if (k != null) { if (seen[k]) continue; seen[k] = 1; }
+      out.push(it);
+    }
+    return out;
+  }
   function _save(orders) {
-    try { (orders||[]).forEach(function(o){ if (o) _ensureLineIds(o.items); }); } catch(e){}
+    try { (orders||[]).forEach(function(o){ if (o && Array.isArray(o.items)) o.items = _dedupeItems(o.items); if (o) _ensureLineIds(o.items); }); } catch(e){}
     _safeWrite(KEY, JSON.stringify(orders));
     // Notify same-tab stat renderers (cross-tab is covered by the native 'storage' event).
     try { window.dispatchEvent(new Event('eg-orders-changed')); } catch(e){}
