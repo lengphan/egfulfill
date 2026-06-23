@@ -1390,6 +1390,17 @@
         + '</div>';
       return { html: html, hasArt: !!design };
     },
+    // Just the uploaded DESIGN file URL (no blank) — for the Uploads gallery, which is
+    // the artwork inbox. Looks up by the stable line key (incl. mobile uploads).
+    designURL: function (o, it) {
+      var dk = (typeof itemDK === 'function') ? itemDK(it) : ((it && (it._dk || it.sku)) || '');
+      var oid = (o && o.id) || (o && o.num) || o, onum = (o && o.num) || (o && o.id) || o;
+      var design = '';
+      try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) design = EGStore.getRawDesign(oid, dk) || EGStore.getRawDesign(onum, dk) || ''; } catch (e) {}
+      if (!design) { try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) design = EGStore.getCachedImage(oid, dk) || EGStore.getCachedImage(onum, dk) || ''; } catch (e) {} }
+      if (!design && it) design = it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
+      return design;
+    },
     zoomUpload: function (html) {
       if (html == null) return;
       var ov = document.getElementById('xfom-zoom-ov');

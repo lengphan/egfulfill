@@ -7791,13 +7791,18 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     }
     function _xfomDesign(it){
       const sku = it.sku || it.SKU || '';
+      // Designs are saved under the STABLE line key (itemDK = lineId||_dk||sku), so look
+      // up by dk FIRST — a bare-sku lookup missed seller/mobile uploads on synced orders
+      // (that's why the composite showed the blank with no artwork overlaid).
+      const _dk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : sku;
+      const _oid = (o && o.id) || _xfomNum;
       try {
         if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) {
-          const raw = EGStore.getRawDesign((o && o.id) || _xfomNum, sku);
+          const raw = EGStore.getRawDesign(_oid, _dk) || EGStore.getRawDesign(_oid, sku);
           if (raw) return raw;
         }
         if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) {
-          const live = EGStore.getCachedImage((o && o.id) || _xfomNum, sku);
+          const live = EGStore.getCachedImage(_oid, _dk) || EGStore.getCachedImage(_oid, sku);
           if (live) return live;
         }
       } catch(e){}
@@ -7986,10 +7991,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     if (upEl) {
       if (!items.length) { upEl.innerHTML = ''; }
       else {
-        window._xfomGallery = items.map(it => _xfomCompositeHTML(it));
+        // Show the raw UPLOADED design file (not the blank composite) — this section is
+        // the artwork inbox; the per-item avatars on the left carry the on-blank preview.
+        window._xfomGallery = items.map(it => { const d = _xfomDesign(it); return d ? `<img src="${d}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain" onerror="this.style.display='none'"/>` : ''; });
         const cells = items.map((it, i) => {
-          const hasArt = !!_xfomDesign(it);
-          return `<button type="button" onclick="xfomZoomUpload(${i})" title="${String(it.name||it.product||it.sku||'Item').replace(/"/g,'&quot;')}" style="position:relative;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#f6f5f4;cursor:zoom-in;padding:0">${window._xfomGallery[i]}${hasArt?'':'<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>'}</button>`;
+          const hasArt = !!window._xfomGallery[i];
+          return `<button type="button" onclick="xfomZoomUpload(${i})" title="${String(it.name||it.product||it.sku||'Item').replace(/"/g,'&quot;')}" style="position:relative;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#fff;cursor:zoom-in;padding:0">${hasArt ? window._xfomGallery[i] : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:18px">—</div>'}${hasArt?'':'<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>'}</button>`;
         }).join('');
         upEl.innerHTML =
           `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9">
