@@ -1531,9 +1531,9 @@
           + (design ? gallery[i] : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:18px">—</div>')
           + (design ? '' : '<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>')
           + '</button>';
-        var caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:4px">'
-          + '<span style="font-size:10px;font-weight:700;color:' + (dsn ? '#191918' : '#c4c3be') + ';font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (dsn || 'Not sent to board yet') + '">' + (dsn || '—') + '</span>'
-          + (design ? '<a href="' + design + '" download="' + (dsn || 'design') + '" onclick="event.stopPropagation()" title="Download artwork" style="font-size:9px;font-weight:700;color:#15803d;text-decoration:none;flex-shrink:0">Download</a>' : '')
+        var caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px">'
+          + '<span style="font-size:12px;font-weight:700;color:' + (dsn ? '#191918' : '#c4c3be') + ';font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (dsn || 'Not sent to board yet') + '">' + (dsn || '—') + '</span>'
+          + (design ? '<a href="' + design + '" download="' + (dsn || 'design') + '" onclick="event.stopPropagation()" title="Download artwork" style="font-size:12.5px;font-weight:700;color:#15803d;text-decoration:none;flex-shrink:0">Download</a>' : '')
           + '</div>';
         return '<div>' + thumb + caption + '</div>';
       }).join('');
