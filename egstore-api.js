@@ -545,7 +545,13 @@
       return { market: '#' + m[2], eg: '', source: LBL[m[1].toLowerCase()] };
     }
     // Seed/legacy: platId carries the marketplace id (SP-/ET-/…), num is the EG id.
-    if (plat) return { market: plat, eg: egNo(), source: PFX[plat.slice(0, 2).toUpperCase()] || 'Etsy' };
+    // BUT only when the prefix is a KNOWN marketplace — a manual order's platId can be
+    // 'MA-…', which must NOT be mistaken for a marketplace number (that's why manual
+    // orders weren't switching to #EG…). Unknown prefix → fall through to manual.
+    if (plat) {
+      var _pfx = PFX[plat.slice(0, 2).toUpperCase()];
+      if (_pfx) return { market: plat, eg: egNo(), source: _pfx };
+    }
     // Manual order → #EG + 10-digit.
     return { market: '', eg: egNo(), source: 'Manual' };
   };
