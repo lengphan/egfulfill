@@ -4581,7 +4581,7 @@ function whRenderOrders() {
               : '';
             const thumb = (_isNewSetup && !_blankChosen && !_designSrc)
               ? `<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d4c9a8;margin-right:10px;background:#fbf8ef"></div>`
-              : `<div onclick="event.stopPropagation();admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="View product composite" style="position:relative;width:40px;height:40px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:${tBg};cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"><img src="${prodImg}" onerror="this.src='https://placehold.co/52x52/f0ede9/9ca3af?text=Item'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}</div>`;
+              : `<div onclick="event.stopPropagation();(window.EGDesignTools&&EGDesignTools.openQuickPos)?EGDesignTools.openQuickPos('${o.num}','${(window.EGDesignTools&&EGDesignTools.itemDK?EGDesignTools.itemDK(it):(it._dk||it.sku||'')).replace(/'/g,"\\'")}'):admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="Position design · Remove BG" style="position:relative;width:40px;height:40px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:${tBg};cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"><img src="${prodImg}" onerror="this.src='https://placehold.co/52x52/f0ede9/9ca3af?text=Item'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}</div>`;
             const _stock = whStockState(it.sku);
             const _stockPill = `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:${_stock.color};white-space:nowrap;flex-shrink:0" title="Blank stock"><span style="width:5px;height:5px;border-radius:50%;background:${_stock.color};display:inline-block;flex-shrink:0"></span>${_stock.label}</span>`;
             // Simple rule (same as operator/warehouse): linked design card,
@@ -8879,8 +8879,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div style="display:flex;gap:14px;align-items:stretch">
                   <div id="xfom-hero" style="width:108px;min-height:108px;flex-shrink:0;border-radius:10px;background:#f6f5f4;border:1px solid #e8e7e4;overflow:hidden;display:flex;align-items:center;justify-content:center"></div>
                   <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-                    <div style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Ship To</div>
-                    <div id="xfom-addr" style="flex:1;background:#f6f5f4;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6">—</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px"><span style="font-size:13.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Ship To</span><button onclick="window.EGDesignTools&&EGDesignTools.editShipTo(window._xfomNum)" title="Add or fix the recipient address" style="font-size:11px;font-weight:600;color:#6b7280;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:2px 9px;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">Edit</button></div>
+                    <div id="xfom-addr" onclick="window.EGDesignTools&&EGDesignTools.editShipToInline(this,window._xfomNum)" title="Click to add / fix the address" style="flex:1;background:#f6f5f4;border-radius:8px;padding:11px 14px;font-size:14px;color:#374151;line-height:1.6;cursor:pointer">—</div>
                   </div>
                 </div>
               </div>
@@ -8943,7 +8943,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.xfomOpen = function(num) {
     xfomEnsure();
-    _xfomNum = num;
+    _xfomNum = num; window._xfomNum = num;
     const o = _xfomFindOrder(num);
     document.getElementById('xfom-num').innerHTML = '<span style="color:#9ca3af;font-weight:700">Order </span><span style="color:#191918;font-weight:800">#' + String(num == null ? '' : num).replace(/[<>&]/g, '') + '</span>';
     document.getElementById('xfom-sub').textContent = o ? [o.store, o.customer, o.date].filter(Boolean).join(' · ') : '—';
