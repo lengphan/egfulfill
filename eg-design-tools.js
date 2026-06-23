@@ -1307,12 +1307,59 @@
     stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
 
+  // ── Editable Ship To — manually enter/fix a recipient address (e.g. when an Etsy
+  //    sync didn't carry it). Writes order.address + customer.name and persists to
+  //    the server (PATCH), then refreshes the open detail modal + boards.
+  function editShipTo(orderNum) {
+    var o = findOrder(orderNum); if (!o) return;
+    var a = o.address || {};
+    var cur = {
+      name: a.name || (o.customer && (o.customer.name || (typeof o.customer === 'string' ? o.customer : ''))) || '',
+      line1: a.line1 || a.street || '', line2: a.line2 || a.apt || a.street2 || '',
+      city: a.city || '', state: a.state || '', zip: a.zip || a.zipCode || ''
+    };
+    var m = document.getElementById('egdt-ship');
+    if (!m) { m = document.createElement('div'); m.id = 'egdt-ship'; m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10050;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif'; document.body.appendChild(m); m.addEventListener('click', function (e) { if (e.target === m) closeShipTo(); }); }
+    var inp = 'width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
+    var lbl = 'font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px';
+    m.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:420px;overflow:hidden">'
+      + '<div style="padding:16px 20px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div style="font-size:15px;font-weight:800;color:#191918">Edit Ship To</div><button onclick="EGDesignTools.closeShipTo()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
+      + '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:12px">'
+      + '<div><label style="' + lbl + '">Recipient</label><input id="egst-name" style="' + inp + '" value="' + esc(cur.name) + '"></div>'
+      + '<div><label style="' + lbl + '">Street</label><input id="egst-line1" style="' + inp + '" value="' + esc(cur.line1) + '"></div>'
+      + '<div><label style="' + lbl + '">Apt / Unit (optional)</label><input id="egst-line2" style="' + inp + '" value="' + esc(cur.line2) + '"></div>'
+      + '<div style="display:flex;gap:10px"><div style="flex:2"><label style="' + lbl + '">City</label><input id="egst-city" style="' + inp + '" value="' + esc(cur.city) + '"></div><div style="flex:1"><label style="' + lbl + '">State</label><input id="egst-state" style="' + inp + '" value="' + esc(cur.state) + '"></div><div style="flex:1"><label style="' + lbl + '">ZIP</label><input id="egst-zip" style="' + inp + '" value="' + esc(cur.zip) + '"></div></div>'
+      + '<button onclick="EGDesignTools.saveShipTo(\'' + jsAttr(orderNum) + '\')" style="margin-top:4px;width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:11px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit">Save address</button>'
+      + '</div></div>';
+    m.style.display = 'flex';
+  }
+  function closeShipTo() { var m = document.getElementById('egdt-ship'); if (m) m.style.display = 'none'; }
+  function saveShipTo(orderNum) {
+    var o = findOrder(orderNum); if (!o) { closeShipTo(); return; }
+    var g = function (id) { return ((document.getElementById(id) || {}).value || '').trim(); };
+    var name = g('egst-name'), line1 = g('egst-line1'), line2 = g('egst-line2'), city = g('egst-city'), state = g('egst-state'), zip = g('egst-zip');
+    var formatted = [[line1, line2].filter(Boolean).join(', '), [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+    var address = { name: name, line1: line1, line2: line2, city: city, state: state, zip: zip, country: (o.address && o.address.country) || '', formatted: formatted };
+    o.address = address;
+    if (name) { if (o.customer && typeof o.customer === 'object') o.customer.name = name; else o.customer = { name: name }; }
+    try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { address: address, customer: o.customer }); } catch (e) {}
+    try {
+      var tok = localStorage.getItem('eg_token') || '';
+      if (tok) fetch((window.EG_API_BASE || '') + '/api/orders/' + encodeURIComponent(o.id), { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ address: address, customer: o.customer }) }).catch(function () {});
+    } catch (e) {}
+    closeShipTo();
+    try { var el = document.getElementById('xfom-addr'); if (el) el.innerHTML = '<strong>' + esc(name) + '</strong><br>' + esc(line1) + (line2 ? (' ' + esc(line2)) : '') + '<br>' + [city, state, zip].filter(Boolean).join(', '); } catch (e) {}
+    refreshBoard();
+    _egdtToast('Ship-to address saved');
+  }
+
   window.EGDesignTools = {
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
+    editShipTo: editShipTo, closeShipTo: closeShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,

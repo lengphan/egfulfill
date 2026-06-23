@@ -133,7 +133,8 @@ export function ordersRoutes(app, requireAuth) {
   // factory board picks a base blank → the chosen mockup must reach mobile scan).
   app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req) => {
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
-                  carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta' };
+                  carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta',
+                  address: 'address', customer: 'customer' };
     const sets = [], vals = []; let n = 1;
     for (const k in (req.body || {})) if (map[k]) { sets.push(`${map[k]}=$${n++}`); vals.push(req.body[k]); }
     const body = req.body || {};
