@@ -1482,7 +1482,7 @@
     // method board (DTG/DTF/EMB…). Edit All → all lines share ONE design ID; Edit Items
     // → each line gets its own (cards key by dk). Realtime: design_cards write fires the
     // storage event the boards already listen to.
-    sendUploadsToBoard: function (orderNum) {
+    sendUploadsToBoard: function (orderNum, boardOverride) {
       var o = findOrder(orderNum); if (!o || !Array.isArray(o.items) || !o.items.length) return;
       if (!(window.EGStore && EGStore.pushToDesignBoard)) return;
       var all = (window._xfomDesignMode === 'all');
@@ -1490,15 +1490,60 @@
       var n = 0;
       o.items.forEach(function (it) {
         var dk = itemDK(it);
-        var board = String(it.printType || it.tech || 'dtg').toLowerCase();
+        // A picked board overrides the per-item method route (Auto).
+        var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || 'dtg').toLowerCase();
         var thumb = '';
         try { thumb = (EGStore.getRawDesign && (EGStore.getRawDesign(o.id, dk) || EGStore.getRawDesign(orderNum, dk))) || ''; } catch (e) {}
         EGStore.pushToDesignBoard({ orderNum: o.id, sku: it.sku, dk: dk, board: board, name: it.name || it.product || 'Design', thumb: thumb || null, byRole: 'Factory', sharedDesignId: sharedId });
         n++;
       });
       try { refreshBoard(); } catch (e) {}
-      _refreshOpenXfom(orderNum);
+      _refreshOpenXfom(orderNum);   // re-render so the new design IDs show in the captions
       if (typeof window.toast === 'function') { try { window.toast('Sent ' + n + ' design' + (n === 1 ? '' : 's') + ' to board'); } catch (e) {} }
+    },
+    // The full Uploads gallery (header + board-picker menu + cells). Each cell shows the
+    // raw artwork, its assigned design ID (DSN-NNN), and a download link — used by all
+    // three factory boards so the order-detail window surfaces the ID + link.
+    boardMenuItems: function () {
+      var boards = [{ c: '', l: 'Auto (by item method)' }, { c: 'dtg', l: 'DTG' }, { c: 'dtf', l: 'DTF' }, { c: 'emb', l: 'Embroidery' }, { c: 'sub', l: 'Sublimation' }, { c: 'scr', l: 'Screen Print' }];
+      return boards.map(function (b) {
+        return '<button type="button" onclick="EGDesignTools.toggleBoardMenu(this);EGDesignTools.sendUploadsToBoard(window._xfomNum,\'' + b.c + '\')" style="display:block;width:100%;text-align:left;background:none;border:none;border-radius:6px;padding:7px 10px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit" onmouseover="this.style.background=\'#f4f2ef\'" onmouseout="this.style.background=\'none\'">' + b.l + '</button>';
+      }).join('');
+    },
+    toggleBoardMenu: function (btn) {
+      try {
+        var inside = btn.closest('.eg-board-menu');
+        if (inside) { inside.style.display = 'none'; return; }   // clicked a menu item
+        var menu = btn.parentNode.querySelector('.eg-board-menu');
+        if (menu) menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+      } catch (e) {}
+    },
+    uploadsGalleryHTML: function (o, items) {
+      if (!items || !items.length) return '';
+      var self = this; var gallery = [];
+      var cells = items.map(function (it, i) {
+        var dk = itemDK(it);
+        var design = self.designURL(o, it);
+        gallery.push(design ? '<img src="' + design + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain" onerror="this.style.display=\'none\'"/>' : '');
+        var dsn = '';
+        try { var card = (window.EGStore && EGStore.getDesignCard) ? EGStore.getDesignCard(o.id, dk) : null; if (card) dsn = card.designId || card.title || ''; } catch (e) {}
+        var thumb = '<button type="button" onclick="EGDesignTools.zoomUpload(window._xfomGallery[' + i + '])" title="' + String(it.name || it.product || it.sku || 'Item').replace(/"/g, '&quot;') + '" style="position:relative;display:block;width:100%;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#fff;cursor:zoom-in;padding:0">'
+          + (design ? gallery[i] : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:18px">—</div>')
+          + (design ? '' : '<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>')
+          + '</button>';
+        var caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;margin-top:4px">'
+          + '<span style="font-size:10px;font-weight:700;color:' + (dsn ? '#191918' : '#c4c3be') + ';font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (dsn || 'Not sent to board yet') + '">' + (dsn || '—') + '</span>'
+          + (design ? '<a href="' + design + '" download="' + (dsn || 'design') + '" onclick="event.stopPropagation()" title="Download artwork" style="font-size:9px;font-weight:700;color:#15803d;text-decoration:none;flex-shrink:0">Download</a>' : '')
+          + '</div>';
+        return '<div>' + thumb + caption + '</div>';
+      }).join('');
+      window._xfomGallery = gallery;
+      var header = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9;position:relative">'
+        + '<div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Uploads · ' + items.length + '</div>'
+        + '<button type="button" onclick="EGDesignTools.toggleBoardMenu(this)" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board ▾</button>'
+        + '<div class="eg-board-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border:1px solid #e5e4e0;border-radius:9px;box-shadow:0 8px 28px rgba(0,0,0,.12);padding:4px;z-index:30;min-width:160px">' + this.boardMenuItems() + '</div>'
+        + '</div>';
+      return header + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px">' + cells + '</div>';
     },
     zoomUpload: function (html) {
       if (html == null) return;

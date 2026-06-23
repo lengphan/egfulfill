@@ -9133,15 +9133,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Uploads gallery — all item composites (blank+design, incl. mobile uploads) at a
     // glance + Send to board. Additive; uses the shared EGDesignTools helpers.
     var _auEl = document.getElementById('xfom-uploads');
-    if (_auEl) {
-      if (!items.length) { _auEl.innerHTML = ''; }
-      else {
-        // Raw uploaded design files (not blank composites) — this is the artwork inbox.
-        window._xfomGallery = items.map(function (it) { var d = (window.EGDesignTools && EGDesignTools.designURL) ? EGDesignTools.designURL(o, it) : ''; return d ? '<img src="' + d + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain" onerror="this.style.display=\'none\'"/>' : ''; });
-        var _aCells = items.map(function (it, i) { var hasArt = !!window._xfomGallery[i]; return '<button type="button" onclick="EGDesignTools.zoomUpload(window._xfomGallery[' + i + '])" title="' + String(it.name || it.product || it.sku || 'Item').replace(/"/g, '&quot;') + '" style="position:relative;aspect-ratio:1;border:1px solid #e5e4e0;border-radius:8px;overflow:hidden;background:#fff;cursor:zoom-in;padding:0">' + (hasArt ? window._xfomGallery[i] : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:18px">—</div>') + (hasArt ? '' : '<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>') + '</button>'; }).join('');
-        _auEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-top:14px;border-top:1px solid #f0ede9"><div style="font-size:12.5px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">Uploads · ' + items.length + '</div><button onclick="EGDesignTools.sendUploadsToBoard(window._xfomNum)" style="font-size:11px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit">Send to board →</button></div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">' + _aCells + '</div>';
-      }
-    }
+    if (_auEl) _auEl.innerHTML = (window.EGDesignTools && EGDesignTools.uploadsGalleryHTML) ? EGDesignTools.uploadsGalleryHTML(o, items) : '';
     _xfomRenderFooter();
     document.getElementById('xfom-modal').classList.remove('modal-hidden');
   };
