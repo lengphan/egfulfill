@@ -7817,9 +7817,12 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     function _xfomCompositeHTML(it){
       const mockup = _xfomMockup(it);
       const design = _xfomDesign(it);
+      // Only overlay the design once a BLANK is chosen (it.blank) — until then the square
+      // stays the plain blank/placeholder; the raw artwork still shows in the Uploads list.
+      const showDesign = !!(design && it && it.blank);
       return `<div style="position:relative;width:100%;height:100%">
         ${mockup ? `<img src="${mockup}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>` : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>`}
-        ${design ? `<img src="${design}" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>` : ''}
+        ${showDesign ? `<img src="${design}" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>` : ''}
       </div>`;
     }
     function _xfomUnitPrice(it){

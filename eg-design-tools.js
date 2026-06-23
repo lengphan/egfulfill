@@ -1405,9 +1405,12 @@
       try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) design = EGStore.getRawDesign(oid, dk) || EGStore.getRawDesign(onum, dk) || ''; } catch (e) {}
       if (!design) { try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) design = EGStore.getCachedImage(oid, dk) || EGStore.getCachedImage(onum, dk) || ''; } catch (e) {} }
       if (!design && it) design = it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
+      // Only overlay the design once a BLANK is chosen (it.blank); until then keep the
+      // square as the plain blank/placeholder. Raw artwork still lives in the Uploads list.
+      var showDesign = !!(design && it && it.blank);
       var html = '<div style="position:relative;width:100%;height:100%">'
         + (blank ? '<img src="' + blank + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>')
-        + (design ? '<img src="' + design + '" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
+        + (showDesign ? '<img src="' + design + '" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
         + '</div>';
       return { html: html, hasArt: !!design };
     },
