@@ -4849,7 +4849,7 @@ function noSyncProduct(sel) {
   colorSel.disabled=false; colorSel.style.color='#374151';
   sizeSel.innerHTML = p.sizes.map(s=>`<option>${s}</option>`).join('');
   sizeSel.disabled=false; sizeSel.style.color='#374151';
-  printSel.innerHTML = p.printTypes.map(t=>`<option>${t}</option>`).join('');
+  printSel.innerHTML = p.printTypes.map(t=>`<option value="${String(t).replace(/"/g,'&quot;')}">${(typeof EGStore!=='undefined'&&EGStore.formatMethod)?EGStore.formatMethod(t):t}</option>`).join('');
   printSel.disabled=false; printSel.style.color='#374151';
   noUpdateSku(row);
 }
@@ -6744,7 +6744,7 @@ function syncTplProduct(sel) {
   colorSel.disabled=false; colorSel.style.color='#374151';
   sizeSel.innerHTML = p.sizes.map(s=>`<option>${s}</option>`).join('');
   sizeSel.disabled=false; sizeSel.style.color='#374151';
-  printSel.innerHTML = p.printTypes.map(t=>`<option>${t}</option>`).join('');
+  printSel.innerHTML = p.printTypes.map(t=>`<option value="${String(t).replace(/"/g,'&quot;')}">${(typeof EGStore!=='undefined'&&EGStore.formatMethod)?EGStore.formatMethod(t):t}</option>`).join('');
   printSel.disabled=false; printSel.style.color='#374151';
   updateTplSku(row);
 }
