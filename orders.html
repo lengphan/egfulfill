@@ -1427,6 +1427,11 @@ function pickDesign(ordNo, escSku, type, dk) {
     } catch(e) {}
     // Re-render the row so the status badge updates immediately
     setTimeout(renderOrders, 60);
+    // If the order-detail modal is open for THIS order, re-render its items so the
+    // clicked action's button highlights immediately (one at a time).
+    if (window._odmCurrentOrder && window._odmCurrentOrder.no === ordNo && typeof openDetailModal === 'function') {
+      setTimeout(function(){ openDetailModal(ordNo); }, 0);
+    }
   }
   // Stash context so design-maker.html knows which order/item to return to.
   // dk = per-line design key so the artwork lands on THIS item only.
@@ -2551,15 +2556,25 @@ function openDetailModal(ordNo) {
     const odmBtnStyle = 'display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:7px;font-size:11.5px;font-weight:600;border:1.5px solid #e5e4e0;background:#fff;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .15s,color .15s;white-space:nowrap;text-decoration:none;flex-shrink:0';
     // Dark "Uploaded" state once a design is attached (uploaded here OR adopted
     // from a customer file / chosen outside) — mirrors the factory side.
+    const _hasUpload = !!(UP_STATE[o.no] && UP_STATE[o.no][itemDK(item)] && UP_STATE[o.no][itemDK(item)].dataUrl);
     const _designAttached = !!(
-      (UP_STATE[o.no] && UP_STATE[o.no][itemDK(item)] && UP_STATE[o.no][itemDK(item)].dataUrl) ||
+      _hasUpload ||
       (item.designUrl && /^(https?:|data:)/.test(String(item.designUrl))) ||
       item.customerFile || (item.designSrc && /^https?:\/\//i.test(String(item.designSrc)))
     );
-    const odmUploadStyle = _designAttached
-      ? odmBtnStyle.replace('border:1.5px solid #e5e4e0;background:#fff;color:#374151', 'border:1.5px solid #191918;background:#191918;color:#fff')
-      : odmBtnStyle;
-    const odmUploadHover = _designAttached ? '' : ' onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#374151\'"';
+    // Highlight ONLY the action that produced the current design (so picking Templates
+    // lights Templates, not "Uploaded"). The user's last click (ITEM_DESIGN_SEL) wins,
+    // else infer the source from the stored design.
+    const _selKey = o.no + '_' + itemDK(item);
+    const _src = (typeof ITEM_DESIGN_SEL !== 'undefined' && ITEM_DESIGN_SEL[_selKey])
+      ? ITEM_DESIGN_SEL[_selKey]
+      : (_hasUpload ? 'upload'
+        : (item.designSrc === 'template' ? 'template'
+        : (item.designSrc === 'design-lab' ? 'lab'
+        : (_designAttached ? 'upload' : ''))));
+    const _darkBtn = odmBtnStyle.replace('border:1.5px solid #e5e4e0;background:#fff;color:#374151', 'border:1.5px solid #191918;background:#191918;color:#fff');
+    const _aStyle = (on) => on ? _darkBtn : odmBtnStyle;
+    const _aHover = (on) => on ? '' : ' onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#374151\'"';
     // Always show the design action trio — once an order is in production, the
     // buttons stay visible but greyed (opacity + pointer-events:none) so the UI
     // doesn't suddenly mutate into a different layout. Same shape as setup.
@@ -2567,9 +2582,9 @@ function openDetailModal(ordNo) {
     // Three neat actions (Upload · Templates · Design Lab) — matches the factory side.
     const designActions = `
       <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmUploadStyle}"${odmUploadHover} title="${_designAttached ? 'Design attached — click to replace' : 'Upload artwork'}">${_designAttached ? 'Uploaded' : 'Upload'}</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Pick from saved templates">Templates</button>
-        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${odmBtnStyle}" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'" title="Open in Design Lab">Design Lab</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='upload')}"${_aHover(_src==='upload')} title="${_src==='upload' ? 'Design uploaded — click to replace' : 'Upload artwork'}">${_src==='upload' ? 'Uploaded' : 'Upload'}</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='template')}"${_aHover(_src==='template')} title="Pick from saved templates">Templates</button>
+        <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='lab')}"${_aHover(_src==='lab')} title="Open in Design Lab">Design Lab</button>
       </div>`;
     // Per-item economics: ONE big line total at the top-right of the item
     // card. The Unit/Qty/Line breakdown strip below the dashed divider has
