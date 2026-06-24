@@ -7928,7 +7928,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
           : '';
         return `<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;border:1px solid #e5e4e0;border-radius:9px">
           <div style="width:56px;height:56px;border-radius:8px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;flex-shrink:0">
-            ${_xfomCompositeHTML(it)}
+            ${(window.EGDesignTools && EGDesignTools.compositeHTML) ? EGDesignTools.compositeHTML(o, it).html : _xfomCompositeHTML(it)}
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.blank || it.name || it.product || 'Item'}</div>
