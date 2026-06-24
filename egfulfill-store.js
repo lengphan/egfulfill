@@ -2842,7 +2842,11 @@
       var self = this;
       return String(raw).split(/\s*\/\s*/).map(function(p){
         var k = p.trim().toLowerCase();
-        return self.METHOD_LABELS[k] || p.trim();
+        // Methods are often STORED as full labels ("DTG Print"). Normalize a trailing
+        // "print" to the code first so 'dtg print'→DTG, 'dtf print'→DTF, while
+        // 'screen print'→'screen'→'Screen Print' (a real method name) is preserved.
+        var code = k.replace(/\s*print$/, '');
+        return self.METHOD_LABELS[code] || self.METHOD_LABELS[k] || p.trim();
       }).filter(Boolean).join(' / ');
     },
     // Per-item print-method display label, shared by every factory board's order
