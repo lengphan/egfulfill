@@ -1236,10 +1236,26 @@
     var dk = itemDK(it);
     var design = designOverlaySrc(orderNum, it);   // may be '' — that's fine now
     var blank = ''; try { blank = setupProductImage(orderNum, dk) || (/^(https?:|data:)/.test(String(it.blankImg || '')) ? it.blankImg : '') || ''; } catch (e) {}
-    if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
+    // Print area (the operator-defined design zone) for this item's product — same
+    // {x,y,w,h}% the Design Maker uses. Constrains the design + seeds its position.
+    var _qpArea = null;
+    try {
+      var _prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+      var _base = String(it.sku || '').split('-')[0];
+      var _prod = _prods.find(function (p) {
+        return (it.blank && String(p.name || '') === String(it.blank))
+          || (Array.isArray(p.variantSkus) && p.variantSkus.some(function (v) { return v && v.sku === it.sku; }))
+          || (p.sku && _base && String(p.sku).toUpperCase() === _base.toUpperCase());
+      });
+      if (_prod && _prod.printAreas && _prod.printAreas.front) _qpArea = _prod.printAreas.front;
+    } catch (e) {}
+    // Seed the design INSIDE the print area on first open (else a sensible centre).
+    if (!it.designPos) it.designPos = _qpArea
+      ? { x: _qpArea.x, y: _qpArea.y, w: _qpArea.w, h: _qpArea.h }
+      : { x: 25, y: 25, w: 50, h: 50 };
     if (!Array.isArray(it.textLayers)) it.textLayers = [];
     var locked = !isNewOrder(o);
-    _qpF = { num: orderNum, dk: dk, locked: locked };
+    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea };
     var m = document.getElementById('egdt-qp');
     if (!m) {
       m = document.createElement('div'); m.id = 'egdt-qp';
@@ -1249,6 +1265,7 @@
         + '<div style="padding:18px 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:440px;height:440px;max-width:100%;background:#f6f5f4 center/120% no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
         + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
         + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span style="font-size:13px;font-weight:600">Drop a design or click to upload</span></div>'
+        + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b9a8e0;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9a8bc4">PRINT AREA</span></div>'
         + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
         + '<div id="egdt-qp-texts"></div>'
         + '</div></div>'
@@ -1272,6 +1289,11 @@
     dEl.src = design || '';
     wrap.style.display = design ? 'block' : 'none';
     wrap.style.left = it.designPos.x + '%'; wrap.style.top = it.designPos.y + '%'; wrap.style.width = it.designPos.w + '%'; wrap.style.height = it.designPos.h + '%';
+    var _areaEl = document.getElementById('egdt-qp-area');
+    if (_areaEl) {
+      if (_qpArea) { _areaEl.style.display = 'block'; _areaEl.style.left = _qpArea.x + '%'; _areaEl.style.top = _qpArea.y + '%'; _areaEl.style.width = _qpArea.w + '%'; _areaEl.style.height = _qpArea.h + '%'; }
+      else { _areaEl.style.display = 'none'; }
+    }
     wrap.style.cursor = locked ? 'default' : 'grab';
     document.getElementById('egdt-qp-empty').style.display = (!design && !locked) ? 'flex' : 'none';
     document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
@@ -1448,10 +1470,13 @@
     function mv(e) {
       if (!mode) return;
       var dd = pct(e.clientX - sx, e.clientY - sy);
-      if (mode === 'text') { if (_tl) { _tl.style.left = Math.max(0, Math.min(96, startX + dd.x)) + '%'; _tl.style.top = Math.max(0, Math.min(96, startY + dd.y)) + '%'; } return; }
+      // Clamp to the PRINT AREA when one is defined; otherwise the full stage.
+      var a = (_qpF && _qpF.area) ? _qpF.area : { x: 0, y: 0, w: 100, h: 100 };
+      var minX = a.x, maxX = a.x + a.w, minY = a.y, maxY = a.y + a.h;
+      if (mode === 'text') { if (_tl) { _tl.style.left = Math.max(minX, Math.min(maxX - 4, startX + dd.x)) + '%'; _tl.style.top = Math.max(minY, Math.min(maxY - 4, startY + dd.y)) + '%'; } return; }
       var wrap = document.getElementById('egdt-qp-wrap');
-      if (mode === 'drag') { wrap.style.left = Math.max(0, Math.min(100 - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(0, Math.min(100 - startH, startY + dd.y)) + '%'; }
-      else { wrap.style.width = Math.max(8, Math.min(100 - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(100 - startY, startH + dd.y)) + '%'; }
+      if (mode === 'drag') { wrap.style.left = Math.max(minX, Math.min(maxX - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(minY, Math.min(maxY - startH, startY + dd.y)) + '%'; }
+      else { wrap.style.width = Math.max(8, Math.min(maxX - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(maxY - startY, startH + dd.y)) + '%'; }
     }
     function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; _tl = null; }
     // Double-click a text layer to edit it (select-all so typing replaces the placeholder).
