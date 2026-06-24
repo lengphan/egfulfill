@@ -3112,10 +3112,12 @@ function itemCompositeThumb(o, item, size) {
   // clicking the avatar just opens a zoom view, never the editor.
   const isLocked = !(o.status === 'new' || o.status === 'action');
   let onclickAttr;
-  if (hasDesign && !isLocked) {
-    onclickAttr = `onclick="event.stopPropagation();openQuickPositionModal(${o.no},'${skuJs}')" title="Click to drag / resize the design"`;
-  } else if (hasDesign && isLocked) {
-    onclickAttr = `onclick="event.stopPropagation();openQuickPositionModal(${o.no},'${skuJs}',true)" title="Locked — order already in production"`;
+  const _miniCall = `sellerMini('${o.id}','${skuJs}',${o.no},${isLocked})`;
+  if (!isLocked) {
+    // Avatar opens the shared mini designer (drop · text · paste design/template ID).
+    onclickAttr = `onclick="event.stopPropagation();${_miniCall}" title="Click to edit the design"`;
+  } else if (hasDesign) {
+    onclickAttr = `onclick="event.stopPropagation();${_miniCall}" title="Locked — order already in production"`;
   } else {
     onclickAttr = `onclick="event.stopPropagation();zoomImg('${(mockup||'').replace(/'/g,"\\'")}')" title="Click to view"`;
   }
@@ -3355,6 +3357,14 @@ function _qpAttachInteractions() {
   window.addEventListener('mouseup', up);
 }
 window.openQuickPositionModal = openQuickPositionModal;
+// Seller item avatar → the SHARED mini designer (blank + drop/upload + simple text +
+// paste a design/template ID), keyed by the EGStore order id + line key. Falls back to
+// the legacy quick-position modal if the shared tool isn't present.
+function sellerMini(ordId, dk, ordNo, viewOnly){
+  if (window.EGDesignTools && EGDesignTools.openQuickPos) { EGDesignTools.openQuickPos(ordId, dk); return; }
+  if (typeof openQuickPositionModal === 'function') openQuickPositionModal(ordNo, dk, viewOnly);
+}
+window.sellerMini = sellerMini;
 window.closeQuickPositionModal = closeQuickPositionModal;
 window.saveQuickPositionModal  = saveQuickPositionModal;
 
