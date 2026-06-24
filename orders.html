@@ -1388,7 +1388,9 @@ function pickDesign(ordNo, escSku, type, dk) {
   // modal passes it; the inline table row omits it (its escSku is unique enough
   // there). Without dk every same-SKU line collapses to escSku → the first item.
   const key = ordNo+'_'+(dk||escSku);
-  ITEM_DESIGN_SEL[key] = ITEM_DESIGN_SEL[key] === type ? null : type;
+  // Always PREFER the clicked action (no toggle) — one action at a time. Switching
+  // to a different one replaces the previous, so the buttons can't both light up.
+  ITEM_DESIGN_SEL[key] = type;
   ['upload','template','lab'].forEach(t => {
     const el = document.getElementById('dsb-'+ordNo+'-'+escSku+'-'+t);
     if (!el) return;
@@ -1404,6 +1406,13 @@ function pickDesign(ordNo, escSku, type, dk) {
     : o?.itemsList.find(i => (i.__uid && i.__uid === escSku) || i.sku.replace(/[^a-zA-Z0-9]/g,'_') === escSku);
   if (o && item) {
     const newSel = ITEM_DESIGN_SEL[key];
+    // Overlay COMPLETELY with the new choice: switching to a template / Design-Lab
+    // source drops any prior uploaded image so two overlays never co-exist (and the
+    // Upload button stops showing as "active" alongside the new one).
+    if (newSel === 'template' || newSel === 'lab') {
+      const _idk = itemDK(item);
+      if (UP_STATE[ordNo] && UP_STATE[ordNo][_idk]) { UP_STATE[ordNo][_idk] = { state:'idle', file:null }; try { if (typeof saveUpState === 'function') saveUpState(); } catch(e){} }
+    }
     if (newSel === 'template')      item.designSrc = 'template';
     else if (newSel === 'lab')      item.designSrc = 'design-lab';
     else if (newSel === 'upload')   item.designSrc = undefined; // upload state lives in UP_STATE, not designSrc
