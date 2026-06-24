@@ -1225,14 +1225,17 @@
   //    the (bg-removed) design back to the item, mirrors onto the board row, and
   //    re-renders. Editable only while the order is new/in-setup.
   var _qpF = null;
+  // Mini designer: blank mockup + design (drag/resize/Remove BG) + drop-to-upload +
+  // simple TEXT layers (add / type / colour / drag). Heavier work → "Open Design Maker".
+  // No design is required to open (you can start from a blank and add art/text here).
   function openQuickPos(orderNum, key) {
     var o = findOrder(orderNum); if (!o) return;
     var it = findItemByKey(o, key); if (!it) return;
     var dk = itemDK(it);
-    var design = designOverlaySrc(orderNum, it);
-    if (!design) { _egdtToast('Upload a design for this item first'); return; }
+    var design = designOverlaySrc(orderNum, it);   // may be '' — that's fine now
     var blank = ''; try { blank = setupProductImage(orderNum, dk) || (/^(https?:|data:)/.test(String(it.blankImg || '')) ? it.blankImg : '') || ''; } catch (e) {}
     if (!it.designPos) it.designPos = { x: 25, y: 25, w: 50, h: 50 };
+    if (!Array.isArray(it.textLayers)) it.textLayers = [];
     var locked = !isNewOrder(o);
     _qpF = { num: orderNum, dk: dk, locked: locked };
     var m = document.getElementById('egdt-qp');
@@ -1241,37 +1244,115 @@
       m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10040;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
       m.innerHTML = '<div style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:480px;overflow:hidden" onclick="event.stopPropagation()">'
         + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egdt-qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div id="egdt-qp-sub" style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools.closeQuickPos()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
-        + '<div style="padding:18px;display:flex;justify-content:center"><div id="egdt-qp-stage" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
+        + '<div style="padding:18px 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:360px;height:360px;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
         + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
+        + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span style="font-size:13px;font-weight:600">Drop a design or click to upload</span></div>'
         + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
+        + '<div id="egdt-qp-texts"></div>'
         + '</div></div>'
-        + '<div style="padding:0 18px 16px;display:flex"><div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools.closeQuickPos()" style="font-size:13px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 14px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Cancel</button><button id="egdt-qp-save" onclick="EGDesignTools.saveQuickPos()" style="font-size:13px;border:none;background:#191918;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-family:inherit">Save</button></div></div>'
+        + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
+        + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
+        + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
+        + '<div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools.closeQuickPos()" style="font-size:13px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 14px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Cancel</button><button id="egdt-qp-save" onclick="EGDesignTools.saveQuickPos()" style="font-size:13px;border:none;background:#191918;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-family:inherit">Save</button></div></div>'
+        + '<input type="file" id="egdt-qp-file" accept="image/*" style="display:none" onchange="EGDesignTools._qpFileChange(event)"/>'
         + '</div>';
       m.addEventListener('click', function (e) { if (e.target === m) closeQuickPos(); });
       document.body.appendChild(m);
       _qpAttach();
     }
     document.getElementById('egdt-qp-title').textContent = '#' + (o.num || o.id) + ' · ' + (it.name || it.blank || dk);
-    document.getElementById('egdt-qp-sub').textContent = locked ? 'Locked — order already in production' : 'Drag to move · drag the corner to resize';
+    document.getElementById('egdt-qp-sub').textContent = locked ? 'Locked — order already in production' : 'Drag art/text to move · drag the corner to resize';
     var stage = document.getElementById('egdt-qp-stage'); stage.style.backgroundImage = blank ? 'url("' + blank + '")' : 'none';
     var wrap = document.getElementById('egdt-qp-wrap'), dEl = document.getElementById('egdt-qp-design');
-    dEl.src = design;
+    dEl.src = design || '';
+    wrap.style.display = design ? 'block' : 'none';
     wrap.style.left = it.designPos.x + '%'; wrap.style.top = it.designPos.y + '%'; wrap.style.width = it.designPos.w + '%'; wrap.style.height = it.designPos.h + '%';
     wrap.style.cursor = locked ? 'default' : 'grab';
-    document.getElementById('egdt-qp-handle').style.display = locked ? 'none' : 'block';
-    document.getElementById('egdt-qp-rmbg').style.display = locked ? 'none' : '';
+    document.getElementById('egdt-qp-empty').style.display = (!design && !locked) ? 'flex' : 'none';
+    document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
+    document.getElementById('egdt-qp-rmbg').style.display = (locked || !design) ? 'none' : '';
     document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
+    document.getElementById('egdt-qp-tools').style.display = locked ? 'none' : 'flex';
+    var lab = document.getElementById('egdt-qp-lab'); if (lab) lab.href = 'design-maker.html?id=' + encodeURIComponent(o.id) + '&sku=' + encodeURIComponent(it.sku || '');
+    _qpRenderTexts(it.textLayers, locked);
     m.style.display = 'flex';
   }
   function closeQuickPos() { var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
+  // Render the saved text layers as draggable, editable, colourable divs on the stage.
+  function _qpRenderTexts(layers, locked) {
+    var host = document.getElementById('egdt-qp-texts'); if (!host) return;
+    host.innerHTML = '';
+    (layers || []).forEach(function (t, i) {
+      var el = document.createElement('div');
+      el.className = 'egdt-qp-tl'; el.setAttribute('data-i', i);
+      el.style.cssText = 'position:absolute;left:' + (t.x || 30) + '%;top:' + (t.y || 45) + '%;color:' + (t.color || '#191918') + ';font-weight:800;font-size:' + (t.size || 20) + 'px;line-height:1.1;white-space:nowrap;cursor:' + (locked ? 'default' : 'move') + ';text-shadow:0 0 2px rgba(255,255,255,.5)';
+      var span = document.createElement('span');
+      span.className = 'egdt-qp-tltext'; span.contentEditable = locked ? 'false' : 'true'; span.textContent = t.text || 'Text';
+      span.style.cssText = 'outline:none;padding:1px 2px';
+      el.appendChild(span);
+      if (!locked) {
+        var ci = document.createElement('input'); ci.type = 'color'; ci.value = t.color || '#191918';
+        ci.style.cssText = 'position:absolute;top:-16px;left:0;width:16px;height:14px;border:none;padding:0;background:none;cursor:pointer;opacity:0;transition:opacity .12s';
+        ci.oninput = function () { el.style.color = ci.value; };
+        el.onmouseenter = function () { ci.style.opacity = '1'; }; el.onmouseleave = function () { ci.style.opacity = '0'; };
+        var del = document.createElement('button'); del.textContent = '×'; del.title = 'Remove text';
+        del.style.cssText = 'position:absolute;top:-16px;right:-6px;width:15px;height:15px;line-height:1;border:none;background:#191918;color:#fff;border-radius:50%;font-size:11px;cursor:pointer;opacity:0;transition:opacity .12s';
+        del.onmouseenter = function () { ci.style.opacity = '1'; del.style.opacity = '1'; };
+        del.onclick = function (e) { e.stopPropagation(); host.removeChild(el); };
+        el.onmouseenter = function () { ci.style.opacity = '1'; del.style.opacity = '1'; }; el.onmouseleave = function () { ci.style.opacity = '0'; del.style.opacity = '0'; };
+        el.appendChild(ci); el.appendChild(del);
+      }
+      host.appendChild(el);
+    });
+  }
+  function qpAddText() {
+    if (!_qpF || _qpF.locked) return;
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+    if (!Array.isArray(it.textLayers)) it.textLayers = [];
+    // Pull current on-screen layers first so we don't drop unsaved edits, then add one.
+    var cur = _qpCollectTexts();
+    cur.push({ text: 'Your text', color: '#191918', x: 32, y: 46, size: 22 });
+    _qpRenderTexts(cur, false);
+  }
+  // Read the live text layers off the stage (position %, content, colour, size).
+  function _qpCollectTexts() {
+    var host = document.getElementById('egdt-qp-texts'); var out = [];
+    if (!host) return out;
+    var stage = document.getElementById('egdt-qp-stage'); var r = stage ? stage.getBoundingClientRect() : null;
+    [].forEach.call(host.querySelectorAll('.egdt-qp-tl'), function (el) {
+      var span = el.querySelector('.egdt-qp-tltext');
+      out.push({ text: (span ? span.textContent : el.textContent || '').trim() || 'Text', color: el.style.color || '#191918', x: parseFloat(el.style.left) || 30, y: parseFloat(el.style.top) || 45, size: parseFloat(el.style.fontSize) || 20 });
+    });
+    return out;
+  }
+  function _qpPickFile() { var f = document.getElementById('egdt-qp-file'); if (f) f.click(); }
+  function _qpFileChange(e) { var f = e && e.target && e.target.files && e.target.files[0]; if (f) _qpReadFile(f); if (e && e.target) e.target.value = ''; }
+  function _qpDrop(e) { e.preventDefault(); var st = document.getElementById('egdt-qp-stage'); if (st) st.style.borderColor = '#c9c4bc'; var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) _qpReadFile(f); }
+  function _qpReadFile(file) {
+    if (!_qpF || _qpF.locked || !/^image\//.test(file.type)) return;
+    var rd = new FileReader();
+    rd.onload = function (ev) {
+      var out = ev.target.result; var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+      it.designUrl = out;
+      try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, out); } catch (e) {}
+      try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, out); } catch (e) {}
+      var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
+      if (dEl) dEl.src = out; if (wrap) wrap.style.display = 'block';
+      document.getElementById('egdt-qp-empty').style.display = 'none';
+      document.getElementById('egdt-qp-handle').style.display = 'block';
+      document.getElementById('egdt-qp-rmbg').style.display = '';
+    };
+    rd.readAsDataURL(file);
+  }
   function saveQuickPos() {
     if (!_qpF || _qpF.locked) { closeQuickPos(); return; }
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), wrap = document.getElementById('egdt-qp-wrap');
-    if (it && wrap) {
-      it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
+    if (it) {
+      if (wrap) it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
+      it.textLayers = _qpCollectTexts();
       try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
       pushItemsToApi(o);
-      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) bi.designPos = it.designPos; });
+      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) { bi.designPos = it.designPos; bi.designUrl = it.designUrl; bi.textLayers = it.textLayers; } });
     }
     closeQuickPos(); refreshBoard();
   }
@@ -1307,24 +1388,39 @@
   }
   function _qpAttach() {
     var stage = document.getElementById('egdt-qp-stage');
-    var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0;
+    var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0, _tl = null;
     function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
     function down(e) {
       if (_qpF && _qpF.locked) return;
       var wrap = document.getElementById('egdt-qp-wrap'), handle = document.getElementById('egdt-qp-handle');
+      var tl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null;
       if (e.target === handle) mode = 'resize';
-      else if (e.target === wrap || wrap.contains(e.target)) { mode = 'drag'; wrap.style.cursor = 'grabbing'; }
+      else if (wrap && wrap.style.display !== 'none' && (e.target === wrap || wrap.contains(e.target))) { mode = 'drag'; wrap.style.cursor = 'grabbing'; }
+      else if (tl) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;   // colour / delete
+        var sp = tl.querySelector('.egdt-qp-tltext');
+        if (sp && document.activeElement === sp) return;                              // editing — let it type
+        mode = 'text'; _tl = tl; sx = e.clientX; sy = e.clientY; startX = parseFloat(tl.style.left) || 0; startY = parseFloat(tl.style.top) || 0; e.preventDefault(); return;
+      }
       else return;
       sx = e.clientX; sy = e.clientY; startX = parseFloat(wrap.style.left) || 0; startY = parseFloat(wrap.style.top) || 0; startW = parseFloat(wrap.style.width) || 50; startH = parseFloat(wrap.style.height) || 50;
       e.preventDefault();
     }
     function mv(e) {
       if (!mode) return;
-      var wrap = document.getElementById('egdt-qp-wrap'), dd = pct(e.clientX - sx, e.clientY - sy);
+      var dd = pct(e.clientX - sx, e.clientY - sy);
+      if (mode === 'text') { if (_tl) { _tl.style.left = Math.max(0, Math.min(96, startX + dd.x)) + '%'; _tl.style.top = Math.max(0, Math.min(96, startY + dd.y)) + '%'; } return; }
+      var wrap = document.getElementById('egdt-qp-wrap');
       if (mode === 'drag') { wrap.style.left = Math.max(0, Math.min(100 - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(0, Math.min(100 - startH, startY + dd.y)) + '%'; }
       else { wrap.style.width = Math.max(8, Math.min(100 - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(100 - startY, startH + dd.y)) + '%'; }
     }
-    function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; }
+    function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; _tl = null; }
+    // Double-click a text layer to edit it (select-all so typing replaces the placeholder).
+    stage.addEventListener('dblclick', function (e) {
+      var tl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null; if (!tl) return;
+      var sp = tl.querySelector('.egdt-qp-tltext'); if (!sp) return; sp.focus();
+      try { var rng = document.createRange(); rng.selectNodeContents(sp); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng); } catch (e2) {}
+    });
     stage.addEventListener('mousedown', down); window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
   }
 
@@ -1560,6 +1656,7 @@
     itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
+    qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
