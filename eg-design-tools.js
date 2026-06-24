@@ -1266,7 +1266,8 @@
         + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
         + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span style="font-size:13px;font-weight:600">Drop a design or click to upload</span></div>'
         + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b9a8e0;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9a8bc4">PRINT AREA</span></div>'
-        + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;background:#191918;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize"></div></div>'
+        + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;outline:1.5px dashed #8b7bc0;outline-offset:1px"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#fff;border:1.5px solid #8b7bc0;border-radius:50%;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>'
+        + '<div id="egdt-qp-extra"></div>'
         + '<div id="egdt-qp-texts"></div>'
         + '</div></div>'
         + '<div id="egdt-qp-idrow" style="padding:0 18px 10px;display:flex;gap:8px;align-items:center"><input id="egdt-qp-idfield" placeholder="Paste a design ID (DSN-…) or template ID" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button></div>'
@@ -1295,7 +1296,8 @@
       else { _areaEl.style.display = 'none'; }
     }
     wrap.style.cursor = locked ? 'default' : 'grab';
-    document.getElementById('egdt-qp-empty').style.display = (!design && !locked) ? 'flex' : 'none';
+    var _hasExtra = Array.isArray(it.designLayers) && it.designLayers.length;
+    document.getElementById('egdt-qp-empty').style.display = (!design && !_hasExtra && !locked) ? 'flex' : 'none';
     document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
     document.getElementById('egdt-qp-rmbg').style.display = (locked || !design) ? 'none' : '';
     document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
@@ -1303,6 +1305,7 @@
     var _idrow = document.getElementById('egdt-qp-idrow'); if (_idrow) _idrow.style.display = locked ? 'none' : 'flex';
     var lab = document.getElementById('egdt-qp-lab'); if (lab) lab.href = 'design-maker.html?id=' + encodeURIComponent(o.id) + '&sku=' + encodeURIComponent(it.sku || '');
     _qpRenderTexts(it.textLayers, locked);
+    _qpRenderDesignLayers(it.designLayers, locked);
     m.style.display = 'flex';
   }
   function closeQuickPos() { var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
@@ -1353,6 +1356,34 @@
     });
     return out;
   }
+  // Additional DESIGN layers (beyond the primary one in egdt-qp-wrap). Each is draggable
+  // + resizable inside the print area, so dropping/pasting a 2nd+ design ADDS it rather
+  // than replacing. Same dashed selection look as the primary.
+  function _qpDesignLayerHTML(src, x, y, w, h) {
+    return '<div class="egdt-qp-dl" style="position:absolute;left:' + x + '%;top:' + y + '%;width:' + w + '%;height:' + h + '%;cursor:grab;outline:1.5px dashed #8b7bc0;outline-offset:1px;z-index:3">'
+      + '<img src="' + src + '" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
+      + '<button class="egdt-qp-dldel" title="Remove" style="position:absolute;top:-9px;left:-9px;width:16px;height:16px;line-height:1;border:none;background:#191918;color:#fff;border-radius:50%;font-size:11px;cursor:pointer">×</button>'
+      + '<div class="egdt-qp-dlh" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#fff;border:1.5px solid #8b7bc0;border-radius:50%;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>';
+  }
+  function _qpRenderDesignLayers(layers, locked) {
+    var host = document.getElementById('egdt-qp-extra'); if (!host) return;
+    host.innerHTML = (layers || []).map(function (l) { return _qpDesignLayerHTML(l.src, l.x != null ? l.x : 30, l.y != null ? l.y : 30, l.w || 40, l.h || 40); }).join('');
+    if (locked) { [].forEach.call(host.querySelectorAll('.egdt-qp-dlh,.egdt-qp-dldel'), function (h) { h.style.display = 'none'; }); }
+  }
+  function _qpAddDesignLayer(src) {
+    if (!_qpF) return; var host = document.getElementById('egdt-qp-extra'); if (!host) return;
+    var a = _qpF.area || { x: 25, y: 25, w: 50, h: 50 };
+    var w = a.w * 0.7, h = a.h * 0.7, x = a.x + (a.w - w) / 2, y = a.y + (a.h - h) / 2;
+    host.insertAdjacentHTML('beforeend', _qpDesignLayerHTML(src, x, y, w, h));
+  }
+  function _qpCollectDesignLayers() {
+    var host = document.getElementById('egdt-qp-extra'); var out = []; if (!host) return out;
+    [].forEach.call(host.querySelectorAll('.egdt-qp-dl'), function (el) {
+      var img = el.querySelector('img');
+      out.push({ src: img ? img.getAttribute('src') : '', x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: parseFloat(el.style.width) || 40, h: parseFloat(el.style.height) || 40 });
+    });
+    return out.filter(function (l) { return l.src; });
+  }
   function _qpPickFile() { var f = document.getElementById('egdt-qp-file'); if (f) f.click(); }
   function _qpFileChange(e) { var f = e && e.target && e.target.files && e.target.files[0]; if (f) _qpReadFile(f); if (e && e.target) e.target.value = ''; }
   function _qpDrop(e) { e.preventDefault(); var st = document.getElementById('egdt-qp-stage'); if (st) st.style.borderColor = '#c9c4bc'; var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) _qpReadFile(f); }
@@ -1361,6 +1392,7 @@
     var rd = new FileReader();
     rd.onload = function (ev) {
       var out = ev.target.result; var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+      if (it.designUrl) { _qpAddDesignLayer(out); return; } // primary already set → ADD a layer
       it.designUrl = out;
       try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, out); } catch (e) {}
       try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, out); } catch (e) {}
@@ -1394,6 +1426,7 @@
     }
     if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design or template found for “' + id + '”'); return; }
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+    if (it.designUrl) { _qpAddDesignLayer(img); if (fld) fld.value = ''; _egdtToast('Added ' + id); return; } // primary set → ADD a layer
     it.designUrl = img;
     try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, img); } catch (e) {}
     try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
@@ -1411,9 +1444,10 @@
     if (it) {
       if (wrap) it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
       it.textLayers = _qpCollectTexts();
+      it.designLayers = _qpCollectDesignLayers();
       try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
       pushItemsToApi(o);
-      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) { bi.designPos = it.designPos; bi.designUrl = it.designUrl; bi.textLayers = it.textLayers; } });
+      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) { bi.designPos = it.designPos; bi.designUrl = it.designUrl; bi.textLayers = it.textLayers; bi.designLayers = it.designLayers; } });
     }
     closeQuickPos(); refreshBoard();
   }
@@ -1449,13 +1483,20 @@
   }
   function _qpAttach() {
     var stage = document.getElementById('egdt-qp-stage');
-    var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0, _tl = null;
+    var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0, _tl = null, _dl = null;
     function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
     function down(e) {
       if (_qpF && _qpF.locked) return;
+      // Remove an extra design layer via its × button.
+      var del = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dldel') : null;
+      if (del) { var dx = del.closest('.egdt-qp-dl'); if (dx) dx.remove(); e.preventDefault(); return; }
       var wrap = document.getElementById('egdt-qp-wrap'), handle = document.getElementById('egdt-qp-handle');
+      var dlh = (e.target && e.target.classList && e.target.classList.contains('egdt-qp-dlh')) ? e.target : null;
+      var dl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dl') : null;
       var tl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null;
       if (e.target === handle) mode = 'resize';
+      else if (dlh) { mode = 'dlresize'; _dl = dlh.parentNode; }
+      else if (dl) { mode = 'dldrag'; _dl = dl; dl.style.cursor = 'grabbing'; }
       else if (wrap && wrap.style.display !== 'none' && (e.target === wrap || wrap.contains(e.target))) { mode = 'drag'; wrap.style.cursor = 'grabbing'; }
       else if (tl) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;   // colour / delete
@@ -1464,7 +1505,9 @@
         mode = 'text'; _tl = tl; sx = e.clientX; sy = e.clientY; startX = parseFloat(tl.style.left) || 0; startY = parseFloat(tl.style.top) || 0; e.preventDefault(); return;
       }
       else return;
-      sx = e.clientX; sy = e.clientY; startX = parseFloat(wrap.style.left) || 0; startY = parseFloat(wrap.style.top) || 0; startW = parseFloat(wrap.style.width) || 50; startH = parseFloat(wrap.style.height) || 50;
+      sx = e.clientX; sy = e.clientY;
+      var src = (mode === 'dldrag' || mode === 'dlresize') ? _dl : wrap;
+      startX = parseFloat(src.style.left) || 0; startY = parseFloat(src.style.top) || 0; startW = parseFloat(src.style.width) || 50; startH = parseFloat(src.style.height) || 50;
       e.preventDefault();
     }
     function mv(e) {
@@ -1474,11 +1517,13 @@
       var a = (_qpF && _qpF.area) ? _qpF.area : { x: 0, y: 0, w: 100, h: 100 };
       var minX = a.x, maxX = a.x + a.w, minY = a.y, maxY = a.y + a.h;
       if (mode === 'text') { if (_tl) { _tl.style.left = Math.max(minX, Math.min(maxX - 4, startX + dd.x)) + '%'; _tl.style.top = Math.max(minY, Math.min(maxY - 4, startY + dd.y)) + '%'; } return; }
+      if (mode === 'dldrag' && _dl) { _dl.style.left = Math.max(minX, Math.min(maxX - startW, startX + dd.x)) + '%'; _dl.style.top = Math.max(minY, Math.min(maxY - startH, startY + dd.y)) + '%'; return; }
+      if (mode === 'dlresize' && _dl) { _dl.style.width = Math.max(8, Math.min(maxX - startX, startW + dd.x)) + '%'; _dl.style.height = Math.max(8, Math.min(maxY - startY, startH + dd.y)) + '%'; return; }
       var wrap = document.getElementById('egdt-qp-wrap');
       if (mode === 'drag') { wrap.style.left = Math.max(minX, Math.min(maxX - startW, startX + dd.x)) + '%'; wrap.style.top = Math.max(minY, Math.min(maxY - startH, startY + dd.y)) + '%'; }
       else { wrap.style.width = Math.max(8, Math.min(maxX - startX, startW + dd.x)) + '%'; wrap.style.height = Math.max(8, Math.min(maxY - startY, startH + dd.y)) + '%'; }
     }
-    function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } mode = null; _tl = null; }
+    function up() { if (mode === 'drag') { var wrap = document.getElementById('egdt-qp-wrap'); if (wrap) wrap.style.cursor = 'grab'; } if (mode === 'dldrag' && _dl) _dl.style.cursor = 'grab'; mode = null; _tl = null; _dl = null; }
     // Double-click a text layer to edit it (select-all so typing replaces the placeholder).
     stage.addEventListener('dblclick', function (e) {
       var tl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null; if (!tl) return;
@@ -1568,11 +1613,17 @@
       // Only overlay the design once a BLANK is chosen (it.blank); until then keep the
       // square as the plain blank/placeholder. Raw artwork still lives in the Uploads list.
       var showDesign = !!(design && it && it.blank);
+      var dp = (it && it.designPos) ? it.designPos : { x: 25, y: 25, w: 50, h: 50 };
+      var extra = (it && Array.isArray(it.designLayers)) ? it.designLayers : [];
+      var extraHtml = showDesign ? extra.map(function (l) {
+        return '<img src="' + l.src + '" style="position:absolute;left:' + l.x + '%;top:' + l.y + '%;width:' + l.w + '%;height:' + l.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>';
+      }).join('') : '';
       var html = '<div style="position:relative;width:100%;height:100%">'
         + (blank ? '<img src="' + blank + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>')
-        + (showDesign ? '<img src="' + design + '" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
+        + (showDesign ? '<img src="' + design + '" style="position:absolute;left:' + dp.x + '%;top:' + dp.y + '%;width:' + dp.w + '%;height:' + dp.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
+        + extraHtml
         + '</div>';
-      return { html: html, hasArt: !!design };
+      return { html: html, hasArt: !!(design || extra.length) };
     },
     // Just the uploaded DESIGN file URL (no blank) — for the Uploads gallery, which is
     // the artwork inbox. Looks up by the stable line key (incl. mobile uploads).
