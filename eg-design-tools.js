@@ -1361,7 +1361,8 @@
     // 2) Saved template by its ID (or name).
     if (!img) {
       try {
-        var t = _loadTemplates().find(function (x) { return String(x.tplId || x.id).toLowerCase() === id.toLowerCase() || String(x.name || '').toLowerCase() === id.toLowerCase(); });
+        var lid = id.toLowerCase();
+        var t = _loadTemplates().find(function (x) { return String(x.tplId || '').toLowerCase() === lid || String(x.id).toLowerCase() === lid || ('tpl-' + String(x.id)).toLowerCase() === lid || String(x.name || '').toLowerCase() === lid; });
         if (t) img = t.designOnlyImg || t.compositeImg || t.productImg || '';
       } catch (e) {}
     }
