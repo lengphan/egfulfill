@@ -2829,10 +2829,11 @@
       });
     },
     // Print-method label expansion. Stored abbreviations or full names both
-    // map to the canonical full label. Used in product subtitles on operator
-    // + seller surfaces. "DTG / Emb" → "DTG Print / Embroidery".
+    // map to the canonical label. Used in product subtitles on operator
+    // + seller surfaces. "DTG / Emb" → "DTG / Embroidery" (DTG/DTF carry no "Print"
+    // suffix — matches the product form labels).
     METHOD_LABELS: {
-      'dtg':'DTG Print','dtf':'DTF Print','emb':'Embroidery',
+      'dtg':'DTG','dtf':'DTF','emb':'Embroidery',
       'apl':'Appliqué','lsr':'Laser','sub':'Sublimation',
       'screen':'Screen Print','sp':'Screen Print'
     },
