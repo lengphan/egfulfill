@@ -5,6 +5,35 @@
    Depends on: Stripe.js (loaded per-page), EGStore (egfulfill-store.js). Page-specific
    globals (TX/STATS/currentPeriod/renderTx/updateStats) are referenced behind typeof
    guards / try-catch, so this is a no-op for them on pages that don't have them. */
+/* ── Self-inject the deposit-modal markup on any page that doesn't already have it
+   (wallet.html keeps its own inline copy, so it's skipped there). This is what lets
+   every page's header "Add Funds" open the SAME window in-place instead of redirecting. */
+(function ensureDepositModal(){
+  function inject(){
+    if (!document.body || document.getElementById('deposit-modal')) return;
+    var wrap = document.createElement('div');
+    wrap.innerHTML = '<div id="deposit-modal" style="display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center">'
+      + '<div onclick="closeDepositModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.42)"></div>'
+      + '<div style="background:#fff;border-radius:16px;width:420px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.22);padding:26px;position:relative">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><div style="font-size:16px;font-weight:700;color:#191918">Add Funds</div><button onclick="closeDepositModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
+      + '<div style="margin-bottom:14px"><label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>'
+      + '<select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918"><option value="vietqr">BIDV</option><option value="paypal">PayPal</option><option value="card">Debit/Credit Card</option></select></div>'
+      + '<div style="margin-bottom:16px"><label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>'
+      + '<div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span>'
+      + '<input id="modal-amount" type="number" min="1" step="0.01" placeholder="0.00" oninput="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:700"/></div>'
+      + '<div style="display:flex;gap:6px;margin-top:8px">'
+      + ['280','500','840','1000'].map(function(v){ return '<button onclick="document.getElementById(\'modal-amount\').value=\''+v+'\';vqrSyncDepositUI()" style="flex:1;background:#f6f5f4;border:none;border-radius:6px;padding:6px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">$'+Number(v).toLocaleString()+'</button>'; }).join('')
+      + '</div>'
+      + '<div id="dep-vqr-box" style="display:none;margin-top:12px;background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px"><span style="color:#6b7280">Your rate — 1 USD = ₫</span><input id="dep-vqr-rate" type="number" min="1" step="1" oninput="vqrSaveRate(this.value);vqrSyncDepositUI()" style="width:100px;text-align:right;border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;font-weight:700;outline:none"/></div><div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#6b7280">Transfer amount</span><b id="dep-vnd-preview" style="font-size:14.5px;color:#191918">₫0</b></div></div></div>'
+      + '<div id="paypal-box" style="display:none;margin-bottom:14px"><div style="font-size:12.5px;color:#6b7280;margin-bottom:10px">You\'ll continue in PayPal\'s secure window to pay with your balance or bank, then return here.</div><button id="paypal-continue" onclick="walPayPalRedirect()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:9px;background:#ffc439;color:#003087;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M5 4h6a2.5 2.5 0 010 5H7L6 13H4l2-9z" stroke="#003087" stroke-width="1.3" stroke-linejoin="round"/></svg>Continue with PayPal</button><div id="paypal-err" style="font-size:12px;color:#dc2626;margin-top:8px;display:none"></div></div>'
+      + '<div id="dep-card-box" style="display:none;margin-bottom:14px"></div>'
+      + '<button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">Pay Now</button>'
+      + '<div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#374151;text-decoration:underline;text-decoration-color:#c4c3be;text-underline-offset:3px;font-weight:600">Go to Wallet →</a></div>'
+      + '</div></div>';
+    while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+  }
+  if (document.body) inject(); else document.addEventListener('DOMContentLoaded', inject);
+})();
 /* ── Deposit modal ── */
 function openDepositModal(amount, method) {
   document.getElementById('deposit-modal').style.display = 'flex';
@@ -81,7 +110,7 @@ function openCardTopUp() {
     +   '</div>'
     +   '<div style="display:flex;gap:24px;flex-wrap:wrap;padding:22px 24px">'
     +     '<div style="flex:1 1 320px;min-width:280px;display:flex;flex-direction:column;gap:14px">'
-    +       '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
+    +       '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" autocomplete="cc-name" name="ccname" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
     +       '<div><label style="' + _lbl + '">CARD NUMBER</label><div id="cc-num" style="' + _ccBox + '"></div></div>'
     +       '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><div id="cc-exp-el" style="' + _ccBox + '"></div></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><div id="cc-cvc-el" style="' + _ccBox + '"></div></div></div>'
     +       '<div id="cc-error" style="display:none;font-size:12.5px;color:#dc2626;font-weight:600;line-height:1.45"></div>'
@@ -298,7 +327,7 @@ function _laAddCardHtml() {
   return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><button onclick="laCancelAddCard()" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:13.5px;font-weight:600;font-family:inherit;display:inline-flex;align-items:center;gap:4px"><span style="font-size:17px;line-height:1">‹</span>Cards</button></div>'
     + '<div style="display:flex;gap:24px;flex-wrap:wrap">'
     + '<div style="flex:1 1 280px;min-width:260px;display:flex;flex-direction:column;gap:14px">'
-    + '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
+    + '<div><label style="' + _lbl + '">CARDHOLDER NAME</label><input id="cc-name" type="text" autocomplete="cc-name" name="ccname" placeholder="JANE COOPER" oninput="ccUpdatePreview()" style="' + _is + ';text-transform:uppercase" ' + _foc + '></div>'
     + '<div><label style="' + _lbl + '">CARD NUMBER</label><div id="cc-num" style="' + _box + '"></div></div>'
     + '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + _lbl + '">EXPIRY</label><div id="cc-exp-el" style="' + _box + '"></div></div><div style="flex:1"><label style="' + _lbl + '">CVC</label><div id="cc-cvc-el" style="' + _box + '"></div></div></div>'
     + '<div id="cc-error" style="display:none;font-size:12.5px;color:#dc2626;font-weight:600;line-height:1.45"></div>'
