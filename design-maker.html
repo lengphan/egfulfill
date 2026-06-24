@@ -3533,9 +3533,14 @@ function closeProdSuccess(){
   document.getElementById('prod-success').style.display = 'none';
   document.body.style.overflow = '';
 }
-/* Show context banner + relabel the primary CTA when the user came from an order */
+/* Show context banner + relabel the primary CTA when the user came from an order.
+   The order-attach route navigates with NO query params (it only stashes
+   eg_design_context); the product route always carries ?id=. So if ?id= is present
+   we came to design/PUBLISH a product — drop any stale order context so we don't
+   wrongly show "Designing for <order>" + the attach flow with no real attachment. */
 (function(){
   try {
+    if (new URLSearchParams(location.search).get('id')) { sessionStorage.removeItem('eg_design_context'); return; }
     const ctx = sessionStorage.getItem('eg_design_context');
     if (!ctx) return;
     const c = JSON.parse(ctx);
