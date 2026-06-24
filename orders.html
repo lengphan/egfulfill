@@ -1087,11 +1087,13 @@ function renderOrders(ordersOverride) {
       // Nudge the Upload button while this item still has no design (uniform cue with
       // the factory boards — same pickNudge animation).
       const _needsDesign = needsSetup && !upFile && ITEM_DESIGN_SEL[dsKey] !== 'template' && ITEM_DESIGN_SEL[dsKey] !== 'lab';
-      // Three neat actions (Upload · Templates · Design Lab) — matches the factory side.
-      const designBtns = () => `
+      // Three actions (Upload · Templates · Design Lab) — TEMPORARILY HIDDEN (display:none)
+      // since the item avatar is now the all-in-one mini designer. DOM/ids kept so it's a
+      // one-line un-hide later (remove the wrapping span).
+      const designBtns = () => `<span style="display:none">
         <button id="dsb-${o.no}-${escSku}-upload" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','upload');openUploadPanel(${o.no},'${itemDK(item)}')" style="${_dsStyle(!!upFile)}${_needsDesign ? ';animation:pickNudge 1.2s ease-in-out infinite' : ''}" title="${upFile ? 'Design file attached' : 'Upload a design file'}">${upFile ? 'Uploaded' : 'Upload'}</button>
         <button id="dsb-${o.no}-${escSku}-template" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','template');openDTpl(event,'${o.no}','${item.sku}')" style="${dsBtnStyle('template')}">Templates</button>
-        <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a>`;
+        <a id="dsb-${o.no}-${escSku}-lab" href="design-maker.html" onclick="event.stopPropagation();pickDesign(${o.no},'${escSku}','lab')" style="${dsBtnStyle('lab')}">Design Lab</a></span>`;
 
 
       /* Pre-designed items: show locked badge ONLY after the order has left "new/action" setup state.
@@ -2580,9 +2582,9 @@ function openDetailModal(ordNo) {
     // buttons stay visible but greyed (opacity + pointer-events:none) so the UI
     // doesn't suddenly mutate into a different layout. Same shape as setup.
     const designDimmed = needsSetup ? '' : 'opacity:.45;pointer-events:none;';
-    // Three neat actions (Upload · Templates · Design Lab) — matches the factory side.
+    // Three actions — TEMPORARILY HIDDEN (display:none); avatar is the editor now.
     const designActions = `
-      <div style="display:inline-flex;align-items:center;gap:5px;${designDimmed}">
+      <div style="display:none;align-items:center;gap:5px;${designDimmed}">
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','upload','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('upload',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='upload')}"${_aHover(_src==='upload')} title="${_src==='upload' ? 'Design uploaded — click to replace' : 'Upload artwork'}">${_src==='upload' ? 'Uploaded' : 'Upload'}</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','template','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('template',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='template')}"${_aHover(_src==='template')} title="Pick from saved templates">Templates</button>
         <button onclick="event.stopPropagation();pickDesign(${o.no},'${odmEscSku}','lab','${itemDK(item).replace(/'/g,"\\'")}');odmSlideOpen('lab',${o.no},'${itemDK(item).replace(/'/g,"\\'")}')" style="${_aStyle(_src==='lab')}"${_aHover(_src==='lab')} title="Open in Design Lab">Design Lab</button>
