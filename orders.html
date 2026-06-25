@@ -1016,7 +1016,10 @@ function renderOrders(ordersOverride) {
     const expItemsHtml = o.itemsList.map((item, itemIdx) => {
       const isLastItem = itemIdx === o.itemsList.length - 1;
       const techLabel = {DTG:'DTG',DTF:'DTF',EMB:'Embroidery',APL:'Applique',LSR:'Laser'}[item.tech]||item.tech;
-      const autoBlank = item.blank || skuToBlank(item.sku);
+      // An un-chosen "New item" (synthetic NEW-… SKU) shows a clean prompt — empty strip,
+      // SKU "N/A", name "Pick a Blank" — instead of a misleading pre-filled product.
+      const _unchosen = /^NEW-/i.test(String(item.sku || ''));
+      const autoBlank = _unchosen ? '' : (item.blank || skuToBlank(item.sku));
       // Per-item key for DOM ids + handlers — a stable unique id, NOT the SKU,
       // so two line items with the same SKU don't share selection/edit state.
       if (item.lineId) item.__uid = item.lineId;   // unify the row handle on the stable lineId
@@ -1045,7 +1048,7 @@ function renderOrders(ordersOverride) {
       const _blankInjected = (autoBlank && !_blankInStd) ? `<option value="${String(autoBlank).replace(/"/g,'&quot;')}" selected>${String(autoBlank).replace(/</g,'&lt;')}</option>` : '';
       const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Select blank…</option>${_blankInjected}${blankOpts}`;
       const printOpts = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']]
-        .map(([v,l])=>`<option value="${v}"${v===item.tech?' selected':''}>${l}</option>`).join('');
+        .map(([v,l])=>`<option value="${v}"${(!_unchosen && v===item.tech)?' selected':''}>${l}</option>`).join('');
 
       // Vertical pipe + breathing room around it so the three steps read as
       // distinct sections, not a single mashed-together row of dropdowns.
@@ -1113,11 +1116,11 @@ function renderOrders(ordersOverride) {
       // Variant pickers — pull real options from the catalog so size/color match
       // what the operator has stocked. _odmExtract* fall back to parsing the SKU.
       const _vOpts = (typeof odmGetVariantOptions === 'function') ? odmGetVariantOptions(item) : { colors:_ODM_DEFAULT_COLORS, sizes:_ODM_DEFAULT_SIZES };
-      const _curColor = item.color || (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || (_vOpts.colors[0] || '');
-      const _curSize  = item.size  || (typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '') || (_vOpts.sizes[0]  || '');
+      const _curColor = _unchosen ? '' : (item.color || (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || (_vOpts.colors[0] || ''));
+      const _curSize  = _unchosen ? '' : (item.size  || (typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '') || (_vOpts.sizes[0]  || ''));
       const _skuEsc = item.sku.replace(/'/g,"\\'");
-      const _colorOpts = _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
-      const _sizeOpts  = _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
+      const _colorOpts = (_unchosen ? '<option value="" selected></option>' : '') + _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
+      const _sizeOpts  = (_unchosen ? '<option value="" selected></option>' : '') + _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
       const _variantSel = (key, opts, curVal, width) => `<select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','${key}',this.value)" style="${SEL};width:${width}px;color:#374151;${lockStyle}">${opts}</select>`;
 
       // Variant pill — blank/color/size grouped into a single bordered control
@@ -1143,8 +1146,8 @@ function renderOrders(ordersOverride) {
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
-            <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.listing||item.name}">${item.listing||item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></div>
-            <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${item.sku}</div>
+            <div style="font-size:13.5px;font-weight:600;color:${_unchosen?'#9ca3af':'#191918'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${_unchosen?'Pick a Blank':(item.listing||item.name)}">${_unchosen?'Pick a Blank':(item.listing||item.name)} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></div>
+            <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${_unchosen?'N/A':item.sku}</div>
           </div>
           <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:100%" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
             <div style="flex:2 1 150px;min-width:120px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div>
