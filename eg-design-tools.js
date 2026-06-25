@@ -1230,6 +1230,32 @@
   // Mini designer: blank mockup + design (drag/resize/Remove BG) + drop-to-upload +
   // simple TEXT layers (add / type / colour / drag). Heavier work → "Open Design Maker".
   // No design is required to open (you can start from a blank and add art/text here).
+  // The editor card markup (shared by the popup overlay AND the inline Edit-All embed).
+  // Order: header · search · stage · tools — so when embedded (header hidden) the search
+  // sits directly under the blank selector and the mockup is the live editor.
+  function _qpCardHTML() {
+    return '<div id="egdt-qp-card" style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:560px;overflow:hidden" onclick="event.stopPropagation()">'
+      + '<div id="egdt-qp-header" style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egdt-qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div id="egdt-qp-sub" style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools.closeQuickPos()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
+      + '<div id="egdt-qp-idrow" style="position:relative;padding:14px 18px 10px;display:flex;gap:8px;align-items:center">'
+      +   '<div id="egdt-qp-results" style="position:absolute;left:18px;right:18px;top:calc(100% - 2px);max-height:240px;overflow:auto;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);display:none;z-index:6"></div>'
+      +   '<input id="egdt-qp-idfield" placeholder="Search designs, templates & images — or paste a DL-/DSN-/TPL- ID" autocomplete="off" oninput="EGDesignTools._qpSearch()" onfocus="this.style.borderColor=\'#191918\';EGDesignTools._qpSearch()" onblur="this.style.borderColor=\'#e5e4e0\';setTimeout(function(){var p=document.getElementById(\'egdt-qp-results\');if(p)p.style.display=\'none\'},180)" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none"/>'
+      +   '<button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button>'
+      + '</div>'
+      + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:440px;height:440px;max-width:100%;background:#f6f5f4 center/120% no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
+      + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
+      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
+      + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b9a8e0;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9a8bc4">PRINT AREA</span></div>'
+      + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;outline:1.5px dashed #8b7bc0;outline-offset:1px"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#fff;border:1.5px solid #8b7bc0;border-radius:50%;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>'
+      + '<div id="egdt-qp-extra"></div>'
+      + '<div id="egdt-qp-texts"></div>'
+      + '</div></div>'
+      + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
+      + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
+      + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
+      + '<div style="margin-left:auto;display:flex;gap:8px"><button id="egdt-qp-cancel" onclick="EGDesignTools.closeQuickPos()" style="font-size:13px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 14px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Cancel</button><button id="egdt-qp-save" onclick="EGDesignTools.saveQuickPos()" style="font-size:13px;border:none;background:#191918;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-family:inherit">Save</button></div></div>'
+      + '<input type="file" id="egdt-qp-file" accept="image/*" style="display:none" onchange="EGDesignTools._qpFileChange(event)"/>'
+      + '</div>';
+  }
   function openQuickPos(orderNum, key, applyAll) {
     var o = findOrder(orderNum); if (!o) return;
     // Apply-all (Edit All): edit the first item, then save propagates to every line.
@@ -1263,35 +1289,34 @@
       : { x: 25, y: 25, w: 50, h: 50 };
     if (!Array.isArray(it.textLayers)) it.textLayers = [];
     var locked = !isNewOrder(o);
-    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea, applyAll: !!applyAll };
+    // 3rd arg accepts a boolean (applyAll) or an options object { applyAll, mount }.
+    var _opts = (applyAll && typeof applyAll === 'object') ? applyAll : { applyAll: !!applyAll };
+    applyAll = !!_opts.applyAll;
+    var _mountSel = _opts.mount || null;
+    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea, applyAll: applyAll, mount: _mountSel };
+    // Persistent backdrop shell (popup mode); the editor CARD lives inside it or is
+    // re-parented into an inline mount (Edit-All embed).
     var m = document.getElementById('egdt-qp');
     if (!m) {
       m = document.createElement('div'); m.id = 'egdt-qp';
-      m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10040;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
-      m.innerHTML = '<div style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:560px;overflow:hidden" onclick="event.stopPropagation()">'
-        + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egdt-qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div id="egdt-qp-sub" style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools.closeQuickPos()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
-        + '<div style="padding:18px 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:440px;height:440px;max-width:100%;background:#f6f5f4 center/120% no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
-        + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-        + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
-        + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b9a8e0;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9a8bc4">PRINT AREA</span></div>'
-        + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;outline:1.5px dashed #8b7bc0;outline-offset:1px"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#fff;border:1.5px solid #8b7bc0;border-radius:50%;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>'
-        + '<div id="egdt-qp-extra"></div>'
-        + '<div id="egdt-qp-texts"></div>'
-        + '</div></div>'
-        + '<div id="egdt-qp-idrow" style="position:relative;padding:0 18px 10px;display:flex;gap:8px;align-items:center">'
-        +   '<div id="egdt-qp-results" style="position:absolute;left:18px;right:18px;bottom:calc(100% - 2px);max-height:240px;overflow:auto;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);display:none;z-index:6"></div>'
-        +   '<input id="egdt-qp-idfield" placeholder="Search designs, templates & images — or paste a DL-/DSN-/TPL- ID" autocomplete="off" oninput="EGDesignTools._qpSearch()" onfocus="this.style.borderColor=\'#191918\';EGDesignTools._qpSearch()" onblur="this.style.borderColor=\'#e5e4e0\';setTimeout(function(){var p=document.getElementById(\'egdt-qp-results\');if(p)p.style.display=\'none\'},180)" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none"/>'
-        +   '<button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button>'
-        + '</div>'
-        + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
-        + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
-        + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
-        + '<div style="margin-left:auto;display:flex;gap:8px"><button onclick="EGDesignTools.closeQuickPos()" style="font-size:13px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 14px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Cancel</button><button id="egdt-qp-save" onclick="EGDesignTools.saveQuickPos()" style="font-size:13px;border:none;background:#191918;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-family:inherit">Save</button></div></div>'
-        + '<input type="file" id="egdt-qp-file" accept="image/*" style="display:none" onchange="EGDesignTools._qpFileChange(event)"/>'
-        + '</div>';
+      m.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:10040;display:none;align-items:center;justify-content:center;padding:24px;font-family:Inter,system-ui,sans-serif';
       m.addEventListener('click', function (e) { if (e.target === m) closeQuickPos(); });
       document.body.appendChild(m);
-      _qpAttach();
+    }
+    // Build (or rebuild, if a modal re-render wiped it) the editor card.
+    var card = document.getElementById('egdt-qp-card');
+    if (!card) { m.insertAdjacentHTML('beforeend', _qpCardHTML()); card = document.getElementById('egdt-qp-card'); _qpAttach(); }
+    // Place the card: into the inline mount (embed) or the centered overlay (popup).
+    var host = _mountSel ? document.querySelector(_mountSel) : m;
+    if (host && card.parentNode !== host) host.appendChild(card);
+    var hdr = document.getElementById('egdt-qp-header'), cancelBtn = document.getElementById('egdt-qp-cancel');
+    if (_mountSel) {
+      m.style.display = 'none';
+      card.style.maxWidth = '100%'; card.style.boxShadow = 'none'; card.style.border = '1.5px solid #e5e4e0';
+      if (hdr) hdr.style.display = 'none'; if (cancelBtn) cancelBtn.style.display = 'none';
+    } else {
+      card.style.maxWidth = '560px'; card.style.boxShadow = '4px 4px 0 #40403d'; card.style.border = '1.5px solid #40403d';
+      if (hdr) hdr.style.display = 'flex'; if (cancelBtn) cancelBtn.style.display = '';
     }
     var _qpIdx = 1; try { var _li = (Array.isArray(o.items) ? o.items : []).findIndex(function (x) { return itemDK(x) === dk; }); _qpIdx = (_li >= 0 ? _li : 0) + 1; } catch (e) {}
     var _qpNo = (window.egOrderIds) ? (function () { var _i = window.egOrderIds(o); return _i.market || ('#' + _i.eg); })() : ('#' + (o.num || o.id));
@@ -1330,7 +1355,7 @@
     _qpRenderTexts(it.textLayers, locked);
     _qpRenderDesignLayers(it.designLayers, locked);
     if (!locked) _qpLoadLibrary();   // warm the Image Library list for search
-    m.style.display = 'flex';
+    if (!_mountSel) m.style.display = 'flex';   // popup only; embed stays inline
   }
   function closeQuickPos() { var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
   // Render the saved text layers as draggable, editable, colourable divs on the stage.
@@ -1576,7 +1601,8 @@
       try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
       pushItemsToApi(o);
     }
-    closeQuickPos(); refreshBoard();
+    if (_qpF && _qpF.mount) { refreshBoard(); _egdtToast('Saved to all items'); }   // embed: stay open
+    else { closeQuickPos(); refreshBoard(); }
   }
   function qpRemoveBg() {
     if (!_qpF || _qpF.locked) return;
