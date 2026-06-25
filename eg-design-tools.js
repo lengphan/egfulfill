@@ -1869,7 +1869,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-25-custom-dropdown';
+  window.EG_BUILD = '2026-06-25-factory-editall-embed';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -1931,15 +1931,18 @@
     },
     allModeBody: function (o) {
       var list = (o && (o.items || o.itemList)) || [];
-      var first = list[0]; var n = list.length;
-      var comp = this.compositeHTML(o, first);
-      return '<div style="display:flex;align-items:center;gap:12px;background:#faf9f7;border:1px solid #ece8e0;border-radius:10px;padding:12px 14px;margin-bottom:14px">'
-        + '<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;color:#191918">One design for all ' + n + ' items</div><div style="font-size:12px;color:#9ca3af;margin-top:1px">Upload once — applied to every item.</div></div>'
-        + '<button onclick="EGDesignTools.uploadAllDesigns(window._xfomNum)" style="flex-shrink:0;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit">' + (comp.hasArt ? 'Replace design' : 'Upload design') + '</button>'
-        + '</div>'
-        + '<div style="display:flex;align-items:center;gap:14px;border:1px solid #e5e4e0;border-radius:8px;padding:14px 16px">'
-        + '<div style="width:72px;height:72px;border-radius:8px;overflow:hidden;flex-shrink:0;border:1px solid #e5e4e0">' + comp.html + '</div>'
-        + '<div style="min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">' + ((first && (first.name || first.product || first.blank)) || 'Design') + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Applied to all ' + n + ' items</div></div>'
+      var n = list.length;
+      var oid = (o && (o.id || o.num)) || '';
+      // Mount the SHARED mini designer inline (apply-all) — same as the seller board's
+      // Edit All — once the xfom modal markup lands. Replaces the old upload-design box.
+      setTimeout(function () {
+        if (window.EGDesignTools && EGDesignTools.openQuickPos && document.getElementById('egdt-qp-mount')) {
+          EGDesignTools.openQuickPos(String(oid), null, { applyAll: true, mount: '#egdt-qp-mount' });
+        }
+      }, 0);
+      return '<div style="margin-bottom:8px">'
+        + '<div style="font-size:12px;font-weight:700;color:#6b7280;letter-spacing:.03em;margin-bottom:6px">DESIGN · applies to all ' + n + ' items</div>'
+        + '<div id="egdt-qp-mount" style="max-width:560px;margin:0 auto"></div>'
         + '</div>';
     },
     uploadAllDesigns: function (orderNum) {
