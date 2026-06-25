@@ -1920,7 +1920,11 @@ function dmRebuildMethodOptions(p){
   var sel = document.getElementById('ps-method'); if (!sel) return;
   var methods = dmProductMethods(p);
   sel.innerHTML = methods.map(function(m){ return '<option value="' + m.replace(/"/g,'&quot;') + '">' + m + '</option>'; }).join('');
-  var pref = (p && p.tech) ? dmNormMethodLabel(p.tech) : '';
+  // Prefer the technique the user picked on the product detail page (cached per product),
+  // then the product's own primary tech, then the current/first.
+  var cached = ''; try { if (p && p.id != null) cached = localStorage.getItem('eg_tech_' + p.id) || ''; } catch (e) {}
+  var cachedLabel = cached ? dmNormMethodLabel(cached) : '';
+  var pref = methods.indexOf(cachedLabel) >= 0 ? cachedLabel : ((p && p.tech) ? dmNormMethodLabel(p.tech) : '');
   var pick = methods.indexOf(pref) >= 0 ? pref : (methods.indexOf(_dmMethod) >= 0 ? _dmMethod : methods[0]);
   _dmMethod = pick; sel.value = pick;
   dmApplyMethodFx();

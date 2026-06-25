@@ -21,7 +21,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 /* Match dashboard cards: lighter bg + dark 2px borderline (offset shadow) */
 html:not([data-theme=dark]) .card{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
 /* technique tabs */
-.tech-tab{flex:1;padding:9px 0;border:1.5px solid #e5e4e0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
+.tech-tab{flex:1;padding:8px 6px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center;white-space:nowrap}
 .tech-tab.on{background:#fff;border-color:#191918;color:#191918}
 .tech-tab:not(.on):hover{border-color:#9ca3af}
 /* size buttons */
@@ -683,16 +683,23 @@ function pdTechs() {
   if (!out.length) out = [{ key:'dtg', label:'DTG printing' }];
   return out;
 }
+function pdCleanTech(s){ return String(s||'').replace(/\b(printing|print)\b/ig,'').replace(/\s{2,}/g,' ').trim(); }
 function pdRenderTechs() {
   var el = document.getElementById('pd-techs'); if (!el) return;
   _techs = pdTechs(); _tech = _techs[0].key;
   el.innerHTML = _techs.map(function(t,i){
     return '<button class="tech-tab'+(i===0?' on':'')+'" data-tech="'+t.key+'" onclick="setTech(\''+t.key+'\')">'+t.label+'</button>';
   }).join('');
+  // Subtitle = just the techniques (no "Print on demand", no "print"/"printing").
+  var subEl = document.getElementById('pd-sub');
+  if (subEl) subEl.textContent = _techs.map(function(t){ return pdCleanTech(t.label); }).join(' / ');
+  setTech(_tech);
 }
 function setTech(t) {
   _tech = t;
   document.querySelectorAll('#pd-techs .tech-tab').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-tech')===t); });
+  // Remember the chosen technique for this product so the Design Maker pre-selects it.
+  try { if (typeof _pid !== 'undefined' && _pid != null) localStorage.setItem('eg_tech_' + _pid, t); } catch (e) {}
 }
 
 function setHero(idx) {
