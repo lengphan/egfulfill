@@ -906,7 +906,7 @@ function renderOrdersPagination(page, total) {
 // Expose the live ORDERS array so the shared mini designer (eg-design-tools.js) can patch
 // item designUrl/designPos/layers back into it after a save — otherwise the avatar +
 // needs-design check render from a stale in-memory copy.
-try { window.ORDERS = ORDERS; } catch (e) {}
+try { window.ORDERS = ORDERS; window.UP_STATE = UP_STATE; window.saveUpState = saveUpState; } catch (e) {}
 function renderOrders(ordersOverride) {
   // eg_hide_seed (set by EGStore.clearAll()) suppresses the JS-baked demo orders so the
   // seller table only shows orders that came in via the manual create-order modal / EGStore.

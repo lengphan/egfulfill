@@ -1639,6 +1639,7 @@
     it.designLayers = _qpCollectDesignLayers();
     // Edit All → copy this exact design (art + position + text + layers) onto EVERY line.
     var targets = (_qpF.applyAll && Array.isArray(o.items) && o.items.length) ? o.items : [it];
+    var _qpUpDirty = false;
     targets.forEach(function (t2) {
       if (t2 !== it) {
         t2.designUrl = it.designUrl;
@@ -1647,10 +1648,16 @@
         t2.designLayers = (it.designLayers || []).map(function (l) { return Object.assign({}, l); });
       }
       var dk2 = itemDK(t2);
-      try { if (window.EGStore && EGStore.cacheRawDesign && o.id && it.designUrl) EGStore.cacheRawDesign(o.id, dk2, it.designUrl); } catch (e) {}
-      try { if (window.EGStore && EGStore.cacheImage && o.id && it.designUrl) EGStore.cacheImage(o.id, dk2, it.designUrl); } catch (e) {}
+      // Overwrite the raw/image cache with the new design — or CLEAR it when the design was
+      // removed, so a previously-cached design on this line doesn't rehydrate.
+      try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, dk2, it.designUrl || ''); } catch (e) {}
+      try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, dk2, it.designUrl || ''); } catch (e) {}
+      // Drop any stale upload-panel state on this line — the mini designer is authoritative,
+      // otherwise UP_STATE would shadow the new design in _itemDesignURL.
+      try { var _us = window.UP_STATE, _on = (o.no != null ? o.no : o.num); if (_us && _on != null && _us[_on]) { delete _us[_on][dk2]; _qpUpDirty = true; } } catch (e) {}
       patchBoardArrays(o.id, dk2, function (row, bi) { if (bi) { bi.designPos = t2.designPos; bi.designUrl = t2.designUrl; bi.textLayers = t2.textLayers; bi.designLayers = t2.designLayers; } });
     });
+    if (_qpUpDirty && typeof window.saveUpState === 'function') { try { window.saveUpState(); } catch (e) {} }
     try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
     if (pushApi) pushItemsToApi(o);
   }
