@@ -1230,8 +1230,10 @@
   // Mini designer: blank mockup + design (drag/resize/Remove BG) + drop-to-upload +
   // simple TEXT layers (add / type / colour / drag). Heavier work → "Open Design Maker".
   // No design is required to open (you can start from a blank and add art/text here).
-  function openQuickPos(orderNum, key) {
+  function openQuickPos(orderNum, key, applyAll) {
     var o = findOrder(orderNum); if (!o) return;
+    // Apply-all (Edit All): edit the first item, then save propagates to every line.
+    if (applyAll && (key == null || key === true) && Array.isArray(o.items) && o.items.length) { key = itemDK(o.items[0]); }
     var it = findItemByKey(o, key); if (!it) return;
     var dk = itemDK(it);
     var design = designOverlaySrc(orderNum, it);   // may be '' — that's fine now
@@ -1261,7 +1263,7 @@
       : { x: 25, y: 25, w: 50, h: 50 };
     if (!Array.isArray(it.textLayers)) it.textLayers = [];
     var locked = !isNewOrder(o);
-    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea };
+    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea, applyAll: !!applyAll };
     var m = document.getElementById('egdt-qp');
     if (!m) {
       m = document.createElement('div'); m.id = 'egdt-qp';
@@ -1293,7 +1295,7 @@
     }
     var _qpIdx = 1; try { var _li = (Array.isArray(o.items) ? o.items : []).findIndex(function (x) { return itemDK(x) === dk; }); _qpIdx = (_li >= 0 ? _li : 0) + 1; } catch (e) {}
     var _qpNo = (window.egOrderIds) ? (function () { var _i = window.egOrderIds(o); return _i.market || ('#' + _i.eg); })() : ('#' + (o.num || o.id));
-    document.getElementById('egdt-qp-title').textContent = _qpNo + '-' + String(_qpIdx).padStart(2, '0');
+    document.getElementById('egdt-qp-title').textContent = _qpNo + (applyAll ? ' · all items' : ('-' + String(_qpIdx).padStart(2, '0')));
     document.getElementById('egdt-qp-sub').textContent = locked ? 'Locked — order already in production' : 'Drag art/text to move · drag the corner to resize';
     var stage = document.getElementById('egdt-qp-stage'); stage.style.backgroundImage = blank ? 'url("' + blank + '")' : 'none';
     var wrap = document.getElementById('egdt-qp-wrap'), dEl = document.getElementById('egdt-qp-design');
@@ -1557,9 +1559,22 @@
       if (wrap) it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
       it.textLayers = _qpCollectTexts();
       it.designLayers = _qpCollectDesignLayers();
+      // Edit All → copy this exact design (art + position + text + layers) onto EVERY line.
+      var targets = (_qpF.applyAll && Array.isArray(o.items) && o.items.length) ? o.items : [it];
+      targets.forEach(function (t2) {
+        if (t2 !== it) {
+          t2.designUrl = it.designUrl;
+          t2.designPos = { x: it.designPos.x, y: it.designPos.y, w: it.designPos.w, h: it.designPos.h };
+          t2.textLayers = (it.textLayers || []).map(function (l) { return Object.assign({}, l); });
+          t2.designLayers = (it.designLayers || []).map(function (l) { return Object.assign({}, l); });
+        }
+        var dk2 = itemDK(t2);
+        try { if (window.EGStore && EGStore.cacheRawDesign && o.id && it.designUrl) EGStore.cacheRawDesign(o.id, dk2, it.designUrl); } catch (e) {}
+        try { if (window.EGStore && EGStore.cacheImage && o.id && it.designUrl) EGStore.cacheImage(o.id, dk2, it.designUrl); } catch (e) {}
+        patchBoardArrays(o.id, dk2, function (row, bi) { if (bi) { bi.designPos = t2.designPos; bi.designUrl = t2.designUrl; bi.textLayers = t2.textLayers; bi.designLayers = t2.designLayers; } });
+      });
       try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
       pushItemsToApi(o);
-      patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) { bi.designPos = it.designPos; bi.designUrl = it.designUrl; bi.textLayers = it.textLayers; bi.designLayers = it.designLayers; } });
     }
     closeQuickPos(); refreshBoard();
   }

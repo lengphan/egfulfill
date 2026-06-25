@@ -2334,20 +2334,19 @@ function _odmAllPreview(o) {
   const blankOpts = `<option value="">Pick a blank…</option>` + _blankList.map(p => `<option value="${p.id}" ${String(p.id) === String(selId) ? 'selected' : ''}>${String(p.name || p.skuBase || '').replace(/</g, '&lt;')}</option>`).join('');
   const mockup = (typeof _itemMockupURL === 'function') ? _itemMockupURL(item) : '';
   const design = (typeof _itemDesignURL === 'function') ? _itemDesignURL(o, item) : '';
+  const pos = item.designPos || { x:25, y:25, w:50, h:50 };
+  const oid = String(o.id).replace(/'/g, "\\'");
   const _lbl = 'font-size:12px;font-weight:700;color:#6b7280;display:block;margin-bottom:6px;letter-spacing:.03em';
   return `<div style="display:flex;flex-direction:column;gap:16px">
     <div><label style="${_lbl}">BLANK · applies to all ${n} items</label>
       <select onchange="odmSetBlankForAll(${o.no}, this.value)" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'">${blankOpts}</select>
     </div>
-    <div><label style="${_lbl}">DESIGN · drop one file (applies to all ${n})</label>
-      <div id="odm-all-drop" ondragover="event.preventDefault();this.style.borderColor='#191918'" ondragleave="this.style.borderColor='#d8d4cd'" ondrop="odmDropAll(event, ${o.no})" onclick="odmUploadAll(${o.no})" title="Drop a design or click to upload" style="position:relative;width:100%;max-width:420px;aspect-ratio:1;margin:0 auto;border:2px dashed #d8d4cd;border-radius:14px;overflow:hidden;cursor:pointer;background:#f6f5f4${mockup ? ` url('${mockup.replace(/'/g, '%27')}') center/contain no-repeat` : ''}">
-        ${design ? `<img src="${design}" style="position:absolute;top:25%;left:25%;width:50%;height:50%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>` : ''}
-        ${design ? '' : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
-          <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg>
-        </div>`}
+    <div><label style="${_lbl}">DESIGN · applies to all ${n} items</label>
+      <div onclick="event.stopPropagation();if(window.EGDesignTools)EGDesignTools.openQuickPos('${oid}', null, true)" title="Open the mini designer — saved to all ${n} items" style="position:relative;width:100%;max-width:420px;aspect-ratio:1;margin:0 auto;border:1.5px solid #e5e4e0;border-radius:14px;overflow:hidden;cursor:pointer;background:#f6f5f4${mockup ? ` url('${mockup.replace(/'/g, '%27')}') center/contain no-repeat` : ''}" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'">
+        ${design ? `<img src="${design}" style="position:absolute;left:${pos.x}%;top:${pos.y}%;width:${pos.w}%;height:${pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>` : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>`}
       </div>
+      <div style="font-size:12px;color:#9ca3af;text-align:center;margin-top:8px">Click to open the mini designer — drop a file, search a design / template, or add text. Saved to all ${n} items.</div>
     </div>
-    <button onclick="event.stopPropagation();odmConfirmAll(${o.no})" style="width:100%;background:#191918;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">Confirm</button>
   </div>`;
 }
 // Confirm (Edit All) — apply the current blank + design to EVERY item in the order.
