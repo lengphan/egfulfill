@@ -1235,7 +1235,12 @@
     var it = findItemByKey(o, key); if (!it) return;
     var dk = itemDK(it);
     var design = designOverlaySrc(orderNum, it);   // may be '' — that's fine now
-    var blank = ''; try { blank = setupProductImage(orderNum, dk) || (/^(https?:|data:)/.test(String(it.blankImg || '')) ? it.blankImg : '') || ''; } catch (e) {}
+    // Resolve the blank mockup EXACTLY like the row avatar (compositeHTML) — try both the
+    // order number and id (setupProductImage keys by number), then fall back to the item's
+    // own blank/thumb — otherwise the stage opens empty while the avatar shows the mockup.
+    var blank = '';
+    try { if (typeof setupProductImage === 'function') blank = setupProductImage(o.num, dk) || setupProductImage(o.id, dk) || setupProductImage(orderNum, dk) || ''; } catch (e) {}
+    if (!blank) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
     // Print area (the operator-defined design zone) for this item's product — same
     // {x,y,w,h}% the Design Maker uses. Constrains the design + seeds its position.
     var _qpArea = null;
