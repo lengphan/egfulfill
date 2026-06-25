@@ -1261,7 +1261,7 @@
       + '</div>'
       + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:480px;height:480px;max-width:100%;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
       + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
+      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" title="Upload a design" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;z-index:1;display:none;align-items:center;justify-content:center;background:#f3f2ef;border:1.5px dashed #cfcabf;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#a8a29a\';this.style.background=\'#efede9\'" onmouseout="this.style.borderColor=\'#cfcabf\';this.style.background=\'#f3f2ef\'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 15V5M8 9l4-4 4 4" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
       + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;transform-origin:center center">'
       +   '<img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
@@ -1360,25 +1360,15 @@
     // When empty, the shaded grey drop zone (egdt-qp-empty) sits ON the print area.
     // Once a design exists, idle shows JUST the artwork — no outline at all; the grey
     // PRINT AREA box only appears while the user is dragging/resizing (see _qpAttach).
-    if (_emptyEl) {
-      if (_isEmpty && !locked) {
-        if (_qpArea) { _emptyEl.style.inset = 'auto'; _emptyEl.style.left = _qpArea.x + '%'; _emptyEl.style.top = _qpArea.y + '%'; _emptyEl.style.width = _qpArea.w + '%'; _emptyEl.style.height = _qpArea.h + '%'; }
-        else { _emptyEl.style.inset = '14px'; _emptyEl.style.left = _emptyEl.style.top = _emptyEl.style.width = _emptyEl.style.height = ''; }
-        _emptyEl.style.display = 'flex';
-      } else { _emptyEl.style.display = 'none'; }
-    }
+    if (_emptyEl) _emptyEl.style.display = (_isEmpty && !locked) ? 'flex' : 'none';   // small centred circle
     if (_areaEl) _areaEl.style.display = 'none';   // idle = no border; shown only during manipulation
-    var _ctlDisp = (locked || !design) ? 'none' : 'flex';
-    document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
-    ['egdt-qp-del', 'egdt-qp-rot'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = _ctlDisp; });
-    var _rl = document.getElementById('egdt-qp-rotline'); if (_rl) _rl.style.display = (locked || !design) ? 'none' : 'block';
-    document.getElementById('egdt-qp-rmbg').style.display = (locked || !design) ? 'none' : '';
     document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
     document.getElementById('egdt-qp-tools').style.display = locked ? 'none' : 'flex';
     var _idrow = document.getElementById('egdt-qp-idrow'); if (_idrow) _idrow.style.display = locked ? 'none' : 'flex';
     var lab = document.getElementById('egdt-qp-lab'); if (lab) lab.href = 'design-maker.html?id=' + encodeURIComponent(o.id) + '&sku=' + encodeURIComponent(it.sku || '');
     _qpRenderTexts(it.textLayers, locked);
     _qpRenderDesignLayers(it.designLayers, locked);
+    _qpDeselectAll();   // start deselected — just the artwork, no handles, until clicked
     if (!locked) _qpLoadLibrary();   // warm the Image Library list for search
     if (!_mountSel) m.style.display = 'flex';   // popup only; embed stays inline
   }
@@ -1475,8 +1465,7 @@
       var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
       if (dEl) dEl.src = out; if (wrap) wrap.style.display = 'block';
       document.getElementById('egdt-qp-empty').style.display = 'none';
-      document.getElementById('egdt-qp-handle').style.display = 'block';
-      document.getElementById('egdt-qp-rmbg').style.display = '';
+      _qpSelectPrimary();
       try { _qpPersist(false); } catch (e) {}
     };
     rd.readAsDataURL(file);
@@ -1490,6 +1479,28 @@
   }
   // Parse the current rotation (deg) off the wrap's transform.
   function _qpReadRot(el) { var m = el && String(el.style.transform || '').match(/rotate\(([-\d.]+)deg\)/); return m ? parseFloat(m[1]) : 0; }
+  // Selection model — when nothing is selected, the stage shows JUST the artwork on the
+  // blank. Clicking a design selects it (its handles appear); clicking empty space (or
+  // closing) deselects everything.
+  function _qpDeselectAll() {
+    ['egdt-qp-del', 'egdt-qp-rot', 'egdt-qp-rotline', 'egdt-qp-handle', 'egdt-qp-rmbg'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    var ex = document.getElementById('egdt-qp-extra'); if (ex) [].forEach.call(ex.querySelectorAll('.egdt-qp-dlh,.egdt-qp-dldel'), function (h) { h.style.display = 'none'; });
+  }
+  function _qpSelectPrimary() {
+    _qpDeselectAll();
+    var wrap = document.getElementById('egdt-qp-wrap'); if (!wrap || wrap.style.display === 'none' || (_qpF && _qpF.locked)) return;
+    var del = document.getElementById('egdt-qp-del'); if (del) del.style.display = 'flex';
+    var rot = document.getElementById('egdt-qp-rot'); if (rot) rot.style.display = 'flex';
+    var rl = document.getElementById('egdt-qp-rotline'); if (rl) rl.style.display = 'block';
+    var h = document.getElementById('egdt-qp-handle'); if (h) h.style.display = 'block';
+    var rm = document.getElementById('egdt-qp-rmbg'); if (rm) rm.style.display = '';
+  }
+  function _qpSelectLayer(el) {
+    _qpDeselectAll();
+    if (!el || (_qpF && _qpF.locked)) return;
+    var h = el.querySelector('.egdt-qp-dlh'); if (h) h.style.display = 'block';
+    var d = el.querySelector('.egdt-qp-dldel'); if (d) d.style.display = '';
+  }
   // Remove the PRIMARY design (the × on the design box) — clears art + rotation, shows the
   // drop zone again if no extra layers remain, and persists.
   function _qpDelPrimary() {
@@ -1502,7 +1513,7 @@
     if (dEl) dEl.src = ''; if (wrap) { wrap.style.display = 'none'; wrap.style.transform = ''; }
     ['egdt-qp-handle', 'egdt-qp-del', 'egdt-qp-rot', 'egdt-qp-rotline', 'egdt-qp-rmbg'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
     var host = document.getElementById('egdt-qp-extra'); var hasExtra = host && host.querySelector('.egdt-qp-dl');
-    if (!hasExtra) { var emp = document.getElementById('egdt-qp-empty'); if (emp) { if (_qpF.area) { emp.style.inset = 'auto'; emp.style.left = _qpF.area.x + '%'; emp.style.top = _qpF.area.y + '%'; emp.style.width = _qpF.area.w + '%'; emp.style.height = _qpF.area.h + '%'; } else { emp.style.inset = '14px'; emp.style.left = emp.style.top = emp.style.width = emp.style.height = ''; } emp.style.display = 'flex'; } }
+    if (!hasExtra) { var emp = document.getElementById('egdt-qp-empty'); if (emp) emp.style.display = 'flex'; }
     try { _qpPersist(false); } catch (e) {}
   }
   function _qpApplyDesign(img, label) {
@@ -1516,8 +1527,7 @@
     var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
     if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
     document.getElementById('egdt-qp-empty').style.display = 'none';
-    document.getElementById('egdt-qp-handle').style.display = 'block';
-    document.getElementById('egdt-qp-rmbg').style.display = '';
+    _qpSelectPrimary();
     _egdtToast('Loaded ' + label);
     try { _qpPersist(false); } catch (e) {}
   }
@@ -1710,6 +1720,14 @@
       // Remove the PRIMARY design via its × button.
       if (e.target && e.target.id === 'egdt-qp-del') { _qpDelPrimary(); e.preventDefault(); return; }
       var wrap = document.getElementById('egdt-qp-wrap'), handle = document.getElementById('egdt-qp-handle');
+      // SELECTION: clicking a design selects it (handles appear); clicking empty space
+      // deselects everything so the stage shows just the artwork on the blank.
+      var _selDl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dl') : null;
+      var _selTl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null;
+      var _inWrap = wrap && wrap.style.display !== 'none' && (e.target === wrap || wrap.contains(e.target));
+      if (_inWrap) _qpSelectPrimary();
+      else if (_selDl) _qpSelectLayer(_selDl);
+      else if (!_selTl) _qpDeselectAll();
       // Rotate the primary design via its bottom handle (drag around the centre).
       if (e.target && e.target.closest && e.target.closest('#egdt-qp-rot')) {
         mode = 'rotate'; var wr = wrap.getBoundingClientRect();
