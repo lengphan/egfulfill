@@ -3109,7 +3109,12 @@ function itemCompositeThumb(o, item, size) {
   // No blank resolved AND no design yet → show the empty "pick a blank" placeholder
   // (dashed), never the listing image. The seller clicks back in to pick a blank.
   if (!mockup && !design) {
-    return `<div title="Pick a blank to preview" style="width:${size}px;height:${size}px;border:1px dashed #d4c9a8;border-radius:7px;background:#fbf8ef;flex-shrink:0"></div>`;
+    // No blank yet — still let the seller click in to add a design (the mini designer opens;
+    // a no-blank line was previously a dead placeholder, so only the 1st item felt clickable).
+    const _lockP = !(o.status === 'new' || o.status === 'action');
+    const _skuP = String(itemDK(item)).replace(/'/g, "\\'");
+    const _ocP = _lockP ? '' : `onclick="event.stopPropagation();sellerMini('${o.id}','${_skuP}',${o.no},false)" `;
+    return `<div ${_ocP}title="${_lockP ? 'Pick a blank to preview' : 'Click to add a design'}" style="width:${size}px;height:${size}px;border:1px dashed #d4c9a8;border-radius:7px;background:#fbf8ef;flex-shrink:0;cursor:${_lockP ? 'default' : 'pointer'};transition:box-shadow .15s"${_lockP ? '' : ` onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"`}></div>`;
   }
   const pos = item.designPos || { x:25, y:25, w:50, h:50 };
   const escSku = item.sku.replace(/[^a-zA-Z0-9]/g, '_');

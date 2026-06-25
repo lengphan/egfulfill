@@ -1261,7 +1261,7 @@
       + '</div>'
       + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:480px;height:480px;max-width:100%;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
       + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" title="Upload a design" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;z-index:1;display:none;align-items:center;justify-content:center;background:#f3f2ef;border:1.5px dashed #cfcabf;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#a8a29a\';this.style.background=\'#efede9\'" onmouseout="this.style.borderColor=\'#cfcabf\';this.style.background=\'#f3f2ef\'"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 15V5M8 9l4-4 4 4" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
+      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" title="Upload a design" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;border-radius:50%;z-index:1;display:none;align-items:center;justify-content:center;background:#f3f2ef;border:1.5px dashed #cfcabf;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#a8a29a\';this.style.background=\'#efede9\'" onmouseout="this.style.borderColor=\'#cfcabf\';this.style.background=\'#f3f2ef\'"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 15V5M8 9l4-4 4 4" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
       + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;transform-origin:center center">'
       +   '<img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
@@ -1714,6 +1714,9 @@
     function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
     function down(e) {
       if (_qpF && _qpF.locked) return;
+      // REMOVE BG is a stage-corner button — let its own click fire; don't treat the
+      // mousedown as a deselect (which would hide it before the click lands).
+      if (e.target && e.target.closest && e.target.closest('#egdt-qp-rmbg')) return;
       // Remove an extra design layer via its × button.
       var del = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dldel') : null;
       if (del) { var dx = del.closest('.egdt-qp-dl'); if (dx) dx.remove(); try { _qpPersist(false); } catch (e2) {} e.preventDefault(); return; }
@@ -1747,7 +1750,7 @@
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;   // colour / delete
         var sp = tl.querySelector('.egdt-qp-tltext');
         if (sp && document.activeElement === sp) return;                              // editing — let it type
-        mode = 'text'; _tl = tl; sx = e.clientX; sy = e.clientY; startX = parseFloat(tl.style.left) || 0; startY = parseFloat(tl.style.top) || 0; e.preventDefault(); return;
+        mode = 'text'; _tl = tl; sx = e.clientX; sy = e.clientY; startX = parseFloat(tl.style.left) || 0; startY = parseFloat(tl.style.top) || 0; _qpShowAreaBox(); e.preventDefault(); return;
       }
       else return;
       sx = e.clientX; sy = e.clientY;
