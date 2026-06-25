@@ -1135,7 +1135,7 @@ function renderOrders(ordersOverride) {
       const pillHaloShadow = needsPick ? ';box-shadow:0 0 0 3px rgba(201,195,186,.18)' : '';
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
-        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px minmax(380px,1fr) 24px auto 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px minmax(380px,620px) 24px auto 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
@@ -1153,6 +1153,7 @@ function renderOrders(ordersOverride) {
           </div>
           <span></span>
           <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:auto">${designBtns()}</div>
+          <span></span>
           ${needsSetup ? `<button onclick="event.stopPropagation();orderDeleteInlineItem(${o.no},'${item.sku.replace(/'/g,"\\'")}')" title="Remove item" style="background:none;border:none;color:#c4c3be;cursor:pointer;padding:5px 6px;border-radius:5px;line-height:0;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;transition:color .15s,background .15s;width:26px;height:26px" onmouseover="this.style.color='#b83c3c';this.style.background='#fef2f2'" onmouseout="this.style.color='#c4c3be';this.style.background='transparent'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4.5h8M5.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5M4 4.5l.5 7a1 1 0 001 .9h3a1 1 0 001-.9l.5-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span></span>'}
         </div>`;
     }).join('');
