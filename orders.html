@@ -1046,7 +1046,7 @@ function renderOrders(ordersOverride) {
       // Always keep a placeholder, and inject the chosen blank when it's not standard.
       const _blankInStd = !!autoBlank && BLANK_OPTS.some(g => Array.isArray(g[1]) && g[1].includes(autoBlank));
       const _blankInjected = (autoBlank && !_blankInStd) ? `<option value="${String(autoBlank).replace(/"/g,'&quot;')}" selected>${String(autoBlank).replace(/</g,'&lt;')}</option>` : '';
-      const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Select blank…</option>${_blankInjected}${blankOpts}`;
+      const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Blank Product</option>${_blankInjected}${blankOpts}`;
       const printOpts = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']]
         .map(([v,l])=>`<option value="${v}"${(!_unchosen && v===item.tech)?' selected':''}>${l}</option>`).join('');
 
@@ -1119,8 +1119,8 @@ function renderOrders(ordersOverride) {
       const _curColor = _unchosen ? '' : (item.color || (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || (_vOpts.colors[0] || ''));
       const _curSize  = _unchosen ? '' : (item.size  || (typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '') || (_vOpts.sizes[0]  || ''));
       const _skuEsc = item.sku.replace(/'/g,"\\'");
-      const _colorOpts = (_unchosen ? '<option value="" selected></option>' : '') + _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
-      const _sizeOpts  = (_unchosen ? '<option value="" selected></option>' : '') + _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
+      const _colorOpts = (_unchosen ? '<option value="" selected>Color</option>' : '') + _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
+      const _sizeOpts  = (_unchosen ? '<option value="" selected>Size</option>' : '') + _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
       const _variantSel = (key, opts, curVal, width) => `<select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','${key}',this.value)" style="${SEL};width:${width}px;color:#374151;${lockStyle}">${opts}</select>`;
 
       // Variant pill — blank/color/size grouped into a single bordered control
@@ -1156,7 +1156,7 @@ function renderOrders(ordersOverride) {
             ${variantDivider}
             <div style="flex:0 0 50px;width:50px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 100px;width:100px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type…</option>${printOpts}</select></div>
+            <div style="flex:0 0 100px;width:100px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type</option>${printOpts}</select></div>
           </div>
           <span></span>
           <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:auto">${designBtns()}</div>
