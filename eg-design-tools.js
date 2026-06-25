@@ -1270,7 +1270,7 @@
         + '<div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between"><div><div id="egdt-qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div><div id="egdt-qp-sub" style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div></div><button onclick="EGDesignTools.closeQuickPos()" style="background:none;border:none;cursor:pointer;color:#6b7280;padding:4px;line-height:0"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
         + '<div style="padding:18px 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:440px;height:440px;max-width:100%;background:#f6f5f4 center/120% no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
         + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-        + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:0;z-index:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#9ca3af;cursor:pointer"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span style="font-size:13px;font-weight:600">Drop a design or click to upload</span></div>'
+        + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
         + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b9a8e0;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9a8bc4">PRINT AREA</span></div>'
         + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;outline:1.5px dashed #8b7bc0;outline-offset:1px"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#fff;border:1.5px solid #8b7bc0;border-radius:50%;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div></div>'
         + '<div id="egdt-qp-extra"></div>'
@@ -1300,14 +1300,25 @@
     dEl.src = design || '';
     wrap.style.display = design ? 'block' : 'none';
     wrap.style.left = it.designPos.x + '%'; wrap.style.top = it.designPos.y + '%'; wrap.style.width = it.designPos.w + '%'; wrap.style.height = it.designPos.h + '%';
-    var _areaEl = document.getElementById('egdt-qp-area');
-    if (_areaEl) {
-      if (_qpArea) { _areaEl.style.display = 'block'; _areaEl.style.left = _qpArea.x + '%'; _areaEl.style.top = _qpArea.y + '%'; _areaEl.style.width = _qpArea.w + '%'; _areaEl.style.height = _qpArea.h + '%'; }
-      else { _areaEl.style.display = 'none'; }
-    }
     wrap.style.cursor = locked ? 'default' : 'grab';
     var _hasExtra = Array.isArray(it.designLayers) && it.designLayers.length;
-    document.getElementById('egdt-qp-empty').style.display = (!design && !_hasExtra && !locked) ? 'flex' : 'none';
+    var _isEmpty = !design && !_hasExtra;
+    var _areaEl = document.getElementById('egdt-qp-area');
+    var _emptyEl = document.getElementById('egdt-qp-empty');
+    // When empty, the shaded grey drop zone (egdt-qp-empty) sits ON the print area and
+    // the purple PRINT AREA outline is hidden (no double box). Once a design exists, the
+    // purple outline returns to guide positioning and the drop zone is gone.
+    if (_emptyEl) {
+      if (_isEmpty && !locked) {
+        if (_qpArea) { _emptyEl.style.inset = 'auto'; _emptyEl.style.left = _qpArea.x + '%'; _emptyEl.style.top = _qpArea.y + '%'; _emptyEl.style.width = _qpArea.w + '%'; _emptyEl.style.height = _qpArea.h + '%'; }
+        else { _emptyEl.style.inset = '14px'; _emptyEl.style.left = _emptyEl.style.top = _emptyEl.style.width = _emptyEl.style.height = ''; }
+        _emptyEl.style.display = 'flex';
+      } else { _emptyEl.style.display = 'none'; }
+    }
+    if (_areaEl) {
+      if (_qpArea && !_isEmpty) { _areaEl.style.display = 'block'; _areaEl.style.left = _qpArea.x + '%'; _areaEl.style.top = _qpArea.y + '%'; _areaEl.style.width = _qpArea.w + '%'; _areaEl.style.height = _qpArea.h + '%'; }
+      else { _areaEl.style.display = 'none'; }
+    }
     document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
     document.getElementById('egdt-qp-rmbg').style.display = (locked || !design) ? 'none' : '';
     document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
@@ -1409,7 +1420,7 @@
       try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, out); } catch (e) {}
       var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
       if (dEl) dEl.src = out; if (wrap) wrap.style.display = 'block';
-      document.getElementById('egdt-qp-empty').style.display = 'none';
+      document.getElementById('egdt-qp-empty').style.display = 'none'; _qpShowAreaBox();
       document.getElementById('egdt-qp-handle').style.display = 'block';
       document.getElementById('egdt-qp-rmbg').style.display = '';
     };
@@ -1417,6 +1428,11 @@
   }
   // Apply a resolved artwork URL to the item — sets the PRIMARY design (if none yet) or
   // ADDS a layer (add-not-replace). Shared by the paste-ID, image-library, and async paths.
+  // Show the purple PRINT AREA outline (it's hidden while the drop zone is empty).
+  function _qpShowAreaBox() {
+    var a = document.getElementById('egdt-qp-area');
+    if (a && _qpF && _qpF.area) { var r = _qpF.area; a.style.display = 'block'; a.style.left = r.x + '%'; a.style.top = r.y + '%'; a.style.width = r.w + '%'; a.style.height = r.h + '%'; }
+  }
   function _qpApplyDesign(img, label) {
     if (!_qpF || _qpF.locked) return;
     if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design or template found for “' + label + '”'); return; }
@@ -1427,7 +1443,7 @@
     try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
     var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
     if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
-    document.getElementById('egdt-qp-empty').style.display = 'none';
+    document.getElementById('egdt-qp-empty').style.display = 'none'; _qpShowAreaBox();
     document.getElementById('egdt-qp-handle').style.display = 'block';
     document.getElementById('egdt-qp-rmbg').style.display = '';
     _egdtToast('Loaded ' + label);
