@@ -1261,7 +1261,7 @@
       + '</div>'
       + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:480px;height:480px;max-width:100%;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
       + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
-      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" title="Upload a design" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78px;height:78px;border-radius:50%;z-index:1;display:none;align-items:center;justify-content:center;background:#f3f2ef;border:1.5px dashed #cfcabf;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#a8a29a\';this.style.background=\'#efede9\'" onmouseout="this.style.borderColor=\'#cfcabf\';this.style.background=\'#f3f2ef\'"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 15V5M8 9l4-4 4 4" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
+      + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" title="Upload a design" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:112px;height:112px;border-radius:50%;z-index:1;display:none;align-items:center;justify-content:center;background:#f3f2ef;border:1.5px dashed #cfcabf;cursor:pointer;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'#a8a29a\';this.style.background=\'#efede9\'" onmouseout="this.style.borderColor=\'#cfcabf\';this.style.background=\'#f3f2ef\'"><svg width="38" height="38" viewBox="0 0 24 24" fill="none"><path d="M12 15V5M8 9l4-4 4 4" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 16v2a1 1 0 001 1h12a1 1 0 001-1v-2" stroke="#a8a29a" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
       + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;transform-origin:center center">'
       +   '<img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
@@ -1516,20 +1516,31 @@
     if (!hasExtra) { var emp = document.getElementById('egdt-qp-empty'); if (emp) emp.style.display = 'flex'; }
     try { _qpPersist(false); } catch (e) {}
   }
+  // A picked design / template / image ID is ALWAYS added as a new, closable layer (it
+  // stacks on top of whatever's already placed — never replaces it). Each added layer has
+  // its own × to remove it later.
   function _qpApplyDesign(img, label) {
     if (!_qpF || _qpF.locked) return;
     if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design or template found for “' + label + '”'); return; }
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
-    if (it.designUrl) { _qpAddDesignLayer(img); _egdtToast('Added ' + label); return; } // primary set → ADD a layer
-    it.designUrl = img;
-    try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, img); } catch (e) {}
-    try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
-    var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
-    if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
-    document.getElementById('egdt-qp-empty').style.display = 'none';
-    _qpSelectPrimary();
-    _egdtToast('Loaded ' + label);
-    try { _qpPersist(false); } catch (e) {}
+    // If the stage is completely empty, seed the primary; otherwise add a layer on top.
+    var hasPrimary = !!it.designUrl;
+    var host = document.getElementById('egdt-qp-extra'); var hasExtra = host && host.querySelector('.egdt-qp-dl');
+    if (!hasPrimary && !hasExtra) {
+      it.designUrl = img;
+      try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, img); } catch (e) {}
+      try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
+      var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
+      if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
+      document.getElementById('egdt-qp-empty').style.display = 'none';
+      _qpSelectPrimary();
+      _egdtToast('Loaded ' + label);
+      try { _qpPersist(false); } catch (e) {}
+    } else {
+      _qpAddDesignLayer(img);   // stacks as a new closable layer (persists itself)
+      document.getElementById('egdt-qp-empty').style.display = 'none';
+      _egdtToast('Added ' + label);
+    }
   }
   // Fetch the seller's Image Library list once (so search can include DL- images).
   function _qpLoadLibrary() {
