@@ -1891,6 +1891,40 @@ function dmToggleThreadPanel(){
   if (sec) sec.style.display = dmIsEmbMethod() ? '' : 'none';
 }
 function dmSetMethod(m){ _dmMethod = m || 'DTG'; dmToggleThreadPanel(); dmApplyMethodFx(); }
+// Normalise a raw method label to the canonical one this editor uses downstream.
+function dmNormMethodLabel(raw){
+  var s = String(raw || '').trim().toLowerCase(); if (!s) return '';
+  if (/dtf/.test(s)) return 'DTF';
+  if (/dtg|direct to garment/.test(s)) return 'DTG';
+  if (/emb|embroid/.test(s)) return 'Embroidery';
+  if (/sub|dye/.test(s)) return 'Sublimation';
+  if (/screen/.test(s)) return 'Screen print';
+  if (/appliqu|\bapl\b/.test(s)) return 'Appliqué';
+  if (/laser|\blsr\b/.test(s)) return 'Laser';
+  if (/vinyl|htv/.test(s)) return 'Vinyl';
+  if (/\buv\b/.test(s)) return 'UV print';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+// The print methods a product actually supports (printTypes → method → tech), de-duped.
+function dmProductMethods(p){
+  var raw = [];
+  if (p && Array.isArray(p.printTypes) && p.printTypes.length) raw = p.printTypes.slice();
+  else if (p && p.method) raw = String(p.method).split(/[\/,·|]+/);
+  else if (p && p.tech) raw = [p.tech];
+  var out = [], seen = {};
+  raw.forEach(function(r){ var l = dmNormMethodLabel(r); if (l && !seen[l]) { seen[l] = 1; out.push(l); } });
+  if (!out.length) out = ['DTG', 'Embroidery', 'Sublimation', 'Screen print'];
+  return out;
+}
+function dmRebuildMethodOptions(p){
+  var sel = document.getElementById('ps-method'); if (!sel) return;
+  var methods = dmProductMethods(p);
+  sel.innerHTML = methods.map(function(m){ return '<option value="' + m.replace(/"/g,'&quot;') + '">' + m + '</option>'; }).join('');
+  var pref = (p && p.tech) ? dmNormMethodLabel(p.tech) : '';
+  var pick = methods.indexOf(pref) >= 0 ? pref : (methods.indexOf(_dmMethod) >= 0 ? _dmMethod : methods[0]);
+  _dmMethod = pick; sel.value = pick;
+  dmApplyMethodFx();
+}
 function dmApplyPrintArea(){
   var wEl = document.getElementById('ps-pa-w'), hEl = document.getElementById('ps-pa-h');
   _dmPaW = Math.max(1, parseFloat(wEl && wEl.value) || 12);
@@ -2701,13 +2735,9 @@ function selectProductById(id) {
   dmUpdatePrintSpecs(p);
   // Right-panel PRODUCT COLOR row must match the product's real variants — never the thread/design palette.
   dmRenderProductColors(p);
-  // Reflect the product's method in the editable dropdown (users can still change it).
-  var _pm = (p.tech ? String(p.tech) : '');
-  if (/emb/i.test(_pm)) _dmMethod = 'Embroidery';
-  else if (/sub/i.test(_pm)) _dmMethod = 'Sublimation';
-  else if (/screen/i.test(_pm)) _dmMethod = 'Screen print';
-  else _dmMethod = 'DTG';
-  var _ms = document.getElementById('ps-method'); if (_ms) _ms.value = _dmMethod;
+  // Rebuild the Method dropdown to ONLY this product's real print types (a heavy
+  // cotton tee with 3 methods shows 3), defaulting to its primary tech.
+  dmRebuildMethodOptions(p);
   if (typeof dmToggleThreadPanel === 'function') dmToggleThreadPanel();
 }
 
