@@ -1135,25 +1135,24 @@ function renderOrders(ordersOverride) {
       const pillHaloShadow = needsPick ? ';box-shadow:0 0 0 3px rgba(201,195,186,.18)' : '';
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
-        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px 380px 24px 248px 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px minmax(380px,1fr) 24px auto 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 36)}
           <div style="min-width:0">
             <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.listing||item.name}">${item.listing||item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty}</span></div>
             <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${item.sku}</div>
           </div>
-          <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:380px" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
-            <div style="flex:0 0 128px;width:128px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div>
+          <div style="display:flex;align-items:center;background:#fff;border:1.5px solid ${pillBorderInactive};border-radius:8px;height:34px;padding:0 4px;transition:border-color .15s${pillHaloShadow};box-sizing:border-box;width:100%" onmouseover="this.style.borderColor='#c9c3ba'" onmouseout="this.style.borderColor='${pillBorderInactive}'">
+            <div style="flex:2 1 150px;min-width:120px;overflow:hidden;display:flex"><select id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 60px;width:60px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
+            <div style="flex:1 1 90px;min-width:64px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 44px;width:44px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
+            <div style="flex:0 0 50px;width:50px;overflow:hidden;display:flex"><select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div>
             ${variantDivider}
-            <div style="flex:0 0 92px;width:92px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type…</option>${printOpts}</select></div>
+            <div style="flex:0 0 100px;width:100px;overflow:hidden;display:flex"><select id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type…</option>${printOpts}</select></div>
           </div>
           <span></span>
-          <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:248px">${designBtns()}</div>
-          <span></span>
+          <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:auto">${designBtns()}</div>
           ${needsSetup ? `<button onclick="event.stopPropagation();orderDeleteInlineItem(${o.no},'${item.sku.replace(/'/g,"\\'")}')" title="Remove item" style="background:none;border:none;color:#c4c3be;cursor:pointer;padding:5px 6px;border-radius:5px;line-height:0;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;transition:color .15s,background .15s;width:26px;height:26px" onmouseover="this.style.color='#b83c3c';this.style.background='#fef2f2'" onmouseout="this.style.color='#c4c3be';this.style.background='transparent'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 4.5h8M5.5 4.5V3a1 1 0 011-1h1a1 1 0 011 1v1.5M4 4.5l.5 7a1 1 0 001 .9h3a1 1 0 001-.9l.5-7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '<span></span>'}
         </div>`;
     }).join('');
