@@ -9,6 +9,7 @@
 <script src="eg-etsy.js"></script>
 <script src="eg-usps.js"></script>
 <script src="eg-design-tools.js"></script>
+<script src="eg-guides.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -3416,6 +3417,11 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       .fstab:hover{background:#f1f0ec}.fstab.on{background:#eeede9;color:#111827;font-weight:600}
       .fstab svg{width:15px;height:15px;flex-shrink:0;opacity:.65}.fstab.on svg{opacity:.9}
     </style>
+    <div style="max-width:1040px;margin:0 auto 16px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:12.5px;font-weight:600;color:#9ca3af">Guides:</span>
+      <button onclick="if(window.EGGuides)EGGuides.openFile()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">File Guidelines</button>
+      <button onclick="if(window.EGGuides)EGGuides.openSize()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Size Guide</button>
+    </div>
     <div style="display:flex;gap:24px;align-items:flex-start;max-width:1040px;margin:0 auto;width:100%">
       <div style="width:208px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
         <a class="fstab on" onclick="whSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
