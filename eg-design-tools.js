@@ -1245,7 +1245,13 @@
       + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
       + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
-      + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab"><img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/><div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#111827;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.25)"></div></div>'
+      + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;transform-origin:center center">'
+      +   '<img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
+      +   '<button id="egdt-qp-del" title="Remove design" style="position:absolute;right:-8px;top:-8px;width:18px;height:18px;background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;font-weight:700;padding:0;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:4;box-shadow:0 1px 4px rgba(17,24,39,.15)">×</button>'
+      +   '<div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#111827;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:4"></div>'
+      +   '<div id="egdt-qp-rotline" style="position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);width:1.5px;height:15px;background:#111827;z-index:3"></div>'
+      +   '<div id="egdt-qp-rot" title="Drag to rotate" style="position:absolute;left:50%;bottom:-27px;transform:translateX(-50%);width:22px;height:22px;background:#fff;border:1.5px solid #111827;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 1px 4px rgba(17,24,39,.18)"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M11.6 5.4A5 5 0 1 0 12.2 8.2" stroke="#111827" stroke-width="1.4" stroke-linecap="round"/><path d="M9.1 5l2.6.5.5-2.6" stroke="#111827" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+      + '</div>'
       + '<div id="egdt-qp-extra"></div>'
       + '<div id="egdt-qp-texts"></div>'
       + '</div></div>'
@@ -1327,6 +1333,7 @@
     dEl.src = design || '';
     wrap.style.display = design ? 'block' : 'none';
     wrap.style.left = it.designPos.x + '%'; wrap.style.top = it.designPos.y + '%'; wrap.style.width = it.designPos.w + '%'; wrap.style.height = it.designPos.h + '%';
+    wrap.style.transform = it.designPos.r ? ('rotate(' + it.designPos.r + 'deg)') : '';
     wrap.style.cursor = locked ? 'default' : 'grab';
     var _hasExtra = Array.isArray(it.designLayers) && it.designLayers.length;
     var _isEmpty = !design && !_hasExtra;
@@ -1343,7 +1350,10 @@
       } else { _emptyEl.style.display = 'none'; }
     }
     if (_areaEl) _areaEl.style.display = 'none';   // idle = no border; shown only during manipulation
+    var _ctlDisp = (locked || !design) ? 'none' : 'flex';
     document.getElementById('egdt-qp-handle').style.display = (locked || !design) ? 'none' : 'block';
+    ['egdt-qp-del', 'egdt-qp-rot'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = _ctlDisp; });
+    var _rl = document.getElementById('egdt-qp-rotline'); if (_rl) _rl.style.display = (locked || !design) ? 'none' : 'block';
     document.getElementById('egdt-qp-rmbg').style.display = (locked || !design) ? 'none' : '';
     document.getElementById('egdt-qp-save').style.display = locked ? 'none' : '';
     document.getElementById('egdt-qp-tools').style.display = locked ? 'none' : 'flex';
@@ -1459,6 +1469,23 @@
   function _qpShowAreaBox() {
     var a = document.getElementById('egdt-qp-area');
     if (a && _qpF && _qpF.area) { var r = _qpF.area; a.style.display = 'block'; a.style.left = r.x + '%'; a.style.top = r.y + '%'; a.style.width = r.w + '%'; a.style.height = r.h + '%'; }
+  }
+  // Parse the current rotation (deg) off the wrap's transform.
+  function _qpReadRot(el) { var m = el && String(el.style.transform || '').match(/rotate\(([-\d.]+)deg\)/); return m ? parseFloat(m[1]) : 0; }
+  // Remove the PRIMARY design (the × on the design box) — clears art + rotation, shows the
+  // drop zone again if no extra layers remain, and persists.
+  function _qpDelPrimary() {
+    if (!_qpF || _qpF.locked) return;
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+    it.designUrl = ''; if (it.designPos) it.designPos.r = 0;
+    try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, ''); } catch (e) {}
+    try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, ''); } catch (e) {}
+    var wrap = document.getElementById('egdt-qp-wrap'), dEl = document.getElementById('egdt-qp-design');
+    if (dEl) dEl.src = ''; if (wrap) { wrap.style.display = 'none'; wrap.style.transform = ''; }
+    ['egdt-qp-handle', 'egdt-qp-del', 'egdt-qp-rot', 'egdt-qp-rotline', 'egdt-qp-rmbg'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
+    var host = document.getElementById('egdt-qp-extra'); var hasExtra = host && host.querySelector('.egdt-qp-dl');
+    if (!hasExtra) { var emp = document.getElementById('egdt-qp-empty'); if (emp) { if (_qpF.area) { emp.style.inset = 'auto'; emp.style.left = _qpF.area.x + '%'; emp.style.top = _qpF.area.y + '%'; emp.style.width = _qpF.area.w + '%'; emp.style.height = _qpF.area.h + '%'; } else { emp.style.inset = '14px'; emp.style.left = emp.style.top = emp.style.width = emp.style.height = ''; } emp.style.display = 'flex'; } }
+    try { _qpPersist(false); } catch (e) {}
   }
   function _qpApplyDesign(img, label) {
     if (!_qpF || _qpF.locked) return;
@@ -1585,7 +1612,11 @@
     if (!_qpF || _qpF.locked) return;
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), wrap = document.getElementById('egdt-qp-wrap');
     if (!o || !it) return;
-    if (wrap) it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50 };
+    // The primary design = the LIVE editor image (findOrder may return a fresh copy, so we
+    // must take designUrl from the DOM, not a stale re-fetch). Empty/hidden → design removed.
+    var _dEl = document.getElementById('egdt-qp-design');
+    it.designUrl = (wrap && wrap.style.display !== 'none' && _dEl) ? (_dEl.getAttribute('src') || '') : '';
+    if (wrap) it.designPos = { x: parseFloat(wrap.style.left) || 0, y: parseFloat(wrap.style.top) || 0, w: parseFloat(wrap.style.width) || 50, h: parseFloat(wrap.style.height) || 50, r: _qpReadRot(wrap) };
     it.textLayers = _qpCollectTexts();
     it.designLayers = _qpCollectDesignLayers();
     // Edit All → copy this exact design (art + position + text + layers) onto EVERY line.
@@ -1593,7 +1624,7 @@
     targets.forEach(function (t2) {
       if (t2 !== it) {
         t2.designUrl = it.designUrl;
-        t2.designPos = { x: it.designPos.x, y: it.designPos.y, w: it.designPos.w, h: it.designPos.h };
+        t2.designPos = { x: it.designPos.x, y: it.designPos.y, w: it.designPos.w, h: it.designPos.h, r: it.designPos.r || 0 };
         t2.textLayers = (it.textLayers || []).map(function (l) { return Object.assign({}, l); });
         t2.designLayers = (it.designLayers || []).map(function (l) { return Object.assign({}, l); });
       }
@@ -1644,13 +1675,24 @@
   function _qpAttach() {
     var stage = document.getElementById('egdt-qp-stage');
     var mode = null, sx = 0, sy = 0, startX = 0, startY = 0, startW = 0, startH = 0, _tl = null, _dl = null;
+    var _rcx = 0, _rcy = 0, _rStartAng = 0, _rStartRot = 0;
     function pct(px, py) { var r = stage.getBoundingClientRect(); return { x: (px / r.width) * 100, y: (py / r.height) * 100 }; }
     function down(e) {
       if (_qpF && _qpF.locked) return;
       // Remove an extra design layer via its × button.
       var del = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dldel') : null;
-      if (del) { var dx = del.closest('.egdt-qp-dl'); if (dx) dx.remove(); e.preventDefault(); return; }
+      if (del) { var dx = del.closest('.egdt-qp-dl'); if (dx) dx.remove(); try { _qpPersist(false); } catch (e2) {} e.preventDefault(); return; }
+      // Remove the PRIMARY design via its × button.
+      if (e.target && e.target.id === 'egdt-qp-del') { _qpDelPrimary(); e.preventDefault(); return; }
       var wrap = document.getElementById('egdt-qp-wrap'), handle = document.getElementById('egdt-qp-handle');
+      // Rotate the primary design via its bottom handle (drag around the centre).
+      if (e.target && e.target.closest && e.target.closest('#egdt-qp-rot')) {
+        mode = 'rotate'; var wr = wrap.getBoundingClientRect();
+        _rcx = wr.left + wr.width / 2; _rcy = wr.top + wr.height / 2;
+        _rStartAng = Math.atan2(e.clientY - _rcy, e.clientX - _rcx);
+        _rStartRot = _qpReadRot(wrap);
+        _qpShowAreaBox(); e.preventDefault(); return;
+      }
       var dlh = (e.target && e.target.classList && e.target.classList.contains('egdt-qp-dlh')) ? e.target : null;
       var dl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-dl') : null;
       var tl = (e.target && e.target.closest) ? e.target.closest('.egdt-qp-tl') : null;
@@ -1674,6 +1716,13 @@
     function mv(e) {
       if (!mode) return;
       var dd = pct(e.clientX - sx, e.clientY - sy);
+      if (mode === 'rotate') {
+        var wr = document.getElementById('egdt-qp-wrap'); if (!wr) return;
+        var ang = Math.atan2(e.clientY - _rcy, e.clientX - _rcx);
+        var rot = _rStartRot + (ang - _rStartAng) * 180 / Math.PI;
+        if (e.shiftKey) rot = Math.round(rot / 15) * 15;   // snap to 15° with Shift
+        wr.style.transform = 'rotate(' + rot + 'deg)'; return;
+      }
       // Move/resize FREELY across the whole mockup (like the big Design Maker) — the dashed
       // PRINT AREA box is just a guide, not a hard boundary. Bound only to the stage edges.
       var minX = 0, maxX = 100, minY = 0, maxY = 100;
@@ -1787,7 +1836,7 @@
       }).join('') : '';
       var html = '<div style="position:relative;width:100%;height:100%">'
         + (blank ? '<img src="' + blank + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>')
-        + (showDesign ? '<img src="' + design + '" style="position:absolute;left:' + dp.x + '%;top:' + dp.y + '%;width:' + dp.w + '%;height:' + dp.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
+        + (showDesign ? '<img src="' + design + '" style="position:absolute;left:' + dp.x + '%;top:' + dp.y + '%;width:' + dp.w + '%;height:' + dp.h + '%;object-fit:contain;' + (dp.r ? 'transform:rotate(' + dp.r + 'deg);' : '') + 'pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
         + extraHtml
         + '</div>';
       return { html: html, hasArt: !!(design || extra.length) };
