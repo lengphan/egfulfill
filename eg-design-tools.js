@@ -1241,7 +1241,7 @@
       +   '<input id="egdt-qp-idfield" placeholder="Search designs, templates & images — or paste a DL-/DSN-/TPL- ID" autocomplete="off" oninput="EGDesignTools._qpSearch()" onfocus="this.style.borderColor=\'#191918\';EGDesignTools._qpSearch()" onblur="this.style.borderColor=\'#e5e4e0\';setTimeout(function(){var p=document.getElementById(\'egdt-qp-results\');if(p)p.style.display=\'none\'},180)" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none"/>'
       +   '<button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button>'
       + '</div>'
-      + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:440px;height:440px;max-width:100%;background:#f6f5f4 center/120% no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
+      + '<div style="padding:0 18px 10px;display:flex;justify-content:center"><div id="egdt-qp-stage" ondragover="event.preventDefault();this.style.borderColor=\'#191918\'" ondragleave="this.style.borderColor=\'#c9c4bc\'" ondrop="EGDesignTools._qpDrop(event)" style="position:relative;width:480px;height:480px;max-width:100%;background:#f6f5f4 center/contain no-repeat;border:1.5px solid #c9c4bc;border-radius:10px;user-select:none;overflow:hidden">'
       + '<button id="egdt-qp-rmbg" type="button" onclick="event.stopPropagation();EGDesignTools.qpRemoveBg()" title="Remove the design background" style="position:absolute;top:7px;right:7px;z-index:5;background:rgba(255,255,255,.94);border:1px solid #e5e4e0;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;letter-spacing:.03em;color:#374151;cursor:pointer;font-family:inherit;box-shadow:0 1px 4px rgba(0,0,0,.08)">REMOVE BG</button>'
       + '<div id="egdt-qp-empty" onclick="EGDesignTools._qpPickFile()" style="position:absolute;inset:14px;z-index:1;display:none;align-items:center;justify-content:center;background:#f1f0ec;border:2px dashed #c9c4bc;border-radius:8px;cursor:pointer"><svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
@@ -1312,10 +1312,10 @@
     var hdr = document.getElementById('egdt-qp-header'), cancelBtn = document.getElementById('egdt-qp-cancel');
     if (_mountSel) {
       m.style.display = 'none';
-      card.style.maxWidth = '100%'; card.style.boxShadow = 'none'; card.style.border = '1.5px solid #e5e4e0';
+      card.style.maxWidth = '100%'; card.style.boxShadow = 'none'; card.style.border = 'none'; card.style.background = 'transparent';
       if (hdr) hdr.style.display = 'none'; if (cancelBtn) cancelBtn.style.display = 'none';
     } else {
-      card.style.maxWidth = '560px'; card.style.boxShadow = '4px 4px 0 #40403d'; card.style.border = '1.5px solid #40403d';
+      card.style.maxWidth = '560px'; card.style.boxShadow = '4px 4px 0 #40403d'; card.style.border = '1.5px solid #40403d'; card.style.background = '#fdfcfa';
       if (hdr) hdr.style.display = 'flex'; if (cancelBtn) cancelBtn.style.display = '';
     }
     var _qpIdx = 1; try { var _li = (Array.isArray(o.items) ? o.items : []).findIndex(function (x) { return itemDK(x) === dk; }); _qpIdx = (_li >= 0 ? _li : 0) + 1; } catch (e) {}
