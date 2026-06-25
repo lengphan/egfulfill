@@ -1226,7 +1226,7 @@
   //    blank + one-click Remove BG. Mirrors the seller's tool; writes designPos +
   //    the (bg-removed) design back to the item, mirrors onto the board row, and
   //    re-renders. Editable only while the order is new/in-setup.
-  var _qpF = null;
+  var _qpF = null, _qpLib = null, _qpResults = [];
   // Mini designer: blank mockup + design (drag/resize/Remove BG) + drop-to-upload +
   // simple TEXT layers (add / type / colour / drag). Heavier work → "Open Design Maker".
   // No design is required to open (you can start from a blank and add art/text here).
@@ -1276,7 +1276,11 @@
         + '<div id="egdt-qp-extra"></div>'
         + '<div id="egdt-qp-texts"></div>'
         + '</div></div>'
-        + '<div id="egdt-qp-idrow" style="padding:0 18px 10px;display:flex;gap:8px;align-items:center"><input id="egdt-qp-idfield" placeholder="Paste an image (DL-…), design (DSN-…) or template ID" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button></div>'
+        + '<div id="egdt-qp-idrow" style="position:relative;padding:0 18px 10px;display:flex;gap:8px;align-items:center">'
+        +   '<div id="egdt-qp-results" style="position:absolute;left:18px;right:18px;bottom:calc(100% - 2px);max-height:240px;overflow:auto;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.14);display:none;z-index:6"></div>'
+        +   '<input id="egdt-qp-idfield" placeholder="Search designs, templates & images — or paste a DL-/DSN-/TPL- ID" autocomplete="off" oninput="EGDesignTools._qpSearch()" onfocus="this.style.borderColor=\'#191918\';EGDesignTools._qpSearch()" onblur="this.style.borderColor=\'#e5e4e0\';setTimeout(function(){var p=document.getElementById(\'egdt-qp-results\');if(p)p.style.display=\'none\'},180)" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none"/>'
+        +   '<button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button>'
+        + '</div>'
         + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
         + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
         + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
@@ -1312,6 +1316,7 @@
     var lab = document.getElementById('egdt-qp-lab'); if (lab) lab.href = 'design-maker.html?id=' + encodeURIComponent(o.id) + '&sku=' + encodeURIComponent(it.sku || '');
     _qpRenderTexts(it.textLayers, locked);
     _qpRenderDesignLayers(it.designLayers, locked);
+    if (!locked) _qpLoadLibrary();   // warm the Image Library list for search
     m.style.display = 'flex';
   }
   function closeQuickPos() { var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
@@ -1426,6 +1431,74 @@
     document.getElementById('egdt-qp-handle').style.display = 'block';
     document.getElementById('egdt-qp-rmbg').style.display = '';
     _egdtToast('Loaded ' + label);
+  }
+  // Fetch the seller's Image Library list once (so search can include DL- images).
+  function _qpLoadLibrary() {
+    if (_qpLib !== null) return;   // already loaded (or [])
+    _qpLib = [];
+    try {
+      var token = localStorage.getItem('eg_token') || '', base = window.EG_API_BASE || '';
+      fetch(base + '/api/design_library', { headers: token ? { Authorization: 'Bearer ' + token } : {} })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (rows) { _qpLib = Array.isArray(rows) ? rows : []; })
+        .catch(function () { _qpLib = []; });
+    } catch (e) { _qpLib = []; }
+  }
+  // Build the searchable index from local designs + templates + the Image Library list.
+  function _qpSearchIndex() {
+    var out = [];
+    try {
+      var cards = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
+      (Array.isArray(cards) ? cards : []).forEach(function (c) {
+        var src = ''; try { if (window.EGStore && EGStore.getRawDesign) src = EGStore.getRawDesign(c.order, c.dk || c.sku) || ''; } catch (e) {}
+        if (!src) return;
+        out.push({ kind: 'design', idLabel: c.designId || 'DSN', label: c.title || c.name || c.designId || 'Design', thumb: src, src: src });
+      });
+    } catch (e) {}
+    try {
+      _loadTemplates().forEach(function (t) {
+        var src = t.designOnlyImg || t.compositeImg || t.productImg || ''; if (!src) return;
+        out.push({ kind: 'template', idLabel: t.tplId || ('TPL-' + t.id), label: t.name || ('TPL-' + t.id), thumb: src, src: src });
+      });
+    } catch (e) {}
+    if (Array.isArray(_qpLib)) _qpLib.forEach(function (d) {
+      out.push({ kind: 'library', idLabel: 'DL-' + d.id, libId: d.id, label: d.name || ('DL-' + d.id), thumb: d.thumb || '', src: d.thumb || '' });
+    });
+    return out;
+  }
+  function _qpSearch() {
+    var fld = document.getElementById('egdt-qp-idfield'), panel = document.getElementById('egdt-qp-results');
+    if (!fld || !panel) return;
+    var q = String(fld.value || '').trim().toLowerCase();
+    var all = _qpSearchIndex();
+    var list = q ? all.filter(function (r) { return (r.label + ' ' + r.idLabel).toLowerCase().indexOf(q) >= 0; }) : all;
+    _qpResults = list.slice(0, 40);
+    if (!_qpResults.length) { panel.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:#9ca3af">No designs, templates or images' + (q ? ' match “' + esc(q) + '”' : ' yet') + '</div>'; panel.style.display = 'block'; return; }
+    panel.innerHTML = _qpResults.map(function (r, i) {
+      var bg = r.thumb ? "background:#f6f5f4 url('" + String(r.thumb).replace(/'/g, '%27') + "') center/cover no-repeat" : 'background:#f0ede9';
+      var tag = r.kind === 'design' ? 'Design' : (r.kind === 'template' ? 'Template' : 'Image');
+      return '<button type="button" onmousedown="event.preventDefault()" onclick="EGDesignTools._qpPickResult(' + i + ')" style="display:flex;align-items:center;gap:10px;width:100%;border:none;background:#fff;padding:7px 10px;cursor:pointer;text-align:left;border-bottom:1px solid #f4f2ef;font-family:inherit" onmouseover="this.style.background=\'#f6f5f4\'" onmouseout="this.style.background=\'#fff\'">'
+        + '<span style="flex:0 0 30px;width:30px;height:30px;border-radius:6px;border:1px solid #e5e4e0;' + bg + '"></span>'
+        + '<span style="min-width:0;flex:1"><span style="display:block;font-size:12.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.label) + '</span><span style="display:block;font-size:11px;color:#b0aaa4;font-family:monospace">' + esc(r.idLabel) + '</span></span>'
+        + '<span style="flex:0 0 auto;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#b0aaa4">' + tag + '</span>'
+        + '</button>';
+    }).join('');
+    panel.style.display = 'block';
+  }
+  function _qpPickResult(i) {
+    var r = _qpResults[i]; if (!r) return;
+    var fld = document.getElementById('egdt-qp-idfield'), panel = document.getElementById('egdt-qp-results');
+    if (panel) panel.style.display = 'none'; if (fld) fld.value = '';
+    if (r.kind === 'library') {   // fetch the full-resolution image (the list only has a thumb)
+      var token = localStorage.getItem('eg_token') || '', base = window.EG_API_BASE || '';
+      _egdtToast('Loading ' + r.idLabel + '…');
+      fetch(base + '/api/design_library/' + r.libId, { headers: token ? { Authorization: 'Bearer ' + token } : {} })
+        .then(function (rr) { return rr.json().catch(function () { return {}; }); })
+        .then(function (d) { var img = (d && (d.data || (d.item && d.item.data))) || r.thumb; if (!img) { _egdtToast('No image for ' + r.idLabel); return; } _qpApplyDesign(img, r.idLabel); })
+        .catch(function () { if (r.thumb) _qpApplyDesign(r.thumb, r.idLabel); else _egdtToast('Could not load ' + r.idLabel); });
+      return;
+    }
+    _qpApplyDesign(r.src, r.idLabel);
   }
   // Paste an Image Library ID (DL-…), a design ID (DSN-…) or a template ID → load the artwork.
   function _qpLoadById() {
@@ -1795,6 +1868,7 @@
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,
+    _qpSearch: _qpSearch, _qpPickResult: _qpPickResult,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
