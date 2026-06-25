@@ -281,12 +281,9 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div style="margin-bottom:18px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Technique</span>
-              <span style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">File guidelines ↗</span>
+              <a href="file-guidelines.html" target="_blank" style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer;text-decoration:none">File guidelines ↗</a>
             </div>
-            <div style="display:flex;gap:8px">
-              <button class="tech-tab on" id="tech-dtg" onclick="setTech('dtg')">DTG printing</button>
-              <button class="tech-tab" id="tech-emb" onclick="setTech('emb')">Embroidery</button>
-            </div>
+            <div id="pd-techs" style="display:flex;gap:8px;flex-wrap:wrap"></div>
           </div>
 
           <!-- Color -->
@@ -302,7 +299,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div style="margin-bottom:20px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
               <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Size</span>
-              <span style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">Size guide</span>
+              <a href="size-guide.html" target="_blank" style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer;text-decoration:none">Size guide ↗</a>
             </div>
             <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
           </div>
@@ -527,6 +524,7 @@ var _heroIdx = 0;
 var _selColor = 0;
 var _selSize = 'M';
 var _tech = 'dtg';
+var _techs = [];
 
 var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
 
@@ -573,6 +571,9 @@ function init() {
     var on = s === (_prod.sizes.indexOf('M') > -1 ? 'M' : _prod.sizes[0]);
     return '<button class="sz-btn'+(on?' on':'')+'" onclick="selectSize(this,\''+s+'\')">'+s+'</button>';
   }).join('');
+
+  // Techniques (operator-chosen — render all of them, not a hardcoded pair)
+  pdRenderTechs();
 
   // Specs
   var spEl = document.getElementById('pd-specs');
@@ -653,10 +654,44 @@ function selectSize(btn, sz) {
   btn.classList.add('on');
 }
 
+// Normalise a raw technique label (from the product's printTypes/method) to a
+// stable {key,label} pair so the buttons match what the operator actually chose.
+function pdNormTech(raw) {
+  var s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+  if (/dtf/.test(s)) return { key:'dtf', label:'DTF printing' };
+  if (/dtg|direct to garment/.test(s)) return { key:'dtg', label:'DTG printing' };
+  if (/emb|embroid/.test(s)) return { key:'emb', label:'Embroidery' };
+  if (/appliqu|\bapl\b/.test(s)) return { key:'apl', label:'Appliqué' };
+  if (/laser|\blsr\b|engrav/.test(s)) return { key:'lsr', label:'Laser' };
+  if (/screen/.test(s)) return { key:'scr', label:'Screen print' };
+  if (/sublim|\bdye\b/.test(s)) return { key:'sub', label:'Sublimation' };
+  if (/vinyl|htv/.test(s)) return { key:'vnl', label:'Vinyl' };
+  if (/\buv\b/.test(s)) return { key:'uv', label:'UV print' };
+  return { key: s.replace(/[^a-z0-9]+/g,'').slice(0,6) || 't', label: raw.charAt(0).toUpperCase() + raw.slice(1) };
+}
+// Every technique this product supports (operator-chosen), de-duped + in order.
+function pdTechs() {
+  var rec = _prod._storeRecord || {};
+  var raw = [];
+  if (Array.isArray(rec.printTypes) && rec.printTypes.length) raw = rec.printTypes.slice();
+  else if (rec.method) raw = String(rec.method).split(/[\/,·|]+/);
+  else if (_prod.sub) raw = String(_prod.sub).replace(/^.*·/, '').split(/[\/,]+/);
+  var out = [], seen = {};
+  raw.forEach(function(r){ var t = pdNormTech(r); if (t && !seen[t.key]) { seen[t.key] = 1; out.push(t); } });
+  if (!out.length) out = [{ key:'dtg', label:'DTG printing' }];
+  return out;
+}
+function pdRenderTechs() {
+  var el = document.getElementById('pd-techs'); if (!el) return;
+  _techs = pdTechs(); _tech = _techs[0].key;
+  el.innerHTML = _techs.map(function(t,i){
+    return '<button class="tech-tab'+(i===0?' on':'')+'" data-tech="'+t.key+'" onclick="setTech(\''+t.key+'\')">'+t.label+'</button>';
+  }).join('');
+}
 function setTech(t) {
   _tech = t;
-  document.getElementById('tech-dtg').classList.toggle('on', t==='dtg');
-  document.getElementById('tech-emb').classList.toggle('on', t==='emb');
+  document.querySelectorAll('#pd-techs .tech-tab').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-tech')===t); });
 }
 
 function setHero(idx) {
