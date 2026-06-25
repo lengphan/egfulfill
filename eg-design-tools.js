@@ -1235,25 +1235,26 @@
     var it = findItemByKey(o, key); if (!it) return;
     var dk = itemDK(it);
     var design = designOverlaySrc(orderNum, it);   // may be '' — that's fine now
-    // Resolve the blank mockup EXACTLY like the row avatar (compositeHTML) — try both the
-    // order number and id (setupProductImage keys by number), then fall back to the item's
-    // own blank/thumb — otherwise the stage opens empty while the avatar shows the mockup.
-    var blank = '';
-    try { if (typeof setupProductImage === 'function') blank = setupProductImage(o.num, dk) || setupProductImage(o.id, dk) || setupProductImage(orderNum, dk) || ''; } catch (e) {}
-    if (!blank) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
-    // Print area (the operator-defined design zone) for this item's product — same
-    // {x,y,w,h}% the Design Maker uses. Constrains the design + seeds its position.
-    var _qpArea = null;
+    // Find the catalog product for this item (drives both the blank mockup + the print area).
+    var _qpArea = null, _prod = null;
     try {
       var _prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
       var _base = String(it.sku || '').split('-')[0];
-      var _prod = _prods.find(function (p) {
+      _prod = _prods.find(function (p) {
         return (it.blank && String(p.name || '') === String(it.blank))
           || (Array.isArray(p.variantSkus) && p.variantSkus.some(function (v) { return v && v.sku === it.sku; }))
           || (p.sku && _base && String(p.sku).toUpperCase() === _base.toUpperCase());
       });
       if (_prod && _prod.printAreas && _prod.printAreas.front) _qpArea = _prod.printAreas.front;
     } catch (e) {}
+    // Resolve the blank mockup the SAME way the row avatar does, so the stage matches it:
+    // the seller's _itemMockupURL first (exact same logic), then the catalog product's
+    // mockup/color image, then setupProductImage (factory boards), then the item's blank.
+    var blank = '';
+    try { if (typeof window._itemMockupURL === 'function') blank = window._itemMockupURL(it) || ''; } catch (e) {}
+    if (!blank && _prod) { var _c = it.color || _prod.mainColor; blank = _prod.mockup || (_c && _prod.colorImages && _prod.colorImages[_c]) || _prod.img || ''; }
+    if (!blank) { try { if (typeof setupProductImage === 'function') blank = setupProductImage(o.num, dk) || setupProductImage(o.id, dk) || setupProductImage(orderNum, dk) || ''; } catch (e) {} }
+    if (!blank) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
     // Seed the design INSIDE the print area on first open (else a sensible centre).
     if (!it.designPos) it.designPos = _qpArea
       ? { x: _qpArea.x, y: _qpArea.y, w: _qpArea.w, h: _qpArea.h }
@@ -1275,7 +1276,7 @@
         + '<div id="egdt-qp-extra"></div>'
         + '<div id="egdt-qp-texts"></div>'
         + '</div></div>'
-        + '<div id="egdt-qp-idrow" style="padding:0 18px 10px;display:flex;gap:8px;align-items:center"><input id="egdt-qp-idfield" placeholder="Paste a design ID (DSN-…) or template ID" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button></div>'
+        + '<div id="egdt-qp-idrow" style="padding:0 18px 10px;display:flex;gap:8px;align-items:center"><input id="egdt-qp-idfield" placeholder="Paste an image (DL-…), design (DSN-…) or template ID" onkeydown="if(event.key===\'Enter\')EGDesignTools._qpLoadById()" style="flex:1;border:1.5px solid #e5e4e0;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"/><button onclick="EGDesignTools._qpLoadById()" style="font-size:12.5px;border:none;background:#374151;color:#fff;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;font-family:inherit">Load</button></div>'
         + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
         + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
         + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
@@ -1409,11 +1410,39 @@
     };
     rd.readAsDataURL(file);
   }
-  // Paste a design ID (DSN-…) or a template ID → load that artwork onto the mockup.
+  // Apply a resolved artwork URL to the item — sets the PRIMARY design (if none yet) or
+  // ADDS a layer (add-not-replace). Shared by the paste-ID, image-library, and async paths.
+  function _qpApplyDesign(img, label) {
+    if (!_qpF || _qpF.locked) return;
+    if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design or template found for “' + label + '”'); return; }
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
+    if (it.designUrl) { _qpAddDesignLayer(img); _egdtToast('Added ' + label); return; } // primary set → ADD a layer
+    it.designUrl = img;
+    try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, img); } catch (e) {}
+    try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
+    var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
+    if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
+    document.getElementById('egdt-qp-empty').style.display = 'none';
+    document.getElementById('egdt-qp-handle').style.display = 'block';
+    document.getElementById('egdt-qp-rmbg').style.display = '';
+    _egdtToast('Loaded ' + label);
+  }
+  // Paste an Image Library ID (DL-…), a design ID (DSN-…) or a template ID → load the artwork.
   function _qpLoadById() {
     if (!_qpF || _qpF.locked) return;
     var fld = document.getElementById('egdt-qp-idfield'); var id = fld ? String(fld.value || '').trim() : '';
     if (!id) return;
+    // 0) Image Library ref: DL-12 (or a /api/design_library/12 link) → fetch the stored image.
+    var libM = id.match(/^DL[-\s_]?(\d+)$/i) || id.match(/\/api\/design_library\/(\d+)/i);
+    if (libM) {
+      var lid = libM[1], token = localStorage.getItem('eg_token') || '', base = window.EG_API_BASE || '';
+      _egdtToast('Loading DL-' + lid + '…');
+      fetch(base + '/api/design_library/' + lid, { headers: token ? { Authorization: 'Bearer ' + token } : {} })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (d) { var img = d && (d.data || (d.item && d.item.data)); if (!img) { _egdtToast('No image found for DL-' + lid); return; } _qpApplyDesign(img, 'DL-' + lid); if (fld) fld.value = ''; })
+        .catch(function () { _egdtToast('Could not load DL-' + lid); });
+      return;
+    }
     var img = '';
     // 1) Design card by its design ID (DSN-…) → its cached raw artwork.
     try {
@@ -1424,24 +1453,13 @@
     // 2) Saved template by its ID (or name).
     if (!img) {
       try {
-        var lid = id.toLowerCase();
-        var t = _loadTemplates().find(function (x) { return String(x.tplId || '').toLowerCase() === lid || String(x.id).toLowerCase() === lid || ('tpl-' + String(x.id)).toLowerCase() === lid || String(x.name || '').toLowerCase() === lid; });
+        var tlid = id.toLowerCase();
+        var t = _loadTemplates().find(function (x) { return String(x.tplId || '').toLowerCase() === tlid || String(x.id).toLowerCase() === tlid || ('tpl-' + String(x.id)).toLowerCase() === tlid || String(x.name || '').toLowerCase() === tlid; });
         if (t) img = t.designOnlyImg || t.compositeImg || t.productImg || '';
       } catch (e) {}
     }
-    if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design or template found for “' + id + '”'); return; }
-    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); if (!it) return;
-    if (it.designUrl) { _qpAddDesignLayer(img); if (fld) fld.value = ''; _egdtToast('Added ' + id); return; } // primary set → ADD a layer
-    it.designUrl = img;
-    try { if (window.EGStore && EGStore.cacheRawDesign && o.id) EGStore.cacheRawDesign(o.id, _qpF.dk, img); } catch (e) {}
-    try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, img); } catch (e) {}
-    var dEl = document.getElementById('egdt-qp-design'), wrap = document.getElementById('egdt-qp-wrap');
-    if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
-    document.getElementById('egdt-qp-empty').style.display = 'none';
-    document.getElementById('egdt-qp-handle').style.display = 'block';
-    document.getElementById('egdt-qp-rmbg').style.display = '';
-    if (fld) fld.value = '';
-    _egdtToast('Loaded ' + id);
+    if (!img || !/^(https?:|data:)/.test(String(img))) { _egdtToast('No design, template or image found for “' + id + '”'); return; }
+    _qpApplyDesign(img, id); if (fld) fld.value = '';
   }
   function saveQuickPos() {
     if (!_qpF || _qpF.locked) { closeQuickPos(); return; }
