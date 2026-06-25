@@ -903,6 +903,10 @@ function renderOrdersPagination(page, total) {
   html += btn('Next →', page + 1, { disabled: page >= total });
   box.innerHTML = html;
 }
+// Expose the live ORDERS array so the shared mini designer (eg-design-tools.js) can patch
+// item designUrl/designPos/layers back into it after a save — otherwise the avatar +
+// needs-design check render from a stale in-memory copy.
+try { window.ORDERS = ORDERS; } catch (e) {}
 function renderOrders(ordersOverride) {
   // eg_hide_seed (set by EGStore.clearAll()) suppresses the JS-baked demo orders so the
   // seller table only shows orders that came in via the manual create-order modal / EGStore.
@@ -1680,7 +1684,9 @@ function pushOrderToProduction(ordNo, btn) {
   const missingDesign = [];
   const missingItems = [];
   o.itemsList.forEach(item => {
-    const hasDesign = !!(UP_STATE[ordNo]?.[itemDK(item)]?.state === 'ok' || item.designSrc);
+    const hasDesign = !!(UP_STATE[ordNo]?.[itemDK(item)]?.state === 'ok' || item.designSrc || item.designUrl
+      || (Array.isArray(item.designLayers) && item.designLayers.length)
+      || (typeof _itemDesignURL === 'function' && _itemDesignURL(o, item)));
     if (!hasDesign) {
       const name = item.listing || item.name || item.sku;
       missingDesign.push(name.length > 22 ? name.slice(0,22)+'…' : name);

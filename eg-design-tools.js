@@ -45,6 +45,7 @@
   // reflects it immediately. `fn(row, item)` runs for each matching board row; if
   // itemKey is given, `item` is that row's matching line (by lineId/_dk then sku).
   function patchBoardArrays(orderId, itemKey, fn) {
+    // Factory boards keep rows as { num, itemList }.
     ['OP_ORDERS', 'WH_ORDERS'].forEach(function (an) {
       try {
         var arr = window[an]; if (!Array.isArray(arr)) return;
@@ -59,6 +60,23 @@
         });
       } catch (e) {}
     });
+    // Seller page (orders.html) keeps its own in-memory ORDERS array as { id/no, itemsList }
+    // — it renders + push-checks from this, NOT from EGStore, so it must be patched too or
+    // the avatar/needs-design stay stale after a mini-designer save.
+    try {
+      var sarr = window.ORDERS;
+      if (Array.isArray(sarr)) {
+        sarr.forEach(function (row) {
+          if (!row || !(String(row.id) === String(orderId) || String(row.no) === String(orderId)) || !Array.isArray(row.itemsList)) return;
+          var item = null;
+          if (itemKey != null) {
+            item = row.itemsList.filter(function (x) { return itemDK(x) === itemKey; })[0]
+                || row.itemsList.filter(function (x) { return String(x.sku) === String(itemKey); })[0] || null;
+          }
+          fn(row, item);
+        });
+      }
+    } catch (e) {}
   }
   function ctxQS(orderNum, sku) {
     var q = [];
