@@ -19,6 +19,10 @@ egful.store, www.egful.store {
 	handle {
 		root * /srv
 		try_files {path} {path}.html /index.html
+		# Force browsers to revalidate HTML/JS/CSS every load (cheap 304s) so a
+		# `git pull` deploy is picked up immediately — no more stale cached eg-*.js
+		# on one board while another board has the new build.
+		header Cache-Control "no-cache"
 		file_server
 	}
 }
