@@ -3108,10 +3108,17 @@ function itemCompositeThumb(o, item, size) {
   const pos = item.designPos || { x:25, y:25, w:50, h:50 };
   const escSku = item.sku.replace(/[^a-zA-Z0-9]/g, '_');
   const hasDesign = !!design;
+  const _rot = pos.r ? `transform:rotate(${pos.r}deg);` : '';
   const designLayer = hasDesign
-    ? `<img src="${design}" style="position:absolute;left:${pos.x}%;top:${pos.y}%;width:${pos.w}%;height:${pos.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`
+    ? `<img src="${design}" style="position:absolute;left:${pos.x}%;top:${pos.y}%;width:${pos.w}%;height:${pos.h}%;object-fit:contain;${_rot}pointer-events:none" onerror="this.style.display='none'"/>`
     : '';
-  const bg = mockup ? `background:#f6f5f4 url('${mockup.replace(/'/g, "%27")}') center/cover no-repeat` : `background:#f6f5f4`;
+  // Extra stacked design layers — so the avatar reflects the full saved composition.
+  const extraLayers = (hasDesign && Array.isArray(item.designLayers))
+    ? item.designLayers.map(l => `<img src="${l.src}" style="position:absolute;left:${l.x}%;top:${l.y}%;width:${l.w}%;height:${l.h}%;object-fit:contain;pointer-events:none" onerror="this.style.display='none'"/>`).join('')
+    : '';
+  // Mockup rendered with 'contain' (not cover) so the design's saved %-position/size line
+  // up exactly with what was set in the mini designer.
+  const bg = mockup ? `background:#f6f5f4 url('${mockup.replace(/'/g, "%27")}') center/contain no-repeat` : `background:#f6f5f4`;
   const skuJs = String(itemDK(item)).replace(/'/g, "\\'");
   // Lock drag/resize once the order leaves setup (new / action). Past that
   // point the factory has the design and any reposition is meaningless —
@@ -3127,7 +3134,7 @@ function itemCompositeThumb(o, item, size) {
   } else {
     onclickAttr = `onclick="event.stopPropagation();zoomImg('${(mockup||'').replace(/'/g,"\\'")}')" title="Click to view"`;
   }
-  return `<div ${onclickAttr} style="width:${size}px;height:${size}px;border:1px solid #e5e4e0;border-radius:7px;${bg};flex-shrink:0;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''">${designLayer}</div>`;
+  return `<div ${onclickAttr} style="width:${size}px;height:${size}px;border:1px solid #e5e4e0;border-radius:7px;${bg};flex-shrink:0;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''">${designLayer}${extraLayers}</div>`;
 }
 
 /* Drag/resize the design on the mockup — no other tools (rotate/flip/text/etc).

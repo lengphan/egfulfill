@@ -1674,9 +1674,9 @@
     function mv(e) {
       if (!mode) return;
       var dd = pct(e.clientX - sx, e.clientY - sy);
-      // Clamp to the PRINT AREA when one is defined; otherwise the full stage.
-      var a = (_qpF && _qpF.area) ? _qpF.area : { x: 0, y: 0, w: 100, h: 100 };
-      var minX = a.x, maxX = a.x + a.w, minY = a.y, maxY = a.y + a.h;
+      // Move/resize FREELY across the whole mockup (like the big Design Maker) — the dashed
+      // PRINT AREA box is just a guide, not a hard boundary. Bound only to the stage edges.
+      var minX = 0, maxX = 100, minY = 0, maxY = 100;
       if (mode === 'text') { if (_tl) { _tl.style.left = Math.max(minX, Math.min(maxX - 4, startX + dd.x)) + '%'; _tl.style.top = Math.max(minY, Math.min(maxY - 4, startY + dd.y)) + '%'; } return; }
       if (mode === 'dldrag' && _dl) { _dl.style.left = Math.max(minX, Math.min(maxX - startW, startX + dd.x)) + '%'; _dl.style.top = Math.max(minY, Math.min(maxY - startH, startY + dd.y)) + '%'; return; }
       if (mode === 'dlresize' && _dl) { _dl.style.width = Math.max(8, Math.min(maxX - startX, startW + dd.x)) + '%'; _dl.style.height = Math.max(8, Math.min(maxY - startY, startH + dd.y)) + '%'; return; }
