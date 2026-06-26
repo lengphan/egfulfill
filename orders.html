@@ -5429,7 +5429,6 @@ function _afmStartVietQR(amountUSD){
   var vnd=Math.max(1000, Math.round(amountUSD*RATE/1000)*1000);
   var ref=('EG'+Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,14);
   _afmVqrRef=ref;
-  var fallbackQr='https://img.vietqr.io/image/'+BANK+'-'+ACCT+'-qr_only.png?amount='+vnd+'&addInfo='+encodeURIComponent(ref)+'&accountName='+encodeURIComponent(NAME);
   var prev=document.getElementById('_afm'); if(prev) prev.style.display='none';
   var m=document.getElementById('_afmvqr');
   if(!m){ m=document.createElement('div'); m.id='_afmvqr'; m.style.cssText='display:none;position:fixed;inset:0;z-index:620;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif'; document.body.appendChild(m); m.addEventListener('click',function(e){ if(e.target===m) _afmCloseVietQR(); }); }
@@ -5447,20 +5446,22 @@ function _afmStartVietQR(amountUSD){
     + '<div id="_afm-vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:9px;background:#f6f5f4;border-radius:9px">Waiting for your transfer&hellip;</div>'
     + '</div>';
   m.style.display='flex';
-  _afmPaintImg(fallbackQr);   // best-effort image immediately; replaced by the local QR below
-  // Ask the server for a monitored VA-backed QR (same endpoint the wallet page uses) so the
-  // bank callback always fires and the top-up auto-confirms.
+  // Build ONE local VietQR carrying the SHORT note (= the exact note the poll matches
+  // on), painted after create-payment resolves the clean ref. No img.vietqr.io (the
+  // red-V→plain flicker) and no server VA qrCode (which baked in VietQR's long note —
+  // why a transfer's memo didn't match and it never auto-confirmed).
+  var _afmDone=false;
+  function _afmFinalize(){
+    if(_afmDone) return; _afmDone=true;
+    var payload=(typeof egBuildVietQR==='function') ? egBuildVietQR(BANK,ACCT,vnd,_afmVqrRef) : '';
+    if(payload) _afmPaintQR(payload);
+    else { var box=document.getElementById('_afm-vqr-box'); if(box) box.textContent='QR unavailable — use the account details below'; }
+  }
   fetch('/api/vietqr/create-payment',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({amount:vnd,note:ref})})
     .then(function(r){return r.json();}).then(function(d){
-      if(!d||d.error) return;
-      if(d.note||d.ref){ _afmVqrRef=d.note||d.ref; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; }
-      // Prefer the EMV QR string, rendered LOCALLY (no external image that an ad-blocker
-      // or CSP can break — that blank-image is exactly why the QR vanished). Else a server
-      // image link; else the img.vietqr.io best-effort already painted above.
-      var code=d.qrCode || (d.content && /^000201/.test(String(d.content)) ? d.content : '');
-      if(code) _afmPaintQR(code);
-      else if(d.qrLink && /^https?:/i.test(d.qrLink)) _afmPaintImg(d.qrLink);
-    }).catch(function(){});
+      if(d&&!d.error&&(d.note||d.ref)){ _afmVqrRef=d.note||d.ref; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; }
+    }).catch(function(){}).then(function(){ _afmFinalize(); });
+  setTimeout(_afmFinalize, 4000);
   // Poll — credit ONLY when the server confirms the matching transfer landed.
   if(_afmVqrPoll) clearInterval(_afmVqrPoll);
   var started=Date.now();

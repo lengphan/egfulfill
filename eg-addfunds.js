@@ -714,10 +714,8 @@ function openVietQRTopUp(amountUSD) {
   _vqrRef = ref;
   let rate = egVqrRate();
   let vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
-  // Fallback only — used if the server can't mint a VA-backed QR. The reliable
-  // path below asks VietQR for a monitored-VA QR so callbacks always fire.
-  const fallbackQr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-qr_only.png'
-    + '?amount=' + vnd + '&addInfo=' + encodeURIComponent(ref) + '&accountName=' + encodeURIComponent(EG_VQR.name);
+  // The QR is built locally from the real account + short note (see below) — no
+  // img.vietqr.io image, so nothing to fall back to.
   let m = document.getElementById('vqr-modal');
   if (!m) {
     m = document.createElement('div');
@@ -750,13 +748,15 @@ function openVietQRTopUp(amountUSD) {
   }
   m.style.display = 'flex'; document.body.style.overflow = 'hidden';
 
-  // Paint a locally-built VietQR immediately — no external image, so it can't show
-  // "QR unavailable". Rebuilt below once the server hands back its clean ref.
-  _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
+  // ONE locally-built VietQR, painted only AFTER we know the final note — so the QR's
+  // note ALWAYS equals the note the status poll reconciles on. (A temp→server note swap
+  // let a buyer scan a note the server never watches → "transferred but never confirms".
+  // Rendering the server's VA qrCode also baked in VietQR's long VA note instead of our
+  // short EGxxxxxx.) No external image → no red-V→plain flicker, no "QR unavailable".
+  var _qrDone = false;
+  function _vqrFinalize() { if (_qrDone) return; _qrDone = true; _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef)); }
 
-  // Re-pull the admin's live USD→VND rate when the modal opens (the page-load cache
-  // can be stale/default — that's why it read ₫25,400 instead of your ₫27,000). If it
-  // differs, recompute the VND amount, update the displayed rate, and rebuild the QR.
+  // Live admin rate (page-load cache can be stale → showed ₫25,400 not your ₫27,000).
   (function refreshRate() {
     const tokR = localStorage.getItem('eg_token') || '';
     fetch('/api/vietqr/rate', { headers: tokR ? { Authorization: 'Bearer ' + tokR } : {} })
@@ -768,15 +768,15 @@ function openVietQRTopUp(amountUSD) {
         rate = nr; vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
         var rl = document.getElementById('vqr-rate-line');
         if (rl) rl.textContent = 'Transfer ≈ ₫' + vnd.toLocaleString('en-US') + ' · 1 USD = ₫' + rate.toLocaleString('en-US');
-        _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
         if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
+        if (_qrDone) _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));  // amount changed after paint
       })
       .catch(function () {});
   })();
 
-  // Ask the server for a clean sequential reference (EG000123) + transfer monitoring.
-  // We keep rendering the QR LOCALLY (reliable); we just adopt the server's ref so the
-  // bank-callback reconciliation matches on the same note.
+  // Adopt the server's clean sequential ref (the exact note the bank callback matches
+  // on), THEN paint the QR once. If the server can't mint, fall back to the client ref
+  // (the poll reads the same _vqrRef, so they still agree).
   (function mintQR() {
     const tok0 = localStorage.getItem('eg_token') || '';
     fetch('/api/vietqr/create-payment', {
@@ -786,18 +786,17 @@ function openVietQRTopUp(amountUSD) {
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d || d.error) return;   // local QR already shown — nothing to do
-        // Adopt the server's clean sequential reference (EG000123) everywhere…
-        if (d.note || d.ref) {
+        if (d && !d.error && (d.note || d.ref)) {
           _vqrRef = d.note || d.ref;
           var n1 = document.getElementById('vqr-ref-note'); if (n1) n1.textContent = _vqrRef;
           var n2 = document.getElementById('vqr-ref-inst'); if (n2) n2.textContent = _vqrRef;
-          // …and rebuild the local QR so it carries the server ref as the note.
-          _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
         }
       })
-      .catch(function () {});   // local QR stands on its own
+      .catch(function () {})
+      .then(function () { _vqrFinalize(); });   // paint once, carrying the resolved note
   })();
+  // Safety: never leave the spinner forever if the network hangs.
+  setTimeout(_vqrFinalize, 4000);
 
   // Poll for the matching transfer (reads _vqrRef live — it switches to the server
   // ref once create-payment returns). Capture VietQR's transaction id when it lands.
