@@ -3919,8 +3919,8 @@ function renderOpOrders() {
             || _blankImg
             || (_isNewSetup ? '' : (((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? EGStore.imageForSku(it.sku, it.name) : null) || it.sellerImg || it.thumb || 'images/122267_b_fm.jpg'));
           const thumb = (_isNewSetup && !_blankChosen && !_designSrc)
-            ? '<div title="Pick a base blank to preview" style="width:40px;height:40px;border-radius:7px;flex-shrink:0;border:1px dashed #d1d5db;margin-right:10px;background:#fff"></div>'
-            : opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 40);
+            ? '<div title="Pick a base blank to preview" style="width:52px;height:52px;border-radius:7px;flex-shrink:0;border:1px dashed #d1d5db;margin-right:10px;background:#fff"></div>'
+            : opItemCompositeThumb(o.num, ei, it, prodImg, tBg, 52);
           // Pushed-to-board state (greyed out when already sent)
           // Push action lives inside the product zoom modal now; the row only
           // shows the pushed-status pill so operators can still tell at a glance.
