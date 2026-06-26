@@ -196,6 +196,11 @@ html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#
 html[data-theme=dark] [style*="border-right:1px solid #e5e4e0"]{border-right-color:#302e2c!important}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 .modal-hidden{display:none!important}
+/* Order-detail modal is TOP-anchored (not centered) so switching the Edit Items /
+   Edit All tabs — which changes the body height — keeps the header + tabs perfectly
+   still instead of re-centering and jumping the whole panel up/down. */
+#order-detail-modal{align-items:flex-start;padding:3vh 0}
+@keyframes odmFade{from{opacity:0}to{opacity:1}}
 html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
 html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
 html[data-theme=dark] .prog-bar{background:#302e2c!important}
@@ -2467,6 +2472,10 @@ function odmSetDesignMode(m) {
   UP_MODE = (m === 'all') ? 'all' : 'each';
   const o = window._odmCurrentOrder;
   if (o) openDetailModal(o.no);
+  // Soft cross-fade the items area so the tab switch reads as a transition, not a
+  // hard repaint (the modal itself stays put — it's top-anchored, see CSS).
+  const el = document.getElementById('odm-items');
+  if (el) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = 'odmFade .2s ease'; }
 }
 function odmUploadAll(ordNo) {
   const o = ORDERS.find(x => x.no === ordNo); if (!o || !o.itemsList.length) return;
