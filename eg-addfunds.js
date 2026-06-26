@@ -591,6 +591,8 @@ function submitDeposit() {
   document.querySelectorAll('#balance-val').forEach(el => el.textContent = '$' + bal.toFixed(2));
   const bigBal = document.getElementById('wallet-bal-big');
   if (bigBal) bigBal.textContent = '$' + bal.toFixed(2);
+  // SERVER ledger: persist this manual top-up (idempotent by a unique ref).
+  try { if (window.EGStore && EGStore.pushLedger) EGStore.pushLedger(amount, { type: 'topup', ref: 'manual-' + Date.now(), note: 'Manual top-up (' + method + ')' }); } catch (e) {}
   pendingFundOrders.forEach(id => removeOrderRows(id));
   pendingFundOrders = [];
   updateUnfundedSection();
@@ -599,7 +601,7 @@ function submitDeposit() {
 // Credit the wallet locally AFTER the server confirmed the charge.
 function _afterCardCredit(amount, ref, txnId){
   amount = Number(amount) || 0;
-  if (typeof vqrCreditWallet === 'function') vqrCreditWallet(amount);
+  if (typeof vqrCreditWallet === 'function') vqrCreditWallet(amount, { ref: txnId || ref, txnId: txnId, note: 'Card top-up' });
   if (typeof vqrRecordDeposit === 'function') vqrRecordDeposit(amount, ref, 'Card', txnId);
   if (typeof closeDepositModal === 'function') closeDepositModal();
   if (typeof walToast === 'function') walToast('✓ Payment confirmed — $' + amount.toFixed(2) + ' added'); else alert('$' + amount.toFixed(2) + ' added');
@@ -677,12 +679,18 @@ function egBuildVietQR(bankBin, account, amountVnd, note) {
   body += '6304';
   return body + _egCrc16(body);
 }
-function vqrCreditWallet(amountUSD) {
+function vqrCreditWallet(amountUSD, opts) {
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amountUSD).toFixed(2));
   localStorage.setItem('eg_balance', bal.toFixed(2));
   document.querySelectorAll('#balance-val').forEach(el => el.textContent = '$' + bal.toFixed(2));
   const big = document.getElementById('wallet-bal-big'); if (big) big.textContent = '$' + bal.toFixed(2);
+  // SERVER ledger: persist the confirmed top-up so the balance survives a refresh
+  // / new device. Idempotent by ref (topup/txn id) → re-confirming never double-credits.
+  try {
+    opts = opts || {};
+    if (window.EGStore && EGStore.pushLedger) EGStore.pushLedger(amountUSD, { type: 'topup', ref: opts.ref || opts.txnId || null, note: opts.note || 'Wallet top-up' });
+  } catch (e) {}
 }
 function closeVietQR() {
   if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
@@ -894,7 +902,7 @@ function _vqrUpdateTx(matchFn, patch) {
 }
 function vqrConfirmPending(rec) {
   var amt = Number(rec.amount_usd) || 0;
-  vqrCreditWallet(amt);
+  vqrCreditWallet(amt, { ref: rec.id || rec.ref || rec.txn_id, txnId: rec.txn_id, note: 'VietQR top-up' });
   var newBal = parseFloat(localStorage.getItem('eg_balance') || '0');
   _vqrUpdateTx(function (t) { return t.pending && (t.topupId === rec.id || t.ref === rec.ref); }, { pending: false, balance: newBal, txnId: rec.txn_id || '' });
   try { var d = (STATS.all[currentPeriod] || STATS.all.month); d.dep += amt; } catch (e) {}

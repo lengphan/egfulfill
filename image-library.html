@@ -631,6 +631,8 @@ document.addEventListener('click',function(e){
     if (!confirm('Unlock the embroidery (.PES) file for $' + price.toFixed(2) + '?\nWallet balance: $' + bal.toFixed(2) + '. You can re-download it any time after.')) return;
     var nb = Math.max(0, bal - price);
     localStorage.setItem('eg_balance', nb.toFixed(2));
+    // SERVER ledger: persist the debit (idempotent by design id → re-download is free).
+    try { if (window.EGStore && EGStore.pushLedger) EGStore.pushLedger(-price, { type: 'design-file', ref: did, note: 'Design file unlock ' + did }); } catch(e){}
     if (window.EGStore && EGStore.markPaidForDesignFile) EGStore.markPaidForDesignFile(did);
     document.querySelectorAll('#balance-val, #wallet-bal-big').forEach(function (el) { el.textContent = '$' + nb.toFixed(2); });
     ilLoad();

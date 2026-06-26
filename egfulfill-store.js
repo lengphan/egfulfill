@@ -626,6 +626,9 @@
       }
       var bal = parseFloat((this.getFactoryBalance() + amt).toFixed(2));
       try { localStorage.setItem(this.FACTORY_BALANCE_KEY, bal.toFixed(2)); } catch (e) {}
+      // SERVER ledger: persist the factory-wallet credit (shared staff wallet),
+      // idempotent by topup id so re-confirming never double-counts.
+      try { if (this.pushLedger) this.pushLedger(amt, { account: 'factory', type: 'topup', ref: opts.topupId || opts.txnId || opts.ref || null, note: opts.label || 'Seller wallet top-up' }); } catch (e) {}
       this._appendFactoryLedger({
         type: 'topup', amount: amt, ts: _ts(),
         orderId: opts.ref || null, topupId: opts.topupId || null, txnId: opts.txnId || null,
@@ -2472,6 +2475,63 @@
           .catch(function(){ if(cb)cb(); });
       } catch(e){ if(cb)cb(); }
     },
+    // ── Wallet balance — SERVER source of truth ──────────────────────────
+    // Balances used to live ONLY in localStorage (eg_balance / eg_factory_balance
+    // / eg_designer_balance), so a refresh or a different device lost / diverged.
+    // Now every money movement appends an idempotent ledger row server-side and
+    // the balance is reconciled FROM the server on load; localStorage stays as an
+    // optimistic cache so the UI updates instantly and still works offline.
+    //   account: omit → the logged-in seller's own wallet; 'factory'/'designer'
+    //   for the shared staff wallets. ref: a stable key (order id, topup id, …)
+    //   so a retry / double-click / two boards never double-count.
+    pushLedger: function(deltaUSD, opts){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
+        var d = parseFloat(deltaUSD); if (!isFinite(d) || d === 0) return;
+        opts = opts || {};
+        fetch('/api/wallet/ledger', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify({ account: opts.account || undefined, delta: d, type: opts.type || 'adjust', ref: opts.ref || null, note: opts.note || null }),
+          keepalive: true
+        }).catch(function(){});
+      } catch(e){}
+    },
+    // Pull the authoritative balance from the server and write it into the local
+    // cache key, then fire the existing balance-changed event so headers update.
+    // account omitted → seller's eg_balance; 'factory'/'designer' → those caches.
+    hydrateBalance: function(account, cb){
+      var self = this;
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) { if(cb)cb(); return; }
+        var url = '/api/wallet' + (account ? ('?account=' + encodeURIComponent(account)) : '');
+        fetch(url, { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(j){
+            if (!j || typeof j.balance !== 'number') { if(cb)cb(); return; }
+            var key = account === 'factory' ? self.FACTORY_BALANCE_KEY
+                    : account === 'designer' ? self.DESIGNER_BALANCE_KEY : 'eg_balance';
+            // MIGRATION (one-time, non-destructive): a wallet that pre-dates the server
+            // ledger has an existing localStorage balance but ZERO ledger rows. Blindly
+            // writing the server's 0 would WIPE their money. Instead, seed an
+            // opening-balance entry from the local cache (idempotent ref) and keep the
+            // local value for this load — the ledger now matches on the next refresh.
+            var localBal = parseFloat(localStorage.getItem(key) || '0') || 0;
+            if ((!j.ledger || j.ledger.length === 0) && localBal > 0 && Math.abs(localBal - j.balance) > 0.005) {
+              self.pushLedger(localBal, { account: account || undefined, type: 'opening', ref: 'opening-' + (account || 'seller'), note: 'Opening balance (migrated from device)' });
+              if (cb) cb(localBal, []);
+              return;   // keep the local value; do not overwrite with the empty-ledger 0
+            }
+            try { localStorage.setItem(key, j.balance.toFixed(2)); } catch(e){}
+            try { if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('eg-balance-changed', { detail:{ balance:j.balance, account:account||'seller' } }));
+              window.dispatchEvent(new CustomEvent('eg-factory-balance-changed'));
+            } } catch(e){}
+            if (cb) cb(j.balance, j.ledger || []);
+          })
+          .catch(function(){ if(cb)cb(); });
+      } catch(e){ if(cb)cb(); }
+    },
+
     // Per-item match state (detected color → candidate threads + chosen one) so the
     // seller's editable picker survives a page refresh.
     THREAD_MATCH_KEY: 'eg_thread_match',

@@ -271,6 +271,16 @@
       // factory_status) so the warehouse "Working" flag shows on every board +
       // mobile, not just the browser that set it.
       try { if (window.EGStore && EGStore.seedItemFactoryStatusFromOrders) EGStore.seedItemFactoryStatusFromOrders(r.data || []); } catch(e){}
+      // Reconcile the wallet balance FROM the server (source of truth) so a
+      // refresh / different device shows the real number, not a stale local cache.
+      // Seller → own wallet; staff also pull the shared factory wallet.
+      try {
+        if (window.EGStore && EGStore.hydrateBalance) {
+          EGStore.hydrateBalance(null);
+          var u = (function(){ try { return JSON.parse(localStorage.getItem(USER_KEY) || '{}'); } catch(e){ return {}; } })();
+          if (u && u.role && u.role !== 'seller') { EGStore.hydrateBalance('factory'); EGStore.hydrateBalance('designer'); }
+        }
+      } catch(e){}
       retrySync();                                                    // recover any order whose POST never landed
       retryPatches();                                                 // recover any status/tracking update that never landed
     });

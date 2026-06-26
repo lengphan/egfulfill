@@ -1818,6 +1818,10 @@ function pushOrderToProduction(ordNo, btn) {
     document.querySelectorAll('#qtm-current-bal').forEach(function(el){ el.textContent = '$' + verifyBal.toFixed(2); });
     var bigBal = document.getElementById('wallet-bal-big');
     if (bigBal) bigBal.textContent = '$' + verifyBal.toFixed(2);
+    // SERVER ledger: record the seller debit (idempotent by order id, so re-pushing
+    // the same order never double-charges). The local cache above is optimistic;
+    // the next page-load hydrate reconciles eg_balance from this ledger.
+    try { if (typeof EGStore !== 'undefined' && EGStore.pushLedger) EGStore.pushLedger(-orderCost, { type: 'order-charge', ref: o.id, note: 'Order ' + o.id + ' pushed to production' }); } catch(e) {}
     // Credit the factory wallet (shared by admin + warehouse). De-duped by
     // orderId in EGStore so re-pushing the same order doesn't double-credit.
     try {
@@ -4060,6 +4064,8 @@ function odmBuyEmbFile(orderId, sku) {
   // Deduct the fee and persist; mark as paid so the paywall flips to a free download.
   const newBalance = Math.max(0, balance - price);
   localStorage.setItem('eg_balance', newBalance.toFixed(2));
+  // SERVER ledger: persist the debit (idempotent by order|sku, so re-unlocking is free).
+  try { if (EGStore.pushLedger) EGStore.pushLedger(-price, { type: 'emb-file', ref: orderId + '|' + sku, note: 'Embroidery file unlock ' + orderId }); } catch(e){}
   EGStore.markSellerPaidForEmb(orderId, sku);
   // Refresh every visible balance pill on this page (topbar, etc).
   document.querySelectorAll('#balance-val, #wallet-bal-big').forEach(el => { el.textContent = '$' + newBalance.toFixed(2); });
