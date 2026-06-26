@@ -2704,19 +2704,21 @@ function openDetailModal(ordNo) {
     }
     // Variant chips — single muted pill with three values inside, separated by dots.
     const chip = function(text){ return '<span style="display:inline-flex;align-items:center;padding:3px 9px;background:transparent;border:1px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#374151;white-space:nowrap">'+text+'</span>'; };
-    return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:11px;position:relative">
+    return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:12px 14px;display:flex;gap:14px;align-items:center;position:relative">
       <!-- remove × — top-right CORNER of the box, light grey (consistent, easy to hit) -->
       <button onclick="odmRemoveItem(${idx})" style="${xVis};position:absolute;top:7px;right:9px;background:none;border:none;color:#d1d5db;cursor:pointer;font-size:18px;line-height:1;padding:2px;font-family:inherit;z-index:2" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
-      <!-- ROW 1 — image · name · line total. (Qty stepper lives on the strip row.) -->
-      <div style="display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center">
-        ${itemCompositeThumb(o, item, 52)}
+      <!-- Bigger item image filling the whole left of the card. -->
+      ${itemCompositeThumb(o, item, 72)}
+      <!-- Right column: name+sku+price aligned ABOVE the variant strip. -->
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:9px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-right:18px">
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.blank || item.listing || item.name}</div>
           <div style="font-size:11.5px;color:#9ca3af;font-family:monospace;margin-top:1px">${(item.sku && !/^NEW-/i.test(String(item.sku))) ? item.sku : 'N/A'}</div>
         </div>
-        <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap;padding-right:16px">$${_lineTotal.toFixed(2)}</div>
+        <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap">$${_lineTotal.toFixed(2)}</div>
       </div>
-      <!-- ROW 2 — fixed-width selector strip + qty stepper pushed right into the blank space. -->
+      <!-- variant strip + qty stepper pushed right into the blank space. -->
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:6px 16px;background:#fff;flex:0 0 auto;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:172px">${blankOptsHtml}</select>
@@ -2742,6 +2744,7 @@ function openDetailModal(ordNo) {
         </div>
       </div>
       ${embRowHtml}
+      </div>
     </div>`;
   }).join(''));
   // Header buttons reflect lock state
@@ -3218,7 +3221,15 @@ function itemCompositeThumb(o, item, size) {
   } else {
     onclickAttr = `onclick="event.stopPropagation();zoomImg('${(mockup||'').replace(/'/g,"\\'")}')" title="Click to view"`;
   }
-  return `<div ${onclickAttr} style="width:${size}px;height:${size}px;border:1px solid #e5e4e0;border-radius:7px;${bg};flex-shrink:0;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''">${designLayer}${extraLayers}</div>`;
+  // Swap component (same as the factory): composite (blank+design) in front, the item's
+  // OWN listing photo behind; a corner arrow flips them. The arrow stops propagation, so
+  // the avatar's click-to-edit (mini designer) is preserved.
+  const _listing = (item.img && /^(https?:|data:)/.test(String(item.img))) ? String(item.img)
+    : (item.sellerImg && /^(https?:|data:)/.test(String(item.sellerImg))) ? String(item.sellerImg)
+    : ((typeof EGStore !== 'undefined' && EGStore.imageForSku) ? (EGStore.imageForSku(item.sku, item.name) || '') : '');
+  const _layerB = _listing ? `<div data-layer="b" style="position:absolute;inset:0;display:none"><img src="${_listing.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/></div>` : '';
+  const _swapArrow = _listing ? `<button onclick="event.stopPropagation();window.EGDesignTools&&EGDesignTools.swapItemImg(this.closest('.egdt-swap'))" title="Swap — blank (production) ⇄ listing photo" style="position:absolute;right:2px;bottom:2px;z-index:4;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.93);border:1px solid #e5e4e0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.18)" onmouseover="this.style.borderColor='#191918'" onmouseout="this.style.borderColor='#e5e4e0'"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2.5 5h7l-2-2.2M11.5 9h-7l2 2.2" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : '';
+  return `<div ${onclickAttr} class="egdt-swap" data-front="a" style="width:${size}px;height:${size}px;border:1px solid #e5e4e0;border-radius:7px;flex-shrink:0;position:relative;overflow:hidden;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''"><div data-layer="a" style="position:absolute;inset:0;${bg}">${designLayer}${extraLayers}</div>${_layerB}${_swapArrow}</div>`;
 }
 
 /* Drag/resize the design on the mockup — no other tools (rotate/flip/text/etc).
