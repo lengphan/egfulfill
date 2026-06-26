@@ -2707,23 +2707,16 @@ function openDetailModal(ordNo) {
     return `<div style="border:1px solid #e5e4e0;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:11px;position:relative">
       <!-- remove × — top-right CORNER of the box, light grey (consistent, easy to hit) -->
       <button onclick="odmRemoveItem(${idx})" style="${xVis};position:absolute;top:7px;right:9px;background:none;border:none;color:#d1d5db;cursor:pointer;font-size:18px;line-height:1;padding:2px;font-family:inherit;z-index:2" title="Remove item" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>
-      <!-- ROW 1 — image · name · (price over qty stepper). -->
+      <!-- ROW 1 — image · name · line total. (Qty stepper lives on the strip row.) -->
       <div style="display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center">
         ${itemCompositeThumb(o, item, 52)}
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.blank || item.listing || item.name}</div>
           <div style="font-size:11.5px;color:#9ca3af;font-family:monospace;margin-top:1px">${(item.sku && !/^NEW-/i.test(String(item.sku))) ? item.sku : 'N/A'}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;padding-right:16px">
-          <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap">$${_lineTotal.toFixed(2)}</div>
-          <div style="display:inline-flex;align-items:center;gap:1px;flex-shrink:0" title="Quantity">
-            <button ${qtyDisabled} onclick="event.stopPropagation();odmChangeQty(${idx},-1)" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:15px;line-height:1;padding:0 4px;font-family:inherit" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#c4c3be'">−</button>
-            <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:14px;text-align:center;white-space:nowrap">${item.qty || 1}</span>
-            <button ${qtyDisabled} onclick="event.stopPropagation();odmChangeQty(${idx},1)" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:15px;line-height:1;padding:0 4px;font-family:inherit" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#c4c3be'">+</button>
-          </div>
-        </div>
+        <div style="font-size:13.5px;font-weight:700;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.005em;white-space:nowrap;padding-right:16px">$${_lineTotal.toFixed(2)}</div>
       </div>
-      <!-- ROW 2 — fixed-width selector strip (stretched a touch, still just-enough). -->
+      <!-- ROW 2 — fixed-width selector strip + qty stepper pushed right into the blank space. -->
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:6px 16px;background:#fff;flex:0 0 auto;${odmPillLocked?'opacity:.85':''}">
           <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:172px">${blankOptsHtml}</select>
@@ -2742,6 +2735,11 @@ function openDetailModal(ordNo) {
           </select>
         </div>
         ${_odmAllMode ? '<span style="font-size:11.5px;color:#9ca3af;font-weight:600;flex-shrink:0">One design for all ↑</span>' : designActions}
+        <div style="margin-left:auto;display:inline-flex;align-items:center;gap:1px;flex-shrink:0" title="Quantity">
+          <button ${qtyDisabled} onclick="event.stopPropagation();odmChangeQty(${idx},-1)" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:15px;line-height:1;padding:0 4px;font-family:inherit" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#c4c3be'">−</button>
+          <span id="odm-qty-${idx}" style="font-size:13px;font-weight:700;color:#191918;min-width:14px;text-align:center;white-space:nowrap">${item.qty || 1}</span>
+          <button ${qtyDisabled} onclick="event.stopPropagation();odmChangeQty(${idx},1)" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:15px;line-height:1;padding:0 4px;font-family:inherit" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#c4c3be'">+</button>
+        </div>
       </div>
       ${embRowHtml}
     </div>`;
