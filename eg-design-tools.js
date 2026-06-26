@@ -1746,6 +1746,16 @@
       + '<div id="egdt-qp-thread-chips"></div>'
       + '</div>';
   }
+  // Candidate in-stock threads near a hex (so a stored/sampled colour offers alternatives
+  // in its dropdown). Returns [] when EGStore can't resolve it.
+  function _qpThreadCandidatesFromHex(hex) {
+    try {
+      var m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || '')); if (!m) return [];
+      var n = parseInt(m[1], 16);
+      if (window.EGStore && EGStore.nearestThreads) return EGStore.nearestThreads((n >> 16) & 255, (n >> 8) & 255, n & 255, 999) || [];
+    } catch (e) {}
+    return [];
+  }
   function _qpRenderThreadChips() {
     var box = document.getElementById('egdt-qp-thread-chips'); if (!box || !_qpF) return;
     var threads = _qpF.threads || [];
@@ -1754,14 +1764,29 @@
       box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Auto-matching the design’s colours… or use “Add colour” to pick from the mockup.' : 'Add a design to auto-match its thread colours.') + '</div>';
       return;
     }
-    box.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + threads.map(function (t, i) {
-      return '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 7px 4px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#191918">'
-        + '<span style="width:14px;height:14px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span>'
-        + '<span style="font-family:monospace">' + (t.code || '—') + '</span>'
-        + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '')
-        + '<button onclick="EGDesignTools._qpThreadRemove(' + i + ')" title="Remove" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:13px;line-height:1;padding:0 0 0 1px;font-family:inherit">×</button>'
+    // One ROW per detected colour: [detected swatch] → [chosen swatch] [dropdown to change
+    // the thread] [× remove]. Mirrors the Design Maker so each match is overridable.
+    box.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">' + threads.map(function (t, i) {
+      var cands = (t.candidates && t.candidates.length) ? t.candidates : [{ code: t.code, name: t.name, hex: t.hex }];
+      var opts = cands.map(function (c) { return '<option value="' + (c.code || '') + '"' + (c.code === t.code ? ' selected' : '') + '>' + (c.code || '—') + (c.name ? ' ' + c.name : '') + '</option>'; }).join('');
+      var detected = t.srcHex || t.hex || '#e5e4e0';
+      return '<div style="display:flex;align-items:center;gap:7px">'
+        + '<span title="Detected ' + detected + '" style="width:15px;height:15px;border-radius:4px;background:' + detected + ';border:1px solid rgba(0,0,0,.14);flex-shrink:0"></span>'
+        + '<svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M3 6.5h6.5M7 4l2.5 2.5L7 9" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        + '<span style="width:15px;height:15px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1px solid rgba(0,0,0,.14);flex-shrink:0"></span>'
+        + '<select onchange="EGDesignTools._qpThreadSetSel(' + i + ',this.value)" style="flex:1;min-width:0;font-size:11.5px;border:1px solid #e5e4e0;border-radius:6px;padding:4px 6px;font-family:inherit;color:#374151;background:#fff;cursor:pointer">' + opts + '</select>'
+        + '<button onclick="EGDesignTools._qpThreadRemove(' + i + ')" title="Remove" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:15px;line-height:1;padding:0 2px;font-family:inherit">×</button>'
         + '</div>';
     }).join('') + '</div>';
+  }
+  // Change which in-stock thread a matched colour maps to (the dropdown).
+  function _qpThreadSetSel(idx, code) {
+    if (!_qpF || !_qpF.threads || !_qpF.threads[idx]) return;
+    var t = _qpF.threads[idx];
+    var pick = (t.candidates || []).filter(function (c) { return c.code === code; })[0];
+    if (pick) { t.code = pick.code; t.name = pick.name; t.hex = pick.hex; } else { t.code = code; }
+    _qpRenderThreadChips();
+    try { _qpPersist(false); } catch (e) {}
   }
   // Eyedropper: sample a colour directly off the design where it sits on the mockup
   // stage. A magnifier loupe follows the cursor over the artwork; clicking adds the
@@ -1831,12 +1856,17 @@
     var py = Math.max(0, Math.min(_qpPick.cv.height - 1, Math.round((e.clientY - rect.top) * sy)));
     var d; try { d = _qpPick.ctx.getImageData(px, py, 1, 1).data; } catch (err) { _qpPickStop(); _egdtToast('Image can’t be sampled in-browser'); return; }
     if (d[3] < 30) return;   // transparent pixel — keep picking, don't cancel
-    if (window.EGStore && EGStore.nearestThread) {
-      var t = EGStore.nearestThread(d[0], d[1], d[2]);
+    if (window.EGStore && (EGStore.nearestThreads || EGStore.nearestThread)) {
+      var cands = EGStore.nearestThreads ? (EGStore.nearestThreads(d[0], d[1], d[2], 999) || []) : [];
+      var t = cands[0] || (EGStore.nearestThread ? EGStore.nearestThread(d[0], d[1], d[2]) : null);
       if (t) {
         _qpF.threads = _qpF.threads || [];
         if (_qpF.threads.some(function (x) { return x.code === t.code; })) { _egdtToast('Thread ' + t.code + ' already added'); }
-        else { _qpF.threads.push({ code: t.code, name: t.name, hex: t.hex }); _qpRenderThreadChips(); try { _qpPersist(false); } catch (e2) {} }
+        else {
+          var srcHex = '#' + [d[0], d[1], d[2]].map(function (c) { return c.toString(16).padStart(2, '0'); }).join('');
+          _qpF.threads.push({ code: t.code, name: t.name, hex: t.hex, srcHex: srcHex, candidates: cands.length ? cands : [{ code: t.code, name: t.name, hex: t.hex }] });
+          _qpRenderThreadChips(); try { _qpPersist(false); } catch (e2) {}
+        }
       }
     }
     _qpPickStop();
@@ -1851,16 +1881,36 @@
     // Seed from any threads already matched for this item (so the panel isn't empty),
     // then refine against the current artwork (same flow as the upload panel).
     var stored = []; try { if (window.EGStore && EGStore.getItemThreadColors) stored = EGStore.getItemThreadColors(_tkOrd, it && it.sku) || []; } catch (e) {}
-    _qpF.threads = stored.slice();
+    // Give stored threads their own candidate list so the dropdown works on reopen.
+    _qpF.threads = stored.map(function (t) {
+      var c = _qpThreadCandidatesFromHex(t.hex);
+      return { code: t.code, name: t.name, hex: t.hex, srcHex: t.srcHex || t.hex, candidates: (c && c.length) ? c : [{ code: t.code, name: t.name, hex: t.hex }] };
+    });
     box.style.display = 'block';
     box.innerHTML = _qpThreadPanelHTML(design);
     _qpRenderThreadChips();
-    if (design && window.EGStore && EGStore.matchThreadColors) {
+    // Prefer matchThreadCandidates (gives a candidate list per detected colour → the
+    // dropdown). Falls back to the single-nearest matchThreadColors if unavailable.
+    if (design && window.EGStore && EGStore.matchThreadCandidates) {
       var token = _qpF.dk;
-      EGStore.matchThreadColors(_upCanvasSrc(design), function (threads) {
+      EGStore.matchThreadCandidates(_upCanvasSrc(design), function (rows) {
         if (!_qpF || _qpF.dk !== token) return;
-        if (threads && threads.length) { _qpF.threads = threads; _qpRenderThreadChips(); }
-        else if (!stored.length) { _qpRenderThreadChips(); }
+        if (rows && rows.length) {
+          _qpF.threads = rows.map(function (r) {
+            var c0 = (r.candidates && r.candidates[0]) || {};
+            return { code: c0.code, name: c0.name, hex: c0.hex, srcHex: r.srcHex, candidates: r.candidates || [] };
+          });
+          _qpRenderThreadChips();
+        } else if (!stored.length) { _qpRenderThreadChips(); }
+      });
+    } else if (design && window.EGStore && EGStore.matchThreadColors) {
+      var token2 = _qpF.dk;
+      EGStore.matchThreadColors(_upCanvasSrc(design), function (threads) {
+        if (!_qpF || _qpF.dk !== token2) return;
+        if (threads && threads.length) {
+          _qpF.threads = threads.map(function (t) { return { code: t.code, name: t.name, hex: t.hex, srcHex: t.hex, candidates: _qpThreadCandidatesFromHex(t.hex) }; });
+          _qpRenderThreadChips();
+        } else if (!stored.length) { _qpRenderThreadChips(); }
       });
     }
   }
@@ -1900,7 +1950,10 @@
       try {
         if (/EMB/i.test(String((t2.printType || t2.tech) || '')) && _qpF.threads && window.EGStore && EGStore.setItemThreadColors) {
           var _tkOrd2 = (o.num != null) ? o.num : o.id;
-          EGStore.setItemThreadColors(_tkOrd2, t2.sku, _qpF.threads);
+          // Save a SLIM list (drop the per-row candidate arrays) so the boards get the
+          // chosen thread without bloating localStorage with the whole palette.
+          var _slim = _qpF.threads.map(function (t) { return { code: t.code, name: t.name, hex: t.hex, srcHex: t.srcHex }; });
+          EGStore.setItemThreadColors(_tkOrd2, t2.sku, _slim);
         }
       } catch (e) {}
     });
@@ -2107,7 +2160,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-swap-arrow';
+  window.EG_BUILD = '2026-06-26-thread-dropdown';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2307,7 +2360,7 @@
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,
     _qpSearch: _qpSearch, _qpPickResult: _qpPickResult,
-    _qpThreadPick: _qpThreadPick, _qpThreadRemove: _qpThreadRemove,
+    _qpThreadPick: _qpThreadPick, _qpThreadRemove: _qpThreadRemove, _qpThreadSetSel: _qpThreadSetSel,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
