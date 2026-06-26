@@ -143,10 +143,33 @@
     var eb = document.getElementById('egg-edit'); eb.style.display = isStaff() ? '' : 'none'; eb.textContent = 'Edit';
     if (_mode === 'size') renderSize(); else renderFile();
   }
+  // Inline mount — renders the SAME guide (title · edit/save · tabs · body) into an
+  // arbitrary container instead of the popup, so a page can expand it accordion-style
+  // (e.g. admin Settings → Guides) with no modal. Reuses every render/edit/save handler
+  // (they target the same egg-* ids, now living inside the container). Don't also call
+  // open()/openFile() on the same page, or the shared ids would collide with the modal.
+  function mount(container, mode, pid) {
+    if (!container) return;
+    _mode = mode === 'size' ? 'size' : 'file';
+    _editing = false;
+    if (_mode === 'size') _pid = pid != null ? String(pid) : (_pid || null);
+    container.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+      + '<div><div id="egg-title" style="font-size:14.5px;font-weight:800;color:#191918"></div><div id="egg-sub" style="font-size:12px;color:#9ca3af;margin-top:1px"></div></div>'
+      + '<button id="egg-edit" onclick="EGGuides._toggleEdit()" style="display:none;font-size:12.5px;font-weight:700;border:1px solid #e5e4e0;background:#fff;color:#374151;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit">Edit</button>'
+      + '</div>'
+      + '<div id="egg-tabs" style="display:none;gap:6px;padding:0 0 12px;flex-wrap:wrap"></div>'
+      + '<div id="egg-body"></div>';
+    document.getElementById('egg-title').textContent = _mode === 'size' ? 'Size guide' : 'File guidelines';
+    document.getElementById('egg-sub').textContent = _mode === 'size' ? 'Measurements by product · pick a tab' : 'Artwork requirements for print & embroidery';
+    var eb = document.getElementById('egg-edit'); eb.style.display = isStaff() ? '' : 'none'; eb.textContent = 'Edit';
+    if (_mode === 'size') renderSize(); else renderFile();
+  }
   window.EGGuides = {
     open: open,
     openFile: function () { open('file'); },
     openSize: function (pid) { open('size', pid); },
+    mount: mount,
     close: close,
     _toggleEdit: function () {
       var eb = document.getElementById('egg-edit');

@@ -3182,18 +3182,24 @@ document.addEventListener('DOMContentLoaded', function(){
         <!-- Guides — File Guidelines + Size Guide (editable, shared with sellers) -->
         <div id="afpanel-guides" class="card fi" style="padding:22px 24px;display:none;max-width:720px">
           <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Guides</div>
-          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Reference guides shared with sellers. Open one to view or edit it.</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Reference guides shared with sellers. Click one to expand &amp; edit it inline.</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <button onclick="if(window.EGGuides)EGGuides.openFile()" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:1px solid #e5e4e0;border-radius:10px;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='#191918';this.style.boxShadow='0 2px 10px rgba(0,0,0,.05)'" onmouseout="this.style.borderColor='#e5e4e0';this.style.boxShadow='none'">
-              <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5L12 4.5V14a.5.5 0 01-.5.5h-8A.5.5 0 013 14V2a.5.5 0 01.5-.5z" stroke="#374151" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V4.5h3M5.5 8h5M5.5 10.5h5" stroke="#374151" stroke-width="1.2" stroke-linecap="round"/></svg></div>
-              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">File Guidelines</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Accepted formats, DPI, color mode, print-file specs.</div></div>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button onclick="if(window.EGGuides)EGGuides.openSize()" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:1px solid #e5e4e0;border-radius:10px;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='#191918';this.style.boxShadow='0 2px 10px rgba(0,0,0,.05)'" onmouseout="this.style.borderColor='#e5e4e0';this.style.boxShadow='none'">
-              <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M2 6h12M6 2v12" stroke="#374151" stroke-width="1.2"/></svg></div>
-              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">Size Guide</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Per-product size charts &amp; print-area dimensions.</div></div>
-              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
+            <div style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden">
+              <button onclick="admToggleGuide('file',this)" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:none;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background='#faf9f7'" onmouseout="this.style.background='#fff'">
+                <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5L12 4.5V14a.5.5 0 01-.5.5h-8A.5.5 0 013 14V2a.5.5 0 01.5-.5z" stroke="#374151" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V4.5h3M5.5 8h5M5.5 10.5h5" stroke="#374151" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+                <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">File Guidelines</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Accepted formats, DPI, color mode, print-file specs.</div></div>
+                <svg data-chev="file" width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;transition:transform .18s"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div id="adm-guide-file" style="display:none;padding:4px 16px 16px;border-top:1px solid #f0ede9"></div>
+            </div>
+            <div style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden">
+              <button onclick="admToggleGuide('size',this)" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:none;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:background .15s" onmouseover="this.style.background='#faf9f7'" onmouseout="this.style.background='#fff'">
+                <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M2 6h12M6 2v12" stroke="#374151" stroke-width="1.2"/></svg></div>
+                <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">Size Guide</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Per-product size charts &amp; print-area dimensions.</div></div>
+                <svg data-chev="size" width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;transition:transform .18s"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div id="adm-guide-size" style="display:none;padding:4px 16px 16px;border-top:1px solid #f0ede9"></div>
+            </div>
           </div>
         </div>
         <!-- Users (admin-only) -->
@@ -3706,6 +3712,23 @@ function showSection(id) {
 }
 
 // Settings tab switcher (seller-style left tabs → right panel).
+// Guides accordion — expand a guide inline (File / Size) to view + edit, no popup.
+// Only one open at a time; re-clicking collapses it. Reuses EGGuides.mount.
+function admToggleGuide(which, btn){
+  var area = document.getElementById('adm-guide-' + which);
+  if(!area) return;
+  var opening = area.style.display === 'none';
+  ['file','size'].forEach(function(w){
+    var a = document.getElementById('adm-guide-' + w); if(a){ a.style.display='none'; a.innerHTML=''; }
+    var ch = document.querySelector('[data-chev="' + w + '"]'); if(ch) ch.style.transform = '';
+  });
+  if(opening){
+    area.style.display = 'block';
+    var ch = document.querySelector('[data-chev="' + which + '"]'); if(ch) ch.style.transform = 'rotate(90deg)';
+    if(window.EGGuides && EGGuides.mount) EGGuides.mount(area, which);
+  }
+}
+window.admToggleGuide = admToggleGuide;
 function admSettingsTab(name, el){
   // Existing 4 panels + the new 'platform' panel (additive — older callers
   // still work, none of the existing panel ids changed).
