@@ -1778,7 +1778,18 @@
     if (!_qpF || _qpF.locked) { closeQuickPos(); return; }
     _qpPersist(true);
     if (_qpF && _qpF.mount) { refreshBoard(); _egdtToast('Saved to all items'); }   // embed: stay open
-    else { closeQuickPos(); refreshBoard(); }
+    else { closeQuickPos(); refreshBoard(); _egRefreshSellerModal(); }
+  }
+  // After a popup save, re-render the seller's order-detail modal (if open) so the
+  // small item avatars + needs-design state reflect the just-saved design without a
+  // tab switch. Skipped for the Edit-All embed (its save keeps the editor mounted).
+  function _egRefreshSellerModal() {
+    try {
+      if (window._odmCurrentOrder && typeof window.openDetailModal === 'function') {
+        var m = document.getElementById('order-detail-modal');
+        if (m && !m.classList.contains('modal-hidden')) window.openDetailModal(window._odmCurrentOrder.no);
+      }
+    } catch (e) {}
   }
   function qpRemoveBg() {
     if (!_qpF || _qpF.locked) return;
@@ -1962,7 +1973,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-qp-thread-match';
+  window.EG_BUILD = '2026-06-26-avatar-rehydrate';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
