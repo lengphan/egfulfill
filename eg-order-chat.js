@@ -374,6 +374,11 @@
     setView('thread');
     renderStatusBar();
     renderMessages();
+    // Pull any messages this device hasn't seen from the server (per-order only;
+    // TEAM:* rooms aren't backed by an order row), then re-render with the merge.
+    if (!isTeam && typeof EGStore !== 'undefined' && EGStore.hydrateOrderChat) {
+      EGStore.hydrateOrderChat(oid, function(){ if (_orderId === oid) renderMessages(); });
+    }
     // Designer is READ-ONLY on order chat (per-order). On TEAM threads they
     // CAN post (it's the factory side-channel they're meant to use). Other
     // roles always see the normal composer.

@@ -648,6 +648,9 @@
       // Debit factory
       var newFactory = parseFloat((factoryBal - amt).toFixed(2));
       try { localStorage.setItem(this.FACTORY_BALANCE_KEY, newFactory.toFixed(2)); } catch(e){}
+      // SERVER: atomic factory→seller move, seller account resolved from the order
+      // id. Idempotent by order ref so re-refunding the same order never doubles.
+      try { if (this.pushTransfer && orderId) this.pushTransfer(amt, { fromAccount: 'factory', toOrderId: orderId, type: 'refund', ref: orderId + '|refund', note: opts.label || 'Refund to seller' }); } catch(e){}
       this._appendFactoryLedger({
         type: opts.reason === 'cancellation' ? 'cancellation' : 'refund',
         amount: amt, ts: _ts(),
@@ -688,6 +691,9 @@
       var newFactory = parseFloat((factoryBal - amt).toFixed(2));
       if (newFactory < 0) newFactory = 0;
       try { localStorage.setItem(this.FACTORY_BALANCE_KEY, newFactory.toFixed(2)); } catch(e){}
+      // SERVER: persist the manual adjustment as a factory↔seller move (seller
+      // resolved by email). amt is signed: +ve credits the seller, −ve debits them.
+      try { if (this.pushTransfer && opts.sellerEmail) this.pushTransfer(amt, { fromAccount: 'factory', toEmail: opts.sellerEmail, type: 'manual-adjust', ref: 'adj-' + (opts.sellerEmail) + '-' + Date.now(), note: opts.note || 'Manual adjustment' }); } catch(e){}
       this._appendFactoryLedger({
         type: 'manual-adjust', amount: amt, ts: _ts(),
         orderId: null,
@@ -764,6 +770,9 @@
       }
       var bal = parseFloat((this.getDesignerBalance() + amt).toFixed(2));
       try { localStorage.setItem(this.DESIGNER_BALANCE_KEY, bal.toFixed(2)); } catch(e){}
+      // SERVER ledger: persist the designer credit (shared 'designer' wallet),
+      // idempotent by card id so re-approving never double-pays.
+      try { if (this.pushLedger) this.pushLedger(amt, { account: 'designer', type: 'earning', ref: opts.cardId != null ? ('card-' + opts.cardId) : null, note: opts.label || 'Design approved' }); } catch(e){}
       ledger.unshift({
         type: 'earning', amount: amt, ts: _ts(),
         cardId: opts.cardId || null, orderId: opts.orderId || null,
@@ -781,6 +790,8 @@
       opts = opts || {};
       var bal = Math.max(0, parseFloat((this.getDesignerBalance() - amt).toFixed(2)));
       try { localStorage.setItem(this.DESIGNER_BALANCE_KEY, bal.toFixed(2)); } catch(e){}
+      // SERVER ledger: persist the designer payout debit.
+      try { if (this.pushLedger) this.pushLedger(-amt, { account: 'designer', type: 'payout', ref: opts.payoutId || null, note: opts.label || 'Payout' }); } catch(e){}
       var ledger = this.getDesignerLedger();
       ledger.unshift({
         type: 'payout', amount: amt, ts: _ts(),
@@ -1788,8 +1799,40 @@
         if (message.internal) entry.internal = true;
         all[orderId].push(entry);
         localStorage.setItem(this.ORDER_CHATS_KEY, JSON.stringify(all));
+        // SERVER-persist the message (idempotent by the client id) so the chat
+        // survives a refresh and reaches every board / device.
+        try {
+          var tok = localStorage.getItem('eg_token') || '';
+          if (tok) fetch('/api/orders/' + encodeURIComponent(orderId) + '/messages', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+            body: JSON.stringify({ clientId: entry.id, text: entry.text, by: entry.by, role: entry.role, system: entry.system, internal: entry.internal, attachment: entry.attachment || null, ts: entry.ts }),
+            keepalive: true
+          }).catch(function(){});
+        } catch(e){}
         return true;
       } catch(e) { return false; }
+    },
+    // Pull an order's chat from the server and MERGE into the local cache (server is
+    // the union of all participants' messages). De-duped by message id. Call on open.
+    hydrateOrderChat: function(orderId, cb){
+      var self = this;
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok || !orderId) { if(cb)cb(); return; }
+        fetch('/api/orders/' + encodeURIComponent(orderId) + '/messages', { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : []; })
+          .then(function(rows){
+            if (!Array.isArray(rows)) { if(cb)cb(); return; }
+            var all = {}; try { all = JSON.parse(localStorage.getItem(self.ORDER_CHATS_KEY) || '{}'); } catch(e){}
+            var local = Array.isArray(all[orderId]) ? all[orderId] : [];
+            var seen = {}; local.forEach(function(m){ if (m && m.id) seen[m.id] = 1; });
+            rows.forEach(function(m){ if (m && m.id && !seen[m.id]) { local.push(m); seen[m.id] = 1; } });
+            local.sort(function(a,b){ return (a.ts||0) - (b.ts||0); });
+            all[orderId] = local;
+            try { localStorage.setItem(self.ORDER_CHATS_KEY, JSON.stringify(all)); } catch(e){}
+            if (cb) cb(local);
+          })
+          .catch(function(){ if(cb)cb(); });
+      } catch(e){ if(cb)cb(); }
     },
     INVENTORY_KEY: 'eg_inventory',
     // Shared inventory store. Each row: { sku, name, variant, inStock, reserved,
@@ -1857,7 +1900,7 @@
       catch(e) { return []; }
     },
     setBackorders: function(list) {
-      try { localStorage.setItem(this.BACKORDER_KEY, JSON.stringify(list || [])); this._emitPurchases(); return true; }
+      try { localStorage.setItem(this.BACKORDER_KEY, JSON.stringify(list || [])); this._emitPurchases(); this._pushFactoryList('backorders', list || []); return true; }
       catch(e) { return false; }
     },
     getPurchaseOrders: function() {
@@ -1865,8 +1908,37 @@
       catch(e) { return []; }
     },
     setPurchaseOrders: function(list) {
-      try { localStorage.setItem(this.PO_KEY, JSON.stringify(list || [])); this._emitPurchases(); return true; }
+      try { localStorage.setItem(this.PO_KEY, JSON.stringify(list || [])); this._emitPurchases(); this._pushFactoryList('purchase_orders', list || []); return true; }
       catch(e) { return false; }
+    },
+    // Mirror a whole factory list (backorders / purchase_orders) to the server so
+    // the Purchases queue survives a refresh + reaches every board. Staff-only on
+    // the server; a seller's call simply 403s and is ignored. Best-effort.
+    _pushFactoryList: function(k, list){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
+        fetch('/api/factory_lists/' + k, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify(list || []), keepalive: true
+        }).catch(function(){});
+      } catch(e){}
+    },
+    // Pull a factory list from the server into the local cache (factory boards call
+    // this on load). Only overwrites when the server actually returns an array.
+    hydrateFactoryList: function(k, cb){
+      var self = this;
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) { if(cb)cb(); return; }
+        fetch('/api/factory_lists/' + k, { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(arr){
+            if (!Array.isArray(arr)) { if(cb)cb(); return; }
+            var key = k === 'backorders' ? self.BACKORDER_KEY : k === 'purchase_orders' ? self.PO_KEY : null;
+            if (key) { try { localStorage.setItem(key, JSON.stringify(arr)); } catch(e){} self._emitPurchases(); }
+            if (cb) cb(arr);
+          })
+          .catch(function(){ if(cb)cb(); });
+      } catch(e){ if(cb)cb(); }
     },
     addPurchaseOrder: function(po) {
       if (!po) return false;
@@ -2492,6 +2564,23 @@
         fetch('/api/wallet/ledger', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
           body: JSON.stringify({ account: opts.account || undefined, delta: d, type: opts.type || 'adjust', ref: opts.ref || null, note: opts.note || null }),
+          keepalive: true
+        }).catch(function(){});
+      } catch(e){}
+    },
+    // Staff-only two-sided move (refund / admin adjust). The seller account is
+    // resolved server-side from the order id OR email, so the credit lands on the
+    // right wallet even though the client only knows a store name. Best-effort.
+    pushTransfer: function(amountUSD, opts){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
+        var a = parseFloat(amountUSD); if (!isFinite(a) || a === 0) return;
+        opts = opts || {};
+        fetch('/api/wallet/transfer', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify({ fromAccount: opts.fromAccount || 'factory', toAccount: opts.toAccount || undefined,
+            toOrderId: opts.toOrderId || undefined, toEmail: opts.toEmail || undefined,
+            amount: a, type: opts.type || 'transfer', ref: opts.ref || null, note: opts.note || null }),
           keepalive: true
         }).catch(function(){});
       } catch(e){}

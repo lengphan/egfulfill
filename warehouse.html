@@ -7628,8 +7628,9 @@ function confirmSellerAdjust() {
   var signed = op === 'add' ? amtRaw : -amtRaw;
   var note = (document.getElementById('sab-note').value || '').trim();
   var sellerName = ''; try { sellerName = (document.getElementById('seller-detail-name')||{}).textContent || ''; } catch(e){}
+  var sellerEmail = ''; try { sellerEmail = ((document.getElementById('seller-detail-email')||{}).textContent || '').split('·')[0].trim(); } catch(e){}
   var res = (typeof EGStore !== 'undefined' && EGStore.adminAdjustSellerBalance)
-    ? EGStore.adminAdjustSellerBalance(signed, { note: note, seller: sellerName.trim() })
+    ? EGStore.adminAdjustSellerBalance(signed, { note: note, seller: sellerName.trim(), sellerEmail: sellerEmail })
     : { ok:false, error:'EGStore not loaded' };
   if (!res.ok) { if (err) err.textContent = res.error || 'Adjustment failed.'; return; }
   // Prepend a transaction row in the visible table.

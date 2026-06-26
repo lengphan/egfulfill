@@ -19,6 +19,7 @@ import { shippingRoutes } from './routes/shipping.js';
 import { designLibraryRoutes } from './routes/design_library.js';
 import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
+import { factoryListsRoutes } from './routes/factory_lists.js';
 import { addClient } from './events.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -120,6 +121,7 @@ shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate
 designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads" design gallery + cross-seller duplicate detection (staff-only)
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 walletRoutes(app, requireAuth);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
+factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

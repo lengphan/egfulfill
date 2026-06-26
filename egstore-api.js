@@ -278,7 +278,11 @@
         if (window.EGStore && EGStore.hydrateBalance) {
           EGStore.hydrateBalance(null);
           var u = (function(){ try { return JSON.parse(localStorage.getItem(USER_KEY) || '{}'); } catch(e){ return {}; } })();
-          if (u && u.role && u.role !== 'seller') { EGStore.hydrateBalance('factory'); EGStore.hydrateBalance('designer'); }
+          if (u && u.role && u.role !== 'seller') {
+            EGStore.hydrateBalance('factory'); EGStore.hydrateBalance('designer');
+            // Staff boards: pull the shared Purchases queues from the server too.
+            if (EGStore.hydrateFactoryList) { EGStore.hydrateFactoryList('backorders'); EGStore.hydrateFactoryList('purchase_orders'); }
+          }
         }
       } catch(e){}
       retrySync();                                                    // recover any order whose POST never landed

@@ -82,4 +82,49 @@ export function walletRoutes(app, requireAuth) {
       [account, delta, b.type || 'adjust', ref, b.note || null, req.user.sub]);
     return { ok: true, balance: await balanceOf(account) };
   });
+
+  // STAFF transfer between two wallets — the atomic two-sided move behind a
+  // refund (factory → seller) or an admin balance adjustment. The seller side is
+  // resolved SERVER-side (the client only knows a store name), so the credit
+  // always lands on the right account:
+  //   toOrderId → that order's seller_id   |   toEmail → that user's id   |   toAccount → as given
+  // `amount` may be signed: +ve moves from→to, −ve reverses (debits the seller).
+  // Idempotent by `ref` (same ref + same pair = one move, never doubled).
+  app.post('/api/wallet/transfer', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const b = req.body || {};
+    const amount = parseFloat(b.amount);
+    if (!isFinite(amount) || amount === 0) { reply.code(400); return { error: 'amount must be a non-zero number' }; }
+    const from = b.fromAccount ? String(b.fromAccount) : 'factory';
+    let to = b.toAccount ? String(b.toAccount) : null;
+    if (!to && b.toOrderId) {
+      const r = await q('select seller_id from orders where id=$1', [String(b.toOrderId)]);
+      if (r.rows[0]) to = r.rows[0].seller_id;
+    }
+    if (!to && b.toEmail) {
+      const r = await q('select id from users where lower(email)=lower($1)', [String(b.toEmail)]);
+      if (r.rows[0]) to = r.rows[0].id;
+    }
+    if (!to) { reply.code(404); return { error: 'could not resolve the destination wallet (seller not found)' }; }
+    if (to === from) { reply.code(400); return { error: 'source and destination are the same wallet' }; }
+    const ref = (b.ref != null && b.ref !== '') ? String(b.ref) : null;
+    const type = b.type || 'transfer';
+    // Two idempotent rows tagged with the SAME ref but distinct types so the pair
+    // is independently de-duped: '<type>-out' debits `from`, '<type>-in' credits `to`.
+    const rows = [
+      { account: from, delta: -amount, type: type + '-out' },
+      { account: to,   delta:  amount, type: type + '-in'  },
+    ];
+    for (const row of rows) {
+      if (ref) {
+        const dup = await q('select 1 from wallet_ledger where account=$1 and type=$2 and ref=$3', [row.account, row.type, ref]);
+        if (dup.rowCount) continue;
+      }
+      await q(
+        `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+         values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
+        [row.account, row.delta, row.type, ref, b.note || null, req.user.sub]);
+    }
+    return { ok: true, fromBalance: await balanceOf(from), toBalance: await balanceOf(to), toAccount: to };
+  });
 }

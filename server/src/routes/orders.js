@@ -206,4 +206,50 @@ export function ordersRoutes(app, requireAuth) {
     const r = await q(`select sku, threads from order_threads where order_id=$1`, [req.params.id]);
     return r.rows;
   });
+
+  // ── Order chat — persisted in order_messages so a conversation survives a
+  //    refresh and reaches every board / device (used to live only in the
+  //    sender's localStorage under eg_order_chats). meta holds the client's
+  //    display fields; client_id makes re-sends idempotent. ─────────────────
+  q(`alter table order_messages add column if not exists meta jsonb`).catch(() => {});
+  q(`alter table order_messages add column if not exists client_id text`).catch(() => {});
+  q(`create unique index if not exists order_messages_client on order_messages (client_id) where client_id is not null`).catch(() => {});
+
+  async function canSeeOrder(user, orderId) {
+    if (isStaff(user)) return true;
+    const r = await q('select seller_id, factory_order from orders where id=$1', [orderId]);
+    const row = r.rows[0];
+    return !!(row && !row.factory_order && row.seller_id === user.sub);
+  }
+
+  app.post('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const b = req.body || {};
+    const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null };
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) do nothing`,
+      [req.params.id, req.user.sub, b.role || 'seller', b.text || '',
+       (b.attachment && typeof b.attachment === 'object') ? b.attachment : null,
+       JSON.stringify(meta), b.clientId || null]);
+    egBroadcast({ type: 'order-message', id: req.params.id });
+    return { ok: true };
+  });
+
+  app.get('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const r = await q(
+      `select id, sender_role, body, attachment, meta, client_id, created_at
+         from order_messages where order_id=$1 order by created_at asc, id asc`, [req.params.id]);
+    // Reconstruct the client entry shape so getOrderChat round-trips unchanged.
+    return r.rows.map((m) => {
+      const meta = m.meta || {};
+      const e = { id: m.client_id || m.id, by: meta.by || (m.sender_role || 'Unknown'),
+        role: m.sender_role || 'seller', text: m.body || '',
+        ts: meta.ts || (m.created_at ? new Date(m.created_at).getTime() : 0), system: !!meta.system };
+      if (m.attachment) e.attachment = m.attachment;
+      if (meta.internal) e.internal = true;
+      return e;
+    });
+  });
 }
