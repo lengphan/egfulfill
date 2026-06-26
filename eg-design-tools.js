@@ -1374,7 +1374,7 @@
     if (!locked) _qpLoadLibrary();   // warm the Image Library list for search
     if (!_mountSel) m.style.display = 'flex';   // popup only; embed stays inline
   }
-  function closeQuickPos() { try { _qpPersist(false); } catch (e) {} var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
+  function closeQuickPos() { try { _qpPickStop(); } catch (e) {} try { _qpPersist(false); } catch (e) {} var m = document.getElementById('egdt-qp'); if (m) m.style.display = 'none'; _qpF = null; }
   // Render the saved text layers as draggable, editable, colourable divs on the stage.
   function _qpRenderTexts(layers, locked) {
     var host = document.getElementById('egdt-qp-texts'); if (!host) return;
@@ -1654,29 +1654,32 @@
   // half-finished work in the mini designer is never lost. pushApi=true also syncs server.
   // ── Thread match (embroidery) ──────────────────────────────────────────────
   // For EMB items the mini designer shows the design's matched in-stock thread
-  // colours (same chips the boards already render), auto-detected from the artwork
-  // and refinable by clicking the artwork thumbnail to sample an extra colour.
-  // Non-EMB items hide the panel entirely. Threads persist via setItemThreadColors.
+  // colours (same chips the boards already render), auto-detected from the artwork.
+  // The "Add colour" eyedropper lets you also pick colours BY HAND — click directly
+  // on the design where it sits on the mockup (a magnifier loupe follows the cursor)
+  // to add the nearest in-stock thread. Non-EMB items hide the panel entirely.
+  // Threads persist via setItemThreadColors.
   function _qpItemTech() {
     try { var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); return String((it && (it.printType || it.tech)) || '').toUpperCase(); } catch (e) { return ''; }
   }
   function _qpThreadPanelHTML(design) {
-    var thumb = design
-      ? '<img id="egdt-qp-thread-thumb" src="' + _upCanvasSrc(design) + '" crossorigin="anonymous" onclick="EGDesignTools._qpThreadSample(event)" title="Click the artwork to add a thread colour" style="width:54px;height:54px;object-fit:contain;border:1px solid #e5e4e0;border-radius:8px;background:#f6f5f4;cursor:crosshair;flex-shrink:0"/>'
+    var pick = design
+      ? '<button id="egdt-qp-thread-pick" type="button" onclick="EGDesignTools._qpThreadPick()" title="Eyedropper — then click the design on the mockup to add its colour" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#374151;background:#fff;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10.4 2.6a1.6 1.6 0 0 1 2.3 2.3l-1 1 .9.9-1.1 1.1-.9-.9-4.8 4.8-2.6.6.6-2.6 4.8-4.8-.9-.9 1.1-1.1.9.9 1-1 .2-.1z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Add colour</button>'
       : '';
-    return '<div style="border-top:1px solid #f0ede9;padding-top:12px;display:flex;gap:12px;align-items:flex-start">'
-      + thumb
-      + '<div style="flex:1;min-width:0">'
-      +   '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Thread colours' + (design ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#c4c3be">· click the artwork to add</span>' : '') + '</div>'
-      +   '<div id="egdt-qp-thread-chips"></div>'
-      + '</div></div>';
+    return '<div style="border-top:1px solid #f0ede9;padding-top:12px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">'
+      +   '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Thread colours' + (design ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#c4c3be">· auto + pick</span>' : '') + '</div>'
+      +   pick
+      + '</div>'
+      + '<div id="egdt-qp-thread-chips"></div>'
+      + '</div>';
   }
   function _qpRenderThreadChips() {
     var box = document.getElementById('egdt-qp-thread-chips'); if (!box || !_qpF) return;
     var threads = _qpF.threads || [];
     if (!threads.length) {
-      var hasDesign = !!document.getElementById('egdt-qp-thread-thumb');
-      box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Matching the artwork’s colours…' : 'Add a design to auto-match its thread colours.') + '</div>';
+      var hasDesign = !!document.getElementById('egdt-qp-thread-pick');
+      box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Auto-matching the design’s colours… or use “Add colour” to pick from the mockup.' : 'Add a design to auto-match its thread colours.') + '</div>';
       return;
     }
     box.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + threads.map(function (t, i) {
@@ -1688,8 +1691,87 @@
         + '</div>';
     }).join('') + '</div>';
   }
+  // Eyedropper: sample a colour directly off the design where it sits on the mockup
+  // stage. A magnifier loupe follows the cursor over the artwork; clicking adds the
+  // nearest in-stock thread. Toggle the button again (or Esc / click off) to cancel.
+  var _qpPick = null;
+  function _qpThreadPick() {
+    if (_qpPickStop()) return;            // already active → toggle off
+    if (!_qpF) return;
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk);
+    var design = it && it.designUrl; if (!design) { _egdtToast('Add a design first'); return; }
+    var img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = function () {
+      var cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      var ctx = cv.getContext('2d'); try { ctx.drawImage(img, 0, 0); } catch (e) {}
+      _qpPick = { cv: cv, ctx: ctx };
+      _qpPickEnter();
+    };
+    img.onerror = function () { _egdtToast('Could not load the artwork to sample'); };
+    img.src = _upCanvasSrc(design);
+  }
+  function _qpPickImg() { return document.getElementById('egdt-qp-design'); }
+  function _qpPickEnter() {
+    var stage = document.getElementById('egdt-qp-stage'); if (!stage) return;
+    document.body.style.cursor = 'crosshair';
+    var btn = document.getElementById('egdt-qp-thread-pick'); if (btn) { btn.style.background = '#191918'; btn.style.color = '#fff'; btn.style.borderColor = '#191918'; }
+    var lens = document.getElementById('egdt-qp-pick-lens');
+    if (!lens) { lens = document.createElement('div'); lens.id = 'egdt-qp-pick-lens'; lens.style.cssText = 'position:fixed;width:96px;height:96px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 8px 24px rgba(0,0,0,.28);background-repeat:no-repeat;background-color:#f6f5f4;pointer-events:none;z-index:10060;display:none'; document.body.appendChild(lens); }
+    lens.dataset.bound = '';
+    document.addEventListener('mousemove', _qpPickMove, true);
+    document.addEventListener('mousedown', _qpPickDown, true);
+    document.addEventListener('keydown', _qpPickKey, true);
+  }
+  function _qpPickStop() {
+    if (!_qpPick) return false;
+    _qpPick = null;
+    document.body.style.cursor = '';
+    var lens = document.getElementById('egdt-qp-pick-lens'); if (lens) lens.style.display = 'none';
+    var btn = document.getElementById('egdt-qp-thread-pick'); if (btn) { btn.style.background = '#fff'; btn.style.color = '#374151'; btn.style.borderColor = '#e5e4e0'; }
+    document.removeEventListener('mousemove', _qpPickMove, true);
+    document.removeEventListener('mousedown', _qpPickDown, true);
+    document.removeEventListener('keydown', _qpPickKey, true);
+    return true;
+  }
+  function _qpPickKey(e) { if (e.key === 'Escape') { e.preventDefault(); _qpPickStop(); } }
+  function _qpPickMove(e) {
+    if (!_qpPick) return;
+    var img = _qpPickImg(), lens = document.getElementById('egdt-qp-pick-lens'); if (!img || !lens) return;
+    var rect = img.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientY < rect.top || e.clientX > rect.right || e.clientY > rect.bottom) { lens.style.display = 'none'; return; }
+    var zoom = 3, size = 96;
+    if (!lens.dataset.bound) { lens.style.backgroundImage = 'url("' + img.src + '")'; lens.style.backgroundSize = (rect.width * zoom) + 'px ' + (rect.height * zoom) + 'px'; lens.dataset.bound = '1'; }
+    lens.style.display = 'block';
+    lens.style.left = (e.clientX - size / 2) + 'px';
+    lens.style.top = (e.clientY - size / 2) + 'px';
+    var ix = e.clientX - rect.left, iy = e.clientY - rect.top;
+    lens.style.backgroundPosition = (-(ix * zoom - size / 2)) + 'px ' + (-(iy * zoom - size / 2)) + 'px';
+  }
+  function _qpPickDown(e) {
+    if (!_qpPick) return;
+    var btn = document.getElementById('egdt-qp-thread-pick'); if (btn && btn.contains(e.target)) return;   // let the toggle button handle it
+    var img = _qpPickImg(); if (!img) { _qpPickStop(); return; }
+    var rect = img.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientY < rect.top || e.clientX > rect.right || e.clientY > rect.bottom) { _qpPickStop(); return; }   // clicked off the design → cancel
+    e.preventDefault(); e.stopPropagation();   // capture phase → suppresses the drag handler
+    var sx = _qpPick.cv.width / rect.width, sy = _qpPick.cv.height / rect.height;
+    var px = Math.max(0, Math.min(_qpPick.cv.width - 1, Math.round((e.clientX - rect.left) * sx)));
+    var py = Math.max(0, Math.min(_qpPick.cv.height - 1, Math.round((e.clientY - rect.top) * sy)));
+    var d; try { d = _qpPick.ctx.getImageData(px, py, 1, 1).data; } catch (err) { _qpPickStop(); _egdtToast('Image can’t be sampled in-browser'); return; }
+    if (d[3] < 30) return;   // transparent pixel — keep picking, don't cancel
+    if (window.EGStore && EGStore.nearestThread) {
+      var t = EGStore.nearestThread(d[0], d[1], d[2]);
+      if (t) {
+        _qpF.threads = _qpF.threads || [];
+        if (_qpF.threads.some(function (x) { return x.code === t.code; })) { _egdtToast('Thread ' + t.code + ' already added'); }
+        else { _qpF.threads.push({ code: t.code, name: t.name, hex: t.hex }); _qpRenderThreadChips(); try { _qpPersist(false); } catch (e2) {} }
+      }
+    }
+    _qpPickStop();
+  }
   function _qpRenderThreads() {
     var box = document.getElementById('egdt-qp-threads'); if (!box || !_qpF) return;
+    _qpPickStop();   // any in-flight eyedropper is stale once the panel rebuilds
     if (!/EMB/i.test(_qpItemTech())) { box.style.display = 'none'; box.innerHTML = ''; _qpF.threads = []; return; }
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk);
     var design = it ? (it.designUrl || '') : '';
@@ -1709,26 +1791,6 @@
         else if (!stored.length) { _qpRenderThreadChips(); }
       });
     }
-  }
-  function _qpThreadSample(ev) {
-    ev.stopPropagation(); if (!_qpF) return;
-    var img = document.getElementById('egdt-qp-thread-thumb'); if (!img || !img.naturalWidth) return;
-    var rect = img.getBoundingClientRect(), cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
-    try {
-      var cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
-      var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
-      var px = Math.max(0, Math.min(img.naturalWidth - 1, Math.round((cx / rect.width) * img.naturalWidth)));
-      var py = Math.max(0, Math.min(img.naturalHeight - 1, Math.round((cy / rect.height) * img.naturalHeight)));
-      var d; try { d = ctx.getImageData(px, py, 1, 1).data; } catch (e) { _egdtToast('Image can’t be sampled in-browser'); return; }
-      if (d[3] < 30) return;
-      if (!(window.EGStore && EGStore.nearestThread)) return;
-      var t = EGStore.nearestThread(d[0], d[1], d[2]); if (!t) return;
-      _qpF.threads = _qpF.threads || [];
-      if (_qpF.threads.some(function (x) { return x.code === t.code; })) { _egdtToast('Thread ' + t.code + ' already added'); return; }
-      _qpF.threads.push({ code: t.code, name: t.name, hex: t.hex });
-      _qpRenderThreadChips();
-      try { _qpPersist(false); } catch (e) {}
-    } catch (e) {}
   }
   function _qpThreadRemove(i) { if (!_qpF || !_qpF.threads) return; _qpF.threads.splice(i, 1); _qpRenderThreadChips(); try { _qpPersist(false); } catch (e) {} }
   function _qpPersist(pushApi) {
@@ -1973,7 +2035,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-avatar-rehydrate';
+  window.EG_BUILD = '2026-06-26-thread-eyedropper';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2157,7 +2219,7 @@
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,
     _qpSearch: _qpSearch, _qpPickResult: _qpPickResult,
-    _qpThreadSample: _qpThreadSample, _qpThreadRemove: _qpThreadRemove,
+    _qpThreadPick: _qpThreadPick, _qpThreadRemove: _qpThreadRemove,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
