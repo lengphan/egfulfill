@@ -1194,7 +1194,7 @@ function renderOrders(ordersOverride) {
       const pillHaloShadow = needsPick ? ';box-shadow:0 0 0 3px rgba(201,195,186,.18)' : '';
       const pillBorderInactive = needsPick ? '#c9c3ba' : '#e5e4e0';
       return `
-        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 36px 270px minmax(380px,620px) 24px auto 1fr 26px;gap:12px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}" onclick="event.stopPropagation()" style="display:grid;grid-template-columns:18px 56px 270px minmax(380px,620px) 24px auto 1fr 26px;gap:14px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 52)}
           <div style="min-width:0">
