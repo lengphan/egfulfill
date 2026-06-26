@@ -18,11 +18,14 @@
   var STAFF_PAGES = { 'admin.html': 1, 'operator.html': 1, 'warehouse.html': 1, 'designer.html': 1 };
   // Seller-only app pages.
   var SELLER_PAGES = {
-    'seller.html': 1, 'orders.html': 1, 'products-dash.html': 1, 'design-lab.html': 1,
-    'design-maker.html': 1, 'analytics.html': 1, 'stores.html': 1, 'wallet.html': 1, 'settings.html': 1
+    'seller.html': 1, 'orders.html': 1, 'products-dash.html': 1,
+    'analytics.html': 1, 'stores.html': 1, 'wallet.html': 1, 'settings.html': 1
   };
-  // Shared pages — any signed-in user (seller ↔ factory).
-  var ANY_PAGES = { 'order-detail.html': 1, 'chat.html': 1 };
+  // Shared pages — any signed-in user (seller ↔ factory). The design tools live here
+  // too: the FACTORY boards open the seller's Design Lab / Design Maker in an overlay
+  // (EGDesignTools.designLab/designMaker), so staff must be allowed to load them —
+  // otherwise the guard bounced them to their dashboard and the overlay/cards broke.
+  var ANY_PAGES = { 'order-detail.html': 1, 'chat.html': 1, 'design-lab.html': 1, 'design-maker.html': 1 };
 
   var DASH = { seller: 'seller.html', operator: 'operator.html', warehouse: 'warehouse.html', admin: 'admin.html', designer: 'designer.html' };
 
