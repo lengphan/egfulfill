@@ -651,6 +651,32 @@ const EG_VQR = {
 };
 let _vqrPoll = null;
 var _vqrRef = '';   // active top-up reference (server-issued EGxxxxxx; read by the inline button + poll)
+// Build a VietQR (NAPAS EMVCo) payload LOCALLY so the QR never depends on an
+// external image (img.vietqr.io / a server qrLink) that an ad-blocker, CSP, or a
+// flaky network can break — that broken image was the "QR unavailable" you saw.
+// The string carries the real BIDV account + amount + note, so a scan still
+// auto-confirms via the note. Rendered to canvas by _vqrPaintQR (QRCode lib).
+function _egTlv(id, val) { val = String(val); return id + String(val.length).padStart(2, '0') + val; }
+function _egCrc16(s) {
+  var crc = 0xFFFF;
+  for (var i = 0; i < s.length; i++) {
+    crc ^= s.charCodeAt(i) << 8;
+    for (var j = 0; j < 8; j++) { crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1); crc &= 0xFFFF; }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+function egBuildVietQR(bankBin, account, amountVnd, note) {
+  var merchant = _egTlv('00', 'A000000727') + _egTlv('01', _egTlv('00', bankBin) + _egTlv('01', account)) + _egTlv('02', 'QRIBFTTA');
+  var body = _egTlv('00', '01')
+    + _egTlv('01', amountVnd > 0 ? '12' : '11')
+    + _egTlv('38', merchant)
+    + _egTlv('53', '704')
+    + (amountVnd > 0 ? _egTlv('54', String(amountVnd)) : '')
+    + _egTlv('58', 'VN')
+    + (note ? _egTlv('62', _egTlv('08', String(note).replace(/[^A-Za-z0-9]/g, ''))) : '');
+  body += '6304';
+  return body + _egCrc16(body);
+}
 function vqrCreditWallet(amountUSD) {
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amountUSD).toFixed(2));
@@ -686,8 +712,8 @@ function openVietQRTopUp(amountUSD) {
   var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
   const ref = ('EG' + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14);
   _vqrRef = ref;
-  const rate = egVqrRate();
-  const vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
+  let rate = egVqrRate();
+  let vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
   // Fallback only — used if the server can't mint a VA-backed QR. The reliable
   // path below asks VietQR for a monitored-VA QR so callbacks always fire.
   const fallbackQr = 'https://img.vietqr.io/image/' + EG_VQR.bank + '-' + EG_VQR.account + '-qr_only.png'
@@ -704,7 +730,7 @@ function openVietQRTopUp(amountUSD) {
     '<div onclick="closeVietQR()" style="position:fixed;inset:0;background:rgba(0,0,0,.45)"></div>'
     + '<div style="position:relative;background:#fff;border-radius:16px;width:380px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.25);padding:22px;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div style="font-size:16px;font-weight:700;color:#191918">Top Up</div><button onclick="closeVietQR()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
-    + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$' + amountUSD.toFixed(2) + '</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer ≈ ₫' + vndStr + ' · 1 USD = ₫' + rate.toLocaleString('en-US') + '</div></div>'
+    + '<div style="text-align:center;margin-bottom:10px"><div style="font-size:13px;color:#6b7280">Adding to wallet</div><div style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$' + amountUSD.toFixed(2) + '</div><div id="vqr-rate-line" style="font-size:12.5px;color:#9ca3af;margin-top:2px">Transfer ≈ ₫' + vndStr + ' · 1 USD = ₫' + rate.toLocaleString('en-US') + '</div></div>'
     + '<div style="display:flex;justify-content:center;margin:6px 0 12px"><div id="vqr-qrbox" style="width:220px;height:220px;border:1px solid #e5e4e0;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12.5px;gap:8px"><span class="vqr-spin" style="width:14px;height:14px;border:2px solid #d1d5db;border-top-color:#6b7280;border-radius:50%;display:inline-block;animation:vqrspin .8s linear infinite"></span>Generating secure QR…</div></div>'
     + '<div style="background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151;line-height:1.7;margin-bottom:12px">'
       + '<div style="display:flex;justify-content:space-between"><span style="color:#9ca3af">Bank</span><b>BIDV</b></div>'
@@ -724,8 +750,33 @@ function openVietQRTopUp(amountUSD) {
   }
   m.style.display = 'flex'; document.body.style.overflow = 'hidden';
 
-  // Ask the server to mint a VA-backed QR (VietQR monitors that VA → guaranteed
-  // callback). Fall back to the generic transfer QR if the call fails.
+  // Paint a locally-built VietQR immediately — no external image, so it can't show
+  // "QR unavailable". Rebuilt below once the server hands back its clean ref.
+  _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
+
+  // Re-pull the admin's live USD→VND rate when the modal opens (the page-load cache
+  // can be stale/default — that's why it read ₫25,400 instead of your ₫27,000). If it
+  // differs, recompute the VND amount, update the displayed rate, and rebuild the QR.
+  (function refreshRate() {
+    const tokR = localStorage.getItem('eg_token') || '';
+    fetch('/api/vietqr/rate', { headers: tokR ? { Authorization: 'Bearer ' + tokR } : {} })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var nr = d && Number(d.rate);
+        if (!nr || nr <= 0 || nr === rate) return;
+        localStorage.setItem('eg_vqr_rate', String(nr));
+        rate = nr; vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
+        var rl = document.getElementById('vqr-rate-line');
+        if (rl) rl.textContent = 'Transfer ≈ ₫' + vnd.toLocaleString('en-US') + ' · 1 USD = ₫' + rate.toLocaleString('en-US');
+        _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
+        if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
+      })
+      .catch(function () {});
+  })();
+
+  // Ask the server for a clean sequential reference (EG000123) + transfer monitoring.
+  // We keep rendering the QR LOCALLY (reliable); we just adopt the server's ref so the
+  // bank-callback reconciliation matches on the same note.
   (function mintQR() {
     const tok0 = localStorage.getItem('eg_token') || '';
     fetch('/api/vietqr/create-payment', {
@@ -735,22 +786,17 @@ function openVietQRTopUp(amountUSD) {
     })
       .then(function (r) { return r.json(); })
       .then(function (d) {
-        if (!d || d.error) throw new Error((d && d.error) || 'no qr');
-        // Adopt the server's clean sequential reference (EG000123) everywhere.
+        if (!d || d.error) return;   // local QR already shown — nothing to do
+        // Adopt the server's clean sequential reference (EG000123) everywhere…
         if (d.note || d.ref) {
           _vqrRef = d.note || d.ref;
           var n1 = document.getElementById('vqr-ref-note'); if (n1) n1.textContent = _vqrRef;
           var n2 = document.getElementById('vqr-ref-inst'); if (n2) n2.textContent = _vqrRef;
+          // …and rebuild the local QR so it carries the server ref as the note.
+          _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
         }
-        // ONE branded VietQR image (no separate plain local-render variant → no flicker
-        // between a logo QR and a plain one). Prefer the server's monitored-VA link;
-        // otherwise the generic BIDV QR, which still auto-confirms via the note.
-        if (d.qrLink && /^https?:\/\//i.test(d.qrLink)) { _vqrPaintImg(d.qrLink); }
-        else { console.warn('VietQR create-payment had no usable QR link:', d); _vqrPaintImg(fallbackQr); }
-        // Keep showing the real BIDV account in the details row — the QR carries the
-        // monitored VA internally, so scanning still routes correctly + auto-confirms.
       })
-      .catch(function () { _vqrPaintImg(fallbackQr); });   // graceful degradation
+      .catch(function () {});   // local QR stands on its own
   })();
 
   // Poll for the matching transfer (reads _vqrRef live — it switches to the server

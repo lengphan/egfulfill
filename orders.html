@@ -5425,7 +5425,7 @@ function _afmPayNow(){
 var _afmVqrRef='', _afmVqrPoll=null;
 function _afmStartVietQR(amountUSD){
   var tok=localStorage.getItem('eg_token')||'';
-  var BANK='970418', ACCT='1231255899', NAME='PHAN MY LINH', RATE=27000;
+  var BANK='970418', ACCT='1231255899', NAME='PHAN MY LINH', RATE=(typeof egVqrRate==='function'?egVqrRate():25400);
   var vnd=Math.max(1000, Math.round(amountUSD*RATE/1000)*1000);
   var ref=('EG'+Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,14);
   _afmVqrRef=ref;
