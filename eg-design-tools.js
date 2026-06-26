@@ -1954,6 +1954,7 @@
           // chosen thread without bloating localStorage with the whole palette.
           var _slim = _qpF.threads.map(function (t) { return { code: t.code, name: t.name, hex: t.hex, srcHex: t.srcHex }; });
           EGStore.setItemThreadColors(_tkOrd2, t2.sku, _slim);
+          if (EGStore.pushItemThreads) EGStore.pushItemThreads(o.id, t2.sku, _slim);   // server-persist (survives refresh / cross-device)
         }
       } catch (e) {}
     });

@@ -7730,6 +7730,17 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     // whether THIS order's xfom modal is currently open and trigger a refresh.
     window.__xfomOrderNum = num;
     const o = _xfomFindOrder(num);
+    // Pull this order's thread colours from the server (cross-device) so the EMB chips
+    // show even if they were set on the seller's browser. Guarded once per order.
+    try {
+      if (o && o.id && window.EGStore && EGStore.hydrateOrderThreads) {
+        window.__xfomThreads = window.__xfomThreads || {};
+        if (!window.__xfomThreads[o.id]) {
+          window.__xfomThreads[o.id] = true;
+          EGStore.hydrateOrderThreads(o.id, o.num, function(rows){ if (rows && rows.length && window.__xfomOrderNum === num) { try { xfomOpen(num); } catch(e){} } });
+        }
+      }
+    } catch (e) {}
     var _oi = (o && window.egOrderIds) ? window.egOrderIds(o) : null;
     var _onum;
     if (_oi) { _onum = _oi.market || ('#' + _oi.eg); }

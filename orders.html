@@ -2517,6 +2517,17 @@ function openDetailModal(ordNo) {
       });
     }
   }
+  // Pull this order's thread colours from the server (survive refresh / cross-device),
+  // then re-render so the EMB chips show. Guarded once per order id.
+  if (window.EGStore && EGStore.hydrateOrderThreads && o.id) {
+    window.__egThreadsHydrated = window.__egThreadsHydrated || {};
+    if (!window.__egThreadsHydrated[o.id]) {
+      window.__egThreadsHydrated[o.id] = true;
+      EGStore.hydrateOrderThreads(o.id, o.no, function(rows){
+        if (rows && rows.length) { try { if (window._odmCurrentOrder && window._odmCurrentOrder.no === ordNo) openDetailModal(ordNo); } catch(e){} }
+      });
+    }
+  }
   const sc = SC[o.status] || SC.new;
   const needsSetup = ['new','action'].includes(o.status);
   const SEL = `border:1.5px solid #e5e4e0;border-radius:6px;padding:4px 24px 4px 8px;font-size:13px;font-family:inherit;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c9c8c4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E") no-repeat right 7px center;-webkit-appearance:none;appearance:none;cursor:pointer;outline:none;`;

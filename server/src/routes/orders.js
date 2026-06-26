@@ -184,4 +184,26 @@ export function ordersRoutes(app, requireAuth) {
     const r = await q(`select sku, kind, data, name from order_designs where order_id=$1`, [req.params.id]);
     return r.rows;
   });
+
+  // ── Thread colours (embroidery) — persisted SERVER-side so they survive a refresh
+  //    and reach the factory cross-device (they used to live only in the seller's
+  //    localStorage, so a reload or a different browser showed none). ──────────────
+  q(`create table if not exists order_threads (
+       order_id text, sku text, threads jsonb, updated_at timestamptz default now(),
+       primary key (order_id, sku)
+     )`).catch(() => {});
+  app.post('/api/orders/:id/threads', { preHandler: requireAuth }, async (req) => {
+    const { sku, threads } = req.body || {};
+    if (!sku) return { error: 'sku required' };
+    await q(
+      `insert into order_threads (order_id, sku, threads, updated_at) values ($1,$2,$3, now())
+       on conflict (order_id, sku) do update set threads=excluded.threads, updated_at=now()`,
+      [req.params.id, sku, JSON.stringify(threads || [])]
+    );
+    return { ok: true };
+  });
+  app.get('/api/orders/:id/threads', { preHandler: requireAuth }, async (req) => {
+    const r = await q(`select sku, threads from order_threads where order_id=$1`, [req.params.id]);
+    return r.rows;
+  });
 }

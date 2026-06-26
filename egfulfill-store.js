@@ -2442,6 +2442,36 @@
     getItemThreadColors: function(orderId, sku){
       try { var m = JSON.parse(localStorage.getItem(this.THREAD_COLORS_KEY) || '{}'); return m[orderId+'|'+sku] || []; } catch(e){ return []; }
     },
+    // Push an item's thread colours to the server (order_threads) so they survive a refresh
+    // and reach the factory cross-device. Best-effort; key by the STABLE order id.
+    pushItemThreads: function(orderId, sku, threads){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok || !orderId || !sku) return;
+        fetch('/api/orders/' + encodeURIComponent(orderId) + '/threads', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+          body: JSON.stringify({ sku: sku, threads: threads || [] }), keepalive: true
+        }).catch(function(){});
+      } catch(e){}
+    },
+    // Pull an order's thread colours from the server and store them locally under BOTH the
+    // order id AND its number (the seller reads by id, the boards by number). Call on open.
+    hydrateOrderThreads: function(orderId, orderNum, cb){
+      var self = this;
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok || !orderId) { if(cb)cb(); return; }
+        fetch('/api/orders/' + encodeURIComponent(orderId) + '/threads', { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : []; })
+          .then(function(rows){
+            (rows || []).forEach(function(row){
+              if (!row || !row.sku) return;
+              var th = row.threads || [];
+              if (th.length) { self.setItemThreadColors(orderId, row.sku, th); if (orderNum != null) self.setItemThreadColors(orderNum, row.sku, th); }
+            });
+            if (cb) cb(rows || []);
+          })
+          .catch(function(){ if(cb)cb(); });
+      } catch(e){ if(cb)cb(); }
+    },
     // Per-item match state (detected color → candidate threads + chosen one) so the
     // seller's editable picker survives a page refresh.
     THREAD_MATCH_KEY: 'eg_thread_match',
