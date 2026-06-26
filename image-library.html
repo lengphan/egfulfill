@@ -607,6 +607,34 @@ document.addEventListener('click',function(e){
   var CPB = 'flex-shrink:0;font-size:11.5px;font-weight:600;font-family:inherit;color:#374151;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:6px;padding:4px 9px;cursor:pointer;transition:border-color .12s';
   var FIELD = 'flex:1;min-width:0;font-size:11.5px;font-family:monospace;color:#374151;background:#f6f5f4;border-radius:6px;padding:5px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
   var LBL = 'font-size:10px;font-weight:700;color:#b0aaa4;text-transform:uppercase;letter-spacing:.05em;width:38px;flex-shrink:0';
+  var DLB = 'flex:1;min-width:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;font-weight:700;font-family:inherit;border-radius:7px;padding:7px 10px;cursor:pointer;text-decoration:none;border:1.5px solid #191918;background:#191918;color:#fff';
+
+  // The paid embroidery (.PES) deliverable for a design. The factory uploads it once the
+  // design is "approved"; it appears here gated by purchase — deduct the admin-set fee
+  // from the wallet, then it's a reusable direct download forever. No .PES → no row.
+  function fileRow(did) {
+    var f = (window.EGStore && EGStore.getDesignFile) ? EGStore.getDesignFile(did) : null;
+    if (!f || !f.dataUrl) return '';
+    var price = (window.EGStore && EGStore.getDesignFilePrice && EGStore.getDesignFilePrice()) || 0;
+    var paid = !!(window.EGStore && EGStore.hasPaidForDesignFile && EGStore.hasPaidForDesignFile(did));
+    var fname = esc(f.name || (did + '.pes'));
+    var inner = (paid || !price)
+      ? '<a href="' + f.dataUrl + '" download="' + fname + '" style="' + DLB + '"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1.5v8M4 6.5l3 3 3-3M2.5 12h9" stroke="#fff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Download .PES' + (paid ? ' ✓' : '') + '</a>'
+      : '<button onclick="ilBuyFile(\'' + did + '\')" style="' + DLB + '"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M4 6V4.3a3 3 0 016 0V6M3 6h8v6.5H3z" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>Unlock .PES · $' + Number(price).toFixed(2) + '</button>';
+    return '<div style="display:flex;align-items:center;gap:7px;margin-top:7px"><span style="' + LBL + '">File</span>' + inner + '</div>';
+  }
+  window.ilBuyFile = function (did) {
+    var price = (window.EGStore && EGStore.getDesignFilePrice && EGStore.getDesignFilePrice()) || 0;
+    if (!price) return;
+    var bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
+    if (bal < price) { alert('Balance too low — $' + price.toFixed(2) + ' needed, $' + bal.toFixed(2) + ' available. Top up in Wallet.'); return; }
+    if (!confirm('Unlock the embroidery (.PES) file for $' + price.toFixed(2) + '?\nWallet balance: $' + bal.toFixed(2) + '. You can re-download it any time after.')) return;
+    var nb = Math.max(0, bal - price);
+    localStorage.setItem('eg_balance', nb.toFixed(2));
+    if (window.EGStore && EGStore.markPaidForDesignFile) EGStore.markPaidForDesignFile(did);
+    document.querySelectorAll('#balance-val, #wallet-bal-big').forEach(function (el) { el.textContent = '$' + nb.toFixed(2); });
+    ilLoad();
+  };
 
   function card(d) {
     var did = 'DL-' + d.id;
@@ -621,6 +649,7 @@ document.addEventListener('click',function(e){
       +   '<div style="font-size:13.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:10px" title="' + esc(d.name) + '">' + (esc(d.name) || 'Untitled') + '</div>'
       +   '<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px"><span style="' + LBL + '">ID</span><code style="' + FIELD + '">' + esc(did) + '</code><button onclick="ilCopy(\'' + did + '\',this)" style="' + CPB + '" onmouseover="this.style.borderColor=\'#9ca3af\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">Copy</button></div>'
       +   '<div style="display:flex;align-items:center;gap:7px"><span style="' + LBL + '">Link</span><code style="' + FIELD + '" title="' + esc(link) + '">' + esc(link) + '</code><button onclick="ilCopy(\'' + link.replace(/'/g, "\\'") + '\',this)" style="' + CPB + '" onmouseover="this.style.borderColor=\'#9ca3af\'" onmouseout="this.style.borderColor=\'#e5e4e0\'">Copy</button></div>'
+      +   fileRow(did)
       + '</div></div>';
   }
 
