@@ -475,7 +475,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="position:relative">
           <button class="fb" id="stores-btn" onclick="toggleFilterMenu('stores-menu',event)" style="font-weight:500">Stores <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></button>
           <div id="stores-menu" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;min-width:180px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">
-            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Filter by Store</div>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="Main Store" onchange="toggleStoreFilter(this)" style="accent-color:#111827"> Main Store</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="EU Store" onchange="toggleStoreFilter(this)" style="accent-color:#111827"> EU Store</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="US Store" onchange="toggleStoreFilter(this)" style="accent-color:#111827"> US Store</label>
@@ -490,7 +489,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="position:relative">
           <button class="fb" id="source-btn" onclick="toggleFilterMenu('source-menu',event)" style="font-weight:500">Source <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></button>
           <div id="source-menu" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;min-width:160px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">
-            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Filter by Source</div>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="Shopify" onchange="toggleSourceFilter(this)" style="accent-color:#111827"> Shopify</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="Etsy" onchange="toggleSourceFilter(this)" style="accent-color:#111827"> Etsy</label>
             <label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151"><input type="checkbox" value="WooCommerce" onchange="toggleSourceFilter(this)" style="accent-color:#111827"> WooCommerce</label>
@@ -503,7 +501,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="position:relative">
           <button class="fb" id="date-btn" onclick="toggleFilterMenu('date-menu',event)" style="font-weight:500">Date range <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg></button>
           <div id="date-menu" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:12px 14px;min-width:220px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">
-            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Filter by Date Created</div>
             <div style="display:flex;flex-direction:column;gap:7px">
               <div><label style="font-size:12.5px;color:#6b7280;display:block;margin-bottom:3px">From</label><input type="date" id="date-from" onchange="applyDateFilter()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 10px;font-size:13.5px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/></div>
               <div><label style="font-size:12.5px;color:#6b7280;display:block;margin-bottom:3px">To</label><input type="date" id="date-to" onchange="applyDateFilter()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:7px;padding:6px 10px;font-size:13.5px;font-family:inherit;outline:none;color:#191918;box-sizing:border-box" onfocus="this.style.borderColor='#111827'" onblur="this.style.borderColor='#e5e4e0'"/></div>
@@ -1320,7 +1317,6 @@ function _egRenderTabs(){
           + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
         + '</button>'
         + '<div id="eg-add-tab-menu" style="display:none;position:absolute;top:calc(100% + 6px);left:0;background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;min-width:180px;z-index:200;box-shadow:0 6px 24px rgba(0,0,0,.1)">'
-          + '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Filter by Status</div>'
           + missing.map(k => '<label style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:13.5px;color:#374151" onclick="egAddTab(\''+k+'\')"><input type="checkbox" style="accent-color:#111827;pointer-events:none">' + EG_TAB_DEFS[k].label + '</label>').join('')
         + '</div>'
       + '</div>'
