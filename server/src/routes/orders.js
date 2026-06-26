@@ -228,7 +228,7 @@ export function ordersRoutes(app, requireAuth) {
     const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null };
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
-       values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) do nothing`,
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
       [req.params.id, req.user.sub, b.role || 'seller', b.text || '',
        (b.attachment && typeof b.attachment === 'object') ? b.attachment : null,
        JSON.stringify(meta), b.clientId || null]);
