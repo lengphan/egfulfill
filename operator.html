@@ -3809,6 +3809,36 @@ var OP_PT_BG  = {dtg:'#ede9fe', sub:'#fff7ed', emb:'#f0fdf4', scr:'#edf2f8'};
 var OP_PT_FG  = {dtg:'#7c3aed', sub:'#c2410c', emb:'#15803d', scr:'#3a5a96'};
 var OP_PT_LBL = {dtg:'DTG', sub:'SUB', emb:'EMB', scr:'SCR'};
 
+// Factory .PES upload (operator, on an APPROVED design card). Accepts ONLY .pes. Stores
+// it as the per-order machine file (operator download) + keyed by the design's DSN id and,
+// when the item references a Design Library image (DL-n), by that DL id too — so it shows
+// as the paid download on the seller's Image Library card. (Dynamic input, never appended
+// → no stray "No file chosen".)
+function opUploadPes(num, sku, designId){
+  var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.pes,.PES';
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0]; if (!f) return;
+    if (!/\.pes$/i.test(f.name)) { if (typeof opPushToast==='function') opPushToast('Only .PES files are accepted'); else alert('Only .PES files are accepted.'); return; }
+    var rd = new FileReader();
+    rd.onload = function(e){
+      var info = { name: f.name, dataUrl: e.target.result };
+      try { if (window.EGStore && EGStore.setItemEmbFile) EGStore.setItemEmbFile(num, sku, info); } catch(_){}
+      try { if (window.EGStore && EGStore.setDesignFile && designId) EGStore.setDesignFile(designId, info); } catch(_){}
+      try {
+        var o = (typeof ORDERS !== 'undefined' ? ORDERS : []).find(function(x){ return String(x.num) === String(num); });
+        var it = o && (o.itemList || o.items || []).find(function(x){ return String(x.sku) === String(sku); });
+        var ref = it ? String(it.designSrc || it.heroImage || it.hero_image || it.designId || it.img || '') : '';
+        var m = ref.match(/DL[-\s_]?(\d+)/i) || ref.match(/\/api\/design_library\/(\d+)/i);
+        if (m && window.EGStore && EGStore.setDesignFile) EGStore.setDesignFile('DL-' + m[1], info);
+      } catch(_){}
+      if (typeof renderOpOrders === 'function') renderOpOrders();
+      if (typeof opPushToast === 'function') opPushToast('.PES attached — now a paid download in the library');
+    };
+    rd.readAsDataURL(f);
+  };
+  inp.click();
+}
+window.opUploadPes = opUploadPes;
 function renderOpOrders() {
   const tbody = document.getElementById('op-order-tbody');
   if (!tbody) return;
@@ -4014,6 +4044,17 @@ function renderOpOrders() {
               ? `<a href="${_dlUrlEsc}" download="${_dlNameEsc}" onclick="event.preventDefault();event.stopPropagation();try{_opDownloadBlob&&_opDownloadBlob(this.getAttribute('href'),this.getAttribute('download'));}catch(e){console.warn('[emb-download] blob fallback failed',e);}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlNameEsc}">${_dsnText} ↓</a>`
               : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
             _designLink = _idHtml;
+            // Factory: once APPROVED, attach the digitized .PES (only) — it becomes the
+            // paid download on the seller's Image Library card. Shows "+ .PES" until one
+            // exists, then a ".PES ✓" badge.
+            try {
+              if (_approved && typeof EGStore !== 'undefined' && EGStore.getDesignFile) {
+                const _hasPes = !!EGStore.getDesignFile(_dcard.designId);
+                _designLink += _hasPes
+                  ? ` <span style="margin-left:8px;font-size:10px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:.04em" title=".PES attached — available in the library">.PES ✓</span>`
+                  : ` <button onclick="event.stopPropagation();opUploadPes('${o.num}','${String(it.sku).replace(/'/g,"\\'")}','${String(_dcard.designId||'').replace(/'/g,"\\'")}')" style="margin-left:8px;font-size:11px;font-weight:700;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:6px;padding:3px 8px;cursor:pointer;font-family:inherit" title="Attach the .PES machine file — becomes the paid download in the seller's library">+ .PES</button>`;
+              }
+            } catch(e){}
           // Thread colour swatches — moved off the product-name row (was too
           // jammed) and into the metaRow as tiny dot-only swatches. Hover the
           // group to see codes + names; full chip view stays in zoom modal.
