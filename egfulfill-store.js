@@ -2597,6 +2597,28 @@
         localStorage.setItem(this.EMB_PAID_KEY, JSON.stringify(m));
       } catch(e){}
     },
+    /* ── Design-centric machine file (.PES) — the paid, REUSABLE deliverable shown in
+       the Image Library. New logic, separate from the per-order emb file above: keyed
+       by the DESIGN id (e.g. "DL-23"/"DSN-7") so once a seller buys it they can
+       re-download it anywhere, forever. The factory uploads the .PES (only) once the
+       design is moved to "approved"; price reuses the admin-set embroidery fee. */
+    DESIGN_FILE_KEY: 'eg_design_files',
+    setDesignFile: function(designId, info) {
+      if (!designId) return;
+      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_KEY) || '{}'); m[designId] = Object.assign({ addedAt: Date.now() }, info || {}); localStorage.setItem(this.DESIGN_FILE_KEY, JSON.stringify(m)); } catch(e){}
+    },
+    getDesignFile: function(designId) {
+      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_KEY) || '{}'); return m[designId] || null; } catch(e){ return null; }
+    },
+    DESIGN_FILE_PAID_KEY: 'eg_design_file_paid',
+    hasPaidForDesignFile: function(designId) {
+      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_PAID_KEY) || '{}'); return !!m[designId]; } catch(e){ return false; }
+    },
+    markPaidForDesignFile: function(designId) {
+      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_PAID_KEY) || '{}'); m[designId] = { paidAt: Date.now() }; localStorage.setItem(this.DESIGN_FILE_PAID_KEY, JSON.stringify(m)); } catch(e){}
+    },
+    // Price = the single admin-set embroidery-file fee (one source of truth).
+    getDesignFilePrice: function() { return this.getEmbFilePrice(); },
     // ── Per-item factory working status ───────────────────────────────────
     // Tracks which specific items the warehouse is actively working on. The
     // warehouse sets the value; operator + admin read it to surface where
