@@ -3034,11 +3034,6 @@ document.addEventListener('DOMContentLoaded', function(){
       .fstab:hover{background:#f1f0ec}.fstab.on{background:#eeede9;color:#111827;font-weight:600}
       .fstab svg{width:15px;height:15px;flex-shrink:0;opacity:.65}.fstab.on svg{opacity:.9}
     </style>
-    <div style="max-width:1040px;margin:0 auto 16px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:12.5px;font-weight:600;color:#9ca3af">Guides:</span>
-      <button onclick="if(window.EGGuides)EGGuides.openFile()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">File Guidelines</button>
-      <button onclick="if(window.EGGuides)EGGuides.openSize()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Size Guide</button>
-    </div>
     <div style="display:flex;gap:24px;align-items:flex-start;max-width:1040px;margin:0 auto;width:100%">
       <div style="width:208px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
         <a class="fstab on" onclick="admSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
@@ -3047,6 +3042,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <a class="fstab" onclick="admSettingsTab('boards',this)"><svg viewBox="0 0 16 16" fill="none"><rect x="1.5" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="2" width="4" height="8"  rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="10.5" y="2" width="4" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>Design Boards</a>
         <a class="fstab" onclick="admSettingsTab('platform',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5.5 3v7L8 14.5l-5.5-3v-7L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.3"/></svg>Platform</a>
         <a class="fstab" onclick="admSettingsTab('users',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.4" stroke="currentColor" stroke-width="1.3"/><path d="M1.5 13c0-2.6 2-4 4.5-4s4.5 1.4 4.5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M11 5.5a2 2 0 010 4M12.5 13c0-1.6-.6-2.8-1.6-3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Users</a>
+        <a class="fstab" onclick="admSettingsTab('guides',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M3 2.5h7a1.5 1.5 0 011.5 1.5v9.5l-2-1.2-2 1.2-2-1.2-2 1.2V4A1.5 1.5 0 013 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 5.5h5M5 8h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Guides</a>
         <div style="border-top:1px solid #f0ede9;margin:8px 4px"></div>
         <a class="fstab" style="color:#dc2626;cursor:pointer" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Log out</a>
       </div>
@@ -3182,6 +3178,23 @@ document.addEventListener('DOMContentLoaded', function(){
           function admSaveShipFrom(){ var g=function(id){var e=document.getElementById(id);return e?e.value.trim():'';}; var o={name:g('adm-ship-name'),street:g('adm-ship-street'),street2:g('adm-ship-street2'),city:g('adm-ship-city'),state:g('adm-ship-state'),zip:g('adm-ship-zip'),phone:g('adm-ship-phone'),email:g('adm-ship-email')}; var msg=document.getElementById('adm-ship-msg'); if(!o.street||!o.zip){ if(msg){msg.textContent='Street + ZIP required';msg.style.color='#dc2626';} return; } try{ if(window.EGUSPS&&EGUSPS.setOrigin) EGUSPS.setOrigin(o); if(msg){msg.textContent='Saved ✓';msg.style.color='#15803d';} }catch(e){ if(msg){msg.textContent='Error: '+e.message;msg.style.color='#dc2626';} } }
           document.addEventListener('DOMContentLoaded', admLoadShipFrom);
           </script>
+        </div>
+        <!-- Guides — File Guidelines + Size Guide (editable, shared with sellers) -->
+        <div id="afpanel-guides" class="card fi" style="padding:22px 24px;display:none;max-width:720px">
+          <div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Guides</div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Reference guides shared with sellers. Open one to view or edit it.</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button onclick="if(window.EGGuides)EGGuides.openFile()" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:1px solid #e5e4e0;border-radius:10px;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='#191918';this.style.boxShadow='0 2px 10px rgba(0,0,0,.05)'" onmouseout="this.style.borderColor='#e5e4e0';this.style.boxShadow='none'">
+              <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M4 1.5h5L12 4.5V14a.5.5 0 01-.5.5h-8A.5.5 0 013 14V2a.5.5 0 01.5-.5z" stroke="#374151" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5V4.5h3M5.5 8h5M5.5 10.5h5" stroke="#374151" stroke-width="1.2" stroke-linecap="round"/></svg></div>
+              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">File Guidelines</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Accepted formats, DPI, color mode, print-file specs.</div></div>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button onclick="if(window.EGGuides)EGGuides.openSize()" style="display:flex;align-items:center;gap:13px;width:100%;text-align:left;border:1px solid #e5e4e0;border-radius:10px;padding:14px 16px;background:#fff;cursor:pointer;font-family:inherit;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='#191918';this.style.boxShadow='0 2px 10px rgba(0,0,0,.05)'" onmouseout="this.style.borderColor='#e5e4e0';this.style.boxShadow='none'">
+              <div style="width:36px;height:36px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M2 6h12M6 2v12" stroke="#374151" stroke-width="1.2"/></svg></div>
+              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#191918">Size Guide</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Per-product size charts &amp; print-area dimensions.</div></div>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M6 4l4 4-4 4" stroke="#c4c3be" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
         <!-- Users (admin-only) -->
         <div id="afpanel-users" class="card fi" style="padding:22px 24px;display:none">
@@ -3696,7 +3709,7 @@ function showSection(id) {
 function admSettingsTab(name, el){
   // Existing 4 panels + the new 'platform' panel (additive — older callers
   // still work, none of the existing panel ids changed).
-  ['profile','notif','threads','boards','platform','users'].forEach(function(t){
+  ['profile','notif','threads','boards','platform','users','guides'].forEach(function(t){
     var p = document.getElementById('afpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
   if (name === 'users' && window.EGAdminUsers) EGAdminUsers.load();
