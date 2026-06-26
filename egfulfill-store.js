@@ -2522,6 +2522,10 @@
               return;   // keep the local value; do not overwrite with the empty-ledger 0
             }
             try { localStorage.setItem(key, j.balance.toFixed(2)); } catch(e){}
+            // Reconcile PAID-FILE entitlements straight from the ledger (the unlock
+            // debit IS the proof of purchase) so a customer who paid keeps the
+            // download cross-device — no separate entitlement table needed.
+            if (!account) self._reconcilePaidFromLedger(j.ledger || []);
             try { if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('eg-balance-changed', { detail:{ balance:j.balance, account:account||'seller' } }));
               window.dispatchEvent(new CustomEvent('eg-factory-balance-changed'));
@@ -2530,6 +2534,23 @@
           })
           .catch(function(){ if(cb)cb(); });
       } catch(e){ if(cb)cb(); }
+    },
+    // Mark paid-file entitlements locally from the server ledger. A type='emb-file'
+    // entry (ref "orderId|sku") flips eg_emb_paid; type='design-file' (ref "DL-id")
+    // flips eg_design_file_paid. Idempotent — only writes when something is missing.
+    _reconcilePaidFromLedger: function(ledger){
+      try {
+        var emb = JSON.parse(localStorage.getItem(this.EMB_PAID_KEY) || '{}');
+        var dfile = JSON.parse(localStorage.getItem(this.DESIGN_FILE_PAID_KEY) || '{}');
+        var changedE = false, changedD = false;
+        (ledger || []).forEach(function(row){
+          if (!row || !row.ref) return;
+          if (row.type === 'emb-file' && !emb[row.ref]) { emb[row.ref] = { paidAt: Date.now(), src: 'ledger' }; changedE = true; }
+          else if (row.type === 'design-file' && !dfile[row.ref]) { dfile[row.ref] = { paidAt: Date.now(), src: 'ledger' }; changedD = true; }
+        });
+        if (changedE) localStorage.setItem(this.EMB_PAID_KEY, JSON.stringify(emb));
+        if (changedD) localStorage.setItem(this.DESIGN_FILE_PAID_KEY, JSON.stringify(dfile));
+      } catch(e){}
     },
 
     // Per-item match state (detected color → candidate threads + chosen one) so the
