@@ -351,22 +351,21 @@
     // placeholder, not the listing. (Use the swap to see the listing.)
     return (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : '';
   }
-  // Swap avatar: two stacked cards in the item thumbnail — the composite (blank+design)
-  // and the item's listing photo. The focused one sits front (top-left, full opacity);
-  // the other peeks from the bottom-right, smaller + faded. Clicking pushes the clicked
-  // card forward; click again to flip back (continuous). No arrow — the faded card IS the
-  // affordance.
-  var _SWAP_FRONT = 'position:absolute;left:0;top:0;width:84%;height:84%;z-index:2;border-radius:6px;overflow:hidden;border:1.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.2);background:#f6f5f4;transition:all .16s';
-  var _SWAP_BACK = 'position:absolute;right:0;bottom:0;width:84%;height:84%;z-index:1;border-radius:6px;overflow:hidden;border:1.5px solid #fff;background:#f6f5f4;opacity:.45;transition:all .16s';
+  // Swap avatar: the item thumbnail shows ONE image at a time — the composite
+  // (blank+design) by default — with a small swap-arrow button in the corner that
+  // toggles to the item's listing photo and back. The arrow stops propagation, so the
+  // avatar's normal click (zoom / mini designer) is UNCHANGED — only the little arrow
+  // swaps which image is shown.
   function swapItemImg(el) {
     if (!el) return;
     var cur = el.getAttribute('data-front') || 'a';
     var next = cur === 'a' ? 'b' : 'a';
     el.setAttribute('data-front', next);
     var a = el.querySelector('[data-layer="a"]'), b = el.querySelector('[data-layer="b"]');
-    if (a) a.style.cssText = (next === 'a' ? _SWAP_FRONT : _SWAP_BACK);
-    if (b) b.style.cssText = (next === 'b' ? _SWAP_FRONT : _SWAP_BACK);
+    if (a) a.style.display = (next === 'a') ? 'block' : 'none';
+    if (b) b.style.display = (next === 'b') ? 'block' : 'none';
   }
+  var _SWAP_ARROW = '<button type="button" onclick="event.stopPropagation();EGDesignTools.swapItemImg(this.closest(\'.egdt-swap\'))" title="Swap — blank (production) ⇄ listing photo" style="position:absolute;right:2px;bottom:2px;z-index:4;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.93);border:1px solid #e5e4e0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.18)" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2.5 5h7l-2-2.2M11.5 9h-7l2 2.2" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
   // Per-ITEM listing image (the item's own marketplace/manual photo) — the back layer of
   // the swap avatar. Distinct from orderListingImg (which picks the first item for the
   // order-level hero/row).
@@ -2108,7 +2107,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-strip-restyle';
+  window.EG_BUILD = '2026-06-26-swap-arrow';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2148,9 +2147,12 @@
       var listing = itemListingURL(o, it);
       if (!listing) return { html: comp, hasArt: !!(design || extra.length) };   // no listing → plain composite
       var listCard = '<img src="' + listing + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>';
-      var html = '<div class="egdt-swap" data-front="a" onclick="event.stopPropagation();EGDesignTools.swapItemImg(this)" title="Click to swap — blank (production) ⇄ listing photo" style="position:relative;width:100%;height:100%;cursor:pointer">'
-        + '<div data-layer="b" style="' + _SWAP_BACK + '">' + listCard + '</div>'
-        + '<div data-layer="a" style="' + _SWAP_FRONT + '">' + comp + '</div>'
+      // One image at a time (composite default) + corner swap arrow. No onclick on the
+      // wrapper, so the board's own avatar click (zoom / mini designer) still fires.
+      var html = '<div class="egdt-swap" data-front="a" style="position:relative;width:100%;height:100%">'
+        + '<div data-layer="a" style="position:absolute;inset:0">' + comp + '</div>'
+        + '<div data-layer="b" style="position:absolute;inset:0;display:none">' + listCard + '</div>'
+        + _SWAP_ARROW
         + '</div>';
       return { html: html, hasArt: !!(design || extra.length) };
     },
