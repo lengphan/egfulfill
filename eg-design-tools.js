@@ -325,6 +325,31 @@
     return '';
   }
 
+  // Robust blank-mockup resolver shared by EVERY board's item avatar (compositeHTML)
+  // and the mini designer. It resolves the chosen blank's image WITHOUT depending on
+  // the seller page's _itemMockupURL or the per-browser setup store — so a blank the
+  // SELLER picked (synced onto it.blank) still hydrates on the factory boards (that was
+  // the "Pick a blank / PENDING" avatar that never filled in). Colour-aware.
+  function blankMockupURL(orderNum, it) {
+    if (!it) return '';
+    var dk = (typeof itemDK === 'function') ? itemDK(it) : ((it && (it._dk || it.sku)) || '');
+    // 1) seller page's own resolver, when present (same result there).
+    try { if (typeof window._itemMockupURL === 'function') { var u = window._itemMockupURL(it); if (u) return u; } } catch (e) {}
+    // 2) per-browser setup store (the factory operator picked the product on this box).
+    try { var s = setupProductImage(orderNum, dk); if (s) return s; } catch (e) {}
+    // 3) catalog product by the chosen blank NAME (it.blank) or the SKU — colour-aware.
+    try {
+      var p = chosenProduct(orderNum, dk);
+      if (!p) {
+        var nm = it.blank || _productNameForSku(it.sku);
+        if (nm) { var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : []; p = prods.find(function (x) { return String(x.name || x.sku || x.id) === String(nm); }); }
+      }
+      if (p) { var c = it.color || p.mainColor; var im = (c && p.colorImages && p.colorImages[c]) || p.mockup || p.img || p.image || ''; if (im) return im; }
+    } catch (e) {}
+    // 4) item-carried fallbacks.
+    return (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
+  }
+
   // Best design-artwork URL to overlay on the blank for the live composite,
   // tried in priority order so the item image hydrates the moment ANY design
   // source exists — uploaded file, cached raw design, or the buyer's
@@ -2035,7 +2060,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-thread-eyedropper';
+  window.EG_BUILD = '2026-06-26-shared-avatar-blank';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2046,8 +2071,11 @@
       var dk = (typeof itemDK === 'function') ? itemDK(it) : ((it && (it._dk || it.sku)) || '');
       var oid = (o && o.id) || (o && o.num) || o;
       var onum = (o && o.num) || (o && o.id) || o;
+      // Resolve the blank the ROBUST shared way (it.blank → catalog, colour-aware), so
+      // a blank picked on the seller side hydrates here too — not just from this box's
+      // local setup store.
       var blank = '';
-      try { if (typeof setupProductImage === 'function') blank = setupProductImage(onum, dk) || setupProductImage(oid, dk) || ''; } catch (e) {}
+      try { blank = blankMockupURL(onum, it) || blankMockupURL(oid, it) || ''; } catch (e) {}
       if (!blank && it) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
       var design = '';
       try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) design = EGStore.getRawDesign(oid, dk) || EGStore.getRawDesign(onum, dk) || ''; } catch (e) {}
@@ -2055,7 +2083,7 @@
       if (!design && it) design = it.designUrl || it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? it.designSrc : '') || '';
       // Only overlay the design once a BLANK is chosen (it.blank); until then keep the
       // square as the plain blank/placeholder. Raw artwork still lives in the Uploads list.
-      var showDesign = !!(design && it && it.blank);
+      var showDesign = !!(design && it && (it.blank || blank));
       var dp = (it && it.designPos) ? it.designPos : { x: 25, y: 25, w: 50, h: 50 };
       var extra = (it && Array.isArray(it.designLayers)) ? it.designLayers : [];
       var extraHtml = showDesign ? extra.map(function (l) {
@@ -2224,7 +2252,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,
