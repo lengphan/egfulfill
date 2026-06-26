@@ -2158,9 +2158,42 @@
     setTimeout(function () { _shipFinish(elRef, _shipDisplay(ad)); refreshBoard(); }, 850);
   }
 
+  // Duplicate-design check (FACTORY-ONLY popover). Hashes the design + asks the staff
+  // endpoint which sellers have the same artwork, then shows a small popover near the
+  // button. Lets the operator spot reused art (and reuse an already-digitised file).
+  function dupCheck(orderNum, itemKey, btn) {
+    var designUrl = '';
+    try { var o = findOrder(orderNum), it = o && findItemByKey(o, itemKey); if (it) designUrl = designOverlaySrc(orderNum, it) || it.designUrl || ''; } catch (e) {}
+    if (!designUrl || !(window.EGStore && EGStore.findDuplicateDesigns)) { _egdtToast('No design to check'); return; }
+    var old = document.getElementById('egdt-dup-pop'); if (old) old.remove();
+    var _ot = '';
+    if (btn) { btn.disabled = true; _ot = btn.textContent; btn.textContent = 'Checking…'; }
+    EGStore.findDuplicateDesigns(designUrl, function (matches) {
+      if (btn) { btn.disabled = false; btn.textContent = _ot; }
+      var sellers = {}; (matches || []).forEach(function (m) { sellers[m.seller_id || m.seller] = m; });
+      var list = Object.keys(sellers).map(function (k) { return sellers[k]; });
+      var pop = document.createElement('div'); pop.id = 'egdt-dup-pop';
+      var r = btn ? btn.getBoundingClientRect() : { bottom: 80, left: 80 };
+      pop.style.cssText = 'position:fixed;z-index:10150;top:' + (r.bottom + 6) + 'px;left:' + Math.max(8, r.left - 140) + 'px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:11px 13px;min-width:230px;max-width:330px;font-family:Inter,system-ui,sans-serif';
+      if (!list.length) {
+        pop.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600">✓ No match in any seller library — unique.</div>';
+      } else {
+        var multi = list.length > 1;
+        pop.innerHTML = '<div style="font-size:11px;font-weight:700;color:' + (multi ? '#b45309' : '#9ca3af') + ';text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">' + (multi ? '⚠ Same artwork · ' + list.length + ' sellers' : '1 seller has this') + '</div>'
+          + list.map(function (m) {
+            var th = m.thumb ? '<img src="' + m.thumb + '" style="width:30px;height:30px;object-fit:cover;border-radius:5px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:30px;height:30px;border-radius:5px;background:#f0ede9;flex-shrink:0"></div>';
+            var dt = ''; try { if (m.created_at) dt = new Date(m.created_at).toLocaleDateString(); } catch (e) {}
+            return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>' + th + '</span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.seller || '—') + '</div><div style="font-size:11px;color:#9ca3af">' + esc(m.name || '') + (dt ? ' · ' + dt : '') + '</div></div></div>';
+          }).join('');
+      }
+      document.body.appendChild(pop);
+      setTimeout(function () { document.addEventListener('click', function _c(e) { if (!pop.contains(e.target) && e.target !== btn) { pop.remove(); document.removeEventListener('click', _c); } }); }, 0);
+    });
+  }
+
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-thread-dropdown';
+  window.EG_BUILD = '2026-06-26-dup-detector';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2365,7 +2398,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, dupCheck: dupCheck, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,

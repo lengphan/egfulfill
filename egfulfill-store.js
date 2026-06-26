@@ -2619,6 +2619,29 @@
     },
     // Price = the single admin-set embroidery-file fee (one source of truth).
     getDesignFilePrice: function() { return this.getEmbFilePrice(); },
+    // ── Duplicate design detection (FACTORY-ONLY) ─────────────────────────────
+    // Hash an image's bytes (SHA-256, same as the server) and ask the staff-only
+    // endpoint for every seller's design with the same bytes. cb(matches[], hashHex).
+    // matches: [{ id, name, thumb, created_at, seller_id, seller }]. Returns [] for a
+    // seller token (the endpoint is requireStaff) or when crypto.subtle is unavailable.
+    findDuplicateDesigns: function(dataUrl, cb) {
+      cb = cb || function(){};
+      try {
+        var s = String(dataUrl || ''); var b64 = s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s;
+        if (!b64 || !(window.crypto && crypto.subtle)) { cb([], null); return; }
+        var bin = atob(b64), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        crypto.subtle.digest('SHA-256', bytes).then(function(buf) {
+          var hex = Array.prototype.map.call(new Uint8Array(buf), function(x){ return x.toString(16).padStart(2, '0'); }).join('');
+          var tok = '';
+          try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+          fetch('/api/design_library/duplicates/' + hex, { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+            .then(function(r){ return r.ok ? r.json() : { matches: [] }; })
+            .then(function(d){ cb((d && d.matches) || [], hex); })
+            .catch(function(){ cb([], hex); });
+        }).catch(function(){ cb([], null); });
+      } catch (e) { cb([], null); }
+    },
     // ── Per-item factory working status ───────────────────────────────────
     // Tracks which specific items the warehouse is actively working on. The
     // warehouse sets the value; operator + admin read it to surface where
