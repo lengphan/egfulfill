@@ -3860,7 +3860,7 @@ function renderOpOrders() {
       </td>
       <td data-col="items">
         <div style="display:flex;align-items:center;gap:9px">
-          ${_pImg ? `<img src="${_pImg}" onclick="event.stopPropagation();opZoomImg(this.src)" title="Click to enlarge — check the listing image" style="width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0;background:#f6f5f4;cursor:zoom-in;transition:box-shadow .12s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''" onerror="this.style.visibility='hidden'">` : `<div style="width:34px;height:34px;border-radius:7px;background:#f0ede9;flex-shrink:0"></div>`}
+          ${_pImg ? `<img src="${_pImg}" onclick="event.stopPropagation();opZoomImg(this.src)" title="Click to enlarge — check the listing image" style="width:52px;height:52px;border-radius:8px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0;background:#f6f5f4;cursor:zoom-in;transition:box-shadow .12s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''" onerror="this.style.visibility='hidden'">` : `<div style="width:52px;height:52px;border-radius:8px;background:#f0ede9;flex-shrink:0"></div>`}
           <div style="min-width:0">
             ${_pTitle ? `<div title="${_pTitle}" style="font-size:13px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">${_pTitle}</div>` : ''}
             <div style="display:flex;align-items:center;gap:5px">
