@@ -346,8 +346,55 @@
       }
       if (p) { var c = it.color || p.mainColor; var im = (c && p.colorImages && p.colorImages[c]) || p.mockup || p.img || p.image || ''; if (im) return im; }
     } catch (e) {}
-    // 4) item-carried fallbacks.
-    return (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
+    // 4) only a GENUINE blank image — never it.thumb/it.sellerImg (those are the LISTING
+    // photo on synced/manual orders). No blank chosen → '' so the avatar shows the blank
+    // placeholder, not the listing. (Use the swap to see the listing.)
+    return (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : '';
+  }
+  // Swap avatar: two stacked cards in the item thumbnail — the composite (blank+design)
+  // and the item's listing photo. The focused one sits front (top-left, full opacity);
+  // the other peeks from the bottom-right, smaller + faded. Clicking pushes the clicked
+  // card forward; click again to flip back (continuous). No arrow — the faded card IS the
+  // affordance.
+  var _SWAP_FRONT = 'position:absolute;left:0;top:0;width:84%;height:84%;z-index:2;border-radius:6px;overflow:hidden;border:1.5px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.2);background:#f6f5f4;transition:all .16s';
+  var _SWAP_BACK = 'position:absolute;right:0;bottom:0;width:84%;height:84%;z-index:1;border-radius:6px;overflow:hidden;border:1.5px solid #fff;background:#f6f5f4;opacity:.45;transition:all .16s';
+  function swapItemImg(el) {
+    if (!el) return;
+    var cur = el.getAttribute('data-front') || 'a';
+    var next = cur === 'a' ? 'b' : 'a';
+    el.setAttribute('data-front', next);
+    var a = el.querySelector('[data-layer="a"]'), b = el.querySelector('[data-layer="b"]');
+    if (a) a.style.cssText = (next === 'a' ? _SWAP_FRONT : _SWAP_BACK);
+    if (b) b.style.cssText = (next === 'b' ? _SWAP_FRONT : _SWAP_BACK);
+  }
+  // Per-ITEM listing image (the item's own marketplace/manual photo) — the back layer of
+  // the swap avatar. Distinct from orderListingImg (which picks the first item for the
+  // order-level hero/row).
+  function itemListingURL(o, it) {
+    try {
+      if (it && it.img && /^(https?:|data:)/.test(String(it.img))) return it.img;
+      if (it && it.sellerImg && /^(https?:|data:)/.test(String(it.sellerImg))) return it.sellerImg;
+      if (it && window.EGStore && EGStore.imageForSku) { var s = EGStore.imageForSku(it.sku, it.name); if (s) return s; }
+      if (it && it.thumb && /^(https?:|data:)/.test(String(it.thumb))) return it.thumb;
+    } catch (e) {}
+    return '';
+  }
+
+  // Order-LEVEL listing image (shared by every board): the marketplace/manual listing
+  // photo — the FIRST item's image when an order has several. Used for the order-row
+  // "items" thumbnail AND the order-detail hero, so both read the same single picture
+  // (never the blank or the design). Mirrors the seller's orderRowImg priority.
+  function orderListingImg(o) {
+    try {
+      var list = (o && (o.itemList || o.items || o.itemsList)) || [];
+      var it = list[0] || {};
+      if (it.img && /^(https?:|data:)/.test(String(it.img))) return it.img;
+      if (it.sellerImg && /^(https?:|data:)/.test(String(it.sellerImg))) return it.sellerImg;
+      if (window.EGStore && EGStore.imageForSku) { var s = EGStore.imageForSku(it.sku, it.name); if (s) return s; }
+      if (o && o.img && /^(https?:|data:)/.test(String(o.img))) return o.img;
+      if (it.thumb && /^(https?:|data:)/.test(String(it.thumb))) return it.thumb;
+    } catch (e) {}
+    return '';
   }
 
   // Best design-artwork URL to overlay on the blank for the live composite,
@@ -2060,7 +2107,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-26-shared-avatar-blank';
+  window.EG_BUILD = '2026-06-26-swap-avatar';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2074,9 +2121,10 @@
       // Resolve the blank the ROBUST shared way (it.blank → catalog, colour-aware), so
       // a blank picked on the seller side hydrates here too — not just from this box's
       // local setup store.
+      // Blank ONLY from a genuine blank source (catalog by it.blank / setup / blankImg) —
+      // never the listing photo. No blank chosen → '' → blank placeholder, not the listing.
       var blank = '';
       try { blank = blankMockupURL(onum, it) || blankMockupURL(oid, it) || ''; } catch (e) {}
-      if (!blank && it) blank = (it.blankImg && /^(https?:|data:)/.test(String(it.blankImg))) ? it.blankImg : (it.thumb || it.sellerImg || '');
       var design = '';
       try { if (typeof EGStore !== 'undefined' && EGStore.getRawDesign) design = EGStore.getRawDesign(oid, dk) || EGStore.getRawDesign(onum, dk) || ''; } catch (e) {}
       if (!design) { try { if (typeof EGStore !== 'undefined' && EGStore.getCachedImage) design = EGStore.getCachedImage(oid, dk) || EGStore.getCachedImage(onum, dk) || ''; } catch (e) {} }
@@ -2089,10 +2137,19 @@
       var extraHtml = showDesign ? extra.map(function (l) {
         return '<img src="' + l.src + '" style="position:absolute;left:' + l.x + '%;top:' + l.y + '%;width:' + l.w + '%;height:' + l.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>';
       }).join('') : '';
-      var html = '<div style="position:relative;width:100%;height:100%">'
+      // The composite (blank+design) — the production view.
+      var comp = '<div style="position:relative;width:100%;height:100%">'
         + (blank ? '<img src="' + blank + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>' : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>')
         + (showDesign ? '<img src="' + design + '" style="position:absolute;left:' + dp.x + '%;top:' + dp.y + '%;width:' + dp.w + '%;height:' + dp.h + '%;object-fit:contain;' + (dp.r ? 'transform:rotate(' + dp.r + 'deg);' : '') + 'pointer-events:none" onerror="this.style.display=\'none\'"/>' : '')
         + extraHtml
+        + '</div>';
+      // Listing photo (the item's own) — the back card of the swap.
+      var listing = itemListingURL(o, it);
+      if (!listing) return { html: comp, hasArt: !!(design || extra.length) };   // no listing → plain composite
+      var listCard = '<img src="' + listing + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>';
+      var html = '<div class="egdt-swap" data-front="a" onclick="event.stopPropagation();EGDesignTools.swapItemImg(this)" title="Click to swap — blank (production) ⇄ listing photo" style="position:relative;width:100%;height:100%;cursor:pointer">'
+        + '<div data-layer="b" style="' + _SWAP_BACK + '">' + listCard + '</div>'
+        + '<div data-layer="a" style="' + _SWAP_FRONT + '">' + comp + '</div>'
         + '</div>';
       return { html: html, hasArt: !!(design || extra.length) };
     },
@@ -2252,7 +2309,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,

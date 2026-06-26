@@ -10975,8 +10975,7 @@ function whPrintLabel(num) {
     (function(){
       var heroEl = document.getElementById('xfom-hero'); if (!heroEl) return;
       var first = items[0] || {};
-      var src = (first.img && /^(https?:|data:)/.test(String(first.img))) ? first.img
-              : ((o && o.img && /^(https?:|data:)/.test(String(o.img))) ? o.img : '');
+      var src = (window.EGDesignTools && EGDesignTools.orderListingImg) ? EGDesignTools.orderListingImg(o) : ((first.img && /^(https?:|data:)/.test(String(first.img))) ? first.img : ((o && o.img) || ''));
       heroEl.innerHTML = src
         ? '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.parentNode.innerHTML=\'\'"/>'
         : '<div style="color:#c4c3be;font-size:10px;text-align:center;line-height:1.3">No<br>image</div>';
