@@ -116,7 +116,7 @@ paypalRoutes(app, requireAuth);   // PayPal card/balance wallet top-up (auto-cap
 stripeRoutes(app, requireAuth);   // Stripe card wallet top-up (Payment Element)
 passwordResetRoutes(app, requireAuth, requireStaff);   // forgot/reset (admin-mediated + email link)
 shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate-shop + labels
-designLibraryRoutes(app, requireAuth);                 // per-seller "my uploads" design gallery (server-side, not localStorage)
+designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads" design gallery + cross-seller duplicate detection (staff-only)
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 
 const port = Number(process.env.PORT) || 3000;

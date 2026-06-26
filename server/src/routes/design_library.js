@@ -3,8 +3,19 @@
 // and 20 of them blew the browser's ~5MB localStorage cap, which then evicted the
 // order list (orders silently vanished). The server is the right home for images.
 import { q } from '../db.js';
+import { createHash } from 'node:crypto';
 
-export function designLibraryRoutes(app, requireAuth) {
+// SHA-256 of the image BYTES (data-URL prefix stripped) — the fingerprint used to detect
+// the same artwork uploaded by different sellers. Returns null if it can't be hashed.
+function hashOf(dataUrl) {
+  try {
+    var s = String(dataUrl || ''); if (!s) return null;
+    var b64 = s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s;
+    return createHash('sha256').update(Buffer.from(b64, 'base64')).digest('hex');
+  } catch (e) { return null; }
+}
+
+export function designLibraryRoutes(app, requireAuth, requireStaff) {
   q(`create table if not exists design_library (
        id          serial primary key,
        seller_id   uuid references users(id) on delete cascade,
@@ -15,6 +26,15 @@ export function designLibraryRoutes(app, requireAuth) {
      )`).catch(() => {});
   q('alter table design_library add column if not exists thumb text').catch(() => {});
   q('create index if not exists design_library_seller_idx on design_library(seller_id, created_at desc)').catch(() => {});
+  // Cross-seller duplicate detection: a content hash per design + a one-time backfill.
+  q('alter table design_library add column if not exists content_hash text').catch(() => {});
+  q('create index if not exists design_library_hash_idx on design_library(content_hash)').catch(() => {});
+  (async () => {
+    try {
+      const r = await q('select id, data from design_library where content_hash is null and data is not null limit 2000');
+      for (const row of r.rows) { const h = hashOf(row.data); if (h) { try { await q('update design_library set content_hash=$1 where id=$2', [h, row.id]); } catch (e) {} } }
+    } catch (e) {}
+  })();
 
   const CAP = 30; // keep the N most-recent uploads per seller
 
@@ -29,10 +49,28 @@ export function designLibraryRoutes(app, requireAuth) {
     return r.rows;
   });
 
+  // Cross-seller DUPLICATE detection — FACTORY/STAFF ONLY (sellers never call this). Given
+  // a design's content hash, return every seller's design with the SAME bytes, so the
+  // factory can spot reused artwork and reuse an already-digitised file instead of redoing
+  // it. Returns thumbnails + the seller's store, not the full image.
+  app.get('/api/design_library/duplicates/:hash', { preHandler: requireStaff }, async (req) => {
+    const h = String(req.params.hash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(h)) return { hash: h, count: 0, matches: [] };
+    const r = await q(
+      `select dl.id, dl.name, dl.thumb, dl.created_at, dl.seller_id,
+              coalesce(u.store_name, u.name, u.email, '—') as seller
+         from design_library dl left join users u on u.id = dl.seller_id
+        where dl.content_hash = $1
+        order by dl.created_at desc`, [h]);
+    return { hash: h, count: r.rows.length, matches: r.rows };
+  });
+
   // Full image data for one upload (fetched only when the seller re-adds it).
   app.get('/api/design_library/:id', { preHandler: requireAuth }, async (req) => {
-    const r = await q('select data from design_library where id=$1 and seller_id=$2', [req.params.id, req.user.sub]);
-    return r.rows[0] || { data: null };
+    const r = await q('select data, content_hash from design_library where id=$1 and seller_id=$2', [req.params.id, req.user.sub]);
+    const row = r.rows[0];
+    if (row && !row.content_hash && row.data) { const h = hashOf(row.data); if (h) { try { await q('update design_library set content_hash=$1 where id=$2', [h, req.params.id]); } catch (e) {} } }
+    return row ? { data: row.data } : { data: null };
   });
 
   // Save an upload. Dedupe by (seller, name) — matches the client's re-use dedupe —
@@ -42,8 +80,8 @@ export function designLibraryRoutes(app, requireAuth) {
     if (!b.data) { reply.code(400); return { error: 'data required' }; }
     if (b.name) await q('delete from design_library where seller_id=$1 and name=$2', [req.user.sub, b.name]).catch(() => {});
     const r = await q(
-      'insert into design_library (seller_id, name, data, thumb) values ($1,$2,$3,$4) returning id, name, thumb, created_at',
-      [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null]
+      'insert into design_library (seller_id, name, data, thumb, content_hash) values ($1,$2,$3,$4,$5) returning id, name, thumb, created_at',
+      [req.user.sub, b.name || 'Untitled', b.data, b.thumb || null, hashOf(b.data)]
     );
     await q(
       `delete from design_library where seller_id=$1 and id not in (
