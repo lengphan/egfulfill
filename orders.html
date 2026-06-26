@@ -1836,6 +1836,15 @@ function pushOrderToProduction(ordNo, btn) {
     pushOrderEvent(o, 'Pushed to production', 'Charged $' + orderCost.toFixed(2) + ' · new balance $' + (parseFloat(localStorage.getItem('eg_balance')||'0')).toFixed(2), 'seller');
   }
   if (typeof EGStore !== 'undefined') {
+    // Capture the seller's thread colours BEFORE submitOrder (a brand-new order id can
+    // purge per-item caches), then re-apply under both keys afterwards.
+    var _pushThreads = {};
+    try {
+      if (EGStore.getItemThreadColors) (o.itemsList || []).forEach(function (it) {
+        var th = EGStore.getItemThreadColors(o.id, it.sku) || EGStore.getItemThreadColors(o.no, it.sku) || [];
+        if (th && th.length) _pushThreads[it.sku] = th;
+      });
+    } catch (e) {}
     EGStore.submitOrder({
       id: o.id,
       seller: o.store || 'My Store',
@@ -1870,11 +1879,23 @@ function pushOrderToProduction(ordNo, btn) {
         _dk: itemDK(it),
         blank: it.blank || null,
         blankImg: it.blankImg || null,
-        file: UP_STATE[o.no]?.[itemDK(it)]?.file || null
+        file: UP_STATE[o.no]?.[itemDK(it)]?.file || null,
+        // Carry the matched thread colours so the factory shows them (they were keyed
+        // by o.id on the seller side but the boards read by order number — see the
+        // copy below that also writes them under both keys for the same browser).
+        threadColors: _pushThreads[it.sku] || []
         // fileData intentionally omitted — operator/admin/warehouse look up the design
         // from eg_image_cache by orderId|_dk (now sent), falling back to designUrl.
       }))
     });
+    // Re-apply the captured thread colours under BOTH the id and number keys — the
+    // factory boards read by order NUMBER, the detail card by id (additive, never clears).
+    try {
+      if (EGStore.setItemThreadColors) Object.keys(_pushThreads).forEach(function (sku) {
+        EGStore.setItemThreadColors(o.id, sku, _pushThreads[sku]);
+        EGStore.setItemThreadColors(o.no, sku, _pushThreads[sku]);
+      });
+    } catch (e) {}
     // For every item: ask EGStore to check inventory vs qty. If short, it
     // files a backorder so the SKU appears in the factory Purchases queue.
     // Without this call, OOS pushes silently vanished from procurement.
