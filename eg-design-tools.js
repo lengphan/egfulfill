@@ -1273,6 +1273,7 @@
       + '<div id="egdt-qp-extra"></div>'
       + '<div id="egdt-qp-texts"></div>'
       + '</div></div>'
+      + '<div id="egdt-qp-threads" style="padding:0 18px 12px;display:none"></div>'
       + '<div id="egdt-qp-tools" style="padding:0 18px 14px;display:flex;align-items:center;gap:12px">'
       + '<button onclick="EGDesignTools.qpAddText()" id="egdt-qp-addtext" style="font-size:12.5px;border:1px solid #e5e4e0;background:#fff;border-radius:8px;padding:7px 12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">+ Add text</button>'
       + '<a id="egdt-qp-lab" href="design-maker.html" style="font-size:12.5px;color:#6b7280;text-decoration:underline;text-underline-offset:2px">Open Design Maker →</a>'
@@ -1317,7 +1318,7 @@
     var _opts = (applyAll && typeof applyAll === 'object') ? applyAll : { applyAll: !!applyAll };
     applyAll = !!_opts.applyAll;
     var _mountSel = _opts.mount || null;
-    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea, applyAll: applyAll, mount: _mountSel };
+    _qpF = { num: orderNum, dk: dk, locked: locked, area: _qpArea, applyAll: applyAll, mount: _mountSel, threads: [] };
     // Persistent backdrop shell (popup mode); the editor CARD lives inside it or is
     // re-parented into an inline mount (Edit-All embed).
     var m = document.getElementById('egdt-qp');
@@ -1369,6 +1370,7 @@
     _qpRenderTexts(it.textLayers, locked);
     _qpRenderDesignLayers(it.designLayers, locked);
     _qpDeselectAll();   // start deselected — just the artwork, no handles, until clicked
+    _qpRenderThreads();   // EMB items → show the matched thread colours (hidden otherwise)
     if (!locked) _qpLoadLibrary();   // warm the Image Library list for search
     if (!_mountSel) m.style.display = 'flex';   // popup only; embed stays inline
   }
@@ -1466,6 +1468,7 @@
       if (dEl) dEl.src = out; if (wrap) wrap.style.display = 'block';
       document.getElementById('egdt-qp-empty').style.display = 'none';
       _qpSelectPrimary();
+      _qpRenderThreads();
       try { _qpPersist(false); } catch (e) {}
     };
     rd.readAsDataURL(file);
@@ -1514,6 +1517,7 @@
     ['egdt-qp-handle', 'egdt-qp-del', 'egdt-qp-rot', 'egdt-qp-rotline', 'egdt-qp-rmbg'].forEach(function (id) { var e = document.getElementById(id); if (e) e.style.display = 'none'; });
     var host = document.getElementById('egdt-qp-extra'); var hasExtra = host && host.querySelector('.egdt-qp-dl');
     if (!hasExtra) { var emp = document.getElementById('egdt-qp-empty'); if (emp) emp.style.display = 'flex'; }
+    _qpRenderThreads();
     try { _qpPersist(false); } catch (e) {}
   }
   // A picked design / template / image ID is ALWAYS added as a new, closable layer (it
@@ -1534,6 +1538,7 @@
       if (dEl) dEl.src = img; if (wrap) wrap.style.display = 'block';
       document.getElementById('egdt-qp-empty').style.display = 'none';
       _qpSelectPrimary();
+      _qpRenderThreads();
       _egdtToast('Loaded ' + label);
       try { _qpPersist(false); } catch (e) {}
     } else {
@@ -1647,6 +1652,85 @@
   // Persist the CURRENT in-progress state (art + position + text + layers) to the order
   // and the boards. Called continuously (drag-end, design load, text edit, on close) so
   // half-finished work in the mini designer is never lost. pushApi=true also syncs server.
+  // ── Thread match (embroidery) ──────────────────────────────────────────────
+  // For EMB items the mini designer shows the design's matched in-stock thread
+  // colours (same chips the boards already render), auto-detected from the artwork
+  // and refinable by clicking the artwork thumbnail to sample an extra colour.
+  // Non-EMB items hide the panel entirely. Threads persist via setItemThreadColors.
+  function _qpItemTech() {
+    try { var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); return String((it && (it.printType || it.tech)) || '').toUpperCase(); } catch (e) { return ''; }
+  }
+  function _qpThreadPanelHTML(design) {
+    var thumb = design
+      ? '<img id="egdt-qp-thread-thumb" src="' + _upCanvasSrc(design) + '" crossorigin="anonymous" onclick="EGDesignTools._qpThreadSample(event)" title="Click the artwork to add a thread colour" style="width:54px;height:54px;object-fit:contain;border:1px solid #e5e4e0;border-radius:8px;background:#f6f5f4;cursor:crosshair;flex-shrink:0"/>'
+      : '';
+    return '<div style="border-top:1px solid #f0ede9;padding-top:12px;display:flex;gap:12px;align-items:flex-start">'
+      + thumb
+      + '<div style="flex:1;min-width:0">'
+      +   '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Thread colours' + (design ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#c4c3be">· click the artwork to add</span>' : '') + '</div>'
+      +   '<div id="egdt-qp-thread-chips"></div>'
+      + '</div></div>';
+  }
+  function _qpRenderThreadChips() {
+    var box = document.getElementById('egdt-qp-thread-chips'); if (!box || !_qpF) return;
+    var threads = _qpF.threads || [];
+    if (!threads.length) {
+      var hasDesign = !!document.getElementById('egdt-qp-thread-thumb');
+      box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Matching the artwork’s colours…' : 'Add a design to auto-match its thread colours.') + '</div>';
+      return;
+    }
+    box.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + threads.map(function (t, i) {
+      return '<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 7px 4px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:11.5px;font-weight:600;color:#191918">'
+        + '<span style="width:14px;height:14px;border-radius:50%;background:' + (t.hex || '#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18)"></span>'
+        + '<span style="font-family:monospace">' + (t.code || '—') + '</span>'
+        + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '')
+        + '<button onclick="EGDesignTools._qpThreadRemove(' + i + ')" title="Remove" style="border:none;background:none;cursor:pointer;color:#c4c3be;font-size:13px;line-height:1;padding:0 0 0 1px;font-family:inherit">×</button>'
+        + '</div>';
+    }).join('') + '</div>';
+  }
+  function _qpRenderThreads() {
+    var box = document.getElementById('egdt-qp-threads'); if (!box || !_qpF) return;
+    if (!/EMB/i.test(_qpItemTech())) { box.style.display = 'none'; box.innerHTML = ''; _qpF.threads = []; return; }
+    var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk);
+    var design = it ? (it.designUrl || '') : '';
+    var _tkOrd = (o && o.num != null) ? o.num : (o && o.id);
+    // Seed from any threads already matched for this item (so the panel isn't empty),
+    // then refine against the current artwork (same flow as the upload panel).
+    var stored = []; try { if (window.EGStore && EGStore.getItemThreadColors) stored = EGStore.getItemThreadColors(_tkOrd, it && it.sku) || []; } catch (e) {}
+    _qpF.threads = stored.slice();
+    box.style.display = 'block';
+    box.innerHTML = _qpThreadPanelHTML(design);
+    _qpRenderThreadChips();
+    if (design && window.EGStore && EGStore.matchThreadColors) {
+      var token = _qpF.dk;
+      EGStore.matchThreadColors(_upCanvasSrc(design), function (threads) {
+        if (!_qpF || _qpF.dk !== token) return;
+        if (threads && threads.length) { _qpF.threads = threads; _qpRenderThreadChips(); }
+        else if (!stored.length) { _qpRenderThreadChips(); }
+      });
+    }
+  }
+  function _qpThreadSample(ev) {
+    ev.stopPropagation(); if (!_qpF) return;
+    var img = document.getElementById('egdt-qp-thread-thumb'); if (!img || !img.naturalWidth) return;
+    var rect = img.getBoundingClientRect(), cx = ev.clientX - rect.left, cy = ev.clientY - rect.top;
+    try {
+      var cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+      var px = Math.max(0, Math.min(img.naturalWidth - 1, Math.round((cx / rect.width) * img.naturalWidth)));
+      var py = Math.max(0, Math.min(img.naturalHeight - 1, Math.round((cy / rect.height) * img.naturalHeight)));
+      var d; try { d = ctx.getImageData(px, py, 1, 1).data; } catch (e) { _egdtToast('Image can’t be sampled in-browser'); return; }
+      if (d[3] < 30) return;
+      if (!(window.EGStore && EGStore.nearestThread)) return;
+      var t = EGStore.nearestThread(d[0], d[1], d[2]); if (!t) return;
+      _qpF.threads = _qpF.threads || [];
+      if (_qpF.threads.some(function (x) { return x.code === t.code; })) { _egdtToast('Thread ' + t.code + ' already added'); return; }
+      _qpF.threads.push({ code: t.code, name: t.name, hex: t.hex });
+      _qpRenderThreadChips();
+      try { _qpPersist(false); } catch (e) {}
+    } catch (e) {}
+  }
+  function _qpThreadRemove(i) { if (!_qpF || !_qpF.threads) return; _qpF.threads.splice(i, 1); _qpRenderThreadChips(); try { _qpPersist(false); } catch (e) {} }
   function _qpPersist(pushApi) {
     if (!_qpF || _qpF.locked) return;
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), wrap = document.getElementById('egdt-qp-wrap');
@@ -1677,6 +1761,14 @@
       // otherwise UP_STATE would shadow the new design in _itemDesignURL.
       try { var _us = window.UP_STATE, _on = (o.no != null ? o.no : o.num); if (_us && _on != null && _us[_on]) { delete _us[_on][dk2]; _qpUpDirty = true; } } catch (e) {}
       patchBoardArrays(o.id, dk2, function (row, bi) { if (bi) { bi.designPos = t2.designPos; bi.designUrl = t2.designUrl; bi.textLayers = t2.textLayers; bi.designLayers = t2.designLayers; } });
+      // Embroidery: save the matched thread colours alongside the design so every
+      // board shows the same chips (keyed by the board's order number + line sku).
+      try {
+        if (/EMB/i.test(String((t2.printType || t2.tech) || '')) && _qpF.threads && window.EGStore && EGStore.setItemThreadColors) {
+          var _tkOrd2 = (o.num != null) ? o.num : o.id;
+          EGStore.setItemThreadColors(_tkOrd2, t2.sku, _qpF.threads);
+        }
+      } catch (e) {}
     });
     if (_qpUpDirty && typeof window.saveUpState === 'function') { try { window.saveUpState(); } catch (e) {} }
     try { if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items }); } catch (e) {}
@@ -1712,6 +1804,7 @@
         try { if (window.EGStore && EGStore.cacheImage && o.id) EGStore.cacheImage(o.id, _qpF.dk, out); } catch (e) {}
         try { if (window.EGStore && EGStore.update && o.id) EGStore.update(o.id, { items: o.items }); } catch (e) {}
         patchBoardArrays(o.id, _qpF.dk, function (row, bi) { if (bi) bi.designUrl = out; });
+        _qpRenderThreads();
         refreshBoard(); _egdtToast('Background removed');
       } finally { if (btn) { btn.disabled = false; btn.style.opacity = ''; } }
     };
@@ -1869,7 +1962,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-25-inline-qty';
+  window.EG_BUILD = '2026-06-26-qp-thread-match';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2053,6 +2146,7 @@
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,
     _qpSearch: _qpSearch, _qpPickResult: _qpPickResult,
+    _qpThreadSample: _qpThreadSample, _qpThreadRemove: _qpThreadRemove,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
