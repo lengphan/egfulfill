@@ -2162,39 +2162,112 @@
   // Duplicate-design check (FACTORY-ONLY popover). Hashes the design + asks the staff
   // endpoint which sellers have the same artwork, then shows a small popover near the
   // button. Lets the operator spot reused art (and reuse an already-digitised file).
-  function dupCheck(orderNum, itemKey, btn) {
-    var designUrl = '';
-    try { var o = findOrder(orderNum), it = o && findItemByKey(o, itemKey); if (it) designUrl = designOverlaySrc(orderNum, it) || it.designUrl || ''; } catch (e) {}
-    if (!designUrl || !(window.EGStore && EGStore.findDuplicateDesigns)) { _egdtToast('No design to check'); return; }
-    var old = document.getElementById('egdt-dup-pop'); if (old) old.remove();
-    var _ot = '';
-    if (btn) { btn.disabled = true; _ot = btn.textContent; btn.textContent = 'Checking…'; }
-    EGStore.findDuplicateDesigns(designUrl, function (matches) {
-      if (btn) { btn.disabled = false; btn.textContent = _ot; }
+  // Cache duplicate-match results by the design URL so re-opening an order (or two
+  // items sharing one artwork) never re-hashes / re-fetches. Value: array of matches.
+  var _dupCache = {};
+  function _dupResolveUrl(orderNum, itemKey) {
+    try { var o = findOrder(orderNum), it = o && findItemByKey(o, itemKey); if (it) return designOverlaySrc(orderNum, it) || it.designUrl || ''; } catch (e) {}
+    return '';
+  }
+  // Resolve → hash → query (cached). cb(matches|null). null = couldn't check.
+  function _dupRun(orderNum, itemKey, cb) {
+    var url = _dupResolveUrl(orderNum, itemKey);
+    if (!url || !(window.EGStore && EGStore.findDuplicateDesigns)) { cb(null); return; }
+    if (_dupCache[url]) { cb(_dupCache[url]); return; }
+    EGStore.findDuplicateDesigns(url, function (matches) {
       var sellers = {}; (matches || []).forEach(function (m) { sellers[m.seller_id || m.seller] = m; });
       var list = Object.keys(sellers).map(function (k) { return sellers[k]; });
-      var pop = document.createElement('div'); pop.id = 'egdt-dup-pop';
-      var r = btn ? btn.getBoundingClientRect() : { bottom: 80, left: 80 };
-      pop.style.cssText = 'position:fixed;z-index:10150;top:' + (r.bottom + 6) + 'px;left:' + Math.max(8, r.left - 140) + 'px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:11px 13px;min-width:230px;max-width:330px;font-family:Inter,system-ui,sans-serif';
-      if (!list.length) {
-        pop.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600">✓ No match in any seller library — unique.</div>';
-      } else {
-        var multi = list.length > 1;
-        pop.innerHTML = '<div style="font-size:11px;font-weight:700;color:' + (multi ? '#b45309' : '#9ca3af') + ';text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">' + (multi ? '⚠ Same artwork · ' + list.length + ' sellers' : '1 seller has this') + '</div>'
-          + list.map(function (m) {
-            var th = m.thumb ? '<img src="' + m.thumb + '" style="width:30px;height:30px;object-fit:cover;border-radius:5px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:30px;height:30px;border-radius:5px;background:#f0ede9;flex-shrink:0"></div>';
-            var dt = ''; try { if (m.created_at) dt = new Date(m.created_at).toLocaleDateString(); } catch (e) {}
-            return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>' + th + '</span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.seller || '—') + '</div><div style="font-size:11px;color:#9ca3af">' + esc(m.name || '') + (dt ? ' · ' + dt : '') + '</div></div></div>';
-          }).join('');
-      }
-      document.body.appendChild(pop);
-      setTimeout(function () { document.addEventListener('click', function _c(e) { if (!pop.contains(e.target) && e.target !== btn) { pop.remove(); document.removeEventListener('click', _c); } }); }, 0);
+      _dupCache[url] = list; cb(list);
     });
+  }
+  // Floating popover listing the sellers who share this artwork, anchored to el.
+  function _dupPopover(el, list) {
+    var old = document.getElementById('egdt-dup-pop'); if (old) old.remove();
+    var pop = document.createElement('div'); pop.id = 'egdt-dup-pop';
+    var r = el ? el.getBoundingClientRect() : { bottom: 80, left: 80 };
+    pop.style.cssText = 'position:fixed;z-index:10150;top:' + (r.bottom + 6) + 'px;left:' + Math.max(8, r.left - 140) + 'px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:11px 13px;min-width:230px;max-width:330px;font-family:Inter,system-ui,sans-serif';
+    if (!list || !list.length) {
+      pop.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600">✓ No match in any seller library — unique.</div>';
+    } else {
+      var multi = list.length > 1;
+      pop.innerHTML = '<div style="font-size:11px;font-weight:700;color:' + (multi ? '#b45309' : '#9ca3af') + ';text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">' + (multi ? '⚠ Same artwork · ' + list.length + ' sellers' : '1 seller has this') + '</div>'
+        + list.map(function (m) {
+          var th = m.thumb ? '<img src="' + m.thumb + '" style="width:30px;height:30px;object-fit:cover;border-radius:5px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:30px;height:30px;border-radius:5px;background:#f0ede9;flex-shrink:0"></div>';
+          var dt = ''; try { if (m.created_at) dt = new Date(m.created_at).toLocaleDateString(); } catch (e) {}
+          return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>' + th + '</span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.seller || '—') + '</div><div style="font-size:11px;color:#9ca3af">' + esc(m.name || '') + (dt ? ' · ' + dt : '') + '</div></div></div>';
+        }).join('');
+    }
+    document.body.appendChild(pop);
+    setTimeout(function () { document.addEventListener('click', function _c(e) { if (!pop.contains(e.target) && e.target !== el) { pop.remove(); document.removeEventListener('click', _c); } }); }, 0);
+  }
+  // Manual click path (kept for callers): run + show the popover.
+  function dupCheck(orderNum, itemKey, btn) {
+    if (!_dupResolveUrl(orderNum, itemKey)) { _egdtToast('No design to check'); return; }
+    var _ot = ''; if (btn) { btn.disabled = true; _ot = btn.textContent; btn.textContent = 'Checking…'; }
+    _dupRun(orderNum, itemKey, function (list) {
+      if (btn) { btn.disabled = false; btn.textContent = _ot; }
+      _dupPopover(btn, list || []);
+    });
+  }
+
+  // ── Auto duplicate badge ────────────────────────────────────────────────
+  // Returns an inline badge that AUTO-runs its check the moment it lands in the
+  // DOM (via the MutationObserver below) — no clicking. While pending it shows a
+  // faint "checking", then flips to ⚠ N sellers (amber, click for who) or a quiet ✓.
+  function dupBadge(orderId, itemKey) {
+    var k = String(itemKey == null ? '' : itemKey).replace(/"/g, '&quot;');
+    var o = String(orderId == null ? '' : orderId).replace(/"/g, '&quot;');
+    return '<span class="egdt-dup-badge" data-dup-pending="1" data-dup-ord="' + o + '" data-dup-key="' + k + '" '
+      + 'style="font-size:11px;font-weight:600;color:#9ca3af;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:3px 8px;font-family:inherit;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">⧉ Checking…</span>';
+  }
+  // Paint a badge element from its match list.
+  function _dupPaintBadge(el, list) {
+    if (!el) return;
+    if (list == null) { el.style.display = 'none'; return; }   // couldn't resolve a design — hide
+    if (!list.length) {
+      el.textContent = '✓ unique';
+      el.style.color = '#15803d'; el.style.borderColor = '#bbf7d0'; el.style.background = '#f0fdf4'; el.style.cursor = 'default';
+      el.onclick = null;
+      return;
+    }
+    var multi = list.length > 1;
+    el.textContent = '⚠ ' + list.length + ' seller' + (multi ? 's' : '');
+    el.style.color = '#b45309'; el.style.borderColor = '#fcd9a8'; el.style.background = '#fffbeb'; el.style.cursor = 'pointer';
+    el.title = 'Same artwork found in ' + list.length + ' other seller librar' + (multi ? 'ies' : 'y') + ' — click for who';
+    el.onclick = function (e) { e.stopPropagation(); _dupPopover(el, list); };
+  }
+  // Run one pending badge.
+  function _autoDupBadge(el) {
+    if (!el || el.getAttribute('data-dup-pending') !== '1') return;
+    el.setAttribute('data-dup-pending', '0');
+    var ord = el.getAttribute('data-dup-ord'), key = el.getAttribute('data-dup-key');
+    _dupRun(ord, key, function (list) { _dupPaintBadge(el, list); });
+  }
+  // Install ONE observer that auto-runs any badge added to the DOM. Pending
+  // badges already present at install time are swept immediately.
+  function _installDupObserver() {
+    if (window.__egdtDupObs) return; window.__egdtDupObs = true;
+    function sweep(root) {
+      if (!root || root.nodeType !== 1) return;
+      if (root.classList && root.classList.contains('egdt-dup-badge')) { _autoDupBadge(root); return; }
+      if (root.querySelectorAll) root.querySelectorAll('.egdt-dup-badge[data-dup-pending="1"]').forEach(_autoDupBadge);
+    }
+    try {
+      var mo = new MutationObserver(function (muts) {
+        muts.forEach(function (m) { (m.addedNodes || []).forEach(sweep); });
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+    } catch (e) {}
+    try { sweep(document.body); } catch (e) {}
+  }
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _installDupObserver);
+    else _installDupObserver();
   }
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-audit-log-activity-page';
+  window.EG_BUILD = '2026-06-27-auto-duplicate-badge';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2399,7 +2472,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, dupCheck: dupCheck, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, dupCheck: dupCheck, dupBadge: dupBadge, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,

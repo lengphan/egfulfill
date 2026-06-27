@@ -9320,7 +9320,7 @@ document.addEventListener('DOMContentLoaded', function() {
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;padding-right:16px">
             ${(typeof EGStore !== 'undefined' && EGStore.deliverableHTML) ? EGStore.deliverableHTML((o && o.id) || _xfomNum, it.sku, it) : ''}
-            ${(() => { const _du = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc((o && o.id) || _xfomNum, it) : (it.designUrl || ''); const _ik = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : (it.lineId||it._dk||it.sku||''); return _du ? `<button onclick="event.stopPropagation();EGDesignTools.dupCheck('${o.id}','${String(_ik).replace(/'/g,"\\'")}',this)" title="Check if other sellers uploaded the same artwork" style="font-size:11px;font-weight:600;color:#6b7280;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:3px 8px;cursor:pointer;font-family:inherit;white-space:nowrap" onmouseover="this.style.borderColor='#191918';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#6b7280'">⧉ Duplicates</button>` : ''; })()}
+            ${(() => { const _du = (window.EGDesignTools && EGDesignTools.designOverlaySrc) ? EGDesignTools.designOverlaySrc((o && o.id) || _xfomNum, it) : (it.designUrl || ''); const _ik = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : (it.lineId||it._dk||it.sku||''); return (_du && EGDesignTools.dupBadge) ? EGDesignTools.dupBadge(o.id, _ik) : ''; })()}
           </div>
         </div>`;
       }).join(''));
