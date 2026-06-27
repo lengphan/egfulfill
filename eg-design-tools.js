@@ -365,6 +365,23 @@
     if (a) a.style.display = (next === 'a') ? 'block' : 'none';
     if (b) b.style.display = (next === 'b') ? 'block' : 'none';
   }
+  // Wrap any thumb's inner HTML (the production composite) with the swap structure:
+  // layer a = the composite passed in, layer b = the item's own listing photo, plus
+  // the corner arrow. Used by the factory LIST rows so they get the same blank⇄listing
+  // swap the seller + the detail modal already have. No listing → returns inner as-is.
+  function swapThumb(innerHtml, it) {
+    var listing = '';
+    try {
+      var cands = [it && it.img, it && it.sellerImg, it && it.listingImg, it && it.thumb];
+      for (var i = 0; i < cands.length; i++) { if (cands[i] && /^(https?:|data:)/.test(String(cands[i]))) { listing = cands[i]; break; } }
+    } catch (e) {}
+    if (!listing) return innerHtml;
+    return '<div class="egdt-swap" data-front="a" style="position:relative;width:100%;height:100%">'
+      + '<div data-layer="a" style="position:absolute;inset:0">' + innerHtml + '</div>'
+      + '<div data-layer="b" style="position:absolute;inset:0;display:none"><img src="' + listing + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/></div>'
+      + _SWAP_ARROW
+      + '</div>';
+  }
   var _SWAP_ARROW = '<button type="button" onclick="event.stopPropagation();EGDesignTools.swapItemImg(this.closest(\'.egdt-swap\'))" title="Swap — blank (production) ⇄ listing photo" style="position:absolute;right:2px;bottom:2px;z-index:4;width:17px;height:17px;border-radius:5px;background:rgba(255,255,255,.93);border:1px solid #e5e4e0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.18)" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\'"><svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2.5 5h7l-2-2.2M11.5 9h-7l2 2.2" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
   // Per-ITEM listing image (the item's own marketplace/manual photo) — the back layer of
   // the swap avatar. Distinct from orderListingImg (which picks the first item for the
@@ -2267,7 +2284,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-board-thread-list-hydrate';
+  window.EG_BUILD = '2026-06-27-factory-row-swap-arrow';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2472,7 +2489,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, dupCheck: dupCheck, dupBadge: dupBadge, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, swapThumb: swapThumb, dupCheck: dupCheck, dupBadge: dupBadge, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,
