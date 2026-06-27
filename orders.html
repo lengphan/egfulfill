@@ -5491,22 +5491,17 @@ function _afmStartVietQR(amountUSD){
     + '<div id="_afm-vqr-status" style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:13.5px;font-weight:600;color:#6b7280;padding:9px;background:#f6f5f4;border-radius:9px">Waiting for your transfer&hellip;</div>'
     + '</div>';
   m.style.display='flex';
-  // Build ONE local VietQR carrying the SHORT note (= the exact note the poll matches
-  // on), painted after create-payment resolves the clean ref. No img.vietqr.io (the
-  // red-V→plain flicker) and no server VA qrCode (which baked in VietQR's long note —
-  // why a transfer's memo didn't match and it never auto-confirmed).
+  // Render VietQR's virtual-account QR (the ONLY QR VietQR syncs back; a raw-account QR
+  // lets a transfer land that never auto-confirms). Poll on our short note, which VietQR
+  // embeds in the VA content. No local QR — on failure we show the account details only.
   var _afmDone=false;
-  function _afmFinalize(){
-    if(_afmDone) return; _afmDone=true;
-    var payload=(typeof egBuildVietQR==='function') ? egBuildVietQR(BANK,ACCT,vnd,_afmVqrRef) : '';
-    if(payload) _afmPaintQR(payload);
-    else { var box=document.getElementById('_afm-vqr-box'); if(box) box.textContent='QR unavailable — use the account details below'; }
-  }
+  function _afmError(){ if(_afmDone) return; _afmDone=true; var box=document.getElementById('_afm-vqr-box'); if(box) box.innerHTML='<div style="text-align:center;color:#b45309;font-size:11.5px;padding:14px;line-height:1.5">Couldn’t reach the bank QR service.<br>Use the account details below.</div>'; }
   fetch('/api/vietqr/create-payment',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({amount:vnd,note:ref})})
     .then(function(r){return r.json();}).then(function(d){
-      if(d&&!d.error&&(d.note||d.ref)){ _afmVqrRef=d.note||d.ref; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; }
-    }).catch(function(){}).then(function(){ _afmFinalize(); });
-  setTimeout(_afmFinalize, 4000);
+      if(d&&!d.error&&d.qrCode){ _afmDone=true; if(d.note){ _afmVqrRef=d.note; var n=document.getElementById('_afm-vqr-ref'); if(n)n.textContent=_afmVqrRef; } _afmPaintQR(d.qrCode); }
+      else { _afmError(); }
+    }).catch(function(){ _afmError(); });
+  setTimeout(_afmError, 7000);
   // Poll — credit ONLY when the server confirms the matching transfer landed.
   if(_afmVqrPoll) clearInterval(_afmVqrPoll);
   var started=Date.now();

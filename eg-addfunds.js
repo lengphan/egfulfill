@@ -653,32 +653,9 @@ const EG_VQR = {
 };
 let _vqrPoll = null;
 var _vqrRef = '';   // active top-up reference (server-issued EGxxxxxx; read by the inline button + poll)
-// Build a VietQR (NAPAS EMVCo) payload LOCALLY so the QR never depends on an
-// external image (img.vietqr.io / a server qrLink) that an ad-blocker, CSP, or a
-// flaky network can break — that broken image was the "QR unavailable" you saw.
-// The string carries the real BIDV account + amount + note, so a scan still
-// auto-confirms via the note. Rendered to canvas by _vqrPaintQR (QRCode lib).
-function _egTlv(id, val) { val = String(val); return id + String(val.length).padStart(2, '0') + val; }
-function _egCrc16(s) {
-  var crc = 0xFFFF;
-  for (var i = 0; i < s.length; i++) {
-    crc ^= s.charCodeAt(i) << 8;
-    for (var j = 0; j < 8; j++) { crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1); crc &= 0xFFFF; }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
-function egBuildVietQR(bankBin, account, amountVnd, note) {
-  var merchant = _egTlv('00', 'A000000727') + _egTlv('01', _egTlv('00', bankBin) + _egTlv('01', account)) + _egTlv('02', 'QRIBFTTA');
-  var body = _egTlv('00', '01')
-    + _egTlv('01', amountVnd > 0 ? '12' : '11')
-    + _egTlv('38', merchant)
-    + _egTlv('53', '704')
-    + (amountVnd > 0 ? _egTlv('54', String(amountVnd)) : '')
-    + _egTlv('58', 'VN')
-    + (note ? _egTlv('62', _egTlv('08', String(note).replace(/[^A-Za-z0-9]/g, ''))) : '');
-  body += '6304';
-  return body + _egCrc16(body);
-}
+// (Local NAPAS-EMVCo QR builder removed: a raw-account QR is never synced back by
+// VietQR, so it can't auto-confirm. The ONLY QR we render now is VietQR's
+// virtual-account qrCode from /api/vietqr/create-payment.)
 function vqrCreditWallet(amountUSD, opts) {
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
   bal = parseFloat((bal + amountUSD).toFixed(2));
@@ -771,11 +748,13 @@ function openVietQRTopUp(amountUSD) {
   // sent but never confirmed". We poll on OUR note, which VietQR embeds in the VA
   // content ("…VQRxxxx OURNOTE…"), so the substring match still reconciles.
   var _qrPainted = false;
-  function _paintLocalFallback() {
+  // No local-QR fallback: a raw-account QR would let the buyer pay a transfer VietQR
+  // never syncs → silent "never confirmed". If the VA QR can't be minted we show a
+  // clear message and rely on the account details + "I've transferred" button instead.
+  function _paintQRError() {
     if (_qrPainted) return; _qrPainted = true;
-    _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
-    var s = document.getElementById('vqr-status');
-    if (s) s.innerHTML = '<span style="color:#b45309">⚠ Live confirm unavailable — after paying, tap “I’ve transferred” below.</span>';
+    var box = document.getElementById('vqr-qrbox');
+    if (box) box.innerHTML = '<div style="text-align:center;color:#b45309;font-size:12px;padding:16px;line-height:1.55">Couldn’t reach the bank QR service.<br>Transfer to the account below, then tap<br>“I’ve transferred — notify admin”.</div>';
   }
   function mintQR() {
     const tok0 = localStorage.getItem('eg_token') || '';
@@ -796,10 +775,10 @@ function openVietQRTopUp(amountUSD) {
           try { localStorage.setItem('eg_vqr_pending', JSON.stringify({ note: _vqrRef, amountUSD: amountUSD, vnd: vnd, ts: Date.now() })); } catch (e) {}
           _vqrPaintQR(d.qrCode);   // the VA QR VietQR tracks + syncs back
         } else {
-          _paintLocalFallback();
+          _paintQRError();
         }
       })
-      .catch(function () { _paintLocalFallback(); });
+      .catch(function () { _paintQRError(); });
   }
 
   // Live admin rate FIRST (so the QR's amount is right), THEN mint the VA QR once.
@@ -821,7 +800,7 @@ function openVietQRTopUp(amountUSD) {
       .then(function () { mintQR(); });   // mint with the final amount
   })();
   // Safety: if VietQR hangs, fall back to a (manual-confirm) QR after 7s rather than spin forever.
-  setTimeout(_paintLocalFallback, 7000);
+  setTimeout(_paintQRError, 7000);
 
   // Poll for the matching transfer (reads _vqrRef live — it switches to the server
   // ref once create-payment returns). Capture VietQR's transaction id when it lands.
