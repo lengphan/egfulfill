@@ -4256,6 +4256,8 @@ function admMergeLiveOrders() {
       if (!o || !o.id || o.factoryStatus === 'draft' || window._admDesignHydrated[o.id] || !EGStore.hydrateOrderDesigns) return;
       window._admDesignHydrated[o.id] = true;
       EGStore.hydrateOrderDesigns(o.id, o.num).then(function (rows) { if (rows && rows.length && typeof admMergeLiveOrders === 'function') { try { if (typeof whRenderOrders === 'function') whRenderOrders(); } catch (e) {} } });
+      // Thread colours too — so the list-row chips show on load, not just in the modal.
+      if (EGStore.hydrateOrderThreads) EGStore.hydrateOrderThreads(o.id, o.num, function (rows) { if (rows && rows.length && typeof whRenderOrders === 'function') { try { whRenderOrders(); } catch (e) {} } });
     });
   } catch (e) {}
   let changed = false;

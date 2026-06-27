@@ -5379,6 +5379,7 @@ function opMergeLiveOrders() {
       if (!o || !o.id || window._opDesignHydrated[o.id] || !EGStore.hydrateOrderDesigns) return;
       window._opDesignHydrated[o.id] = true;
       EGStore.hydrateOrderDesigns(o.id, o.num).then(function (rows) { if (rows && rows.length && typeof renderOpOrders === 'function') renderOpOrders(); });
+      if (EGStore.hydrateOrderThreads) EGStore.hydrateOrderThreads(o.id, o.num, function (rows) { if (rows && rows.length && typeof renderOpOrders === 'function') { try { renderOpOrders(); } catch (e) {} } });
     });
   } catch (e) {}
   var added = false;
