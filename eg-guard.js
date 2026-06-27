@@ -57,3 +57,42 @@
   if (!authorized) { go(DASH[user.role] || 'seller-login.html'); return; }
   // authorized → allow the page to render.
 })();
+
+/* ── Cosmetic nav-permission hiding (COMPLETELY SEPARATE from the access lock above) ──
+   Hides sidebar tabs a SELLER TEAM MEMBER isn't permitted to see. This NEVER redirects
+   and NEVER blocks a page from loading — worst case a hidden tab is still reachable by
+   typing its URL. It is DORMANT unless eg_user.permissions is a non-empty array, so every
+   existing account (no permissions field) is completely unaffected. Fail-open on any error. */
+(function () {
+  // page filename → surface. seller.html / dashboard.html are intentionally absent so the
+  // Dashboard is always shown (a member always has a landing tab).
+  var SURFACE = {
+    'orders.html': 'orders', 'order-detail.html': 'orders',
+    'products-dash.html': 'products', 'product-templates.html': 'products',
+    'design-lab.html': 'design', 'design-maker.html': 'design',
+    'fulfillment.html': 'fulfillment',
+    'analytics.html': 'analytics',
+    'stores.html': 'stores',
+    'wallet.html': 'wallet',
+    'settings.html': 'settings',
+    'chat.html': 'chat'
+  };
+  function apply() {
+    try {
+      var u = JSON.parse(localStorage.getItem('eg_user') || 'null');
+      if (!u || u.role !== 'seller') return;                 // only seller team members
+      var perms = Array.isArray(u.permissions) ? u.permissions : null;
+      if (!perms || !perms.length) return;                   // FAIL-OPEN: no restriction set → show everything
+      var links = document.querySelectorAll('a.ni[href]');
+      for (var i = 0; i < links.length; i++) {
+        var href = (links[i].getAttribute('href') || '').split('/').pop().split('#')[0].split('?')[0].toLowerCase();
+        var surface = SURFACE[href];
+        if (surface && perms.indexOf(surface) < 0) links[i].style.display = 'none';
+      }
+    } catch (e) { /* fail-open — never hide on error */ }
+  }
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+    else apply();
+  }
+})();
