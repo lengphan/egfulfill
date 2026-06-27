@@ -1,11 +1,25 @@
 // User management API — ADMIN ONLY. Backs the "Users" admin screen so you
 // add/promote/reset/delete accounts from the app instead of editing the DB.
 import { q } from '../db.js';
-import { hashPassword } from '../auth.js';
+import { hashPassword, isStaff } from '../auth.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
 
-export function usersRoutes(app, requireAdmin) {
+export function usersRoutes(app, requireAdmin, requireAuth) {
+  // Lighter, STAFF-readable seller directory (any non-seller role). Backs the
+  // seller-adjust panel on the factory boards (warehouse/admin) so a balance
+  // adjustment resolves to a real account. Minimal fields only — no password,
+  // no cross-seller PII beyond what staff already see on orders.
+  if (requireAuth) {
+    app.get('/api/sellers', { preHandler: requireAuth }, async (req, reply) => {
+      if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+      const r = await q(
+        `select id, name, store_name, email, active from users
+          where role='seller' order by coalesce(store_name, name, email) asc`);
+      return r.rows;
+    });
+  }
+
   // Soft-disable flag. Deactivating keeps the user row (so seller_id stays on all
   // their orders — nothing is orphaned), but blocks login. schema.sql sets this on
   // fresh installs; this alter covers existing databases.

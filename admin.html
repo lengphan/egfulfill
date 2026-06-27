@@ -5928,11 +5928,11 @@ function _sellerInitials(s){ return (s||'?').trim().split(/\s+/).map(w=>w[0]||''
 function loadRealSellers() {
   try {
     var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
-    fetch('/api/users', { headers: { Authorization: 'Bearer ' + tok } })
+    fetch('/api/sellers', { headers: { Authorization: 'Bearer ' + tok } })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(rows){
         if (!Array.isArray(rows)) return;
-        var sellers = rows.filter(function(u){ return u.role === 'seller'; });
+        var sellers = rows;   // endpoint already returns only sellers
         if (!sellers.length) return;
         var list = document.getElementById('seller-list');
         var count = document.getElementById('seller-count');
