@@ -714,14 +714,23 @@ function _vqrPaintQR(text) {
   document.head.appendChild(s);
 }
 function openVietQRTopUp(amountUSD) {
-  // The server issues a clean sequential reference (EG000123) when it mints the QR
-  // below. Until then we show a temporary client-side ref so the modal isn't blank;
-  // it's replaced by the server's once create-payment returns.
+  // ONE stable note for the whole top-up — generated here, baked into the QR,
+  // shown to the buyer, and polled on. It is NEVER swapped, so the note the buyer
+  // scans always equals the note we reconcile (a temp→server-note swap previously
+  // let buyers scan a note we never watched → "transferred but never confirms").
+  // Reuse an unpaid, recent note for the SAME amount so reopening the modal shows
+  // the SAME QR they may have already scanned, instead of minting a fresh one.
   var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
-  const ref = ('EG' + Date.now().toString(36)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14);
+  var ref = '';
+  try {
+    var _pend = JSON.parse(localStorage.getItem('eg_vqr_pending') || 'null');
+    if (_pend && _pend.note && _pend.amountUSD === amountUSD && (Date.now() - (_pend.ts || 0)) < 30 * 60 * 1000) ref = _pend.note;
+  } catch (e) {}
+  if (!ref) ref = ('EG' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
   _vqrRef = ref;
   let rate = egVqrRate();
   let vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
+  try { localStorage.setItem('eg_vqr_pending', JSON.stringify({ note: ref, amountUSD: amountUSD, vnd: vnd, ts: Date.now() })); } catch (e) {}
   // The QR is built locally from the real account + short note (see below) — no
   // img.vietqr.io image, so nothing to fall back to.
   let m = document.getElementById('vqr-modal');
@@ -756,15 +765,14 @@ function openVietQRTopUp(amountUSD) {
   }
   m.style.display = 'flex'; document.body.style.overflow = 'hidden';
 
-  // ONE locally-built VietQR, painted only AFTER we know the final note — so the QR's
-  // note ALWAYS equals the note the status poll reconciles on. (A temp→server note swap
-  // let a buyer scan a note the server never watches → "transferred but never confirms".
-  // Rendering the server's VA qrCode also baked in VietQR's long VA note instead of our
-  // short EGxxxxxx.) No external image → no red-V→plain flicker, no "QR unavailable".
-  var _qrDone = false;
-  function _vqrFinalize() { if (_qrDone) return; _qrDone = true; _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef)); }
+  // Paint the QR IMMEDIATELY with OUR note — no network wait, so it appears instantly
+  // (previously it waited up to 4s on a slow/failing create-payment mint). Locally
+  // built from the real account + short note: no external image → no flicker, no
+  // "QR unavailable", and the note in the QR == the note we poll on, always.
+  _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));
 
   // Live admin rate (page-load cache can be stale → showed ₫25,400 not your ₫27,000).
+  // Repaints with the SAME note if the amount changes.
   (function refreshRate() {
     const tokR = localStorage.getItem('eg_token') || '';
     fetch('/api/vietqr/rate', { headers: tokR ? { Authorization: 'Bearer ' + tokR } : {} })
@@ -776,35 +784,24 @@ function openVietQRTopUp(amountUSD) {
         rate = nr; vnd = Math.max(1000, Math.round(amountUSD * rate / 1000) * 1000);
         var rl = document.getElementById('vqr-rate-line');
         if (rl) rl.textContent = 'Transfer ≈ ₫' + vnd.toLocaleString('en-US') + ' · 1 USD = ₫' + rate.toLocaleString('en-US');
+        try { localStorage.setItem('eg_vqr_pending', JSON.stringify({ note: _vqrRef, amountUSD: amountUSD, vnd: vnd, ts: Date.now() })); } catch (e) {}
         if (typeof vqrSyncDepositUI === 'function') vqrSyncDepositUI();
-        if (_qrDone) _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));  // amount changed after paint
+        _vqrPaintQR(egBuildVietQR(EG_VQR.bank, EG_VQR.account, vnd, _vqrRef));  // amount changed → repaint, same note
       })
       .catch(function () {});
   })();
 
-  // Adopt the server's clean sequential ref (the exact note the bank callback matches
-  // on), THEN paint the QR once. If the server can't mint, fall back to the client ref
-  // (the poll reads the same _vqrRef, so they still agree).
-  (function mintQR() {
+  // Register the pending top-up with the server in the BACKGROUND so the bank-sync +
+  // admin reconciliation know our note. Best-effort: it NEVER blocks the QR and NEVER
+  // changes the note we poll on (we send OUR note; the response is ignored).
+  (function register() {
     const tok0 = localStorage.getItem('eg_token') || '';
     fetch('/api/vietqr/create-payment', {
       method: 'POST',
       headers: Object.assign({ 'Content-Type': 'application/json' }, tok0 ? { Authorization: 'Bearer ' + tok0 } : {}),
       body: JSON.stringify({ amount: vnd, note: ref })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (d && !d.error && (d.note || d.ref)) {
-          _vqrRef = d.note || d.ref;
-          var n1 = document.getElementById('vqr-ref-note'); if (n1) n1.textContent = _vqrRef;
-          var n2 = document.getElementById('vqr-ref-inst'); if (n2) n2.textContent = _vqrRef;
-        }
-      })
-      .catch(function () {})
-      .then(function () { _vqrFinalize(); });   // paint once, carrying the resolved note
+    }).catch(function () {});
   })();
-  // Safety: never leave the spinner forever if the network hangs.
-  setTimeout(_vqrFinalize, 4000);
 
   // Poll for the matching transfer (reads _vqrRef live — it switches to the server
   // ref once create-payment returns). Capture VietQR's transaction id when it lands.
@@ -821,6 +818,7 @@ function openVietQRTopUp(amountUSD) {
 }
 function vqrOnPaid(amountUSD, ref, txnId) {
   if (_vqrPoll) { clearInterval(_vqrPoll); _vqrPoll = null; }
+  try { localStorage.removeItem('eg_vqr_pending'); } catch (e) {}   // top-up done — next one mints a fresh note
   vqrCreditWallet(amountUSD);
   vqrRecordDeposit(amountUSD, ref, 'BIDV', txnId);
   const s = document.getElementById('vqr-status');
