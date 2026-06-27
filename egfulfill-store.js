@@ -2143,17 +2143,34 @@
     // every dashboard updates without a reload.
     PLAN_KEY: 'eg_seller_plan',
     PLAN_TIERS: [
-      { id:'starter',    name:'Starter',    shortName:'Starter',    monthlyPrice:0,  orderLimit:500,      orderLimitLabel:'500',       storeLimit:1,         storeLimitLabel:'1 store',         tagline:'500 orders/month · 1 store · Basic analytics',           features:'Basic analytics' },
-      { id:'pro',        name:'Pro',        shortName:'Pro',        monthlyPrice:29, orderLimit:2000,     orderLimitLabel:'2,000',     storeLimit:5,         storeLimitLabel:'5 stores',        tagline:'2,000 orders/month · 5 stores · Full analytics · Priority support', features:'Full analytics · Priority support' },
+      { id:'starter',    name:'Starter',    shortName:'Starter',    monthlyPrice:0,  orderLimit:500,      orderLimitLabel:'500',       storeLimit:2,         storeLimitLabel:'2 stores',        tagline:'Discounted blank pricing · 2 stores · Basic analytics',  features:'Basic analytics' },
+      { id:'pro',        name:'Pro',        shortName:'Pro',        monthlyPrice:29, orderLimit:2000,     orderLimitLabel:'2,000',     storeLimit:10,        storeLimitLabel:'10 stores',       tagline:'20% off blanks · 10 stores · Advanced analytics',        features:'20% off blanks · Advanced analytics' },
       { id:'enterprise', name:'Enterprise', shortName:'Enterprise', monthlyPrice:99, orderLimit:Infinity, orderLimitLabel:'Unlimited', storeLimit:Infinity,  storeLimitLabel:'Unlimited stores', tagline:'Unlimited orders · Unlimited stores · Dedicated manager', features:'Dedicated manager' }
     ],
+    // Admin-editable override: admin can change each tier's price/tagline/features in
+    // Settings → Plans; the override is stored and merged over the defaults above, so the
+    // billing cards + CTAs reflect it. (localStorage today — server-back for cross-device,
+    // same gap as the other admin-set prices.)
+    PLAN_OVERRIDE_KEY: 'eg_plan_tiers',
+    getPlanTiers: function() {
+      var base = this.PLAN_TIERS;
+      try {
+        var ov = JSON.parse(localStorage.getItem(this.PLAN_OVERRIDE_KEY) || 'null');
+        if (Array.isArray(ov)) return base.map(function(t){ var o = ov.find(function(x){ return x && x.id === t.id; }); return o ? Object.assign({}, t, o) : t; });
+      } catch (e) {}
+      return base;
+    },
+    setPlanTiers: function(tiers) {
+      try { localStorage.setItem(this.PLAN_OVERRIDE_KEY, JSON.stringify(tiers || [])); window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail:{} })); return true; } catch (e) { return false; }
+    },
     getPlan: function() {
       try { return localStorage.getItem(this.PLAN_KEY) || 'starter'; }
       catch (e) { return 'starter'; }
     },
     getPlanMeta: function(planId) {
       var id = planId || this.getPlan();
-      return this.PLAN_TIERS.find(function(t){ return t.id === id; }) || this.PLAN_TIERS[0];
+      var tiers = this.getPlanTiers();
+      return tiers.find(function(t){ return t.id === id; }) || tiers[0];
     },
     setPlan: function(planId) {
       var valid = this.PLAN_TIERS.some(function(t){ return t.id === planId; });
@@ -2165,9 +2182,10 @@
     // Next upgrade tier ("starter" → "pro" → "enterprise" → null on top tier).
     getNextPlan: function(planId) {
       var id = planId || this.getPlan();
-      var i = this.PLAN_TIERS.findIndex(function(t){ return t.id === id; });
-      if (i < 0 || i >= this.PLAN_TIERS.length - 1) return null;
-      return this.PLAN_TIERS[i + 1];
+      var tiers = this.getPlanTiers();
+      var i = tiers.findIndex(function(t){ return t.id === id; });
+      if (i < 0 || i >= tiers.length - 1) return null;
+      return tiers[i + 1];
     },
     // Current usage for the active month. Stored separately so a test can
     // override it via localStorage. Defaults to 847 (matches the demo seed).

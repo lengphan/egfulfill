@@ -479,23 +479,23 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <span style="background:#f0ede9;color:#374151;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">Starter</span>
           </div>
           <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:12px;padding:22px;color:#191918;margin-bottom:20px">
-            <div style="font-size:14px;color:#6b7280;margin-bottom:6px">Starter Plan · Billed monthly</div>
-            <div style="font-size:33px;font-weight:800;letter-spacing:-0.02em;color:#191918">$0<span style="font-size:15px;font-weight:400;color:#9ca3af">/mo</span></div>
-            <div style="font-size:13.5px;color:#6b7280;margin-top:10px">500 orders/month · 1 store · Basic analytics</div>
+            <div style="font-size:14px;color:#6b7280;margin-bottom:6px"><span id="bill-cur-name">Starter</span> Plan · Billed monthly</div>
+            <div style="font-size:33px;font-weight:800;letter-spacing:-0.02em;color:#191918">$<span id="bill-cur-price">0</span><span style="font-size:15px;font-weight:400;color:#9ca3af">/mo</span></div>
+            <div id="bill-cur-tagline" style="font-size:13.5px;color:#6b7280;margin-top:10px">Discounted blank pricing · 2 stores · Basic analytics</div>
             <div style="margin-top:16px;background:#e5e4e0;border-radius:6px;height:6px"><div style="background:#191918;height:6px;border-radius:6px;width:84.7%"></div></div>
             <div style="font-size:12.5px;color:#9ca3af;margin-top:5px">424 / 500 orders used this month</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px">
-              <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Pro Plan</div>
-              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$29<span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
-              <div style="font-size:13px;color:#6b7280;margin-bottom:12px">2,000 orders · 5 stores · Full analytics · Priority support</div>
+              <div id="bill-pro-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Pro Plan</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-pro-price">29</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div id="bill-pro-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">20% off blanks · 10 stores · Advanced analytics</div>
               <button class="btn btn-dk" style="width:100%;justify-content:center" onclick="openUpgradeModal()">Upgrade to Pro</button>
             </div>
             <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px">
-              <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Enterprise</div>
-              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$99<span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
-              <div style="font-size:13px;color:#6b7280;margin-bottom:12px">Unlimited orders · Unlimited stores · Dedicated manager</div>
+              <div id="bill-ent-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Enterprise</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-ent-price">99</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div id="bill-ent-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">Unlimited orders · Unlimited stores · Dedicated manager</div>
               <button class="btn btn-out" style="width:100%;justify-content:center">Contact Sales</button>
             </div>
           </div>
@@ -1276,6 +1276,30 @@ function saveProfile(){
 var _walletBal = parseFloat(localStorage.getItem('eg_balance')||'0');
 var _topUpAmt = 0;
 var PRO_PRICE = 29;
+
+// Billing cards are data-driven from EGStore.getPlanTiers() so the admin Plans editor
+// (Settings → Plans) flows straight through to what the seller sees here.
+function renderBillingPlans(){
+  try {
+    if (typeof EGStore === 'undefined' || !EGStore.getPlanTiers) return;
+    var tiers = EGStore.getPlanTiers();
+    var byId = function(id){ return tiers.find(function(t){ return t.id===id; }) || {}; };
+    var cur = EGStore.getPlanMeta ? EGStore.getPlanMeta(EGStore.getPlan && EGStore.getPlan()) : (tiers[0]||{});
+    var set = function(id,v){ var el=document.getElementById(id); if(el) el.textContent=(v==null?'':v); };
+    set('bill-cur-name', cur.shortName||cur.name||'Starter');
+    set('bill-cur-price', cur.monthlyPrice!=null?cur.monthlyPrice:0);
+    set('bill-cur-tagline', cur.tagline||'');
+    var pro=byId('pro'), ent=byId('enterprise');
+    set('bill-pro-name', (pro.name||'Pro')+' Plan');
+    set('bill-pro-price', pro.monthlyPrice!=null?pro.monthlyPrice:29);
+    set('bill-pro-tagline', pro.tagline||'');
+    PRO_PRICE = pro.monthlyPrice!=null?pro.monthlyPrice:29;
+    set('bill-ent-name', ent.name||'Enterprise');
+    set('bill-ent-price', ent.monthlyPrice!=null?ent.monthlyPrice:99);
+    set('bill-ent-tagline', ent.tagline||'');
+  } catch(e){}
+}
+try { (document.readyState==='loading') ? document.addEventListener('DOMContentLoaded', renderBillingPlans) : renderBillingPlans(); window.addEventListener('eg-plan-changed', renderBillingPlans); } catch(e){}
 
 function openUpgradeModal(){
   _walletBal = parseFloat(localStorage.getItem('eg_balance')||'0');
