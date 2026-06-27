@@ -1,0 +1,98 @@
+// Team members — a seller (owner) invites other users to their account with a
+// per-member permission set (the surfaces they may open). PURELY ADDITIVE: a new
+// table + new routes, and the AUTH/login path is deliberately untouched. Members
+// get their permissions from GET /api/team/my-access (the client reads it on load),
+// so a missing membership simply means "no restriction" → full access (fail-open).
+import { q } from '../db.js';
+
+export function teamRoutes(app, requireAuth) {
+  q(`create table if not exists team_members (
+       id uuid primary key default gen_random_uuid(),
+       owner_id   text not null,        -- the team owner's user id
+       email      text not null,        -- the member's login email
+       user_id    text,                 -- filled once they accept / exist
+       role       text default 'editor',
+       permissions jsonb default '[]',  -- surfaces the member may open
+       status     text default 'invited', -- 'invited' | 'active'
+       invite_token text,
+       invited_at timestamptz default now(),
+       accepted_at timestamptz
+     )`).catch(() => {});
+  q(`create unique index if not exists team_members_owner_email on team_members (owner_id, lower(email))`).catch(() => {});
+  q(`create index if not exists team_members_email on team_members (lower(email))`).catch(() => {});
+
+  // ── The member-facing endpoint (drives nav-hiding) ─────────────────────────
+  // The ACTIVE membership for the signed-in user, by email. Returns null perms
+  // when they aren't a restricted member → the client shows everything.
+  app.get('/api/team/my-access', { preHandler: requireAuth }, async (req) => {
+    try {
+      const r = await q(
+        `select owner_id, role, permissions from team_members
+          where lower(email)=lower($1) and status='active' limit 1`, [req.user.email || '']);
+      if (!r.rows[0]) return { member: false, permissions: null };
+      const row = r.rows[0];
+      return { member: true, ownerId: row.owner_id, role: row.role,
+               permissions: Array.isArray(row.permissions) ? row.permissions : [] };
+    } catch (e) { return { member: false, permissions: null }; }
+  });
+
+  // ── Owner management — the caller is always the owner of the rows they touch ─
+  app.get('/api/team', { preHandler: requireAuth }, async (req) => {
+    const r = await q(
+      `select id, email, user_id, role, permissions, status, invited_at
+         from team_members where owner_id=$1 order by invited_at asc`, [req.user.sub]);
+    return r.rows;
+  });
+
+  // Invite (or re-invite) a member. Creates an 'invited' row + token. Idempotent
+  // per (owner, email) — re-inviting updates role/permissions and re-issues the token.
+  app.post('/api/team/invite', { preHandler: requireAuth }, async (req) => {
+    const b = req.body || {};
+    const email = String(b.email || '').toLowerCase().trim();
+    if (!email) return { error: 'email required' };
+    if (email === String(req.user.email || '').toLowerCase()) return { error: "you can't invite yourself" };
+    const token = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+    const perms = JSON.stringify(Array.isArray(b.permissions) ? b.permissions : ['orders']);
+    const ex = await q('select id from team_members where owner_id=$1 and lower(email)=lower($2)', [req.user.sub, email]);
+    if (ex.rows[0]) {
+      await q(`update team_members set role=$1, permissions=$2, invite_token=$3, status=case when status='active' then 'active' else 'invited' end where id=$4`,
+        [b.role || 'editor', perms, token, ex.rows[0].id]);
+      return { ok: true, id: ex.rows[0].id, token, reinvited: true };
+    }
+    const r = await q(
+      `insert into team_members (owner_id, email, role, permissions, status, invite_token)
+       values ($1,$2,$3,$4,'invited',$5) returning id`,
+      [req.user.sub, email, b.role || 'editor', perms, token]);
+    return { ok: true, id: r.rows[0].id, token };
+  });
+
+  // Update a member's permissions / role (owner only).
+  app.patch('/api/team/members/:id', { preHandler: requireAuth }, async (req) => {
+    const b = req.body || {}; const sets = [], vals = []; let n = 1;
+    if (Array.isArray(b.permissions)) { sets.push(`permissions=$${n++}`); vals.push(JSON.stringify(b.permissions)); }
+    if (b.role) { sets.push(`role=$${n++}`); vals.push(b.role); }
+    if (b.status === 'active' || b.status === 'invited') { sets.push(`status=$${n++}`); vals.push(b.status); }
+    if (!sets.length) return { ok: true };
+    vals.push(req.params.id); vals.push(req.user.sub);
+    await q(`update team_members set ${sets.join(',')} where id=$${n++} and owner_id=$${n}`, vals);
+    return { ok: true };
+  });
+
+  app.delete('/api/team/members/:id', { preHandler: requireAuth }, async (req) => {
+    await q('delete from team_members where id=$1 and owner_id=$2', [req.params.id, req.user.sub]);
+    return { ok: true };
+  });
+
+  // Accept an invite — the invitee must be SIGNED IN and their email must match the
+  // invite. Flips the membership to 'active' and links their user id. (The emailed
+  // link lands them here; until accepted they aren't restricted.)
+  app.post('/api/team/accept/:token', { preHandler: requireAuth }, async (req) => {
+    const r = await q(
+      `update team_members set status='active', user_id=$1, accepted_at=now()
+        where invite_token=$2 and lower(email)=lower($3) and status<>'active'
+        returning owner_id, permissions`,
+      [req.user.sub, req.params.token, req.user.email || '']);
+    if (!r.rows[0]) { return { error: 'invite not found, already used, or email mismatch' }; }
+    return { ok: true, permissions: r.rows[0].permissions };
+  });
+}

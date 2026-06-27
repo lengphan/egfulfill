@@ -20,6 +20,7 @@ import { designLibraryRoutes } from './routes/design_library.js';
 import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
+import { teamRoutes } from './routes/team.js';
 import { auditRoutes } from './audit.js';
 import { addClient } from './events.js';
 
@@ -123,6 +124,7 @@ designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 walletRoutes(app, requireAuth);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
+teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 auditRoutes(app, requireAdmin);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 
 const port = Number(process.env.PORT) || 3000;

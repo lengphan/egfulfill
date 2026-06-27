@@ -91,6 +91,7 @@
       }
     } catch (e) { /* fail-open — never hide on error */ }
   }
+  try { window.egApplyNavPerms = apply; } catch (e) {}   // re-runnable after a live permission refresh
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
     else apply();

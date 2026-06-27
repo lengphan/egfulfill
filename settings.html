@@ -1295,15 +1295,37 @@ var TEAM_SURFACES = [
   {k:'wallet',label:'Wallet'},{k:'chat',label:'Chat'},{k:'settings',label:'Settings'}
 ];
 var ALL_SURFACES = TEAM_SURFACES.map(function(s){return s.k;});
-function getTeamMembers(){
-  try { var m = JSON.parse(localStorage.getItem('eg_team_members')||'null'); if(Array.isArray(m)) return m; } catch(e){}
-  return [
-    {name:'Alex Chen', email:'demo@egfulfill.com', role:'owner', status:'active', initials:'AC'},
-    {name:'Sarah Kim', email:'sarah@mystore.com', role:'admin', status:'active', initials:'SK', permissions:ALL_SURFACES.slice()},
-    {name:'', email:'mike@agency.com', role:'editor', status:'invited', initials:'?', permissions:['orders','design']}
-  ];
+var _teamMembers = [];
+function _teamTok(){ try { return localStorage.getItem('eg_token')||''; } catch(e){ return ''; } }
+function _teamInitials(s){ return (String(s||'?').trim().split(/\s+/).map(function(w){return w[0]||'';}).slice(0,2).join('')||'?').toUpperCase(); }
+function _teamOwnerRow(){
+  var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user')||'{}')||{}; } catch(e){}
+  return { id:null, name:u.name||'You', email:u.email||'', role:'owner', status:'active', initials:_teamInitials(u.name||u.email||'You') };
 }
-function saveTeamMembers(m){ try { localStorage.setItem('eg_team_members', JSON.stringify(m)); } catch(e){} }
+// Load the team from the server (owner first, then members). Falls back to the demo
+// list if the API isn't reachable, so the screen still renders offline.
+function loadTeam(){
+  var box = document.getElementById('team-members-list'); if(!box) return;
+  var tok = _teamTok();
+  fetch((window.EG_API_BASE||'')+'/api/team', { headers: tok?{Authorization:'Bearer '+tok}:{} })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(rows){
+      if(!Array.isArray(rows)){ throw new Error('no api'); }
+      _teamMembers = [_teamOwnerRow()].concat(rows.map(function(m){
+        return { id:m.id, name:m.email, email:m.email, role:m.role||'editor', status:m.status||'invited',
+                 initials:_teamInitials(m.email), permissions:Array.isArray(m.permissions)?m.permissions:[] };
+      }));
+      renderTeamMembers();
+    })
+    .catch(function(){
+      // Offline/demo fallback (local only).
+      _teamMembers = [ _teamOwnerRow(),
+        {id:'demo-1', name:'Sarah Kim', email:'sarah@mystore.com', role:'admin', status:'active', initials:'SK', permissions:ALL_SURFACES.slice()},
+        {id:'demo-2', name:'', email:'mike@agency.com', role:'editor', status:'invited', initials:'?', permissions:['orders','design']} ];
+      renderTeamMembers();
+    });
+}
+function getTeamMembers(){ return _teamMembers.length ? _teamMembers : [_teamOwnerRow()]; }
 function _teamEsc(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c];}); }
 function renderTeamMembers(){
   var box = document.getElementById('team-members-list'); if(!box) return;
@@ -1336,27 +1358,49 @@ function renderTeamMembers(){
   }).join('');
 }
 function teamTogglePerm(i, surface){
-  var m = getTeamMembers(); if(!m[i] || m[i].role==='owner') return;
-  var perms = Array.isArray(m[i].permissions)?m[i].permissions.slice():ALL_SURFACES.slice();
+  var m = _teamMembers[i]; if(!m || m.role==='owner') return;
+  var perms = Array.isArray(m.permissions)?m.permissions.slice():ALL_SURFACES.slice();
   var idx = perms.indexOf(surface); if(idx>=0) perms.splice(idx,1); else perms.push(surface);
-  m[i].permissions = perms; saveTeamMembers(m); renderTeamMembers();
+  m.permissions = perms; renderTeamMembers();   // optimistic
+  if(m.id && String(m.id).indexOf('demo-')!==0){
+    var tok=_teamTok();
+    fetch((window.EG_API_BASE||'')+'/api/team/members/'+encodeURIComponent(m.id), {
+      method:'PATCH', headers:Object.assign({'Content-Type':'application/json'}, tok?{Authorization:'Bearer '+tok}:{}),
+      body:JSON.stringify({permissions:perms})
+    }).catch(function(){});
+  }
 }
 function teamRemove(i){
-  var m = getTeamMembers(); if(!m[i] || m[i].role==='owner') return;
-  if(m[i].status==='invited'){ alert('Invite re-sent to '+m[i].email+'.'); return; }
-  if(!confirm('Remove '+(m[i].name||m[i].email)+' from the team?')) return;
-  m.splice(i,1); saveTeamMembers(m); renderTeamMembers();
+  var m = _teamMembers[i]; if(!m || m.role==='owner') return;
+  if(m.status==='invited' && m.id && String(m.id).indexOf('demo-')!==0){
+    // Resend = re-issue the invite token.
+    var tk=_teamTok();
+    fetch((window.EG_API_BASE||'')+'/api/team/invite',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tk?{Authorization:'Bearer '+tk}:{}),body:JSON.stringify({email:m.email,role:m.role,permissions:m.permissions})})
+      .then(function(r){return r.json();}).then(function(d){ alert('Invite re-sent to '+m.email+(d&&d.token?('\nAccept link token: '+d.token):'')); }).catch(function(){ alert('Invite re-sent to '+m.email+'.'); });
+    return;
+  }
+  if(!confirm('Remove '+(m.name||m.email)+' from the team?')) return;
+  _teamMembers.splice(i,1); renderTeamMembers();
+  if(m.id && String(m.id).indexOf('demo-')!==0){
+    var tok=_teamTok();
+    fetch((window.EG_API_BASE||'')+'/api/team/members/'+encodeURIComponent(m.id),{method:'DELETE',headers:tok?{Authorization:'Bearer '+tok}:{}}).catch(function(){});
+  }
 }
 function teamInvite(){
   var email = prompt('Invite a team member — their email:'); if(!email) return;
   email = email.trim(); if(!/.+@.+\..+/.test(email)){ alert('Enter a valid email.'); return; }
-  var m = getTeamMembers();
-  m.push({name:'', email:email, role:'editor', status:'invited', initials:'?', permissions:['orders']});
-  saveTeamMembers(m); renderTeamMembers();
-  alert('Invite created for '+email+'. (Email delivery needs the server mailer wired.)');
+  var tok=_teamTok();
+  fetch((window.EG_API_BASE||'')+'/api/team/invite',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({email:email,role:'editor',permissions:['orders']})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.error){ alert(d.error); return; }
+      alert('Invite created for '+email+'.\n\nThey accept by signing in and opening:\n  /api/team/accept/'+(d&&d.token||'')+'\n(Email delivery needs the server SMTP mailer wired.)');
+      loadTeam();
+    })
+    .catch(function(){ alert('Could not reach the server to create the invite.'); });
 }
-window.teamTogglePerm=teamTogglePerm; window.teamRemove=teamRemove; window.teamInvite=teamInvite; window.renderTeamMembers=renderTeamMembers;
-try { (document.readyState==='loading')?document.addEventListener('DOMContentLoaded',renderTeamMembers):renderTeamMembers(); } catch(e){}
+window.teamTogglePerm=teamTogglePerm; window.teamRemove=teamRemove; window.teamInvite=teamInvite; window.renderTeamMembers=renderTeamMembers; window.loadTeam=loadTeam;
+try { (document.readyState==='loading')?document.addEventListener('DOMContentLoaded',loadTeam):loadTeam(); } catch(e){}
 
 /* ── Member settings lock: hide Billing + Team sub-tabs for restricted members (owner sees all) ── */
 (function(){

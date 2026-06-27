@@ -285,6 +285,24 @@
           }
         }
       } catch(e){}
+      // Team-member access: pull this user's permission set (if any) so the nav-hiding
+      // reflects the owner's latest toggles WITHOUT a re-login. Not a member → strip any
+      // stale restriction (full access restored). Then re-apply the nav hide immediately.
+      try {
+        api('/team/my-access').then(function (ta) {
+          if (ta.error) return;
+          try {
+            var uu = JSON.parse(localStorage.getItem(USER_KEY) || '{}') || {};
+            var next = (ta.data && ta.data.member && Array.isArray(ta.data.permissions)) ? ta.data.permissions : null;
+            var changed = JSON.stringify(uu.permissions || null) !== JSON.stringify(next);
+            if (changed) {
+              if (next) uu.permissions = next; else delete uu.permissions;
+              localStorage.setItem(USER_KEY, JSON.stringify(uu));
+              if (typeof window.egApplyNavPerms === 'function') window.egApplyNavPerms();
+            }
+          } catch (e) {}
+        }).catch(function () {});
+      } catch(e){}
       retrySync();                                                    // recover any order whose POST never landed
       retryPatches();                                                 // recover any status/tracking update that never landed
     });
