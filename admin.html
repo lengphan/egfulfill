@@ -9244,6 +9244,18 @@ document.addEventListener('DOMContentLoaded', function() {
     xfomEnsure();
     _xfomNum = num; window._xfomNum = num;
     const o = _xfomFindOrder(num);
+    // Hydrate THIS order's designs + threads from the server the moment it opens, so the
+    // images/threads appear immediately instead of only after a list re-render ("click
+    // away, come back"). Guarded per order so the re-render can't loop.
+    try {
+      window.__xfomHydrated = window.__xfomHydrated || {};
+      if (o && o.id && window.EGStore && !window.__xfomHydrated[o.id]) {
+        window.__xfomHydrated[o.id] = true;
+        var _reopen = function (rows) { if (rows && rows.length && _xfomNum === num) { try { xfomOpen(num); } catch (e) {} } };
+        if (EGStore.hydrateOrderDesigns) EGStore.hydrateOrderDesigns(o.id, o.num).then(_reopen);
+        if (EGStore.hydrateOrderThreads) EGStore.hydrateOrderThreads(o.id, o.num, _reopen);
+      }
+    } catch (e) {}
     var _oi = (o && window.egOrderIds) ? window.egOrderIds(o) : null;
     var _onum;
     if (_oi) { _onum = _oi.market || ('#' + _oi.eg); }

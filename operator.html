@@ -7735,11 +7735,15 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     // Pull this order's thread colours from the server (cross-device) so the EMB chips
     // show even if they were set on the seller's browser. Guarded once per order.
     try {
-      if (o && o.id && window.EGStore && EGStore.hydrateOrderThreads) {
+      if (o && o.id && window.EGStore) {
         window.__xfomThreads = window.__xfomThreads || {};
         if (!window.__xfomThreads[o.id]) {
           window.__xfomThreads[o.id] = true;
-          EGStore.hydrateOrderThreads(o.id, o.num, function(rows){ if (rows && rows.length && window.__xfomOrderNum === num) { try { xfomOpen(num); } catch(e){} } });
+          var _reopen = function(rows){ if (rows && rows.length && window.__xfomOrderNum === num) { try { xfomOpen(num); } catch(e){} } };
+          // Designs too — so the artwork shows the instant the modal opens, not only after
+          // a list re-render ("click away, come back").
+          if (EGStore.hydrateOrderDesigns) EGStore.hydrateOrderDesigns(o.id, o.num).then(_reopen);
+          if (EGStore.hydrateOrderThreads) EGStore.hydrateOrderThreads(o.id, o.num, _reopen);
         }
       }
     } catch (e) {}
