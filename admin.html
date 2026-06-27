@@ -575,6 +575,10 @@ document.addEventListener('DOMContentLoaded', function(){
       <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="6" cy="5" r="2.6"/><path d="M1.6 12.8C1.6 10.4 3.6 8.8 6 8.8s4.4 1.6 4.4 4a.6.6 0 01-.6.6H2.2a.6.6 0 01-.6-.6z"/><circle cx="11.7" cy="5.7" r="2.1" opacity=".55"/><path d="M10.6 8.9c2 0 3.9 1.4 3.9 3.6a.5.5 0 01-.5.5h-2.1c.05-1.6-.6-3-1.8-4 .16-.06.33-.1.5-.1z" opacity=".55"/></svg>
       Sellers
     </a>
+    <a class="ni" href="#activity" data-section="activity">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8h3l1.5-4 2.5 9 1.8-5H14.5"/></svg>
+      Activity
+    </a>
   </nav>
   <div style="padding:12px 14px;border-top:1px solid #f0ede9;flex-shrink:0;cursor:pointer;transition:background .15s;border-radius:8px;margin:4px 6px" onclick="openPersonalSettings()" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
     <div style="display:flex;align-items:center;gap:9px">
@@ -2165,6 +2169,47 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
   </div>
 
+<!-- ===== ACTIVITY (audit log) ===== -->
+  <div id="section-activity" class="section fi">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#191918">Activity log</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:2px">Every change to orders, designs and wallets — searchable, so you can answer a customer inquiry without the server console.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input id="audit-f-entity" placeholder="Order / entity ID (e.g. FF-123)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;width:210px" />
+        <select id="audit-f-action" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;background:#fff">
+          <option value="">All actions</option>
+          <option value="order.saved">Order saved</option>
+          <option value="order.updated">Order updated</option>
+          <option value="item.status">Item status</option>
+          <option value="design.saved">Design saved</option>
+          <option value="wallet.ledger">Wallet entry</option>
+          <option value="wallet.transfer">Wallet transfer</option>
+        </select>
+        <input id="audit-f-actor" placeholder="Who (email)" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;width:150px" />
+        <button onclick="loadAudit()" style="background:#191918;border:none;color:#fff;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer;font-family:inherit">Search</button>
+        <button onclick="document.getElementById('audit-f-entity').value='';document.getElementById('audit-f-action').value='';document.getElementById('audit-f-actor').value='';loadAudit()" style="background:#fff;border:1.5px solid #e5e4e0;color:#6b7280;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit">Clear</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="dtable" style="width:100%;border-collapse:collapse">
+        <colgroup><col style="width:150px"><col style="width:150px"><col style="width:140px"><col style="width:150px"><col><col style="width:120px"></colgroup>
+        <thead><tr style="background:#fafaf9;border-bottom:1px solid #e5e4e0">
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">When</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Who</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Action</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Entity</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Change</th>
+          <th style="text-align:left;padding:10px 14px;font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Note</th>
+        </tr></thead>
+        <tbody id="audit-tbody">
+          <tr><td colspan="6" style="padding:28px 14px;text-align:center;color:#9ca3af;font-size:13px">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 <!-- ===== SELLER SYNC ===== -->
   <!-- ===== CHAT ===== -->
   <div id="section-chat" data-eg-chat-section class="section fi" style="height:calc(100vh - 102px);display:none">
@@ -3618,7 +3663,7 @@ document.addEventListener('DOMContentLoaded', function(){
 </style>
 
 <script>
-const TITLES = {overview:'Overview',orders:'Orders',inventory:'Inventory',purchases:'Purchases',products:'Products',shipping:'Shipping',chat:'Chat','users':'Users & Roles',balance:'Wallet',settings:'Settings','api-hub':'API Hub',broadcast:'Broadcast',sellers:'Sellers','design-studio':'Board'};
+const TITLES = {overview:'Overview',orders:'Orders',inventory:'Inventory',purchases:'Purchases',products:'Products',shipping:'Shipping',chat:'Chat','users':'Users & Roles',balance:'Wallet',settings:'Settings','api-hub':'API Hub',broadcast:'Broadcast',sellers:'Sellers','design-studio':'Board',activity:'Activity'};
 
 function togglePwd(btn) {
   const inp = btn.previousElementSibling;
@@ -3701,6 +3746,7 @@ function showSection(id) {
   if (id === 'inventory') { renderInventory(); }
   if (id === 'purchases') { renderBackorderBanner(); if(typeof renderPoHistory==='function') renderPoHistory(); }
   if (id === 'design-studio') { if(typeof udbInit==='function') udbInit(); }
+  if (id === 'activity') { if (typeof loadAudit === 'function') loadAudit(); }
   if (id === 'shipping') { if (typeof renderScanHistory === 'function') renderScanHistory(); }
   if (id === 'settings') {
     if (typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('adm-thread-mgr');
@@ -3710,6 +3756,67 @@ function showSection(id) {
     }
   }
 }
+
+// ── Activity log (audit) ────────────────────────────────────────────────
+// Fetch the admin-only audit feed with the current filters and render the table.
+function _auditEsc(s){ return String(s==null?'':s).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';}); }
+function _auditWhen(ts){ try { var d=new Date(ts); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); } catch(e){ return ts||''; } }
+var _AUDIT_LABEL = { 'order.saved':'Order saved','order.updated':'Order updated','item.status':'Item status','design.saved':'Design saved','wallet.ledger':'Wallet entry','wallet.transfer':'Wallet transfer' };
+// Compact diff: show before→after for the fields that changed, else the after payload.
+function _auditChange(row){
+  var b = row.before || null, a = row.after || null;
+  if (b && a && typeof a === 'object') {
+    var parts = [];
+    Object.keys(a).forEach(function(k){
+      var bv = b[k], av = a[k];
+      if (bv !== undefined && String(bv) !== String(av)) parts.push(_auditEsc(k)+': '+_auditEsc(bv)+' → '+_auditEsc(av));
+      else if (bv === undefined) parts.push(_auditEsc(k)+': '+_auditEsc(av));
+    });
+    if (parts.length) return parts.join('<br>');
+  }
+  if (a && typeof a === 'object') {
+    return Object.keys(a).map(function(k){ return _auditEsc(k)+': '+_auditEsc(typeof a[k]==='object'?JSON.stringify(a[k]):a[k]); }).join(' · ');
+  }
+  return '<span style="color:#9ca3af">—</span>';
+}
+function loadAudit(){
+  var tb = document.getElementById('audit-tbody'); if (!tb) return;
+  var tok = localStorage.getItem('eg_token') || '';
+  var qp = [];
+  var ent = (document.getElementById('audit-f-entity')||{}).value || '';
+  var act = (document.getElementById('audit-f-action')||{}).value || '';
+  var who = (document.getElementById('audit-f-actor')||{}).value || '';
+  if (ent.trim()) qp.push('entityId=' + encodeURIComponent(ent.trim()));
+  if (act) qp.push('action=' + encodeURIComponent(act));
+  if (who.trim()) qp.push('actor=' + encodeURIComponent(who.trim()));
+  qp.push('limit=300');
+  tb.innerHTML = '<tr><td colspan="6" style="padding:28px 14px;text-align:center;color:#9ca3af;font-size:13px">Loading…</td></tr>';
+  fetch('/api/audit?' + qp.join('&'), { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function(r){ if (r.status === 403) throw new Error('admin-only'); return r.ok ? r.json() : []; })
+    .then(function(rows){
+      if (!Array.isArray(rows) || !rows.length) {
+        tb.innerHTML = '<tr><td colspan="6" style="padding:28px 14px;text-align:center;color:#9ca3af;font-size:13px">No activity matches these filters yet.</td></tr>';
+        return;
+      }
+      tb.innerHTML = rows.map(function(row){
+        var role = row.actor_role || 'system';
+        var roleColor = role==='seller' ? '#1d4ed8' : role==='admin' ? '#7c3aed' : role==='system' ? '#9ca3af' : '#15803d';
+        var ent = row.entity_id ? ('<span style="font-family:monospace;font-size:12px;color:#191918">' + _auditEsc(row.entity_id) + '</span>') : '<span style="color:#9ca3af">—</span>';
+        return '<tr style="border-bottom:1px solid #f0ede9">'
+          + '<td style="padding:10px 14px;font-size:12.5px;color:#6b7280;white-space:nowrap">' + _auditWhen(row.ts) + '</td>'
+          + '<td style="padding:10px 14px;font-size:12.5px"><div style="color:#191918;font-weight:600">' + _auditEsc(row.actor||'system') + '</div><div style="color:' + roleColor + ';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">' + _auditEsc(role) + '</div></td>'
+          + '<td style="padding:10px 14px;font-size:12.5px;color:#191918">' + _auditEsc(_AUDIT_LABEL[row.action] || row.action) + '</td>'
+          + '<td style="padding:10px 14px;font-size:12.5px">' + ent + (row.entity_type ? ('<div style="color:#9ca3af;font-size:11px">' + _auditEsc(row.entity_type) + '</div>') : '') + '</td>'
+          + '<td style="padding:10px 14px;font-size:12px;color:#374151;line-height:1.5">' + _auditChange(row) + '</td>'
+          + '<td style="padding:10px 14px;font-size:12px;color:#6b7280">' + (_auditEsc(row.note) || '<span style="color:#d1d5db">—</span>') + '</td>'
+          + '</tr>';
+      }).join('');
+    })
+    .catch(function(e){
+      tb.innerHTML = '<tr><td colspan="6" style="padding:28px 14px;text-align:center;color:#c2410c;font-size:13px">' + (e.message==='admin-only' ? 'Activity log is admin-only.' : 'Could not load the activity log.') + '</td></tr>';
+    });
+}
+window.loadAudit = loadAudit;
 
 // Settings tab switcher (seller-style left tabs → right panel).
 // Guides accordion — expand a guide inline (File / Size) to view + edit, no popup.

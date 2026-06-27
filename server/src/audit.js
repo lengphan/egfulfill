@@ -26,6 +26,28 @@ export function ensureAuditTable() {
   return _ready;
 }
 
+// Admin-only read API for the Activity page. Filterable by entity / id / action /
+// actor / time, newest first. GET /api/audit?entityId=FF-123 answers "what happened
+// to this order?" without touching the server console.
+export function auditRoutes(app, requireAdmin) {
+  ensureAuditTable();
+  app.get('/api/audit', { preHandler: requireAdmin }, async (req) => {
+    const f = req.query || {};
+    const where = [], vals = []; let n = 1;
+    if (f.entityType) { where.push(`entity_type=$${n++}`); vals.push(f.entityType); }
+    if (f.entityId)   { where.push(`entity_id=$${n++}`); vals.push(String(f.entityId)); }
+    if (f.action)     { where.push(`action=$${n++}`); vals.push(f.action); }
+    if (f.actor)      { where.push(`actor ilike $${n++}`); vals.push('%' + f.actor + '%'); }
+    if (f.since)      { where.push(`ts >= $${n++}`); vals.push(f.since); }
+    const lim = Math.min(parseInt(f.limit, 10) || 200, 1000);
+    const sql = `select id, ts, actor, actor_role, action, entity_type, entity_id, before, after, note
+                 from audit_log ${where.length ? 'where ' + where.join(' and ') : ''}
+                 order by ts desc, id desc limit ${lim}`;
+    const r = await q(sql, vals);
+    return r.rows;
+  });
+}
+
 export function audit(req, action, opts) {
   try {
     opts = opts || {};

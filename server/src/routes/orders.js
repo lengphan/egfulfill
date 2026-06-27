@@ -4,6 +4,7 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
+import { audit } from '../audit.js';
 
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
@@ -98,6 +99,7 @@ export function ordersRoutes(app, requireAuth) {
        (o.meta && typeof o.meta === 'object') ? o.meta : {}]
     );
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
+    audit(req, 'order.saved', { entityType: 'order', entityId: o.id, after: { status: o.status, total: o.total, customer: (o.customer && o.customer.name) || null } });
     egBroadcast({ type: 'orders', id: o.id });
     return { ok: true, id: o.id };
   });
@@ -140,6 +142,16 @@ export function ordersRoutes(app, requireAuth) {
     const body = req.body || {};
     const wantsItems = isStaff(req.user) && Array.isArray(body.items);
     if (!sets.length && !wantsItems) return { ok: true };
+    // Snapshot the fields we're about to change, so the audit trail shows the
+    // BEFORE value (the "my address/status/tracking was changed" inquiry).
+    let before = null;
+    if (sets.length) {
+      const cols = Object.keys(body).filter((k) => map[k]).map((k) => map[k]);
+      if (cols.length) {
+        const pre = await q(`select ${cols.join(',')} from orders where id=$1`, [req.params.id]);
+        before = pre.rows[0] || null;
+      }
+    }
     // sellers may only patch their own orders; staff any
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
@@ -147,6 +159,11 @@ export function ordersRoutes(app, requireAuth) {
       await q(`update orders set ${sets.join(',')} where ${where}`, vals);
     }
     if (wantsItems) await replaceItems(req.params.id, body.items);
+    // Record only the changed scalar fields (not the heavy items array).
+    const after = {}; for (const k in body) if (map[k]) after[k] = body[k];
+    if (Object.keys(after).length || wantsItems) {
+      audit(req, 'order.updated', { entityType: 'order', entityId: req.params.id, before, after: Object.keys(after).length ? after : { items: 'replaced' } });
+    }
     egBroadcast({ type: 'orders', id: req.params.id });
     return { ok: true };
   });
@@ -159,8 +176,11 @@ export function ordersRoutes(app, requireAuth) {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const { sku, status } = req.body || {};
     if (!sku) { reply.code(400); return { error: 'sku required' }; }
+    const pre = await q('select factory_status from order_items where order_id=$1 and sku=$2 limit 1', [req.params.id, sku]);
     await q('update order_items set factory_status=$1 where order_id=$2 and sku=$3',
       [status || '', req.params.id, sku]);
+    audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
+      before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
     egBroadcast({ type: 'item-status', id: req.params.id, sku: sku, status: status || '' });
     return { ok: true };
   });
@@ -176,6 +196,7 @@ export function ordersRoutes(app, requireAuth) {
        on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, updated_at=now()`,
       [req.params.id, sku, kind || 'raster', data, name || null]
     );
+    audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };
   });
   // Fetch all designs for one order — called lazily when the order is opened, so a

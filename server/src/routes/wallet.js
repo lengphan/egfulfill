@@ -14,6 +14,7 @@
 // never double-counts.
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
+import { audit } from '../audit.js';
 
 export function walletRoutes(app, requireAuth) {
   q(`create table if not exists wallet_ledger (
@@ -80,6 +81,7 @@ export function walletRoutes(app, requireAuth) {
        values ($1,$2,$3,$4,$5,$6)
        on conflict do nothing`,
       [account, delta, b.type || 'adjust', ref, b.note || null, req.user.sub]);
+    audit(req, 'wallet.ledger', { entityType: 'wallet', entityId: account, after: { delta, type: b.type || 'adjust', ref, note: b.note || null } });
     return { ok: true, balance: await balanceOf(account) };
   });
 
@@ -125,6 +127,7 @@ export function walletRoutes(app, requireAuth) {
          values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
         [row.account, row.delta, row.type, ref, b.note || null, req.user.sub]);
     }
+    audit(req, 'wallet.transfer', { entityType: 'wallet', entityId: to, after: { from, to, amount, type, ref, note: b.note || null } });
     return { ok: true, fromBalance: await balanceOf(from), toBalance: await balanceOf(to), toAccount: to };
   });
 }
