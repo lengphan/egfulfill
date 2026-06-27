@@ -11133,15 +11133,20 @@ function whPrintLabel(num) {
         const unit = _xfomUnitPrice(it);
         const line = unit * qty;
         const embFile = (typeof EGStore !== 'undefined' && EGStore.getItemEmbFile) ? EGStore.getItemEmbFile((o && o.id) || _xfomNum, it.sku) : null;
+        // Title = chosen blank (or "Pick a blank") ×qty. SKU line = platform SKU · blank SKU · Method.
+        const _xpb = (it.blank && String(it.blank).trim()) || ((window.EGDesignTools && EGDesignTools.getItemSetup) ? (EGDesignTools.getItemSetup((o.num || o.id), it.sku).product || '') : '');
+        const _xmethod = (typeof EGStore !== 'undefined' && EGStore.methodLabel) ? EGStore.methodLabel(it) : ((it.printType || it.tech || '') + '');
+        const _xblankSku = (() => { try { if (!_xpb) return ''; const prods = (EGStore.getCatalogProducts && EGStore.getCatalogProducts()) || []; const p = prods.find(x => (x.name || '') === _xpb || (x.sku || '') === _xpb); return p ? (p.skuBase || p.sku || '') : ''; } catch (e) { return ''; } })();
+        const _xskuLine = [it.sku || '', _xblankSku, _xmethod].filter(Boolean).join(' · ');
+        const _xtitle = _xpb ? `<span style="color:#191918">${String(_xpb).replace(/</g,'&lt;')}</span>` : `<span style="color:#d4a017;font-style:italic">Pick a blank</span>`;
         return `<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;border:1px solid #e5e4e0;border-radius:9px;position:relative">
           ${(window.EGDesignTools && EGDesignTools.isNewOrder && EGDesignTools.isNewOrder(o)) ? `<button onclick="event.stopPropagation();EGDesignTools.removeItem('${o.id}','${(window.EGDesignTools&&EGDesignTools.itemDK)?EGDesignTools.itemDK(it):(it.lineId||it._dk||it.sku)}')" title="Remove item" style="position:absolute;top:7px;right:9px;background:none;border:none;color:#d1d5db;cursor:pointer;font-size:18px;line-height:1;padding:2px;z-index:3;font-family:inherit" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>` : ''}
           <div onclick="event.stopPropagation();if(window.EGDesignTools&&EGDesignTools.openQuickPos)EGDesignTools.openQuickPos('${o.id}','${(window.EGDesignTools&&EGDesignTools.itemDK)?EGDesignTools.itemDK(it):(it.lineId||it._dk||it.sku)}')" title="Click to edit the design" style="width:72px;height:72px;border-radius:8px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;flex-shrink:0;cursor:pointer">
             ${(window.EGDesignTools && EGDesignTools.compositeHTML) ? EGDesignTools.compositeHTML(o, it).html : (thumb ? `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:10px">—</div>`)}
           </div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.blank || it.name || it.product || 'Item'}</div>
-            <div style="font-size:13px;color:#9ca3af;margin-top:2px">${it.sku || ''}${it.printType ? ' · ' + it.printType : (it.tech ? ' · ' + it.tech : '')}</div>
-            <div style="font-size:13px;color:#6b7280;margin-top:3px"><span style="color:#9ca3af">Unit</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${unit.toFixed(2)}</strong> <span style="color:#9ca3af">× ${qty} =</span> <strong style="color:#191918;font-variant-numeric:tabular-nums">$${line.toFixed(2)}</strong></div>
+            <div style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_xtitle} <span style="color:#9ca3af;font-weight:400">×${qty}</span></div>
+            <div style="font-size:13px;color:#9ca3af;margin-top:2px">${String(_xskuLine).replace(/</g,'&lt;')}</div>
             <div style="margin-top:8px">${window.EGDesignTools ? EGDesignTools.itemActions(o, it, {noTrash:true}) : ''}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;padding-right:16px">
