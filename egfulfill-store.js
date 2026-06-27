@@ -2348,7 +2348,7 @@
     // Pull all server-stored designs for one order into the local caches (best
     // effort). Call when an order is opened so uploads reappear after a refresh /
     // on another device / on the factory boards.
-    hydrateOrderDesigns: function(orderId) {
+    hydrateOrderDesigns: function(orderId, orderNum) {
       var self = this;
       try {
         var tok = localStorage.getItem('eg_token') || '';
@@ -2356,14 +2356,21 @@
         return fetch('/api/orders/' + encodeURIComponent(orderId) + '/designs', { headers: { Authorization: 'Bearer ' + tok } })
           .then(function(r){ return r.ok ? r.json() : []; })
           .then(function(rows){
+            // Cache under BOTH the stable order id AND the display number, because the
+            // boards resolve designs by o.num while the server keys by o.id — for Etsy
+            // orders id ('etsy-…') ≠ num (the marketplace number), so a single-key cache
+            // left the factory avatar blank. (FF- orders have id===num, so this is a no-op.)
+            var keys = [orderId]; if (orderNum != null && String(orderNum) !== String(orderId)) keys.push(orderNum);
             (rows || []).forEach(function(d){
               if (!d || !d.sku || !d.data) return;
-              if (d.kind === 'emb') {
-                self._localCachePut(self.EMB_FILE_KEY, orderId + '|' + d.sku, { name: d.name, dataUrl: d.data, addedAt: Date.now() });
-              } else {
-                self._localCachePut(self.RAW_DESIGN_KEY, orderId + '|' + d.sku, d.data);
-                self._localCachePut(self.IMAGE_CACHE_KEY, orderId + '|' + d.sku, d.data);
-              }
+              keys.forEach(function(K){
+                if (d.kind === 'emb') {
+                  self._localCachePut(self.EMB_FILE_KEY, K + '|' + d.sku, { name: d.name, dataUrl: d.data, addedAt: Date.now() });
+                } else {
+                  self._localCachePut(self.RAW_DESIGN_KEY, K + '|' + d.sku, d.data);
+                  self._localCachePut(self.IMAGE_CACHE_KEY, K + '|' + d.sku, d.data);
+                }
+              });
             });
             if (rows && rows.length) { try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch(e){} }
             return rows || [];

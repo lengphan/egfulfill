@@ -4255,7 +4255,7 @@ function admMergeLiveOrders() {
     live.forEach(function (o) {
       if (!o || !o.id || o.factoryStatus === 'draft' || window._admDesignHydrated[o.id] || !EGStore.hydrateOrderDesigns) return;
       window._admDesignHydrated[o.id] = true;
-      EGStore.hydrateOrderDesigns(o.id).then(function (rows) { if (rows && rows.length && typeof admMergeLiveOrders === 'function') { try { if (typeof whRenderOrders === 'function') whRenderOrders(); } catch (e) {} } });
+      EGStore.hydrateOrderDesigns(o.id, o.num).then(function (rows) { if (rows && rows.length && typeof admMergeLiveOrders === 'function') { try { if (typeof whRenderOrders === 'function') whRenderOrders(); } catch (e) {} } });
     });
   } catch (e) {}
   let changed = false;
