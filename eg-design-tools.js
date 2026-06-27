@@ -754,11 +754,29 @@
   function removeItem(orderNum, sku) {
     try {
       var o = findOrder(orderNum); if (!o || !Array.isArray(o.items)) return;
-      if (o.items.length <= 1) { alert('An order must have at least one item.'); return; }
-      if (!window.confirm('Remove this item from the order?')) return;
       assignDesignKeys(o.items);
-      o.items = o.items.filter(function (i) { return itemDK(i) !== sku; });   // remove ONLY this line, not every same-sku line
+      // Count what the board ACTUALLY shows — a line added via "Add item" lives in the
+      // board-local array (OP_ORDERS/WH_ORDERS/ORDERS) and isn't always folded back into
+      // o.items, so guarding on o.items alone wrongly blocks deleting a freshly-added line.
+      var shown = o.items.length;
+      [window.OP_ORDERS, window.WH_ORDERS, window.ORDERS].forEach(function (arr) {
+        if (!Array.isArray(arr)) return;
+        arr.forEach(function (row) {
+          if (!row) return;
+          var match = String(row.num) === String(orderNum) || String(row.id) === String(orderNum)
+            || String(row.no) === String(orderNum) || String(row.num) === String(o.id) || String(row.id) === String(o.id);
+          var list = row.itemList || row.itemsList;
+          if (match && Array.isArray(list)) shown = Math.max(shown, list.length);
+        });
+      });
+      if (shown <= 1) { alert('An order must have at least one item.'); return; }
+      if (!window.confirm('Remove this item from the order?')) return;
+      var _keep = function (i) { return itemDK(i) !== sku && String(i.sku) !== String(sku); };   // remove ONLY this line
+      o.items = o.items.filter(_keep);
       if (window.EGStore && EGStore.update) EGStore.update(o.id, { items: o.items });
+      // Remove the line from the board-local arrays too, so the row updates immediately.
+      patchBoardArrays(o.id, null, function (row) { if (Array.isArray(row.itemList)) row.itemList = row.itemList.filter(_keep); if (Array.isArray(row.itemsList)) row.itemsList = row.itemsList.filter(_keep); });
+      patchBoardArrays(orderNum, null, function (row) { if (Array.isArray(row.itemList)) row.itemList = row.itemList.filter(_keep); if (Array.isArray(row.itemsList)) row.itemsList = row.itemsList.filter(_keep); });
     } catch (e) {}
     refreshBoard();
   }
@@ -2292,7 +2310,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-xfom-hydrate-on-open';
+  window.EG_BUILD = '2026-06-27-removeitem-count-fix';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
