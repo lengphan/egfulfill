@@ -514,23 +514,10 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div id="panel-team" style="display:none" class="fi">
         <div class="card" style="overflow:hidden">
           <div style="padding:18px 22px 12px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:15px;font-weight:700;color:#191918">Team Members</div>
-            <button class="btn btn-dk" style="font-size:13.5px">+ Invite Member</button>
+            <div><div style="font-size:15px;font-weight:700;color:#191918">Team Members</div><div style="font-size:12.5px;color:#9ca3af;margin-top:2px">Tick the areas each member can open. Unticked tabs are hidden for them.</div></div>
+            <button class="btn btn-dk" style="font-size:13.5px" onclick="teamInvite()">+ Invite Member</button>
           </div>
-          <div style="padding:16px 22px;display:flex;flex-direction:column;gap:12px">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f9f9f8;border-radius:10px;border:1px solid #eeede9">
-              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#111827;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">AC</div><div><div style="font-size:14px;font-weight:600;color:#191918">Alex Chen</div><div style="font-size:12.5px;color:#9ca3af">demo@egfulfill.com</div></div></div>
-              <div style="display:flex;align-items:center;gap:10px"><span style="background:#f0ede9;color:#374151;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Owner</span></div>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f9f9f8;border-radius:10px;border:1px solid #eeede9">
-              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#6366f1;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">SK</div><div><div style="font-size:14px;font-weight:600;color:#191918">Sarah Kim</div><div style="font-size:12.5px;color:#9ca3af">sarah@mystore.com</div></div></div>
-              <div style="display:flex;align-items:center;gap:8px"><span style="background:#dbeafe;color:#1d4ed8;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Admin</span><button style="background:none;border:none;font-size:13px;color:#dc2626;cursor:pointer;padding:4px 8px">Remove</button></div>
-            </div>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff7ed;border-radius:10px;border:1px dashed #fed7aa">
-              <div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#f0ede9;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af">?</div><div><div style="font-size:14px;font-weight:500;color:#374151">mike@agency.com</div><div style="font-size:12.5px;color:#191918">Invite pending · sent Apr 22</div></div></div>
-              <div style="display:flex;align-items:center;gap:8px"><span style="background:#f0ede9;color:#374151;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Editor</span><button style="background:none;border:none;font-size:13px;color:#6b7280;cursor:pointer;padding:4px 8px">Resend</button></div>
-            </div>
-          </div>
+          <div id="team-members-list" style="padding:16px 22px;display:flex;flex-direction:column;gap:12px"></div>
         </div>
       </div>
 
@@ -1300,6 +1287,91 @@ function renderBillingPlans(){
   } catch(e){}
 }
 try { (document.readyState==='loading') ? document.addEventListener('DOMContentLoaded', renderBillingPlans) : renderBillingPlans(); window.addEventListener('eg-plan-changed', renderBillingPlans); } catch(e){}
+
+/* ── Team members + per-member access surfaces (drives the nav-hiding) ── */
+var TEAM_SURFACES = [
+  {k:'orders',label:'Orders'},{k:'products',label:'Products'},{k:'design',label:'Design'},
+  {k:'fulfillment',label:'Fulfillment'},{k:'analytics',label:'Analytics'},{k:'stores',label:'Stores'},
+  {k:'wallet',label:'Wallet'},{k:'chat',label:'Chat'},{k:'settings',label:'Settings'}
+];
+var ALL_SURFACES = TEAM_SURFACES.map(function(s){return s.k;});
+function getTeamMembers(){
+  try { var m = JSON.parse(localStorage.getItem('eg_team_members')||'null'); if(Array.isArray(m)) return m; } catch(e){}
+  return [
+    {name:'Alex Chen', email:'demo@egfulfill.com', role:'owner', status:'active', initials:'AC'},
+    {name:'Sarah Kim', email:'sarah@mystore.com', role:'admin', status:'active', initials:'SK', permissions:ALL_SURFACES.slice()},
+    {name:'', email:'mike@agency.com', role:'editor', status:'invited', initials:'?', permissions:['orders','design']}
+  ];
+}
+function saveTeamMembers(m){ try { localStorage.setItem('eg_team_members', JSON.stringify(m)); } catch(e){} }
+function _teamEsc(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c];}); }
+function renderTeamMembers(){
+  var box = document.getElementById('team-members-list'); if(!box) return;
+  box.innerHTML = getTeamMembers().map(function(m,i){
+    var pending = m.status === 'invited', isOwner = m.role === 'owner';
+    var bg = pending ? '#fff7ed' : '#f9f9f8', border = pending ? '1px dashed #fed7aa' : '1px solid #eeede9';
+    var avBg = isOwner ? '#111827' : (m.role==='admin'?'#6366f1':'#f0ede9'), avColor = (isOwner||m.role==='admin') ? '#fff' : '#9ca3af';
+    var roleBadge = isOwner ? '<span style="background:#f0ede9;color:#374151;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px">Owner</span>'
+      : '<span style="background:#dbeafe;color:#1d4ed8;font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:5px;text-transform:capitalize">'+_teamEsc(m.role||'member')+'</span>';
+    var actionBtn = isOwner ? '' : '<button onclick="teamRemove('+i+')" style="background:none;border:none;font-size:13px;color:'+(pending?'#6b7280':'#dc2626')+';cursor:pointer;padding:4px 8px">'+(pending?'Resend':'Remove')+'</button>';
+    var head = '<div style="display:flex;align-items:center;justify-content:space-between">'
+      + '<div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:'+avBg+';border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+avColor+'">'+_teamEsc(m.initials||'?')+'</div>'
+      + '<div><div style="font-size:14px;font-weight:600;color:#191918">'+_teamEsc(m.name||m.email)+'</div><div style="font-size:12.5px;color:#9ca3af">'+(pending?('Invite pending · '+_teamEsc(m.email)):_teamEsc(m.email))+'</div></div></div>'
+      + '<div style="display:flex;align-items:center;gap:8px">'+roleBadge+actionBtn+'</div></div>';
+    var access;
+    if(isOwner){ access = '<div style="margin-top:8px;font-size:12px;color:#9ca3af">Full access — owner</div>'; }
+    else {
+      var perms = Array.isArray(m.permissions)?m.permissions:ALL_SURFACES.slice();
+      access = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid '+(pending?'#fde6cc':'#eeede9')+'">'
+        + '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Can access</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px">'
+        + TEAM_SURFACES.map(function(s){
+            var on = perms.indexOf(s.k) >= 0;
+            return '<button onclick="teamTogglePerm('+i+',\''+s.k+'\')" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;cursor:pointer;font-family:inherit;border:1px solid '+(on?'#191918':'#e5e4e0')+';background:'+(on?'#191918':'#fff')+';color:'+(on?'#fff':'#9ca3af')+'">'
+              + (on?'<svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5L10 3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>':'')
+              + _teamEsc(s.label)+'</button>';
+          }).join('') + '</div></div>';
+    }
+    return '<div style="padding:12px 14px;background:'+bg+';border-radius:10px;border:'+border+'">'+head+access+'</div>';
+  }).join('');
+}
+function teamTogglePerm(i, surface){
+  var m = getTeamMembers(); if(!m[i] || m[i].role==='owner') return;
+  var perms = Array.isArray(m[i].permissions)?m[i].permissions.slice():ALL_SURFACES.slice();
+  var idx = perms.indexOf(surface); if(idx>=0) perms.splice(idx,1); else perms.push(surface);
+  m[i].permissions = perms; saveTeamMembers(m); renderTeamMembers();
+}
+function teamRemove(i){
+  var m = getTeamMembers(); if(!m[i] || m[i].role==='owner') return;
+  if(m[i].status==='invited'){ alert('Invite re-sent to '+m[i].email+'.'); return; }
+  if(!confirm('Remove '+(m[i].name||m[i].email)+' from the team?')) return;
+  m.splice(i,1); saveTeamMembers(m); renderTeamMembers();
+}
+function teamInvite(){
+  var email = prompt('Invite a team member — their email:'); if(!email) return;
+  email = email.trim(); if(!/.+@.+\..+/.test(email)){ alert('Enter a valid email.'); return; }
+  var m = getTeamMembers();
+  m.push({name:'', email:email, role:'editor', status:'invited', initials:'?', permissions:['orders']});
+  saveTeamMembers(m); renderTeamMembers();
+  alert('Invite created for '+email+'. (Email delivery needs the server mailer wired.)');
+}
+window.teamTogglePerm=teamTogglePerm; window.teamRemove=teamRemove; window.teamInvite=teamInvite; window.renderTeamMembers=renderTeamMembers;
+try { (document.readyState==='loading')?document.addEventListener('DOMContentLoaded',renderTeamMembers):renderTeamMembers(); } catch(e){}
+
+/* ── Member settings lock: hide Billing + Team sub-tabs for restricted members (owner sees all) ── */
+(function(){
+  function lock(){
+    try {
+      var u = JSON.parse(localStorage.getItem('eg_user')||'null');
+      if(!u || u.role!=='seller') return;
+      var perms = Array.isArray(u.permissions)?u.permissions:null;
+      if(!perms || !perms.length) return;   // owner / unrestricted → full settings
+      ['tab-billing','tab-team'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+      ['panel-billing','panel-team'].forEach(function(id){ var p=document.getElementById(id); if(p && p.style.display!=='none' && typeof showTab==='function') showTab('profile'); });
+    } catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',lock); else lock();
+})();
 
 function openUpgradeModal(){
   _walletBal = parseFloat(localStorage.getItem('eg_balance')||'0');
