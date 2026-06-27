@@ -1380,10 +1380,10 @@
       + '<div id="egdt-qp-area" style="position:absolute;border:1.5px dashed #b0aaa4;border-radius:4px;pointer-events:none;display:none;z-index:2"><span style="position:absolute;top:-8px;left:6px;background:#fdfcfa;padding:0 4px;font-size:9px;font-weight:700;letter-spacing:.04em;color:#9ca3af">PRINT AREA</span></div>'
       + '<div id="egdt-qp-wrap" style="position:absolute;cursor:grab;transform-origin:center center">'
       +   '<img id="egdt-qp-design" draggable="false" style="display:block;width:100%;height:100%;object-fit:contain;pointer-events:none"/>'
-      +   '<button id="egdt-qp-del" title="Remove design" style="position:absolute;right:-8px;top:-8px;width:18px;height:18px;background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:50%;cursor:pointer;font-size:13px;line-height:1;font-weight:700;padding:0;display:flex;align-items:center;justify-content:center;font-family:inherit;z-index:4;box-shadow:0 1px 4px rgba(17,24,39,.15)">×</button>'
-      +   '<div id="egdt-qp-handle" style="position:absolute;right:-5px;bottom:-5px;width:11px;height:11px;background:#111827;border:1.5px solid #fff;border-radius:2px;cursor:nwse-resize;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:4"></div>'
-      +   '<div id="egdt-qp-rotline" style="position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);width:1.5px;height:15px;background:#111827;z-index:3"></div>'
-      +   '<div id="egdt-qp-rot" title="Drag to rotate" style="position:absolute;left:50%;bottom:-27px;transform:translateX(-50%);width:22px;height:22px;background:#fff;border:1.5px solid #111827;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 1px 4px rgba(17,24,39,.18)"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M11.6 5.4A5 5 0 1 0 12.2 8.2" stroke="#111827" stroke-width="1.4" stroke-linecap="round"/><path d="M9.1 5l2.6.5.5-2.6" stroke="#111827" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
+      +   '<button id="egdt-qp-del" title="Remove design" style="position:absolute;right:-7px;top:-7px;width:16px;height:16px;background:#fff;color:#6b7280;border:1px solid #e5e4e0;border-radius:50%;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 1px 3px rgba(17,24,39,.12)" onmouseover="this.style.color=\'#191918\';this.style.borderColor=\'#191918\'" onmouseout="this.style.color=\'#6b7280\';this.style.borderColor=\'#e5e4e0\'"><svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
+      +   '<div id="egdt-qp-handle" style="position:absolute;right:-4px;bottom:-4px;width:10px;height:10px;background:#fff;border:1.5px solid #9ca3af;border-radius:2px;cursor:nwse-resize;box-shadow:0 1px 2px rgba(0,0,0,.15);z-index:4"></div>'
+      +   '<div id="egdt-qp-rotline" style="position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:1px;height:14px;background:#c4c3be;z-index:3"></div>'
+      +   '<div id="egdt-qp-rot" title="Drag to rotate" style="position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);width:18px;height:18px;background:#fff;border:1px solid #e5e4e0;border-radius:50%;cursor:grab;display:flex;align-items:center;justify-content:center;z-index:4;box-shadow:0 1px 3px rgba(17,24,39,.12);color:#6b7280" onmouseover="this.style.color=\'#191918\';this.style.borderColor=\'#191918\'" onmouseout="this.style.color=\'#6b7280\';this.style.borderColor=\'#e5e4e0\'"><svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M11.6 5.4A5 5 0 1 0 12.2 8.2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M9.1 5l2.6.5.5-2.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'
       + '</div>'
       + '<div id="egdt-qp-extra"></div>'
       + '<div id="egdt-qp-texts"></div>'
@@ -2310,7 +2310,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-removeitem-count-fix';
+  window.EG_BUILD = '2026-06-27-subtle-designer-handles';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
