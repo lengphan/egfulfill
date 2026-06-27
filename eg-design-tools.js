@@ -826,9 +826,13 @@
     if (isNewOrder(o)) {
       var setup = getItemSetup(num, sku);
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
-      // Show the blank the OTHER board already picked (synced on it.blank), so the
-      // selection persists across boards instead of resetting to "Pick a blank…".
-      var curProd = setup.product || it.blank || _productNameForSku(it.sku) || '', matched = false;
+      // Marketplace (Etsy/synced) orders come in UNSET: ignore the synced variant so the
+      // factory consciously picks Product/Colour/Size/Method. Only the factory's OWN picks
+      // (saved in `setup`) pre-fill. Manual orders keep their it.* values.
+      var _synced = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
+      // Show the blank the OTHER board already picked (setup), so the selection persists
+      // across boards; for synced orders the it.blank fallback is suppressed.
+      var curProd = setup.product || (_synced ? '' : (it.blank || _productNameForSku(it.sku))) || '', matched = false;
       var prodOpts = '<option value="">Product</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
@@ -836,7 +840,7 @@
         prodOpts += opt(v, p.name || p.sku || v, s);
       });
       if (curProd && !matched) prodOpts += opt(curProd, curProd, true);
-      var curPt = (setup.printType || tech || '').toString().toUpperCase();
+      var curPt = (setup.printType || (_synced ? '' : tech) || '').toString().toUpperCase();
       // Offer only the chosen blank's supported methods (synced from the product's
       // saved methods); keep the item's current method even if not listed, and fall
       // back to the full set when no product/method is known.
@@ -846,8 +850,12 @@
       var ptOpts = '<option value="">Method</option>';
       _pmCodes.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
       var vo = variantOptions(num, sku, it);
-      var colorOpts = (vo.curColor ? '' : '<option value="">Color</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
-      var sizeOpts = (vo.curSize ? '' : '<option value="">Size</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
+      // Synced orders: the SELECTED colour/size come only from the factory's setup, not
+      // the Etsy variant — so they start empty until picked. (Lists stay full.)
+      var _curColor = _synced ? (setup.color || '') : vo.curColor;
+      var _curSize = _synced ? (setup.size || '') : vo.curSize;
+      var colorOpts = (_curColor ? '' : '<option value="">Color</option>') + vo.colors.map(function (c) { return opt(c, c, c === _curColor); }).join('');
+      var sizeOpts = (_curSize ? '' : '<option value="">Size</option>') + vo.sizes.map(function (s) { return opt(s, s, s === _curSize); }).join('');
       // One unified box — Product · Color · Size · Method on a single line,
       // dot-separated, mirroring the seller-side variation pill. The selects are
       // borderless/transparent so they read as one continuous control.
@@ -2284,7 +2292,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-uploads-dedup-editall';
+  window.EG_BUILD = '2026-06-27-etsy-strip-force-unset';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
