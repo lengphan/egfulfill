@@ -1931,9 +1931,9 @@ document.addEventListener('DOMContentLoaded', function(){
            subtle divider where it matters. -->
       <div>
         <div style="margin-bottom:10px">
-          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Sellers · 3</div>
+          <div id="seller-count" style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Sellers · 3</div>
         </div>
-        <div style="display:flex;flex-direction:column">
+        <div id="seller-list" style="display:flex;flex-direction:column">
           <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid #191918;background:transparent" onclick="selectSeller('seller-a',this)">
             <div style="display:flex;align-items:center;gap:9px">
               <div style="width:30px;height:30px;background:#ede9fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#7c3aed;flex-shrink:0">SA</div>
@@ -5915,6 +5915,54 @@ function printAllReady() {
 renderPrintQueue();
 
 // ---- Sellers panel ----
+// REAL accounts loaded from /api/users (admin). Keyed by user id. When present,
+// selectSeller uses these (real name/email/wallet) so an admin balance adjustment
+// resolves to the actual server wallet — not the demo placeholders below.
+window.REAL_SELLERS = window.REAL_SELLERS || {};
+window._selSeller = window._selSeller || null;
+
+function _sellerInitials(s){ return (s||'?').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase() || 'S'; }
+
+// Pull the real seller list and render the left-hand pills. Falls back silently
+// to the hardcoded demo pills if the call fails (offline / non-admin).
+function loadRealSellers() {
+  try {
+    var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
+    fetch('/api/users', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(rows){
+        if (!Array.isArray(rows)) return;
+        var sellers = rows.filter(function(u){ return u.role === 'seller'; });
+        if (!sellers.length) return;
+        var list = document.getElementById('seller-list');
+        var count = document.getElementById('seller-count');
+        if (count) count.textContent = 'Sellers · ' + sellers.length;
+        if (!list) return;
+        window.REAL_SELLERS = {};
+        var html = '';
+        sellers.forEach(function(u, i){
+          var nm = u.store_name || u.name || u.email;
+          var active = u.active !== false;
+          window.REAL_SELLERS[u.id] = { id: u.id, name: nm, email: u.email, active: active };
+          var dot = active ? '#191918' : '#c9c3ba';
+          html += '<div class="seller-card-item" id="sc-' + u.id + '" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid ' + (i===0?'#191918':'transparent') + ';background:transparent" onclick="selectSeller(\'' + u.id + '\',this)">'
+            + '<div style="display:flex;align-items:center;gap:9px">'
+            + '<div style="width:30px;height:30px;background:#ede9fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#7c3aed;flex-shrink:0">' + _sellerInitials(nm) + '</div>'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">' + nm.replace(/[<>]/g,'') + ' <span style="width:6px;height:6px;border-radius:50%;background:' + dot + '" title="' + (active?'Active':'Suspended') + '"></span></div>'
+            + '<div style="font-size:11.5px;color:#9ca3af">' + (u.email||'').replace(/[<>]/g,'') + '</div>'
+            + '</div></div></div>';
+        });
+        list.innerHTML = html;
+        // Auto-select the first real seller.
+        var first = list.querySelector('.seller-card-item');
+        if (first) selectSeller(sellers[0].id, first);
+      })
+      .catch(function(){});
+  } catch(e){}
+}
+window.loadRealSellers = loadRealSellers;
+
 function selectSeller(id, el) {
   // Reset every seller pill: transparent border + transparent background so
   // only the active one shows chrome, with no light-grey hover lingering on
@@ -5924,6 +5972,31 @@ function selectSeller(id, el) {
   el.style.background = 'transparent';
   // Refresh the Balance stats for the newly selected seller.
   try { updateSellerBalanceStats(id); } catch(e){}
+  // REAL account path: populate identity from the live user + fetch the real
+  // server wallet balance so the adjust modal acts on the true balance.
+  var real = window.REAL_SELLERS[id];
+  if (real) {
+    window._selSeller = { id: real.id, email: real.email, name: real.name, balance: 0 };
+    document.getElementById('seller-detail-avatar').textContent = _sellerInitials(real.name);
+    document.getElementById('seller-detail-avatar').style.background = '#ede9fe';
+    document.getElementById('seller-detail-avatar').style.color = '#7c3aed';
+    document.getElementById('seller-detail-name').textContent = real.name;
+    document.getElementById('seller-detail-email').textContent = real.email;
+    var st = document.getElementById('seller-detail-status');
+    st.textContent = real.active ? 'Active' : 'Suspended';
+    st.style.cssText = 'font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase';
+    // Fetch the seller's real wallet balance (staff may read any account).
+    try {
+      var tok = localStorage.getItem('eg_token') || '';
+      fetch('/api/wallet?account=' + encodeURIComponent(real.id), { headers: { Authorization: 'Bearer ' + tok } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j && typeof j.balance === 'number' && window._selSeller && window._selSeller.id === real.id) {
+          window._selSeller.balance = j.balance;
+          var sc = document.getElementById('sab-current'); if (sc) sc.textContent = '$' + j.balance.toFixed(2);
+        } }).catch(function(){});
+    } catch(e){}
+    return;
+  }
   const SELLER_INFO = {
     'seller-a': {name:'Seller A Store', email:'sellera@store.com · Since Jan 2025', avatar:'SA', avatarBg:'#ede9fe', avatarColor:'#7c3aed', status:'Active', statsLabel:'Seller A', earned:'$8,420', pending:'$1,240', owed:'$340'},
     'seller-b': {name:'Seller B Store', email:'sellerb@shop.com · Since Mar 2025', avatar:'SB', avatarBg:'#dbeafe', avatarColor:'#1d4ed8', status:'Suspended', statsLabel:'Seller B', earned:'$2,140', pending:'$0', owed:'$120'},
@@ -5947,6 +6020,8 @@ function selectSeller(id, el) {
 function _initSellerSection() {
   try { setSellerTab('balance'); } catch(e){}
   try { updateSellerBalanceStats('seller-a'); } catch(e){}
+  // Replace the demo pills with the real seller accounts (admin-only API).
+  try { loadRealSellers(); } catch(e){}
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', _initSellerSection);
@@ -6013,8 +6088,9 @@ window.toggleSellerStatus = toggleSellerStatus;
 function openSellerAdjustModal() {
   var existing = document.getElementById('sab-modal');
   if (existing) existing.remove();
+  // Show the SELECTED SELLER's real wallet balance (not the admin's own).
   var currBal = 0;
-  try { currBal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0; } catch(e){}
+  try { currBal = (window._selSeller && typeof window._selSeller.balance === 'number') ? window._selSeller.balance : 0; } catch(e){}
   var sellerName = '';
   try { sellerName = (document.getElementById('seller-detail-name') || {}).textContent || ''; } catch(e){}
   var ov = document.createElement('div');
@@ -6082,10 +6158,23 @@ function confirmSellerAdjust() {
   var note = (document.getElementById('sab-note').value || '').trim();
   var sellerName = ''; try { sellerName = (document.getElementById('seller-detail-name')||{}).textContent || ''; } catch(e){}
   var sellerEmail = ''; try { sellerEmail = ((document.getElementById('seller-detail-email')||{}).textContent || '').split('·')[0].trim(); } catch(e){}
+  var sel = window._selSeller || null;
+  var isRemote = !!(sel && sel.id);
   var res = (typeof EGStore !== 'undefined' && EGStore.adminAdjustSellerBalance)
-    ? EGStore.adminAdjustSellerBalance(signed, { note: note, seller: sellerName.trim(), sellerEmail: sellerEmail })
+    ? EGStore.adminAdjustSellerBalance(signed, { note: note, seller: sellerName.trim(),
+        sellerEmail: sellerEmail, sellerAccount: sel && sel.id, remote: isRemote })
     : { ok:false, error:'EGStore not loaded' };
   if (!res.ok) { if (err) err.textContent = res.error || 'Adjustment failed.'; return; }
+  // Real account: re-fetch the seller's authoritative balance and update the pill.
+  if (isRemote) {
+    try {
+      var tok = localStorage.getItem('eg_token') || '';
+      fetch('/api/wallet?account=' + encodeURIComponent(sel.id), { headers: { Authorization: 'Bearer ' + tok } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if (j && typeof j.balance === 'number') { if (window._selSeller && window._selSeller.id === sel.id) window._selSeller.balance = j.balance; var sc = document.getElementById('sab-current'); if (sc) sc.textContent = '$' + j.balance.toFixed(2); } })
+        .catch(function(){});
+    } catch(e){}
+  }
   // Prepend a transaction row in the visible table.
   try {
     var tbody = document.querySelector('#seller-tab-balance table.dtable tbody');
@@ -6100,7 +6189,7 @@ function confirmSellerAdjust() {
         + '<td style="padding:10px 18px 10px 12px"><span style="font-size:10.5px;font-weight:700;color:#15803d;background:#dcfce7;padding:2px 7px;border-radius:4px;letter-spacing:.04em">APPLIED</span></td>';
       tbody.insertBefore(row, tbody.firstChild);
     }
-    var cur = document.getElementById('sab-current'); if (cur) cur.textContent = '$' + res.sellerBal.toFixed(2);
+    if (!isRemote && typeof res.sellerBal === 'number') { var cur = document.getElementById('sab-current'); if (cur) cur.textContent = '$' + res.sellerBal.toFixed(2); }
   } catch(e){}
   modal.remove();
 }

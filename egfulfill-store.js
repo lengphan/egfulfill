@@ -682,6 +682,20 @@
       var amt = parseFloat(amount) || 0;
       if (amt === 0) return { ok:false, error:'Amount must be non-zero' };
       opts = opts || {};
+      // REMOTE mode (real seller selected): the adjustment targets ANOTHER user's
+      // wallet, so it must NOT touch the admin's own local eg_balance. Move it
+      // server-side only (factory↔seller, resolved by account id or email); the
+      // admin's view of the seller balance is refreshed from the server by the UI.
+      if (opts.remote && (opts.sellerAccount || opts.sellerEmail)) {
+        try {
+          if (this.pushTransfer) this.pushTransfer(amt, {
+            fromAccount: 'factory', toAccount: opts.sellerAccount || undefined, toEmail: opts.sellerEmail || undefined,
+            type: 'manual-adjust', ref: 'adj-' + (opts.sellerAccount || opts.sellerEmail) + '-' + Date.now(),
+            note: opts.note || 'Manual adjustment'
+          });
+        } catch(e){ return { ok:false, error:'Could not reach the server' }; }
+        return { ok:true, remote:true, amount: amt };
+      }
       var sellerBal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
       var newSeller = parseFloat((sellerBal + amt).toFixed(2));
       if (newSeller < 0) return { ok:false, error:'Adjustment would leave seller balance negative ($' + newSeller.toFixed(2) + ')' };
