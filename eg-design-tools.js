@@ -2284,7 +2284,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-uploads-dl-and-personal-settings';
+  window.EG_BUILD = '2026-06-27-uploads-dedup-editall';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2446,6 +2446,15 @@
     uploadsGalleryHTML: function (o, items) {
       if (!items || !items.length) return '';
       var self = this; var gallery = [];
+      // Dedup by design URL: when Edit-All applies ONE artwork to every item, show it
+      // ONCE instead of N identical tiles. Items with no design stay individual.
+      var _seenDesign = {}; var _uniq = [];
+      (items || []).forEach(function (it) {
+        var d = self.designURL(o, it) || '';
+        if (d) { if (_seenDesign[d]) return; _seenDesign[d] = true; }
+        _uniq.push(it);
+      });
+      items = _uniq;
       var cells = items.map(function (it, i) {
         var dk = itemDK(it);
         var design = self.designURL(o, it);
