@@ -829,7 +829,7 @@
       // Show the blank the OTHER board already picked (synced on it.blank), so the
       // selection persists across boards instead of resetting to "Pick a blank…".
       var curProd = setup.product || it.blank || _productNameForSku(it.sku) || '', matched = false;
-      var prodOpts = '<option value="">Pick a blank…</option>';
+      var prodOpts = '<option value="">Product</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
         var s = curProd && String(curProd) === String(v); if (s) matched = true;
@@ -843,17 +843,17 @@
       var _pmCodes = productMethodCodes(curProd);
       if (_pmCodes && curPt && _pmCodes.indexOf(curPt) < 0) _pmCodes = [curPt].concat(_pmCodes);
       if (!_pmCodes) _pmCodes = PRINT_METHODS;
-      var ptOpts = '<option value="">Method…</option>';
+      var ptOpts = '<option value="">Method</option>';
       _pmCodes.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
       var vo = variantOptions(num, sku, it);
-      var colorOpts = (vo.curColor ? '' : '<option value="">Color…</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
-      var sizeOpts = (vo.curSize ? '' : '<option value="">Size…</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
+      var colorOpts = (vo.curColor ? '' : '<option value="">Color</option>') + vo.colors.map(function (c) { return opt(c, c, c === vo.curColor); }).join('');
+      var sizeOpts = (vo.curSize ? '' : '<option value="">Size</option>') + vo.sizes.map(function (s) { return opt(s, s, s === vo.curSize); }).join('');
       // One unified box — Product · Color · Size · Method on a single line,
       // dot-separated, mirroring the seller-side variation pill. The selects are
       // borderless/transparent so they read as one continuous control.
-      // Lettering LIGHT, dot dividers DARK (swapped from before).
+      // Lettering + dot dividers BOTH light (the dot matches the placeholder lettering).
       var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#9ca3af;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;-webkit-appearance:none;-moz-appearance:none;appearance:none';
-      var _dot = '<span style="color:#374151;font-weight:700;padding:0 5px;flex-shrink:0">·</span>';
+      var _dot = '<span style="color:#c9c3ba;font-weight:600;padding:0 5px;flex-shrink:0">·</span>';
       // Fixed-width box: each variant select is LOCKED to a set width and clips overflow,
       // so a long product title can't stretch the row. Stretched a touch overall, with the
       // PRODUCT name given the most width. The full value is one click away in the editor.
@@ -894,7 +894,7 @@
   // p: { setup, sep, checkbox, thumb, title, meta, designLink, selector, status, trash }
   function itemRowLayout(p) {
     p = p || {};
-    var nameBlock = '<div style="' + (p.setup ? 'flex:0 1 auto;max-width:240px' : 'flex:1') + ';min-width:0;margin-right:16px">'
+    var nameBlock = '<div style="' + (p.setup ? 'width:240px;flex:0 0 240px' : 'flex:1') + ';min-width:0;margin-right:16px">'
       + '<div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (p.title || '') + '</div>'
       + '<div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">'
         + (p.meta || '')
@@ -902,7 +902,7 @@
       + '</div></div>';
     // Selector + design upload sit centered between the name and the status when
     // the order is still in setup; locked orders just show the meta row.
-    var center = p.setup ? '<div style="flex:1;display:flex;align-items:center;justify-content:center;min-width:0">' + (p.selector || '') + '</div>' : '';
+    var center = p.setup ? '<div style="flex:1;display:flex;align-items:center;justify-content:flex-start;min-width:0">' + (p.selector || '') + '</div>' : '';
     var trash = p.trash ? '<span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center">' + p.trash + '</span>' : '';
     return '<div style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 44px;position:relative;' + (p.sep || '') + '">'
       + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
@@ -2284,7 +2284,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-factory-row-swap-arrow';
+  window.EG_BUILD = '2026-06-27-factory-strip-cleanup';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
