@@ -8178,6 +8178,62 @@ document.addEventListener('click', function(e){
 function openPersonalSettings() {
   document.getElementById('personal-settings-modal').classList.remove('modal-hidden');
   showPsTab('ps-profile');
+  // Load the REAL signed-in user into the form (was hardcoded demo text).
+  try {
+    var u = JSON.parse(localStorage.getItem('eg_user') || '{}') || {};
+    var full = (u.name || u.display_name || '').trim();
+    var parts = full.split(/\s+/);
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('ps-first', parts[0] || '');
+    set('ps-last', parts.slice(1).join(' ') || '');
+    set('ps-display', full);
+    set('ps-email', u.email || '');
+    var nm = document.getElementById('ps-card-name'); if (nm) nm.textContent = full || '—';
+    var em = document.getElementById('ps-card-email'); if (em) em.textContent = u.email || '';
+    var av = document.getElementById('ps-avatar');
+    if (av) {
+      if (u.avatar && /^(https?:|data:)/.test(String(u.avatar))) av.innerHTML = '<img src="' + u.avatar + '" style="width:100%;height:100%;object-fit:cover"/>';
+      else av.textContent = (full.split(/\s+/).map(function (w) { return w[0] || ''; }).slice(0, 2).join('') || 'A').toUpperCase();
+    }
+  } catch (e) {}
+}
+// Persist the profile to localStorage eg_user (the app's source for the display
+// name + avatar everywhere) and best-effort to the server; refresh the chrome.
+function savePersonalProfile(btn) {
+  var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}') || {}; } catch (e) {}
+  var val = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  var display = val('ps-display') || [val('ps-first'), val('ps-last')].filter(Boolean).join(' ');
+  u.name = display; u.email = val('ps-email') || u.email;
+  try { localStorage.setItem('eg_user', JSON.stringify(u)); } catch (e) {}
+  // Server (admin can patch their own row); harmless no-op if no id/endpoint.
+  try {
+    var tok = localStorage.getItem('eg_token') || '';
+    if (tok && (u.id || u.sub)) fetch('/api/users/' + encodeURIComponent(u.id || u.sub), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify({ name: u.name })
+    }).catch(function () {});
+  } catch (e) {}
+  // Refresh the modal card + the sidebar avatar/name if present.
+  try {
+    var nm = document.getElementById('ps-card-name'); if (nm) nm.textContent = u.name || '—';
+    var em = document.getElementById('ps-card-email'); if (em) em.textContent = u.email || '';
+    window.dispatchEvent(new CustomEvent('eg-user-changed'));
+  } catch (e) {}
+  if (btn) { var _t = btn.textContent; btn.textContent = 'Saved ✓'; btn.disabled = true; setTimeout(function () { btn.textContent = _t; btn.disabled = false; closePersonalSettings(); }, 850); }
+}
+function psChangeAvatar() { var f = document.getElementById('ps-avatar-file'); if (f) f.click(); }
+function psAvatarPicked(input) {
+  var f = input && input.files && input.files[0]; if (!f) return;
+  if (f.size > 1024 * 1024) { alert('Image must be under 1MB.'); input.value = ''; return; }
+  var r = new FileReader();
+  r.onload = function (e) {
+    var dataUrl = e.target.result;
+    var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}') || {}; } catch (er) {}
+    u.avatar = dataUrl; try { localStorage.setItem('eg_user', JSON.stringify(u)); } catch (er) {}
+    var av = document.getElementById('ps-avatar'); if (av) av.innerHTML = '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:cover"/>';
+    try { window.dispatchEvent(new CustomEvent('eg-user-changed')); } catch (er) {}
+  };
+  r.readAsDataURL(f);
 }
 function closePersonalSettings() {
   document.getElementById('personal-settings-modal').classList.add('modal-hidden');
@@ -8223,33 +8279,34 @@ function showPsTab(id) {
       <!-- Profile Tab -->
       <div id="ps-profile">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding:16px;background:#f9f9f8;border-radius:12px;border:1px solid #eeede9">
-          <div style="width:52px;height:52px;background:#111827;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#191918;flex-shrink:0">WH</div>
+          <div id="ps-avatar" style="width:52px;height:52px;background:#111827;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden">WH</div>
           <div style="flex:1">
-            <div style="font-size:14.5px;font-weight:600;color:#191918">Admin User</div>
-            <div style="font-size:13px;color:#9ca3af;margin-top:2px">admin@egops.com</div>
+            <div id="ps-card-name" style="font-size:14.5px;font-weight:600;color:#191918">Admin User</div>
+            <div id="ps-card-email" style="font-size:13px;color:#9ca3af;margin-top:2px">admin@egops.com</div>
           </div>
-          <button class="btn btn-out" style="font-size:13px;padding:5px 12px">Change avatar</button>
+          <button class="btn btn-out" onclick="psChangeAvatar()" style="font-size:13px;padding:5px 12px">Change avatar</button>
+          <input id="ps-avatar-file" type="file" accept="image/*" style="display:none" onchange="psAvatarPicked(this)"/>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">First Name</label>
-            <input class="input" value="Warehouse" style="background:#fff"/>
+            <input id="ps-first" class="input" value="" style="background:#fff"/>
           </div>
           <div>
             <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Last Name</label>
-            <input class="input" value="Admin" style="background:#fff"/>
+            <input id="ps-last" class="input" value="" style="background:#fff"/>
           </div>
         </div>
         <div style="margin-bottom:12px">
           <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Display Name</label>
-          <input class="input" value="Admin User" style="background:#fff"/>
+          <input id="ps-display" class="input" value="" style="background:#fff"/>
         </div>
         <div style="margin-bottom:20px">
           <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Email Address</label>
-          <input class="input" value="admin@egops.com" style="background:#fff"/>
+          <input id="ps-email" class="input" value="" style="background:#fff"/>
         </div>
         <div style="display:flex;justify-content:flex-end">
-          <button class="btn btn-dk" onclick="alert('Profile saved.')">Save Changes</button>
+          <button class="btn btn-dk" onclick="savePersonalProfile(this)">Save Changes</button>
         </div>
       </div>
 

@@ -2284,7 +2284,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-27-factory-strip-cleanup';
+  window.EG_BUILD = '2026-06-27-uploads-dl-and-personal-settings';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
@@ -2456,9 +2456,18 @@
           + (design ? gallery[i] : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#c4c3be;font-size:18px">—</div>')
           + (design ? '' : '<span style="position:absolute;bottom:3px;left:3px;background:#fef3c7;color:#92400e;font-size:8px;font-weight:800;padding:1px 4px;border-radius:4px">no art</span>')
           + '</button>';
-        var caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px">'
-          + '<span style="font-size:12px;font-weight:700;color:' + (dsn ? '#191918' : '#c4c3be') + ';font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (dsn || 'Not sent to board yet') + '">' + (dsn || '—') + '</span>'
-          + (design ? '<a href="' + design + '" download="' + (dsn || 'design') + '" onclick="event.stopPropagation()" title="Download artwork" style="font-size:12.5px;font-weight:700;color:#15803d;text-decoration:none;flex-shrink:0">Download</a>' : '')
+        // Download options: the artwork image, plus the .emb stitch file when one
+        // exists for this item. On-theme down-into-tray arrow; no leading dash.
+        var emb = null;
+        try { var _ef = (window.EGStore && EGStore.getItemEmbFile) ? EGStore.getItemEmbFile(o.id, it.sku) : null; if (_ef && _ef.dataUrl) emb = _ef; } catch (e) {}
+        var dlArrow = '<svg width="11" height="11" viewBox="0 0 14 14" fill="none" style="flex-shrink:0"><path d="M7 1.5v7m0 0L4.4 5.9M7 8.5l2.6-2.6M2.5 11.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        var dlBtn = function (href, name, label) { return '<a href="' + href + '" download="' + String(name).replace(/"/g, '&quot;') + '" onclick="event.stopPropagation()" title="Download ' + label + '" style="font-size:11.5px;font-weight:700;color:#15803d;text-decoration:none;display:inline-flex;align-items:center;gap:3px;flex-shrink:0">' + dlArrow + label + '</a>'; };
+        var caption = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px">'
+          + '<span style="font-size:12px;font-weight:700;color:' + (dsn ? '#191918' : '#c4c3be') + ';font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (dsn || 'Not sent to board yet') + '">' + (dsn || '') + '</span>'
+          + '<span style="display:inline-flex;align-items:center;gap:10px;flex-shrink:0">'
+          + (design ? dlBtn(design, (dsn || 'design') + '.png', 'Image') : '')
+          + (emb ? dlBtn(emb.dataUrl, emb.name || ((dsn || 'design') + '.emb'), '.emb') : '')
+          + '</span>'
           + '</div>';
         return '<div>' + thumb + caption + '</div>';
       }).join('');
