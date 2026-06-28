@@ -4,7 +4,7 @@
 // get their permissions from GET /api/team/my-access (the client reads it on load),
 // so a missing membership simply means "no restriction" → full access (fail-open).
 import { q } from '../db.js';
-import { sendMail } from '../mailer.js';
+import { sendMail, mailConfigured } from '../mailer.js';
 
 // Best-effort invite email (no-op unless SMTP_* is configured). Points the invitee at
 // Settings → Team, where the in-app banner lets them accept.
@@ -31,11 +31,15 @@ export function teamRoutes(app, requireAuth) {
     try {
       sent = await sendMail({
         to,
-        subject: 'EGFULFILL · SMTP test',
-        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFULFILL email (Brevo SMTP) is working. 🎉</div>'
+        subject: 'EGFULFILL · email test',
+        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFULFILL email is working. 🎉</div>'
       });
     } catch (e) { error = e.message; }
-    return { smtpConfigured: !!process.env.SMTP_HOST, smtpHost: process.env.SMTP_HOST || null, to, sent, error };
+    return {
+      mailConfigured: mailConfigured(),
+      transport: process.env.BREVO_API_KEY ? 'brevo-api' : (process.env.SMTP_HOST ? 'smtp' : 'none'),
+      to, sent, error
+    };
   });
 
   q(`create table if not exists team_members (
