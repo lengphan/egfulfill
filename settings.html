@@ -1224,11 +1224,29 @@ document.getElementById('balance-val').textContent='$'+parseFloat(localStorage.g
 (function(){applyTheme(localStorage.getItem('eg_theme')==='dark');applyLang(localStorage.getItem('eg_lang')||'en');})();
 
 /* ── Profile save ── */
+// Populate the Profile form from the REAL signed-in user (was hardcoded demo text,
+// which made it look like you were in a different account than the header shows).
+function loadProfile(){
+  var u={}; try{ u=JSON.parse(localStorage.getItem('eg_user')||'{}')||{}; }catch(e){}
+  var full=(u.name||'').trim(); var parts=full.split(/\s+/);
+  var set=function(id,v){ var el=document.getElementById(id); if(el) el.value=(v||''); };
+  set('prof-fname', parts[0]||'');
+  set('prof-lname', parts.slice(1).join(' ')||'');
+  set('prof-email', u.email||'');
+  set('prof-biz', u.store_name||u.business||'');
+  var initials=(((parts[0]&&parts[0][0])||'')+((parts[1]&&parts[1][0])||'')||'EG').toUpperCase();
+  var av=document.querySelector('#panel-profile .card div[style*="56px"]');
+  if(av){ if(u.avatar&&/^(https?:|data:)/.test(String(u.avatar))) av.innerHTML='<img src="'+u.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>'; else av.textContent=initials; }
+}
+try { (document.readyState==='loading')?document.addEventListener('DOMContentLoaded',loadProfile):loadProfile(); window.loadProfile=loadProfile; } catch(e){}
 function saveProfile(){
   const fn = document.getElementById('prof-fname').value.trim();
   const ln = document.getElementById('prof-lname').value.trim();
   const email = document.getElementById('prof-email').value.trim();
   const biz = document.getElementById('prof-biz').value.trim();
+
+  // Persist to eg_user — the app's single source for the display name / store / avatar.
+  try { var u=JSON.parse(localStorage.getItem('eg_user')||'{}')||{}; u.name=(fn+' '+ln).trim()||u.name; if(email) u.email=email; if(biz) u.store_name=biz; localStorage.setItem('eg_user', JSON.stringify(u)); window.dispatchEvent(new CustomEvent('eg-user-changed')); } catch(e){}
 
   // Avatar initials (up to 2 chars)
   const initials = ((fn[0]||'') + (ln[0]||'')).toUpperCase() || 'EG';
