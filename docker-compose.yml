@@ -79,6 +79,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      # Brevo HTTP API — preferred email transport (sends over HTTPS:443, so it works
+      # even though the host blocks outbound SMTP ports). Set BREVO_API_KEY in .env.
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
       # Google Sheets order import (API key reads link-shared sheets) + optional
       # service account to auto-CREATE a ready-filled sheet, + optional copy link.
       GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}
