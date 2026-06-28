@@ -1387,19 +1387,45 @@ function teamRemove(i){
   }
 }
 function teamInvite(){
-  var email = prompt('Invite a team member — their email:'); if(!email) return;
-  email = email.trim(); if(!/.+@.+\..+/.test(email)){ alert('Enter a valid email.'); return; }
+  var ex = document.getElementById('ti-modal'); if(ex) ex.remove();
+  var ov = document.createElement('div');
+  ov.id = 'ti-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(17,24,39,.32);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:inherit';
+  ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML =
+    '<div onclick="event.stopPropagation()" style="background:#fff;border:1px solid #e8e6e2;border-radius:14px;width:420px;max-width:92vw;box-shadow:0 10px 30px rgba(17,24,39,.10);overflow:hidden;animation:fadeUp .2s ease">'
+    + '<div style="padding:20px 22px 0">'
+    +   '<div style="font-size:16px;font-weight:700;color:#191918">Invite a team member</div>'
+    +   '<div style="font-size:13px;color:#9ca3af;margin-top:3px">They sign in with this email, then you pick which tabs they can open.</div>'
+    + '</div>'
+    + '<div style="padding:16px 22px 4px">'
+    +   '<label style="font-size:12px;font-weight:600;color:#6b7280;display:block;margin-bottom:6px">Email address</label>'
+    +   '<input id="ti-email" type="email" placeholder="teammate@email.com" style="width:100%;border:1.5px solid #e5e4e0;border-radius:9px;padding:10px 12px;font-size:14px;outline:none;font-family:inherit;box-sizing:border-box" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'" onkeydown="if(event.key===\'Enter\')confirmTeamInvite()"/>'
+    +   '<div id="ti-err" style="font-size:12.5px;color:#c2410c;margin-top:6px;min-height:15px"></div>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;gap:8px;padding:6px 22px 18px">'
+    +   '<button onclick="document.getElementById(\'ti-modal\').remove()" style="background:#fff;border:1.5px solid #e5e4e0;color:#191918;font-size:13.5px;font-weight:600;padding:9px 16px;border-radius:9px;cursor:pointer;font-family:inherit">Cancel</button>'
+    +   '<button id="ti-send" onclick="confirmTeamInvite()" style="background:#111827;border:none;color:#fff;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:9px;cursor:pointer;font-family:inherit">Send invite</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  setTimeout(function(){ var i=document.getElementById('ti-email'); if(i) i.focus(); }, 40);
+}
+function confirmTeamInvite(){
+  var emailEl = document.getElementById('ti-email'), errEl = document.getElementById('ti-err');
+  var email = ((emailEl && emailEl.value) || '').trim();
+  if(!/.+@.+\..+/.test(email)){ if(errEl) errEl.textContent='Enter a valid email address.'; return; }
+  var btn = document.getElementById('ti-send'); if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   var tok=_teamTok();
   fetch((window.EG_API_BASE||'')+'/api/team/invite',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{}),body:JSON.stringify({email:email,role:'editor',permissions:['orders']})})
     .then(function(r){return r.json();})
     .then(function(d){
-      if(d&&d.error){ alert(d.error); return; }
-      alert('Invite created for '+email+'.\n\nThey accept by signing in and opening:\n  /api/team/accept/'+(d&&d.token||'')+'\n(Email delivery needs the server SMTP mailer wired.)');
+      if(d&&d.error){ if(errEl) errEl.textContent=d.error; if(btn){btn.disabled=false;btn.textContent='Send invite';} return; }
+      var ov=document.getElementById('ti-modal'); if(ov) ov.remove();
       loadTeam();
     })
-    .catch(function(){ alert('Could not reach the server to create the invite.'); });
+    .catch(function(){ if(errEl) errEl.textContent='Could not reach the server.'; if(btn){btn.disabled=false;btn.textContent='Send invite';} });
 }
-window.teamTogglePerm=teamTogglePerm; window.teamRemove=teamRemove; window.teamInvite=teamInvite; window.renderTeamMembers=renderTeamMembers; window.loadTeam=loadTeam;
+window.teamTogglePerm=teamTogglePerm; window.teamRemove=teamRemove; window.teamInvite=teamInvite; window.confirmTeamInvite=confirmTeamInvite; window.renderTeamMembers=renderTeamMembers; window.loadTeam=loadTeam;
 try { (document.readyState==='loading')?document.addEventListener('DOMContentLoaded',loadTeam):loadTeam(); } catch(e){}
 
 /* ── Member settings lock: hide Billing + Team sub-tabs for restricted members (owner sees all) ── */
