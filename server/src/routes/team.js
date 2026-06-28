@@ -21,6 +21,23 @@ function emailInvite(toEmail, ownerName) {
 }
 
 export function teamRoutes(app, requireAuth) {
+  // Diagnostic: confirm SMTP is wired + Brevo accepts a send. Sends to the caller's
+  // own email by default (?to= override). Returns whether SMTP env is set and whether
+  // the message was accepted by the relay — so we can tell config vs delivery problems.
+  app.get('/api/team/test-email', { preHandler: requireAuth }, async (req) => {
+    const to = (req.query && req.query.to) || req.user.email || '';
+    if (!to) return { smtpConfigured: !!process.env.SMTP_HOST, sent: false, error: 'no recipient' };
+    let sent = false, error = null;
+    try {
+      sent = await sendMail({
+        to,
+        subject: 'EGFULFILL · SMTP test',
+        html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFULFILL email (Brevo SMTP) is working. 🎉</div>'
+      });
+    } catch (e) { error = e.message; }
+    return { smtpConfigured: !!process.env.SMTP_HOST, smtpHost: process.env.SMTP_HOST || null, to, sent, error };
+  });
+
   q(`create table if not exists team_members (
        id uuid primary key default gen_random_uuid(),
        owner_id   text not null,        -- the team owner's user id
