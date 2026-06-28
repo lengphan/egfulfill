@@ -2036,11 +2036,8 @@ document.addEventListener('DOMContentLoaded', function(){
             <!-- Transactions table — flows directly under the header strip -->
             <table class="dtable" style="border:none;margin:0;background:#fff">
               <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px 8px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px">Order</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;text-align:right">Amount</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 18px 8px 12px">Status</th></tr></thead>
-              <tbody>
-                <tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">Apr 23</td><td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">#FF-8821</td><td style="font-size:13px;color:#191918;padding:11px 12px">Hoodie + Tee · fulfilled</td><td style="font-weight:600;color:#15803d;padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">+$54.98</td><td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#6b7280">Settled</span></td></tr>
-                <tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">Apr 22</td><td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">#FF-8810</td><td style="font-size:13px;color:#191918;padding:11px 12px">B+C Tee · fulfilled</td><td style="font-weight:600;color:#15803d;padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">+$38.00</td><td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#6b7280">Settled</span></td></tr>
-                <tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">Apr 21</td><td style="font-family:monospace;font-size:12.5px;color:#9ca3af;padding:11px 12px">—</td><td style="font-size:13px;color:#191918;padding:11px 12px">Factory production fee</td><td style="font-weight:600;color:#dc2626;padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">−$85.40</td><td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#c2410c">Pending</span></td></tr>
-                <tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">Apr 20</td><td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">#FF-8800</td><td style="font-size:13px;color:#191918;padding:11px 12px">Hoodie × 3 · fulfilled</td><td style="font-weight:600;color:#15803d;padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">+$142.50</td><td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#6b7280">Settled</span></td></tr>
+              <tbody id="seller-tx-tbody">
+                <tr><td colspan="5" style="padding:26px 18px;text-align:center;color:#9ca3af;font-size:13px">Select a seller to see their transactions.</td></tr>
               </tbody>
             </table>
           </div>
@@ -6115,6 +6112,26 @@ function loadRealSellers() {
 }
 window.loadRealSellers = loadRealSellers;
 
+// Render the selected seller's REAL wallet ledger into the transactions table
+// (replaces the old hardcoded demo rows that ignored which seller was selected).
+function renderSellerTx(ledger){
+  var tb = document.getElementById('seller-tx-tbody'); if(!tb) return;
+  if(!ledger || !ledger.length){ tb.innerHTML = '<tr><td colspan="5" style="padding:26px 18px;text-align:center;color:#9ca3af;font-size:13px">No transactions yet.</td></tr>'; return; }
+  var TYPE_LABEL = { topup:'Wallet top-up', 'order-charge':'Order charge', refund:'Refund', 'manual-adjust':'Manual adjustment', 'emb-file':'Embroidery file', 'design-file':'Design file', opening:'Opening balance', earning:'Designer earning', payout:'Payout', 'refund-in':'Refund received', 'refund-out':'Refund sent', 'manual-adjust-in':'Adjustment', 'manual-adjust-out':'Adjustment', 'test-cleanup':'Adjustment' };
+  var esc = function(s){ return String(s==null?'':s).replace(/[<>&]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':'&amp;';}); };
+  tb.innerHTML = ledger.map(function(t){
+    var amt = parseFloat(t.delta)||0, pos = amt >= 0;
+    var d=''; try{ d=new Date(t.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }catch(e){}
+    var ref = (t.ref && /^(FF-|etsy-|#)/i.test(String(t.ref))) ? String(t.ref).split('|')[0] : '—';
+    var desc = t.note || TYPE_LABEL[t.type] || t.type || '—';
+    return '<tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">'+esc(d)+'</td>'
+      + '<td style="font-family:monospace;font-size:12.5px;color:'+(ref==='—'?'#9ca3af':'#374151')+';padding:11px 12px">'+esc(ref)+'</td>'
+      + '<td style="font-size:13px;color:#191918;padding:11px 12px">'+esc(desc)+'</td>'
+      + '<td style="font-weight:600;color:'+(pos?'#15803d':'#dc2626')+';padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">'+(pos?'+':'−')+'$'+Math.abs(amt).toFixed(2)+'</td>'
+      + '<td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#6b7280">Settled</span></td></tr>';
+  }).join('');
+}
+window.renderSellerTx = renderSellerTx;
 function selectSeller(id, el) {
   // Reset every seller pill: transparent border + transparent background so
   // only the active one shows chrome, with no light-grey hover lingering on
@@ -6138,14 +6155,15 @@ function selectSeller(id, el) {
     st.textContent = real.active ? 'Active' : 'Suspended';
     st.style.cssText = 'font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase';
     // Fetch the seller's real wallet balance (staff may read any account).
+    var _txb = document.getElementById('seller-tx-tbody'); if (_txb) _txb.innerHTML = '<tr><td colspan="5" style="padding:26px 18px;text-align:center;color:#9ca3af;font-size:13px">Loading…</td></tr>';
     try {
       var tok = localStorage.getItem('eg_token') || '';
       fetch('/api/wallet?account=' + encodeURIComponent(real.id), { headers: { Authorization: 'Bearer ' + tok } })
         .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(j){ if (j && typeof j.balance === 'number' && window._selSeller && window._selSeller.id === real.id) {
-          window._selSeller.balance = j.balance;
-          var sc = document.getElementById('sab-current'); if (sc) sc.textContent = '$' + j.balance.toFixed(2);
-        } }).catch(function(){});
+        .then(function(j){ if (j && window._selSeller && window._selSeller.id === real.id) {
+          if (typeof j.balance === 'number') { window._selSeller.balance = j.balance; var sc = document.getElementById('sab-current'); if (sc) sc.textContent = '$' + j.balance.toFixed(2); }
+          renderSellerTx(j.ledger || []);
+        } }).catch(function(){ renderSellerTx([]); });
     } catch(e){}
     return;
   }
