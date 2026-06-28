@@ -4,6 +4,21 @@
 // get their permissions from GET /api/team/my-access (the client reads it on load),
 // so a missing membership simply means "no restriction" → full access (fail-open).
 import { q } from '../db.js';
+import { sendMail } from '../mailer.js';
+
+// Best-effort invite email (no-op unless SMTP_* is configured). Points the invitee at
+// Settings → Team, where the in-app banner lets them accept.
+function emailInvite(toEmail, ownerName) {
+  const base = process.env.APP_URL || 'https://egful.store';
+  sendMail({
+    to: toEmail,
+    subject: (ownerName ? (ownerName + ' invited you') : 'You\'ve been invited') + ' to a team on EGFULFILL',
+    html: '<div style="font-family:Inter,Arial,sans-serif;color:#191918;line-height:1.6">'
+      + '<p><b>' + (ownerName || 'A team') + '</b> invited you to join their team on EGFULFILL.</p>'
+      + '<p>Sign in with this email, then open <a href="' + base + '/settings.html#team" style="color:#111827;font-weight:600">Settings → Team</a> and click <b>Accept invite</b>.</p>'
+      + '<p style="color:#9ca3af;font-size:13px">If you don\'t have an account yet, sign up first at ' + base + '/seller-login.html</p></div>'
+  }).catch(() => {});
+}
 
 export function teamRoutes(app, requireAuth) {
   q(`create table if not exists team_members (
@@ -68,6 +83,8 @@ export function teamRoutes(app, requireAuth) {
     if (email === String(req.user.email || '').toLowerCase()) return { error: "you can't invite yourself" };
     const token = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
     const perms = JSON.stringify(Array.isArray(b.permissions) ? b.permissions : ['orders']);
+    // Email the invitee a link (no-op unless SMTP is configured).
+    try { const on = await q(`select coalesce(nullif(store_name,''),nullif(name,''),email) as nm from users where id=$1`, [req.user.sub]); emailInvite(email, on.rows[0] && on.rows[0].nm); } catch (e) {}
     const ex = await q('select id from team_members where owner_id=$1 and lower(email)=lower($2)', [req.user.sub, email]);
     if (ex.rows[0]) {
       await q(`update team_members set role=$1, permissions=$2, invite_token=$3, status=case when status='active' then 'active' else 'invited' end where id=$4`,
