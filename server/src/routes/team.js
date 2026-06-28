@@ -27,13 +27,28 @@ export function teamRoutes(app, requireAuth) {
   app.get('/api/team/my-access', { preHandler: requireAuth }, async (req) => {
     try {
       const r = await q(
-        `select owner_id, role, permissions from team_members
-          where lower(email)=lower($1) and status='active' limit 1`, [req.user.email || '']);
+        `select t.owner_id, t.role, t.permissions,
+                coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
+           from team_members t left join users u on u.id = t.owner_id
+          where lower(t.email)=lower($1) and t.status='active' limit 1`, [req.user.email || '']);
       if (!r.rows[0]) return { member: false, permissions: null };
       const row = r.rows[0];
-      return { member: true, ownerId: row.owner_id, role: row.role,
+      return { member: true, ownerId: row.owner_id, role: row.role, ownerName: row.owner_name || 'your team',
                permissions: Array.isArray(row.permissions) ? row.permissions : [] };
     } catch (e) { return { member: false, permissions: null }; }
+  });
+
+  // Pending invites addressed to the signed-in user (so a member sees "you've been
+  // invited to X's team" in their own Settings → Team, even without email delivery).
+  app.get('/api/team/my-invites', { preHandler: requireAuth }, async (req) => {
+    try {
+      const r = await q(
+        `select t.id, t.invite_token, t.role, t.permissions, t.owner_id, t.invited_at,
+                coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
+           from team_members t left join users u on u.id = t.owner_id
+          where lower(t.email)=lower($1) and t.status='invited' order by t.invited_at desc`, [req.user.email || '']);
+      return r.rows;
+    } catch (e) { return []; }
   });
 
   // ── Owner management — the caller is always the owner of the rows they touch ─
