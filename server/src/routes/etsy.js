@@ -418,6 +418,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       } catch (e) { keyOnly = { error: e.message }; }
       const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
+        sharedSecretSet: !!SHARED_SECRET,
+        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only',
+        connScopes: conn.scopes,
         scopes: conn.scopes,
         receipt_id: rc.receipt_id,
         state: { is_paid: rc.is_paid, is_shipped: rc.is_shipped, status: rc.status, receipt_type: rc.receipt_type, buyer_user_id: rc.buyer_user_id },
