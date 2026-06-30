@@ -15,6 +15,14 @@ egful.store, www.egful.store {
 		reverse_proxy api:3000
 	}
 
+	# SECURITY: the static root is the whole repo dir, so secrets/source must be blocked
+	# from the web. Anything matching here is 404'd before file_server can serve it —
+	# .env, .git, server source, compose, package files, node_modules, etc.
+	@hidden path /.env* /.git /.git/* /.gitignore /.claude* /.dockerignore /server /server/* /node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/*
+	handle @hidden {
+		respond 404
+	}
+
 	# Everything else → the static frontend (clean URLs: /orders → orders.html)
 	handle {
 		root * /srv
