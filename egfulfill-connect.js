@@ -64,6 +64,7 @@
       '#eg-connect-card li{display:flex;align-items:flex-start;gap:11px;font-size:13.75px;color:#3a3f47;line-height:1.45}' +
       '#eg-connect-card li .eg-cn-ck{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#e9f6ee;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}' +
       '#eg-connect-card .note{font-size:12.5px;color:#8a8f98;line-height:1.5;margin:0 0 22px;padding:11px 13px;background:#f7f6f4;border-radius:11px;text-align:left}' +
+      '#eg-cn-shopbox:focus-within{border-color:#191918;box-shadow:0 0 0 3px rgba(17,24,39,.06)}' +
       '#eg-connect-card .ft{display:flex;gap:9px}' +
       '.eg-cn-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;font-size:14px;font-weight:650;cursor:pointer;border-radius:12px;padding:11px 16px;text-decoration:none;border:1px solid transparent;transition:transform .12s ease,box-shadow .16s ease,background .14s ease}' +
       '.eg-cn-btn.ghost{background:#fff;color:#3a3f47;border-color:#e5e4e0}' +
@@ -94,6 +95,14 @@
         '<h3 id="eg-cn-title">Connect</h3>' +
         '<p id="eg-cn-sub">EGFULFILL will be able to:</p>' +
         '<ul id="eg-cn-perms"></ul>' +
+        '<div id="eg-cn-shopwrap" style="display:none;text-align:left;margin:0 0 18px">' +
+          '<label style="font-size:12.5px;font-weight:600;color:#3a3f47;display:block;margin-bottom:7px">Your Shopify store</label>' +
+          '<div id="eg-cn-shopbox" style="display:flex;align-items:center;border:1px solid #e5e4e0;border-radius:12px;padding:0 13px;background:#fff;transition:border-color .14s,box-shadow .14s">' +
+            '<input id="eg-cn-shop" type="text" placeholder="your-store" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;border:none;outline:none;background:none;font-family:inherit;font-size:14px;color:#191918;padding:11px 0" />' +
+            '<span style="font-size:13.5px;color:#9ca3af;flex-shrink:0;white-space:nowrap">.myshopify.com</span>' +
+          '</div>' +
+          '<div id="eg-cn-shoperr" style="font-size:12px;color:#c0392b;margin-top:7px;display:none"></div>' +
+        '</div>' +
         '<p class="note" id="eg-cn-note"></p>' +
         '<div class="ft">' +
           '<button class="eg-cn-btn ghost" type="button" onclick="EGConnect._close()">Cancel</button>' +
@@ -154,8 +163,38 @@
       "You'll be taken to " + meta.name + " to approve access. You can disconnect any time from Settings.";
     var btn = document.getElementById('eg-cn-continue');
     btn.textContent = 'Continue';
-    btn.onclick = function () { _openPopup(_currentPlatform); };
+    // Shopify OAuth is per-store, so collect the .myshopify.com domain before leaving.
+    var shopWrap = document.getElementById('eg-cn-shopwrap');
+    var shopErr = document.getElementById('eg-cn-shoperr');
+    var shopIn = document.getElementById('eg-cn-shop');
+    if (shopErr) shopErr.style.display = 'none';
+    if (_key(platform) === 'shopify') {
+      if (shopWrap) shopWrap.style.display = 'block';
+      if (shopIn) shopIn.value = '';
+      btn.onclick = function () {
+        var shop = _normShop(shopIn ? shopIn.value : '');
+        if (!shop) {
+          if (shopErr) { shopErr.textContent = 'Enter your store name, e.g. your-store'; shopErr.style.display = 'block'; }
+          if (shopIn) shopIn.focus();
+          return;
+        }
+        if (shopErr) shopErr.style.display = 'none';
+        _openPopup('shopify', { shop: shop });
+      };
+      if (shopIn) { shopIn.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); btn.click(); } }; setTimeout(function () { shopIn.focus(); }, 80); }
+    } else {
+      if (shopWrap) shopWrap.style.display = 'none';
+      btn.onclick = function () { _openPopup(_currentPlatform); };
+    }
     document.getElementById('eg-connect-ov').classList.add('on');
+  }
+  // Normalize a Shopify store to its <name>.myshopify.com admin domain (OAuth requires
+  // it). Returns '' for a custom/unrecognized domain so we can prompt for the right one.
+  function _normShop(v) {
+    v = String(v || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\s/g, '');
+    if (!v) return '';
+    if (v.indexOf('.') < 0) v = v + '.myshopify.com';
+    return /\.myshopify\.com$/.test(v) ? v : '';
   }
 
   /* ── Popup ── */
@@ -167,8 +206,9 @@
     return origin + '/oauth-callback.html?platform=' + encodeURIComponent(platform);
   }
 
-  function _openPopup(platform) {
+  function _openPopup(platform, extra) {
     var url = _OAUTH_URL(platform);
+    if (extra && extra.shop) url += '&shop=' + encodeURIComponent(extra.shop);
     // Size generously so the provider's consent/login page fits with NO manual resize
     // or scroll, but clamp to the available screen. Center on the ACTIVE monitor.
     var availW = (window.screen && window.screen.availWidth) || 1280;

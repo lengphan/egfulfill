@@ -35,6 +35,11 @@ services:
       TIKTOK_APP_KEY: ${TIKTOK_APP_KEY:-}
       TIKTOK_APP_SECRET: ${TIKTOK_APP_SECRET:-}
       TIKTOK_SERVICE_ID: ${TIKTOK_SERVICE_ID:-}
+      # Shopify per-store OAuth — Client ID + Client secret from the Shopify app.
+      # Register the redirect URL as https://egful.store/oauth-callback.html
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:-}
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-read_orders,write_orders,read_products}
       # USPS Labels — values come from .env. Defaults to the TEM test environment
       # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
       # only when going live.

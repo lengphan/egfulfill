@@ -43,10 +43,11 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   var qs = new URLSearchParams(location.search);
   var platform = (qs.get('platform') || 'shopify').toLowerCase().replace(/[^a-z]/g, '');
   var force = qs.get('force'); // 'fail' to simulate decline; otherwise success
-  var code = qs.get('code');      // present when Etsy OR TikTok redirects back to us
-  var appKey = qs.get('app_key'); // TikTok's return carries app_key; Etsy's does not
+  var code = qs.get('code');      // present when Etsy / TikTok / Shopify redirects back
+  var appKey = qs.get('app_key'); // TikTok's return carries app_key
+  var shopRet = qs.get('shop');   // Shopify's return carries shop (+ hmac); Etsy's carries neither
   var stateRet = qs.get('state');
-  if (code) platform = appKey ? 'tiktok' : 'etsy'; // pick the platform from the return shape
+  if (code) platform = appKey ? 'tiktok' : (shopRet ? 'shopify' : 'etsy'); // pick platform from the return shape
   var names = {
     shopify: 'Shopify', etsy: 'Etsy', tiktok: 'TikTok Shop', tiktokshop: 'TikTok Shop',
     woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay', bigcommerce: 'BigCommerce'
@@ -157,12 +158,59 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
     } catch (e) { fail(e.message); }
   }
 
+  // ── Real Shopify OAuth. Per-STORE: the shop domain rides in as ?shop=…, we redirect
+  //    to that store's /admin/oauth/authorize, and exchange the code for an offline token. ──
+  var SHOPIFY_KEY = 'eg_shopify_oauth';
+  function normShop(v){ v = String(v||'').trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/\s/g,''); if(!v) return ''; if(v.indexOf('.')<0) v = v + '.myshopify.com'; return /\.myshopify\.com$/.test(v) ? v : ''; }
+  async function shopifyStart(){
+    try {
+      var shop = normShop(qs.get('shop') || '');
+      if (!shop) { fail('Missing or invalid Shopify store. Start again from Connect and enter your .myshopify.com URL.'); return; }
+      var cfg = await fetch('/api/shopify/config').then(function(r){return r.json();});
+      if (!cfg || !cfg.configured) { fail('Shopify app is not configured on the server yet'); return; }
+      var st = randStr().slice(0,24);
+      var tok0 = '';
+      try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
+      var redirect = (cfg.redirect_uri || (location.origin + '/oauth-callback.html')).replace('://www.', '://');
+      localStorage.setItem(SHOPIFY_KEY, JSON.stringify({ state: st, token: tok0, shop: shop, redirect: redirect }));
+      location.href = 'https://' + shop + '/admin/oauth/authorize'
+        + '?client_id=' + encodeURIComponent(cfg.api_key)
+        + '&scope=' + encodeURIComponent(cfg.scopes)
+        + '&redirect_uri=' + encodeURIComponent(redirect)
+        + '&state=' + encodeURIComponent(st);
+    } catch (e) { fail(e.message); }
+  }
+  async function shopifyExchange(c){
+    try {
+      var saved = {}; try { saved = JSON.parse(localStorage.getItem(SHOPIFY_KEY) || '{}'); } catch(_){}
+      if (saved.state && stateRet && saved.state !== stateRet) { console.warn('OAuth state mismatch — the server also verifies Shopify HMAC.'); }
+      var shop = normShop(qs.get('shop') || saved.shop || '');
+      var tok = '';
+      try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok) tok = saved.token || '';
+      if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
+      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
+      var res = await fetch('/api/shopify/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ shop: shop, code: c, query: location.search })
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      localStorage.removeItem(SHOPIFY_KEY);
+      if (!res.ok) { fail(data.error || ('Connection failed (' + res.status + ')')); return; }
+      finish(true, data.shop_name || 'Shopify store');
+    } catch (e) { fail(e.message); }
+  }
+
   function fail(reason){ finish(false, null, reason); }
 
   if (code && appKey) { tiktokExchange(code, stateRet); }   // returning from TikTok
+  else if (code && shopRet) { shopifyExchange(code); }      // returning from Shopify
   else if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
   else if (platform === 'etsy') { etsyStart(); }            // starting the Etsy flow
   else if (platform === 'tiktok' || platform === 'tiktokshop') { tiktokStart(); } // starting TikTok
+  else if (platform === 'shopify') { shopifyStart(); }      // starting Shopify (shop domain in ?shop=)
   else { setTimeout(function () { finish(force !== 'fail'); }, 1500); } // demo for other platforms
 
   function finish(success, shopLabel, reason) {
