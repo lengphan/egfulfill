@@ -682,11 +682,13 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
-  // Diagnostic + self-repair (staff): if the shop lookup failed at connect time the
-  // connection stores shop_id = user_id, which 400s EVERY receipts call
-  // ("Could not find a shop for user with user_id …"). This re-runs the lookup (both
-  // x-api-key modes), shows the raw response, and — if a real shop_id resolves now —
-  // repairs the stored connection so syncs work. GET /api/etsy/whoami
+  // Diagnostic + self-repair (staff): a connection can store shop_id = user_id when the
+  // owner-lookup failed at connect time, which 400s EVERY receipts call ("Could not
+  // find a shop for user with user_id …"). This resolves the real shop_id — preferring
+  // findShops-by-name (?shop_name=CustomBabeUSA), which works regardless of Etsy's
+  // quirky owner-lookup — repairs the stored connection, then TESTS whether this token
+  // can actually read the shop's receipts (the definitive owner-vs-not check).
+  //   GET /api/etsy/whoami?shop_name=CustomBabeUSA
   app.get('/api/etsy/whoami', { preHandler: requireStaff }, async (req, reply) => {
     const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
     if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
@@ -694,25 +696,39 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const out = { stored_shop_id: conn.shop_id, stored_shop_name: conn.shop_name, token_user_id: userId,
                   apiKeyMode: API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only' };
     let shop = null;
-    try {
-      const r = await etsyGet(conn, `/users/${userId}/shops`);
-      out.users_shops = r;
-      shop = Array.isArray(r && r.results) ? r.results[0] : r;
-    } catch (e) { out.users_shops_error = e.message; }
-    // Fallback: retry with x-api-key = keystring ALONE (the Etsy-v3-correct value).
+    // 1) Preferred when a name is supplied: findShops by name. Public data, no owner
+    //    requirement — reliably yields the numeric shop_id.
+    const wantName = String((req.query && req.query.shop_name) || '').trim();
+    if (wantName) {
+      try {
+        const r = await etsyGet(conn, `/shops?shop_name=${encodeURIComponent(wantName)}`);
+        const list = r.results || [];
+        out.findShops_count = list.length;
+        const match = list.find(s => String(s.shop_name || '').toLowerCase() === wantName.toLowerCase()) || list[0];
+        if (match && match.shop_id) shop = match;
+      } catch (e) { out.findShops_error = e.message; }
+    }
+    // 2) Fallback: owner-lookup by the token's user_id.
     if (!shop || !shop.shop_id) {
       try {
-        const token = await validToken(conn);
-        const res = await fetch(API + `/users/${userId}/shops`, { headers: { 'x-api-key': KEYSTRING, Authorization: 'Bearer ' + token } });
-        const body = await res.json().catch(() => ({}));
-        out.users_shops_keyonly = { http: res.status, body };
-        if (res.ok) { const s = Array.isArray(body && body.results) ? body.results[0] : body; if (s && s.shop_id) shop = s; }
-      } catch (e) { out.users_shops_keyonly_error = e.message; }
+        const r = await etsyGet(conn, `/users/${userId}/shops`);
+        out.users_shops = r;
+        shop = Array.isArray(r && r.results) ? r.results[0] : r;
+      } catch (e) { out.users_shops_error = e.message; }
     }
-    if (shop && shop.shop_id && String(shop.shop_id) !== String(conn.shop_id)) {
-      await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
-        [String(shop.shop_id), shop.shop_name || conn.shop_name, conn.id]);
-      out.repaired = { new_shop_id: String(shop.shop_id), shop_name: shop.shop_name || conn.shop_name };
+    if (shop && shop.shop_id) {
+      if (String(shop.shop_id) !== String(conn.shop_id)) {
+        await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
+          [String(shop.shop_id), shop.shop_name || conn.shop_name, conn.id]);
+        conn.shop_id = String(shop.shop_id); conn.shop_name = shop.shop_name || conn.shop_name;
+        out.repaired = { new_shop_id: conn.shop_id, shop_name: conn.shop_name };
+      }
+      // The definitive test: can THIS token read the shop's receipts? 200 = owner/authorized;
+      // 403 = the connected Etsy account does not own this shop (reconnect as the owner).
+      try {
+        const rc = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
+        out.receipts_access = { ok: true, count: (rc.results || []).length };
+      } catch (e) { out.receipts_access = { ok: false, error: e.message }; }
     }
     return out;
   });
