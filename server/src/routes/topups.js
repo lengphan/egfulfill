@@ -73,17 +73,6 @@ export function topupsRoutes(app, requireAuth) {
       "update topup_requests set status='received', confirmed_at=now(), confirmed_by=$2 where id=$1 and status='pending' returning *",
       [req.params.id, req.user.sub]
     );
-    if (!r.rows[0]) { reply.code(404); return { error: 'Not found or already processed' }; }
-    return r.rows[0];
-  });
-
-  // Admin/staff reject a top-up (e.g. money never arrived).
-  app.post('/api/topups/:id/reject', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
-    const r = await q(
-      "update topup_requests set status='rejected', confirmed_at=now(), confirmed_by=$2 where id=$1 and status='pending' returning *",
-      [req.params.id, req.user.sub]
-    );
     const rec = r.rows[0];
     if (!rec) { reply.code(404); return { error: 'Not found or already processed' }; }
     // Credit the SELLER's wallet the instant an admin approves — append-only and
@@ -99,9 +88,8 @@ export function topupsRoutes(app, requireAuth) {
     return rec;
   });
 
-  // Admin/staff REJECT a pending top-up → status flips to 'rejected' (no credit). The
-  // seller's wallet reads this and shows the row as Rejected. (This endpoint was missing,
-  // so the admin Reject button used to 404 silently.)
+  // Admin/staff reject a top-up (e.g. money never arrived) → status flips to 'rejected'
+  // (NO credit). The seller's wallet reads this and shows the row as Rejected.
   app.post('/api/topups/:id/reject', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
     const r = await q(
