@@ -73,9 +73,11 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var tok0 = '';
       try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
       if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
-      localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier: verifier, state: st, token: tok0 }));
       var ch = await challenge(verifier);
       var redirect = cfg.redirect_uri || (location.origin + '/oauth-callback.html');
+      // Stash the EXACT redirect used here so the exchange sends the same value — Etsy
+      // rejects the token exchange if its redirect_uri differs from the authorize one.
+      localStorage.setItem(ETSY_PKCE_KEY, JSON.stringify({ verifier: verifier, state: st, token: tok0, redirect: redirect }));
       location.href = 'https://www.etsy.com/oauth/connect'
         + '?response_type=code'
         + '&client_id=' + encodeURIComponent(cfg.keystring)
@@ -102,7 +104,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var res = await fetch('/api/etsy/exchange', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
-        body: JSON.stringify({ code: c, code_verifier: saved.verifier, redirect_uri: location.origin + '/oauth-callback.html' })
+        body: JSON.stringify({ code: c, code_verifier: saved.verifier, redirect_uri: saved.redirect || (location.origin + '/oauth-callback.html') })
       });
       var data = await res.json().catch(function(){ return {}; });
       localStorage.removeItem(ETSY_PKCE_KEY);
