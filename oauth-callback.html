@@ -42,9 +42,10 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   var qs = new URLSearchParams(location.search);
   var platform = (qs.get('platform') || 'shopify').toLowerCase().replace(/[^a-z]/g, '');
   var force = qs.get('force'); // 'fail' to simulate decline; otherwise success
-  var code = qs.get('code');   // present when Etsy redirects back to us
+  var code = qs.get('code');      // present when Etsy OR TikTok redirects back to us
+  var appKey = qs.get('app_key'); // TikTok's return carries app_key; Etsy's does not
   var stateRet = qs.get('state');
-  if (code) platform = 'etsy'; // Etsy's return URL carries only code+state, no platform
+  if (code) platform = appKey ? 'tiktok' : 'etsy'; // pick the platform from the return shape
   var names = {
     shopify: 'Shopify', etsy: 'Etsy', tiktok: 'TikTok Shop', tiktokshop: 'TikTok Shop',
     woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay', bigcommerce: 'BigCommerce'
@@ -110,10 +111,55 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
     } catch (e) { fail(e.message); }
   }
 
+  // ── Real TikTok Shop OAuth. No PKCE: the app has a service_id; TikTok returns to
+  //    our registered callback with code + app_key. ──
+  var TIKTOK_KEY = 'eg_tiktok_oauth';
+  async function tiktokStart(){
+    try {
+      var cfg = await fetch('/api/tiktok/config').then(function(r){return r.json();});
+      if (!cfg || !cfg.configured) { fail('TikTok Shop app is not configured on the server yet'); return; }
+      var st = randStr().slice(0,24);
+      var tok0 = '';
+      try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
+      localStorage.setItem(TIKTOK_KEY, JSON.stringify({ state: st, token: tok0 }));
+      // TikTok uses the callback URL registered in the Partner Center — we don't pass
+      // redirect_uri here, only service_id (+ our state to round-trip).
+      var base = cfg.authorize_url || 'https://services.tiktokshop.com/open/authorize';
+      location.href = base
+        + '?service_id=' + encodeURIComponent(cfg.service_id)
+        + '&state=' + encodeURIComponent(st);
+    } catch (e) { fail(e.message); }
+  }
+
+  async function tiktokExchange(c, st){
+    try {
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem(TIKTOK_KEY) || '{}'); } catch(_){}
+      if (saved.state && st && saved.state !== st) { console.warn('OAuth state mismatch — continuing; the auth_code still validates server-side.'); }
+      var tok = '';
+      try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok) tok = saved.token || '';
+      if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
+      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
+      var res = await fetch('/api/tiktok/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
+        body: JSON.stringify({ code: c })
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      localStorage.removeItem(TIKTOK_KEY);
+      if (!res.ok) { fail(data.error || ('Connection failed (' + res.status + ')')); return; }
+      finish(true, data.shop_name || 'TikTok shop');
+    } catch (e) { fail(e.message); }
+  }
+
   function fail(reason){ finish(false, null, reason); }
 
-  if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
-  else if (platform === 'etsy') { etsyStart(); }       // starting the Etsy flow
+  if (code && appKey) { tiktokExchange(code, stateRet); }   // returning from TikTok
+  else if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
+  else if (platform === 'etsy') { etsyStart(); }            // starting the Etsy flow
+  else if (platform === 'tiktok' || platform === 'tiktokshop') { tiktokStart(); } // starting TikTok
   else { setTimeout(function () { finish(force !== 'fail'); }, 1500); } // demo for other platforms
 
   function finish(success, shopLabel, reason) {

@@ -5794,25 +5794,28 @@ function whRenderPagination(total) {
   const pp = whPerPage;
   const optHtml = [10, 25, 50, 100].map(n => `<option value="${n}"${pp === n ? ' selected' : ''}>${n}</option>`).join('')
     + `<option value="all"${pp === 'all' ? ' selected' : ''}>All</option>`;
-  const sel = `<span style="display:inline-flex;align-items:center;gap:6px">Rows per page:
-    <select onchange="whSetPerPage(this.value)" style="border:1px solid #e5e4e0;border-radius:7px;padding:3px 6px;font-size:13px;font-family:inherit;color:#191918;background:#fff;cursor:pointer">${optHtml}</select></span>`;
-  let right;
+  const optHtmlLabeled = [10, 25, 50, 100].map(n => `<option value="${n}"${pp === n ? ' selected' : ''}>${n} / page</option>`).join('')
+    + `<option value="all"${pp === 'all' ? ' selected' : ''}>All</option>`;
+  const sel = `<span style="display:inline-flex;align-items:center;gap:6px;flex:1;min-width:150px;justify-content:flex-end;padding-right:56px">
+    <select onchange="whSetPerPage(this.value)" style="border:1px solid #e5e4e0;border-radius:7px;padding:3px 6px;font-size:13px;font-family:inherit;color:#191918;background:#fff;cursor:pointer">${optHtmlLabeled}</select></span>`;
+  let count, pager;
   if (pp === 'all' || total === 0) {
-    right = `<span>${total} order${total !== 1 ? 's' : ''}</span>`;
+    count = `<span style="flex:1;min-width:150px">${total} order${total !== 1 ? 's' : ''}</span>`;
+    pager = `<span></span>`;
   } else {
     const pages = Math.max(1, Math.ceil(total / pp));
     const start = (whPage - 1) * pp + 1;
     const end = Math.min(total, whPage * pp);
-    const btnStyle = 'border:1px solid #e5e4e0;background:#fff;border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:14px;color:#374151;line-height:1';
+    const btnStyle = 'border:1px solid #e5e4e0;background:#fff;border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:16px;color:#374151;line-height:1';
     const dis = 'opacity:.4;cursor:default';
-    right = `<span style="display:inline-flex;align-items:center;gap:10px">
-      <span>${start}–${end} of ${total}</span>
+    count = `<span style="flex:1;min-width:150px">${start}–${end} of ${total}</span>`;
+    pager = `<span style="display:inline-flex;align-items:center;gap:10px;justify-content:center">
       <button onclick="whGoPage(-1)" ${whPage <= 1 ? 'disabled' : ''} style="${btnStyle}${whPage <= 1 ? ';' + dis : ''}">‹</button>
-      <span style="min-width:74px;text-align:center">Page ${whPage} / ${pages}</span>
+      <span style="min-width:92px;text-align:center">Page ${whPage} / ${pages}</span>
       <button onclick="whGoPage(1)" ${whPage >= pages ? 'disabled' : ''} style="${btnStyle}${whPage >= pages ? ';' + dis : ''}">›</button>
     </span>`;
   }
-  bar.innerHTML = sel + right;
+  bar.innerHTML = count + pager + sel;
 }
 function whSetFilter(val, btn) {
   whStatusFilter = val;

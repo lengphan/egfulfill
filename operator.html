@@ -1059,17 +1059,15 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         </table>
         <!-- Pagination footer -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid #f3f3f1">
-          <span id="op-page-info" style="font-size:13px;color:#9ca3af">Showing 1–10 of <span id="op-total-count">7</span> orders</span>
-          <div id="op-pagination" style="display:flex;gap:4px"></div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:13px;color:#9ca3af">Show</span>
-            <select id="op-per-page" class="select" style="font-size:13px;padding:3px 8px;width:64px" onchange="opSetPerPage(+this.value)">
-              <option value="10" selected>10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
+          <span id="op-page-info" style="font-size:13px;color:#9ca3af;flex:1;min-width:140px">Showing 1–10 of <span id="op-total-count">7</span> orders</span>
+          <div id="op-pagination" style="display:flex;align-items:center;gap:10px;justify-content:center"></div>
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:140px;justify-content:flex-end;padding-right:52px">
+            <select id="op-per-page" class="select" style="font-size:13px;padding:3px 8px;width:96px" onchange="opSetPerPage(+this.value)">
+              <option value="10" selected>10 / page</option>
+              <option value="25">25 / page</option>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
             </select>
-            <span style="font-size:13px;color:#9ca3af">per page</span>
           </div>
         </div>
       </div>
@@ -3774,22 +3772,12 @@ function opSetPerPage(n) { opPerPage = n; opPage = 1; renderOpOrders(); }
 function gotoOpPage(n) { opPage = n; renderOpOrders(); }
 function opRenderPagination(page, total) {
   var box = document.getElementById('op-pagination'); if (!box) return;
-  if (total <= 1) { box.innerHTML = ''; return; }
-  var btn = function (label, p, o) {
-    o = o || {};
-    var style = 'padding:5px 10px;font-size:13px;border-radius:6px;border:1px solid #e5e4e0;background:' + (o.current ? '#191918;color:#fff;border-color:#191918;font-weight:600' : '#fff;color:' + (o.disabled ? '#d8d4cd' : '#374151')) + ';cursor:' + (o.disabled ? 'default' : 'pointer') + ';font-family:inherit';
-    return '<button style="' + style + '"' + (o.disabled ? ' disabled' : ' onclick="gotoOpPage(' + p + ')"') + '>' + label + '</button>';
+  var arrow = function (label, p, disabled) {
+    return '<button style="width:28px;height:28px;padding:0;font-size:16px;line-height:1;border-radius:6px;border:1px solid #e5e4e0;background:#fff;color:' + (disabled ? '#d8d4cd' : '#374151') + ';cursor:' + (disabled ? 'default' : 'pointer') + ';font-family:inherit"' + (disabled ? ' disabled' : ' onclick="gotoOpPage(' + p + ')"') + '>' + label + '</button>';
   };
-  var pages = [], lo = Math.max(2, page - 1), hi = Math.min(total - 1, page + 1);
-  pages.push(1);
-  if (lo > 2) pages.push('…');
-  for (var i = lo; i <= hi; i++) pages.push(i);
-  if (hi < total - 1) pages.push('…');
-  if (total > 1) pages.push(total);
-  var html = btn('‹', page - 1, { disabled: page <= 1 });
-  pages.forEach(function (p) { html += (p === '…') ? '<span style="padding:5px 4px;font-size:13px;color:#c4c3be">…</span>' : btn(String(p), p, { current: p === page }); });
-  html += btn('›', page + 1, { disabled: page >= total });
-  box.innerHTML = html;
+  box.innerHTML = arrow('‹', page - 1, page <= 1)
+    + '<span style="font-size:13px;color:#6b7280;min-width:92px;text-align:center;display:inline-block">Page ' + page + ' / ' + total + '</span>'
+    + arrow('›', page + 1, page >= total);
 }
 
 function opUpdateTabCounts() {

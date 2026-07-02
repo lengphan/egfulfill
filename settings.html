@@ -1016,10 +1016,10 @@ function showTab(name){
 // Only the two platforms we actively support get their own tile. Everything
 // else is collapsed under the dotted "Other platform" placeholder so the
 // grid doesn't promise integrations that don't exist yet.
-var PLATFORM_TILES = ['etsy','shopify'];
+var PLATFORM_TILES = ['etsy','tiktok','shopify'];
 // Proper display names locally so they don't depend on egfulfill-connect.js having
 // loaded before the first render (which showed lowercase keys).
-var PLATFORM_NAMES = { etsy:'Etsy', shopify:'Shopify' };
+var PLATFORM_NAMES = { etsy:'Etsy', tiktok:'TikTok Shop', shopify:'Shopify' };
 function _settingsTok(){ try { return localStorage.getItem('eg_token') || ''; } catch(e){ return ''; } }
 function _csToast(msg, bad){
   if (typeof window.toast === 'function') { try { return window.toast(msg); } catch(e){} }

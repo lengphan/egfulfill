@@ -7,6 +7,7 @@ import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
 import { catalogRoutes } from './routes/catalog.js';
 import { etsyRoutes } from './routes/etsy.js';
+import { tiktokRoutes } from './routes/tiktok.js';
 import { usersRoutes } from './routes/users.js';
 import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
@@ -111,6 +112,7 @@ inventoryRoutes(app, requireStaff);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin);
 catalogRoutes(app, requireAuth, requireStaff);
 etsyRoutes(app, requireAuth, requireStaff);
+tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)
 usersRoutes(app, requireAdmin, requireAuth);   // admin user management + staff-readable GET /api/sellers (seller-adjust panel)
 uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);

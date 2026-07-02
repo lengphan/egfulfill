@@ -29,6 +29,12 @@ services:
       ETSY_KEYSTRING: ${ETSY_KEYSTRING:-ijo2vcdd3opuo9vj15wedqd8}
       ETSY_REDIRECT_URI: ${ETSY_REDIRECT_URI:-https://egful.store/oauth-callback.html}
       ETSY_SHARED_SECRET: ${ETSY_SHARED_SECRET:-}
+      # TikTok Shop OAuth connect — app_key + app_secret + service_id from the
+      # TikTok Shop Partner Center. Register the callback there as
+      # https://egful.store/oauth-callback.html (same page Etsy uses).
+      TIKTOK_APP_KEY: ${TIKTOK_APP_KEY:-}
+      TIKTOK_APP_SECRET: ${TIKTOK_APP_SECRET:-}
+      TIKTOK_SERVICE_ID: ${TIKTOK_SERVICE_ID:-}
       # USPS Labels — values come from .env. Defaults to the TEM test environment
       # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
       # only when going live.

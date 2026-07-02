@@ -2,7 +2,16 @@
 # VPS IP) and Caddy fetches a free HTTPS cert automatically.
 # No domain yet? Use `:80` instead of the domain line to test over plain HTTP.
 
-egful.store, www.egful.store {
+# Canonical host is egful.store. Redirect www → non-www so the app, the OAuth popup,
+# and the OAuth redirect_uri all live on ONE origin. A www/non-www split silently
+# breaks the Etsy/TikTok connect flow: the popup stashes your login token in one
+# origin's localStorage, then the provider redirects back to the OTHER origin where
+# that token doesn't exist → "You're not signed in to EGFULFILL."
+www.egful.store {
+	redir https://egful.store{uri} permanent
+}
+
+egful.store {
 	encode gzip
 
 	# API → the Node app

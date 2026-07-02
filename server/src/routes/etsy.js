@@ -8,12 +8,14 @@ const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
 // (the shared secret is NOT needed for the PKCE token exchange, only here).
 const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
 const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
-const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://www.egful.store/oauth-callback.html';
+const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html';
 // shops_r/shops_w are needed to READ shipping profiles (and shop-level data) and to
 // create them — without shops_r, /shops/{id}/shipping-profiles returns 403 and Etsy
 // publish fails ("shipping_profile_id required"). Adding a scope requires the user
 // to RECONNECT (re-authorize) so the new token carries it.
-const SCOPES = 'transactions_r transactions_w listings_r listings_w shops_r shops_w';
+// address_r is REQUIRED to read buyer shipping addresses on receipts — without it
+// Etsy redacts first_line/city/zip to null (confirmed by Etsy support, Jul 2026).
+const SCOPES = 'address_r transactions_r transactions_w listings_r listings_w shops_r shops_w';
 const TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
 const API = 'https://api.etsy.com/v3/application';
 
