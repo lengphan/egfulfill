@@ -8,7 +8,11 @@ const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
 // (the shared secret is NOT needed for the PKCE token exchange, only here).
 const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
 const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
-const REDIRECT_URI = process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html';
+// Force the canonical (non-www) host: the served config, the authorize redirect_uri,
+// and the browser's post-Caddy origin must all agree, or Etsy rejects the token
+// exchange with a redirect_uri mismatch. Normalizing here makes a stale www value in
+// .env harmless (Caddy already redirects www → non-www for the browser).
+const REDIRECT_URI = (process.env.ETSY_REDIRECT_URI || 'https://egful.store/oauth-callback.html').replace('://www.', '://');
 // shops_r/shops_w are needed to READ shipping profiles (and shop-level data) and to
 // create them — without shops_r, /shops/{id}/shipping-profiles returns 403 and Etsy
 // publish fails ("shipping_profile_id required"). Adding a scope requires the user
