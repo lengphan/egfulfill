@@ -5,6 +5,7 @@
 // (polling its own top-ups) credits itself.
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
+import { sendMail, mailConfigured } from '../mailer.js';
 
 export function topupsRoutes(app, requireAuth) {
   q(`create table if not exists topup_requests (
@@ -22,15 +23,31 @@ export function topupsRoutes(app, requireAuth) {
        confirmed_at timestamptz,
        confirmed_by uuid)`).catch(() => {});
   q(`alter table topup_requests add column if not exists txn_id text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists method text`).catch(() => {});
+  q(`alter table topup_requests add column if not exists attachment text`).catch(() => {});
 
   // Seller creates a pending top-up (after they've transferred via VietQR).
   app.post('/api/topups', { preHandler: requireAuth }, async (req) => {
     const b = req.body || {};
     const r = await q(
-      `insert into topup_requests (seller_id, seller_email, seller_name, amount_usd, vnd, ref, note, status)
-       values ($1,$2,$3,$4,$5,$6,$7,'pending') returning *`,
-      [req.user.sub, req.user.email || null, b.name || null, Number(b.amount) || 0, Math.round(Number(b.vnd) || 0), b.ref || null, b.note || null]
+      `insert into topup_requests (seller_id, seller_email, seller_name, amount_usd, vnd, ref, note, method, attachment, status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') returning *`,
+      [req.user.sub, req.user.email || null, b.name || null, Number(b.amount) || 0, Math.round(Number(b.vnd) || 0), b.ref || null, b.note || null, b.method || null, b.attachment || null]
     );
+    // Best-effort: email the admins that a manual top-up is awaiting review. Fire-and-
+    // forget so it NEVER blocks or fails the response (the pending row is the source of truth).
+    (async () => {
+      try {
+        if (!mailConfigured()) return;
+        const admins = await q("select email from users where role='admin' and email is not null and email <> ''");
+        const amt = (Number(b.amount) || 0).toFixed(2);
+        const who = req.user.email || b.name || 'A seller';
+        const how = b.method ? (' via ' + b.method) : '';
+        const subject = `Top-up pending review — $${amt}${how}`;
+        const text = `${who} submitted a $${amt} top-up${how}. It's awaiting your confirmation in the Factory Wallet → Pending top-ups.`;
+        for (const row of admins.rows) { if (row.email) sendMail({ to: row.email, subject, text }).catch(() => {}); }
+      } catch (e) {}
+    })();
     return r.rows[0];
   });
 

@@ -10546,6 +10546,8 @@ function admRenderPendingTopups() {
     .then(function (r) { return r.json(); })
     .then(function (list) {
       if (!Array.isArray(list) || !list.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      window._admTopupProofs = {};
+      list.forEach(function (t) { if (t && t.attachment) window._admTopupProofs[t.id] = t.attachment; });
       var rows = list.map(function (t) {
         var d = new Date(t.created_at || Date.now());
         var when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -10554,9 +10556,10 @@ function admRenderPendingTopups() {
         return '<tr style="border-top:1px solid #f3f3f1">'
           + '<td style="font-size:12.5px;color:#9ca3af;padding:10px 12px 10px 16px;white-space:nowrap">' + when + '</td>'
           + '<td style="font-size:13px;color:#191918;padding:10px 12px">' + String(who).replace(/</g, '&lt;') + '</td>'
-          + '<td style="font-family:monospace;font-size:12px;color:#b45309;padding:10px 12px">' + (t.ref || '—') + '</td>'
+          + '<td style="font-family:monospace;font-size:12px;color:#b45309;padding:10px 12px">' + (t.ref || '—') + (t.method ? '<div style="font-family:inherit;font-size:11px;color:#6b7280;margin-top:2px">' + String(t.method).replace(/</g, '&lt;') + '</div>' : '') + '</td>'
           + '<td style="font-weight:700;color:#15803d;padding:10px 12px;text-align:right;white-space:nowrap">+$' + Number(t.amount_usd || 0).toFixed(2) + '<span style="color:#9ca3af;font-weight:500;font-size:11.5px"> ' + vnd + '</span></td>'
           + '<td style="padding:10px 16px 10px 12px;text-align:right;white-space:nowrap">'
+            + (t.attachment ? '<button onclick="admViewProof(\'' + t.id + '\')" title="View payment proof" style="background:#fff;border:1.5px solid #e5e4e0;color:#374151;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Proof</button> ' : '')
             + '<button onclick="admConfirmTopup(\'' + t.id + '\')" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Received</button> '
             + '<button onclick="admRejectTopup(\'' + t.id + '\')" title="Reject" style="background:#fff;border:1.5px solid #e5e4e0;color:#6b7280;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Reject</button>'
           + '</td></tr>';
@@ -10566,10 +10569,22 @@ function admRenderPendingTopups() {
         + '<div style="padding:12px 16px;border-bottom:1px solid #f3ead6;display:flex;align-items:center;gap:8px">'
           + '<span style="font-size:14.5px;font-weight:700;color:#191918">Pending top-ups</span>'
           + '<span style="background:#b45309;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px">' + list.length + '</span>'
-          + '<span style="font-size:12.5px;color:#9ca3af;margin-left:4px">Seller transferred via VietQR — confirm once the money lands in the bank.</span></div>'
+          + '<span style="font-size:12.5px;color:#9ca3af;margin-left:4px">Seller transferred manually — open Proof to verify, then confirm once the money lands.</span></div>'
         + '<table style="width:100%;border-collapse:collapse"><tbody>' + rows + '</tbody></table></div>';
     })
     .catch(function () { box.style.display = 'none'; });
+}
+function admViewProof(id) {
+  var src = (window._admTopupProofs || {})[id];
+  if (!src) { alert('No proof attached to this top-up.'); return; }
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(17,24,39,.82);z-index:100000;display:flex;align-items:center;justify-content:center;padding:30px;cursor:zoom-out';
+  ov.onclick = function () { ov.remove(); };
+  var isPdf = /^data:application\/pdf/.test(src);
+  ov.innerHTML = isPdf
+    ? '<embed src="' + src + '" type="application/pdf" style="width:min(900px,92vw);height:88vh;border-radius:10px;background:#fff" onclick="event.stopPropagation()"/>'
+    : '<img src="' + src + '" alt="Payment proof" style="max-width:92vw;max-height:88vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)" onclick="event.stopPropagation()"/>';
+  document.body.appendChild(ov);
 }
 function admConfirmTopup(id) {
   var tok = localStorage.getItem('eg_token');
