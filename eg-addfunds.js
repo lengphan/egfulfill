@@ -619,9 +619,15 @@ function ppSubmit(amount) {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
     body: JSON.stringify({ amount: amount, method: 'PingPong', ref: ref, note: 'PingPong top-up ' + ref, name: (u.name || u.email || ''), attachment: _ppAttachment })
   })
-    .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json().catch(function () { return {}; }); })
-    .then(function () { done('✓ Top-up submitted — waiting for admin review'); })
-    .catch(function () { if (btn) btn.disabled = false; if (errEl) { errEl.textContent = 'Could not submit — please try again.'; errEl.style.display = 'block'; } });
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
+    .then(function (res) {
+      if (!res.ok) throw new Error((res.d && res.d.error) || ('Server error ' + res.status));
+      done('✓ Top-up submitted — waiting for admin review');
+    })
+    .catch(function (e) {
+      if (btn) btn.disabled = false;
+      if (errEl) { errEl.textContent = (e && e.message) ? ('Could not submit — ' + e.message) : 'Could not submit — check your connection and try again.'; errEl.style.display = 'block'; }
+    });
 }
 function submitDeposit() {
   const amount = parseFloat(document.getElementById('modal-amount').value);
