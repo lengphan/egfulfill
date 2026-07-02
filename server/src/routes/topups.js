@@ -84,6 +84,30 @@ export function topupsRoutes(app, requireAuth) {
       "update topup_requests set status='rejected', confirmed_at=now(), confirmed_by=$2 where id=$1 and status='pending' returning *",
       [req.params.id, req.user.sub]
     );
+    const rec = r.rows[0];
+    if (!rec) { reply.code(404); return { error: 'Not found or already processed' }; }
+    // Credit the SELLER's wallet the instant an admin approves — append-only and
+    // idempotent by (account,type,ref) with ref=the topup id (the same ref the client
+    // reconciler uses), so it can never double-credit. No more slow client polling.
+    if (rec.seller_id) {
+      await q(
+        `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+         values ($1,$2,'topup',$3,$4,$5) on conflict do nothing`,
+        [rec.seller_id, Number(rec.amount_usd) || 0, String(rec.id), (rec.method ? rec.method + ' top-up' : 'Wallet top-up'), req.user.sub]
+      ).catch(() => {});
+    }
+    return rec;
+  });
+
+  // Admin/staff REJECT a pending top-up → status flips to 'rejected' (no credit). The
+  // seller's wallet reads this and shows the row as Rejected. (This endpoint was missing,
+  // so the admin Reject button used to 404 silently.)
+  app.post('/api/topups/:id/reject', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const r = await q(
+      "update topup_requests set status='rejected', confirmed_at=now(), confirmed_by=$2 where id=$1 and status='pending' returning *",
+      [req.params.id, req.user.sub]
+    );
     if (!r.rows[0]) { reply.code(404); return { error: 'Not found or already processed' }; }
     return r.rows[0];
   });

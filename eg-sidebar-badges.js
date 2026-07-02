@@ -62,12 +62,31 @@
     el.style.display = n > 0 ? '' : 'none';
   }
 
+  // Wallet badge = pending top-ups awaiting review. Async (server); only on pages that
+  // actually render a wallet badge. Staff → the whole factory queue; a seller → their own
+  // pending submissions (the /api/topups response is scoped by role).
+  function refreshWalletBadge() {
+    if (!document.querySelector('[data-badge="wallet"]')) return;
+    var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+    if (!tok) return;
+    fetch((window.EG_API_BASE || '') + '/api/topups?status=pending', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) {
+        var n = Array.isArray(list) ? list.length : 0;
+        document.querySelectorAll('[data-badge="wallet"]').forEach(function (el) { paint(el, n); });
+      }).catch(function () {});
+  }
   function refresh() {
     var orders = readOrderOpen();
     var chat = readUnreadConvs();
     document.querySelectorAll('[data-badge="orders"]').forEach(function (el) { paint(el, orders); });
     document.querySelectorAll('[data-badge="chat"]').forEach(function (el) { paint(el, chat); });
+    refreshWalletBadge();
   }
+  // Keep the wallet badge live: poll while the tab is visible + on focus / explicit event.
+  setInterval(function () { if (!document.hidden) refreshWalletBadge(); }, 30000);
+  window.addEventListener('focus', refreshWalletBadge);
+  window.addEventListener('eg-topups-changed', refreshWalletBadge);
 
   if (document.readyState !== 'loading') refresh();
   else document.addEventListener('DOMContentLoaded', refresh);

@@ -567,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Management</div>
     <a class="ni" href="#balance" data-section="balance">
       <svg viewBox="0 0 16 16" fill="currentColor" fill-rule="evenodd"><path d="M2.5 3h11A1.5 1.5 0 0115 4.5V6H1V4.5A1.5 1.5 0 012.5 3zM1 7.8h14v3.7A1.5 1.5 0 0113.5 13h-11A1.5 1.5 0 011 11.5V7.8zm2.2 2.1a.6.6 0 000 1.2h2.1a.6.6 0 000-1.2H3.2z"/></svg>
-      Wallet
+      Wallet <span class="badge-red" data-badge="wallet" style="display:none">0</span>
     </a>
     <a class="ni" href="#settings" data-section="settings">
       <svg viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd"><path d="M9.954 2.21a.75.75 0 01.738-.71h2.616a.75.75 0 01.738.71l.12 2.022c.57.16 1.107.387 1.605.671l1.616-1.22a.75.75 0 01.98.07l1.85 1.85a.75.75 0 01.07.98l-1.22 1.616c.284.498.51 1.035.671 1.605l2.022.12a.75.75 0 01.71.738v2.616a.75.75 0 01-.71.738l-2.022.12c-.16.57-.387 1.107-.671 1.605l1.22 1.616a.75.75 0 01-.07.98l-1.85 1.85a.75.75 0 01-.98.07l-1.616-1.22c-.498.284-1.035.51-1.605.671l-.12 2.022a.75.75 0 01-.738.71h-2.616a.75.75 0 01-.738-.71l-.12-2.022a7.4 7.4 0 01-1.605-.671l-1.616 1.22a.75.75 0 01-.98-.07l-1.85-1.85a.75.75 0 01-.07-.98l1.22-1.616a7.4 7.4 0 01-.671-1.605l-2.022-.12a.75.75 0 01-.71-.738v-2.616a.75.75 0 01.71-.738l2.022-.12c.16-.57.387-1.107.671-1.605l-1.22-1.616a.75.75 0 01.07-.98l1.85-1.85a.75.75 0 01.98-.07l1.616 1.22c.498-.284 1.035-.51 1.605-.671l.12-2.022zM12 15a3 3 0 100-6 3 3 0 000 6z"/></svg>
@@ -10595,6 +10595,7 @@ function admConfirmTopup(id) {
       // Record it in the factory wallet (credits balance + visible ledger row).
       try { if (window.EGStore && EGStore.recordFactoryTopup) EGStore.recordFactoryTopup(rec.amount_usd, { topupId: rec.id, ref: rec.ref, txnId: rec.txn_id, label: 'Seller top-up — ' + (rec.seller_email || rec.seller_name || 'seller') }); } catch (e) {}
       admRenderPendingTopups();
+      try { window.dispatchEvent(new Event('eg-topups-changed')); } catch (e) {}   // decrement the Wallet badge now
       if (typeof walRefresh === 'function') walRefresh();
     })
     .catch(function (e) { alert('Error: ' + e.message); });
@@ -10604,7 +10605,7 @@ function admRejectTopup(id) {
   var tok = localStorage.getItem('eg_token');
   fetch('/api/topups/' + id + '/reject', { method: 'POST', headers: { Authorization: 'Bearer ' + tok } })
     .then(function (r) { return r.json(); })
-    .then(function () { admRenderPendingTopups(); })
+    .then(function () { admRenderPendingTopups(); try { window.dispatchEvent(new Event('eg-topups-changed')); } catch (e) {} })
     .catch(function (e) { alert('Error: ' + e.message); });
 }
 window.admConfirmTopup = admConfirmTopup;

@@ -922,14 +922,16 @@ function renderTx() {
     }).join('');
 }
 
-// Pull the REAL transactions into the history table: the confirmed wallet ledger
-// (/api/wallet) + any pending manual top-ups not yet in the ledger (/api/topups).
+// Pull the REAL transactions into the history table from the server (source of truth):
+// the confirmed wallet ledger (/api/wallet) + top-up requests (/api/topups) for their
+// live status. Server-authoritative, so admin confirm/reject reflects here directly.
 async function hydrateWalletTx() {
   var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
   if (!tok) return;                      // logged out → nothing to load (API would 401)
   var H = { Authorization: 'Bearer ' + tok };
   var base = window.EG_API_BASE || '';
   var fmt = function (iso) { try { var d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } };
+  var ts = function (iso) { try { return new Date(iso).getTime() || 0; } catch (e) { return 0; } };
   var methodOf = function (s) {
     var m = String(s || '').match(/pingpong|paypal|lian ?lian|vietqr|bidv|card|stripe/i);
     if (!m) return '—';
@@ -939,15 +941,16 @@ async function hydrateWalletTx() {
   try {
     var res = await Promise.all([
       fetch(base + '/api/wallet', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(base + '/api/topups?status=pending', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch(base + '/api/topups', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]);
-    var wallet = res[0], pend = res[1], out = [];
+    var wallet = res[0], tops = res[1], out = [];
     // Confirmed ledger movements — running balance walked back from the current total.
     if (wallet && Array.isArray(wallet.ledger)) {
       var bal = Number(wallet.balance) || 0;
       wallet.ledger.forEach(function (row) {
         var delta = Number(row.delta) || 0;
         out.push({
+          _ts: ts(row.created_at),
           date: fmt(row.created_at),
           desc: row.note || (delta >= 0 ? 'Wallet top-up' : 'Order charge'),
           ref: row.ref || '', txnId: '',
@@ -958,22 +961,40 @@ async function hydrateWalletTx() {
         bal = bal - delta;               // balance BEFORE this row → for the next (older) one
       });
     }
-    // Pending manual top-ups (not yet credited) — newest on top.
-    if (Array.isArray(pend)) {
-      pend.slice().reverse().forEach(function (t) {
-        out.unshift({
+    // Top-up requests: pending → "awaiting review", rejected → "rejected". Received ones
+    // are skipped here because they already appear as the ledger credit above (no dupes).
+    if (Array.isArray(tops)) {
+      tops.forEach(function (t) {
+        if (t.status === 'received') return;
+        var isRej = t.status === 'rejected';
+        out.push({
+          _ts: ts(t.created_at),
           date: fmt(t.created_at),
-          desc: (t.method || 'Manual') + ' top-up — awaiting review',
+          desc: (t.method || 'Manual') + ' top-up — ' + (isRej ? 'rejected by admin' : 'awaiting review'),
           ref: t.ref || '', txnId: '',
           method: t.method || '—',
-          type: 'deposit', amount: Number(t.amount_usd) || 0, balance: 0, pending: true
+          type: 'deposit', amount: Number(t.amount_usd) || 0, balance: 0,
+          pending: !isRej, rejected: isRej
         });
       });
     }
+    out.sort(function (a, b) { return (b._ts || 0) - (a._ts || 0); });   // newest first
     TX = out;
     if (typeof renderTx === 'function') renderTx();
+    // Keep the big balance in sync too, so a confirmed top-up updates it live.
+    if (wallet && typeof wallet.balance === 'number') {
+      try {
+        localStorage.setItem('eg_balance', Number(wallet.balance).toFixed(2));
+        document.querySelectorAll('#balance-val').forEach(function (el) { el.textContent = '$' + Number(wallet.balance).toFixed(2); });
+        var big = document.getElementById('wallet-bal-big'); if (big) big.textContent = '$' + Number(wallet.balance).toFixed(2);
+      } catch (e) {}
+    }
   } catch (e) {}
 }
+// Keep the seller's history responsive to admin confirm/reject: refresh every 15s while
+// the tab is visible, and immediately when it regains focus — no manual reload needed.
+setInterval(function () { if (!document.hidden) hydrateWalletTx(); }, 15000);
+window.addEventListener('focus', function () { hydrateWalletTx(); });
 
 /* ── Unfunded order selection ── */
 let pendingFundOrders = [];
