@@ -17,7 +17,7 @@
       + '<div style="background:#fff;border-radius:16px;width:420px;max-width:calc(100vw - 32px);box-shadow:0 24px 64px rgba(0,0,0,.22);padding:26px;position:relative">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px"><div style="font-size:16px;font-weight:700;color:#191918">Add Funds</div><button onclick="closeDepositModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
       + '<div style="margin-bottom:14px"><label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Payment method</label>'
-      + '<select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918"><option value="vietqr">BIDV</option><option value="pingpong">PingPong</option><option value="paypal">PayPal</option><option value="card">Debit/Credit Card</option></select></div>'
+      + '<select id="modal-method" onchange="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918"><option value="vietqr">BIDV</option><option value="pingpong">PingPong</option><option value="lianlian">Lian Lian</option><option value="paypal">PayPal</option><option value="card">Debit/Credit Card</option></select></div>'
       + '<div style="margin-bottom:16px"><label style="font-size:13.5px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>'
       + '<div style="position:relative"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span>'
       + '<input id="modal-amount" type="number" min="1" step="0.01" placeholder="0.00" oninput="vqrSyncDepositUI()" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:700"/></div>'
@@ -26,9 +26,9 @@
       + '</div>'
       + '<div id="dep-vqr-box" style="display:none;margin-top:12px;background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#374151"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px"><span style="color:#6b7280">Your rate — 1 USD = ₫</span><input id="dep-vqr-rate" type="number" min="1" step="1" oninput="vqrSaveRate(this.value);vqrSyncDepositUI()" style="width:100px;text-align:right;border:1.5px solid #e5e4e0;border-radius:7px;padding:5px 8px;font-size:13px;font-family:inherit;font-weight:700;outline:none"/></div><div style="display:flex;align-items:center;justify-content:space-between"><span style="color:#6b7280">Transfer amount</span><b id="dep-vnd-preview" style="font-size:14.5px;color:#191918">₫0</b></div></div></div>'
       + '<div id="dep-pingpong-box" style="display:none;margin-top:12px;margin-bottom:14px;background:#faf9f7;border:1px solid #e5e4e0;border-radius:10px;padding:12px 13px">'
-        + '<div style="font-size:12.5px;color:#6b7280;margin-bottom:9px;line-height:1.5">Send the amount via PingPong to the account below, then upload your payment screenshot. Your balance posts once an admin confirms it.</div>'
+        + '<div id="pp-intro" style="font-size:12.5px;color:#6b7280;margin-bottom:9px;line-height:1.5">Send the amount via PingPong to the account below, then upload your payment screenshot. Your balance posts once an admin confirms it.</div>'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #e5e4e0;border-radius:8px;padding:9px 11px;margin-bottom:11px">'
-          + '<div style="min-width:0"><div style="font-size:11px;color:#9ca3af;font-weight:700;letter-spacing:.04em">PINGPONG EMAIL</div><div style="font-size:13.5px;font-weight:700;color:#191918;overflow:hidden;text-overflow:ellipsis">helennguyen958@gmail.com</div></div>'
+          + '<div style="min-width:0"><div id="pp-email-label" style="font-size:11px;color:#9ca3af;font-weight:700;letter-spacing:.04em">PINGPONG EMAIL</div><div id="pp-email" style="font-size:13.5px;font-weight:700;color:#191918;overflow:hidden;text-overflow:ellipsis">helennguyen958@gmail.com</div></div>'
           + '<button type="button" onclick="ppCopyEmail(this)" style="flex-shrink:0;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:7px;padding:6px 11px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit">Copy</button>'
         + '</div>'
         + '<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Payment proof</label>'
@@ -466,22 +466,28 @@ function vqrSyncDepositUI() {
   var amt = parseFloat((document.getElementById('modal-amount') || {}).value) || 0;
   var vnd = Math.max(0, Math.round(amt * egVqrRate() / 1000) * 1000);
   var pv = document.getElementById('dep-vnd-preview'); if (pv) pv.textContent = '₫' + vnd.toLocaleString('en-US');
-  // PayPal: show the PayPal Buttons and hide the Confirm button (PayPal has its own).
-  var isPaypal = methodEl.value === 'paypal';
-  var ppBox = document.getElementById('paypal-box'); if (ppBox) ppBox.style.display = isPaypal ? 'block' : 'none';
-  if (isPaypal && typeof ppInit === 'function') ppInit();
+  // Manual pay-to-account methods (PingPong, Lian Lian, PayPal): the seller sends
+  // off-platform to a fixed account, uploads proof, and it posts as a pending top-up an
+  // admin confirms. One shared box; the email/label swap per method.
+  var manual = EG_MANUAL_PAY[methodEl.value] || null;
+  var isManual = !!manual;
+  var manualBox = document.getElementById('dep-pingpong-box'); if (manualBox) manualBox.style.display = isManual ? 'block' : 'none';
+  if (isManual) {
+    var emEl = document.getElementById('pp-email'); if (emEl) emEl.textContent = manual.email;
+    var lblEl = document.getElementById('pp-email-label'); if (lblEl) lblEl.textContent = manual.label.toUpperCase() + ' EMAIL';
+    var introEl = document.getElementById('pp-intro'); if (introEl) introEl.textContent = 'Send the amount via ' + manual.label + ' to the account below, then upload your payment screenshot. Your balance posts once an admin confirms it.';
+  }
+  // The old PayPal redirect box is retired (PayPal is a manual method now) — keep it hidden.
+  var ppRedirect = document.getElementById('paypal-box'); if (ppRedirect) ppRedirect.style.display = 'none';
   // Card: show the saved-cards picker (pick one to charge, or add a new one) so the
   // seller can use a card they already saved instead of always re-entering one.
   var isCard = methodEl.value === 'card';
   var cardBox = document.getElementById('dep-card-box'); if (cardBox) cardBox.style.display = isCard ? 'block' : 'none';
   if (isCard) { if (_depStripeCards == null) _loadDepCards(); else _renderDepCardPicker(); }
-  // PingPong: manual send-to-account flow — show the account + proof-upload box.
-  var isPP = methodEl.value === 'pingpong';
-  var ppBox = document.getElementById('dep-pingpong-box'); if (ppBox) ppBox.style.display = isPP ? 'block' : 'none';
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   if (btn) {
-    btn.style.display = isPaypal ? 'none' : '';
-    if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isPP ? 'Submit for review' : 'Pay Now';
+    btn.style.display = '';
+    if (btn.lastChild && btn.lastChild.nodeType === 3) btn.lastChild.textContent = isManual ? 'Submit for review' : 'Pay Now';
   }
 }
 // ── Saved-cards picker inside Add Funds (Debit/Credit Card method) ────────────
@@ -583,7 +589,13 @@ function closeDepositModal() {
   document.getElementById('deposit-modal').style.display = 'none';
   document.body.style.overflow = '';
 }
-// ── PingPong manual top-up (send to our PingPong account → upload proof → pending) ──
+// ── Manual pay-to-account top-ups (send off-platform to a fixed account → upload proof
+//    → pending top-up an admin confirms). Used when a live API isn't available. ──
+var EG_MANUAL_PAY = {
+  pingpong: { label: 'PingPong',  email: 'helennguyen958@gmail.com', prefix: 'PP' },
+  paypal:   { label: 'PayPal',    email: 'admin@embroiderygoods.com', prefix: 'PYP' },
+  lianlian: { label: 'Lian Lian', email: 'phanmylinh0410@gmail.com', prefix: 'LL' }
+};
 var _ppAttachment = null, _ppFileName = '';
 function ppResetFile() {
   _ppAttachment = null; _ppFileName = '';
@@ -592,7 +604,9 @@ function ppResetFile() {
   var er = document.getElementById('pp-err'); if (er) er.style.display = 'none';
 }
 function ppCopyEmail(btn) {
-  try { navigator.clipboard.writeText('helennguyen958@gmail.com'); } catch (e) {}
+  var emEl = document.getElementById('pp-email');
+  var email = (emEl && emEl.textContent) || '';
+  try { navigator.clipboard.writeText(email); } catch (e) {}
   if (btn) { var t = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = t; }, 1400); }
 }
 function ppOnFile(input) {
@@ -608,16 +622,19 @@ function ppOnFile(input) {
 function ppSubmit(amount) {
   var errEl = document.getElementById('pp-err');
   if (!_ppAttachment) { if (errEl) { errEl.textContent = 'Please upload your payment screenshot first.'; errEl.style.display = 'block'; } return; }
+  var methodEl = document.getElementById('modal-method');
+  var mkey = (methodEl && methodEl.value) || 'pingpong';
+  var manual = EG_MANUAL_PAY[mkey] || EG_MANUAL_PAY.pingpong;
   var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
   var u = {}; try { u = JSON.parse(localStorage.getItem('eg_user') || '{}'); } catch (e) {}
-  var ref = 'PP-' + Date.now().toString(36).toUpperCase();
+  var ref = (manual.prefix || 'MAN') + '-' + Date.now().toString(36).toUpperCase();
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   var done = function (msg) { ppResetFile(); if (btn) btn.disabled = false; closeDepositModal(); if (typeof walToast === 'function') walToast(msg); else alert(msg); };
   if (btn) btn.disabled = true;
   if (!tok) { done('Top-up submitted — waiting for admin review'); return; } // dev/local: no session
   fetch((window.EG_API_BASE || '') + '/api/topups', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ amount: amount, method: 'PingPong', ref: ref, note: 'PingPong top-up ' + ref, name: (u.name || u.email || ''), attachment: _ppAttachment })
+    body: JSON.stringify({ amount: amount, method: manual.label, ref: ref, note: manual.label + ' top-up ' + ref, name: (u.name || u.email || ''), attachment: _ppAttachment })
   })
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
     .then(function (res) {
@@ -636,9 +653,9 @@ function submitDeposit() {
   // VietQR: don't credit instantly — show the scan-to-pay QR and wait for the
   // bank transfer to land (auto-confirmed via /api/vietqr/status).
   if (method === 'vietqr') { closeDepositModal(); openVietQRTopUp(amount); return; }
-  // PingPong: manual — the seller sent money to our PingPong account off-platform.
-  // Record a PENDING top-up (with the uploaded proof) that an admin confirms. No credit yet.
-  if (method === 'pingpong') { ppSubmit(amount); return; }
+  // Manual (PingPong / Lian Lian / PayPal): the seller sent money off-platform to a fixed
+  // account. Record a PENDING top-up (with the uploaded proof) an admin confirms. No credit yet.
+  if (EG_MANUAL_PAY[method]) { ppSubmit(amount); return; }
   // Debit/Credit Card: hand off to the existing Stripe top-up flow, carrying
   // the entered amount into the card modal.
   if (method === 'card') {

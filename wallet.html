@@ -868,8 +868,9 @@ function updateStats() {
   document.getElementById('tx-filter-label').textContent = `— ${PLATFORM_LABELS[currentPlatform]}, ${PERIOD_LABELS[currentPeriod]}`;
 }
 
-/* ── Transaction data — empty for a clean test slate ── */
-const TX = [];
+/* ── Transaction data — hydrated from the REAL wallet ledger + pending top-ups
+   (hydrateWalletTx below). Starts empty and fills in once the API responds. ── */
+let TX = [];
 const PLATFORM_COLORS = { shopify:'#f0ede9:#374151', etsy:'#f0ede9:#374151', woo:'#f0ede9:#374151', amazon:'#f0ede9:#374151', manual:'#f0ede9:#374151', all:'#f0ede9:#374151' };
 
 function filterTx(f) {
@@ -919,6 +920,59 @@ function renderTx() {
         <td style="font-weight:600;color:${balColor};text-align:right;white-space:nowrap">${balCell}</td>
       </tr>`;
     }).join('');
+}
+
+// Pull the REAL transactions into the history table: the confirmed wallet ledger
+// (/api/wallet) + any pending manual top-ups not yet in the ledger (/api/topups).
+async function hydrateWalletTx() {
+  var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+  if (!tok) return;                      // logged out → nothing to load (API would 401)
+  var H = { Authorization: 'Bearer ' + tok };
+  var base = window.EG_API_BASE || '';
+  var fmt = function (iso) { try { var d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; } };
+  var methodOf = function (s) {
+    var m = String(s || '').match(/pingpong|paypal|lian ?lian|vietqr|bidv|card|stripe/i);
+    if (!m) return '—';
+    var k = m[0].toLowerCase().replace(/\s/g, '');
+    return { pingpong: 'PingPong', paypal: 'PayPal', lianlian: 'Lian Lian', vietqr: 'VietQR', bidv: 'BIDV', card: 'Card', stripe: 'Card' }[k] || m[0];
+  };
+  try {
+    var res = await Promise.all([
+      fetch(base + '/api/wallet', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch(base + '/api/topups?status=pending', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    ]);
+    var wallet = res[0], pend = res[1], out = [];
+    // Confirmed ledger movements — running balance walked back from the current total.
+    if (wallet && Array.isArray(wallet.ledger)) {
+      var bal = Number(wallet.balance) || 0;
+      wallet.ledger.forEach(function (row) {
+        var delta = Number(row.delta) || 0;
+        out.push({
+          date: fmt(row.created_at),
+          desc: row.note || (delta >= 0 ? 'Wallet top-up' : 'Order charge'),
+          ref: row.ref || '', txnId: '',
+          method: methodOf(row.note || row.type),
+          type: delta >= 0 ? 'deposit' : 'charge',
+          amount: Math.abs(delta), balance: bal
+        });
+        bal = bal - delta;               // balance BEFORE this row → for the next (older) one
+      });
+    }
+    // Pending manual top-ups (not yet credited) — newest on top.
+    if (Array.isArray(pend)) {
+      pend.slice().reverse().forEach(function (t) {
+        out.unshift({
+          date: fmt(t.created_at),
+          desc: (t.method || 'Manual') + ' top-up — awaiting review',
+          ref: t.ref || '', txnId: '',
+          method: t.method || '—',
+          type: 'deposit', amount: Number(t.amount_usd) || 0, balance: 0, pending: true
+        });
+      });
+    }
+    TX = out;
+    if (typeof renderTx === 'function') renderTx();
+  } catch (e) {}
 }
 
 /* ── Unfunded order selection ── */
@@ -1132,6 +1186,7 @@ function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.get
 
 updateStats();
 renderTx();
+hydrateWalletTx();   // fill the history from the real ledger + pending top-ups
 
 // ── Header shared JS ──
 const _I18N={en:{preferences:'Preferences',notifications:'Notifications',new_btn:'New',manual_order:'Manual order',manual_order_sub:'Create from scratch',sync_platforms:'Sync from platforms',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Appearance',light_mode:'Light mode',dark_mode:'Dark mode'},vi:{preferences:'Tùy chọn',notifications:'Thông báo',new_btn:'Tạo mới',manual_order:'Tạo đơn thủ công',manual_order_sub:'Nhập từ đầu',sync_platforms:'Kết nối sàn',sync_platforms_sub:'Shopify, Etsy, WooCommerce…',appearance:'Giao diện',light_mode:'Chế độ sáng',dark_mode:'Chế độ tối'}};
