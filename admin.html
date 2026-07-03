@@ -851,22 +851,22 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #f3f3f1">
           <div style="border-left:3px solid #111827;padding-left:10px">
             <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">In Queue</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div id="adm-pq-queue" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
             <div style="font-size:12px;color:#111827;font-weight:600">Orders</div>
           </div>
           <div style="border-left:3px solid #4b5563;padding-left:10px">
             <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Printing</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div id="adm-pq-print" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
             <div style="font-size:12px;color:#4b5563;font-weight:600">Active</div>
           </div>
           <div style="border-left:3px solid #9ca3af;padding-left:10px">
             <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Quality Check</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div id="adm-pq-qc" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
             <div style="font-size:12px;color:#6b7280;font-weight:600">In review</div>
           </div>
           <div style="border-left:3px solid #d1d5db;padding-left:10px">
             <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Shipped</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
+            <div id="adm-pq-ship" style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
             <div style="font-size:12px;color:#9ca3af;font-weight:600">Fulfilled</div>
           </div>
         </div>
@@ -10233,18 +10233,30 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     if (st) st.textContent = (PERIOD_LABELS[currentTrendPeriod]||'Custom') + ' \u00b7 All platforms';
   }
 
+  // Pipeline counts come from the SAME live source as the overview cards (EGStore.stats):
+  // In Queue = new, Printing = in-production, Quality Check = in-review, Shipped = shipped.
+  var _pcChart = null;
+  function _pcVals(){
+    var s = (window.EGStore && EGStore.stats) ? EGStore.stats() : { new:0, inProduction:0, inReview:0, shipped:0 };
+    return [s.new||0, s.inProduction||0, s.inReview||0, s.shipped||0];
+  }
   function initPC() {
     const el = document.getElementById('pchart');
     if (!el || typeof Chart === 'undefined') return;
-    const ctx = el.getContext('2d');
-    const labs = ['In Queue','Printing','Quality Check','Shipped'];
-    const vals = [0,0,0,0];
     const cols = ['#111827','#4b5563','#9ca3af','#d1d5db'];
-    new Chart(ctx, {
+    const existing = Chart.getChart(el); if (existing) existing.destroy();
+    _pcChart = new Chart(el.getContext('2d'), {
       type:'doughnut',
-      data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderWidth:0,hoverOffset:4}]},
+      data:{labels:['In Queue','Printing','Quality Check','Shipped'],datasets:[{data:_pcVals(),backgroundColor:cols,borderWidth:0,hoverOffset:4}]},
       options:{responsive:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){ return ' '+c.label+': '+c.parsed; }}}}}
     });
+    refreshAdmPipeline();
+  }
+  function refreshAdmPipeline(){
+    const labs = ['In Queue','Printing','Quality Check','Shipped'];
+    const cols = ['#111827','#4b5563','#9ca3af','#d1d5db'];
+    const vals = _pcVals();
+    if (_pcChart) { _pcChart.data.datasets[0].data = vals; _pcChart.update('none'); }
     const total = vals.reduce(function(a,b){ return a+b; },0);
     const leg = document.getElementById('pleg');
     if (leg) leg.innerHTML = labs.map(function(l,i){
@@ -10259,7 +10271,11 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
         + '</div>'
         + '</div>';
     }).join('');
+    // The 4 status-breakdown cards at the top of the trend card mirror the same counts.
+    var bd = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+    bd('adm-pq-queue', vals[0]); bd('adm-pq-print', vals[1]); bd('adm-pq-qc', vals[2]); bd('adm-pq-ship', vals[3]);
   }
+  window.refreshAdmPipeline = refreshAdmPipeline;
 
   const RECENT = [
     {id:'d5b2837ef91c',num:'FF-7001',platId:'SP-70001',cust:'James Liu',store:'Main Store',total:45,profit:17.80,created:'4/16/2026',
@@ -10388,6 +10404,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     set('adm-revenue', EGStore.money(s.revenue));
     set('adm-open',    s.open);
     set('adm-sellers', s.storeCount || 0);
+    if (typeof window.refreshAdmPipeline === 'function') window.refreshAdmPipeline();   // pipeline doughnut + breakdown
   });
 })();
 </script>
