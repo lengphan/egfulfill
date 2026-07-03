@@ -572,6 +572,14 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <div style="font-size:12px;color:#9ca3af;margin-top:6px">Created Mar 15, 2026 · Last used 3 days ago</div>
           </div>
         </div>
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">AI text generation</div>
+          <div style="font-size:13px;color:#9ca3af;margin-bottom:16px">Add your own model key to auto-draft product titles &amp; descriptions. We use <b>your</b> key — pick whichever model you already pay for; any works. Stored only in this browser. Leave the rest blank.</div>
+          <div style="margin-bottom:14px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">OpenAI</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ai-openai-key" type="password" class="finput" placeholder="API key (sk-…)" autocomplete="off" style="flex:2;min-width:200px"/><input id="ai-openai-model" class="finput" placeholder="gpt-4o-mini" autocomplete="off" style="flex:1;min-width:120px"/></div></div>
+          <div style="margin-bottom:14px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Anthropic (Claude)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ai-anthropic-key" type="password" class="finput" placeholder="API key (sk-ant-…)" autocomplete="off" style="flex:2;min-width:200px"/><input id="ai-anthropic-model" class="finput" placeholder="claude-haiku-4-5" autocomplete="off" style="flex:1;min-width:120px"/></div></div>
+          <div style="margin-bottom:16px"><label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px">Google Gemini</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="ai-google-key" type="password" class="finput" placeholder="API key" autocomplete="off" style="flex:2;min-width:200px"/><input id="ai-google-model" class="finput" placeholder="gemini-1.5-flash" autocomplete="off" style="flex:1;min-width:120px"/></div></div>
+          <div style="display:flex;align-items:center;gap:12px"><button class="btn btn-dk" onclick="egSaveAiKeys()" style="font-size:13.5px">Save</button><span id="ai-keys-status" style="font-size:12.5px;color:#15803d;display:none">Saved</span></div>
+        </div>
         <div class="card" style="padding:18px 22px">
           <div style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Webhook Endpoint</div>
           <div style="font-size:13px;color:#9ca3af;margin-bottom:12px">Receive real-time events to your server</div>
@@ -1000,6 +1008,29 @@ function showTab(name){
     document.getElementById('panel-'+t).style.display = t===name ? '' : 'none';
     document.getElementById('tab-'+t).classList.toggle('on', t===name);
   });
+  if (name === 'api' && typeof egLoadAiKeys === 'function') egLoadAiKeys();
+}
+// ── Bring-your-own AI keys (Settings → API Keys). Uses the shared EGAI layer so the Scout
+//    title/description tools run on the SELLER's own key, never the platform owner's. ──
+function egLoadAiKeys(){
+  if (!window.EGAI) return;
+  var c = EGAI.load();
+  ['openai','anthropic','google'].forEach(function(p){
+    var k=document.getElementById('ai-'+p+'-key'); var m=document.getElementById('ai-'+p+'-model');
+    if (k) k.value = (c[p] && c[p].key) || '';
+    if (m) m.value = (c[p] && c[p].model) || '';
+  });
+}
+function egSaveAiKeys(){
+  if (!window.EGAI) return;
+  var c = {};
+  ['openai','anthropic','google'].forEach(function(p){
+    var k=document.getElementById('ai-'+p+'-key'); var m=document.getElementById('ai-'+p+'-model');
+    var key=((k&&k.value)||'').trim();
+    if (key) c[p] = { key: key, model: ((m&&m.value)||'').trim() };
+  });
+  EGAI.save(c);
+  var s=document.getElementById('ai-keys-status'); if(s){ s.style.display='inline'; setTimeout(function(){ s.style.display='none'; }, 1800); }
 }
 // Deep-link from anywhere (e.g. sidebar "Upgrade to Pro" → settings.html#billing).
 (function(){
@@ -1717,6 +1748,7 @@ document.addEventListener('click',function(e){
 <script src="egfulfill-store.js"></script>
 <script src="eg-addfunds.js"></script>
 <script src="egstore-api.js"></script>
+<script src="eg-ai.js"></script>
 <script defer src="eg-seller-plan.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="egfulfill-connect.js"></script>
