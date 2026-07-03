@@ -362,20 +362,194 @@
     _fetchPage(_query || _feedQuery, page, _feed);
   }
 
-  // Make = start turning this idea into a real product. Default hands off to the EXISTING
-  // design-maker via ?scout=1 (a page may override EGScout.onMake — the Publish flow does this).
+  // Make = turn this idea into a real product. Opens the Publish modal below (NO design-maker).
+  // A page may still override EGScout.onMake to take over.
   function _make(listing) {
     if (!listing) return;
     if (typeof g.EGScout.onMake === 'function') { g.EGScout.onMake(listing, _role); return; }
-    try {
-      sessionStorage.setItem('eg_scout_ctx', JSON.stringify({
-        title: listing.title || '', description: listing.description || '', tags: listing.tags || [],
-        image: listing.image || '', images: listing.images || [], url: listing.url || '', price: (listing.price != null ? listing.price : null), role: _role
-      }));
-    } catch (e) {}
-    toast('Opening the builder…');
-    setTimeout(function () { location.href = 'design-maker.html?scout=1'; }, 220);
+    openPublish(listing);
   }
 
-  g.EGScout = { open: open, close: close, mount: mount, onMake: null, _est: _est };
+  // ══════════════════ Publish flow (Make → here; the design-maker is skipped) ══════════════════
+  // Synced product images → pick a blank (colour/size) → optional Template/Design ID → publish to a
+  // connected store, or connect one. "Save for later" stashes the product (eg_scout_products) so it
+  // can be finished in the Design Maker. Shared by seller + admin.
+  var PUB_CSS =
+    '#eg-pub-ov{position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}' +
+    '#eg-pub-ov.on{display:flex}' +
+    '#eg-pub-card{background:#fdfcfa;border:1px solid #e5e4e0;border-radius:18px;box-shadow:0 24px 70px rgba(17,24,39,.24);width:100%;max-width:600px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}' +
+    '#eg-pub-head{display:flex;align-items:flex-start;gap:12px;padding:18px 22px;border-bottom:1px solid #ece9e3;flex-shrink:0}' +
+    '#eg-pub-head h3{margin:0;font-size:17px;font-weight:750;color:#191918}' +
+    '#eg-pub-head .sub{font-size:12.5px;color:#9ca3af;margin-top:2px;max-width:430px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '#eg-pub-x{margin-left:auto;background:none;border:none;cursor:pointer;color:#9ca3af;padding:6px;border-radius:8px;line-height:0;flex-shrink:0}' +
+    '#eg-pub-x:hover{background:#f4f2ef;color:#191918}' +
+    '#eg-pub-body{overflow-y:auto;padding:18px 22px;display:flex;flex-direction:column;gap:19px}' +
+    '.eg-pub-l{font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}' +
+    '.eg-pub-l em{font-weight:500;text-transform:none;letter-spacing:0;color:#9ca3af;font-size:11.5px;font-style:normal}' +
+    '#eg-pub-imgs{display:flex;gap:9px;flex-wrap:wrap}' +
+    '.eg-pub-img{position:relative;width:70px;height:70px;border-radius:9px;overflow:hidden;border:1px solid #e5e4e0;background:#f4f2ef;flex-shrink:0;cursor:pointer}' +
+    '.eg-pub-img img{width:100%;height:100%;object-fit:cover;display:block}' +
+    '.eg-pub-img.primary{border:2px solid #191918}' +
+    '.eg-pub-img .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(17,24,39,.72);color:#fff;border:none;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}' +
+    '.eg-pub-img .pr{position:absolute;bottom:0;left:0;right:0;background:#191918;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:1px;letter-spacing:.03em}' +
+    '.eg-pub-in,.eg-pub-sel{width:100%;border:1px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit;color:#191918;outline:none;background:#fff;box-sizing:border-box}' +
+    '.eg-pub-in:focus,.eg-pub-sel:focus{border-color:#191918}' +
+    '.eg-pub-row{display:flex;gap:10px;margin-top:9px}' +
+    '.eg-pub-row>div{flex:1;min-width:0}' +
+    '.eg-pub-cap{font-size:11px;color:#9ca3af;font-weight:600;margin-bottom:4px;display:block}' +
+    '.eg-pub-hint{font-size:11.5px;color:#9ca3af;margin-top:6px;line-height:1.5}' +
+    '.eg-pub-store{display:flex;align-items:center;gap:10px;border:1px solid #e5e4e0;border-radius:10px;padding:10px 13px;cursor:pointer;margin-bottom:8px;transition:border-color .12s,box-shadow .12s;background:#fff}' +
+    '.eg-pub-store:hover{border-color:#9ca3af}' +
+    '.eg-pub-store.on{border-color:#191918;box-shadow:0 0 0 1px #191918}' +
+    '.eg-pub-store b{font-size:13.5px;font-weight:650;color:#191918;display:block}' +
+    '.eg-pub-store i{font-size:11.5px;color:#9ca3af;font-style:normal}' +
+    '.eg-pub-connect{width:100%;border:1.5px dashed #c9c3ba;border-radius:11px;padding:15px;text-align:center;cursor:pointer;background:transparent;font-family:inherit;color:#6b7280;font-size:13.5px;font-weight:600;transition:border-color .12s,color .12s}' +
+    '.eg-pub-connect:hover{border-color:#191918;color:#191918}' +
+    '#eg-pub-foot{border-top:1px solid #ece9e3;padding:14px 22px;display:flex;gap:10px;flex-shrink:0}' +
+    '#eg-pub-foot button{flex:1;border-radius:11px;padding:12px;font-size:14px;font-weight:650;cursor:pointer;font-family:inherit;transition:opacity .14s,background .14s}' +
+    '#eg-pub-save{background:#fff;border:1px solid #e5e4e0;color:#374151}' +
+    '#eg-pub-save:hover{background:#f7f6f4}' +
+    '#eg-pub-publish{background:#191918;border:none;color:#fff}' +
+    '#eg-pub-publish:hover{opacity:.88}';
+
+  var _pub = null, _pubInjected = false;
+  function injectPub() {
+    if (_pubInjected) return; _pubInjected = true;
+    if (!document.getElementById('eg-pub-css')) { var st = document.createElement('style'); st.id = 'eg-pub-css'; st.textContent = PUB_CSS; document.head.appendChild(st); }
+    var ov = document.createElement('div'); ov.id = 'eg-pub-ov';
+    ov.innerHTML =
+      '<div id="eg-pub-card" role="dialog" aria-modal="true" aria-label="Make product">' +
+        '<div id="eg-pub-head"><div><h3>Make product</h3><div class="sub" id="eg-pub-sub"></div></div>' +
+          '<button id="eg-pub-x" type="button" aria-label="Close"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>' +
+        '<div id="eg-pub-body">' +
+          '<div><div class="eg-pub-l">Images <em>synced from Etsy — click to set primary, × to remove</em></div><div id="eg-pub-imgs"></div></div>' +
+          '<div><div class="eg-pub-l">Choose your blank</div><select class="eg-pub-sel" id="eg-pub-product"></select>' +
+            '<div class="eg-pub-row"><div><label class="eg-pub-cap">Colour</label><select class="eg-pub-sel" id="eg-pub-color"></select></div><div><label class="eg-pub-cap">Size</label><select class="eg-pub-sel" id="eg-pub-size"></select></div></div></div>' +
+          '<div><div class="eg-pub-l">Design <em>optional</em></div><input class="eg-pub-in" id="eg-pub-design" placeholder="Template or Design ID — e.g. TPL-1234 or DSN-5678" autocomplete="off"/>' +
+            '<div class="eg-pub-hint">Have a design ready? Paste its Template/Design ID. Or <b>Save for later</b> and finish it in the Design Maker.</div></div>' +
+          '<div><div class="eg-pub-l">Publish to</div><div id="eg-pub-stores"></div></div>' +
+        '</div>' +
+        '<div id="eg-pub-foot"><button id="eg-pub-save" type="button">Save for later</button><button id="eg-pub-publish" type="button">Publish</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) closePub(); });
+    document.getElementById('eg-pub-x').addEventListener('click', closePub);
+    document.getElementById('eg-pub-product').addEventListener('change', _pubOnProduct);
+    document.getElementById('eg-pub-save').addEventListener('click', _pubSave);
+    document.getElementById('eg-pub-publish').addEventListener('click', _pubPublish);
+  }
+  function openPublish(listing) {
+    if (!listing) return;
+    injectPub();
+    _pub = { listing: listing, images: (listing.images && listing.images.length ? listing.images.slice() : (listing.image ? [listing.image] : [])), store: null };
+    document.getElementById('eg-pub-sub').textContent = listing.title || '';
+    document.getElementById('eg-pub-design').value = '';
+    _pubRenderImgs(); _pubRenderProducts(); _pubRenderStores();
+    document.getElementById('eg-pub-ov').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  }
+  function closePub() { var ov = document.getElementById('eg-pub-ov'); if (ov) ov.classList.remove('on'); document.body.style.overflow = ''; }
+
+  function _pubRenderImgs() {
+    var box = document.getElementById('eg-pub-imgs'); if (!box) return;
+    if (!_pub.images.length) { box.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;padding:6px 0">No images — you\'ll add your own design in the Design Maker.</div>'; return; }
+    box.innerHTML = _pub.images.map(function (u, i) {
+      return '<div class="eg-pub-img' + (i === 0 ? ' primary' : '') + '" data-i="' + i + '"><img src="' + esc(u) + '" alt=""/>' + (i === 0 ? '<span class="pr">PRIMARY</span>' : '') + '<button class="rm" type="button" data-i="' + i + '" title="Remove">&times;</button></div>';
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.rm'), function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); _pub.images.splice(+b.getAttribute('data-i'), 1); _pubRenderImgs(); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('.eg-pub-img'), function (d) {
+      d.addEventListener('click', function () { var i = +d.getAttribute('data-i'); if (i > 0) { _pub.images.unshift(_pub.images.splice(i, 1)[0]); _pubRenderImgs(); } });
+    });
+  }
+
+  function _pubCatalog() { try { if (!window.EGStore) return []; var fn = EGStore.getCatalogProducts || EGStore.getCatalog; return (fn ? (fn.call(EGStore) || []) : []); } catch (e) { return []; } }
+  function _pubList(p, keys) {
+    for (var i = 0; i < keys.length; i++) { var v = p[keys[i]]; if (Array.isArray(v) && v.length) return v.map(function (x) { return (x && x.name) ? x.name : String(x); }); }
+    return [];
+  }
+  function _pubRenderProducts() {
+    var sel = document.getElementById('eg-pub-product'); if (!sel) return;
+    var cat = _pubCatalog().filter(function (p) { return !p.status || p.status === 'Active'; });
+    sel._cat = cat;
+    if (!cat.length) { sel.innerHTML = '<option value="">No blanks in your catalog yet</option>'; document.getElementById('eg-pub-color').innerHTML = '<option>Default</option>'; document.getElementById('eg-pub-size').innerHTML = '<option>One size</option>'; return; }
+    sel.innerHTML = cat.map(function (p, i) { return '<option value="' + i + '">' + esc(p.name || p.type || ('Product ' + (i + 1))) + '</option>'; }).join('');
+    _pubOnProduct();
+  }
+  function _pubOnProduct() {
+    var sel = document.getElementById('eg-pub-product'); var cat = sel && sel._cat; if (!cat || !cat.length) return;
+    var p = cat[+sel.value] || cat[0] || {};
+    // Real catalog products carry colours as a colorImages map; fall back to a colours array.
+    var colors = (p.colorImages && typeof p.colorImages === 'object') ? Object.keys(p.colorImages) : _pubList(p, ['colors', 'colours', 'colorList']);
+    var sizes = _pubList(p, ['sizes', 'sizeList']);
+    if (!sizes.length && Array.isArray(p.variants)) sizes = p.variants.map(function (v) { return (v && v.size) ? v.size : (typeof v === 'string' ? v : ''); }).filter(Boolean);
+    sizes = sizes.filter(function (s, i) { return sizes.indexOf(s) === i; });   // de-dupe
+    document.getElementById('eg-pub-color').innerHTML = (colors.length ? colors : ['Default']).map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+    document.getElementById('eg-pub-size').innerHTML = (sizes.length ? sizes : ['One size']).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
+  }
+
+  function _pubRenderStores() {
+    var box = document.getElementById('eg-pub-stores'); if (!box) return;
+    box.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;padding:4px 0">Checking your connected stores…</div>';
+    var tk = tok();
+    var plats = [['etsy', 'Etsy'], ['shopify', 'Shopify'], ['tiktok', 'TikTok Shop']];
+    Promise.all(plats.map(function (pl) {
+      return fetch((g.EG_API_BASE || '') + '/api/' + pl[0] + '/connected', { headers: tk ? { Authorization: 'Bearer ' + tk } : {} })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (d) { return { key: pl[0], label: pl[1], connected: !!(d && d.connected), shops: (d && d.shops) || [] }; })
+        .catch(function () { return { key: pl[0], label: pl[1], connected: false }; });
+    })).then(function (results) {
+      var connected = results.filter(function (r) { return r.connected; });
+      if (!connected.length) {
+        box.innerHTML = '<button class="eg-pub-connect" id="eg-pub-connect" type="button">+ Connect a store to publish</button>';
+        var cb = document.getElementById('eg-pub-connect'); if (cb) cb.addEventListener('click', function () { location.href = 'settings.html#stores'; });
+        _pub.store = null; return;
+      }
+      box.innerHTML = connected.map(function (r, i) {
+        return '<div class="eg-pub-store' + (i === 0 ? ' on' : '') + '" data-key="' + r.key + '"><div style="flex:1"><b>' + esc(r.label) + '</b><i>' + esc((r.shops && r.shops[0]) || 'Connected') + '</i></div></div>';
+      }).join('');
+      _pub.store = connected[0].key;
+      Array.prototype.forEach.call(box.querySelectorAll('.eg-pub-store'), function (d) {
+        d.addEventListener('click', function () {
+          Array.prototype.forEach.call(box.querySelectorAll('.eg-pub-store'), function (x) { x.classList.remove('on'); });
+          d.classList.add('on'); _pub.store = d.getAttribute('data-key');
+        });
+      });
+    });
+  }
+
+  function _pubCollect() {
+    var sel = document.getElementById('eg-pub-product'); var cat = sel && sel._cat;
+    var p = (cat && cat.length) ? cat[+sel.value] : null;
+    return {
+      listing_id: _pub.listing.listing_id, title: _pub.listing.title || '', description: _pub.listing.description || '',
+      price: (_pub.listing.price != null ? _pub.listing.price : null), tags: _pub.listing.tags || [], url: _pub.listing.url || '',
+      images: _pub.images.slice(), product: p ? (p.name || p.type || '') : '', productId: p ? (p.id || null) : null,
+      color: (document.getElementById('eg-pub-color') || {}).value || '', size: (document.getElementById('eg-pub-size') || {}).value || '',
+      designId: ((document.getElementById('eg-pub-design') || {}).value || '').trim(), store: _pub.store, ts: Date.now()
+    };
+  }
+  function _pubPersist(prod) { try { var all = JSON.parse(localStorage.getItem('eg_scout_products') || '[]'); all.unshift(prod); localStorage.setItem('eg_scout_products', JSON.stringify(all.slice(0, 200))); } catch (e) {} }
+  function _pubSave() { _pubPersist(_pubCollect()); toast('Saved — finish & publish it from the Design Maker anytime.'); closePub(); }
+  function _pubPublish() {
+    var prod = _pubCollect();
+    if (!prod.store) { toast('Connect a store first, or use Save for later.'); return; }
+    _pubPersist(prod);
+    if (prod.store !== 'etsy') { toast('Saved. Publishing to ' + prod.store + ' is coming soon — Etsy publishes live now.'); closePub(); return; }
+    var img = prod.images[0] || _pub.listing.image || '';
+    var btn = document.getElementById('eg-pub-publish'); if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    fetch((g.EG_API_BASE || '') + '/api/etsy/publish', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok() },
+      body: JSON.stringify({ title: prod.title, description: prod.description || prod.title, price: prod.price || 0, quantity: 999, image: img })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); }).then(function (res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+      if (!res || res.error) { toast('Etsy publish failed: ' + ((res && res.error) || 'unknown error')); return; }
+      toast('✓ Draft listing created on Etsy');
+      if (res.url) { try { window.open(res.url, '_blank'); } catch (e) {} }
+      closePub();
+    }).catch(function (e) { if (btn) { btn.disabled = false; btn.textContent = 'Publish'; } toast('Etsy publish failed: ' + e.message); });
+  }
+
+  g.EGScout = { open: open, close: close, mount: mount, openPublish: openPublish, onMake: null, _est: _est };
 })(window);
