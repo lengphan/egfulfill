@@ -24,13 +24,47 @@
     }
     return null;
   }
+  // Call the seller's OWN provider directly from the browser (their key never touches our server).
+  // Returns the generated text, or throws. OpenAI/Google allow browser CORS; Anthropic needs the
+  // explicit direct-browser-access header.
+  async function _post(url, headers, body) {
+    var r = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    var d = await r.json().catch(function () { return {}; });
+    if (!r.ok) { throw new Error((d && d.error && (d.error.message || d.error)) || ('AI request failed (' + r.status + ')')); }
+    return d;
+  }
+  async function generate(prompt, opts) {
+    opts = opts || {};
+    var a = active();
+    if (!a) throw new Error('No AI key set — add one in Settings → API Keys.');
+    var maxTokens = opts.maxTokens || 500;
+    if (a.provider === 'openai') {
+      var d = await _post('https://api.openai.com/v1/chat/completions',
+        { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + a.key },
+        { model: a.model, messages: [{ role: 'user', content: prompt }], max_tokens: maxTokens, temperature: 0.7 });
+      return ((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').trim();
+    }
+    if (a.provider === 'anthropic') {
+      var d2 = await _post('https://api.anthropic.com/v1/messages',
+        { 'Content-Type': 'application/json', 'x-api-key': a.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        { model: a.model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] });
+      return ((d2.content && d2.content[0] && d2.content[0].text) || '').trim();
+    }
+    if (a.provider === 'google') {
+      var d3 = await _post('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(a.model) + ':generateContent?key=' + encodeURIComponent(a.key),
+        { 'Content-Type': 'application/json' },
+        { contents: [{ parts: [{ text: prompt }] }] });
+      return ((d3.candidates && d3.candidates[0] && d3.candidates[0].content && d3.candidates[0].content.parts && d3.candidates[0].content.parts[0] && d3.candidates[0].content.parts[0].text) || '').trim();
+    }
+    throw new Error('Unknown AI provider: ' + a.provider);
+  }
+
   g.EGAI = {
     PROVIDERS: PROVIDERS,
     load: load,
     save: save,
     active: active,
-    configured: function () { return !!active(); }
-    // generate(prompt) is added with the Scout "Make" flow — it reads active() and calls
-    // that provider directly from the browser with the seller's own key.
+    configured: function () { return !!active(); },
+    generate: generate
   };
 })(window);

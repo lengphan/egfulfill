@@ -9,6 +9,7 @@
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
 <script src="eg-sidebar-badges.js"></script>
+<script src="eg-ai.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
 *{box-sizing:border-box}
@@ -3164,19 +3165,77 @@ function dmRecalcRow(input){
   me.textContent = pct + '%';              me.style.color = color;
 }
 
-/* Auto-generated listing description */
-function dmRegenDesc(){
-  const title = (document.getElementById('dm-listing-title').value || currentProductName).trim();
-  const desc =
-    `The ${currentProductName.toLowerCase()} is a wardrobe staple — the perfect canvas for this design. `
+/* Auto-generated listing description. Uses the seller's OWN AI key (Settings → API Keys) when
+   present — bring-your-own, called straight from the browser so it never spends the platform's
+   API — and falls back to a template when there's no key or the request fails. */
+async function dmRegenDesc(){
+  const title = (document.getElementById('dm-listing-title').value || currentProductName || '').trim();
+  const descEl = document.getElementById('dm-listing-desc');
+  const tmpl =
+    `The ${(currentProductName||'product').toLowerCase()} is a wardrobe staple — the perfect canvas for this design. `
     + `Printed on demand with a durable, true-to-size fit and a smooth surface for crisp, vivid detail. `
     + `Each piece is made to order and quality-checked before it ships.\n\n`
     + `• Premium blank · soft, breathable fabric\n`
     + `• Design printed front and centre, built to last wash after wash\n`
     + `• Available across every size in the range\n\n`
     + `Listing: ${title}`;
-  document.getElementById('dm-listing-desc').value = desc;
+  if (window.EGAI && EGAI.configured && EGAI.configured()) {
+    const btn = document.querySelector('button[onclick="dmRegenDesc()"]');
+    const old = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Writing…'; }
+    try {
+      const kw = (window._egScoutTags && window._egScoutTags.length) ? ('\nRelevant keywords: ' + window._egScoutTags.slice(0,10).join(', ')) : '';
+      const prompt = `Write a compelling, SEO-friendly Etsy listing description for a print-on-demand ${currentProductName||'product'}.\n`
+        + `Title: "${title}".${kw}\n\n`
+        + `Rules: 90-160 words, warm and benefit-led, include 3-4 short bullet points each starting with "• ", `
+        + `state it is made to order and quality-checked, and do NOT invent brand names, exact sizes, or prices. `
+        + `Return ONLY the description text (no title, no preamble).`;
+      const out = await EGAI.generate(prompt, { maxTokens: 500 });
+      if (out) { descEl.value = out; return; }
+    } catch (e) { if (typeof toast === 'function') toast('AI: ' + (e.message||'failed') + ' — used a template'); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = old; } }
+  }
+  descEl.value = tmpl;
 }
+
+/* ── Product Scout hand-off ── When the design-maker is opened from Super Spy (?scout=1), pre-fill
+   the listing title + description (AI if a key is set) and show the spied Etsy image as a REMOVABLE
+   reference. Fully guarded: on a normal open there is no ?scout=1, so nothing here runs and the
+   existing design-maker flow is completely untouched. */
+function dmInitFromScout(){
+  try {
+    if (!new URLSearchParams(location.search).get('scout')) return;
+    const raw = sessionStorage.getItem('eg_scout_ctx'); if (!raw) return;
+    sessionStorage.removeItem('eg_scout_ctx');            // one-shot — a refresh won't re-apply
+    const ctx = JSON.parse(raw); if (!ctx) return;
+    const title = (ctx.title || '').trim();
+    if (title) {
+      const lt = document.getElementById('dm-listing-title'); if (lt) lt.value = title;
+      const dt = document.getElementById('design-title'); if (dt) dt.value = title.slice(0, 60);
+    }
+    window._egScoutTags = Array.isArray(ctx.tags) ? ctx.tags : [];
+    try { dmRegenDesc(); } catch(e){}                     // AI (own key) or template
+    if (ctx.image) dmShowScoutRef(ctx.image, ctx.url, title);
+  } catch(e){}
+}
+function dmShowScoutRef(img, url, title){
+  const old = document.getElementById('dm-scout-ref'); if (old) old.remove();
+  const c = document.createElement('div'); c.id = 'dm-scout-ref';
+  c.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:5000;width:200px;background:#fff;border:1px solid #e5e4e0;border-radius:14px;box-shadow:0 12px 34px rgba(17,24,39,.18);overflow:hidden;font-family:Inter,-apple-system,sans-serif';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid #f0ede9';
+  head.innerHTML = '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#9ca3af">Spied reference</span>';
+  const x = document.createElement('button'); x.textContent = '✕'; x.title = 'Dismiss';
+  x.style.cssText = 'background:none;border:none;cursor:pointer;color:#9ca3af;line-height:0;padding:2px;font-size:13px';
+  x.onclick = function(){ c.remove(); };
+  head.appendChild(x); c.appendChild(head);
+  const a = document.createElement('a'); a.href = url || '#'; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block';
+  const im = document.createElement('img'); im.src = img; im.alt = ''; im.style.cssText = 'width:100%;height:150px;object-fit:cover;display:block';
+  a.appendChild(im); c.appendChild(a);
+  const cap = document.createElement('div'); cap.style.cssText = 'padding:8px 10px;font-size:12px;color:#6b7280;line-height:1.4'; cap.textContent = title || '';
+  c.appendChild(cap); document.body.appendChild(c);
+}
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(dmInitFromScout, 140); });
 
 /* Connect to store → publish the design to selling platforms */
 // Reflect the real Etsy connection state in the publish row (works for any logged-in

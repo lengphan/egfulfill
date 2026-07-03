@@ -47,7 +47,7 @@
     '.eg-scout-empty{grid-column:1/-1;text-align:center;color:#9ca3af;font-size:14px;padding:60px 0;line-height:1.6}' +
     '.eg-scout-card{background:#fff;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .14s,box-shadow .14s,transform .08s}' +
     '.eg-scout-card:hover{border-color:#191918;box-shadow:0 4px 18px rgba(17,24,39,.1);transform:translateY(-1px)}' +
-    '.eg-scout-img{aspect-ratio:1/1;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
+    '.eg-scout-img{aspect-ratio:1/1;min-height:172px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
     '.eg-scout-img img{width:100%;height:100%;object-fit:cover;display:block}' +
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
@@ -63,7 +63,13 @@
     '.eg-scout-save:hover{background:#f7f6f4}' +
     '.eg-scout-save.on{background:#191918;color:#fff;border-color:#191918}' +
     '#eg-scout-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#191918;color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:11px;box-shadow:0 12px 32px rgba(17,24,39,.28);z-index:9600;opacity:0;transition:opacity .2s;pointer-events:none}' +
-    '#eg-scout-toast.show{opacity:1}';
+    '#eg-scout-toast.show{opacity:1}' +
+    /* ── Page mode: rendered full-page via EGScout.mount(el) instead of the modal overlay ── */
+    '.eg-scout-pagewrap{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}' +
+    '.eg-scout-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}' +
+    '.eg-scout-pagewrap #eg-scout-form{flex:1;min-width:260px;display:flex;gap:9px;padding:0;border:none;background:none}' +
+    '.eg-scout-pagewrap #eg-scout-grid{flex:none;overflow:visible;padding:0;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}' +
+    '.eg-scout-pagewrap #eg-scout-tabs{margin-left:0}';
 
   var HTML =
     '<div id="eg-scout-panel" role="dialog" aria-modal="true" aria-label="Super Spy">' +
@@ -81,6 +87,21 @@
       '</form>' +
       '<div id="eg-scout-grid"><div class="eg-scout-empty">Search a niche above to see what\'s selling on Etsy.</div></div>' +
     '</div>';
+
+  // Page-mode markup (search bar + tabs + grid) — same element IDs as the modal so all the
+  // search/favorites/render logic is shared verbatim. A page uses mount(); a modal uses open().
+  var PAGE_HTML =
+    '<div class="eg-scout-bar">' +
+      '<form id="eg-scout-form" autocomplete="off">' +
+        '<input id="eg-scout-q" type="text" placeholder="Search a niche, e.g. personalized pennant, custom apron…" autocomplete="off"/>' +
+        '<button id="eg-scout-go" type="submit">Search</button>' +
+      '</form>' +
+      '<div id="eg-scout-tabs">' +
+        '<button type="button" data-view="search" class="eg-scout-tab on">Search</button>' +
+        '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>' +
+      '</div>' +
+    '</div>' +
+    '<div id="eg-scout-grid"><div class="eg-scout-empty">Search a niche above to see what\'s selling on Etsy.</div></div>';
 
   var _injected = false, _role = 'seller', _last = [], _view = 'search';
 
@@ -111,6 +132,23 @@
     var i = document.getElementById('eg-scout-q'); if (i) setTimeout(function () { i.focus(); }, 60);
   }
   function close() { var ov = document.getElementById('eg-scout-ov'); if (ov) ov.classList.remove('on'); document.body.style.overflow = ''; }
+
+  // Full-page mount: render the SAME engine into a page container (superspy.html) instead of the
+  // modal overlay. Shared so admin reuses it without a rebuild. A page loads eg-scout.js and calls
+  // EGScout.mount(el, {role}); it never opens the modal, so the fixed IDs never collide.
+  function mount(el, opts) {
+    opts = opts || {}; _role = opts.role || 'seller';
+    if (!el) return;
+    if (!document.getElementById('eg-scout-css')) { var st = document.createElement('style'); st.id = 'eg-scout-css'; st.textContent = CSS; document.head.appendChild(st); }
+    if (!document.getElementById('eg-scout-toast')) { var t = document.createElement('div'); t.id = 'eg-scout-toast'; document.body.appendChild(t); }
+    el.classList.add('eg-scout-pagewrap');
+    el.innerHTML = PAGE_HTML;
+    document.getElementById('eg-scout-form').addEventListener('submit', function (e) { e.preventDefault(); doSearch(); });
+    Array.prototype.forEach.call(el.querySelectorAll('.eg-scout-tab'), function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-view')); }); });
+    updateFavCount();
+    setView('search');
+    var i = document.getElementById('eg-scout-q'); if (i) setTimeout(function () { i.focus(); }, 80);
+  }
 
   function setView(v) {
     _view = v;
@@ -183,13 +221,22 @@
     wireCards(grid, favs);
   }
 
-  // M3 hands this off to the product/design builder. A page can set EGScout.onMake to take over.
+  // Make = start turning this idea into a real product. Hands off to the EXISTING design-maker
+  // (no change to its flow): we drop a scout context in sessionStorage and open it with ?scout=1;
+  // a small guarded hook there pre-fills the listing title/description (via the seller's own AI key
+  // if set) and shows the Etsy image as a removable reference. A page may override EGScout.onMake.
   function _make(listing) {
     if (!listing) return;
     if (typeof g.EGScout.onMake === 'function') { g.EGScout.onMake(listing, _role); return; }
-    toast('Saved to draft — builder hand-off comes next.');
+    try {
+      sessionStorage.setItem('eg_scout_ctx', JSON.stringify({
+        title: listing.title || '', description: listing.description || '', tags: listing.tags || [],
+        image: listing.image || '', url: listing.url || '', price: (listing.price != null ? listing.price : null), role: _role
+      }));
+    } catch (e) {}
+    toast('Opening the builder…');
+    setTimeout(function () { location.href = 'design-maker.html?scout=1'; }, 220);
   }
 
-  g.EGScout = { open: open, close: close, onMake: null };
-  if (document.body) inject(); else document.addEventListener('DOMContentLoaded', inject);
+  g.EGScout = { open: open, close: close, mount: mount, onMake: null };
 })(window);

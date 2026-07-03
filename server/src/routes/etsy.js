@@ -349,7 +349,24 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { reply.code(r.status >= 400 && r.status < 500 ? r.status : 502); return { error: (d && d.error) || ('Etsy search error ' + r.status) }; }
-      const results = (d.results || []).map((l) => ({
+      const base = d.results || [];
+      const pickImg = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
+      // findAllListingsActive frequently DROPS the Images include, so cards came back with no
+      // thumbnail. getListingsByListingIds DOES return images — fetch them in ONE batch call and
+      // merge, so every card has a picture (this is why the grid looked empty before).
+      const imgById = {};
+      const ids = base.map((l) => l.listing_id).filter(Boolean);
+      if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
+        try {
+          const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images';
+          const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
+          if (br.ok) {
+            const bd = await br.json().catch(() => ({}));
+            (bd.results || []).forEach((l) => { const url = pickImg(l.images && l.images[0]); if (url) imgById[l.listing_id] = url; });
+          }
+        } catch (e) { /* image enrich is best-effort — never fail the search over a thumbnail */ }
+      }
+      const results = base.map((l) => ({
         listing_id: l.listing_id,
         title: l.title || '',
         description: l.description || '',
@@ -357,7 +374,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         currency: (l.price && l.price.currency_code) || 'USD',
         url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
         tags: Array.isArray(l.tags) ? l.tags : [],
-        image: (l.images && l.images[0] && (l.images[0].url_570xN || l.images[0].url_fullxfull || l.images[0].url_680x540)) || null,
+        image: pickImg(l.images && l.images[0]) || imgById[l.listing_id] || null,
         shop_name: (l.shop && l.shop.shop_name) || null,
         num_favorers: l.num_favorers || 0
       }));
