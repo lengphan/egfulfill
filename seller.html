@@ -1312,6 +1312,52 @@ if (!IS_DEMO) {
   });
 }
 
+// ── Real dashboard stats: compute the buckets from the seller's OWN orders so every
+//    card reflects actual data (rebuilt on load + whenever orders change). Demo mode
+//    (?demo=1) keeps the showcase presets. ──
+function _dashOrderTs(o){
+  if (!o) return 0;
+  if (o.submittedAt) return o.submittedAt;
+  var c = o.created_at || o.created || o.date;
+  if (c) { var t = Date.parse(c); if (t) return t; }
+  if (o.timeline && o.timeline[0]) return o.timeline[0].at || o.timeline[0].ts || 0;
+  return 0;
+}
+function _dashRange(period){
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth(), end = Date.now();
+  if (period === 'month')     return { start: new Date(y, m, 1).getTime(), end: end };
+  if (period === 'lastmonth') return { start: new Date(y, m-1, 1).getTime(), end: new Date(y, m, 1).getTime() };
+  if (period === '7d')        return { start: end - 7*864e5, end: end };
+  if (period === '30d')       return { start: end - 30*864e5, end: end };
+  if (period === 'quarter')   return { start: new Date(y, m-2, 1).getTime(), end: end };
+  return { start: 0, end: end };
+}
+function _computeDashBucket(orders, platform, period){
+  var rng = _dashRange(period), n=0, rev=0, prof=0, shipped=0, refunded=0;
+  orders.forEach(function(o){
+    if (platform !== 'all' && _dashPlat(o) !== platform) return;
+    var ts = _dashOrderTs(o);
+    if (ts && (ts < rng.start || ts >= rng.end)) return;   // outside the window (unknown ts → always counted)
+    n++; rev += Number(o.total)||0; prof += Number(o.profit)||0;
+    var fs = String(o.factoryStatus || o.status || 'new');
+    if (fs === 'shipped') shipped++;
+    if (fs === 'refunded' || o.refunded) refunded++;
+  });
+  return { orders:n, revenue:rev, profit:prof,
+           fulfillRate: n ? Math.round((shipped/n)*1000)/10 : 0,
+           aov: n ? rev/n : 0,
+           returnRate: n ? Math.round((refunded/n)*1000)/10 : 0 };
+}
+function rebuildDashStats(){
+  if (IS_DEMO) return;   // demo keeps the preset showcase numbers
+  var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders()||[]).filter(function(o){return o&&o.id;}) : [];
+  ['month','7d','30d','lastmonth','quarter'].forEach(function(per){
+    Object.keys(DASH_STATS).forEach(function(plat){
+      DASH_STATS[plat][per] = _computeDashBucket(orders, plat, per);
+    });
+  });
+}
+
 let dashPlatform = 'all', dashPeriod = 'month';
 
 function setDashPlatform(p) {
@@ -1344,7 +1390,7 @@ function _dashSyncStores(){
   // guarded): tear down the existing wrap, then re-enhance with the rebuilt options.
   try{ var w=sel.closest('.eg-sel'); if(w){ w.parentNode.insertBefore(sel,w); w.remove(); sel.style.display=''; sel._egEnhanced=false; } if(typeof egEnhanceSelect==='function') egEnhanceSelect(sel); }catch(e){}
 }
-(function(){ function go(){ try{ _dashSyncStores(); }catch(e){} } if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go(); document.addEventListener('eg-orders-changed', go); })();
+(function(){ function go(){ try{ rebuildDashStats(); _dashSyncStores(); updateDashStats(); }catch(e){} } if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',go); else go(); document.addEventListener('eg-orders-changed', go); })();
 
 // Speedometer-style count-up: ramps from 0 → target with cubic ease-out.
 // Reads the current el.dataset.target to dedupe consecutive identical calls
@@ -1414,7 +1460,11 @@ function updateDashStats(animate) {
   // starts at zero and will fill in as actual orders flow.
   const bd = (id, v) => { const el = document.getElementById(id); if (el) setVal(el, v, intFmt); };
   if (IS_DEMO) { bd('bd-inqueue', 47); bd('bd-printing', 124); bd('bd-qc', 86); bd('bd-shipped', 873); }
-  else        { bd('bd-inqueue', 0);  bd('bd-printing', 0);   bd('bd-qc', 0);  bd('bd-shipped', 0);   }
+  else {
+    // Real pipeline counts from the seller's live orders (via EGStore.stats()).
+    var _ps = (window.EGStore && EGStore.stats) ? EGStore.stats() : {new:0,inReview:0,inProduction:0,shipped:0};
+    bd('bd-inqueue', _ps.new||0); bd('bd-printing', _ps.inProduction||0); bd('bd-qc', _ps.inReview||0); bd('bd-shipped', _ps.shipped||0);
+  }
   // Active stores card (#w-stores) — count platforms with month orders > 0
   const storeCount = Object.keys(DASH_STATS).filter(k => k!=='all' && (DASH_STATS[k]?.month?.orders||0) > 0).length;
   setVal(document.querySelector('#w-stores [style*="2.6rem"]'), storeCount, intFmt);
