@@ -76,7 +76,7 @@
       '<div id="eg-scout-head">' +
         '<div><h3>Super Spy</h3><div class="sub">Spy what\'s selling on Etsy — live, nothing stored. Make it, or save it.</div></div>' +
         '<div id="eg-scout-tabs">' +
-          '<button type="button" data-view="search" class="eg-scout-tab on">Search</button>' +
+          '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
           '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>' +
         '</div>' +
         '<button id="eg-scout-x" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>' +
@@ -97,7 +97,7 @@
         '<button id="eg-scout-go" type="submit">Search</button>' +
       '</form>' +
       '<div id="eg-scout-tabs">' +
-        '<button type="button" data-view="search" class="eg-scout-tab on">Search</button>' +
+        '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
         '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>' +
       '</div>' +
     '</div>' +
@@ -153,7 +153,7 @@
   function setView(v) {
     _view = v;
     Array.prototype.forEach.call(document.querySelectorAll('.eg-scout-tab'), function (b) { b.classList.toggle('on', b.getAttribute('data-view') === v); });
-    document.getElementById('eg-scout-form').style.display = (v === 'search') ? '' : 'none';
+    // Keep the search bar visible in BOTH views so the All/Favorites toggle never shifts position.
     if (v === 'favs') { renderFavorites(); }
     else {
       var grid = document.getElementById('eg-scout-grid');

@@ -160,7 +160,9 @@
       ul.appendChild(li);
     });
     document.getElementById('eg-cn-note').textContent =
-      "You'll be taken to " + meta.name + " to approve access. You can disconnect any time from Settings.";
+      (_key(platform) === 'other')
+        ? "We'll open a chat with the EGFULFILL team with your request ready to send — you can add details before sending."
+        : ("You'll be taken to " + meta.name + " to approve access. You can disconnect any time from Settings.");
     var btn = document.getElementById('eg-cn-continue');
     btn.textContent = 'Continue';
     // Shopify OAuth is per-store, so collect the .myshopify.com domain before leaving.
@@ -182,6 +184,11 @@
         _openPopup('shopify', { shop: shop });
       };
       if (shopIn) { shopIn.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); btn.click(); } }; setTimeout(function () { shopIn.focus(); }, 80); }
+    } else if (_key(platform) === 'other') {
+      // Not an OAuth channel — it's a request to our team. Continue opens the seller's Support
+      // chat with a ready-to-send custom-integration message to the administrator.
+      if (shopWrap) shopWrap.style.display = 'none';
+      btn.onclick = function () { _requestCustomIntegration(); };
     } else {
       if (shopWrap) shopWrap.style.display = 'none';
       btn.onclick = function () { _openPopup(_currentPlatform); };
@@ -195,6 +202,14 @@
     if (!v) return '';
     if (v.indexOf('.') < 0) v = v + '.myshopify.com';
     return /\.myshopify\.com$/.test(v) ? v : '';
+  }
+  // "Other platform" = a request to our team, not an OAuth connect. Drop a ready-to-send message
+  // into the seller's Support chat with the administrator, then open the chat window.
+  function _requestCustomIntegration() {
+    var msg = "Hi EGFULFILL team — I'd like to connect a sales channel that isn't listed yet (not Etsy, Shopify or TikTok). Could you set up a custom integration for me?\n\n• Platform / marketplace: \n• Store URL: \n• What I sell: \n\nThanks!";
+    try { localStorage.setItem('eg_chat_draft', JSON.stringify({ conv: 'support-general', text: msg })); } catch (e) {}
+    try { _close(); } catch (e) {}
+    window.location.href = 'chat.html';
   }
 
   /* ── Popup ── */
