@@ -243,12 +243,36 @@
       if (title) title.textContent = 'All Chats';
       if (sub) sub.textContent = 'Pick a conversation';
       renderList();
+      _hydrateSupportThreads(function(){ if (_view === 'list') renderList(); });   // staff: pull seller support threads
     } else {
       body.style.display = 'flex';
       list.style.display = 'none';
       if (back) back.style.display = 'flex';
       if (openFull) openFull.style.display = 'inline-flex';
     }
+  }
+
+  // ── Staff support inbox (ADDITIVE) ── Seller "EGFULFILL Support" chats ride on order_messages
+  //    under `support-<sellerId>`. Staff pull them via /api/support/threads and hydrate into the
+  //    SAME local cache, so they appear in this list and open/reply with the existing machinery.
+  var _supportNames = {};
+  function _hydrateSupportThreads(cb) {
+    if (!isFactory()) { if (cb) cb(); return; }
+    var tk = ''; try { tk = localStorage.getItem('eg_token') || ''; } catch (e) {}
+    if (!tk) { if (cb) cb(); return; }
+    fetch((window.EG_API_BASE || '') + '/api/support/threads', { headers: { Authorization: 'Bearer ' + tk } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) {
+        if (!Array.isArray(rows) || !rows.length) { if (cb) cb(); return; }
+        var pending = rows.length;
+        rows.forEach(function (t) {
+          _supportNames[t.order_id] = t.seller_name || ('Seller ' + String(t.seller_id || '').slice(0, 6));
+          if (typeof EGStore !== 'undefined' && EGStore.hydrateOrderChat) {
+            EGStore.hydrateOrderChat(t.order_id, function () { if (--pending <= 0 && cb) cb(); });
+          } else if (--pending <= 0 && cb) cb();
+        });
+      })
+      .catch(function () { if (cb) cb(); });
   }
 
   function renderList() {
@@ -262,13 +286,17 @@
     }
     box.innerHTML = threads.map(function(t){
       var st = ROLE_STYLE[t.lastRole] || ROLE_STYLE.seller;
-      var initials = String(t.orderId).replace(/[^A-Z0-9]/gi,'').slice(-2).toUpperCase() || '##';
+      var isSup = String(t.orderId).indexOf('support-') === 0;
+      var initials = isSup ? 'SP' : (String(t.orderId).replace(/[^A-Z0-9]/gi,'').slice(-2).toUpperCase() || '##');
+      var nameHtml = isSup
+        ? '<span>Support</span><span style="color:#9ca3af;font-weight:500;margin-left:5px">' + String(_supportNames[t.orderId] || 'Seller').replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>'
+        : '<span style="font-family:monospace">#' + t.orderId + '</span>';
       var preview = (t.lastText || '').slice(0, 60);
       var unread = t.count;
       return '<div onclick="xOrderChatOpenFromList(\'' + String(t.orderId).replace(/\\/g,'\\\\').replace(/\'/g,"\\'") + '\')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .12s" onmouseover="this.style.background=\'#fafaf9\'" onmouseout="this.style.background=\'#fff\'">'
         + '<div style="width:34px;height:34px;border-radius:50%;background:' + st.bg + ';color:' + st.fg + ';display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;flex-shrink:0">' + initials + '</div>'
         + '<div style="flex:1;min-width:0">'
-          + '<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#191918"><span style="font-family:monospace">#' + t.orderId + '</span><span style="margin-left:auto;font-size:11px;color:#9ca3af;font-weight:500">' + fmtTime(t.lastTs) + '</span></div>'
+          + '<div style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#191918">' + nameHtml + '<span style="margin-left:auto;font-size:11px;color:#9ca3af;font-weight:500">' + fmtTime(t.lastTs) + '</span></div>'
           + '<div style="font-size:12px;color:#6b7280;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + preview.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>'
         + '</div>'
         + '<div style="width:20px;height:20px;border-radius:50%;background:#111827;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (unread > 99 ? '99+' : unread) + '</div>'
@@ -365,11 +393,13 @@
           pillLabel = otherMeta.label;
         }
         title.innerHTML = titleLabel + ' <span id="xoc-order" style="color:#191918;font-weight:600;font-size:11.5px;background:#f0ede9;border:1px solid #d8d4cd;padding:1px 8px;border-radius:5px;margin-left:5px">' + pillLabel + '</span>';
+      } else if (oid.indexOf('support-') === 0) {
+        title.innerHTML = 'Support <span id="xoc-order" style="color:#191918;font-weight:600;font-size:11.5px;background:#f0ede9;border:1px solid #d8d4cd;padding:1px 8px;border-radius:5px;margin-left:5px">' + String(_supportNames[oid] || 'Seller').replace(/</g,'&lt;') + '</span>';
       } else {
         title.innerHTML = 'Order Chat <span id="xoc-order" style="font-family:monospace;color:#191918;font-weight:600;font-size:11.5px;background:#f0ede9;border:1px solid #d8d4cd;padding:1px 7px;border-radius:5px;margin-left:5px;letter-spacing:.02em">#' + _orderId + '</span>';
       }
     }
-    var sub = (opts && opts.subtitle) || (o ? [o.customer && o.customer.name, o.seller].filter(Boolean).join(' · ') : '—');
+    var sub = (opts && opts.subtitle) || (o ? [o.customer && o.customer.name, o.seller].filter(Boolean).join(' · ') : (oid.indexOf('support-') === 0 ? 'Seller support request' : '—'));
     document.getElementById('xoc-sub').textContent = sub;
     setView('thread');
     renderStatusBar();
