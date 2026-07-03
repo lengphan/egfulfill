@@ -63,7 +63,7 @@
     '.eg-scout-tab b{font-weight:750;margin-left:2px}' +
     '#eg-scout-x{background:none;border:none;cursor:pointer;color:#9ca3af;padding:7px;border-radius:9px;line-height:0;transition:background .12s,color .12s}' +
     '#eg-scout-x:hover{background:#f4f2ef;color:#191918}' +
-    '#eg-scout-form{display:flex;gap:9px;padding:14px 22px;border-bottom:1px solid #ece9e3;flex-shrink:0}' +
+    '#eg-scout-form{display:flex;gap:9px;padding:14px 22px;flex-shrink:0}' +
     '#eg-scout-q{flex:1;border:1px solid #e5e4e0;border-radius:11px;padding:11px 14px;font-size:14px;font-family:inherit;color:#191918;outline:none;background:#fff;transition:border-color .14s,box-shadow .14s}' +
     '#eg-scout-q:focus{border-color:#191918;box-shadow:0 0 0 3px rgba(17,24,39,.06)}' +
     '#eg-scout-go{background:#191918;color:#fff;border:none;border-radius:11px;padding:11px 22px;font-size:14px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .12s,box-shadow .16s}' +
@@ -85,12 +85,12 @@
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
     '.eg-scout-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}' +
-    '.eg-scout-stat{background:rgba(0,0,0,.045);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15}' +
-    '.eg-scout-stat b{font-size:14.5px;font-weight:750;color:#191918;font-variant-numeric:tabular-nums}' +
+    '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:9px;padding:9px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1}' +
+    '.eg-scout-stat b{font-size:18px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.01em}' +
     '.eg-scout-stat i{font-size:10px;color:#9ca3af;font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-top:2px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
     '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
-    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;max-height:118px;overflow:hidden;position:relative;padding-bottom:26px}' +
+    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;max-height:84px;overflow:hidden;position:relative;padding-bottom:26px}' +
     '.eg-scout-tag{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.06);color:#6b7280;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;max-width:100%}' +
     '.eg-scout-copy{position:absolute;bottom:0;right:0;background:#191918;color:#fff;border:none;font-size:10px;font-weight:650;padding:4px 11px;border-radius:6px;cursor:pointer;line-height:1.3;transition:opacity .12s}' +
     '.eg-scout-copy:hover{opacity:.85}' +
@@ -114,7 +114,7 @@
     '.eg-scout-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}' +
     '.eg-scout-pagewrap #eg-scout-form{flex:1;min-width:260px;display:flex;gap:9px;padding:0;border:none;background:none}' +
     '.eg-scout-pagewrap #eg-scout-note{padding:0;margin-bottom:14px}' +
-    '.eg-scout-pagewrap #eg-scout-grid{flex:none;overflow:visible;padding:0;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}' +
+    '.eg-scout-pagewrap #eg-scout-grid{flex:none;overflow:visible;padding:0;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}' +
     '.eg-scout-pagewrap #eg-scout-tabs{margin-left:0}' +
     '.eg-scout-pagewrap #eg-scout-pager{border-top:none;padding:22px 0 4px}';
 
@@ -264,7 +264,6 @@
       .catch(function () { _loading = false; if (grid) grid.innerHTML = '<div class="eg-scout-empty">Search failed — check your connection and try again.</div>'; });
   }
 
-  var CARD_SHADES = ['#ffffff', '#fbf9f5', '#f7f4ee', '#fcfaf6', '#f8f5ef', '#fdfbf8'];
   function cardHTML(l, i, favView) {
     var e = _est(l);
     var img = l.image ? '<img src="' + esc(l.image) + '" alt="" loading="lazy"/>' : '<div class="eg-scout-noimg">No image</div>';
@@ -275,7 +274,7 @@
     var tagHTML = tags.length
       ? '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '<button class="eg-scout-copy" type="button" data-i="' + i + '" title="Copy all keywords">Copy</button></div>'
       : '';
-    return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '" style="background:' + CARD_SHADES[i % CARD_SHADES.length] + '">' +
+    return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '">' +
       (favView ? '<button class="eg-scout-remove" type="button" data-i="' + i + '" title="Remove" aria-label="Remove">&times;</button>' : '') +
       (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
       '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
@@ -284,7 +283,7 @@
           '<span class="eg-scout-stat"><b>' + _fmt(e.views24) + '</b><i>Views · 24h</i></span>' +
           '<span class="eg-scout-stat"><b>' + _fmt(e.sold24) + '</b><i>Sold · 24h</i></span>' +
           '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue</i></span>' +
-          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold · all</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold</i></span>' +
         '</div>' +
         '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
         '<div class="eg-scout-meta">' +
