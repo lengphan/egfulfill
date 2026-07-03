@@ -344,8 +344,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const query = String((req.query && (req.query.q || req.query.keywords)) || '').trim();
     if (!query) { reply.code(400); return { error: 'Missing search query (?q=)' }; }
     const limit = Math.min(48, Math.max(1, parseInt((req.query && req.query.limit) || '24', 10) || 24));
+    const offset = Math.max(0, parseInt((req.query && req.query.offset) || '0', 10) || 0);
+    const sort = (req.query && req.query.sort === 'created') ? 'created' : 'score';   // 'created' powers the daily feed
     try {
-      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&sort_on=score&includes=Images,Shop';
+      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&sort_order=down&includes=Images,Shop';
       const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { reply.code(r.status >= 400 && r.status < 500 ? r.status : 502); return { error: (d && d.error) || ('Etsy search error ' + r.status) }; }
@@ -353,8 +355,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       const pickImg = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
       // findAllListingsActive frequently DROPS the Images include, so cards came back with no
       // thumbnail. getListingsByListingIds DOES return images — fetch them in ONE batch call and
-      // merge, so every card has a picture (this is why the grid looked empty before).
-      const imgById = {};
+      // merge, so every card has a picture AND the FULL image set (used by the Make/publish flow).
+      const imgsById = {};
       const ids = base.map((l) => l.listing_id).filter(Boolean);
       if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
         try {
@@ -362,23 +364,30 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
           if (br.ok) {
             const bd = await br.json().catch(() => ({}));
-            (bd.results || []).forEach((l) => { const url = pickImg(l.images && l.images[0]); if (url) imgById[l.listing_id] = url; });
+            (bd.results || []).forEach((l) => { const arr = (l.images || []).map(pickImg).filter(Boolean); if (arr.length) imgsById[l.listing_id] = arr; });
           }
         } catch (e) { /* image enrich is best-effort — never fail the search over a thumbnail */ }
       }
-      const results = base.map((l) => ({
-        listing_id: l.listing_id,
-        title: l.title || '',
-        description: l.description || '',
-        price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
-        currency: (l.price && l.price.currency_code) || 'USD',
-        url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
-        tags: Array.isArray(l.tags) ? l.tags : [],
-        image: pickImg(l.images && l.images[0]) || imgById[l.listing_id] || null,
-        shop_name: (l.shop && l.shop.shop_name) || null,
-        num_favorers: l.num_favorers || 0
-      }));
-      return { count: d.count || results.length, query: query, results };
+      const results = base.map((l) => {
+        const inlineImgs = (l.images || []).map(pickImg).filter(Boolean);
+        const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
+        return {
+          listing_id: l.listing_id,
+          title: l.title || '',
+          description: l.description || '',
+          price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
+          currency: (l.price && l.price.currency_code) || 'USD',
+          url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
+          tags: Array.isArray(l.tags) ? l.tags : [],
+          image: images[0] || null,
+          images: images,                                                     // ALL listing images (for Make/publish)
+          created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,  // unix s
+          views: (typeof l.views === 'number' ? l.views : null),
+          shop_name: (l.shop && l.shop.shop_name) || null,
+          num_favorers: l.num_favorers || 0
+        };
+      });
+      return { count: d.count || results.length, query: query, offset: offset, limit: limit, results };
     } catch (e) { reply.code(502); return { error: e.message }; }
   });
 

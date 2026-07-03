@@ -1,9 +1,13 @@
-/* eg-scout.js — SHARED "Super Spy" product-research modal.
-   Search Etsy LIVE (nothing is stored on our servers — the /api/etsy/search endpoint just
-   proxies Etsy's public search), pick a product to sell (Make → hands off to the builder),
-   or Save it to Favorites. Favorites are the seller's OWN client-side bookmarks (localStorage
-   only), so we never persist Etsy data. ONE modal, shared by seller + admin: EGScout.open({role}).
-   Monotone beige + dark-grey theme, one-word buttons. */
+/* eg-scout.js — SHARED "SpyDeck" product-research surface.
+   Search Etsy LIVE (the /api/etsy/search endpoint proxies Etsy's public search; nothing is stored
+   on our servers), see estimated performance stats, Make a product from an idea, or Save it to
+   Favorites (client-side bookmarks only). ONE engine, shared by seller + admin:
+   EGScout.mount(el,{role}) for a full page, or EGScout.open({role}) for the modal.
+
+   Stats note: Etsy's public API exposes Favorites, Created date, Tags & Price — but NOT views,
+   units sold, or revenue. Those four boxes are ESTIMATES derived from favorites + listing age +
+   price (clearly marked "est."), the same way scraping tools approximate them. Monotone theme;
+   the only accent is a red border on trending finds. */
 (function (g) {
   'use strict';
   if (typeof document === 'undefined' || g.EGScout) return;
@@ -20,15 +24,36 @@
     var a = favLoad();
     var idx = -1; for (var i = 0; i < a.length; i++) { if (String(a[i].listing_id) === String(l.listing_id)) { idx = i; break; } }
     if (idx >= 0) a.splice(idx, 1);
-    else a.unshift({ listing_id: l.listing_id, title: l.title, image: l.image, price: l.price, url: l.url, num_favorers: l.num_favorers });
+    // Keep enough to re-render the full card (incl. stats) in the Favorites view.
+    else a.unshift({ listing_id: l.listing_id, title: l.title, image: l.image, images: l.images || [], price: l.price, url: l.url, num_favorers: l.num_favorers, created: l.created || null, tags: l.tags || [], description: l.description || '' });
     favSave(a); updateFavCount(); return idx < 0;
   }
   function updateFavCount() { var e = document.getElementById('eg-scout-favn'); if (e) e.textContent = favLoad().length; }
 
+  // ── Estimates (Etsy's API doesn't expose views/sold/revenue — derive them from favorites + age).
+  function _est(l) {
+    var fav = l.num_favorers || 0;
+    var price = (l.price != null) ? Number(l.price) : 0;
+    var created = l.created || 0;
+    var nowS = Date.now() / 1000;
+    var ageDays = created ? Math.max(1, (nowS - created) / 86400) : 45;
+    var totalSold = Math.round(fav * 3.5) || fav;
+    var perDay = totalSold / ageDays;
+    var sold24 = Math.max(0, Math.round(perDay));
+    var views24 = Math.max(sold24, Math.round(perDay * 36 + (fav / ageDays) * 10));
+    var revenue = Math.round(totalSold * price);
+    var vel = fav / ageDays;                                  // favorites per day = demand velocity
+    var trending = (ageDays <= 30 && vel >= 1.2) || vel >= 6;  // young + wanted, or very hot
+    return { totalSold: totalSold, sold24: sold24, views24: views24, revenue: revenue, trending: trending };
+  }
+  function _fmt(n) { n = Math.round(n || 0); if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return String(n); }
+  function _money(n) { n = Math.round(n || 0); if (n >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; return '$' + n; }
+  function _dateStr(created) { if (!created) return ''; try { return new Date(created * 1000).toLocaleDateString('en-GB'); } catch (e) { return ''; } }
+
   var CSS =
     '#eg-scout-ov{position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:9400;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}' +
     '#eg-scout-ov.on{display:flex}' +
-    '#eg-scout-panel{background:#fdfcfa;border:1px solid #e5e4e0;border-radius:18px;box-shadow:0 24px 70px rgba(17,24,39,.22);width:100%;max-width:1080px;height:88vh;display:flex;flex-direction:column;overflow:hidden;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}' +
+    '#eg-scout-panel{background:#fdfcfa;border:1px solid #e5e4e0;border-radius:18px;box-shadow:0 24px 70px rgba(17,24,39,.22);width:100%;max-width:1120px;height:88vh;display:flex;flex-direction:column;overflow:hidden;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}' +
     '#eg-scout-head{display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid #ece9e3;flex-shrink:0}' +
     '#eg-scout-head h3{margin:0;font-size:18px;font-weight:750;color:#191918;letter-spacing:-.01em}' +
     '#eg-scout-head .sub{font-size:12.5px;color:#9ca3af;margin-top:1px}' +
@@ -43,67 +68,99 @@
     '#eg-scout-q:focus{border-color:#191918;box-shadow:0 0 0 3px rgba(17,24,39,.06)}' +
     '#eg-scout-go{background:#191918;color:#fff;border:none;border-radius:11px;padding:11px 22px;font-size:14px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .12s,box-shadow .16s}' +
     '#eg-scout-go:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(17,24,39,.2)}' +
-    '#eg-scout-grid{flex:1;overflow-y:auto;padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:16px;align-content:start}' +
+    '#eg-scout-note{padding:2px 22px 0;font-size:12.5px;color:#9ca3af;flex-shrink:0;display:none}' +
+    '#eg-scout-note.on{display:block}' +
+    '#eg-scout-grid{flex:1;overflow-y:auto;padding:18px 22px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;align-content:start}' +
     '.eg-scout-empty{grid-column:1/-1;text-align:center;color:#9ca3af;font-size:14px;padding:60px 0;line-height:1.6}' +
-    '.eg-scout-card{background:#fff;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .14s,box-shadow .14s,transform .08s}' +
+    '.eg-scout-card{position:relative;background:#fff;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .14s,box-shadow .14s,transform .08s}' +
     '.eg-scout-card:hover{border-color:#191918;box-shadow:0 4px 18px rgba(17,24,39,.1);transform:translateY(-1px)}' +
-    '.eg-scout-img{aspect-ratio:1/1;min-height:172px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
+    '.eg-scout-card.trend{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.35)}' +
+    '.eg-scout-card.trend:hover{border-color:#dc2626;box-shadow:0 4px 18px rgba(220,38,38,.2)}' +
+    '.eg-scout-trend{position:absolute;top:8px;left:8px;z-index:2;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em}' +
+    '.eg-scout-remove{position:absolute;top:6px;right:6px;z-index:3;width:28px;height:28px;border:none;background:none;color:transparent;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:color .12s}' +
+    '.eg-scout-card:hover .eg-scout-remove{color:#40403d}' +
+    '.eg-scout-remove:hover{color:#191918}' +
+    '.eg-scout-img{aspect-ratio:1/1;min-height:188px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
     '.eg-scout-img img{width:100%;height:100%;object-fit:cover;display:block}' +
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
+    '.eg-scout-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}' +
+    '.eg-scout-stat{background:#f7f6f4;border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;line-height:1.15}' +
+    '.eg-scout-stat b{font-size:14.5px;font-weight:750;color:#191918;font-variant-numeric:tabular-nums}' +
+    '.eg-scout-stat i{font-size:10px;color:#9ca3af;font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-top:2px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
-    '.eg-scout-metrics{display:flex;gap:7px}' +
-    '.eg-scout-pill{flex:1;background:#f7f6f4;border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;line-height:1.15}' +
-    '.eg-scout-pill b{font-size:14px;font-weight:750;color:#191918}' +
-    '.eg-scout-pill i{font-size:10.5px;color:#9ca3af;font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-top:1px}' +
-    '.eg-scout-actions{display:flex;gap:8px;margin-top:auto}' +
-    '.eg-scout-make{flex:1;background:#191918;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
+    '.eg-scout-meta{display:flex;align-items:center;gap:10px;font-size:11.5px;color:#6b7280;flex-wrap:wrap}' +
+    '.eg-scout-meta .eg-scout-esttag{margin-left:auto;font-size:9.5px;font-weight:700;color:#b8b4ad;text-transform:uppercase;letter-spacing:.04em}' +
+    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px}' +
+    '.eg-scout-tag{background:#f4f2ef;border:1px solid #ece9e3;color:#6b7280;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}' +
+    '.eg-scout-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}' +
+    '.eg-scout-make{background:#191918;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
     '.eg-scout-make:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(17,24,39,.2)}' +
-    '.eg-scout-save{flex-shrink:0;background:#fff;border:1px solid #e5e4e0;color:#374151;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,border-color .12s,color .12s}' +
+    '.eg-scout-save{background:#fff;border:1px solid #e5e4e0;color:#374151;border-radius:9px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,border-color .12s,color .12s}' +
     '.eg-scout-save:hover{background:#f7f6f4}' +
     '.eg-scout-save.on{background:#191918;color:#fff;border-color:#191918}' +
+    '#eg-scout-pager{flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:14px;padding:14px 22px;border-top:1px solid #ece9e3}' +
+    '#eg-scout-pager:empty{display:none}' +
+    '.eg-scout-pg-btn{background:#fff;border:1px solid #e5e4e0;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:17px;color:#374151;display:flex;align-items:center;justify-content:center;transition:border-color .12s;line-height:0}' +
+    '.eg-scout-pg-btn:hover{border-color:#191918}' +
+    '.eg-scout-pg-btn:disabled{opacity:.35;cursor:default;border-color:#e5e4e0}' +
+    '.eg-scout-pgtxt{font-size:13.5px;font-weight:600;color:#374151;min-width:96px;text-align:center;font-variant-numeric:tabular-nums}' +
+    '.eg-scout-perpage{margin-left:8px;border:1px solid #e5e4e0;border-radius:8px;padding:6px 8px;font-size:12.5px;font-family:inherit;color:#6b7280;background:#fff;cursor:pointer;outline:none}' +
     '#eg-scout-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#191918;color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:11px;box-shadow:0 12px 32px rgba(17,24,39,.28);z-index:9600;opacity:0;transition:opacity .2s;pointer-events:none}' +
     '#eg-scout-toast.show{opacity:1}' +
     /* ── Page mode: rendered full-page via EGScout.mount(el) instead of the modal overlay ── */
     '.eg-scout-pagewrap{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif}' +
-    '.eg-scout-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:20px}' +
+    '.eg-scout-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px}' +
     '.eg-scout-pagewrap #eg-scout-form{flex:1;min-width:260px;display:flex;gap:9px;padding:0;border:none;background:none}' +
-    '.eg-scout-pagewrap #eg-scout-grid{flex:none;overflow:visible;padding:0;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}' +
-    '.eg-scout-pagewrap #eg-scout-tabs{margin-left:0}';
+    '.eg-scout-pagewrap #eg-scout-note{padding:0;margin-bottom:14px}' +
+    '.eg-scout-pagewrap #eg-scout-grid{flex:none;overflow:visible;padding:0;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}' +
+    '.eg-scout-pagewrap #eg-scout-tabs{margin-left:0}' +
+    '.eg-scout-pagewrap #eg-scout-pager{border-top:none;padding:22px 0 4px}';
+
+  var TABS =
+    '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
+    '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>';
+  var FORM =
+    '<input id="eg-scout-q" type="text" placeholder="Search a niche, e.g. personalized pennant, custom apron…" autocomplete="off"/>' +
+    '<button id="eg-scout-go" type="submit">Search</button>';
 
   var HTML =
-    '<div id="eg-scout-panel" role="dialog" aria-modal="true" aria-label="Super Spy">' +
+    '<div id="eg-scout-panel" role="dialog" aria-modal="true" aria-label="SpyDeck">' +
       '<div id="eg-scout-head">' +
-        '<div><h3>Super Spy</h3><div class="sub">Spy what\'s selling on Etsy — live, nothing stored. Make it, or save it.</div></div>' +
-        '<div id="eg-scout-tabs">' +
-          '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
-          '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>' +
-        '</div>' +
+        '<div><h3>SpyDeck</h3><div class="sub">Spy what\'s selling on Etsy. Make it, or save it.</div></div>' +
+        '<div id="eg-scout-tabs">' + TABS + '</div>' +
         '<button id="eg-scout-x" type="button" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>' +
       '</div>' +
-      '<form id="eg-scout-form" autocomplete="off">' +
-        '<input id="eg-scout-q" type="text" placeholder="Search a niche, e.g. personalized pennant, custom apron…" autocomplete="off"/>' +
-        '<button id="eg-scout-go" type="submit">Search</button>' +
-      '</form>' +
-      '<div id="eg-scout-grid"><div class="eg-scout-empty">Search a niche above to see what\'s selling on Etsy.</div></div>' +
+      '<form id="eg-scout-form" autocomplete="off">' + FORM + '</form>' +
+      '<div id="eg-scout-note"></div>' +
+      '<div id="eg-scout-grid"><div class="eg-scout-empty">Loading fresh finds…</div></div>' +
+      '<div id="eg-scout-pager"></div>' +
     '</div>';
 
-  // Page-mode markup (search bar + tabs + grid) — same element IDs as the modal so all the
-  // search/favorites/render logic is shared verbatim. A page uses mount(); a modal uses open().
+  // Page-mode markup (search bar + tabs + note + grid + pager) — same element IDs as the modal so
+  // all the search/favorites/render logic is shared verbatim. A page uses mount(); a modal uses open().
   var PAGE_HTML =
     '<div class="eg-scout-bar">' +
-      '<form id="eg-scout-form" autocomplete="off">' +
-        '<input id="eg-scout-q" type="text" placeholder="Search a niche, e.g. personalized pennant, custom apron…" autocomplete="off"/>' +
-        '<button id="eg-scout-go" type="submit">Search</button>' +
-      '</form>' +
-      '<div id="eg-scout-tabs">' +
-        '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
-        '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>' +
-      '</div>' +
+      '<form id="eg-scout-form" autocomplete="off">' + FORM + '</form>' +
+      '<div id="eg-scout-tabs">' + TABS + '</div>' +
     '</div>' +
-    '<div id="eg-scout-grid"><div class="eg-scout-empty">Search a niche above to see what\'s selling on Etsy.</div></div>';
+    '<div id="eg-scout-note"></div>' +
+    '<div id="eg-scout-grid"><div class="eg-scout-empty">Loading fresh finds…</div></div>' +
+    '<div id="eg-scout-pager"></div>';
+
+  // Rotating default queries so the page hydrates with fresh products BEFORE any search (the "daily
+  // new products" homepage). We pick by the calendar day, so it changes daily without server storage.
+  var FEED_QUERIES = ['personalized gift', 'custom name sign', 'minimalist wall art', 'funny shirt',
+    'birth flower jewelry', 'custom pet portrait', 'embroidered sweatshirt', 'handmade candle',
+    'wedding gift', 'birthday gift idea', 'custom door mat', 'trending home decor'];
 
   var _injected = false, _role = 'seller', _last = [], _view = 'search';
+  var _query = '', _feedQuery = '', _feed = false, _page = 1, _count = 0, _perPage = 24, _loading = false;
+
+  function _wireCommon(root) {
+    (root || document).querySelector('#eg-scout-form').addEventListener('submit', function (e) { e.preventDefault(); doSearch(1); });
+    Array.prototype.forEach.call((root || document).querySelectorAll('.eg-scout-tab'), function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-view')); }); });
+  }
 
   function inject() {
     if (_injected) return; _injected = true;
@@ -112,8 +169,7 @@
     var t = document.createElement('div'); t.id = 'eg-scout-toast'; document.body.appendChild(t);
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     document.getElementById('eg-scout-x').addEventListener('click', close);
-    document.getElementById('eg-scout-form').addEventListener('submit', function (e) { e.preventDefault(); doSearch(); });
-    Array.prototype.forEach.call(document.querySelectorAll('.eg-scout-tab'), function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-view')); }); });
+    _wireCommon(document);
   }
 
   function toast(msg) {
@@ -129,13 +185,12 @@
     setView('search');
     document.getElementById('eg-scout-ov').classList.add('on');
     document.body.style.overflow = 'hidden';
-    var i = document.getElementById('eg-scout-q'); if (i) setTimeout(function () { i.focus(); }, 60);
+    _maybeLoadFeed();
   }
   function close() { var ov = document.getElementById('eg-scout-ov'); if (ov) ov.classList.remove('on'); document.body.style.overflow = ''; }
 
   // Full-page mount: render the SAME engine into a page container (superspy.html) instead of the
-  // modal overlay. Shared so admin reuses it without a rebuild. A page loads eg-scout.js and calls
-  // EGScout.mount(el, {role}); it never opens the modal, so the fixed IDs never collide.
+  // modal overlay. Shared so admin reuses it without a rebuild.
   function mount(el, opts) {
     opts = opts || {}; _role = opts.role || 'seller';
     if (!el) return;
@@ -143,53 +198,88 @@
     if (!document.getElementById('eg-scout-toast')) { var t = document.createElement('div'); t.id = 'eg-scout-toast'; document.body.appendChild(t); }
     el.classList.add('eg-scout-pagewrap');
     el.innerHTML = PAGE_HTML;
-    document.getElementById('eg-scout-form').addEventListener('submit', function (e) { e.preventDefault(); doSearch(); });
-    Array.prototype.forEach.call(el.querySelectorAll('.eg-scout-tab'), function (b) { b.addEventListener('click', function () { setView(b.getAttribute('data-view')); }); });
+    _wireCommon(el);
     updateFavCount();
     setView('search');
-    var i = document.getElementById('eg-scout-q'); if (i) setTimeout(function () { i.focus(); }, 80);
+    _maybeLoadFeed();
   }
+
+  function _maybeLoadFeed() { if (!_last.length && !_loading) loadFeed(); }
+  function _note(msg) { var n = document.getElementById('eg-scout-note'); if (!n) return; if (msg) { n.textContent = msg; n.classList.add('on'); } else { n.classList.remove('on'); } }
 
   function setView(v) {
     _view = v;
     Array.prototype.forEach.call(document.querySelectorAll('.eg-scout-tab'), function (b) { b.classList.toggle('on', b.getAttribute('data-view') === v); });
-    // Keep the search bar visible in BOTH views so the All/Favorites toggle never shifts position.
-    if (v === 'favs') { renderFavorites(); }
+    if (v === 'favs') { _note(''); _clearPager(); renderFavorites(); }
     else {
-      var grid = document.getElementById('eg-scout-grid');
-      if (_last.length) render(_last);
-      else grid.innerHTML = '<div class="eg-scout-empty">Search a niche above to see what\'s selling on Etsy.</div>';
+      if (_last.length) { render(_last); renderPager(); if (_feed) _note('Fresh finds for today — or search any niche above.'); }
+      else _maybeLoadFeed();
     }
   }
 
-  function doSearch() {
-    var q = (document.getElementById('eg-scout-q').value || '').trim();
-    if (!q) return;
-    var grid = document.getElementById('eg-scout-grid');
-    grid.innerHTML = '<div class="eg-scout-empty">Searching…</div>';
-    fetch((g.EG_API_BASE || '') + '/api/etsy/search?q=' + encodeURIComponent(q) + '&limit=36', { headers: { Authorization: 'Bearer ' + tok() } })
-      .then(function (r) { return r.json().catch(function () { return {}; }); })
-      .then(function (d) {
-        if (d && d.error) { grid.innerHTML = '<div class="eg-scout-empty">' + esc(d.error) + '</div>'; return; }
-        _last = (d && d.results) || [];
-        render(_last);
-      })
-      .catch(function () { grid.innerHTML = '<div class="eg-scout-empty">Search failed — check your connection and try again.</div>'; });
+  // Load the rotating daily feed (fresh products before any search).
+  function loadFeed() {
+    var day = Math.floor(Date.now() / 86400000);
+    _feedQuery = FEED_QUERIES[day % FEED_QUERIES.length];
+    _feed = true;
+    _fetchPage(_feedQuery, 1, true);
   }
 
-  function cardHTML(l, i) {
+  function doSearch(page) {
+    var q = (document.getElementById('eg-scout-q').value || '').trim();
+    if (!q) { _feed = true; loadFeed(); return; }
+    _feed = false;
+    _fetchPage(q, page || 1, false);
+  }
+
+  function _fetchPage(q, page, isFeed) {
+    _query = q; _page = Math.max(1, page || 1); _loading = true;
+    var grid = document.getElementById('eg-scout-grid');
+    if (grid) grid.innerHTML = '<div class="eg-scout-empty">' + (isFeed ? 'Loading fresh finds…' : 'Searching…') + '</div>';
+    _clearPager();
+    var offset = (_page - 1) * _perPage;
+    var url = (g.EG_API_BASE || '') + '/api/etsy/search?q=' + encodeURIComponent(q) + '&limit=' + _perPage + '&offset=' + offset + (isFeed ? '&sort=created' : '');
+    fetch(url, { headers: { Authorization: 'Bearer ' + tok() } })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        _loading = false;
+        if (_view !== 'search') return;                       // user switched to Favorites mid-flight
+        if (d && d.error) { if (grid) grid.innerHTML = '<div class="eg-scout-empty">' + esc(d.error) + '</div>'; return; }
+        _last = (d && d.results) || [];
+        _count = (d && d.count) || _last.length;
+        render(_last);
+        renderPager();
+        _note(isFeed ? 'Fresh finds for today — or search any niche above.' : '');
+      })
+      .catch(function () { _loading = false; if (grid) grid.innerHTML = '<div class="eg-scout-empty">Search failed — check your connection and try again.</div>'; });
+  }
+
+  function cardHTML(l, i, favView) {
+    var e = _est(l);
     var img = l.image ? '<img src="' + esc(l.image) + '" alt="" loading="lazy"/>' : '<div class="eg-scout-noimg">No image</div>';
-    var price = (l.price != null) ? ('$' + Number(l.price).toFixed(2)) : '—';
-    var favs = (l.num_favorers || 0);
     var saved = favHas(l.listing_id);
-    return '<div class="eg-scout-card">' +
+    var created = _dateStr(l.created);
+    var favs = l.num_favorers || 0;
+    var tags = (Array.isArray(l.tags) ? l.tags : []).slice(0, 3);
+    var tagHTML = tags.length ? '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '</div>' : '';
+    return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '">' +
+      (favView ? '<button class="eg-scout-remove" type="button" data-i="' + i + '" title="Remove" aria-label="Remove">&times;</button>' : '') +
+      (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
       '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
       '<div class="eg-scout-body">' +
-        '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
-        '<div class="eg-scout-metrics">' +
-          '<span class="eg-scout-pill"><b>' + price + '</b><i>Price</i></span>' +
-          '<span class="eg-scout-pill"><b>' + favs + '</b><i>Favorites</i></span>' +
+        '<div class="eg-scout-stats">' +
+          '<span class="eg-scout-stat"><b>~' + _fmt(e.views24) + '</b><i>Views · 24h</i></span>' +
+          '<span class="eg-scout-stat"><b>~' + _fmt(e.sold24) + '</b><i>Sold · 24h</i></span>' +
+          '<span class="eg-scout-stat"><b>~' + _money(e.revenue) + '</b><i>Revenue</i></span>' +
+          '<span class="eg-scout-stat"><b>~' + _fmt(e.totalSold) + '</b><i>Sold · all</i></span>' +
         '</div>' +
+        '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
+        '<div class="eg-scout-meta">' +
+          '<span title="Favorites">&#9829; ' + _fmt(favs) + '</span>' +
+          (created ? '<span title="Created on Etsy">Created ' + esc(created) + '</span>' : '') +
+          '<span class="eg-scout-esttag" title="Views, sold & revenue are estimates">est.</span>' +
+        '</div>' +
+        tagHTML +
         '<div class="eg-scout-actions">' +
           '<button class="eg-scout-make" type="button" data-i="' + i + '">Make</button>' +
           '<button class="eg-scout-save' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '">' + (saved ? 'Saved' : 'Save') + '</button>' +
@@ -197,46 +287,75 @@
       '</div>' +
     '</div>';
   }
-  function wireCards(grid, list) {
+
+  function wireCards(grid, list, favView) {
     Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-make'), function (b) { b.addEventListener('click', function () { _make(list[+b.getAttribute('data-i')]); }); });
     Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-save'), function (b) {
       b.addEventListener('click', function () {
         var l = list[+b.getAttribute('data-i')]; var on = favToggle(l);
         b.classList.toggle('on', on); b.textContent = on ? 'Saved' : 'Save';
-        if (_view === 'favs' && !on) renderFavorites();   // removing from the Favorites view drops the card
+        if (_view === 'favs' && !on) renderFavorites();
       });
     });
+    if (favView) {
+      Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-remove'), function (b) {
+        b.addEventListener('click', function (ev) {
+          ev.preventDefault(); ev.stopPropagation();
+          favToggle(list[+b.getAttribute('data-i')]); renderFavorites();
+        });
+      });
+    }
   }
+
   function render(results) {
     var grid = document.getElementById('eg-scout-grid');
     if (!results.length) { grid.innerHTML = '<div class="eg-scout-empty">No results — try a different niche.</div>'; return; }
-    grid.innerHTML = results.map(function (l, i) { return cardHTML(l, i); }).join('');
-    wireCards(grid, results);
+    grid.innerHTML = results.map(function (l, i) { return cardHTML(l, i, false); }).join('');
+    wireCards(grid, results, false);
   }
   function renderFavorites() {
     var grid = document.getElementById('eg-scout-grid');
     var favs = favLoad();
     if (!favs.length) { grid.innerHTML = '<div class="eg-scout-empty">No favorites yet.<br>Search, then Save the products you want to sell.</div>'; return; }
-    grid.innerHTML = favs.map(function (l, i) { return cardHTML(l, i); }).join('');
-    wireCards(grid, favs);
+    grid.innerHTML = favs.map(function (l, i) { return cardHTML(l, i, true); }).join('');
+    wireCards(grid, favs, true);
   }
 
-  // Make = start turning this idea into a real product. Hands off to the EXISTING design-maker
-  // (no change to its flow): we drop a scout context in sessionStorage and open it with ?scout=1;
-  // a small guarded hook there pre-fills the listing title/description (via the seller's own AI key
-  // if set) and shows the Etsy image as a removable reference. A page may override EGScout.onMake.
+  function _clearPager() { var p = document.getElementById('eg-scout-pager'); if (p) p.innerHTML = ''; }
+  function renderPager() {
+    var p = document.getElementById('eg-scout-pager'); if (!p) return;
+    if (_view !== 'search' || !_last.length) { p.innerHTML = ''; return; }
+    var total = Math.max(1, Math.min(50, Math.ceil((_count || _last.length) / _perPage)));   // cap deep pagination
+    p.innerHTML =
+      '<button class="eg-scout-pg-btn" id="eg-scout-prev" ' + (_page <= 1 ? 'disabled' : '') + ' aria-label="Previous page">&#8249;</button>' +
+      '<span class="eg-scout-pgtxt">Page ' + _page + ' / ' + total + '</span>' +
+      '<button class="eg-scout-pg-btn" id="eg-scout-next" ' + (_page >= total ? 'disabled' : '') + ' aria-label="Next page">&#8250;</button>' +
+      '<select class="eg-scout-perpage" id="eg-scout-perpage" title="Products per page">' +
+        [12, 24, 36, 48].map(function (n) { return '<option value="' + n + '"' + (n === _perPage ? ' selected' : '') + '>' + n + ' / page</option>'; }).join('') +
+      '</select>';
+    var prev = document.getElementById('eg-scout-prev'); if (prev) prev.onclick = function () { if (_page > 1) _go(_page - 1); };
+    var next = document.getElementById('eg-scout-next'); if (next) next.onclick = function () { if (_page < total) _go(_page + 1); };
+    var pp = document.getElementById('eg-scout-perpage'); if (pp) pp.onchange = function () { _perPage = parseInt(pp.value, 10) || 24; _go(1); };
+  }
+  function _go(page) {
+    var grid = document.getElementById('eg-scout-grid'); if (grid) grid.scrollTop = 0;
+    _fetchPage(_query || _feedQuery, page, _feed);
+  }
+
+  // Make = start turning this idea into a real product. Default hands off to the EXISTING
+  // design-maker via ?scout=1 (a page may override EGScout.onMake — the Publish flow does this).
   function _make(listing) {
     if (!listing) return;
     if (typeof g.EGScout.onMake === 'function') { g.EGScout.onMake(listing, _role); return; }
     try {
       sessionStorage.setItem('eg_scout_ctx', JSON.stringify({
         title: listing.title || '', description: listing.description || '', tags: listing.tags || [],
-        image: listing.image || '', url: listing.url || '', price: (listing.price != null ? listing.price : null), role: _role
+        image: listing.image || '', images: listing.images || [], url: listing.url || '', price: (listing.price != null ? listing.price : null), role: _role
       }));
     } catch (e) {}
     toast('Opening the builder…');
     setTimeout(function () { location.href = 'design-maker.html?scout=1'; }, 220);
   }
 
-  g.EGScout = { open: open, close: close, mount: mount, onMake: null };
+  g.EGScout = { open: open, close: close, mount: mount, onMake: null, _est: _est };
 })(window);
