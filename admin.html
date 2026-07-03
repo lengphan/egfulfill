@@ -4876,7 +4876,7 @@ function whRenderOrders() {
             const _fsLabelAdm = _orderDone ? '' : (_fs === 'working' ? 'Working' : 'Pending');
             const _fsColorAdm = _fs === 'working' ? '#191918' : '#9ca3af';
             const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${_fsColorAdm};white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
-            const _title = `<span style="display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${_pickedBlank ? _pickedBlank : (_isNewSetup ? '<span style="color:#d4a017;font-style:italic">Pick a blank</span>' : ((it.variant && String(it.variant).trim()) ? it.variant : (it.name||'Item')))}</span> <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}`;
+            const _title = `<span style="display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${_pickedBlank ? _pickedBlank : (_isNewSetup ? '<span style="color:#6b7280;font-style:italic">Pick a blank</span>' : ((it.variant && String(it.variant).trim()) ? it.variant : (it.name||'Item')))}</span> <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}`;
             const _meta = (window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + ((window.EGDesignTools && EGDesignTools.displaySku) ? EGDesignTools.displaySku(o, it) : (it.sku||'')) + '</span>') : metaRow;
             return (window.EGDesignTools && EGDesignTools.itemRowLayout) ? EGDesignTools.itemRowLayout({
               setup: _isNewSetup, sep: sep, thumb: thumb, title: _title, meta: _meta, designLink: _designLink,
@@ -8496,7 +8496,7 @@ function showPsTab(id) {
 
 <script>
 const SUPPLIER_DATA = {
-  ssa:{logo:'SSA',logoBg:'#111827',logoColor:'#d4a017',name:'SS Activewear',url:'api.ssactivewear.com',status:'Connected',statusClass:'b-shipped'},
+  ssa:{logo:'SSA',logoBg:'#111827',logoColor:'#f3eee2',name:'SS Activewear',url:'api.ssactivewear.com',status:'Connected',statusClass:'b-shipped'},
   sm:{logo:'SM',logoBg:'#1e3a8a',logoColor:'#fff',name:'SanMar',url:'sanmar.com',status:'Coming Soon',statusClass:'b-queue'},
   ab:{logo:'AB',logoBg:'#dc2626',logoColor:'#fff',name:'AlphaBroder',url:'alphabroder.com',status:'Coming Soon',statusClass:'b-queue'}
 };
@@ -9460,7 +9460,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const _xmethod = (typeof EGStore !== 'undefined' && EGStore.methodLabel) ? EGStore.methodLabel(it) : ((it.printType || it.tech || '') + '');
         const _xblankSku = (() => { try { if (!_xpb) return ''; const prods = (EGStore.getCatalogProducts && EGStore.getCatalogProducts()) || []; const p = prods.find(x => (x.name || '') === _xpb || (x.sku || '') === _xpb); return p ? (p.skuBase || p.sku || '') : ''; } catch (e) { return ''; } })();
         const _xskuLine = [it.sku || '', _xblankSku, _xmethod].filter(Boolean).join(' · ');
-        const _xtitle = _xpb ? `<span style="color:#191918">${String(_xpb).replace(/</g,'&lt;')}</span>` : `<span style="color:#d4a017;font-style:italic">Pick a blank</span>`;
+        const _xtitle = _xpb ? `<span style="color:#191918">${String(_xpb).replace(/</g,'&lt;')}</span>` : `<span style="color:#6b7280;font-style:italic">Pick a blank</span>`;
         return `<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;border:1px solid #e5e4e0;border-radius:9px;position:relative">
           ${(window.EGDesignTools && EGDesignTools.isNewOrder && EGDesignTools.isNewOrder(o)) ? `<button onclick="event.stopPropagation();EGDesignTools.removeItem('${o.id}','${(window.EGDesignTools&&EGDesignTools.itemDK)?EGDesignTools.itemDK(it):(it.lineId||it._dk||it.sku)}')" title="Remove item" style="position:absolute;top:7px;right:9px;background:none;border:none;color:#d1d5db;cursor:pointer;font-size:18px;line-height:1;padding:2px;z-index:3;font-family:inherit" onmouseover="this.style.color='#dc2626'" onmouseout="this.style.color='#d1d5db'">×</button>` : ''}
           <div onclick="event.stopPropagation();if(window.EGDesignTools&&EGDesignTools.openQuickPos)EGDesignTools.openQuickPos('${o.id}','${(window.EGDesignTools&&EGDesignTools.itemDK)?EGDesignTools.itemDK(it):(it.lineId||it._dk||it.sku)}')" title="Click to edit the design" style="width:72px;height:72px;border-radius:8px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;flex-shrink:0;cursor:pointer">

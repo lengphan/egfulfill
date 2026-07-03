@@ -3159,7 +3159,7 @@ function dmRecalcRow(input){
   const row = input.closest('tr');
   const pe = row.querySelector('.dm-row-profit');
   const me = row.querySelector('.dm-row-margin');
-  const color = pct < 30 ? '#dc2626' : pct < 50 ? '#d4a017' : '#059669';
+  const color = pct < 30 ? '#dc2626' : pct < 50 ? '#9ca3af' : '#059669';
   pe.textContent = '$' + profit.toFixed(2); pe.style.color = color;
   me.textContent = pct + '%';              me.style.color = color;
 }
