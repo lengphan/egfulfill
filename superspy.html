@@ -17,6 +17,10 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
 .btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
 .btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
+.bal-chip{background:#fff;border:1px solid #e5e4e0;color:#191918;transition:border-color .15s}.bal-chip:hover{border-color:#9ca3af}
+html[data-theme=dark] .bal-chip{background:#252220!important;border-color:#302e2c!important;color:#d8d4cc!important}
+html[data-theme=dark] .btn-dk{background:#2a2826!important;color:#e8e4e0!important}
+html[data-theme=dark] #new-menu-dd{background:#252220!important;border-color:#302e2c!important}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
 #mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
 #mob-ham:hover{background:#f6f5f4}
@@ -58,6 +62,7 @@ html[data-theme=dark] [style*="color:#6b7280"]{color:#8a8580!important}
     <div style="font-size:11px;font-weight:700;color:#c4c3be;text-transform:uppercase;letter-spacing:.07em;padding:12px 20px 4px">Account</div>
     <a class="ni" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</a>
   </nav>
+  <div style="background:transparent;border:1px solid #d8d4cf;border-radius:10px;padding:12px 14px;margin:8px;flex-shrink:0"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em">Starter Plan</span><span style="font-size:11px;color:#9ca3af">847/1k</span></div><div style="background:#e8e3dd;border-radius:999px;height:4px;margin-bottom:8px;overflow:hidden"><div style="width:84.7%;height:100%;background:linear-gradient(90deg,#191918,#7a92c4);border-radius:999px"></div></div><button onclick="window.location='settings.html#billing'" style="width:100%;background:transparent;border:1px solid #191918;color:#191918;font-size:12.5px;font-weight:600;padding:6px;border-radius:7px;cursor:pointer;font-family:inherit;transition:background .15s,color .15s" onmouseover="this.style.background='#191918';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#191918'">Upgrade to Pro ↑</button></div>
 </aside>
 <div id="mob-ov" onclick="toggleSidebar()"></div>
 
@@ -70,10 +75,29 @@ html[data-theme=dark] [style*="color:#6b7280"]{color:#8a8580!important}
       <span style="color:#191918;font-weight:600">SpyDeck</span>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+      <div style="display:flex;align-items:center;gap:4px;position:relative">
+        <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
+          <div style="position:relative;margin-right:4px">
+            <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none" width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#9ca3af" stroke-width="1.3"/><path d="M9.5 9.5L12 12" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="hdr-search" onkeydown="hdrSearchKey(event)" style="width:220px;background:#f6f5f4;border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:6px 12px 6px 30px;font-size:14px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box" placeholder="Search a niche on SpyDeck…" autocomplete="off"/>
+          </div>
+        </div>
+        <button class="ibtn" id="hdr-search-btn" onclick="toggleHdrSearch()" title="Search"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      </div>
+      <button class="ibtn" id="hdr-lang-btn" onclick="toggleLang()" title="Toggle language"><span id="hdr-lang-code" style="font-size:12.5px;font-weight:700;letter-spacing:.04em">EN</span></button>
       <button class="ibtn" onclick="toggleTheme()" id="pref-btn" title="Toggle light / dark mode" style="padding:6px 8px"><span id="hdr-theme-track" style="display:inline-block;position:relative;width:34px;height:18px;border-radius:11px;background:#e5e4e0;transition:background .25s;flex-shrink:0"><span id="hdr-theme-knob" style="position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .25s"></span></span></button>
-      <a class="ibtn" href="wallet.html" title="Wallet" style="text-decoration:none;font-weight:600;color:#191918"><span id="balance-val" style="font-variant-numeric:tabular-nums">$0.00</span></a>
+      <button class="ibtn" style="position:relative" onclick="typeof toggleNotifPanel==='function'&&toggleNotifPanel(event)" title="Notifications"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a5 5 0 015 5v3l1 1.5H2L3 9.5v-3a5 5 0 015-5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="notif-dot" style="position:absolute;top:1px;right:1px;min-width:16px;height:16px;background:#191918;color:#fff;font-size:10px;font-weight:700;border-radius:999px;border:1.5px solid #f4f2ef;display:none;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none">0</span></button>
+      <div style="width:1px;height:20px;background:#f0ede9;margin:0 3px"></div>
+      <button class="bal-chip" type="button" onclick="openQuickTopUp()" title="Add funds" style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;flex-shrink:0;font-family:inherit"><span id="balance-val" style="font-variant-numeric:tabular-nums">$0.00</span></button>
+      <div style="position:relative">
+        <button class="btn btn-dk" onclick="toggleNewMenu(event)" id="new-menu-btn" style="gap:6px"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>New<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5 8 3.5" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+        <div id="new-menu-dd" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:6px;min-width:210px;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.12)">
+          <div onclick="goManualOrder()" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#374151" stroke-width="1.3"/><path d="M4 7h6M4 4.5h6M4 9.5h3" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">Manual order</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Create from scratch</div></div></div>
+          <div onclick="window.location='settings.html#stores'" style="display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''"><div style="width:28px;height:28px;background:#f4f2ef;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11z" stroke="#374151" stroke-width="1.3"/><path d="M1.5 7h11M7 1.5S5 4 5 7s2 5.5 2 5.5" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg></div><div><div style="font-size:14px;font-weight:600;color:#191918">Sync from platforms</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Etsy, Shopify, TikTok…</div></div></div>
+        </div>
+      </div>
       <div style="width:1px;height:20px;background:#e5e4e0;margin:0 3px"></div>
-      <a class="ibtn" href="settings.html" style="text-decoration:none"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div></a>
+      <div class="ibtn" style="cursor:pointer" onclick="window.location='settings.html'"><div style="width:28px;height:28px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">P</div></div>
     </div>
   </header>
 
@@ -90,11 +114,24 @@ html[data-theme=dark] [style*="color:#6b7280"]{color:#8a8580!important}
 function toggleSidebar(){var s=document.querySelector('.sidebar'),o=document.getElementById('mob-ov');if(s)s.classList.toggle('mob-open');if(o)o.classList.toggle('on');}
 function toggleTheme(){var dark=document.documentElement.getAttribute('data-theme')==='dark';if(dark){document.documentElement.removeAttribute('data-theme');}else{document.documentElement.setAttribute('data-theme','dark');}try{localStorage.setItem('eg_theme',dark?'light':'dark');}catch(e){}syncThemeKnob();}
 function syncThemeKnob(){var dark=document.documentElement.getAttribute('data-theme')==='dark';var t=document.getElementById('hdr-theme-track'),k=document.getElementById('hdr-theme-knob');if(t)t.style.background=dark?'#4b5563':'#e5e4e0';if(k)k.style.transform=dark?'translateX(16px)':'translateX(0)';}
-syncThemeKnob();
+function toggleLang(){var cur=localStorage.getItem('eg_lang')||'en';var nx=cur==='en'?'vi':'en';try{localStorage.setItem('eg_lang',nx);}catch(e){}var c=document.getElementById('hdr-lang-code');if(c)c.textContent=nx.toUpperCase();}
+function toggleNewMenu(e){if(e)e.stopPropagation();var dd=document.getElementById('new-menu-dd');if(dd)dd.style.display=dd.style.display==='none'?'block':'none';}
+function closeNewMenu(){var dd=document.getElementById('new-menu-dd');if(dd)dd.style.display='none';}
+function goManualOrder(){closeNewMenu();if(typeof openNewOrderModal==='function'){openNewOrderModal();}else{window.location='orders.html';}}
+function openQuickTopUp(){if(typeof openDepositModal==='function'){openDepositModal();return;}window.location.href='wallet.html?addfunds=1';}
+function toggleHdrSearch(){var wrap=document.getElementById('hdr-search-wrap'),inp=document.getElementById('hdr-search');if(!wrap)return;var open=wrap.style.maxWidth&&wrap.style.maxWidth!=='0px'&&wrap.style.maxWidth!=='0';if(open){closeHdrSearch();}else{wrap.style.maxWidth='240px';wrap.style.opacity='1';setTimeout(function(){if(inp)inp.focus();},220);}}
+function closeHdrSearch(){var wrap=document.getElementById('hdr-search-wrap');if(wrap){wrap.style.maxWidth='0';wrap.style.opacity='0';}}
+function hdrSearchKey(e){if(e.key==='Escape'){closeHdrSearch();return;}if(e.key==='Enter'){var v=(e.target.value||'').trim();if(v){var q=document.getElementById('eg-scout-q');if(q){q.value=v;var f=document.getElementById('eg-scout-form');if(f)f.dispatchEvent(new Event('submit',{cancelable:true,bubbles:true}));}}closeHdrSearch();}}
+document.addEventListener('click',function(e){var nb=document.getElementById('new-menu-btn');if(nb&&!nb.contains(e.target))closeNewMenu();});
+(function(){try{document.getElementById('balance-val').textContent='$'+parseFloat(localStorage.getItem('eg_balance')||'0').toFixed(2);}catch(e){}var lc=document.getElementById('hdr-lang-code');if(lc)lc.textContent=(localStorage.getItem('eg_lang')||'en').toUpperCase();syncThemeKnob();})();
 </script>
 <script src="egfulfill-store.js"></script>
 <script src="egstore-api.js"></script>
 <script src="eg-sidebar-badges.js"></script>
+<script src="eg-addfunds.js"></script>
+<script src="eg-new-order.js"></script>
+<script src="eg-seller-notif.js"></script>
+<script src="eg-seller-plan.js" defer></script>
 <script src="eg-scout.js"></script>
 <script src="eg-role-switcher.js" defer></script>
 <script>
