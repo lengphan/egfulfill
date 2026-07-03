@@ -1348,9 +1348,15 @@ function _computeDashBucket(orders, platform, period){
            aov: n ? rev/n : 0,
            returnRate: n ? Math.round((refunded/n)*1000)/10 : 0 };
 }
+// Same seller scope as the sv-* stats + sidebar badge: EXCLUDE factory/marketplace-synced
+// orders so the dashboard only ever counts THIS seller's own orders (never admin's).
+function _dashIsFactorySynced(o){
+  return /^etsy-/i.test(String(o && o.id || '')) ||
+    ['etsy','shopify','tiktok','woocommerce','amazon','ebay'].indexOf(String(o && o.source || '').toLowerCase()) !== -1;
+}
 function rebuildDashStats(){
   if (IS_DEMO) return;   // demo keeps the preset showcase numbers
-  var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders()||[]).filter(function(o){return o&&o.id;}) : [];
+  var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders()||[]).filter(function(o){ return o && o.id && !_dashIsFactorySynced(o); }) : [];
   ['month','7d','30d','lastmonth','quarter'].forEach(function(per){
     Object.keys(DASH_STATS).forEach(function(plat){
       DASH_STATS[plat][per] = _computeDashBucket(orders, plat, per);
@@ -2447,16 +2453,11 @@ document.querySelectorAll('#balance-val').forEach(function(el){el.textContent='$
       ['etsy','shopify','tiktok','woocommerce','amazon','ebay'].indexOf(String(o && o.source || '').toLowerCase()) !== -1;
   }
   // bindStats just re-fires on order changes; we recompute from the filtered set.
+  // SINGLE writer to the stat cards: refresh the dropdown-aware dashboard whenever orders
+  // change. (Previously this set sv-orders/revenue/profit/fulfill directly, which fought
+  // updateDashStats writing the SAME elements — and it only covered 4 of the cards.)
   EGStore.bindStats(function(){
-    var orders = ((EGStore.getOrders && EGStore.getOrders()) || []).filter(function(o){ return o && o.id && !isFactorySynced(o); });
-    var total = orders.length;
-    var revenue = orders.reduce(function(a,o){ return a + (Number(o.total) || 0); }, 0);
-    var profit  = orders.reduce(function(a,o){ return a + (Number(o.profit) || 0); }, 0);
-    var shipped = orders.filter(function(o){ return /ship|deliver|fulfil/i.test(String(o.factoryStatus || o.status || '')); }).length;
-    set('sv-orders',  total);
-    set('sv-revenue', EGStore.money(revenue));
-    set('sv-profit',  EGStore.money(profit));
-    set('sv-fulfill', (total ? Math.round(shipped / total * 100) : 0) + '%');
+    try { if (typeof rebuildDashStats === 'function') { rebuildDashStats(); updateDashStats(); } } catch (e) {}
   });
 })();
 </script>
