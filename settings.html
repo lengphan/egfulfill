@@ -477,7 +477,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div class="card" style="padding:22px 24px;margin-bottom:16px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
             <div style="font-size:15px;font-weight:700;color:#191918">Current Plan</div>
-            <span style="background:#f0ede9;color:#374151;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">Starter</span>
+            <span id="bill-cur-badge" style="background:#f0ede9;color:#374151;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">Starter</span>
           </div>
           <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:12px;padding:22px;color:#191918;margin-bottom:20px">
             <div style="font-size:14px;color:#6b7280;margin-bottom:6px"><span id="bill-cur-name">Starter</span> Plan · Billed monthly</div>
@@ -487,26 +487,24 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             <div style="font-size:12.5px;color:#9ca3af;margin-top:5px">424 / 500 orders used this month</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px;display:flex;flex-direction:column">
-              <div id="bill-pro-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Pro Plan</div>
-              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-pro-price">29</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
-              <div id="bill-pro-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">20% off blanks · 10 stores · Advanced analytics</div>
-              <button class="btn btn-dk" style="width:100%;justify-content:center;margin-top:auto" onclick="openUpgradeModal()">Upgrade to Pro</button>
+            <div id="bill-l-card" style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px;display:flex;flex-direction:column">
+              <div id="bill-l-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Starter Plan</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-l-price">0</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div id="bill-l-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">Discounted blank pricing · 2 stores · Basic analytics</div>
+              <button id="bill-l-btn" class="btn btn-out" style="width:100%;justify-content:center;margin-top:auto">Downgrade</button>
             </div>
-            <div style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px;display:flex;flex-direction:column">
-              <div id="bill-ent-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Enterprise</div>
-              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-ent-price">99</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
-              <div id="bill-ent-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">Unlimited orders · Unlimited stores · Dedicated manager</div>
-              <button class="btn btn-out" style="width:100%;justify-content:center;margin-top:auto">Contact Sales</button>
+            <div id="bill-r-card" style="background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:10px;padding:16px;display:flex;flex-direction:column">
+              <div id="bill-r-name" style="font-size:14px;font-weight:700;color:#191918;margin-bottom:4px">Enterprise</div>
+              <div style="font-size:23px;font-weight:800;color:#111827;margin-bottom:8px">$<span id="bill-r-price">99</span><span style="font-size:13px;font-weight:400;color:#9ca3af">/mo</span></div>
+              <div id="bill-r-tagline" style="font-size:13px;color:#6b7280;margin-bottom:12px">Unlimited orders · Unlimited stores · Dedicated manager</div>
+              <button id="bill-r-btn" class="btn btn-out" style="width:100%;justify-content:center;margin-top:auto">Contact Sales</button>
             </div>
           </div>
         </div>
         <div class="card" style="padding:22px 24px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:14px">Payment Method</div>
-          <div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;display:flex;align-items:center;gap:12px;background:#fafaf9">
-            <div style="width:38px;height:24px;background:#1a1f71;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">VISA</div>
-            <div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">•••• •••• •••• 4242</div><div style="font-size:12.5px;color:#9ca3af">Expires 08/27</div></div>
-            <button class="btn btn-out" style="font-size:13px;padding:5px 11px">Update</button>
+          <div id="pay-method-list" style="display:flex;flex-direction:column;gap:10px">
+            <div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;color:#9ca3af;font-size:13.5px;background:#fafaf9">Loading…</div>
           </div>
         </div>
       </div>
@@ -1010,6 +1008,7 @@ function showTab(name){
     document.getElementById('tab-'+t).classList.toggle('on', t===name);
   });
   if (name === 'api' && typeof egLoadAiKeys === 'function') egLoadAiKeys();
+  if (name === 'billing') { try { renderBillingPlans(); } catch(e){} try { renderPaymentMethod(); } catch(e){} }
 }
 // ── Bring-your-own AI keys (Settings → API Keys). Uses the shared EGAI layer so the Scout
 //    title/description tools run on the SELLER's own key, never the platform owner's. ──
@@ -1316,28 +1315,86 @@ var _topUpAmt = 0;
 var PRO_PRICE = 29;
 
 // Billing cards are data-driven from EGStore.getPlanTiers() so the admin Plans editor
-// (Settings → Plans) flows straight through to what the seller sees here.
+// (Settings → Plans) flows straight through to what the seller sees here. The CURRENT plan is the
+// big card on top; the two OTHER tiers fill the bottom row — lower price on the LEFT (Downgrade),
+// higher on the RIGHT — so the current plan is never repeated below.
 function renderBillingPlans(){
   try {
     if (typeof EGStore === 'undefined' || !EGStore.getPlanTiers) return;
-    var tiers = EGStore.getPlanTiers();
-    var byId = function(id){ return tiers.find(function(t){ return t.id===id; }) || {}; };
+    var tiers = EGStore.getPlanTiers().slice().sort(function(a,b){ return (a.monthlyPrice||0)-(b.monthlyPrice||0); });
     var cur = EGStore.getPlanMeta ? EGStore.getPlanMeta(EGStore.getPlan && EGStore.getPlan()) : (tiers[0]||{});
     var set = function(id,v){ var el=document.getElementById(id); if(el) el.textContent=(v==null?'':v); };
+    set('bill-cur-badge', cur.shortName||cur.name||'Starter');
     set('bill-cur-name', cur.shortName||cur.name||'Starter');
     set('bill-cur-price', cur.monthlyPrice!=null?cur.monthlyPrice:0);
     set('bill-cur-tagline', cur.tagline||'');
-    var pro=byId('pro'), ent=byId('enterprise');
-    set('bill-pro-name', (pro.name||'Pro')+' Plan');
-    set('bill-pro-price', pro.monthlyPrice!=null?pro.monthlyPrice:29);
-    set('bill-pro-tagline', pro.tagline||'');
-    PRO_PRICE = pro.monthlyPrice!=null?pro.monthlyPrice:29;
-    set('bill-ent-name', ent.name||'Enterprise');
-    set('bill-ent-price', ent.monthlyPrice!=null?ent.monthlyPrice:99);
-    set('bill-ent-tagline', ent.tagline||'');
+    var proT = tiers.find(function(t){ return t.id==='pro'; }); if (proT) PRO_PRICE = proT.monthlyPrice!=null?proT.monthlyPrice:29;
+    var others = tiers.filter(function(t){ return t.id!==cur.id; });   // the tiers you can switch TO
+    _fillSwitchCard('l', others[0]||null, cur);   // lowest of the others → left
+    _fillSwitchCard('r', others[1]||null, cur);   // highest of the others → right
   } catch(e){}
 }
-try { (document.readyState==='loading') ? document.addEventListener('DOMContentLoaded', renderBillingPlans) : renderBillingPlans(); window.addEventListener('eg-plan-changed', renderBillingPlans); } catch(e){}
+// One of the two bottom "switch to another plan" cards. Downgrade if it's cheaper than the current
+// plan, Contact Sales for Enterprise, otherwise Upgrade.
+function _fillSwitchCard(side, tier, cur){
+  var card=document.getElementById('bill-'+side+'-card');
+  var nameEl=document.getElementById('bill-'+side+'-name');
+  var priceEl=document.getElementById('bill-'+side+'-price');
+  var tagEl=document.getElementById('bill-'+side+'-tagline');
+  var btn=document.getElementById('bill-'+side+'-btn');
+  if(!tier){ if(card) card.style.display='none'; return; }
+  if(card) card.style.display='';
+  var nm=tier.name||'';
+  if(nameEl) nameEl.textContent = /plan$/i.test(nm) ? nm : (nm+' Plan');
+  if(priceEl) priceEl.textContent = (tier.monthlyPrice!=null?tier.monthlyPrice:0);
+  if(tagEl) tagEl.textContent = tier.tagline||'';
+  if(!btn) return;
+  btn.style.display='';
+  if(tier.id==='enterprise'){
+    btn.textContent='Contact Sales'; btn.className='btn btn-out';
+    btn.onclick=function(){ location.href='mailto:sales@egfulfill.app?subject='+encodeURIComponent('Enterprise plan enquiry'); };
+  } else if((tier.monthlyPrice||0) < (cur.monthlyPrice||0)){
+    btn.textContent='Downgrade'; btn.className='btn btn-out';
+    btn.onclick=function(){ _changePlanTo(tier.id, tier.shortName||tier.name); };
+  } else {
+    btn.textContent='Upgrade to '+(tier.shortName||tier.name); btn.className='btn btn-dk';
+    btn.onclick=function(){ if(tier.id==='pro' && typeof openUpgradeModal==='function') openUpgradeModal(); else _changePlanTo(tier.id, tier.shortName||tier.name); };
+  }
+}
+function _changePlanTo(id, label){
+  try{
+    if(!window.confirm('Switch to the '+label+' plan?')) return;
+    if(EGStore && EGStore.setPlan) EGStore.setPlan(id);   // fires eg-plan-changed → billing + sidebars re-render
+    if(typeof toast==='function') toast('Now on the '+label+' plan');
+  }catch(e){}
+}
+// Payment Method — real wallet balance + the seller's saved cards (/api/stripe/cards, the same
+// source the Add-Funds modal reads), replacing the old hardcoded VISA •••• 4242.
+function renderPaymentMethod(){
+  var box=document.getElementById('pay-method-list'); if(!box) return;
+  var bal=parseFloat(localStorage.getItem('eg_balance')||'0')||0;
+  var walletRow='<div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;display:flex;align-items:center;gap:12px;background:#fafaf9">'
+    + '<div style="width:38px;height:24px;background:#191918;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:.02em">WALLET</div>'
+    + '<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">Wallet balance</div><div style="font-size:12.5px;color:#9ca3af">$'+bal.toFixed(2)+' available</div></div>'
+    + '<button class="btn btn-out" style="font-size:13px;padding:5px 11px" onclick="if(typeof openQuickTopUp===\'function\')openQuickTopUp()">Add funds</button></div>';
+  box.innerHTML = walletRow + '<div style="padding:12px 16px;border:1.5px dashed #e5e4e0;border-radius:10px;color:#9ca3af;font-size:13px;background:#fafaf9">Loading saved cards…</div>';
+  var tok=localStorage.getItem('eg_token')||'';
+  fetch((window.EG_API_BASE||'')+'/api/stripe/cards',{ headers: tok?{Authorization:'Bearer '+tok}:{} })
+    .then(function(r){ return r.json(); }).then(function(d){
+      var cards=(d&&Array.isArray(d.cards))?d.cards:[];
+      var rows=cards.map(function(c){
+        var brand=String(c.brand||'CARD').toUpperCase().slice(0,4);
+        var exp=(c.exp_month||c.expMonth||'••')+'/'+String(c.exp_year||c.expYear||'••').toString().slice(-2);
+        return '<div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;display:flex;align-items:center;gap:12px;background:#fafaf9">'
+          + '<div style="width:38px;height:24px;background:#1a1f71;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0">'+brand+'</div>'
+          + '<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">•••• •••• •••• '+(c.last4||'••••')+'</div><div style="font-size:12.5px;color:#9ca3af">Expires '+exp+'</div></div>'
+          + '<button class="btn btn-out" style="font-size:13px;padding:5px 11px" onclick="if(typeof openQuickTopUp===\'function\')openQuickTopUp()">Update</button></div>';
+      });
+      if(!cards.length) rows=['<div style="padding:12px 16px;border:1.5px dashed #e5e4e0;border-radius:10px;display:flex;align-items:center;gap:12px;background:#fafaf9"><div style="width:38px;height:24px;background:#e5e4e0;border-radius:4px;flex-shrink:0"></div><div style="flex:1"><div style="font-size:14px;font-weight:600;color:#191918">No card saved</div><div style="font-size:12.5px;color:#9ca3af">Add one when you top up your wallet</div></div></div>'];
+      box.innerHTML = walletRow + rows.join('');
+    }).catch(function(){ box.innerHTML = walletRow + '<div style="padding:12px 16px;border:1.5px solid #e5e4e0;border-radius:10px;color:#9ca3af;font-size:13px;background:#fafaf9">Couldn\'t load saved cards.</div>'; });
+}
+try { (document.readyState==='loading') ? document.addEventListener('DOMContentLoaded', function(){ renderBillingPlans(); renderPaymentMethod(); }) : (function(){ renderBillingPlans(); renderPaymentMethod(); })(); window.addEventListener('eg-plan-changed', renderBillingPlans); } catch(e){}
 
 /* ── Team members + per-member access surfaces (drives the nav-hiding) ── */
 var TEAM_SURFACES = [

@@ -54,52 +54,10 @@
       }
     });
 
-    // 4) Settings.html billing card — dynamic rewrite of the static template.
-    var billing = document.getElementById('panel-billing');
-    if (billing) {
-      // Plan badge in header
-      billing.querySelectorAll('span').forEach(function (el) {
-        var t = (el.textContent || '').trim();
-        if (/^(Starter|Pro|Enterprise)$/.test(t) && /border-radius:\s*999px/i.test(el.getAttribute('style') || '')) {
-          el.textContent = m.name;
-        }
-      });
-      // Plan tagline in the big card
-      billing.querySelectorAll('div').forEach(function (el) {
-        var t = (el.textContent || '').trim();
-        if (/^(Starter|Pro|Enterprise) Plan · Billed monthly$/.test(t)) {
-          el.textContent = m.name + ' Plan · Billed monthly';
-        }
-      });
-      // Price block — first <div> inside the big card with $X<span>/mo</span>
-      billing.querySelectorAll('div').forEach(function (el) {
-        if (el.children.length === 1 && /^\$\d+/.test((el.textContent || '').trim()) && /font-size:\s*33px/i.test(el.getAttribute('style') || '')) {
-          el.innerHTML = '$' + (m.monthlyPrice || 0) + '<span style="font-size:15px;font-weight:400;color:#9ca3af">/mo</span>';
-        }
-      });
-      // Feature line under the price
-      billing.querySelectorAll('div').forEach(function (el) {
-        var t = (el.textContent || '').trim();
-        if (/orders\/month · \d+ store · Basic analytics$/.test(t) ||
-            /\d[,\d]*\s+orders · \d+ stores · Full analytics · Priority support$/.test(t) ||
-            /Unlimited orders · Unlimited stores · Dedicated manager$/.test(t)) {
-          el.textContent = m.tagline;
-        }
-      });
-      // Disable the matching upgrade button(s) when already at that tier.
-      billing.querySelectorAll('button').forEach(function (btn) {
-        var t = (btn.textContent || '').trim();
-        if (t === 'Upgrade to Pro' && m.id === 'pro') {
-          btn.textContent = 'Current Plan';
-          btn.disabled = true;
-          btn.style.opacity = '0.55';
-          btn.style.cursor = 'default';
-        }
-        if (t === 'Upgrade to Pro' && m.id === 'enterprise') {
-          btn.style.display = 'none';
-        }
-      });
-    }
+    // 4) Settings.html billing panel is now fully owned by renderBillingPlans() there (ID-driven:
+    //    current plan on top, the other tiers as Downgrade/Upgrade cards below). We deliberately no
+    //    longer text-rewrite it here — the two systems raced and the text-matcher clobbered the
+    //    switch cards' taglines. Sections 1–3 above still sync the sidebar/upgrade widgets globally.
   }
 
   if (document.readyState === 'loading') {
