@@ -1775,16 +1775,26 @@
   // to add the nearest in-stock thread. Non-EMB items hide the panel entirely.
   // Threads persist via setItemThreadColors.
   function _qpItemTech() {
-    try { var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk); return String((it && (it.printType || it.tech)) || '').toUpperCase(); } catch (e) { return ''; }
+    try {
+      var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk);
+      var t = String((it && (it.printType || it.tech)) || '').toUpperCase();
+      // Synced orders keep the chosen method in the factory setup store, not on the item — check
+      // both so an embroidery item ALWAYS shows the thread panel, not just manual/factory orders.
+      if (!t && typeof getItemSetup === 'function') { var s = getItemSetup(_qpF.num, it && it.sku) || {}; t = String(s.printType || '').toUpperCase(); }
+      return t;
+    } catch (e) { return ''; }
   }
   function _qpThreadPanelHTML(design) {
     var pick = design
-      ? '<button id="egdt-qp-thread-pick" type="button" onclick="EGDesignTools._qpThreadPick()" title="Eyedropper — then click the design on the mockup to add its colour" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#374151;background:#fff;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10.4 2.6a1.6 1.6 0 0 1 2.3 2.3l-1 1 .9.9-1.1 1.1-.9-.9-4.8 4.8-2.6.6.6-2.6 4.8-4.8-.9-.9 1.1-1.1.9.9 1-1 .2-.1z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Add colour</button>'
+      ? '<button id="egdt-qp-thread-pick" type="button" onclick="EGDesignTools._qpThreadPick()" title="Eyedropper — click the design on the mockup to sample a colour" style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#374151;background:#fff;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10.4 2.6a1.6 1.6 0 0 1 2.3 2.3l-1 1 .9.9-1.1 1.1-.9-.9-4.8 4.8-2.6.6.6-2.6 4.8-4.8-.9-.9 1.1-1.1.9.9 1-1 .2-.1z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>Pick</button>'
       : '';
+    // Manual add is ALWAYS available — the fallback when the artwork didn't auto-match (or there's
+    // no design yet). Appends a thread row whose dropdown lets the operator pick any in-stock colour.
+    var addManual = '<button id="egdt-qp-thread-add" type="button" onclick="EGDesignTools._qpThreadAddManual()" title="Add a thread colour by hand" style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:650;color:#191918;background:#fff;border:1.5px solid #e5e4e0;border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Add colour</button>';
     return '<div style="border-top:1px solid #f0ede9;padding-top:12px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">'
       +   '<div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Thread colours' + (design ? ' <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#c4c3be">· auto + pick</span>' : '') + '</div>'
-      +   pick
+      +   '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' + pick + addManual + '</div>'
       + '</div>'
       + '<div id="egdt-qp-thread-chips"></div>'
       + '</div>';
@@ -1804,7 +1814,7 @@
     var threads = _qpF.threads || [];
     if (!threads.length) {
       var hasDesign = !!document.getElementById('egdt-qp-thread-pick');
-      box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Auto-matching the design’s colours… or use “Add colour” to pick from the mockup.' : 'Add a design to auto-match its thread colours.') + '</div>';
+      box.innerHTML = '<div style="font-size:12px;color:#9ca3af">' + (hasDesign ? 'Auto-matching the design’s colours… or use Pick / Add colour.' : 'No colours yet — add a design to auto-match, or use “Add colour” to add them by hand.') + '</div>';
       return;
     }
     // One ROW per detected colour: [detected swatch] → [chosen swatch] [dropdown to change
@@ -1958,6 +1968,17 @@
     }
   }
   function _qpThreadRemove(i) { if (!_qpF || !_qpF.threads) return; _qpF.threads.splice(i, 1); _qpRenderThreadChips(); try { _qpPersist(false); } catch (e) {} }
+  // Manual add — the fallback when the artwork didn't auto-match. Seeds the row with a broad
+  // in-stock list so the dropdown lets the operator pick any colour by hand.
+  function _qpThreadAddManual() {
+    if (!_qpF) return;
+    if (!Array.isArray(_qpF.threads)) _qpF.threads = [];
+    var cands = _qpThreadCandidatesFromHex('#808080');   // ~all in-stock threads, nearest-first
+    var first = (cands && cands[0]) || { code: '', name: 'Pick a colour', hex: '#9ca3af' };
+    _qpF.threads.push({ code: first.code, name: first.name, hex: first.hex, srcHex: first.hex, candidates: (cands && cands.length) ? cands : [first] });
+    _qpRenderThreadChips();
+    try { _qpPersist(false); } catch (e) {}
+  }
   function _qpPersist(pushApi) {
     if (!_qpF || _qpF.locked) return;
     var o = findOrder(_qpF.num), it = o && findItemByKey(o, _qpF.dk), wrap = document.getElementById('egdt-qp-wrap');
@@ -2528,7 +2549,7 @@
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,
     _qpSearch: _qpSearch, _qpPickResult: _qpPickResult,
-    _qpThreadPick: _qpThreadPick, _qpThreadRemove: _qpThreadRemove, _qpThreadSetSel: _qpThreadSetSel,
+    _qpThreadPick: _qpThreadPick, _qpThreadAddManual: _qpThreadAddManual, _qpThreadRemove: _qpThreadRemove, _qpThreadSetSel: _qpThreadSetSel,
     editShipToInline: editShipToInline, cancelShipTo: cancelShipTo, saveShipTo: saveShipTo,
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,

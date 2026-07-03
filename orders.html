@@ -5175,7 +5175,7 @@ function submitNewOrder() {
     del: del,
     status: 'new',
     src: channel,
-    store: document.getElementById('no-store').value || 'Main Store',
+    store: (document.getElementById('no-store').value || '').trim() || (function(){ try { var u = JSON.parse(localStorage.getItem('eg_user') || '{}') || {}; return (u.store_name || u.store || u.shop || u.shop_name || u.name || '').trim(); } catch(e){ return ''; } })() || 'My Store',
     total: items.reduce((s,i) => s + i.qty * 15, 0),  // rough estimate; seller can refine
     profit: 0,
     created: fmtDate,
