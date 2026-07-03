@@ -5158,6 +5158,19 @@ function whMarkPrescan(orderNum) {
   const o = WH_ORDERS.find(x => x.num === orderNum);
   if (o && admCanonStatus(o.status) === 'in_review') o.status = 'prescan';
 }
+// USPS_MOCK sample label (client-side) so a scanned order always has a viewable label without
+// live postage. A real label (from Generate Label) is used as-is when present.
+function _whMockLabel(name, addr, tracking) {
+  return '<div style="width:340px;border:2px solid #191918;padding:14px 16px;font-family:monospace;font-size:12px;color:#191918;background:#fff">'
+    + '<div style="font-weight:800;font-size:14px;border-bottom:2px solid #191918;padding-bottom:6px;margin-bottom:8px;display:flex;justify-content:space-between">USPS GROUND ADVANTAGE<span style="font-size:9px;color:#9ca3af">SAMPLE</span></div>'
+    + '<div style="font-size:9px;color:#9ca3af;letter-spacing:.06em">SHIP TO</div>'
+    + '<div style="font-weight:700">' + String(name || 'Recipient').replace(/</g, '&lt;') + '</div>'
+    + '<div>' + String(addr || '').replace(/</g, '&lt;') + '</div>'
+    + '<div style="text-align:center;margin:14px 0 4px;font-size:30px;line-height:.7;letter-spacing:1px">▏█▏██▏█▏█▏██▏█▏▏█▏██▏█</div>'
+    + '<div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:1px">' + tracking + '</div>'
+    + '<div style="text-align:center;font-size:9px;color:#9ca3af;margin-top:8px">USPS_MOCK — sample label, no real postage</div>'
+    + '</div>';
+}
 // Scan an Awaiting-Scan order → record in shared scan history → move to Scanned.
 function whScanOrder(orderNum) {
   const o = WH_ORDERS.find(x => x.num === orderNum);
@@ -5165,11 +5178,26 @@ function whScanOrder(orderNum) {
   const tracking = o.tracking || ('9400 1000 0000 ' + Math.floor(1000000000 + Math.random()*9e9).toString().replace(/(\d{4})(\d{4})(\d{2})/,'$1 $2 $3'));
   o.tracking = tracking;
   o.status = 'scanned';
+  var to = (typeof _whOrderShipTo === 'function' && _whOrderShipTo(orderNum)) || {};
+  var addr = [to.street, [to.city, [to.state, to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ');
+  // Ensure a viewable label — a real one if generated already, else a sample (mock mode).
+  var _label = (o.label && (o.label.labelHtml || o.label.labelImage)) ? o.label : { labelHtml: _whMockLabel(to.name || o.customer, addr, tracking), imageType: 'HTML' };
+  o.label = Object.assign({}, o.label || {}, _label, { tracking_number: tracking });
   if (typeof EGStore !== 'undefined' && EGStore.update) {
-    EGStore.update(o.id || orderNum, { factoryStatus: 'scanned' });
+    EGStore.update(o.id || orderNum, { factoryStatus: 'scanned', tracking: tracking, trackingCarrier: 'USPS' });
   }
   if (typeof EGStore !== 'undefined' && EGStore.recordScan) {
     EGStore.recordScan({ order: orderNum, customer: o.customer, carrier: o.carrier || 'USPS', tracking: tracking, by: 'Admin' });
+  }
+  // CRITICAL: record the shipment so the scanned order shows in the Shipments table + its label can
+  // be reopened. (Previously Scan only logged scan history → the order vanished from Shipments.)
+  if (typeof EGUSPS !== 'undefined' && EGUSPS.recordShipment) {
+    EGUSPS.recordShipment({
+      tracking: tracking, orderNum: orderNum, orderId: o.id || orderNum,
+      recipient: to.name || (o.customer && (o.customer.name || o.customer)) || '',
+      recipientAddr: addr, carrier: o.carrier || 'USPS', service: 'Ground Advantage',
+      date: (new Date()).toISOString().slice(0, 10), status: 'shipped', manual: false, label: _label
+    });
   }
   return true;
 }

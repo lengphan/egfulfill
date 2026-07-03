@@ -5381,19 +5381,54 @@ function whMarkPrescan(orderNum) {
 // factory has to attach a real label before it can ship. This matches the seller flow
 // where some sellers print labels themselves on their platform and just send orders
 // here for fulfillment.
+// USPS_MOCK sample label (client-side) so a scanned order always has a viewable label without
+// live postage. A real label (from Generate Label) is used as-is when present.
+function _whMockLabel(o, tracking) {
+  var to = o.shipTo || {};
+  var name = (o.customer && (o.customer.name || o.customer)) || to.name || 'Recipient';
+  return '<div style="width:340px;border:2px solid #191918;padding:14px 16px;font-family:monospace;font-size:12px;color:#191918;background:#fff">'
+    + '<div style="font-weight:800;font-size:14px;border-bottom:2px solid #191918;padding-bottom:6px;margin-bottom:8px;display:flex;justify-content:space-between">USPS GROUND ADVANTAGE<span style="font-size:9px;color:#9ca3af">SAMPLE</span></div>'
+    + '<div style="font-size:9px;color:#9ca3af;letter-spacing:.06em">SHIP TO</div>'
+    + '<div style="font-weight:700">' + String(name).replace(/</g, '&lt;') + '</div>'
+    + '<div>' + String((to.street || '') + ' ' + (to.apt || '')).replace(/</g, '&lt;') + '</div>'
+    + '<div>' + [to.city, to.state, to.zip].filter(Boolean).join(', ').replace(/</g, '&lt;') + '</div>'
+    + '<div style="text-align:center;margin:14px 0 4px;font-size:30px;line-height:.7;letter-spacing:1px">▏█▏██▏█▏█▏██▏█▏▏█▏██▏█</div>'
+    + '<div style="text-align:center;font-weight:800;font-size:13px;letter-spacing:1px">' + tracking + '</div>'
+    + '<div style="text-align:center;font-size:9px;color:#9ca3af;margin-top:8px">USPS_MOCK — sample label, no real postage</div>'
+    + '</div>';
+}
 function whScanOrder(orderNum) {
   const o = WH_ORDERS.find(x => x.num === orderNum);
   if (!o || whCanonStatus(o.status) !== 'awaiting_scan') return false;
-  const tracking = (o.label && o.label.tracking_number) || o.tracking || '';
+  let tracking = (o.label && o.label.tracking_number) || o.tracking || '';
+  // MOCK/sample: mint a sample USPS tracking if none exists so Scan always yields a shipment.
+  // Include randomness so a same-millisecond bulk scan can't collide (recordShipment dedups by tracking).
+  if (!tracking) tracking = '9400' + String(Date.now()).slice(-10) + String(Math.floor(Math.random() * 1e6)).padStart(6, '0') + '02';
   o.tracking = tracking;
   o.status = 'scanned';
-  if (!tracking) o.needsLabel = true; // surfaced in the order row as an "Upload label" prompt
+  o.needsLabel = false;
+  // Ensure a viewable label — a real one if generated already, else a sample (mock mode).
+  var _label = (o.label && (o.label.labelHtml || o.label.labelImage)) ? o.label : { labelHtml: _whMockLabel(o, tracking), imageType: 'HTML' };
+  o.label = Object.assign({}, o.label || {}, _label, { tracking_number: tracking });
+  o.trackingLabelUrl = 1;
   if (Array.isArray(o.itemList)) o.itemList.forEach(it => { if (whCanonStatus(it.status) === 'awaiting_scan') it.status = 'scanned'; });
   if (typeof EGStore !== 'undefined' && EGStore.update) {
-    EGStore.update(o.id || orderNum, { factoryStatus: 'scanned', needsLabel: !tracking });
+    EGStore.update(o.id || orderNum, { factoryStatus: 'scanned', tracking: tracking, trackingCarrier: 'USPS', needsLabel: false });
   }
   if (typeof EGStore !== 'undefined' && EGStore.recordScan) {
-    EGStore.recordScan({ order: orderNum, customer: o.customer, carrier: o.carrier || 'TBD', tracking: tracking || '—', by: 'Warehouse' });
+    EGStore.recordScan({ order: orderNum, customer: o.customer, carrier: o.carrier || 'USPS', tracking: tracking, by: 'Warehouse' });
+  }
+  // CRITICAL: record the shipment so the scanned order shows in the Shipments table + its label can
+  // be reopened. (Previously Scan only logged scan history → the order vanished from Shipments.)
+  if (typeof EGUSPS !== 'undefined' && EGUSPS.recordShipment) {
+    var _to = o.shipTo || {};
+    EGUSPS.recordShipment({
+      tracking: tracking, orderNum: orderNum, orderId: o.id || orderNum,
+      recipient: (o.customer && (o.customer.name || o.customer)) || _to.name || '',
+      recipientAddr: [(_to.street || ''), [_to.city, _to.state, _to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+      carrier: o.carrier || 'USPS', service: 'Ground Advantage', date: (new Date()).toISOString().slice(0, 10),
+      status: 'shipped', manual: false, label: _label
+    });
   }
   return true;
 }
