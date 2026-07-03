@@ -648,7 +648,7 @@ const DB_COLUMNS = [
   { id:'paid',       name:'Paid',        color:'#6b7280', icon:'💸' },
 ];
 
-const DB_CARDS = [
+const DB_DEMO = [
   { id:1, col:'incoming', title:'Dragon Print — Front & Back', orderNum:'FF-8801', product:'Gildan Hoodie 18500 · Navy · M/L', type:'DTG', priority:'high', dueDate:'2026-05-08', payment:32, payStatus:'pending', assignee:null, thumbnail:'images/design1.png', specs:{'Print Area':'12" × 14"','DPI':'300','Bleed':'0.25"','Color Mode':'RGB'}, files:[], checklist:[{text:'Check bleed area',done:false},{text:'Convert to RGB',done:false},{text:'Export 300dpi PNG',done:false}], notes:[{author:'Operator',avatar:'O',text:'Please ensure bleed is 0.25in on all sides. Dragon should face right.',ts:'2026-05-05 09:12'}] },
   { id:2, col:'incoming', title:'Coffee Mug Wrap 360°', orderNum:'FF-8802', product:'Ceramic Mug 11oz · White', type:'SUB', priority:'normal', dueDate:'2026-05-10', payment:18, payStatus:'pending', assignee:null, thumbnail:'images/487_fm.jpg', specs:{'Print Area':'8.5" × 3.5"','DPI':'200','Bleed':'0.125"','Color Mode':'CMYK'}, files:[], checklist:[{text:'Wrap template alignment',done:false},{text:'CMYK color check',done:false}], notes:[{author:'Operator',avatar:'O',text:'Client wants warm earthy tones.',ts:'2026-05-05 10:30'}] },
   { id:3, col:'inprogress', title:'Leo Brand — Chest Logo', orderNum:'FF-8795', product:'Gildan Tee 5000 · Black · S–XL', type:'EMB', priority:'normal', dueDate:'2026-05-07', payment:45, payStatus:'pending', assignee:'Phan', thumbnail:'images/82220_f_fm.jpg', specs:{'Stitch Count':'~8,500','Size':'3.5" × 3.5"','Colors':'3','Format':'DST/PES'}, files:[{name:'leo-chest-v1.dst',size:'42KB'}], checklist:[{text:'Convert to DST',done:true},{text:'Test sew-out',done:false},{text:'Final color match',done:false}], notes:[{author:'Operator',avatar:'O',text:'Left chest, 3.5in wide. Gold thread for lion, white for text.',ts:'2026-05-04 14:00'},{author:'Phan',avatar:'P',text:'DST v1 attached — running test sew-out tomorrow.',ts:'2026-05-05 08:45'}] },
@@ -661,6 +661,66 @@ const DB_CARDS = [
 // ══════════════════════════════════════════════════
 // SECTIONS
 // ══════════════════════════════════════════════════
+// ── LIVE design cards ── Read the REAL cards the factory/designer created (egfulfill_design_cards:
+// minted on every design upload/push with a Design ID + col 'incoming'). Falls back to the demo
+// only when the store is empty so the board isn't blank in dev. Column moves / claims persist back.
+function _dbLoadCards() {
+  var raw = [];
+  try { raw = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]'); } catch (e) {}
+  if (!Array.isArray(raw) || !raw.length) return DB_DEMO.slice();
+  return raw.map(function (c) {
+    return {
+      id: c.id, col: c.col || 'incoming',
+      title: c.title || c.designId || 'Design',
+      designId: c.designId || c.title || '',
+      orderNum: c.order || c.orderNum || '',
+      sku: c.sku || '', dk: c.dk || '',
+      product: c.product || '—',
+      type: String(c.type || 'DTG'),
+      priority: c.priority || 'normal',
+      dueDate: c.due || c.dueDate || '',
+      payment: c.payment || 0,
+      payStatus: c.payStatus || 'pending',
+      assignee: (c.assignee !== undefined) ? c.assignee : null,
+      thumbnail: c.thumb || c.thumbnail || '',
+      thumb_ref: c.thumb_ref || '',
+      specs: c.specs || {},
+      files: Array.isArray(c.files) ? c.files : [],
+      checklist: Array.isArray(c.checklist) ? c.checklist : [],
+      notes: Array.isArray(c.notes) ? c.notes : [],
+      history: Array.isArray(c.history) ? c.history : []
+    };
+  });
+}
+function _dbSaveCards() {
+  try {
+    var store = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
+    if (!Array.isArray(store) || !store.length) return;   // demo mode → nothing real to persist
+    var before = JSON.stringify(store);
+    var byId = {}; store.forEach(function (c) { byId[c.id] = c; });
+    DB_CARDS.forEach(function (b) {
+      var s = byId[b.id]; if (!s) return;
+      s.col = b.col; s.assignee = b.assignee; s.payStatus = b.payStatus;
+      s.checklist = b.checklist; s.notes = b.notes;
+    });
+    var after = JSON.stringify(store);
+    // Only write when something actually changed. This is critical: writing fires a native
+    // cross-tab storage event → our listener re-renders → _dbSaveCards again; the guard stops
+    // that render/storage ping-pong after one hop (and no manual dispatch, which looped in-tab).
+    if (after === before) return;
+    localStorage.setItem('egfulfill_design_cards', after);
+  } catch (e) {}
+}
+let DB_CARDS = _dbLoadCards();
+// Live-refresh when a design is uploaded/pushed on another board/tab (or this one).
+window.addEventListener('storage', function (e) {
+  if (!e || e.key === 'egfulfill_design_cards' || e.key === 'eg_design_ping' || e.key === null) {
+    DB_CARDS = _dbLoadCards();
+    try { if (typeof dbRender === 'function' && document.getElementById('sec-board') && document.getElementById('sec-board').style.display !== 'none') dbRender(); } catch (x) {}
+    try { if (typeof renderOverview === 'function') renderOverview(); } catch (x) {}
+  }
+});
+
 const SECTION_TITLES = { overview:'Overview', board:'Design Board', wallet:'Wallet', settings:'Settings' };
 
 function showSec(id) {
@@ -768,6 +828,7 @@ function dbDrop(e, colId) {
 // RENDER BOARD
 // ══════════════════════════════════════════════════
 function dbRender() {
+  _dbSaveCards();   // persist any col/claim/approve mutation back to the live store before re-rendering
   const filtered = DB_FILTER === 'all' ? DB_CARDS : DB_CARDS.filter(c => c.type.toLowerCase() === DB_FILTER);
   const board = document.getElementById('db-board');
   board.innerHTML = '';
