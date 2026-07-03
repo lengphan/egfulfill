@@ -238,10 +238,37 @@ export function ordersRoutes(app, requireAuth) {
 
   async function canSeeOrder(user, orderId) {
     if (isStaff(user)) return true;
+    // Support conversations ride on order_messages under a synthetic id `support-<sellerId>`.
+    // A seller may only see/post to their OWN support thread; staff (above) see all of them.
+    if (String(orderId).indexOf('support-') === 0) return orderId === ('support-' + user.sub);
     const r = await q('select seller_id, factory_order from orders where id=$1', [orderId]);
     const row = r.rows[0];
     return !!(row && !row.factory_order && row.seller_id === user.sub);
   }
+
+  // Staff-only: list every seller support thread (one row per seller) with its last message, so the
+  // staff chat can show "EGFULFILL Support" conversations that sellers started. Sellers never hit this.
+  app.get('/api/support/threads', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
+    const r = await q(`
+      select m.order_id,
+             max(m.created_at) as last_at,
+             count(*)::int as n,
+             (select body from order_messages x where x.order_id = m.order_id order by created_at desc, id desc limit 1) as last_body,
+             (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')) as seller_name
+        from order_messages m
+       where m.order_id like 'support-%'
+       group by m.order_id
+       order by last_at desc`);
+    return r.rows.map((x) => ({
+      order_id: x.order_id,
+      seller_id: String(x.order_id).replace('support-', ''),
+      seller_name: x.seller_name || null,
+      last: x.last_body || '',
+      last_at: x.last_at ? new Date(x.last_at).getTime() : 0,
+      n: x.n
+    }));
+  });
 
   app.post('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
