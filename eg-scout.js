@@ -85,14 +85,15 @@
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
     '.eg-scout-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}' +
-    '.eg-scout-stat{background:#f7f6f4;border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;line-height:1.15}' +
+    '.eg-scout-stat{background:rgba(0,0,0,.045);border-radius:8px;padding:7px 9px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.15}' +
     '.eg-scout-stat b{font-size:14.5px;font-weight:750;color:#191918;font-variant-numeric:tabular-nums}' +
     '.eg-scout-stat i{font-size:10px;color:#9ca3af;font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-top:2px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
-    '.eg-scout-meta{display:flex;align-items:center;gap:10px;font-size:11.5px;color:#6b7280;flex-wrap:wrap}' +
-    '.eg-scout-meta .eg-scout-esttag{margin-left:auto;font-size:9.5px;font-weight:700;color:#b8b4ad;text-transform:uppercase;letter-spacing:.04em}' +
-    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px}' +
-    '.eg-scout-tag{background:#f4f2ef;border:1px solid #ece9e3;color:#6b7280;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}' +
+    '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
+    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;max-height:118px;overflow:hidden;position:relative;padding-bottom:26px}' +
+    '.eg-scout-tag{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.06);color:#6b7280;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;max-width:100%}' +
+    '.eg-scout-copy{position:absolute;bottom:0;right:0;background:#191918;color:#fff;border:none;font-size:10px;font-weight:650;padding:4px 11px;border-radius:6px;cursor:pointer;line-height:1.3;transition:opacity .12s}' +
+    '.eg-scout-copy:hover{opacity:.85}' +
     '.eg-scout-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}' +
     '.eg-scout-make{background:#191918;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
     '.eg-scout-make:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(17,24,39,.2)}' +
@@ -217,11 +218,16 @@
     }
   }
 
-  // Load the rotating daily feed (fresh products before any search).
+  // The daily feed is cached so the page paints INSTANTLY on open (no spinner), then refreshes live.
+  var FEED_CACHE_KEY = 'eg_scout_feed';
+  function _saveFeedCache(results) { try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify({ ts: Date.now(), results: (results || []).slice(0, 48) })); } catch (e) {} }
+  function _loadFeedCache() { try { var c = JSON.parse(localStorage.getItem(FEED_CACHE_KEY) || 'null'); return (c && Array.isArray(c.results)) ? c.results : null; } catch (e) { return null; } }
   function loadFeed() {
     var day = Math.floor(Date.now() / 86400000);
     _feedQuery = FEED_QUERIES[day % FEED_QUERIES.length];
     _feed = true;
+    var cached = _loadFeedCache();
+    if (cached && cached.length) { _last = cached; _count = cached.length; render(_last); renderPager(); _note('Fresh finds for today — or search any niche above.'); }
     _fetchPage(_feedQuery, 1, true);
   }
 
@@ -232,52 +238,58 @@
     _fetchPage(q, page || 1, false);
   }
 
-  function _fetchPage(q, page, isFeed) {
+  function _fetchPage(q, page, isFeed, isFallback) {
     _query = q; _page = Math.max(1, page || 1); _loading = true;
     var grid = document.getElementById('eg-scout-grid');
-    if (grid) grid.innerHTML = '<div class="eg-scout-empty">' + (isFeed ? 'Loading fresh finds…' : 'Searching…') + '</div>';
-    _clearPager();
+    var keepCards = isFeed && grid && grid.querySelector('.eg-scout-card');   // silent background refresh of the feed — no spinner flash
+    if (grid && !keepCards) grid.innerHTML = '<div class="eg-scout-empty">' + (isFeed ? 'Loading fresh finds…' : 'Searching…') + '</div>';
+    if (!keepCards) _clearPager();
     var offset = (_page - 1) * _perPage;
-    var url = (g.EG_API_BASE || '') + '/api/etsy/search?q=' + encodeURIComponent(q) + '&limit=' + _perPage + '&offset=' + offset + (isFeed ? '&sort=created' : '');
+    var url = (g.EG_API_BASE || '') + '/api/etsy/search?q=' + encodeURIComponent(q) + '&limit=' + _perPage + '&offset=' + offset + ((isFeed && !isFallback) ? '&sort=created' : '');
     fetch(url, { headers: { Authorization: 'Bearer ' + tok() } })
       .then(function (r) { return r.json().catch(function () { return {}; }); })
       .then(function (d) {
         _loading = false;
         if (_view !== 'search') return;                       // user switched to Favorites mid-flight
         if (d && d.error) { if (grid) grid.innerHTML = '<div class="eg-scout-empty">' + esc(d.error) + '</div>'; return; }
-        _last = (d && d.results) || [];
+        var res = (d && d.results) || [];
+        if (isFeed && !isFallback && !res.length) { _fetchPage(q, page, true, true); return; }   // newest-sort empty → retry unsorted
+        _last = res;
         _count = (d && d.count) || _last.length;
         render(_last);
         renderPager();
+        if (isFeed) _saveFeedCache(_last);
         _note(isFeed ? 'Fresh finds for today — or search any niche above.' : '');
       })
       .catch(function () { _loading = false; if (grid) grid.innerHTML = '<div class="eg-scout-empty">Search failed — check your connection and try again.</div>'; });
   }
 
+  var CARD_SHADES = ['#ffffff', '#fbf9f5', '#f7f4ee', '#fcfaf6', '#f8f5ef', '#fdfbf8'];
   function cardHTML(l, i, favView) {
     var e = _est(l);
     var img = l.image ? '<img src="' + esc(l.image) + '" alt="" loading="lazy"/>' : '<div class="eg-scout-noimg">No image</div>';
     var saved = favHas(l.listing_id);
     var created = _dateStr(l.created);
     var favs = l.num_favorers || 0;
-    var tags = (Array.isArray(l.tags) ? l.tags : []).slice(0, 3);
-    var tagHTML = tags.length ? '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '</div>' : '';
-    return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '">' +
+    var tags = (Array.isArray(l.tags) ? l.tags : []).slice(0, 13);   // Etsy allows up to 13 tags
+    var tagHTML = tags.length
+      ? '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '<button class="eg-scout-copy" type="button" data-i="' + i + '" title="Copy all keywords">Copy</button></div>'
+      : '';
+    return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '" style="background:' + CARD_SHADES[i % CARD_SHADES.length] + '">' +
       (favView ? '<button class="eg-scout-remove" type="button" data-i="' + i + '" title="Remove" aria-label="Remove">&times;</button>' : '') +
       (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
       '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
       '<div class="eg-scout-body">' +
         '<div class="eg-scout-stats">' +
-          '<span class="eg-scout-stat"><b>~' + _fmt(e.views24) + '</b><i>Views · 24h</i></span>' +
-          '<span class="eg-scout-stat"><b>~' + _fmt(e.sold24) + '</b><i>Sold · 24h</i></span>' +
-          '<span class="eg-scout-stat"><b>~' + _money(e.revenue) + '</b><i>Revenue</i></span>' +
-          '<span class="eg-scout-stat"><b>~' + _fmt(e.totalSold) + '</b><i>Sold · all</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.views24) + '</b><i>Views · 24h</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.sold24) + '</b><i>Sold · 24h</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold · all</i></span>' +
         '</div>' +
         '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
         '<div class="eg-scout-meta">' +
           '<span title="Favorites">&#9829; ' + _fmt(favs) + '</span>' +
-          (created ? '<span title="Created on Etsy">Created ' + esc(created) + '</span>' : '') +
-          '<span class="eg-scout-esttag" title="Views, sold & revenue are estimates">est.</span>' +
+          '<span title="Created on Etsy">' + (created ? 'Created ' + esc(created) : '') + '</span>' +
         '</div>' +
         tagHTML +
         '<div class="eg-scout-actions">' +
@@ -295,6 +307,14 @@
         var l = list[+b.getAttribute('data-i')]; var on = favToggle(l);
         b.classList.toggle('on', on); b.textContent = on ? 'Saved' : 'Save';
         if (_view === 'favs' && !on) renderFavorites();
+      });
+    });
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-copy'), function (b) {
+      b.addEventListener('click', function () {
+        var l = list[+b.getAttribute('data-i')]; var kws = (Array.isArray(l.tags) ? l.tags : []);
+        try { navigator.clipboard.writeText(kws.join(', ')); } catch (e) {}
+        var was = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = was; }, 1200);
+        toast('Copied ' + kws.length + ' keywords');
       });
     });
     if (favView) {

@@ -347,7 +347,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const offset = Math.max(0, parseInt((req.query && req.query.offset) || '0', 10) || 0);
     const sort = (req.query && req.query.sort === 'created') ? 'created' : 'score';   // 'created' powers the daily feed
     try {
-      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&sort_order=down&includes=Images,Shop';
+      // shop_location=US → only US shops (English listings that ship in the USA); filters out the
+      // foreign-language shops (e.g. German) the seller doesn't want.
+      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&shop_location=US&includes=Images,Shop';
       const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { reply.code(r.status >= 400 && r.status < 500 ? r.status : 502); return { error: (d && d.error) || ('Etsy search error ' + r.status) }; }
