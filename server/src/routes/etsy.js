@@ -336,6 +336,35 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     configured: !!KEYSTRING
   }));
 
+  // ── Product Scout: public Etsy listing search (product research). No seller OAuth —
+  // the app keystring alone can query public active listings. requireAuth so only signed-in
+  // users hit it (plan-gating layers on top later). Shared by the seller + admin Scout modal.
+  app.get('/api/etsy/search', { preHandler: requireAuth }, async (req, reply) => {
+    if (!KEYSTRING) { reply.code(500); return { error: 'Server missing ETSY_KEYSTRING' }; }
+    const query = String((req.query && (req.query.q || req.query.keywords)) || '').trim();
+    if (!query) { reply.code(400); return { error: 'Missing search query (?q=)' }; }
+    const limit = Math.min(48, Math.max(1, parseInt((req.query && req.query.limit) || '24', 10) || 24));
+    try {
+      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&sort_on=score&includes=Images,Shop';
+      const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { reply.code(r.status >= 400 && r.status < 500 ? r.status : 502); return { error: (d && d.error) || ('Etsy search error ' + r.status) }; }
+      const results = (d.results || []).map((l) => ({
+        listing_id: l.listing_id,
+        title: l.title || '',
+        description: l.description || '',
+        price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
+        currency: (l.price && l.price.currency_code) || 'USD',
+        url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
+        tags: Array.isArray(l.tags) ? l.tags : [],
+        image: (l.images && l.images[0] && (l.images[0].url_570xN || l.images[0].url_fullxfull || l.images[0].url_680x540)) || null,
+        shop_name: (l.shop && l.shop.shop_name) || null,
+        num_favorers: l.num_favorers || 0
+      }));
+      return { count: d.count || results.length, query: query, results };
+    } catch (e) { reply.code(502); return { error: e.message }; }
+  });
+
   // Same-origin image proxy for Etsy's public CDN. The factory boards run canvas
   // colour analysis (thread matching) on the buyer's uploaded artwork — but a
   // remote cross-origin image taints the canvas and getImageData() throws. Loading
