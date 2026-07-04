@@ -153,7 +153,7 @@
       + fld('Ref 1 — Order #', 'egusps-ref1', 'FF-7015')
       + fld('Ref 2 — Store / Seller', 'egusps-ref2', 'Seller')
       + '</div>'
-      + fld('Contents', 'egusps-contents', 'Gildan Tee ×1 — DTG')
+      + fld('Contents', 'egusps-contents', 'GILDAN-5000 Black M ×1')
       // EXTRA SERVICES
       + '<div style="' + HD + '">EXTRA SERVICES</div>'
       + '<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:#191918;cursor:pointer"><input type="checkbox" id="egusps-sig" style="accent-color:#191918">Signature Confirmation <span style="color:#9ca3af">+$3.65</span></label>'
@@ -345,14 +345,36 @@
 
   // Build a "Contents" line from an order's items — base product name + qty (+ method),
   // tolerant of the various item shapes across the boards/EGStore.
-  function contentsFromItems(items) {
+  // The label "Contents" describes what's PHYSICALLY in the box — our chosen blank's SKU × qty,
+  // NOT the marketplace listing title. The blank/variant a board picked lives in the shared
+  // eg_neworder_setup store (key `orderNum|sku`). If nothing's been picked (e.g. a synced order
+  // whose blank was never chosen) we emit "No Blank Chosen" so it's obvious at the label step.
+  function _blankSetup(orderNum, key) {
+    if (!orderNum || !key) return {};
+    try { var a = JSON.parse(localStorage.getItem('eg_neworder_setup') || '{}'); return a[orderNum + '|' + key] || {}; } catch (e) { return {}; }
+  }
+  function _blankSkuFor(blankName, color, size) {
+    var base = '';
+    try {
+      if (window.EGStore && EGStore.getCatalogProducts) {
+        var p = (EGStore.getCatalogProducts() || []).filter(function (x) { return String(x.name || '') === String(blankName); })[0];
+        if (p) base = p.sku || p.id || '';
+      }
+    } catch (e) {}
+    if (!base) base = blankName || '';
+    var variant = [color, size].filter(Boolean).join(' ');
+    return base + (variant ? ' ' + variant : '');
+  }
+  function contentsFromItems(items, orderNum) {
     if (!items || !items.length) return '';
     return items.map(function (i) {
       i = i || {};
-      var name = i.name || i.product || i.productName || i.title || 'Item';
-      var qty = i.qty || i.quantity || i.qnty || i.count || '';
-      var method = i.print || i.method || i.printType || i.printMethod || i.technique || '';
-      return name + (qty ? ' ×' + qty : '') + (method ? ' — ' + method : '');
+      var qty = i.qty || i.quantity || i.qnty || i.count || 1;
+      var s = _blankSetup(orderNum, i.sku); if (!s.product && i.dk) s = _blankSetup(orderNum, i.dk);
+      var blank = s.product || i.blank || i.blankName || '';
+      var color = s.color || i.color || '', size = s.size || i.size || '';
+      if (!blank) return 'No Blank Chosen ×' + qty;
+      return _blankSkuFor(blank, color, size) + ' ×' + qty;
     }).join('; ');
   }
 

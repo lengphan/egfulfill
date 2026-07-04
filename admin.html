@@ -5249,7 +5249,7 @@ function _whOrderShipTo(num) {
   }
   if (!items && o) items = (o.items && o.items.length) ? o.items : (o.itemList || []);
   return { name: name, street: street, city: city, state: state, zip: zip, egId: egId,
-           contents: (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items || []) : '' };
+           contents: (window.EGUSPS && EGUSPS.contentsFromItems) ? EGUSPS.contentsFromItems(items || [], num) : '' };
 }
 // Bulk-buy + print USPS labels for every selected order (auto cheapest USPS), record
 // each shipment, mark shipped, and open one print sheet with all labels.
