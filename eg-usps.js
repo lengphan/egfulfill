@@ -418,6 +418,49 @@
   // sh-d-{order,status,carrier,weight,cost,ref,name,addr,date,tracking}, sh-d-labelpreview,
   // sh-d-fakebar, sh-today-count. Operator has its own (opRenderShipments) with a seed.
   function _esc(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  // Status pill + Refund button for a shipment row. Every created label is recorded here; a label
+  // that hasn't been handed to USPS can be refunded (Refund pending → Refunded, postage back to EPS).
+  function _pill(bg, fg, txt) { return '<span style="display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;background:' + bg + ';color:' + fg + '">' + txt + '</span>'; }
+  function _shipStatusCell(s) {
+    var st = String((s && s.status) || 'shipped').toLowerCase().replace(/\s+/g, '_');
+    var pill;
+    if (st === 'refunded') pill = _pill('#f3f4f6', '#6b7280', 'Refunded');
+    else if (st === 'refund_pending') pill = _pill('#fef3c7', '#92400e', 'Refund pending');
+    else if (st === 'delivered') pill = _pill('#f0fdf4', '#15803d', 'Delivered');
+    else if (st === 'in_transit' || st === 'transit') pill = _pill('#eff6ff', '#1d4ed8', 'In transit');
+    else pill = _pill('#eff6ff', '#1d4ed8', 'Shipped');
+    var trkClean = String((s && s.tracking) || '').replace(/\s/g, '');
+    var refundable = trkClean && ['refunded', 'refund_pending', 'delivered', 'in_transit', 'transit'].indexOf(st) < 0;
+    var btn = refundable
+      ? ' <button onclick="event.stopPropagation();EGUSPS.refundShipment(\'' + trkClean + '\')" title="Refund this unused label — only before hand-off; postage credits back to EPS" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;border:1px solid #e5e4e0;background:#fff;color:#b4453a;cursor:pointer;font-family:inherit;margin-left:6px">Refund</button>'
+      : '';
+    return pill + btn;
+  }
+  function _patchShipment(tracking, patch) {
+    var k = String(tracking || '').replace(/\s/g, ''); var a = getShipments(); var hit = false;
+    a.forEach(function (x) { if (String((x && x.tracking) || '').replace(/\s/g, '') === k) { Object.assign(x, patch); hit = true; } });
+    if (hit) _saveShipments(a);
+  }
+  function _rerenderShipments() {
+    if (typeof window.opRenderShipments === 'function') { try { window.opRenderShipments(); } catch (e) {} }
+    else if (typeof window.renderRecentShipments === 'function') { try { window.renderRecentShipments(); } catch (e) {} }
+    else { try { renderShipments('sh-table-body'); } catch (e) {} }
+    try { renderEpsCard('eps-card'); } catch (e) {}
+  }
+  function refundShipment(tracking) {
+    var t = String(tracking || '').replace(/\s/g, ''); if (!t) return;
+    var s = getShipmentLabel(t); if (!s) return;
+    if (!window.confirm('Refund this label?\n' + (s.tracking || t) + '\n\nOnly do this if the package has NOT been handed to USPS. Postage credits back to your EPS balance.')) return;
+    _patchShipment(t, { status: 'refund_pending' }); _rerenderShipments();
+    fetch('/api/usps/refund', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, body: JSON.stringify({ tracking: t }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res && res.ok && /cancel|refund/i.test(res.status || 'CANCELED')) { _patchShipment(t, { status: 'refunded', refunded: true }); }
+        else { _patchShipment(t, { status: 'shipped' }); alert('Refund failed: ' + ((res && res.error) || 'unknown error')); }
+        _rerenderShipments();
+      })
+      .catch(function (e) { _patchShipment(t, { status: 'shipped' }); _rerenderShipments(); alert('Refund failed: ' + e.message); });
+  }
   function renderShipments(tbodyId) {
     var body = document.getElementById(tbodyId || 'sh-table-body');
     if (!body) return;
@@ -442,7 +485,7 @@
           + '<td>' + carrierTxt + (svcShort ? '<span style="color:#9ca3af;font-size:11.5px"> · ' + svcShort + '</span>' : '') + '</td>'
           + '<td style="color:#16a34a;font-weight:600">' + (s.cost ? '$' + s.cost : '—') + '</td>'
           + '<td style="color:#9ca3af;font-size:12.5px">' + (s.date || '') + '</td>'
-          + '<td><span class="badge b-shipped">Shipped</span></td>'
+          + '<td>' + _shipStatusCell(s) + '</td>'
           + '</tr>';
       }).join('');
     }
@@ -508,7 +551,7 @@
   // from the portal, then subtract label postage bought since (each bought label returns .cost).
   // Available ≈ reconciled − spent-since. Shared so admin + warehouse show the same number.
   var EPS_KEY = 'eg_usps_eps';
-  function _epsSpentTotal() { return getShipments().reduce(function (s, x) { var c = parseFloat(x && x.cost); return s + (isFinite(c) ? c : 0); }, 0); }
+  function _epsSpentTotal() { return getShipments().reduce(function (s, x) { var c = parseFloat(x && x.cost); return s + ((x && !x.refunded && isFinite(c)) ? c : 0); }, 0); }
   function getEps() { try { var e = JSON.parse(localStorage.getItem(EPS_KEY) || 'null'); return (e && typeof e === 'object') ? e : { balance: null, asOf: '', spentAtReconcile: 0 }; } catch (e) { return { balance: null, asOf: '', spentAtReconcile: 0 }; } }
   function setEpsBalance(v) { var e = getEps(); var n = parseFloat(v); e.balance = isFinite(n) ? Math.max(0, n) : null; e.asOf = _todayStr(); e.spentAtReconcile = _epsSpentTotal(); try { localStorage.setItem(EPS_KEY, JSON.stringify(e)); } catch (er) {} return e; }
   function epsSummary() { var e = getEps(); var since = Math.max(0, _epsSpentTotal() - (e.spentAtReconcile || 0)); return { balance: e.balance, asOf: e.asOf, spentSince: since, available: (e.balance == null) ? null : Math.max(0, e.balance - since) }; }
@@ -546,6 +589,7 @@
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,
     createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate,
     getShipments: getShipments, recordShipment: recordShipment, getShipmentLabel: getShipmentLabel, openSavedLabel: openSavedLabel,
+    refundShipment: refundShipment, _shipStatusCell: _shipStatusCell,
     renderShipments: renderShipments, selectShipment: selectShipment, contentsFromItems: contentsFromItems
   };
 })();
