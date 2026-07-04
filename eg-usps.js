@@ -582,7 +582,71 @@
     setEpsBalance(v); renderEpsCard(elId || 'eps-card');
   }
 
+  // ── Live USPS rates table (Prices API) ──────────────────────────────────────
+  // Syncs the real USPS Prices API via /api/usps/rates. Cached per day per (dest,weight) so it
+  // paints INSTANTLY from cache, then refreshes if the cache is from a prior day (daily-updating).
+  var RATES_KEY = 'eg_usps_rates';
+  function _ratesCache() { try { return JSON.parse(localStorage.getItem(RATES_KEY) || 'null') || {}; } catch (e) { return {}; } }
+  function fetchRates(toZip, weightOz, cb) {
+    fetch('/api/usps/rates', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, body: JSON.stringify({ toZip: toZip, weightOz: weightOz }) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { if (res && res.ok) { try { localStorage.setItem(RATES_KEY, JSON.stringify({ date: _todayISO(), toZip: toZip, weightOz: weightOz, rates: res.rates, origin: res.origin })); } catch (e) {} } cb && cb(res); })
+      .catch(function (e) { cb && cb({ error: e.message }); });
+  }
+  function _todayISO() { try { return new Date().toISOString().slice(0, 10); } catch (e) { return ''; } }
+  function _ratesRefresh(elId) {
+    var z = (document.getElementById(elId + '-zip') || {}).value || '';
+    var oz = (document.getElementById(elId + '-oz') || {}).value || '8';
+    var box = document.getElementById(elId + '-rows'); if (box) box.innerHTML = '<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">Fetching live USPS rates…</td></tr>';
+    fetchRates(z.replace(/\D/g, '').slice(0, 5), oz, function () { renderRatesTable(elId); });
+  }
+  function _ratesRows(rates, loading, err) {
+    if (loading) return '<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">Fetching live USPS rates…</td></tr>';
+    if (err) return '<tr><td colspan="3" style="padding:16px;text-align:center;color:#b4453a;font-size:12px">' + err + '</td></tr>';
+    if (!rates || !rates.length) return '<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;font-size:12px">Enter a destination ZIP → Get</td></tr>';
+    return rates.map(function (r, i) {
+      return '<tr style="border-top:1px solid #f0ede9">'
+        + '<td style="padding:8px 10px;font-size:12px;color:#191918">' + (r.service || r.mailClass) + (r.zone ? ' <span style="color:#c0bdb6">Z' + r.zone + '</span>' : '') + '</td>'
+        + '<td style="padding:8px 6px;font-size:11px;color:#9ca3af;white-space:nowrap">' + (r.days ? String(r.days).replace(/\s*specific.*/i, '').slice(0, 14) : '—') + '</td>'
+        + '<td style="padding:8px 10px;font-size:12.5px;font-weight:700;color:' + (i === 0 ? '#15803d' : '#191918') + ';text-align:right;white-space:nowrap">$' + Number(r.price).toFixed(2) + '</td></tr>';
+    }).join('');
+  }
+  function renderRatesTable(elId) {
+    var id = elId || 'usps-rates'; var el = document.getElementById(id); if (!el) return;
+    var c = _ratesCache(); var toZip = c.toZip || '10001', weightOz = c.weightOz || 8;
+    var stale = (!c.rates || c.date !== _todayISO());
+    el.innerHTML = '<div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;overflow:hidden">'
+      + '<div style="padding:11px 12px;border-bottom:1px solid #f0ede9;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:#16a34a"></span><span style="font-size:12.5px;font-weight:700;color:#191918">USPS rates · live</span><span style="flex:1"></span><span style="font-size:10.5px;color:#9ca3af">' + (c.date || _todayISO()) + '</span></div>'
+      + '<div style="padding:9px 12px;display:flex;gap:6px;align-items:center;border-bottom:1px solid #f0ede9">'
+      +   '<span style="font-size:11px;color:#6b7280">To</span><input id="' + id + '-zip" value="' + toZip + '" maxlength="5" inputmode="numeric" style="width:58px;font-size:12px;padding:5px 7px;border:1px solid #e5e4e0;border-radius:6px;font-family:inherit">'
+      +   '<input id="' + id + '-oz" value="' + weightOz + '" inputmode="decimal" style="width:46px;font-size:12px;padding:5px 7px;border:1px solid #e5e4e0;border-radius:6px;font-family:inherit"><span style="font-size:11px;color:#6b7280">oz</span>'
+      +   '<button onclick="EGUSPS._ratesRefresh(\'' + id + '\')" style="margin-left:auto;font-size:11.5px;font-weight:600;padding:5px 12px;border-radius:6px;border:1px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit">Get</button></div>'
+      + '<table style="width:100%;border-collapse:collapse"><tbody id="' + id + '-rows">' + _ratesRows(c.rates, stale && !c.rates, null) + '</tbody></table>'
+      + '<div style="padding:7px 12px;font-size:10px;color:#c0bdb6;border-top:1px dashed #eeece8">Commercial rates from our origin · synced daily from the USPS Prices API</div>'
+      + '</div>';
+    if (stale) fetchRates(toZip, weightOz, function () { var box = document.getElementById(id + '-rows'); if (box) { var cc = _ratesCache(); box.innerHTML = _ratesRows(cc.rates, false, null); } });
+  }
+
+  // Return labels recorded in the shipments store (kind:'return' / a *_RETURN_SERVICE class).
+  function renderReturns(tbodyId) {
+    var body = document.getElementById(tbodyId || 'returns-table-body'); if (!body) return;
+    var list = getShipments().filter(function (s) { return s && (s.kind === 'return' || /RETURN/i.test(s.service || '')); });
+    var empty = document.getElementById('returns-empty'); if (empty) empty.style.display = list.length ? 'none' : '';
+    body.innerHTML = list.map(function (s) {
+      var trkClean = String(s.tracking || '').replace(/\s/g, '');
+      var trk = (s.label && (s.label.labelHtml || s.label.labelImage || s.label.labelUrl))
+        ? '<a onclick="EGUSPS.openSavedLabel(\'' + trkClean + '\')" style="font-family:monospace;font-size:12.5px;color:#3a5a96;cursor:pointer;text-decoration:underline;text-underline-offset:2px">' + (s.tracking || '') + '</a>'
+        : '<span style="font-family:monospace;font-size:12.5px;color:#374151">' + (s.tracking || '—') + '</span>';
+      return '<tr><td style="padding:9px 16px">' + trk + '</td>'
+        + '<td style="padding:9px 16px">' + (s.recipient || '—') + '</td>'
+        + '<td style="padding:9px 16px">' + (s.orderNum ? '#' + s.orderNum : '—') + '</td>'
+        + '<td style="padding:9px 16px;color:#6b7280">' + (s.cost ? '$' + s.cost : '<span title="Scan-Based Payment — charged only when used">On use</span>') + '</td>'
+        + '<td style="padding:9px 16px">' + _shipStatusCell(s) + '</td></tr>';
+    }).join('');
+  }
+
   window.EGUSPS = {
+    fetchRates: fetchRates, renderRatesTable: renderRatesTable, _ratesRefresh: _ratesRefresh, renderReturns: renderReturns,
     getEps: getEps, setEpsBalance: setEpsBalance, epsSummary: epsSummary, renderEpsCard: renderEpsCard, promptEpsBalance: promptEpsBalance,
     _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,

@@ -1773,6 +1773,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <div style="display:flex;align-items:center;border-bottom:2px solid #e5e4e0;margin-bottom:20px">
       <button id="pst-tab-scan"      onclick="setPrintTab('scan')"      style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-2px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">Scan History</button>
       <button id="pst-tab-shipments" onclick="setPrintTab('shipments')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Shipments</button>
+      <button id="pst-tab-returns" onclick="setPrintTab('returns')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Returns</button>
+      <button id="pst-tab-label" onclick="setPrintTab('label')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Label</button>
       <div style="flex:1"></div>
       <div style="display:flex;align-items:center;gap:8px;position:relative;margin-bottom:6px">
         <button class="btn btn-dk" style="font-size:12.5px;padding:6px 14px" onclick="shippingNewLabel()">+ New Label</button>
@@ -1826,6 +1828,41 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <tbody id="shn-table-body"></tbody>
         </table>
         <div id="shn-empty" style="display:none;padding:40px 24px;text-align:center;color:#9ca3af;font-size:14px">No labels scanned yet.</div>
+      </div>
+    </div>
+
+    <!-- Returns tab -->
+    <div id="pst-returns" style="display:none">
+      <div class="card" style="overflow:hidden">
+        <div style="padding:13px 16px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px">
+          <div style="font-size:14.5px;font-weight:700;color:#191918">Returns</div>
+          <div style="flex:1"></div>
+          <button class="btn btn-dk" style="font-size:12.5px;padding:6px 14px" onclick="shippingNewLabel()">+ New return label</button>
+        </div>
+        <div style="padding:11px 16px;font-size:12.5px;color:#6b7280;background:#faf9f7;border-bottom:1px solid #f3f3f1;line-height:1.5">Merchant-funded · <b>Scan-Based Payment</b> — you're only charged when the customer actually ships it back. Ground Advantage Return ≈ $6–8, Priority Return ≈ $15.</div>
+        <table class="dtable" style="width:100%">
+          <thead><tr>
+            <th style="text-align:left;padding:9px 16px">Return tracking</th>
+            <th style="text-align:left;padding:9px 16px">Customer</th>
+            <th style="text-align:left;padding:9px 16px">Order</th>
+            <th style="text-align:left;padding:9px 16px">Cost</th>
+            <th style="text-align:left;padding:9px 16px">Status</th>
+          </tr></thead>
+          <tbody id="returns-table-body"></tbody>
+        </table>
+        <div id="returns-empty" style="padding:40px 24px;text-align:center;color:#9ca3af;font-size:14px">No returns yet — generate a return label to email a customer. Backend is live (Ground/Priority Return, scan-based).</div>
+      </div>
+    </div>
+
+    <!-- Label tab -->
+    <div id="pst-label" style="display:none">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start">
+        <div class="card" style="padding:22px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:5px">Create a shipping label</div>
+          <div style="font-size:13px;color:#6b7280;line-height:1.55;margin-bottom:18px">Rate-shop the cheapest USPS service and buy a label — prefilled from an order, or enter an address manually. Bought labels appear in Shipments and can be refunded before hand-off.</div>
+          <button class="btn btn-dk" onclick="shippingNewLabel()">+ New shipping label</button>
+        </div>
+        <div id="usps-rates"></div>
       </div>
     </div>
 
@@ -11617,7 +11654,7 @@ function whPrintLabel(num) {
 // Hook the shared label modal's "Go to Shipments →" button to this board's nav.
 window.egGoToShipments = function () { if (typeof showSection === 'function') showSection('shipping'); if (typeof setPrintTab === 'function') setPrintTab('shipments'); };
 window.setPrintTab = function(tab) {
-  ['scan','shipments'].forEach(t => {
+  ['scan','shipments','returns','label'].forEach(t => {
     const pnl = document.getElementById('pst-' + t);
     if (pnl) pnl.style.display = t === tab ? 'block' : 'none';
     const btn = document.getElementById('pst-tab-' + t);
@@ -11625,6 +11662,8 @@ window.setPrintTab = function(tab) {
   });
   if (tab === 'scan' && typeof renderScanHistory === 'function') renderScanHistory();
   if (tab === 'shipments' && typeof renderRecentShipments === 'function') renderRecentShipments();
+  if (tab === 'returns' && window.EGUSPS && EGUSPS.renderReturns) EGUSPS.renderReturns('returns-table-body');
+  if (tab === 'label' && window.EGUSPS && EGUSPS.renderRatesTable) EGUSPS.renderRatesTable('usps-rates');
 };
 
 // Header "+ New" dropdown toggle. Warehouse was missing this, so clicking the
