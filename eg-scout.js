@@ -28,7 +28,12 @@
     else a.unshift({ listing_id: l.listing_id, title: l.title, image: l.image, images: l.images || [], price: l.price, url: l.url, num_favorers: l.num_favorers, created: l.created || null, tags: l.tags || [], description: l.description || '' });
     favSave(a); updateFavCount(); return idx < 0;
   }
-  function updateFavCount() { var e = document.getElementById('eg-scout-favn'); if (e) e.textContent = favLoad().length; }
+  // Saved = in-progress products (Make → Save for later). Distinct from Favorites (research bookmarks).
+  function _savedLoad() { try { return JSON.parse(localStorage.getItem('eg_scout_products') || '[]'); } catch (e) { return []; } }
+  function updateFavCount() {
+    var e = document.getElementById('eg-scout-favn'); if (e) e.textContent = favLoad().length;
+    var s = document.getElementById('eg-scout-savedn'); if (s) s.textContent = _savedLoad().length;
+  }
 
   // ── Estimates (Etsy's API doesn't expose views/sold/revenue — derive them from favorites + age).
   function _est(l) {
@@ -119,7 +124,8 @@
     '.eg-scout-pagewrap #eg-scout-pager{border-top:none;padding:22px 0 4px}';
 
   var TABS =
-    '<button type="button" data-view="search" class="eg-scout-tab on">All</button>' +
+    '<button type="button" data-view="search" class="eg-scout-tab on">Search</button>' +
+    '<button type="button" data-view="saved" class="eg-scout-tab">Saved<b id="eg-scout-savedn">0</b></button>' +
     '<button type="button" data-view="favs" class="eg-scout-tab">Favorites<b id="eg-scout-favn">0</b></button>';
   var FORM =
     '<input id="eg-scout-q" type="text" placeholder="Search a niche, e.g. personalized pennant, custom apron…" autocomplete="off"/>' +
@@ -212,6 +218,7 @@
     _view = v;
     Array.prototype.forEach.call(document.querySelectorAll('.eg-scout-tab'), function (b) { b.classList.toggle('on', b.getAttribute('data-view') === v); });
     if (v === 'favs') { _note(''); _clearPager(); renderFavorites(); }
+    else if (v === 'saved') { _note(''); _clearPager(); renderSaved(); }
     else {
       if (_last.length) { render(_last); renderPager(); if (_feed) _note('Fresh finds for today — or search any niche above.'); }
       else _maybeLoadFeed();
@@ -293,7 +300,7 @@
         tagHTML +
         '<div class="eg-scout-actions">' +
           '<button class="eg-scout-make" type="button" data-i="' + i + '">Make</button>' +
-          '<button class="eg-scout-save' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '">' + (saved ? 'Saved' : 'Save') + '</button>' +
+          '<button class="eg-scout-save' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '">' + (saved ? 'Favorited' : 'Favorite') + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -304,7 +311,7 @@
     Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-save'), function (b) {
       b.addEventListener('click', function () {
         var l = list[+b.getAttribute('data-i')]; var on = favToggle(l);
-        b.classList.toggle('on', on); b.textContent = on ? 'Saved' : 'Save';
+        b.classList.toggle('on', on); b.textContent = on ? 'Favorited' : 'Favorite';
         if (_view === 'favs' && !on) renderFavorites();
       });
     });
@@ -335,9 +342,39 @@
   function renderFavorites() {
     var grid = document.getElementById('eg-scout-grid');
     var favs = favLoad();
-    if (!favs.length) { grid.innerHTML = '<div class="eg-scout-empty">No favorites yet.<br>Search, then Save the products you want to sell.</div>'; return; }
+    if (!favs.length) { grid.innerHTML = '<div class="eg-scout-empty">No favorites yet.<br>Search, then tap <b>Favorite</b> on the products you want to research.</div>'; return; }
     grid.innerHTML = favs.map(function (l, i) { return cardHTML(l, i, true); }).join('');
     wireCards(grid, favs, true);
+  }
+  // Saved = products you started via Make → Save for later (in-progress, finish in the Design Maker).
+  function savedCardHTML(p, i) {
+    var img = (p.images && p.images[0]) ? '<img src="' + esc(p.images[0]) + '" alt="" loading="lazy"/>' : '<div class="eg-scout-noimg">No image</div>';
+    var variant = [p.color, p.size].filter(Boolean).join(' · ');
+    return '<div class="eg-scout-card">' +
+      '<a class="eg-scout-img" href="' + esc(p.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
+      '<div class="eg-scout-body">' +
+        '<div class="eg-scout-title" title="' + esc(p.title || '') + '">' + esc(p.title || 'Untitled product') + '</div>' +
+        '<div class="eg-scout-meta"><span>' + esc(p.product || 'No blank chosen') + (variant ? ' · ' + esc(variant) : '') + '</span><span>' + esc(p.store || '') + '</span></div>' +
+        '<div class="eg-scout-actions">' +
+          '<button class="eg-scout-make eg-scout-cont" type="button" data-i="' + i + '">Continue</button>' +
+          '<button class="eg-scout-save eg-scout-sremove" type="button" data-i="' + i + '">Remove</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+  function renderSaved() {
+    var grid = document.getElementById('eg-scout-grid');
+    var list = _savedLoad();
+    if (!list.length) { grid.innerHTML = '<div class="eg-scout-empty">No saved products yet.<br>Hit <b>Make</b> on any find, then <b>Save for later</b> to park it here and finish in the Design Maker.</div>'; return; }
+    grid.innerHTML = list.map(function (p, i) { return savedCardHTML(p, i); }).join('');
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-cont'), function (b) { b.addEventListener('click', function () {
+      var p = list[+b.getAttribute('data-i')];
+      openPublish({ listing_id: p.listing_id, title: p.title, description: p.description, price: p.price, tags: p.tags, url: p.url, images: p.images });
+    }); });
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-sremove'), function (b) { b.addEventListener('click', function () {
+      var all = _savedLoad(); all.splice(+b.getAttribute('data-i'), 1); try { localStorage.setItem('eg_scout_products', JSON.stringify(all)); } catch (e) {}
+      updateFavCount(); renderSaved();
+    }); });
   }
 
   function _clearPager() { var p = document.getElementById('eg-scout-pager'); if (p) p.innerHTML = ''; }
