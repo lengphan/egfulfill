@@ -55,11 +55,13 @@ export function ordersRoutes(app, requireAuth) {
          group by o.id order by o.created_at desc`);
       return r.rows;
     }
-    // Sellers only see their OWN orders, never the admin/factory-synced ones
-    // (admin's Etsy store is separate from a seller's own connected stores).
+    // Sellers only see their OWN orders, never the admin/factory-synced ones. A team member sees
+    // their OWNER's orders (if their permissions include 'orders'); a plain seller sees their own.
+    const sel = await resolveSeller(req.user);
+    if (!_canSurface(sel, 'orders')) return [];
     const r = await q(
       `select o.*, ${agg} from orders o ${join} where o.seller_id=$1 and o.factory_order=false group by o.id order by o.created_at desc`,
-      [req.user.sub]
+      [sel.id]
     );
     return r.rows;
   });
@@ -71,10 +73,14 @@ export function ordersRoutes(app, requireAuth) {
     // Ownership guard: a seller may only create/update THEIR OWN, non-factory
     // orders. Block a crafted id from overwriting another seller's order or
     // un-flagging a factory order into the seller's own view. Staff may upsert any.
+    let ownerId = req.user.sub;
     if (!isStaff(req.user)) {
+      const sel = await resolveSeller(req.user);   // a team member creates/edits under the OWNER
+      if (!_canSurface(sel, 'orders')) { reply.code(403); return { error: 'No access to orders' }; }
+      ownerId = sel.id;
       const ex = await q('select seller_id, factory_order from orders where id=$1', [o.id]);
       const row = ex.rows[0];
-      if (row && (row.factory_order || row.seller_id !== req.user.sub)) {
+      if (row && (row.factory_order || row.seller_id !== sel.id)) {
         reply.code(403); return { error: 'Not allowed to modify this order' };
       }
     }
@@ -92,7 +98,7 @@ export function ordersRoutes(app, requireAuth) {
          carrier=excluded.carrier, tracking=excluded.tracking,
          seq=coalesce(orders.seq, excluded.seq),
          meta=coalesce(excluded.meta, orders.meta), factory_order=false`,
-      [o.id, req.user.sub, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
+      [o.id, ownerId, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
@@ -133,7 +139,7 @@ export function ordersRoutes(app, requireAuth) {
 
   // Patch status/tracking/etc. Staff may also replace the line items (used when a
   // factory board picks a base blank → the chosen mockup must reach mobile scan).
-  app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req) => {
+  app.patch('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
     const map = { factoryStatus: 'factory_status', status: 'status', tracking: 'tracking',
                   carrier: 'carrier', total: 'total', timeline: 'timeline', notes: 'notes', meta: 'meta',
                   address: 'address', customer: 'customer' };
@@ -152,10 +158,12 @@ export function ordersRoutes(app, requireAuth) {
         before = pre.rows[0] || null;
       }
     }
-    // sellers may only patch their own orders; staff any
+    // sellers may only patch their own orders; staff any; a team member patches the OWNER's.
+    const sel = isStaff(req.user) ? null : await resolveSeller(req.user);
+    if (sel && !_canSurface(sel, 'orders')) { reply.code(403); return { error: 'No access to orders' }; }
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
-      if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(req.user.sub); }
+      if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(sel.id); }
       await q(`update orders set ${sets.join(',')} where ${where}`, vals);
     }
     if (wantsItems) await replaceItems(req.params.id, body.items);
@@ -240,14 +248,33 @@ export function ordersRoutes(app, requireAuth) {
   q(`alter table order_messages add column if not exists client_id text`).catch(() => {});
   q(`create unique index if not exists order_messages_client on order_messages (client_id) where client_id is not null`).catch(() => {});
 
+  // A seller who is an ACTIVE team member of an owner acts on the OWNER's board. Returns the effective
+  // seller id (owner for a member, else self) + the member's permission surfaces (perms=null means a
+  // full owner, not a team member). Staff → own id, not a member. This is what enforces the "team
+  // members see their owner's orders" exception server-side, not just in the UI.
+  async function resolveSeller(user) {
+    if (!user) return { id: null, perms: null, member: false };
+    if (isStaff(user)) return { id: user.sub, perms: null, member: false };
+    try {
+      const r = await q("select owner_id, permissions from team_members where lower(email)=lower($1) and status='active' limit 1", [user.email || '']);
+      const row = r.rows[0];
+      if (row && row.owner_id) return { id: row.owner_id, perms: Array.isArray(row.permissions) ? row.permissions : [], member: true };
+    } catch (e) {}
+    return { id: user.sub, perms: null, member: false };
+  }
+  // A team member is limited to their granted surfaces (hide/unhide). A full owner (perms=null) passes.
+  function _canSurface(sel, surface) { return !(sel && sel.member && sel.perms && sel.perms.indexOf(surface) < 0); }
+
   async function canSeeOrder(user, orderId) {
     if (isStaff(user)) return true;
     // Support conversations ride on order_messages under a synthetic id `support-<sellerId>`.
     // A seller may only see/post to their OWN support thread; staff (above) see all of them.
     if (String(orderId).indexOf('support-') === 0) return orderId === ('support-' + user.sub);
+    const sel = await resolveSeller(user);
+    if (!_canSurface(sel, 'orders')) return false;
     const r = await q('select seller_id, factory_order from orders where id=$1', [orderId]);
     const row = r.rows[0];
-    return !!(row && !row.factory_order && row.seller_id === user.sub);
+    return !!(row && !row.factory_order && row.seller_id === sel.id);
   }
 
   // Staff-only: list every seller support thread (one row per seller) with its last message, so the
