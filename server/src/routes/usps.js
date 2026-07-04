@@ -83,6 +83,26 @@ async function paymentToken() {
   return _pay.token;
 }
 
+// Parse a multipart/form-data body into [{ head, body:Buffer }]. USPS Labels 3.0 returns the
+// JSON "labelMetadata" part + the "labelImage" part (base64 text) this way. Byte-safe.
+function _splitMultipart(buf, boundary) {
+  const out = []; const delim = Buffer.from('--' + boundary);
+  let start = buf.indexOf(delim); if (start === -1) return out; start += delim.length;
+  while (true) {
+    const next = buf.indexOf(delim, start); if (next === -1) break;
+    let seg = buf.slice(start, next);
+    if (seg[0] === 0x0d && seg[1] === 0x0a) seg = seg.slice(2);   // strip leading CRLF
+    const sep = seg.indexOf(Buffer.from('\r\n\r\n'));
+    if (sep !== -1) {
+      let body = seg.slice(sep + 4);
+      if (body.length >= 2 && body[body.length - 2] === 0x0d && body[body.length - 1] === 0x0a) body = body.slice(0, -2);
+      out.push({ head: seg.slice(0, sep).toString('latin1'), body });
+    }
+    start = next + delim.length;
+  }
+  return out;
+}
+
 export function uspsRoutes(app, requireAuth, requireStaff) {
   // Connectivity/qualification check — surfaces exactly which step is wired.
   app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
@@ -186,27 +206,41 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
           weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),   // oz → lb, min 1oz
           length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 2,
           processingCategory: 'MACHINABLE',
-          destinationEntryFacilityType: 'NONE'
+          destinationEntryFacilityType: 'NONE',
+          mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10)   // required by Labels 3.0
         }
       };
       const res = await fetch(`${BASE}/labels/v3/label`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json',
+        headers: { 'Content-Type': 'application/json', Accept: 'multipart/form-data',
                    Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay },
         body: JSON.stringify(payload)
       });
       const ct = res.headers.get('content-type') || '';
-      const raw = await res.text();
-      if (!res.ok) { reply.code(400); return { error: 'USPS label failed: ' + raw.slice(0, 500) }; }
-      // Labels 3.0 returns JSON with the label image base64 + tracking number.
-      let data = {}; try { data = JSON.parse(raw); } catch (e) {}
-      const tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || '';
-      const labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || '';
+      const ab = Buffer.from(await res.arrayBuffer());
+      if (!res.ok) { reply.code(400); return { error: 'USPS label failed: ' + ab.toString('utf8').slice(0, 500) }; }
+      // Labels 3.0 returns multipart/form-data: a JSON "labelMetadata" part (trackingNumber, postage)
+      // + a "labelImage" part whose body is ALREADY base64 text (its header says application/pdf).
+      // Parse both; fall back to plain JSON for older/simple responses.
+      let tracking = '', labelImage = '', imgType = payload.imageInfo.imageType, cost = null;
+      const bMatch = ct.match(/boundary=("?)([^";]+)\1/i);
+      if (/multipart\//i.test(ct) && bMatch) {
+        for (const part of _splitMultipart(ab, bMatch[2])) {
+          if (/name="?labelMetadata"?/i.test(part.head) || /application\/json/i.test(part.head)) {
+            try { const md = JSON.parse(part.body.toString('utf8')); tracking = md.trackingNumber || (md.labelMetadata && md.labelMetadata.trackingNumber) || tracking; if (md.postage != null) cost = md.postage; } catch (e) {}
+          } else if (/name="?labelImage"?/i.test(part.head)) {
+            labelImage = part.body.toString('latin1').trim();   // body is already base64 text — use as-is
+            if (/image\/png/i.test(part.head)) imgType = 'PNG'; else if (/application\/pdf/i.test(part.head)) imgType = 'PDF';
+          }
+        }
+      } else {
+        try { const data = JSON.parse(ab.toString('utf8')); tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || ''; labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || ''; } catch (e) {}
+      }
       // Persist tracking onto the order if one was passed.
       if (b.orderId && tracking) {
         try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [tracking, b.orderId]); } catch (e) {}
       }
-      return { ok: true, trackingNumber: tracking, imageType: payload.imageInfo.imageType, labelImage, contentType: ct };
+      return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }
