@@ -6,7 +6,9 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 
-const ALLOWED = { backorders: 1, purchase_orders: 1, inventory: 1 };
+// ship_origin holds the factory-wide return/ship-from address as a single-element array [origin],
+// so it's shared across every staff board + device (was per-browser localStorage).
+const ALLOWED = { backorders: 1, purchase_orders: 1, inventory: 1, ship_origin: 1 };
 
 export function factoryListsRoutes(app, requireAuth) {
   q(`create table if not exists factory_lists (

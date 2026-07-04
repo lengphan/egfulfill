@@ -18,7 +18,25 @@
   };
 
   function getOrigin() { try { return JSON.parse(localStorage.getItem(ORIGIN_KEY) || 'null'); } catch (e) { return null; } }
-  function setOrigin(o) { try { localStorage.setItem(ORIGIN_KEY, JSON.stringify(o || {})); } catch (e) {} }
+  function setOrigin(o) {
+    try { localStorage.setItem(ORIGIN_KEY, JSON.stringify(o || {})); } catch (e) {}
+    // Mirror to the server (factory-wide, staff-only) so every board + device shares one ship-from.
+    try { fetch('/api/factory_lists/ship_origin', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, keepalive: true, body: JSON.stringify([o || {}]) }).catch(function () {}); } catch (e) {}
+  }
+  // Pull the shared factory ship-from from the server → local cache; refresh an open label form/rates.
+  function hydrateOrigin(cb) {
+    try {
+      fetch('/api/factory_lists/ship_origin', { headers: { Authorization: 'Bearer ' + token() } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (v) {
+          var o = Array.isArray(v) ? v[0] : (v && v.zip ? v : null);
+          if (o && o.zip) { try { localStorage.setItem(ORIGIN_KEY, JSON.stringify(o)); } catch (e) {} }
+          try { if (document.getElementById('label-form')) renderLabelForm('label-form'); } catch (e) {}
+          try { if (document.getElementById('usps-rates')) renderRatesTable('usps-rates'); } catch (e) {}
+          if (cb) cb(o);
+        }).catch(function () { if (cb) cb(null); });
+    } catch (e) { if (cb) cb(null); }
+  }
 
   // Parse a "City, ST 12345" string into parts.
   function parseCityStateZip(s) {
@@ -743,11 +761,15 @@
     renderLabelForm: renderLabelForm, _saveOriginFromForm: _saveOriginFromForm,
     fetchWeightRates: fetchWeightRates, renderRatesTable: renderRatesTable, _ratesRefresh: _ratesRefresh, renderReturns: renderReturns,
     _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
-    ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
+    ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin, hydrateOrigin: hydrateOrigin,
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,
     createLabel: createLabel, openLabel: openLabel, openLabelModal: openLabelModal, _validate: _validate,
     getShipments: getShipments, recordShipment: recordShipment, getShipmentLabel: getShipmentLabel, openSavedLabel: openSavedLabel,
     refundShipment: refundShipment, returnFromShipment: returnFromShipment, _shipStatusCell: _shipStatusCell,
     renderShipments: renderShipments, selectShipment: selectShipment, contentsFromItems: contentsFromItems
   };
+
+  // On load, staff boards pull the factory-wide ship-from from the server so it's the same on every
+  // device (not just the browser that saved it). Sellers don't ship, so skip (avoids a 403).
+  try { var _u = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_u && _u.role && _u.role !== 'seller') hydrateOrigin(); } catch (e) {}
 })();
