@@ -196,9 +196,10 @@
   function templates(orderNum, sku, name) { openSellerPage('product-templates.html' + ctxQS(orderNum, sku), 'Templates' + (name ? (' · ' + name) : '')); }
   function designMaker(orderNum, sku, name) { openSellerPage('design-maker.html' + ctxQS(orderNum, sku), 'Design Maker' + (name ? (' · ' + name) : '')); }
 
-  // Design Lab hub — mirrors the SELLER's design-lab layout (the 3 cards) but
-  // rendered chrome-less inside the factory shell (no seller sidebar/account).
-  // Each card launches the same reused flow.
+  // Design Lab hub — mirrors the SELLER's design-lab.html layout (the SAME 4 cards:
+  // Upload & Design · Use a Template · Image Library · Browse Catalog) but rendered
+  // chrome-less inside the factory shell (no seller sidebar/account). Each card launches
+  // the same reused flow. Keep in lock-step with design-lab.html so the count never differs.
   function designLab() {
     var card = function (icon, title, desc, cta, action) {
       return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fdfcfa;border:1px solid #40403d;border-radius:14px;padding:24px;cursor:pointer;font-family:inherit;box-shadow:2px 2px 0 #40403d;transition:box-shadow .12s ease,transform .12s ease" onmouseover="this.style.boxShadow=\'4px 4px 0 #40403d\';this.style.transform=\'translate(-1px,-1px)\'" onmouseout="this.style.boxShadow=\'2px 2px 0 #40403d\';this.style.transform=\'\'">'
@@ -210,16 +211,18 @@
     var PEN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     var BOX = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9" stroke="currentColor" stroke-width="1.6"/></svg>';
     var TPL = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    var IMG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M4 17l5-5 4 3.5L16 12l4 4" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     var ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:' + SIDEBAR_W + 'px;background:#f4f2ef;z-index:99990;display:flex;flex-direction:column;overflow:auto';
     ov.innerHTML =
       '<div style="display:flex;align-items:center;justify-content:space-between;height:54px;box-sizing:border-box;padding:0 24px;border-bottom:1px solid rgba(0,0,0,.14);background:#f7f5f0;position:sticky;top:0;z-index:1"><div style="font-size:16px;font-weight:800;color:#191918">Design Lab</div><button id="egdl-x" title="Back to board" style="background:none;border:none;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:0 4px">&times;</button></div>'
       + '<div style="max-width:1500px;margin:0 auto;padding:28px 32px 48px;width:100%;box-sizing:border-box">'
       + '<div style="font-size:22px;font-weight:800;color:#191918;margin-bottom:20px">Welcome to Design Lab</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;max-width:1080px">'
       + card(PEN, 'Upload &amp; Design', 'Start with your artwork — upload a file, place it on a blank, generate a mockup, and publish.', 'Open editor →', 'maker')
-      + card(BOX, 'Catalog', 'Browse your product catalog — base blanks ready to customize, then drop a design on top.', 'Browse products →', 'catalog')
       + card(TPL, 'Use a Template', 'Start from a saved product setup. Apply a fresh design to something already configured.', 'View product templates →', 'templates')
+      + card(IMG, 'Image Library', 'Your uploaded design images — copy each image link or design ID to drop into an import sheet.', 'Open library →', 'library')
+      + card(BOX, 'Browse Catalog', 'Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.', 'Browse blanks →', 'catalog')
       + '</div></div>';
     mount(ov);
     function close() { unmount(); }
@@ -229,6 +232,7 @@
         var act = b.getAttribute('data-act');
         if (act === 'templates') openSellerPage('product-templates.html', 'Templates', designLab);
         else if (act === 'catalog') openSellerPage('products-dash.html', 'Catalog', designLab);   // seller product catalog
+        else if (act === 'library') openSellerPage('image-library.html', 'Image Library', designLab);
         else openSellerPage('design-maker.html', 'Design Maker', designLab);                      // Upload & Design
       });
     });
@@ -1844,6 +1848,19 @@
   // Eyedropper: sample a colour directly off the design where it sits on the mockup
   // stage. A magnifier loupe follows the cursor over the artwork; clicking adds the
   // nearest in-stock thread. Toggle the button again (or Esc / click off) to cancel.
+  // Precision "target" cursor (crosshair + centre dot) for eyedropper mode — replaces the
+  // design's grab-hand so you can see exactly which pixel you're sampling. Scoped to the stage.
+  function _qpEnsurePickStyle() {
+    if (document.getElementById('egdt-pick-style')) return;
+    var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'>"
+      + "<g fill='none' stroke='#fff' stroke-width='3.4' stroke-linecap='round'><path d='M12 3v6M12 15v6M3 12h6M15 12h6'/></g>"
+      + "<g fill='none' stroke='#111' stroke-width='1.5' stroke-linecap='round'><path d='M12 3v6M12 15v6M3 12h6M15 12h6'/></g>"
+      + "<circle cx='12' cy='12' r='2.3' fill='#111'/><circle cx='12' cy='12' r='2.3' fill='none' stroke='#fff' stroke-width='1'/></svg>";
+    var cur = 'url("data:image/svg+xml,' + encodeURIComponent(svg) + '") 12 12, crosshair';
+    var st = document.createElement('style'); st.id = 'egdt-pick-style';
+    st.textContent = '#egdt-qp-stage.egdt-picking,#egdt-qp-stage.egdt-picking *{cursor:' + cur + ' !important}';
+    document.head.appendChild(st);
+  }
   var _qpPick = null;
   function _qpThreadPick() {
     if (_qpPickStop()) return;            // already active → toggle off
@@ -1863,7 +1880,9 @@
   function _qpPickImg() { return document.getElementById('egdt-qp-design'); }
   function _qpPickEnter() {
     var stage = document.getElementById('egdt-qp-stage'); if (!stage) return;
+    _qpEnsurePickStyle();
     document.body.style.cursor = 'crosshair';
+    stage.classList.add('egdt-picking');   // target (＋ dot) cursor over the design, overriding its grab-hand
     var btn = document.getElementById('egdt-qp-thread-pick'); if (btn) { btn.style.background = '#191918'; btn.style.color = '#fff'; btn.style.borderColor = '#191918'; }
     var lens = document.getElementById('egdt-qp-pick-lens');
     if (!lens) { lens = document.createElement('div'); lens.id = 'egdt-qp-pick-lens'; lens.style.cssText = 'position:fixed;width:96px;height:96px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 8px 24px rgba(0,0,0,.28);background-repeat:no-repeat;background-color:#f6f5f4;pointer-events:none;z-index:10060;display:none'; document.body.appendChild(lens); }
@@ -1876,6 +1895,7 @@
     if (!_qpPick) return false;
     _qpPick = null;
     document.body.style.cursor = '';
+    var stg = document.getElementById('egdt-qp-stage'); if (stg) stg.classList.remove('egdt-picking');
     var lens = document.getElementById('egdt-qp-pick-lens'); if (lens) lens.style.display = 'none';
     var btn = document.getElementById('egdt-qp-thread-pick'); if (btn) { btn.style.background = '#fff'; btn.style.color = '#374151'; btn.style.borderColor = '#e5e4e0'; }
     document.removeEventListener('mousemove', _qpPickMove, true);
@@ -2331,7 +2351,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-06-28-seller-tx-real-ledger';
+  window.EG_BUILD = '2026-07-04-thread-pick-target-cursor';
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory
