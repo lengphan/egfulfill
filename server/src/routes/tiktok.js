@@ -67,11 +67,12 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   }));
 
   // Lightweight connection check for any logged-in user.
-  // Scoped per user: a seller sees ONLY the shop(s) THEY connected; staff see all.
+  // A SELLER sees only shop(s) THEY connected. FACTORY/staff share one pool of factory-connected
+  // shops (any non-seller connector), gated against seller shops.
   app.get('/api/tiktok/connected', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
     const r = await q(staff
-      ? `select shop_name from platform_connections where platform='tiktok' order by created_at`
+      ? `select shop_name from platform_connections pc where platform='tiktok' and not exists (select 1 from users u where u.id=pc.connected_by and u.role='seller') order by created_at`
       : `select shop_name from platform_connections where platform='tiktok' and connected_by=$1 order by created_at`,
       staff ? [] : [req.user.sub]);
     return { connected: r.rowCount > 0, shops: r.rows.map(x => x.shop_name).filter(Boolean) };

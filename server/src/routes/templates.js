@@ -31,13 +31,15 @@ export function templatesRoutes(app, requireAuth) {
 
   // List templates (newest first). Includes composite so the cards render; the set
   // is small (capped) so the payload stays reasonable.
-  app.get('/api/templates', { preHandler: requireAuth }, async () => {
-    const r = await q(`select id, name, data, composite, layers from templates order by updated_at desc limit 200`);
+  // Templates are per-user product setups — each user (seller or staff) sees & deletes ONLY their
+  // own. Prevents one seller reading or deleting another seller's templates.
+  app.get('/api/templates', { preHandler: requireAuth }, async (req) => {
+    const r = await q(`select id, name, data, composite, layers from templates where seller_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
     return r.rows;
   });
 
   app.delete('/api/templates/:id', { preHandler: requireAuth }, async (req) => {
-    await q(`delete from templates where id=$1`, [req.params.id]);
+    await q(`delete from templates where id=$1 and seller_id=$2`, [req.params.id, req.user.sub]);
     return { ok: true };
   });
 }

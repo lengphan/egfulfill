@@ -187,7 +187,8 @@ export function ordersRoutes(app, requireAuth) {
 
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
   // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
-  app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req) => {
+  app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const { sku, data, name, kind } = req.body || {};
     if (!sku || !data) return { error: 'sku and data required' };
     await q(
@@ -201,7 +202,8 @@ export function ordersRoutes(app, requireAuth) {
   });
   // Fetch all designs for one order — called lazily when the order is opened, so a
   // big base64 payload never rides along on the main /api/orders list.
-  app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req) => {
+  app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const r = await q(`select sku, kind, data, name from order_designs where order_id=$1`, [req.params.id]);
     return r.rows;
   });
@@ -213,7 +215,8 @@ export function ordersRoutes(app, requireAuth) {
        order_id text, sku text, threads jsonb, updated_at timestamptz default now(),
        primary key (order_id, sku)
      )`).catch(() => {});
-  app.post('/api/orders/:id/threads', { preHandler: requireAuth }, async (req) => {
+  app.post('/api/orders/:id/threads', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const { sku, threads } = req.body || {};
     if (!sku) return { error: 'sku required' };
     await q(
@@ -223,7 +226,8 @@ export function ordersRoutes(app, requireAuth) {
     );
     return { ok: true };
   });
-  app.get('/api/orders/:id/threads', { preHandler: requireAuth }, async (req) => {
+  app.get('/api/orders/:id/threads', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const r = await q(`select sku, threads from order_threads where order_id=$1`, [req.params.id]);
     return r.rows;
   });
