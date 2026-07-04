@@ -428,6 +428,8 @@
     '.eg-pub-img.primary{border:2px solid #191918}' +
     '.eg-pub-img .rm{position:absolute;top:2px;right:2px;width:18px;height:18px;background:rgba(17,24,39,.72);color:#fff;border:none;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}' +
     '.eg-pub-img .pr{position:absolute;bottom:0;left:0;right:0;background:#191918;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:1px;letter-spacing:.03em}' +
+    '.eg-pub-addimg{width:70px;height:70px;border:1.5px dashed #c4c3be;border-radius:9px;background:#faf9f7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;color:#9ca3af;font-family:inherit;flex-shrink:0;transition:border-color .15s,color .15s}' +
+    '.eg-pub-addimg span{font-size:22px;line-height:1;font-weight:300}.eg-pub-addimg i{font-size:10px;font-style:normal;font-weight:600}.eg-pub-addimg:hover{border-color:#191918;color:#191918}' +
     '.eg-pub-in,.eg-pub-sel{width:100%;border:1px solid #e5e4e0;border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit;color:#191918;outline:none;background:#fff;box-sizing:border-box}' +
     '.eg-pub-in:focus,.eg-pub-sel:focus{border-color:#191918}' +
     '.eg-pub-row{display:flex;gap:10px;margin-top:9px}' +
@@ -488,16 +490,26 @@
 
   function _pubRenderImgs() {
     var box = document.getElementById('eg-pub-imgs'); if (!box) return;
-    if (!_pub.images.length) { box.innerHTML = '<div style="font-size:12.5px;color:#9ca3af;padding:6px 0">No images — you\'ll add your own design in the Design Maker.</div>'; return; }
-    box.innerHTML = _pub.images.map(function (u, i) {
+    var tiles = _pub.images.map(function (u, i) {
       return '<div class="eg-pub-img' + (i === 0 ? ' primary' : '') + '" data-i="' + i + '"><img src="' + esc(u) + '" alt=""/>' + (i === 0 ? '<span class="pr">PRIMARY</span>' : '') + '<button class="rm" type="button" data-i="' + i + '" title="Remove">&times;</button></div>';
     }).join('');
+    // Blank tile to add more images (upload) — always present, even with no synced images.
+    box.innerHTML = tiles + '<button type="button" class="eg-pub-addimg" id="eg-pub-addimg" title="Add an image"><span>+</span><i>Add</i></button>';
     Array.prototype.forEach.call(box.querySelectorAll('.rm'), function (b) {
       b.addEventListener('click', function (e) { e.stopPropagation(); _pub.images.splice(+b.getAttribute('data-i'), 1); _pubRenderImgs(); });
     });
     Array.prototype.forEach.call(box.querySelectorAll('.eg-pub-img'), function (d) {
       d.addEventListener('click', function () { var i = +d.getAttribute('data-i'); if (i > 0) { _pub.images.unshift(_pub.images.splice(i, 1)[0]); _pubRenderImgs(); } });
     });
+    var add = document.getElementById('eg-pub-addimg'); if (add) add.addEventListener('click', _pubAddImage);
+  }
+  function _pubAddImage() {
+    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      var rd = new FileReader(); rd.onload = function () { _pub.images.push(String(rd.result)); _pubRenderImgs(); }; rd.readAsDataURL(f);
+    });
+    document.body.appendChild(inp); inp.click(); setTimeout(function () { try { document.body.removeChild(inp); } catch (e) {} }, 2000);
   }
 
   function _pubCatalog() { try { if (!window.EGStore) return []; var fn = EGStore.getCatalogProducts || EGStore.getCatalog; return (fn ? (fn.call(EGStore) || []) : []); } catch (e) { return []; } }
@@ -509,7 +521,7 @@
     var sel = document.getElementById('eg-pub-product'); if (!sel) return;
     var cat = _pubCatalog().filter(function (p) { return !p.status || p.status === 'Active'; });
     sel._cat = cat;
-    if (!cat.length) { sel.innerHTML = '<option value="">No blanks in your catalog yet</option>'; document.getElementById('eg-pub-color').innerHTML = '<option>Default</option>'; document.getElementById('eg-pub-size').innerHTML = '<option>One size</option>'; return; }
+    if (!cat.length) { sel.innerHTML = '<option value="">No blanks in your catalog yet</option>'; document.getElementById('eg-pub-color').innerHTML = '<option>All Colours</option>'; document.getElementById('eg-pub-size').innerHTML = '<option>All Sizes</option>'; return; }
     sel.innerHTML = cat.map(function (p, i) { return '<option value="' + i + '">' + esc(p.name || p.type || ('Product ' + (i + 1))) + '</option>'; }).join('');
     _pubOnProduct();
   }
@@ -521,8 +533,9 @@
     var sizes = _pubList(p, ['sizes', 'sizeList']);
     if (!sizes.length && Array.isArray(p.variants)) sizes = p.variants.map(function (v) { return (v && v.size) ? v.size : (typeof v === 'string' ? v : ''); }).filter(Boolean);
     sizes = sizes.filter(function (s, i) { return sizes.indexOf(s) === i; });   // de-dupe
-    document.getElementById('eg-pub-color').innerHTML = (colors.length ? colors : ['Default']).map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
-    document.getElementById('eg-pub-size').innerHTML = (sizes.length ? sizes : ['One size']).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
+    // "All Colours"/"All Sizes" lead (and default) so every variant syncs to the platform unless narrowed.
+    document.getElementById('eg-pub-color').innerHTML = ['All Colours'].concat(colors.length ? colors : ['Default']).map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+    document.getElementById('eg-pub-size').innerHTML = ['All Sizes'].concat(sizes.length ? sizes : ['One size']).map(function (s) { return '<option>' + esc(s) + '</option>'; }).join('');
   }
 
   function _pubRenderStores() {
