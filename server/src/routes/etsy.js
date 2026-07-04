@@ -417,10 +417,14 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(502); return { error: e.message }; }
   });
 
-  // Lightweight connection check for ANY logged-in user (sellers publish to the
-  // shop connected on the admin side). No tokens leaked — just names.
-  app.get('/api/etsy/connected', { preHandler: requireAuth }, async () => {
-    const r = await q(`select shop_name from platform_connections where platform='etsy' order by created_at`);
+  // Connection check + shop names, SCOPED per user: a seller sees ONLY the shop(s) THEY connected
+  // (so the seller-side "publish to" never shows another seller's or the admin's shop); staff see all.
+  app.get('/api/etsy/connected', { preHandler: requireAuth }, async (req) => {
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const r = await q(staff
+      ? `select shop_name from platform_connections where platform='etsy' order by created_at`
+      : `select shop_name from platform_connections where platform='etsy' and connected_by=$1 order by created_at`,
+      staff ? [] : [req.user.sub]);
     return { connected: r.rowCount > 0, shops: r.rows.map(x => x.shop_name).filter(Boolean) };
   });
 

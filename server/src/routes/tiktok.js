@@ -67,8 +67,13 @@ export function tiktokRoutes(app, requireAuth, requireStaff) {
   }));
 
   // Lightweight connection check for any logged-in user.
-  app.get('/api/tiktok/connected', { preHandler: requireAuth }, async () => {
-    const r = await q(`select shop_name from platform_connections where platform='tiktok' order by created_at`);
+  // Scoped per user: a seller sees ONLY the shop(s) THEY connected; staff see all.
+  app.get('/api/tiktok/connected', { preHandler: requireAuth }, async (req) => {
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const r = await q(staff
+      ? `select shop_name from platform_connections where platform='tiktok' order by created_at`
+      : `select shop_name from platform_connections where platform='tiktok' and connected_by=$1 order by created_at`,
+      staff ? [] : [req.user.sub]);
     return { connected: r.rowCount > 0, shops: r.rows.map(x => x.shop_name).filter(Boolean) };
   });
 
