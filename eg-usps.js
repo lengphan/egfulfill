@@ -666,7 +666,63 @@
     }).join('');
   }
 
+  // Full create-label form rendered INLINE (the Label tab) — same fields as the popup, full-size.
+  function renderLabelForm(elId) {
+    var el = document.getElementById(elId || 'label-form'); if (!el) return;
+    el.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:13px">'
+      + '<div><div style="' + LB + '">Ship to <span style="font-weight:400;text-transform:none;color:#9ca3af">— paste name + address</span></div>'
+      +   '<textarea id="lf-to" style="' + TA + '" placeholder="Jane Doe&#10;123 Main St, Apt 4&#10;Austin, TX 78701"></textarea></div>'
+      + '<div><div style="' + LB + '">Ship from <span style="font-weight:400;text-transform:none;color:#9ca3af">— your return address (reused for returns)</span></div>'
+      +   '<textarea id="lf-from" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea></div>'
+      + '<div style="' + HD + '">PACKAGE</div>'
+      + '<div style="display:grid;grid-template-columns:1.3fr .7fr 1.1fr;gap:10px">'
+      +   '<div><div style="' + LB + '">Service</div><select id="lf-svc" style="' + IN + ';background:#fff"><option>USPS Ground Advantage</option><option>USPS Priority Mail</option><option>USPS Priority Mail Express</option></select></div>'
+      +   '<div><div style="' + LB + '">Weight (oz)</div><input id="lf-weight" type="number" min="1" value="8" style="' + IN + '"></div>'
+      +   '<div><div style="' + LB + '">Dimensions L×W×H</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"><input id="lf-len" type="number" min="1" value="9" style="' + IN + '"><input id="lf-wid" type="number" min="1" value="6" style="' + IN + '"><input id="lf-hgt" type="number" min="1" value="2" style="' + IN + '"></div></div>'
+      + '</div>'
+      + '<div style="' + HD + '">REFERENCE INFO <span style="font-weight:400;color:#9ca3af;letter-spacing:0">— printed on the label</span></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+      +   '<div><div style="' + LB + '">Ref 1 — Order #</div><input id="lf-ref1" style="' + IN + '" placeholder="FF-7015"></div>'
+      +   '<div><div style="' + LB + '">Ref 2 — Store / Seller</div><input id="lf-ref2" style="' + IN + '" placeholder="Seller"></div>'
+      + '</div>'
+      + '<div><div style="' + LB + '">Contents</div><input id="lf-contents" style="' + IN + '" placeholder="GILDAN-5000 Black M ×1"></div>'
+      + '<div style="' + HD + '">EXTRA SERVICES</div>'
+      + '<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:#191918;cursor:pointer"><input type="checkbox" id="lf-sig" style="accent-color:#191918">Signature Confirmation <span style="color:#9ca3af">+$3.65</span></label>'
+      + '<label style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:#191918;cursor:pointer"><input type="checkbox" id="lf-ins" style="accent-color:#191918">Insurance <span style="color:#9ca3af">+$2.45</span></label>'
+      + '<div style="display:flex;justify-content:flex-end;border-top:1px solid #f0ede9;padding-top:14px;margin-top:2px"><button id="lf-buy" style="font-size:13.5px;padding:10px 22px;border-radius:8px;border:none;background:#191918;color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Buy label</button></div>'
+      + '</div>';
+    var buy = document.getElementById('lf-buy');
+    if (buy) buy.addEventListener('click', function () { _buyInlineLabel(buy); });
+  }
+  function _buyInlineLabel(btn) {
+    var gv = function (id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; };
+    var to = parseAddressBlock(gv('lf-to')), from = parseAddressBlock(gv('lf-from'));
+    if (!to.zip || !to.street) { alert('Enter the Ship-to name + address.'); return; }
+    if (!from.zip || !from.street) { alert('Enter the Ship-from address.'); return; }
+    var payload = {
+      to: to, from: from, weightOz: parseFloat(gv('lf-weight')) || 8,
+      length: parseFloat(gv('lf-len')) || 9, width: parseFloat(gv('lf-wid')) || 6, height: parseFloat(gv('lf-hgt')) || 2,
+      mailClass: mailClassOf(gv('lf-svc')), imageType: 'PDF', refNo: gv('lf-ref1'), refNo2: gv('lf-ref2'), contents: gv('lf-contents'), orderId: gv('lf-ref1'),
+      signature: !!(document.getElementById('lf-sig') && document.getElementById('lf-sig').checked),
+      insurance: !!(document.getElementById('lf-ins') && document.getElementById('lf-ins').checked)
+    };
+    btn.disabled = true; btn.textContent = 'Buying…';
+    createLabel(payload).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Buy label';
+      if (!res || res.error) { alert('USPS label failed: ' + ((res && res.error) || 'unknown error')); return; }
+      var tracking = res.trackingNumber || '';
+      try { openLabel(res, tracking); } catch (e) {}
+      recordShipment({ tracking: tracking, orderNum: gv('lf-ref1'), orderId: gv('lf-ref1'), recipient: to.name || '',
+        recipientAddr: [to.street, [to.city, [to.state, to.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', '),
+        carrier: 'USPS', service: gv('lf-svc'), cost: res.cost || null, date: _todayStr(), status: 'shipped', manual: !gv('lf-ref1'),
+        label: { labelHtml: res.labelHtml || '', labelImage: res.labelImage || '', imageType: res.imageType || 'PDF' } });
+      _rerenderShipments();
+    }).catch(function (e) { btn.disabled = false; btn.textContent = 'Buy label'; alert('USPS label failed: ' + e.message); });
+  }
+
   window.EGUSPS = {
+    renderLabelForm: renderLabelForm,
     fetchWeightRates: fetchWeightRates, renderRatesTable: renderRatesTable, _ratesRefresh: _ratesRefresh, renderReturns: renderReturns,
     _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,

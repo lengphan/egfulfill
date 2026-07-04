@@ -1830,11 +1830,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <!-- Label tab -->
     <div id="pst-label" style="display:none">
       <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start">
-        <div class="card" style="padding:22px">
-          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:5px">Create a shipping label</div>
-          <div style="font-size:13px;color:#6b7280;line-height:1.55;margin-bottom:18px">Rate-shop the cheapest USPS service and buy a label — prefilled from an order, or enter an address manually. Bought labels appear in Shipments and can be refunded before hand-off.</div>
-          <button class="btn btn-dk" onclick="shippingNewLabel()">+ New shipping label</button>
-        </div>
+        <div class="card" style="padding:22px"><div id="label-form"></div></div>
         <div id="usps-rates"></div>
       </div>
     </div>
@@ -11635,7 +11631,7 @@ window.setPrintTab = function(tab) {
   });
   if (tab === 'scan' && typeof renderScanHistory === 'function') renderScanHistory();
   if (tab === 'shipments' && typeof renderRecentShipments === 'function') renderRecentShipments();
-  if (tab === 'label' && window.EGUSPS && EGUSPS.renderRatesTable) EGUSPS.renderRatesTable('usps-rates');
+  if (tab === 'label' && window.EGUSPS) { if (EGUSPS.renderLabelForm) EGUSPS.renderLabelForm('label-form'); if (EGUSPS.renderRatesTable) EGUSPS.renderRatesTable('usps-rates'); }
 };
 
 // Header "+ New" dropdown toggle. Warehouse was missing this, so clicking the
