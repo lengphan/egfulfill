@@ -8664,7 +8664,29 @@ document.addEventListener('DOMContentLoaded', opRenderPurchases);
         b.addEventListener('click', function(e){ e.stopPropagation(); _addTab(b.getAttribute('data-add')); });
       });
     }
+    _dragReorder(wrap);
     _refreshCounts();
+  }
+  // Drag-to-reorder the status tabs; "All" stays pinned first. Order persists in _save/_load.
+  function _dragReorder(wrap) {
+    var dragKey = null;
+    wrap.querySelectorAll('.tab-btn[data-key]').forEach(function (btn) {
+      var key = btn.getAttribute('data-key');
+      if (key === 'all') return;
+      btn.setAttribute('draggable', 'true'); btn.style.cursor = 'grab';
+      btn.addEventListener('dragstart', function (e) { dragKey = key; btn.style.opacity = '0.45'; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', key); } catch (_) {} });
+      btn.addEventListener('dragend', function () { dragKey = null; btn.style.opacity = ''; });
+      btn.addEventListener('dragover', function (e) { e.preventDefault(); try { e.dataTransfer.dropEffect = 'move'; } catch (_) {} });
+      btn.addEventListener('drop', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var from = dragKey; if (!from) { try { from = e.dataTransfer.getData('text/plain'); } catch (_) {} }
+        if (!from || from === key) return;
+        var arr = _active.slice(); var fi = arr.indexOf(from); if (fi < 0) return;
+        arr.splice(fi, 1); var ti = arr.indexOf(key); if (ti < 0) return; arr.splice(ti, 0, from);
+        if (arr[0] !== 'all') { arr = arr.filter(function (k) { return k !== 'all'; }); arr.unshift('all'); }
+        _active = arr; _save(_active); _render();
+      });
+    });
   }
   function _addTab(key) {
     if (!DEFS[key] || _active.indexOf(key) > -1) return;

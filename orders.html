@@ -1285,7 +1285,7 @@ function _egRenderTabs(){
     // when the X is visible (on hover) — see CSS for .fb.filter-btn:hover.
     const removeBtn = isAll ? '' :
       '<span class="eg-tab-x" onclick="event.stopPropagation();egRemoveTab(\''+key+'\')">×</span>';
-    return '<button class="fb filter-btn'+isActive+'" data-filter="'+def.filter+'" onclick="filterOrders(\''+def.filter+'\',this)" style="position:relative">' + def.label + ' <span id="cnt-'+key+'" style="font-size:12px;font-weight:700;opacity:.75">0</span>' + removeBtn + '</button>';
+    return '<button class="fb filter-btn'+isActive+'" data-filter="'+def.filter+'" data-key="'+key+'" onclick="filterOrders(\''+def.filter+'\',this)" style="position:relative">' + def.label + ' <span id="cnt-'+key+'" style="font-size:12px;font-weight:700;opacity:.75">0</span>' + removeBtn + '</button>';
   }).join('');
   // "+ Add tab" trigger — only shows when there are tabs left to add.
   const missing = Object.keys(EG_TAB_DEFS).filter(k => k !== 'all' && _egActiveTabs.indexOf(k) === -1);
@@ -1304,8 +1304,30 @@ function _egRenderTabs(){
       + '</div>'
     : '';
   wrap.innerHTML = html + addBtnHtml;
+  _egDragReorderTabs(wrap);
   // Refresh counts so the new buttons show real numbers immediately.
   updateFilterCounts();
+}
+// Drag-to-reorder the seller's status tabs; "All" stays pinned first. Order persists via _egSaveTabs.
+function _egDragReorderTabs(wrap){
+  var dragKey = null;
+  wrap.querySelectorAll('.filter-btn[data-key]').forEach(function(btn){
+    var key = btn.getAttribute('data-key');
+    if (key === 'all') return;
+    btn.setAttribute('draggable','true'); btn.style.cursor='grab';
+    btn.addEventListener('dragstart', function(e){ dragKey=key; btn.style.opacity='0.45'; try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',key);}catch(_){} });
+    btn.addEventListener('dragend', function(){ dragKey=null; btn.style.opacity=''; });
+    btn.addEventListener('dragover', function(e){ e.preventDefault(); try{e.dataTransfer.dropEffect='move';}catch(_){} });
+    btn.addEventListener('drop', function(e){
+      e.preventDefault(); e.stopPropagation();
+      var from = dragKey; if(!from){ try{from=e.dataTransfer.getData('text/plain');}catch(_){} }
+      if(!from || from===key) return;
+      var arr=_egActiveTabs.slice(); var fi=arr.indexOf(from); if(fi<0) return;
+      arr.splice(fi,1); var ti=arr.indexOf(key); if(ti<0) return; arr.splice(ti,0,from);
+      if(arr[0]!=='all'){ arr=arr.filter(function(k){return k!=='all';}); arr.unshift('all'); }
+      _egActiveTabs=arr; _egSaveTabs(_egActiveTabs); _egRenderTabs();
+    });
+  });
 }
 function egAddTab(key){
   if (!EG_TAB_DEFS[key] || _egActiveTabs.indexOf(key) > -1) return;
