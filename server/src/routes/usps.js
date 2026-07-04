@@ -103,6 +103,26 @@ function _splitMultipart(buf, boundary) {
   return out;
 }
 
+// Pull { tracking, labelImage(base64 text), imgType, cost } out of a Labels-3.0 response
+// (multipart: JSON labelMetadata part + base64 labelImage part; JSON fallback for older shapes).
+function _parseLabelMultipart(ct, ab, imgType0) {
+  var tracking = '', labelImage = '', imgType = imgType0 || 'PDF', cost = null;
+  var bMatch = String(ct || '').match(/boundary=("?)([^";\s]+)/i);
+  if (/multipart\//i.test(ct) && bMatch) {
+    for (const part of _splitMultipart(ab, bMatch[2])) {
+      if (/name="?labelMetadata"?/i.test(part.head) || /application\/json/i.test(part.head)) {
+        try { const md = JSON.parse(part.body.toString('utf8')); tracking = md.trackingNumber || (md.labelMetadata && md.labelMetadata.trackingNumber) || tracking; if (md.postage != null) cost = md.postage; } catch (e) {}
+      } else if (/name="?labelImage"?/i.test(part.head)) {
+        labelImage = part.body.toString('latin1').trim();   // already base64 text
+        if (/image\/png/i.test(part.head)) imgType = 'PNG'; else if (/application\/pdf/i.test(part.head)) imgType = 'PDF';
+      }
+    }
+  } else {
+    try { const data = JSON.parse(ab.toString('utf8')); tracking = data.trackingNumber || (data.labelMetadata && data.labelMetadata.trackingNumber) || ''; labelImage = data.labelImage || (data.labelMetadata && data.labelMetadata.labelImage) || ''; } catch (e) {}
+  }
+  return { tracking: tracking, labelImage: labelImage, imgType: imgType, cost: cost };
+}
+
 export function uspsRoutes(app, requireAuth, requireStaff) {
   // Connectivity/qualification check — surfaces exactly which step is wired.
   app.get('/api/usps/test', { preHandler: requireStaff }, async () => {
@@ -241,6 +261,108 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
         try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [tracking, b.orderId]); } catch (e) {}
       }
       return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // ── Live rates (Prices API) — powers the Shipping "Label" tab rate table + rate-shopping.
+  // body: { toZip, fromZip?, weightOz?, length?, width?, height? } → cheapest rate per mail class.
+  app.post('/api/usps/rates', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const b = req.body || {};
+      const toZip = String(b.toZip || b.destinationZIPCode || '').replace(/\D/g, '').slice(0, 5);
+      const fromZip = String(b.fromZip || b.originZIPCode || process.env.USPS_ORIGIN_ZIP || '').replace(/\D/g, '').slice(0, 5);
+      if (!toZip || !fromZip) { reply.code(400); return { error: 'origin (fromZip) + destination (toZip) ZIP are required' }; }
+      if (process.env.USPS_MOCK) {
+        return { ok: true, mock: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10),
+          rates: [{ mailClass: 'USPS_GROUND_ADVANTAGE', service: 'USPS Ground Advantage', price: 6.74, zone: '—', days: '2-5 days' }, { mailClass: 'PRIORITY_MAIL', service: 'Priority Mail', price: 9.85, zone: '—', days: '1-3 days' }] };
+      }
+      const oauth = await oauthToken();
+      const payload = {
+        originZIPCode: fromZip, destinationZIPCode: toZip,
+        weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),
+        length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 3,
+        mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10),
+        accountType: ACCT_TYPE, accountNumber: ACCT, priceType: 'COMMERCIAL'
+      };
+      const res = await fetch(`${BASE}/prices/v3/total-rates/search`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + oauth },
+        body: JSON.stringify(payload)
+      });
+      const raw = await res.text();
+      if (!res.ok) { reply.code(400); return { error: 'USPS rates failed: ' + raw.slice(0, 300) }; }
+      let data = {}; try { data = JSON.parse(raw); } catch (e) {}
+      const byClass = {};
+      (data.rateOptions || []).forEach(function (opt) {
+        (opt.rates || []).forEach(function (rt) {
+          const mc = rt.mailClass || rt.productName || ''; const price = Number(rt.price);
+          if (!mc || !isFinite(price)) return;
+          if (!byClass[mc] || price < byClass[mc].price) {
+            byClass[mc] = { mailClass: mc, service: rt.productName || rt.description || mc, price: price, zone: rt.zone || '', days: rt.productDefinition || (rt.commitment && rt.commitment.name) || '', startDate: rt.startDate || '', endDate: rt.endDate || '' };
+          }
+        });
+      });
+      const rates = Object.keys(byClass).map(function (k) { return byClass[k]; }).sort(function (a, c) { return a.price - c.price; });
+      return { ok: true, origin: fromZip, destination: toZip, weightOz: Number(b.weightOz) || 8, asOf: new Date().toISOString().slice(0, 10), rates: rates };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // ── Return label (merchant-funded, Scan-Based Payment: charged only when the customer ships it).
+  // Label goes FROM the customer TO our return address. body: { customer:{...}, to:{...return...},
+  // weightOz, service:'ground'|'priority' }.
+  app.post('/api/usps/return-label', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const b = req.body || {};
+      const cust = b.customer || b.from || {}, ret = b.to || b.returnTo || {};
+      if (!cust.zip || !cust.street) { reply.code(400); return { error: 'Customer street + ZIP are required' }; }
+      if (!ret.zip || !ret.street) { reply.code(400); return { error: 'Return-to street + ZIP are required' }; }
+      const svc = String(b.service || 'ground').toLowerCase();
+      const mailClass = svc === 'priority' ? 'PRIORITY_MAIL_RETURN_SERVICE' : 'USPS_GROUND_ADVANTAGE_RETURN_SERVICE';
+      if (process.env.USPS_MOCK) {
+        const t = '9202' + String(Date.now()).slice(-14) + '02';
+        return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: '<div style="border:2px solid #111;padding:14px;font-family:monospace">USPS RETURN — SAMPLE<br>' + mailClass + '<br>' + t + '</div>', service: mailClass, scanBasedPayment: true };
+      }
+      const oauth = await oauthToken(); const pay = await paymentToken();
+      const splitName = (n) => { const p = String(n || '').trim().split(/\s+/); return { first: p.shift() || 'Customer', last: p.join(' ') || '-' }; };
+      const cn = splitName(cust.name), rn = splitName(ret.name);
+      const payload = {
+        imageInfo: { imageType: (b.imageType || 'PDF'), labelType: '4X6LABEL' },
+        fromAddress: { firstName: cn.first, lastName: cn.last, streetAddress: cust.street, secondaryAddress: cust.street2 || undefined, city: cust.city, state: cust.state, ZIPCode: String(cust.zip).slice(0, 5) },
+        toAddress: { firstName: rn.first, lastName: rn.last, streetAddress: ret.street, secondaryAddress: ret.street2 || undefined, city: ret.city, state: ret.state, ZIPCode: String(ret.zip).slice(0, 5) },
+        packageDescription: {
+          mailClass: mailClass, rateIndicator: b.rateIndicator || 'SP',
+          weight: Math.max(0.0625, (Number(b.weightOz) || 8) / 16),
+          length: Number(b.length) || 9, width: Number(b.width) || 6, height: Number(b.height) || 2,
+          processingCategory: 'MACHINABLE', destinationEntryFacilityType: 'NONE',
+          mailingDate: b.mailingDate || new Date().toISOString().slice(0, 10)
+        }
+      };
+      const res = await fetch(`${BASE}/labels/v3/return-label`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'multipart/form-data', Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay },
+        body: JSON.stringify(payload)
+      });
+      const ct = res.headers.get('content-type') || '';
+      const ab = Buffer.from(await res.arrayBuffer());
+      if (!res.ok) { reply.code(400); return { error: 'USPS return label failed: ' + ab.toString('utf8').slice(0, 400) }; }
+      const parsed = _parseLabelMultipart(ct, ab, payload.imageInfo.imageType);
+      return { ok: true, trackingNumber: parsed.tracking, imageType: parsed.imgType, labelImage: parsed.labelImage, cost: parsed.cost, service: mailClass, scanBasedPayment: true, contentType: ct };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // ── Refund/cancel an UNUSED label (before it enters the mailstream). Postage credits back to EPS.
+  // body: { tracking } → USPS returns { status:'CANCELED' } on success. (Frontend: Refund pending → Refunded.)
+  app.post('/api/usps/refund', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const tracking = String((req.body && (req.body.tracking || req.body.trackingNumber)) || '').replace(/\s/g, '');
+      if (!tracking) { reply.code(400); return { error: 'tracking number required' }; }
+      if (process.env.USPS_MOCK) return { ok: true, mock: true, trackingNumber: tracking, status: 'CANCELED' };
+      const oauth = await oauthToken(); const pay = await paymentToken();
+      const res = await fetch(`${BASE}/labels/v3/label/${encodeURIComponent(tracking)}`, {
+        method: 'DELETE', headers: { Authorization: 'Bearer ' + oauth, 'X-Payment-Authorization-Token': pay }
+      });
+      const raw = await res.text();
+      if (!res.ok) { reply.code(400); return { error: 'USPS refund failed: ' + raw.slice(0, 300) }; }
+      let data = {}; try { data = JSON.parse(raw); } catch (e) {}
+      return { ok: true, trackingNumber: data.trackingNumber || tracking, status: data.status || 'CANCELED' };
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 }
