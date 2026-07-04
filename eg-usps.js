@@ -479,7 +479,46 @@
     if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
     if (open) { try { ta.focus(); } catch (e) {} }
   }
+
+  // ── USPS EPS "labeling balance" ─────────────────────────────────────────────
+  // There is NO USPS balance API (the whole USPS API suite exposes payment *authorization*
+  // only). The real figure lives in the EPS portal. So we store the balance an admin reconciles
+  // from the portal, then subtract label postage bought since (each bought label returns .cost).
+  // Available ≈ reconciled − spent-since. Shared so admin + warehouse show the same number.
+  var EPS_KEY = 'eg_usps_eps';
+  function _epsSpentTotal() { return getShipments().reduce(function (s, x) { var c = parseFloat(x && x.cost); return s + (isFinite(c) ? c : 0); }, 0); }
+  function getEps() { try { var e = JSON.parse(localStorage.getItem(EPS_KEY) || 'null'); return (e && typeof e === 'object') ? e : { balance: null, asOf: '', spentAtReconcile: 0 }; } catch (e) { return { balance: null, asOf: '', spentAtReconcile: 0 }; } }
+  function setEpsBalance(v) { var e = getEps(); var n = parseFloat(v); e.balance = isFinite(n) ? Math.max(0, n) : null; e.asOf = _todayStr(); e.spentAtReconcile = _epsSpentTotal(); try { localStorage.setItem(EPS_KEY, JSON.stringify(e)); } catch (er) {} return e; }
+  function epsSummary() { var e = getEps(); var since = Math.max(0, _epsSpentTotal() - (e.spentAtReconcile || 0)); return { balance: e.balance, asOf: e.asOf, spentSince: since, available: (e.balance == null) ? null : Math.max(0, e.balance - since) }; }
+  function _epsFmt(n) { return '$' + (Number(n) || 0).toFixed(2); }
+  function renderEpsCard(elId) {
+    var el = document.getElementById(elId || 'eps-card'); if (!el) return;
+    var s = epsSummary(), unset = (s.balance == null);
+    var low = (!unset && s.available < 25);
+    el.innerHTML =
+      '<div style="background:#fff;border:1px solid ' + (low ? '#e7b7b0' : '#e5e4e0') + ';border-radius:14px;padding:15px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap">'
+      + '<div style="width:34px;height:34px;border-radius:9px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="#374151" stroke-width="1.6"/><path d="M2 10h20" stroke="#374151" stroke-width="1.6"/><path d="M6 15h4" stroke="#374151" stroke-width="1.6" stroke-linecap="round"/></svg></div>'
+      + '<div style="flex:1;min-width:170px">'
+      +   '<div style="font-size:11px;font-weight:700;letter-spacing:.05em;color:#9ca3af;text-transform:uppercase">USPS Labeling Balance · EPS</div>'
+      +   '<div style="font-size:27px;font-weight:800;color:' + (low ? '#b4453a' : '#191918') + ';line-height:1.15;margin-top:2px">' + (unset ? '<span style="font-size:14px;font-weight:600;color:#9ca3af">Not set — reconcile from EPS portal</span>' : _epsFmt(s.available)) + '</div>'
+      +   (unset ? '' : '<div style="font-size:12px;color:#6b7280;margin-top:3px">Reconciled ' + _epsFmt(s.balance) + ' on ' + (s.asOf || '—') + ' · spent since ' + _epsFmt(s.spentSince) + '</div>')
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:6px">'
+      +   '<button onclick="EGUSPS.promptEpsBalance(\'' + (elId || 'eps-card') + '\')" style="font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:8px;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;font-family:inherit;white-space:nowrap">Update balance</button>'
+      +   '<a href="https://eps.usps.com" target="_blank" rel="noopener" style="font-size:11px;color:#6b7280;text-align:center;text-decoration:none">Open EPS portal ↗</a>'
+      + '</div>'
+      + '<div style="flex-basis:100%;font-size:10.5px;color:#b0ada6;border-top:1px dashed #eeece8;padding-top:7px;margin-top:1px">USPS has no balance API — enter the figure from your EPS portal; we subtract label postage bought since to estimate what’s left.</div>'
+      + '</div>';
+  }
+  function promptEpsBalance(elId) {
+    var cur = getEps();
+    var v = window.prompt('Enter the current USPS EPS balance (from the EPS portal):', cur.balance != null ? String(cur.balance) : '');
+    if (v == null) return;
+    setEpsBalance(v); renderEpsCard(elId || 'eps-card');
+  }
+
   window.EGUSPS = {
+    getEps: getEps, setEpsBalance: setEpsBalance, epsSummary: epsSummary, renderEpsCard: renderEpsCard, promptEpsBalance: promptEpsBalance,
     _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
     parseCityStateZip: parseCityStateZip, parseAddressBlock: parseAddressBlock, mailClassOf: mailClassOf, MAILCLASS: MAILCLASS,

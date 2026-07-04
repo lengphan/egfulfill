@@ -1766,6 +1766,9 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <!-- ===== SHIPPING ===== -->
   <div id="section-shipping" class="section fi">
 
+    <!-- USPS EPS labeling balance (reconciled — USPS exposes no balance API) -->
+    <div id="eps-card" style="margin-bottom:16px"></div>
+
     <!-- ── Section-level tabs ── -->
     <div style="display:flex;align-items:center;border-bottom:2px solid #e5e4e0;margin-bottom:20px">
       <button id="pst-tab-scan"      onclick="setPrintTab('scan')"      style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-2px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">Scan History</button>
@@ -4069,7 +4072,7 @@ function showSection(id) {
   if (id === 'inventory') { renderInventory(); setTimeout(() => { const si = document.getElementById('scan-input'); if (si) si.focus(); }, 60); }
   if (id === 'purchases') { renderBackorderBanner(); renderPoHistory(); }
   if (id === 'design-studio') { if(typeof udbRenderTypeChips==='function') udbRenderTypeChips(); udbRenderBoard(); udbRenderList(); udbUpdateStats(); }
-  if (id === 'shipping') { if (typeof renderScanHistory === 'function') renderScanHistory(); }
+  if (id === 'shipping') { if (typeof renderScanHistory === 'function') renderScanHistory(); if (window.EGUSPS && EGUSPS.renderEpsCard) EGUSPS.renderEpsCard('eps-card'); }
   if (id === 'settings') {
     if (typeof EGStore!=='undefined' && EGStore.renderThreadManager) EGStore.renderThreadManager('wh-thread-mgr');
     var _bp = document.getElementById('wh-boards-panel');
