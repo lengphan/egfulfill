@@ -22,7 +22,9 @@
 
   // Parse a "City, ST 12345" string into parts.
   function parseCityStateZip(s) {
-    var m = String(s || '').match(/^(.+?),?\s*([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?\s*$/);
+    // Tolerate a trailing country token ("US" / "USA" / "United States") after the ZIP.
+    s = String(s || '').replace(/[,\s]+(?:u\.?\s?s\.?\s?a?\.?|united states(?: of america)?)\s*$/i, '').trim();
+    var m = s.match(/^(.+?),?\s*([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?\s*$/);
     return m ? { city: m[1].trim(), state: m[2].toUpperCase(), zip: m[3] } : { city: '', state: '', zip: '' };
   }
 
@@ -586,13 +588,16 @@
   var RATE_WEIGHTS = [{ oz: 8, label: '8 oz' }, { oz: 16, label: '1 lb' }, { oz: 32, label: '2 lb' }, { oz: 48, label: '3 lb' }];
   function _todayISO() { try { return new Date().toISOString().slice(0, 10); } catch (e) { return ''; } }
   function _ratesCache() { try { return JSON.parse(localStorage.getItem(RATES_KEY) || 'null') || {}; } catch (e) { return {}; } }
-  function _rateOne(toZip, oz) {
-    return fetch('/api/usps/rates', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, body: JSON.stringify({ toZip: toZip, weightOz: oz }) })
+  function _rateOne(fromZip, toZip, oz) {
+    return fetch('/api/usps/rates', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, body: JSON.stringify({ fromZip: fromZip, toZip: toZip, weightOz: oz }) })
       .then(function (r) { return r.json().then(function (j) { return { status: r.status, j: j }; }); });
   }
   function _pickSvc(rates, re) { for (var i = 0; i < (rates || []).length; i++) { if (re.test(rates[i].mailClass || '') || re.test(rates[i].service || '')) return rates[i]; } return null; }
   function fetchWeightRates(toZip, cb) {
-    Promise.all(RATE_WEIGHTS.map(function (w) { return _rateOne(toZip, w.oz).catch(function (e) { return { status: 0, j: { error: e.message } }; }); }))
+    // Origin = our saved Ship-from ZIP (Settings / the Label form). USPS needs both ends to rate a zone.
+    var fromZip = String(((getOrigin() || {}).zip) || '').replace(/\D/g, '').slice(0, 5);
+    if (fromZip.length !== 5) { cb && cb({ ok: false, error: 'Set your Ship-from address first (the Label tab or Settings) — its ZIP is the rate origin.', toZip: toZip, rows: [] }); return; }
+    Promise.all(RATE_WEIGHTS.map(function (w) { return _rateOne(fromZip, toZip, w.oz).catch(function (e) { return { status: 0, j: { error: e.message } }; }); }))
       .then(function (results) {
         var err = null, zone = '';
         var rows = RATE_WEIGHTS.map(function (w, i) {
@@ -666,15 +671,27 @@
     }).join('');
   }
 
+  // Format our stored ship-from (origin) into a pasteable block.
+  function _fmtOrigin(o) {
+    if (!o) return '';
+    return [o.name || '', [o.street, o.street2].filter(Boolean).join(', '), [o.city, [o.state, o.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join('\n');
+  }
+  // Persist the Ship-from as our origin so it prefills next time + feeds returns + the rate origin.
+  function _saveOriginFromForm() {
+    var e = document.getElementById('lf-from'); if (!e) return;
+    var o = parseAddressBlock(String(e.value || '').trim());
+    if (o.zip && o.street) setOrigin(o);
+  }
   // Full create-label form rendered INLINE (the Label tab) — same fields as the popup, full-size.
   function renderLabelForm(elId) {
     var el = document.getElementById(elId || 'label-form'); if (!el) return;
+    var originBlock = _fmtOrigin(getOrigin());
     el.innerHTML =
       '<div style="display:flex;flex-direction:column;gap:13px">'
       + '<div><div style="' + LB + '">Ship to <span style="font-weight:400;text-transform:none;color:#9ca3af">— paste name + address</span></div>'
       +   '<textarea id="lf-to" style="' + TA + '" placeholder="Jane Doe&#10;123 Main St, Apt 4&#10;Austin, TX 78701"></textarea></div>'
       + '<div><div style="' + LB + '">Ship from <span style="font-weight:400;text-transform:none;color:#9ca3af">— your return address (reused for returns)</span></div>'
-      +   '<textarea id="lf-from" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001"></textarea></div>'
+      +   '<textarea id="lf-from" onblur="EGUSPS._saveOriginFromForm()" style="' + TA + '" placeholder="EGFULFILL&#10;456 Warehouse Rd&#10;Dallas, TX 75001">' + String(originBlock).replace(/</g, '&lt;') + '</textarea></div>'
       + '<div style="' + HD + '">PACKAGE</div>'
       + '<div style="display:grid;grid-template-columns:1.3fr .7fr 1.1fr;gap:10px">'
       +   '<div><div style="' + LB + '">Service</div><select id="lf-svc" style="' + IN + ';background:#fff"><option>USPS Ground Advantage</option><option>USPS Priority Mail</option><option>USPS Priority Mail Express</option></select></div>'
@@ -700,6 +717,7 @@
     var to = parseAddressBlock(gv('lf-to')), from = parseAddressBlock(gv('lf-from'));
     if (!to.zip || !to.street) { alert('Enter the Ship-to name + address.'); return; }
     if (!from.zip || !from.street) { alert('Enter the Ship-from address.'); return; }
+    setOrigin(from);   // remember our ship-from for next time + returns + rate origin
     var payload = {
       to: to, from: from, weightOz: parseFloat(gv('lf-weight')) || 8,
       length: parseFloat(gv('lf-len')) || 9, width: parseFloat(gv('lf-wid')) || 6, height: parseFloat(gv('lf-hgt')) || 2,
@@ -722,7 +740,7 @@
   }
 
   window.EGUSPS = {
-    renderLabelForm: renderLabelForm,
+    renderLabelForm: renderLabelForm, _saveOriginFromForm: _saveOriginFromForm,
     fetchWeightRates: fetchWeightRates, renderRatesTable: renderRatesTable, _ratesRefresh: _ratesRefresh, renderReturns: renderReturns,
     _toggleFrom: _toggleFrom, _syncFromSummary: _syncFromSummary,
     ORIGIN_KEY: ORIGIN_KEY, getOrigin: getOrigin, setOrigin: setOrigin,
