@@ -376,7 +376,13 @@
   }
   function getShipmentLabel(key) {
     var a = getShipments();
-    for (var i = 0; i < a.length; i++) { if (a[i].tracking === key || (key && a[i].orderNum === key) || (key && a[i].orderId === key)) return a[i]; }
+    // Normalize whitespace both sides: label links pass a space-stripped tracking, but some
+    // boards STORE the tracking with spaces (e.g. "9400 1000 0000 …") — an exact match would miss.
+    var k = String(key == null ? '' : key).replace(/\s/g, '');
+    for (var i = 0; i < a.length; i++) {
+      var t = String(a[i].tracking || '').replace(/\s/g, '');
+      if ((k && t === k) || (key && a[i].orderNum === key) || (key && a[i].orderId === key)) return a[i];
+    }
     return null;
   }
   function openSavedLabel(key) {
