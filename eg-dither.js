@@ -69,25 +69,36 @@
     }
   }
 
-  // Resolve a canvas from a <canvas> or a container element (create+append a canvas sized to the box).
-  function canvasOf(target) {
-    if (!target) return null;
-    if (target.tagName === 'CANVAS') return target;
-    // the container needs to be a positioning context so the canvas can be absolute (out of flow)
-    try { if (getComputedStyle(target).position === 'static') target.style.position = 'relative'; } catch (e) {}
-    var c = target.querySelector('canvas[data-egd]');
-    if (!c) {
-      c = document.createElement('canvas'); c.setAttribute('data-egd', '1');
-      // absolute + inset:0 fills the parent WITHOUT contributing to its height — otherwise an in-flow
-      // canvas at height:100% feeds back through the ResizeObserver, growing a grid/flex cell unboundedly
-      // and pushing sibling content (the login form) down. This was the "fields jump down" bug.
-      c.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%';
-      target.appendChild(c);
-    }
+  // Measure the target's DISPLAY size (its box for a container, own size for a <canvas>).
+  function measure(target) {
+    var isCanvas = target.tagName === 'CANVAS';
     var r = target.getBoundingClientRect();
-    c.width = Math.max(1, Math.round(r.width || target.clientWidth || 300));
-    c.height = Math.max(1, Math.round(r.height || target.clientHeight || 300));
-    return c;
+    var W = Math.max(1, Math.round((isCanvas ? (target.clientWidth || r.width) : r.width) || 300));
+    var H = Math.max(1, Math.round((isCanvas ? (target.clientHeight || r.height) : r.height) || 300));
+    return { isCanvas: isCanvas, W: W, H: H };
+  }
+
+  // Paint the finished low-res offscreen buffer onto the target. A <canvas> gets a nearest-neighbour blit;
+  // ANY OTHER element gets a STATIC background-image (data-URL). The background approach can't flash or
+  // blank — no live canvas, no ResizeObserver feedback loop, no anti-fingerprint canvas-readback issues —
+  // which is what fixes both the Design Lab 2-stage flash and the login-panel blanking.
+  function paintInto(target, m, off) {
+    if (m.isCanvas) {
+      target.width = m.W; target.height = m.H;
+      target.style.imageRendering = 'pixelated';
+      var cx = target.getContext('2d'); cx.imageSmoothingEnabled = false;
+      cx.clearRect(0, 0, m.W, m.H);
+      cx.drawImage(off, 0, 0, off.width, off.height, 0, 0, m.W, m.H);
+      return;
+    }
+    var url; try { url = off.toDataURL('image/png'); } catch (e) { return; }
+    target.style.backgroundImage = 'url(' + url + ')';
+    target.style.backgroundSize = 'cover';
+    target.style.backgroundPosition = 'center';
+    target.style.backgroundRepeat = 'no-repeat';
+    target.style.imageRendering = 'pixelated';
+    var old = target.querySelector && target.querySelector('canvas[data-egd]');
+    if (old && old.parentNode) old.parentNode.removeChild(old);   // drop any live canvas from an older build
   }
 
   // Seeded PRNG (deterministic art when a seed is given).
@@ -96,12 +107,13 @@
   // ── Procedural art: soft seeded blobs → dithered through the palette. ──
   function art(target, opts) {
     opts = opts || {};
-    var canvas = canvasOf(target); if (!canvas) return;
-    var W = canvas.width, H = canvas.height, px = opts.pixel || 4;
-    var cw = Math.max(1, Math.ceil(W / px)), ch = Math.max(1, Math.ceil(H / px));
+    if (!target) return;
+    var m = measure(target); if (m.W < 2 || m.H < 2) return;   // not laid out yet — a redraw will catch it
+    var px = opts.pixel || 4;
+    var cw = Math.max(1, Math.ceil(m.W / px)), ch = Math.max(1, Math.ceil(m.H / px));
     var off = document.createElement('canvas'); off.width = cw; off.height = ch;
     var o = off.getContext('2d');
-    var rnd = prng(opts.seed != null ? opts.seed : Math.floor((Date.now ? 1 : 1) * 7 + cw)); // seed or size-derived
+    var rnd = prng(opts.seed != null ? opts.seed : cw + ch);   // seed or size-derived
     var g = o.createLinearGradient(0, 0, cw, ch); g.addColorStop(0, '#fff'); g.addColorStop(1, '#111');
     o.fillStyle = g; o.fillRect(0, 0, cw, ch);
     var blobs = opts.blobs || 5;
@@ -115,16 +127,17 @@
     var img = o.getImageData(0, 0, cw, ch);
     ditherBuffer(img.data, cw, ch, opts.palette || paletteFor(opts.pop));
     o.putImageData(img, 0, 0);
-    blit(canvas, off, cw, ch);
+    paintInto(target, m, off);
   }
 
   // ── Real image: cover/contain-fit a photo, optional contrast, dither through the palette. ──
   function image(target, src, opts) {
     opts = opts || {};
-    var canvas = canvasOf(target); if (!canvas) return;
+    if (!target) return;
     var run = function (im) {
-      var W = canvas.width, H = canvas.height, px = opts.pixel || 3;
-      var cw = Math.max(1, Math.ceil(W / px)), ch = Math.max(1, Math.ceil(H / px));
+      var m = measure(target); if (m.W < 2 || m.H < 2) return;
+      var px = opts.pixel || 3;
+      var cw = Math.max(1, Math.ceil(m.W / px)), ch = Math.max(1, Math.ceil(m.H / px));
       var off = document.createElement('canvas'); off.width = cw; off.height = ch;
       var o = off.getContext('2d');
       // fit
@@ -138,21 +151,13 @@
       if (k !== 1) for (var i = 0; i < d.length; i += 4) { for (var c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, (d[i + c] - 128) * k + 128)); }
       ditherBuffer(d, cw, ch, opts.palette || paletteFor(opts.pop));
       o.putImageData(img, 0, 0);
-      blit(canvas, off, cw, ch);
+      paintInto(target, m, off);
     };
     if (src && src.tagName) { (src.complete ? run(src) : src.addEventListener('load', function () { run(src); })); return; }
     var im = new Image(); im.crossOrigin = 'anonymous';
     im.onload = function () { run(im); };
     im.onerror = function () { art(target, opts); };   // graceful: fall back to procedural art
     im.src = src;
-  }
-
-  // Nearest-neighbour scale the low-res buffer up to the display canvas (chunky pixels).
-  function blit(canvas, off, cw, ch) {
-    canvas.style.imageRendering = 'pixelated';
-    var cx = canvas.getContext('2d'); cx.imageSmoothingEnabled = false;
-    cx.clearRect(0, 0, canvas.width, canvas.height);
-    cx.drawImage(off, 0, 0, cw, ch, 0, 0, canvas.width, canvas.height);
   }
 
   // Mount into a container + keep it sized to the box (re-render on resize, debounced).
