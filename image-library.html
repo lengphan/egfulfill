@@ -614,9 +614,18 @@ document.addEventListener('click',function(e){
   // The paid embroidery (.PES) deliverable for a design. The factory uploads it once the
   // design is "approved"; it appears here gated by purchase — deduct the admin-set fee
   // from the wallet, then it's a reusable direct download forever. No .PES → no row.
+  var _ilFetched = {};   // designs we've already tried to pull from the server (guards the re-render loop)
   function fileRow(did) {
     var f = (window.EGStore && EGStore.getDesignFile) ? EGStore.getDesignFile(did) : null;
-    if (!f || !f.dataUrl) return '';
+    if (!f || !f.dataUrl) {
+      // Download-on-demand: the .PES bytes may live only on the server (another device / after a cache
+      // clear). Pull them once, then re-render so the download row appears. Guarded so it can't loop.
+      if (window.EGStore && EGStore.fetchDesignFile && !_ilFetched[did] && (localStorage.getItem('eg_token') || '')) {
+        _ilFetched[did] = true;
+        EGStore.fetchDesignFile(did, function (res) { if (res && res.data && window.ilLoad) window.ilLoad(); });
+      }
+      return '';
+    }
     var price = (window.EGStore && EGStore.getDesignFilePrice && EGStore.getDesignFilePrice()) || 0;
     var paid = !!(window.EGStore && EGStore.hasPaidForDesignFile && EGStore.hasPaidForDesignFile(did));
     var fname = esc(f.name || (did + '.pes'));
