@@ -29,9 +29,10 @@
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
     '[id^=panel-] label,[id^=afpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:11px}',
-    /* dashboard stat cards → gentle hover only: a soft shadow, NO border highlight and NO transform
-       (transform on hover was overriding the drag-to-reorder transform, breaking dragging) */
-    '.wcard:hover,.stat-card:hover{box-shadow:0 3px 14px rgba(0,0,0,.06)!important;border-color:#e6e4df!important}',
+    /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
+       no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
+    'html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
+    'html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
     '.btn-dk{border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
