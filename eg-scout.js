@@ -82,6 +82,9 @@
     '.eg-scout-card.trend{border-color:#dc2626;box-shadow:0 0 0 1px rgba(220,38,38,.35)}' +
     '.eg-scout-card.trend:hover{border-color:#dc2626;box-shadow:0 4px 18px rgba(220,38,38,.2)}' +
     '.eg-scout-trend{position:absolute;top:8px;left:8px;z-index:2;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em}' +
+    '.eg-scout-heart{position:absolute;top:9px;right:9px;z-index:3;width:32px;height:32px;border-radius:50%;background:rgba(17,24,39,.42);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background .12s,transform .1s}' +
+    '.eg-scout-heart:hover{background:rgba(17,24,39,.62)}.eg-scout-heart:active{transform:scale(.88)}' +
+    '.eg-scout-heart svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:1.9}.eg-scout-heart.on svg{fill:#ef4444;stroke:#ef4444}' +
     '.eg-scout-remove{position:absolute;top:6px;right:6px;z-index:3;width:28px;height:28px;border:none;background:none;color:transparent;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:color .12s}' +
     '.eg-scout-card:hover .eg-scout-remove{color:#40403d}' +
     '.eg-scout-remove:hover{color:#191918}' +
@@ -89,17 +92,22 @@
     '.eg-scout-img img{width:100%;height:100%;object-fit:cover;display:block}' +
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
-    '.eg-scout-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}' +
-    '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:9px;padding:9px 8px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1}' +
-    '.eg-scout-stat b{font-size:18px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.01em}' +
-    '.eg-scout-stat i{font-size:10px;color:#9ca3af;font-style:normal;font-weight:600;letter-spacing:.02em;text-transform:uppercase;margin-top:2px}' +
+    '.eg-scout-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}' +
+    '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:8px;padding:7px 3px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;min-width:0}' +
+    '.eg-scout-stat b{font-size:14.5px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis}' +
+    '.eg-scout-stat i{font-size:8px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:uppercase;margin-top:3px;line-height:1.2}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
     '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
-    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;height:64px;box-sizing:border-box;overflow:hidden;position:relative;padding-bottom:24px}' +
+    '.eg-scout-tagwrap{display:flex;flex-direction:column}' +
+    '.eg-scout-tags{display:flex;flex-wrap:wrap;gap:5px;align-content:flex-start;max-height:23px;overflow:hidden;transition:max-height .18s ease}' +
+    '.eg-scout-tags.expanded{max-height:220px}' +
+    '.eg-scout-tagbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px}' +
+    '.eg-scout-more{background:none;border:none;color:#6b7280;font-size:10.5px;font-weight:650;cursor:pointer;font-family:inherit;padding:0;white-space:nowrap}.eg-scout-more:hover{color:#191918}' +
     '.eg-scout-tag{background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.06);color:#6b7280;font-size:10.5px;font-weight:500;padding:2px 7px;border-radius:6px;white-space:nowrap;max-width:100%}' +
-    '.eg-scout-copy{position:absolute;bottom:0;right:0;background:#191918;color:#fff;border:none;font-size:10px;font-weight:650;padding:4px 11px;border-radius:6px;cursor:pointer;line-height:1.3;transition:opacity .12s}' +
+    '.eg-scout-copy{flex-shrink:0;background:#191918;color:#fff;border:none;font-size:10px;font-weight:650;padding:5px 13px;border-radius:6px;cursor:pointer;line-height:1.3;transition:opacity .12s}' +
     '.eg-scout-copy:hover{opacity:.85}' +
-    '.eg-scout-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto}' +
+    '.eg-scout-actions{margin-top:auto}' +
+    '.eg-scout-add{width:100%;background:#fff;border:1.5px solid #191918;color:#191918;border-radius:9px;padding:10px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:background .12s,color .12s}.eg-scout-add:hover{background:#191918;color:#fff}' +
     '.eg-scout-make{background:#191918;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
     '.eg-scout-make:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(17,24,39,.2)}' +
     '.eg-scout-save{background:#fff;border:1px solid #e5e4e0;color:#374151;border-radius:9px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,border-color .12s,color .12s}' +
@@ -278,12 +286,19 @@
     var created = _dateStr(l.created);
     var favs = l.num_favorers || 0;
     var tags = (Array.isArray(l.tags) ? l.tags : []).slice(0, 13);   // Etsy allows up to 13 tags
+    // One row of keywords by default; "+N" expands the rest inline. Copy stays locked on the right.
     var tagHTML = tags.length
-      ? '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '<button class="eg-scout-copy" type="button" data-i="' + i + '" title="Copy all keywords">Copy</button></div>'
+      ? '<div class="eg-scout-tagwrap">'
+        + '<div class="eg-scout-tags">' + tags.map(function (t) { return '<span class="eg-scout-tag">' + esc(t) + '</span>'; }).join('') + '</div>'
+        + '<div class="eg-scout-tagbar">'
+        +   (tags.length > 3 ? '<button class="eg-scout-more" type="button">+' + tags.length + ' keywords</button>' : '<span></span>')
+        +   '<button class="eg-scout-copy" type="button" data-i="' + i + '" title="Copy all keywords">Copy</button>'
+        + '</div></div>'
       : '';
     return '<div class="eg-scout-card' + (e.trending ? ' trend' : '') + '">' +
       (favView ? '<button class="eg-scout-remove" type="button" data-i="' + i + '" title="Remove" aria-label="Remove">&times;</button>' : '') +
       (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
+      '<button class="eg-scout-heart' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '" title="Save to favorites" aria-label="Favorite"><svg viewBox="0 0 24 24"><path d="M12 20.7C7 17 3.5 13.9 3.5 9.7 3.5 7 5.5 5.2 7.9 5.2c1.5 0 2.9.7 4.1 2.2 1.2-1.5 2.6-2.2 4.1-2.2 2.4 0 4.4 1.8 4.4 4.5 0 4.2-3.5 7.3-8.5 11z"/></svg></button>' +
       '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
       '<div class="eg-scout-body">' +
         '<div class="eg-scout-stats">' +
@@ -299,20 +314,30 @@
         '</div>' +
         tagHTML +
         '<div class="eg-scout-actions">' +
-          '<button class="eg-scout-make" type="button" data-i="' + i + '">Make</button>' +
-          '<button class="eg-scout-save' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '">' + (saved ? 'Favorited' : 'Favorite') + '</button>' +
+          '<button class="eg-scout-add" type="button" data-i="' + i + '">Add to store</button>' +
         '</div>' +
       '</div>' +
     '</div>';
   }
 
   function wireCards(grid, list, favView) {
-    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-make'), function (b) { b.addEventListener('click', function () { _make(list[+b.getAttribute('data-i')]); }); });
-    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-save'), function (b) {
-      b.addEventListener('click', function () {
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-add'), function (b) { b.addEventListener('click', function () { _make(list[+b.getAttribute('data-i')]); }); });
+    // Heart overlay on the image = favourite toggle (fills red when saved).
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-heart'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
         var l = list[+b.getAttribute('data-i')]; var on = favToggle(l);
-        b.classList.toggle('on', on); b.textContent = on ? 'Favorited' : 'Favorite';
+        b.classList.toggle('on', on);
         if (_view === 'favs' && !on) renderFavorites();
+      });
+    });
+    // "+N keywords" expands the clipped keyword row inline.
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-more'), function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var wrap = b.closest('.eg-scout-tagwrap'); if (!wrap) return;
+        var tagsEl = wrap.querySelector('.eg-scout-tags'); var on = tagsEl.classList.toggle('expanded');
+        b.textContent = on ? '− less' : '+' + tagsEl.querySelectorAll('.eg-scout-tag').length + ' keywords';
       });
     });
     Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-copy'), function (b) {
