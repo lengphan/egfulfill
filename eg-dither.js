@@ -159,7 +159,11 @@
   function mount(el, opts) {
     opts = opts || {};
     var draw = function () { (opts.mode === 'image' ? image(el, opts.src, opts) : art(el, opts)); };
+    // Draw now, again next frame (after layout settles), and once more on full load (fonts/images can
+    // reflow the panel) — guarantees a paint even if the panel measures 0/wrong at DOMContentLoaded.
     draw();
+    if (global.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(draw); });
+    if (global.addEventListener) global.addEventListener('load', draw, { once: true });
     if (global.ResizeObserver) {
       var t, ro = new ResizeObserver(function () { clearTimeout(t); t = setTimeout(draw, 120); });
       ro.observe(el);
