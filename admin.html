@@ -1985,7 +1985,7 @@ document.addEventListener('DOMContentLoaded', function(){
            card; the dark #191918 header sits flush against the tabs strip
            so the whole header reads as one unit. -->
       <div>
-        <div style="border:1px solid #40403d;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.05);background:#fdfcfa;margin-bottom:18px">
+        <div class="card" style="overflow:hidden;background:#fdfcfa;margin-bottom:18px">
           <!-- Dark identity band -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
             <div style="display:flex;align-items:center;gap:13px;min-width:0">
@@ -2014,7 +2014,7 @@ document.addEventListener('DOMContentLoaded', function(){
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
               <button id="seller-action-export" style="display:none;background:none;border:none;font-size:12.5px;font-weight:600;color:#6b7280;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.background='#f6f5f4';this.style.color='#191918'" onmouseout="this.style.background='transparent';this.style.color='#6b7280'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Export CSV</button>
-              <button id="seller-action-adjust" onclick="openSellerAdjustModal()" style="display:none;background:#191918;color:#fff;border:none;font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Adjust</button>
+              <button id="seller-action-adjust" class="btn btn-dk" onclick="openSellerAdjustModal()" style="display:none;font-size:12.5px;padding:5px 12px;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Adjust</button>
               <button id="seller-action-invite" class="btn btn-dk" style="display:none;font-size:13px;padding:6px 14px">+ Invite Member</button>
             </div>
           </div>
