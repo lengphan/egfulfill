@@ -54,6 +54,16 @@
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
     'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
+    /* LESS-BORING stat cards: a colored top-accent BAND on each card, cycling 6 sticky-note colours by
+       position (Tavus colored-header vibe). Pure ::after, no markup change — touches no card logic. */
+    '.wcard,.stat-card{position:relative}',
+    '.wcard::after,.stat-card::after{content:"";position:absolute;top:0;left:0;right:0;height:7px;z-index:2;pointer-events:none;background:var(--eg-accent)}',
+    '.wcard:nth-child(6n+1)::after,.stat-card:nth-child(6n+1)::after{background:#7ed9b0}',
+    '.wcard:nth-child(6n+2)::after,.stat-card:nth-child(6n+2)::after{background:#f2a3c7}',
+    '.wcard:nth-child(6n+3)::after,.stat-card:nth-child(6n+3)::after{background:#f4c95d}',
+    '.wcard:nth-child(6n+4)::after,.stat-card:nth-child(6n+4)::after{background:#9db0f2}',
+    '.wcard:nth-child(6n+5)::after,.stat-card:nth-child(6n+5)::after{background:#f0a184}',
+    '.wcard:nth-child(6n+6)::after,.stat-card:nth-child(6n+6)::after{background:#c4a3e8}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
     /* secondary/outlined buttons stay FLAT (no drop shadow) */
