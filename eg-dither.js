@@ -30,13 +30,25 @@
 
   var POPS = { violet: '#8b5cf6', coral: '#ff5c39', teal: '#12b886', amber: '#ffd43b', blue: '#4c6ef5', pink: '#f06595' };
 
+  // Named FULL palettes (dark→light). The muted grey/beige/black ramps read like the Tavus starter-kit
+  // photos — desaturated, no colour dominance. Use these for card imagery; use `pop` names for accent art.
+  var PALETTES = {
+    noir:  [[25, 25, 24], [64, 64, 61], [120, 118, 112], [190, 186, 178], [240, 237, 230]],  // ink→grey→beige→paper
+    paper: [[45, 42, 39], [108, 104, 98], [168, 162, 152], [214, 210, 201], [244, 242, 238]], // warm beige ramp
+    slate: [[20, 22, 26], [58, 62, 70], [116, 122, 132], [182, 186, 194], [236, 238, 242]],   // cool grey ramp
+    // muted grey/beige with a single faint violet lift (grey-dominant, subtle brand tint)
+    dusk:  [[25, 25, 24], [58, 56, 64], [120, 116, 128], [176, 170, 186], [240, 237, 230]]
+  };
+
   function hex(h) {
     h = String(h || '').replace('#', '');
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
     return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
   }
-  // Luminance-ordered 5-stop palette: ink · violet-dk · violet · POP · paper.
+  // Resolve to a luminance-ordered 5-stop palette: a named full palette (noir/paper/slate/dusk),
+  // or ink · violet-dk · violet · POP · paper for a colour pop.
   function paletteFor(pop) {
+    if (PALETTES[pop]) return PALETTES[pop].slice();
     var P = POPS[pop] || pop || POPS.violet;
     return [INK, VIO_DK, VIO, hex(P), PAPER];
   }
@@ -166,7 +178,7 @@
     });
   }
 
-  var EGDither = { BAYER: BAYER, POPS: POPS, paletteFor: paletteFor, hex: hex, art: art, image: image, mount: mount, autoInit: autoInit, _dither: ditherBuffer };
+  var EGDither = { BAYER: BAYER, POPS: POPS, PALETTES: PALETTES, paletteFor: paletteFor, hex: hex, art: art, image: image, mount: mount, autoInit: autoInit, _dither: ditherBuffer };
   global.EGDither = EGDither;
   if (typeof module !== 'undefined' && module.exports) module.exports = EGDither;
 

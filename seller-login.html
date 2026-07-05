@@ -116,27 +116,10 @@
     </div>
   </div>
 
-  <div class="right"><div id="mosaic"></div></div>
+  <!-- dithered art panel (eg-dither.js) — modern-retro digital, violet pop -->
+  <div class="right" data-dither="art" data-pop="violet" data-seed="31"></div>
 
-<script>
-  // Pixel-mosaic panel (neon-purple squares on paper) — the Tavus-style accent art.
-  (function () {
-    var box = document.getElementById('mosaic'); if (!box) return;
-    var cols = 14, rows = Math.max(16, Math.round(cols * (window.innerHeight / (window.innerWidth * 0.46))));
-    box.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-    box.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
-    var frag = document.createDocumentFragment();
-    for (var i = 0; i < cols * rows; i++) {
-      var c = document.createElement('i');
-      // denser toward the LEFT edge (the mosaic sits on the left) → clustered like the inspiration
-      var col = i % cols, edge = 1 - (col / cols);
-      var on = Math.random() < (0.18 + edge * 0.5);
-      c.style.background = on ? (Math.random() < 0.82 ? '#8b5cf6' : '#7c3aed') : 'transparent';
-      frag.appendChild(c);
-    }
-    box.appendChild(frag);
-  })();
-</script>
+<script src="eg-dither.js"></script>
 <script src="egstore-api.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
