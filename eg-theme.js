@@ -10,7 +10,10 @@
     ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-tint:#f3efff}',
 
     /* ── ACCENT ─────────────────────────────────────────────── */
-    /* active sidebar nav — purple tint background + purple text/icon (always-visible accent) */
+    /* sidebar nav — Tavus/login language: monospace uppercase labels, smooth subtle-grey hover
+       (never a dark hover), ACCENT selected state (purple tint + purple text/icon) */
+    'html:not([data-theme=dark]) .ni{font-family:ui-monospace,SFMono-Regular,Menlo,monospace!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px;transition:background-color .16s ease,color .16s ease!important}',
+    'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
     'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important}',
     'html:not([data-theme=dark]) .ni.on svg{color:#7c3aed!important;opacity:1!important}',
     /* the "gold" UI button becomes the accent (gold survives only as a garment/thread PRODUCT colour) */
