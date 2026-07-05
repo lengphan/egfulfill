@@ -407,54 +407,42 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:40px;animation-delay:.05s" class="fi">
 
       <!-- Row 1, left: Upload & design -->
-      <a href="design-maker.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M13.5 2.5l2 2-9 9-2.5.5.5-2.5 9-9z" stroke="#374151" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 15.5h14" stroke="#374151" stroke-width="1.4" stroke-linecap="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Upload & Design</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Start with your artwork. Upload a file, place it on a blank, generate a mockup, and publish.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Open editor
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a href="design-maker.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+        <div class="dl-art" data-dither="art" data-pop="noir" data-seed="7" style="height:118px;position:relative;background:#e9e6e0"></div>
+        <div style="padding:18px 22px 20px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Upload & Design</div>
+          <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Start with your artwork. Upload a file, place it on a blank, generate a mockup, and publish.</div>
+          <div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open editor <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 1, right: Use a template -->
-      <a href="product-templates.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="14" height="14" rx="2.5" stroke="#374151" stroke-width="1.3"/><path d="M6 6h6M6 9h6M6 12h4" stroke="#374151" stroke-width="1.3" stroke-linecap="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Use a Template</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Start from a saved product setup. Apply a fresh design to something you've already configured.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          View product templates
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a href="product-templates.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+        <div class="dl-art" data-dither="art" data-pop="noir" data-seed="23" style="height:118px;position:relative;background:#e9e6e0"></div>
+        <div style="padding:18px 22px 20px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Use a Template</div>
+          <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Start from a saved product setup. Apply a fresh design to something you've already configured.</div>
+          <div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">View product templates <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 2, left: Image Library — your uploaded design images + copyable links / IDs -->
-      <a href="image-library.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><rect x="2" y="2.5" width="14" height="13" rx="2.5" stroke="#374151" stroke-width="1.3"/><circle cx="6.2" cy="6.5" r="1.4" stroke="#374151" stroke-width="1.3"/><path d="M2.5 13l4-4 3.2 3 2.3-2.2 3.5 3.4" stroke="#374151" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Image Library</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Your uploaded design images — copy each image link or design ID to drop straight into an import sheet.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Open library
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a href="image-library.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+        <div class="dl-art" data-dither="art" data-pop="noir" data-seed="41" style="height:118px;position:relative;background:#e9e6e0"></div>
+        <div style="padding:18px 22px 20px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Image Library</div>
+          <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Your uploaded design images — copy each image link or design ID to drop straight into an import sheet.</div>
+          <div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open library <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 2, right: Browse catalog -->
-      <a href="products-dash.html" class="dl-path-card" style="display:block;background:#fff;border-radius:14px;padding:24px;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
-        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;margin-bottom:14px">
-          <svg width="22" height="22" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L16 5.5v7L9 16.5 2 12.5v-7L9 1.5z" stroke="#374151" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 1.5v15M2 5.5l7 4 7-4" stroke="#374151" stroke-width="1.3"/></svg>
-        </div>
-        <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Browse Catalog</div>
-        <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:18px">Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.</div>
-        <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:4px">
-          Browse blanks
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <a href="products-dash.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+        <div class="dl-art" data-dither="art" data-pop="noir" data-seed="59" style="height:118px;position:relative;background:#e9e6e0"></div>
+        <div style="padding:18px 22px 20px">
+          <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px">Browse Catalog</div>
+          <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.</div>
+          <div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Browse blanks <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
