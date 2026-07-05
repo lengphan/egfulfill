@@ -23,7 +23,9 @@
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
-    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important}',
+    /* border MUST be set at THIS scoped specificity — each board carries its own
+       `html:not([data-theme=dark]) .ni.on{border:1px solid #191918!important}` that outranks a bare .ni.on */
+    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border:1.5px solid transparent!important}',
     'html:not([data-theme=dark]) .ni.on svg{color:#7c3aed!important;opacity:1!important}',
     'html:not([data-theme=dark]) .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
     'html:not([data-theme=dark]) .btn-gold:hover{background:var(--eg-accent-dk)!important;border-color:var(--eg-accent-dk)!important}',
@@ -35,7 +37,7 @@
 
     /* ── DARK-MODE ACCENT (lighter purple for contrast on the dark base) ── */
     'html[data-theme=dark] .ni:hover:not(.on){background:rgba(255,255,255,.05)!important;color:#f0ede6!important}',
-    'html[data-theme=dark] .ni.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important}',
+    'html[data-theme=dark] .ni.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
     'html[data-theme=dark] .ni.on svg{color:var(--eg-accent-lt)!important;opacity:1!important}',
     'html[data-theme=dark] .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
     'html[data-theme=dark] .btn-gold:hover{background:var(--eg-accent-lt)!important;border-color:var(--eg-accent-lt)!important}',
