@@ -43,7 +43,11 @@
     /* "or" divider + google host */
     .divider{display:flex;align-items:center;gap:12px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#a8a296;margin:22px 0}
     .divider::before,.divider::after{content:'';flex:1;height:1.5px;background:repeating-linear-gradient(90deg,var(--dash) 0 6px,transparent 6px 10px)}
-    #g-signin{display:flex;justify-content:center;min-height:44px}
+    /* Tavus-style social button — outlined + hard offset shadow, mono uppercase, presses in on click */
+    .btn-social{width:100%;padding:13px;background:#fff;color:var(--ink);border:1.5px solid var(--ink);border-radius:0;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:4px 4px 0 var(--ink);transition:transform .1s,box-shadow .1s,background .15s}
+    .btn-social:hover{background:#faf8f4}
+    .btn-social:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+    #g-fallback{display:none;justify-content:center;margin-top:12px}
     .foot{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);text-align:center;margin-top:22px;text-transform:uppercase;letter-spacing:.03em}
     .foot a{color:var(--accent-dk);font-weight:700;text-decoration:underline;text-underline-offset:2px}
     .foot a:hover{color:var(--ink)}
@@ -97,7 +101,11 @@
       </form>
 
       <div class="divider">or</div>
-      <div id="g-signin"></div>
+      <button type="button" class="btn-social" id="g-btn" onclick="egGoogle()">
+        <svg width="17" height="17" viewBox="0 0 18 18" style="flex-shrink:0"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.42 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <div id="g-fallback"></div>
 
       <div class="foot">No account yet? <a href="seller-signup.html">Start for free →</a></div>
 
@@ -145,20 +153,35 @@
       EGAuth.routeAfterLogin();
     });
   }
+  var _gReady = false;
   function _egInitGoogle() {
-    var host = document.getElementById('g-signin'); if (!host) return;
+    var btn = document.getElementById('g-btn'); if (!btn) return;
     fetch('/api/auth/google/client-id')
       .then(function (r) { return r.json(); })
       .then(function (cfg) {
-        if (!cfg || !cfg.clientId) { host.style.display = 'none'; return; }   // not configured yet
-        function render() {
-          if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(render, 300); return; }
-          google.accounts.id.initialize({ client_id: cfg.clientId, callback: _egGoogleCb });
-          google.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', width: 320 });
+        if (!cfg || !cfg.clientId) {   // not configured yet — hide the button + the "or" divider
+          btn.style.display = 'none'; var d = document.querySelector('.divider'); if (d) d.style.display = 'none'; return;
         }
-        render();
+        (function ready() {
+          if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(ready, 300); return; }
+          google.accounts.id.initialize({ client_id: cfg.clientId, callback: _egGoogleCb });
+          _gReady = true;
+          // reliable fallback: pre-render the real GIS button (hidden), revealed only if One Tap can't display
+          var fb = document.getElementById('g-fallback');
+          if (fb) { try { google.accounts.id.renderButton(fb, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', width: 320 }); } catch (e) {} }
+        })();
       })
-      .catch(function () { host.style.display = 'none'; });
+      .catch(function () { btn.style.display = 'none'; });
+  }
+  // custom Tavus-style button → Google One Tap; if it can't show, reveal the GIS fallback button
+  function egGoogle() {
+    if (!_gReady || !(window.google && google.accounts && google.accounts.id)) return;
+    var reveal = function () { var btn = document.getElementById('g-btn'), fb = document.getElementById('g-fallback'); if (btn) btn.style.display = 'none'; if (fb) fb.style.display = 'flex'; };
+    try {
+      google.accounts.id.prompt(function (n) {
+        if ((n.isNotDisplayed && n.isNotDisplayed()) || (n.isSkippedMoment && n.isSkippedMoment())) reveal();
+      });
+    } catch (e) { reveal(); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _egInitGoogle); else _egInitGoogle();
 
