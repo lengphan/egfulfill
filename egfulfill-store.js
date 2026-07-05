@@ -2891,10 +2891,30 @@
     DESIGN_FILE_KEY: 'eg_design_files',
     setDesignFile: function(designId, info) {
       if (!designId) return;
-      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_KEY) || '{}'); m[designId] = Object.assign({ addedAt: Date.now() }, info || {}); localStorage.setItem(this.DESIGN_FILE_KEY, JSON.stringify(m)); } catch(e){}
+      info = info || {};
+      try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_KEY) || '{}'); m[designId] = Object.assign({ addedAt: Date.now() }, info); localStorage.setItem(this.DESIGN_FILE_KEY, JSON.stringify(m)); } catch(e){}
+      // Mirror the bytes to the server (survives cache-clear + reaches every device; access-controlled).
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; var data = info.dataUrl || info.data;
+        if (tok && data) fetch('/api/design_files', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, keepalive: true, body: JSON.stringify({ designId: designId, data: data, name: info.name || info.embFileName, orderId: info.orderId || info.order, sku: info.sku, mime: info.mime }) }).catch(function(){});
+      } catch(e){}
     },
     getDesignFile: function(designId) {
       try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_KEY) || '{}'); return m[designId] || null; } catch(e){ return null; }
+    },
+    // Pull a machine file from the server into the local cache — download-on-demand when the local
+    // bytes are missing (another device, or after a cache clear). Cb gets the file record (or null).
+    fetchDesignFile: function(designId, cb) {
+      var self = this;
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok || !designId) { if(cb)cb(null); return; }
+        fetch('/api/design_files/' + encodeURIComponent(designId), { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(f){
+            if (f && f.data) { try { var m = JSON.parse(localStorage.getItem(self.DESIGN_FILE_KEY) || '{}'); m[designId] = Object.assign({}, m[designId], { name: f.name, dataUrl: f.data, mime: f.mime, orderId: f.orderId, sku: f.sku }); localStorage.setItem(self.DESIGN_FILE_KEY, JSON.stringify(m)); } catch(e){} }
+            if (cb) cb(f);
+          }).catch(function(){ if(cb)cb(null); });
+      } catch(e){ if(cb)cb(null); }
     },
     DESIGN_FILE_PAID_KEY: 'eg_design_file_paid',
     hasPaidForDesignFile: function(designId) {

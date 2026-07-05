@@ -19,6 +19,7 @@ import { stripeRoutes } from './routes/stripe.js';
 import { passwordResetRoutes } from './routes/password-reset.js';
 import { shippingRoutes } from './routes/shipping.js';
 import { designLibraryRoutes } from './routes/design_library.js';
+import { designFilesRoutes } from './routes/design_files.js';
 import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
@@ -125,6 +126,7 @@ stripeRoutes(app, requireAuth);   // Stripe card wallet top-up (Payment Element)
 passwordResetRoutes(app, requireAuth, requireStaff);   // forgot/reset (admin-mediated + email link)
 shippingRoutes(app, requireAuth, requireStaff);        // EasyPost + Shippo rate-shop + labels
 designLibraryRoutes(app, requireAuth, requireStaff);   // per-seller "my uploads" design gallery + cross-seller duplicate detection (staff-only)
+designFilesRoutes(app, requireAuth);                   // machine deliverable files (.pes/.emb) stored server-side, access-controlled (staff any; seller own)
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 walletRoutes(app, requireAuth);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
