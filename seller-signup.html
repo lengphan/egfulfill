@@ -6,117 +6,157 @@
   <title>Create Seller Account – EGFULFILL</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
   <style>
+    /* ── Tavus-mode seller signup (matches seller-login): mosaic LEFT, form RIGHT, neon-purple accent. ── */
+    :root{ --accent:#8b5cf6; --accent-dk:#7c3aed; --ink:#191918; --paper:#f0ede6; --dash:#bcb6aa; --muted:#6b7280; }
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background-color:#f7f5f0;background-image:linear-gradient(#e7e4dd 1px,transparent 1px),linear-gradient(90deg,#e7e4dd 1px,transparent 1px);background-size:26px 26px;color:#191918;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px}
-    .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:44px;line-height:1;color:#191918;text-decoration:none;margin-bottom:26px}
-    .card{width:100%;max-width:404px;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 10px 34px rgba(0,0,0,.07);padding:34px 32px}
-    .heading{font-size:23px;font-weight:800;letter-spacing:-0.03em;margin-bottom:5px}
-    .subheading{font-size:13.5px;color:#9ca3af;margin-bottom:24px;line-height:1.5}
-    label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px}
-    .input{width:100%;padding:11px 13px;border:1.5px solid #e5e4e0;border-radius:10px;font-size:13.5px;color:#191918;outline:none;font-family:inherit;background:#faf9f7;transition:border-color .15s,background .15s}
-    .input:focus{border-color:#374151;background:#fff}
-    .input.err{border-color:#dc2626}
-    .input:-webkit-autofill,.input:-webkit-autofill:hover,.input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px #faf9f7 inset;-webkit-text-fill-color:#191918;caret-color:#191918;transition:background-color 9999s ease-in-out 0s}
-    .field-err{font-size:11.5px;color:#dc2626;margin-top:4px;min-height:15px}
+    body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background:var(--paper);color:var(--ink);display:grid;grid-template-columns:.95fr 1.05fr}
+    .left{order:2;display:flex;flex-direction:column;justify-content:center;padding:40px 6vw;min-height:100vh}
+    .brand{display:flex;align-items:center;gap:9px;margin-bottom:34px}
+    .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:30px;line-height:1;color:var(--ink);text-decoration:none;letter-spacing:-.01em}
+    .wrap{width:100%;max-width:430px}
+    .heading{font-family:'Fraunces',serif;font-weight:600;font-optical-sizing:auto;font-size:38px;line-height:1.05;letter-spacing:-.02em;margin-bottom:12px}
+    .sub{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:26px}
+    label{display:block;font-family:ui-monospace,Menlo,monospace;font-size:11px;font-weight:600;color:var(--ink);letter-spacing:.04em;text-transform:uppercase;margin-bottom:7px}
+    .input{width:100%;padding:13px 14px;border:1.5px dashed var(--dash);border-radius:0;font-size:14px;color:var(--ink);outline:none;font-family:ui-monospace,Menlo,monospace;background:transparent;transition:border-color .15s}
+    .input::placeholder{color:#a8a296}
+    .input:focus{border-style:solid;border-color:var(--accent)}
+    .input.err{border-style:solid;border-color:#dc2626}
+    .input:-webkit-autofill,.input:-webkit-autofill:hover,.input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px var(--paper) inset;-webkit-text-fill-color:var(--ink);caret-color:var(--ink);transition:background-color 9999s ease-in-out 0s}
+    .field-err{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#dc2626;margin-top:5px;min-height:15px}
     .pw-wrap{position:relative}
-    .pw-toggle{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;transition:color .15s;line-height:0}
-    .pw-toggle:hover{color:#374151}
-    .btn-dk{width:100%;padding:12px;background:#191918;color:#f3eee2;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .15s}
-    .btn-dk:hover{background:#2c2a27}
-    .btn-dk:disabled{opacity:.55;cursor:not-allowed}
-    .btn-social{width:100%;padding:11px;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:9px;transition:border-color .15s,background .15s}
-    .btn-social:hover{border-color:#9ca3af;background:#faf9f7}
-    .error-banner{display:none;font-size:12.5px;color:#dc2626;background:#fef2f2;border:1.5px solid #fecaca;border-radius:9px;padding:9px 12px;margin-bottom:14px}
-    .check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12.5px;color:#6b7280;line-height:1.5;margin-bottom:18px}
-    .check input{accent-color:#191918;width:14px;height:14px;margin-top:2px;flex-shrink:0}
-    .check a{color:#191918;font-weight:600;text-decoration:none}
-    .check a:hover{text-decoration:underline}
-    .link{font-size:12.5px;color:#191918;text-decoration:none;font-weight:600}
-    .link:hover{text-decoration:underline}
-    .divider{display:flex;align-items:center;gap:12px;font-size:12px;color:#c4c3be;margin:20px 0}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:#ececea}
-    .foot{font-size:13px;color:#9ca3af;text-align:center;margin-top:22px}
-    .foot a{color:#191918;font-weight:700;text-decoration:none}
-    .foot a:hover{text-decoration:underline}
-    .pagefoot{margin-top:26px;font-size:11.5px;color:#c4c3be;display:flex;gap:18px;align-items:center}
-    .pagefoot a{color:#c4c3be;text-decoration:none}.pagefoot a:hover{color:#9ca3af}
+    .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:2px;color:#9ca3af;transition:color .15s;line-height:0}
+    .pw-toggle:hover{color:var(--ink)}
+    .btn-dk{width:100%;padding:14px;background:var(--accent);color:#fff;border:1.5px solid var(--ink);border-radius:0;font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;box-shadow:4px 4px 0 var(--ink);transition:transform .1s,box-shadow .1s,background .15s}
+    .btn-dk:hover{background:var(--accent-dk)}
+    .btn-dk:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+    .btn-dk:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:4px 4px 0 var(--ink)}
+    .error-banner{display:none;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#dc2626;background:#fef2f2;border:1.5px solid #fca5a5;padding:10px 12px;margin-bottom:16px}
+    .check{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted);line-height:1.55;margin:14px 0 18px;text-transform:uppercase;letter-spacing:.02em}
+    .check input{accent-color:var(--accent);width:14px;height:14px;margin-top:1px;flex-shrink:0}
+    .check a{color:var(--accent-dk);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+    .check a:hover{color:var(--ink)}
+    .divider{display:flex;align-items:center;gap:12px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#a8a296;margin:20px 0}
+    .divider::before,.divider::after{content:'';flex:1;height:1.5px;background:repeating-linear-gradient(90deg,var(--dash) 0 6px,transparent 6px 10px)}
+    #g-signin{display:flex;justify-content:center;min-height:44px}
+    .foot{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted);text-align:center;margin-top:22px;text-transform:uppercase;letter-spacing:.03em}
+    .foot a{color:var(--accent-dk);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+    .foot a:hover{color:var(--ink)}
+    .pagefoot{margin-top:30px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#a8a296;display:flex;gap:16px;align-items:center;text-transform:uppercase;letter-spacing:.04em}
+    .pagefoot a{color:#a8a296;text-decoration:none}.pagefoot a:hover{color:var(--muted)}
+    .right{order:1;position:relative;overflow:hidden;background:var(--paper);border-right:1.5px solid var(--ink)}
+    #mosaic{position:absolute;inset:0;display:grid}#mosaic i{display:block}
     @keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    .fu{animation:fu .3s cubic-bezier(.22,1,.36,1) both}
+    .fu{animation:fu .35s cubic-bezier(.22,1,.36,1) both}
+    @media(max-width:860px){ body{grid-template-columns:1fr} .right{display:none} .left{padding:36px 24px} .heading{font-size:31px} }
   </style>
 </head>
 <body>
 
-  <a href="index.html" class="logo">egfulfill</a>
+  <div class="left">
+    <div class="wrap fu">
+      <div class="brand"><a href="index.html" class="logo">egfulfill</a></div>
+      <h1 class="heading">Create your account</h1>
+      <p class="sub">■ Start selling print-on-demand — no minimums, free to start.</p>
 
-  <div class="card fu">
-    <h1 class="heading">Create your account</h1>
-    <p class="subheading">Start selling print-on-demand — no minimums, free to start.</p>
+      <div id="signup-error" class="error-banner"></div>
 
-    <div id="signup-error" class="error-banner"></div>
-
-    <form onsubmit="submitSignup(event)" novalidate>
-      <div style="margin-bottom:14px">
-        <label>Email</label>
-        <input id="su-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"/>
-        <div id="err-email" class="field-err"></div>
-      </div>
-
-      <div style="margin-bottom:14px">
-        <label>Password</label>
-        <div class="pw-wrap">
-          <input id="su-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="padding-right:42px"/>
-          <button type="button" class="pw-toggle" onclick="togglePw('su-password')">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
-          </button>
+      <form onsubmit="submitSignup(event)" novalidate>
+        <div style="margin-bottom:16px">
+          <label>Email</label>
+          <input id="su-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"/>
+          <div id="err-email" class="field-err"></div>
         </div>
-        <div id="err-password" class="field-err"></div>
-      </div>
 
-      <div style="margin-bottom:6px">
-        <label>Confirm password</label>
-        <div class="pw-wrap">
-          <input id="su-confirm" class="input" type="password" placeholder="Re-enter your password" autocomplete="new-password" style="padding-right:42px"/>
-          <button type="button" class="pw-toggle" onclick="togglePw('su-confirm')">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
-          </button>
+        <div style="margin-bottom:16px">
+          <label>Password</label>
+          <div class="pw-wrap">
+            <input id="su-password" class="input" type="password" placeholder="At least 8 characters" autocomplete="new-password" style="padding-right:44px"/>
+            <button type="button" class="pw-toggle" onclick="togglePw('su-password')">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+          <div id="err-password" class="field-err"></div>
         </div>
-        <div id="err-confirm" class="field-err"></div>
+
+        <div style="margin-bottom:2px">
+          <label>Confirm password</label>
+          <div class="pw-wrap">
+            <input id="su-confirm" class="input" type="password" placeholder="Re-enter your password" autocomplete="new-password" style="padding-right:44px"/>
+            <button type="button" class="pw-toggle" onclick="togglePw('su-confirm')">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>
+          </div>
+          <div id="err-confirm" class="field-err"></div>
+        </div>
+
+        <label class="check"><input type="checkbox" id="su-terms"/> <span>I agree to the <a href="#" onclick="return false">Terms of Service</a> and <a href="#" onclick="return false">Privacy Policy</a>.</span></label>
+
+        <button type="submit" class="btn-dk" id="su-btn">Create account</button>
+      </form>
+
+      <div class="divider">or</div>
+      <div id="g-signin"></div>
+
+      <div class="foot">Already signed up? <a href="seller-login.html">Log in →</a></div>
+
+      <div class="pagefoot">
+        <span>© 2026 EGFULFILL, Inc.</span>
+        <a href="login.html">Staff login</a>
       </div>
-
-      <label class="check"><input type="checkbox" id="su-terms"/> <span>I agree to the <a href="#" onclick="return false">Terms of Service</a> and <a href="#" onclick="return false">Privacy Policy</a>.</span></label>
-
-      <button type="submit" class="btn-dk" id="su-btn">Create account</button>
-    </form>
-
-    <div class="divider">or sign up with</div>
-
-    <!-- Social sign-up -->
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <button type="button" class="btn-social" onclick="socialSignup('Facebook')">
-        <svg width="17" height="17" viewBox="0 0 18 18"><path fill="#1877F2" d="M18 9a9 9 0 1 0-10.4 8.89v-6.29H5.31V9h2.29V7.02c0-2.26 1.35-3.5 3.4-3.5.99 0 2.02.17 2.02.17v2.22h-1.14c-1.12 0-1.47.7-1.47 1.41V9h2.5l-.4 2.6h-2.1v6.29A9 9 0 0 0 18 9z"/></svg>
-        Sign up with Facebook
-      </button>
     </div>
-
-    <div class="foot">Already signed up? <a href="seller-login.html">Log in →</a></div>
   </div>
 
-  <div class="pagefoot">
-    <span>© 2026 EGFULFILL, Inc.</span>
-    <a href="#">Privacy</a>
-    <a href="#">Terms</a>
-  </div>
+  <div class="right"><div id="mosaic"></div></div>
 
-<script src="egstore-api.js"></script>
 <script>
-  function togglePw(id){ const inp = document.getElementById(id); inp.type = inp.type === 'password' ? 'text' : 'password'; }
-
-  function socialSignup(provider){
-    const btns = document.querySelectorAll('.btn-social');
-    btns.forEach(b => b.disabled = true);
-    // Demo: simulate the OAuth handshake then land on the seller dashboard.
-    setTimeout(() => { window.location.href = 'seller.html'; }, 700);
+  (function () {
+    var box = document.getElementById('mosaic'); if (!box) return;
+    var cols = 14, rows = Math.max(16, Math.round(cols * (window.innerHeight / (window.innerWidth * 0.46))));
+    box.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
+    box.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < cols * rows; i++) {
+      var c = document.createElement('i'), col = i % cols, edge = 1 - (col / cols);
+      var on = Math.random() < (0.18 + edge * 0.5);
+      c.style.background = on ? (Math.random() < 0.82 ? '#8b5cf6' : '#7c3aed') : 'transparent';
+      frag.appendChild(c);
+    }
+    box.appendChild(frag);
+  })();
+</script>
+<script src="egstore-api.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  // ── Google sign-up: same GIS flow as login — a Google account signs up + logs in in one step. ──
+  function _egGoogleCb(resp) {
+    if (!resp || !resp.credential || !window.EGAuth) return;
+    EGAuth.googleSignIn(resp.credential).then(function (res) {
+      if (res.error) {
+        var b = document.getElementById('signup-error');
+        if (b) { b.textContent = res.error.message || 'Google sign-in failed'; b.style.display = 'block'; }
+        return;
+      }
+      EGAuth.routeAfterLogin();
+    });
   }
+  function _egInitGoogle() {
+    var host = document.getElementById('g-signin'); if (!host) return;
+    fetch('/api/auth/google/client-id')
+      .then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        if (!cfg || !cfg.clientId) { host.style.display = 'none'; return; }   // not configured yet
+        function render() {
+          if (!(window.google && google.accounts && google.accounts.id)) { setTimeout(render, 300); return; }
+          google.accounts.id.initialize({ client_id: cfg.clientId, callback: _egGoogleCb });
+          google.accounts.id.renderButton(host, { type: 'standard', theme: 'outline', size: 'large', text: 'signup_with', shape: 'rectangular', width: 320 });
+        }
+        render();
+      })
+      .catch(function () { host.style.display = 'none'; });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _egInitGoogle); else _egInitGoogle();
+
+  function togglePw(id){ const inp = document.getElementById(id); inp.type = inp.type === 'password' ? 'text' : 'password'; }
 
   function submitSignup(e){
     e.preventDefault();
@@ -144,9 +184,8 @@
     if(!ok) return;
     const btn = document.getElementById('su-btn');
     btn.disabled = true; btn.textContent = 'Creating account…';
-    // Real signup via Supabase Auth. The handle_new_user() trigger creates the
-    // matching profiles row with role='seller'. Falls back to the demo redirect
-    // if the client isn't loaded.
+    // Real signup via the API. Public signup always creates role='seller'. Falls back
+    // to the demo redirect if the client isn't loaded.
     if (window.EGAuth) {
       EGAuth.signUp(email, pw, { role: 'seller' }).then(function(res){
         if (res.error) {
