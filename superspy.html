@@ -136,10 +136,10 @@ document.addEventListener('click',function(e){var nb=document.getElementById('ne
 <script src="eg-role-switcher.js" defer></script>
 <script>
 (function(){
-  // SpyDeck is a Pro feature. Staff (admin/operator/…) always have access; sellers need Pro+.
+  // SpyDeck access: staff always; sellers get it bundled with Pro (admin toggle) OR via the add-on.
   function scoutAllowed(role){
     if(role && role!=='seller') return true;
-    try{ var p=(window.EGStore&&EGStore.getPlan)?EGStore.getPlan():(localStorage.getItem('eg_seller_plan')||'starter'); return p==='pro'||p==='enterprise'; }catch(e){ return false; }
+    try{ return (window.EGStore && EGStore.hasSpydeck) ? EGStore.hasSpydeck() : ((localStorage.getItem('eg_seller_plan')||'starter')!=='starter'); }catch(e){ return false; }
   }
   function renderLocked(el){
     var teaser='';

@@ -2200,6 +2200,32 @@
       try { window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail: { plan: planId } })); } catch (e) {}
       return true;
     },
+    // ── SpyDeck add-on ──────────────────────────────────────────────────────
+    // Admin config: is SpyDeck bundled into Pro, and (if not) the standalone price. Reset in admin
+    // Settings. Client-side today (matches the plan system); server-back it with the plan later.
+    SPYDECK_CFG_KEY: 'eg_spydeck_config',
+    SPYDECK_ADDON_KEY: 'eg_spydeck_addon',
+    getSpydeckConfig: function() {
+      try { var c = JSON.parse(localStorage.getItem(this.SPYDECK_CFG_KEY) || 'null'); if (c && typeof c === 'object') return { bundled: c.bundled !== false, price: (c.price != null ? Number(c.price) : 9) }; } catch (e) {}
+      return { bundled: true, price: 9 };   // default: included with Pro
+    },
+    setSpydeckConfig: function(c) {
+      c = c || {}; var v = { bundled: c.bundled !== false, price: (c.price != null ? Math.max(0, Number(c.price) || 0) : 9) };
+      try { localStorage.setItem(this.SPYDECK_CFG_KEY, JSON.stringify(v)); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('eg-spydeck-config', { detail: v })); } catch (e) {}
+      return v;
+    },
+    getSpydeckAddon: function() { try { return localStorage.getItem(this.SPYDECK_ADDON_KEY) === '1'; } catch (e) { return false; } },
+    setSpydeckAddon: function(on) { try { localStorage.setItem(this.SPYDECK_ADDON_KEY, on ? '1' : '0'); } catch (e) {} try { window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail: { plan: this.getPlan() } })); } catch (e) {} },
+    // Access gate: staff always; else SpyDeck is bundled into Pro/Enterprise, OR bought as an add-on.
+    hasSpydeck: function() {
+      try {
+        var cfg = this.getSpydeckConfig();
+        var proPlus = (this.getPlan() === 'pro' || this.getPlan() === 'enterprise');
+        if (cfg.bundled && proPlus) return true;
+        return this.getSpydeckAddon();
+      } catch (e) { return false; }
+    },
     // Next upgrade tier ("starter" → "pro" → "enterprise" → null on top tier).
     getNextPlan: function(planId) {
       var id = planId || this.getPlan();
