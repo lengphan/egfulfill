@@ -1570,16 +1570,12 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       /* Flat, card-less settings panels (Claude-style) */
       #section-settings .card{background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;padding:2px 0 22px!important;max-width:620px}
     </style>
-    <div style="max-width:1040px;margin:0 auto 16px;display:flex;align-items:center;gap:8px">
-      <span style="font-size:12.5px;font-weight:600;color:#9ca3af">Guides:</span>
-      <button onclick="if(window.EGGuides)EGGuides.openFile()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">File Guidelines</button>
-      <button onclick="if(window.EGGuides)EGGuides.openSize()" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Size Guide</button>
-    </div>
     <div style="display:flex;gap:24px;align-items:flex-start;max-width:1040px;margin:0 auto;width:100%">
       <div style="width:208px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
         <a class="fstab on" onclick="opSettingsTab('profile',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Profile</a>
         <a class="fstab" onclick="opSettingsTab('notif',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5A4 4 0 004 5.5v4l-1.5 2h11L12 9.5v-4A4 4 0 008 1.5z" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 13.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3"/></svg>Notifications</a>
         <a class="fstab" onclick="opSettingsTab('threads',this)"><svg viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="11" cy="5" r="2.2" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="11" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>Thread Colors</a>
+        <a class="fstab" onclick="opSettingsTab('guides',this)"><svg viewBox="0 0 16 16" fill="none"><path d="M3 2.5h7a1.5 1.5 0 011.5 1.5v9.5l-2-1.2-2 1.2-2-1.2-2 1.2V4A1.5 1.5 0 013 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 5.5h5M5 8h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Guides</a>
         <div style="border-top:1px solid #f0ede9;margin:8px 4px"></div>
         <a class="fstab" style="color:#dc2626;cursor:pointer" onclick="if(confirm('Log out of egfulfill?')){try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user');}catch(e){}location.href='login.html';}"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M10.5 11l3-3-3-3M13.5 8H6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Log out</a>
       </div>
@@ -1622,6 +1618,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">In-stock embroidery threads. Designs uploaded by sellers are matched against this list, and the chosen thread codes are sent with each order.</div>
           <div id="op-thread-mgr"></div>
         </div>
+        <div id="ofpanel-guides" class="card fi" style="padding:22px 24px;display:none;max-width:720px"><div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:4px">Guides</div><div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">File requirements and product size charts. Shared from the admin settings.</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button onclick="if(window.EGGuides)EGGuides.openFile()" class="btn btn-out">File Guidelines</button><button onclick="if(window.EGGuides)EGGuides.openSize()" class="btn btn-out">Size Guide</button></div></div>
       </div>
     </div>
   </div>
@@ -2524,7 +2521,7 @@ function showSection(id) {
 
 // Operator settings tab switcher (seller-style left tabs → right panel).
 function opSettingsTab(name, el){
-  ['profile','notif','threads'].forEach(function(t){
+  ['profile','notif','threads','guides'].forEach(function(t){
     var p = document.getElementById('ofpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
