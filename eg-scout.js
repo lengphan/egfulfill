@@ -95,15 +95,18 @@
     '.eg-scout-img{position:relative;aspect-ratio:1/1;min-height:188px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
     '.eg-scout-img img{width:100%;height:100%;object-fit:cover;display:block}' +
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
-    /* frosted-glass monospace overlay on the image — favourites + created date (Tavus ID-pill style) */
-    '.eg-scout-imeta{position:absolute;left:8px;bottom:8px;z-index:3;display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.02em;color:#191918;background:rgba(255,255,255,.5);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.55);border-radius:7px;padding:4px 9px}' +
+    /* two dark frosted boxes on the image — favourites | created date (Tavus Phoenix-4 / ID: pills):
+       white monospace, lightly frosted, NO white border */
+    '.eg-scout-imeta{position:absolute;left:8px;bottom:8px;z-index:3;display:flex;align-items:center;gap:6px}' +
+    '.eg-scout-ibox{display:inline-flex;align-items:center;gap:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.03em;color:#fff;background:rgba(17,24,39,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);border-radius:5px;padding:4px 8px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
-    '.eg-scout-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}' +
-    '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:8px;padding:7px 3px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;min-width:0}' +
-    /* value shows FULL (no ellipsis) — $100.3K fits via 13px + tight tabular figures */
-    '.eg-scout-stat b{font-size:13px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.03em;white-space:nowrap}' +
-    '.eg-scout-stat i{font-size:8px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:uppercase;margin-top:3px;line-height:1.15}' +
-    '.eg-scout-sub{display:block;font-size:7.5px;font-weight:700;color:#b8b2ab;letter-spacing:.03em;margin-top:1px;min-height:9px}' +
+    /* 2x2 grid — roomier + readable (the 4-in-a-row was too squished/small) */
+    '.eg-scout-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}' +
+    '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:8px;padding:9px 6px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;min-width:0}' +
+    /* value shows FULL (no ellipsis) — $100.3K fits easily in the wider 2x2 cell at 16px */
+    '.eg-scout-stat b{font-size:16px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}' +
+    '.eg-scout-stat i{font-size:8.5px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:3px;line-height:1.15}' +
+    '.eg-scout-sub{display:block;font-size:8px;font-weight:700;color:#b8b2ab;letter-spacing:.03em;margin-top:1px;min-height:9px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
     '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
     '.eg-scout-tagwrap{display:flex;flex-direction:column}' +
@@ -308,7 +311,7 @@
       (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
       '<button class="eg-scout-heart' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '" title="Save to favorites" aria-label="Favorite"><svg viewBox="0 0 24 24"><path d="M12 20.7C7 17 3.5 13.9 3.5 9.7 3.5 7 5.5 5.2 7.9 5.2c1.5 0 2.9.7 4.1 2.2 1.2-1.5 2.6-2.2 4.1-2.2 2.4 0 4.4 1.8 4.4 4.5 0 4.2-3.5 7.3-8.5 11z"/></svg></button>' +
       '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img +
-        '<span class="eg-scout-imeta"><span style="color:#ef4444">&#9829;</span> ' + _fmt(favs) + (created ? ' <span style="opacity:.4">·</span> ' + esc(created) : '') + '</span>' +
+        '<div class="eg-scout-imeta"><span class="eg-scout-ibox">&#9829; ' + _fmt(favs) + '</span>' + (created ? '<span class="eg-scout-ibox">' + esc(created) + '</span>' : '') + '</div>' +
       '</a>' +
       '<div class="eg-scout-body">' +
         '<div class="eg-scout-stats">' +
