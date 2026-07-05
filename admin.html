@@ -3276,6 +3276,30 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="btn btn-out" style="font-size:13px" onclick="renderPlansEditor()">Reset</button>
             <button class="btn btn-dk" style="font-size:13px" onclick="savePlansEditor(this)">Save plans</button>
           </div>
+
+          <!-- SpyDeck add-on pricing: bundle it into Pro/Enterprise free, or sell it standalone.
+               Backed by EGStore.getSpydeckConfig()/setSpydeckConfig(); the seller Billing page +
+               the SpyDeck gate (EGStore.hasSpydeck) read the same config. -->
+          <div style="border-top:1px solid #f0ede9;margin:24px 0 16px"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="font-size:15px;font-weight:700;color:#191918">SpyDeck add-on</div>
+            <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#7c3aed;background:#f3efff;border:1px solid #e4d9ff;padding:2px 7px;border-radius:20px">Research</span>
+          </div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Bundle SpyDeck into Pro &amp; Enterprise for free, or sell it à-la-carte to any seller as a standalone monthly add-on.</div>
+          <div style="border:1px solid #e5e4e0;border-radius:10px;padding:4px 16px">
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 0;border-bottom:1px solid #f0ede9">
+              <span><span style="font-size:13.5px;color:#374151;font-weight:600">Included free with Pro &amp; Enterprise</span><span style="display:block;font-size:12px;color:#9ca3af;margin-top:1px">When on, Pro/Enterprise sellers get SpyDeck at no extra cost.</span></span>
+              <input type="checkbox" id="sd-bundled" style="width:17px;height:17px;accent-color:#8b5cf6;flex-shrink:0"/>
+            </label>
+            <div style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:start;padding:14px 0">
+              <div><label style="font-size:11.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Standalone price /mo ($)</label><input class="input" id="sd-price" type="number" min="0" step="1" style="background:#fff"/></div>
+              <div style="font-size:12.5px;color:#9ca3af;padding-top:22px">Charged to sellers (e.g. on Starter) who add SpyDeck on its own.</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+            <button class="btn btn-out" style="font-size:13px" onclick="renderSpydeckCfg()">Reset</button>
+            <button class="btn btn-dk" style="font-size:13px" onclick="saveSpydeckCfg(this)">Save add-on</button>
+          </div>
         </div>
         <!-- Users (admin-only) -->
         <div id="afpanel-users" class="card fi" style="padding:22px 24px;display:none">
@@ -3897,13 +3921,29 @@ function savePlansEditor(btn){
   if (btn){ var _t = btn.textContent; btn.textContent = 'Saved ✓'; btn.disabled = true; setTimeout(function(){ btn.textContent = _t; btn.disabled = false; }, 900); }
 }
 window.savePlansEditor = savePlansEditor;
+// ── SpyDeck add-on config (bundle-with-Pro toggle + standalone price) ──
+function renderSpydeckCfg(){
+  if (typeof EGStore === 'undefined' || !EGStore.getSpydeckConfig) return;
+  var c = EGStore.getSpydeckConfig();
+  var b = document.getElementById('sd-bundled'), p = document.getElementById('sd-price');
+  if (b) b.checked = c.bundled !== false;
+  if (p) p.value = (c.price != null ? c.price : 9);
+}
+window.renderSpydeckCfg = renderSpydeckCfg;
+function saveSpydeckCfg(btn){
+  if (typeof EGStore === 'undefined' || !EGStore.setSpydeckConfig) return;
+  var b = document.getElementById('sd-bundled'), p = document.getElementById('sd-price');
+  EGStore.setSpydeckConfig({ bundled: b ? b.checked : true, price: p ? (parseFloat(p.value) || 0) : 9 });
+  if (btn){ var t = btn.textContent; btn.textContent = 'Saved ✓'; btn.disabled = true; setTimeout(function(){ btn.textContent = t; btn.disabled = false; }, 900); }
+}
+window.saveSpydeckCfg = saveSpydeckCfg;
 function admSettingsTab(name, el){
   // Existing 4 panels + the new 'platform' panel (additive — older callers
   // still work, none of the existing panel ids changed).
   ['profile','notif','threads','boards','platform','users','guides','plans'].forEach(function(t){
     var p = document.getElementById('afpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
-  if (name === 'plans') renderPlansEditor();
+  if (name === 'plans') { renderPlansEditor(); renderSpydeckCfg(); }
   if (name === 'users' && window.EGAdminUsers) EGAdminUsers.load();
   if (name === 'platform' && window.egRefreshEtsy) egRefreshEtsy();
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });

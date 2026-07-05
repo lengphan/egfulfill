@@ -501,6 +501,20 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </div>
           </div>
         </div>
+        <!-- SpyDeck add-on — bundled-free on Pro/Enterprise, else a standalone monthly line.
+             Price + bundling come from EGStore.getSpydeckConfig() (set by admin → Settings → Plans). -->
+        <div class="card" style="padding:22px 24px;margin-bottom:16px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <div style="font-size:15px;font-weight:700;color:#191918">SpyDeck</div>
+                <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#7c3aed;background:#f3efff;border:1px solid #e4d9ff;padding:2px 7px;border-radius:20px">Research</span>
+              </div>
+              <div style="font-size:13.5px;color:#6b7280;max-width:460px">Product-research add-on — trending listings, keyword &amp; sales estimates, and one-click add-to-store.</div>
+            </div>
+            <div id="bill-spydeck-cta" style="flex-shrink:0;text-align:right"></div>
+          </div>
+        </div>
         <div class="card" style="padding:22px 24px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:14px">Payment Method</div>
           <div id="pay-method-list" style="display:flex;flex-direction:column;gap:10px">
@@ -1008,8 +1022,28 @@ function showTab(name){
     document.getElementById('tab-'+t).classList.toggle('on', t===name);
   });
   if (name === 'api' && typeof egLoadAiKeys === 'function') egLoadAiKeys();
-  if (name === 'billing') { try { renderBillingPlans(); } catch(e){} try { renderPaymentMethod(); } catch(e){} }
+  if (name === 'billing') { try { renderBillingPlans(); } catch(e){} try { renderPaymentMethod(); } catch(e){} try { renderSpydeckAddon(); } catch(e){} }
 }
+// SpyDeck add-on line on Billing — bundled-free (Pro/Enterprise) OR a standalone $X/mo the seller can add.
+function renderSpydeckAddon(){
+  var cta = document.getElementById('bill-spydeck-cta'); if(!cta || typeof EGStore==='undefined') return;
+  var cfg  = EGStore.getSpydeckConfig ? EGStore.getSpydeckConfig() : { bundled:true, price:9 };
+  var plan = EGStore.getPlan ? EGStore.getPlan() : 'starter';
+  if (cfg.bundled && (plan==='pro' || plan==='enterprise')) {
+    cta.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#059669">'
+      + '<svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="#059669" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Included with your plan</span>';
+    return;
+  }
+  var has = EGStore.getSpydeckAddon && EGStore.getSpydeckAddon();
+  cta.innerHTML = has
+    ? '<div style="font-size:13px;color:#6b7280;margin-bottom:6px">$'+cfg.price+'/mo · <span style="color:#059669;font-weight:600">Active</span></div>'
+      + '<button class="btn btn-out" style="font-size:12.5px" onclick="_toggleSpydeckAddon(false)">Remove</button>'
+    : '<div style="font-size:20px;font-weight:800;color:#111827;margin-bottom:6px">$'+cfg.price+'<span style="font-size:12px;font-weight:400;color:#9ca3af">/mo</span></div>'
+      + '<button class="btn btn-dk" style="font-size:12.5px;background:#8b5cf6;border-color:#8b5cf6" onclick="_toggleSpydeckAddon(true)">Add SpyDeck</button>';
+}
+window.renderSpydeckAddon = renderSpydeckAddon;
+function _toggleSpydeckAddon(on){ try { if (EGStore.setSpydeckAddon) EGStore.setSpydeckAddon(on); } catch(e){} renderSpydeckAddon(); }
+window._toggleSpydeckAddon = _toggleSpydeckAddon;
 // ── Bring-your-own AI keys (Settings → API Keys). Uses the shared EGAI layer so the Scout
 //    title/description tools run on the SELLER's own key, never the platform owner's. ──
 function egLoadAiKeys(){
