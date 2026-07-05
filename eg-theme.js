@@ -32,6 +32,11 @@
     /* dashboard stat cards → gentle hover only: a soft shadow, NO border highlight and NO transform
        (transform on hover was overriding the drag-to-reorder transform, breaking dragging) */
     '.wcard:hover,.stat-card:hover{box-shadow:0 3px 14px rgba(0,0,0,.06)!important;border-color:#e6e4df!important}',
+    /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
+       presses into it on hover, fully seated on click */
+    '.btn-dk{border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
+    '.btn-dk:hover{transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #191918!important}',
+    '.btn-dk:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #191918!important}',
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
