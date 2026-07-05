@@ -10,6 +10,13 @@
   var css = [
     ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff}',
 
+    /* ── SHARP CORNERS everywhere (retro/pixelated sticky-note vibe) ─── */
+    /* flatten every radius (beats inline styles via !important); functional round bits are restored below */
+    '*{border-radius:0!important}',
+    '.toggle{border-radius:999px!important}',
+    '.toggle-thumb{border-radius:50%!important}',
+    'input[type=radio]{border-radius:50%!important}',
+
     /* ── FONTS (both light + dark) ─────────────────────────────── */
     /* sidebar nav → monospace uppercase, smooth transition, NO box border (kills the outlined-active look) */
     /* transparent 1.5px border on EVERY nav item (active or not) → kills the outlined-active box AND
@@ -34,8 +41,8 @@
     '[id^=panel-] label,[id^=afpanel-] label,[id^=wfpanel-] label,[id^=ofpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px}',
     /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
-    'html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
-    'html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
+    'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
+    'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
     '.btn-dk,.btn-out,.btn-gold,.btn-green,.btn-amber,.btn-blue{border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
