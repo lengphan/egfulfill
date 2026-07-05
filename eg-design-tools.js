@@ -201,12 +201,15 @@
   // chrome-less inside the factory shell (no seller sidebar/account). Each card launches
   // the same reused flow. Keep in lock-step with design-lab.html so the count never differs.
   function designLab() {
-    var card = function (icon, title, desc, cta, action) {
-      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e6e4df;border-radius:14px;padding:22px;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease" onmouseover="this.style.borderColor=\'#8b5cf6\';this.style.boxShadow=\'0 8px 22px rgba(139,92,246,.15)\';this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.borderColor=\'#e6e4df\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,.05)\';this.style.transform=\'\'">'
-        + '<div style="width:46px;height:46px;border-radius:12px;background:#f3efff;color:#7c3aed;display:flex;align-items:center;justify-content:center;margin-bottom:16px">' + icon + '</div>'
-        + '<div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">' + title + '</div>'
-        + '<div style="font-size:13.5px;color:#6b7280;line-height:1.55;margin-bottom:16px">' + desc + '</div>'
-        + '<div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em">' + cta + '</div></button>';
+    // Dithered header (eg-dither, muted grey/beige/black 'noir' palette) replaces the icon tile.
+    var card = function (icon, title, desc, cta, action, seed) {
+      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e6e4df;border-radius:14px;overflow:hidden;padding:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease" onmouseover="this.style.borderColor=\'#8b5cf6\';this.style.boxShadow=\'0 8px 22px rgba(139,92,246,.15)\';this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.borderColor=\'#e6e4df\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,.05)\';this.style.transform=\'\'">'
+        + '<div class="egdl-art" data-dither="art" data-pop="noir" data-seed="' + seed + '" data-pixel="4" style="height:118px;position:relative;background:#e9e6e0"></div>'
+        + '<div style="padding:18px 20px 20px">'
+        +   '<div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">' + title + '</div>'
+        +   '<div style="font-size:13.5px;color:#6b7280;line-height:1.55;margin-bottom:16px">' + desc + '</div>'
+        +   '<div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em">' + cta + '</div>'
+        + '</div></button>';
     };
     var PEN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     var BOX = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9" stroke="currentColor" stroke-width="1.6"/></svg>';
@@ -219,12 +222,13 @@
       + '<div style="max-width:1500px;margin:0 auto;padding:28px 32px 48px;width:100%;box-sizing:border-box">'
       + '<div style="font-family:\'Fraunces\',serif;font-size:26px;font-weight:600;color:#191918;letter-spacing:-.02em;margin-bottom:20px">Welcome to Design Lab</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;max-width:1080px">'
-      + card(PEN, 'Upload &amp; Design', 'Start with your artwork — upload a file, place it on a blank, generate a mockup, and publish.', 'Open editor →', 'maker')
-      + card(TPL, 'Use a Template', 'Start from a saved product setup. Apply a fresh design to something already configured.', 'View product templates →', 'templates')
-      + card(IMG, 'Image Library', 'Your uploaded design images — copy each image link or design ID to drop into an import sheet.', 'Open library →', 'library')
-      + card(BOX, 'Browse Catalog', 'Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.', 'Browse blanks →', 'catalog')
+      + card(PEN, 'Upload &amp; Design', 'Start with your artwork — upload a file, place it on a blank, generate a mockup, and publish.', 'Open editor →', 'maker', 7)
+      + card(TPL, 'Use a Template', 'Start from a saved product setup. Apply a fresh design to something already configured.', 'View product templates →', 'templates', 23)
+      + card(IMG, 'Image Library', 'Your uploaded design images — copy each image link or design ID to drop into an import sheet.', 'Open library →', 'library', 41)
+      + card(BOX, 'Browse Catalog', 'Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.', 'Browse blanks →', 'catalog', 59)
       + '</div></div>';
     mount(ov);
+    try { if (window.EGDither) EGDither.autoInit(ov); } catch (e) {}   // paint the dithered card headers
     function close() { unmount(); }
     ov.querySelector('#egdl-x').addEventListener('click', close);
     ov.querySelectorAll('.egdl-card').forEach(function (b) {
@@ -2351,7 +2355,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-05-accent-theme-designlab';
+  window.EG_BUILD = '2026-07-05-designlab-dither';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}

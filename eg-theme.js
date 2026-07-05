@@ -20,6 +20,9 @@
     "h1{font-family:'Fraunces',serif!important;font-optical-sizing:auto;letter-spacing:-.02em}",
     /* status pills read in monospace, like the login's labels/eyebrows */
     '.badge,.b-new,.b-queue,.b-prod,.b-qc,.b-packed,.b-shipped{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    /* table headers + filter buttons → monospace (Tavus table language) */
+    '.dtable th{font-family:' + MONO + '!important}',
+    '.fb{font-family:' + MONO + '!important;letter-spacing:.02em}',
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
