@@ -23,6 +23,12 @@
     /* table headers + filter buttons → monospace (Tavus table language) */
     '.dtable th{font-family:' + MONO + '!important}',
     '.fb{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
+    '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px}',
+    'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
+    'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
+    /* settings form labels → monospace uppercase, like the login field labels */
+    '[id^=panel-] label,[id^=afpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:11px}',
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
