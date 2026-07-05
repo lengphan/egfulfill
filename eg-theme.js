@@ -39,6 +39,17 @@
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
     '[id^=panel-] label,[id^=afpanel-] label,[id^=wfpanel-] label,[id^=ofpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px}',
+
+    /* ── Tavus DETAIL UTILITIES (opt-in classes — additive, touch nothing until used) ── */
+    /* .eg-tag — bordered mono pill (version/status), e.g. <span class="eg-tag">v1.0.0</span> */
+    '.eg-tag{display:inline-flex;align-items:center;font-family:' + MONO + '!important;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#191918;background:#fff;border:1.5px solid #191918;padding:2px 8px;line-height:1.5}',
+    /* .eg-title-mono — mono/pixelated display title, e.g. <h1 class="eg-title-mono">Trivia Master</h1> */
+    '.eg-title-mono{font-family:' + MONO + '!important;font-weight:700;letter-spacing:-.01em;color:#191918}',
+    /* .eg-meta — dot-separated metadata row: <div class="eg-meta"><span class="eg-meta-label">What you get</span><span class="eg-meta-item">PAL</span><span class="eg-meta-item">One-click</span></div> */
+    '.eg-meta{display:flex;align-items:center;flex-wrap:wrap;font-family:' + MONO + '!important;font-size:12px;color:#6b7280}',
+    '.eg-meta-label{font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding-right:12px;margin-right:12px;border-right:1.5px solid #e5e4e0}',
+    '.eg-meta-item{font-weight:600;color:#374151}',
+    '.eg-meta-item+.eg-meta-item::before{content:"·";color:#c4c3be;margin:0 8px}',
     /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
