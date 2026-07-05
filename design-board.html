@@ -709,9 +709,12 @@ function _dbSaveCards() {
     // that render/storage ping-pong after one hop (and no manual dispatch, which looped in-tab).
     if (after === before) return;
     localStorage.setItem('egfulfill_design_cards', after);
+    try { if (window.EGStore && EGStore.pushKV) EGStore.pushKV('design_cards', 'egfulfill_design_cards'); } catch (e) {}
   } catch (e) {}
 }
 let DB_CARDS = _dbLoadCards();
+// Pull the shared design-board state from the server (survives cache-clear + same on every staff device).
+try { if (window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('design_cards', 'egfulfill_design_cards', function(){ DB_CARDS = _dbLoadCards(); try { if (typeof dbRender === 'function') dbRender(); } catch(e){} }); } catch(e){}
 // Live-refresh when a design is uploaded/pushed on another board/tab (or this one).
 window.addEventListener('storage', function (e) {
   if (!e || e.key === 'egfulfill_design_cards' || e.key === 'eg_design_ping' || e.key === null) {

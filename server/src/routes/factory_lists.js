@@ -6,9 +6,15 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 
-// ship_origin holds the factory-wide return/ship-from address as a single-element array [origin],
-// so it's shared across every staff board + device (was per-browser localStorage).
-const ALLOWED = { backorders: 1, purchase_orders: 1, inventory: 1, ship_origin: 1 };
+// Factory-global staff KV. Arrays (backorders/POs/inventory) OR objects (setup maps, board state,
+// the ship_origin blob) — all shared across every staff board + device (was per-browser localStorage).
+const ALLOWED = {
+  backorders: 1, purchase_orders: 1, inventory: 1, ship_origin: 1,
+  neworder_setup: 1,     // factory's blank/colour/size/method picks per order line (keyed object)
+  design_cards: 1,       // design-board workflow state (columns, assignee, checklist, notes)
+  design_lab_assigned: 1,// design-lab assignments
+  design_types: 1        // board settings — thread/design types
+};
 
 export function factoryListsRoutes(app, requireAuth) {
   q(`create table if not exists factory_lists (
@@ -17,23 +23,29 @@ export function factoryListsRoutes(app, requireAuth) {
        updated_at timestamptz not null default now()
      )`).catch(() => {});
 
-  // Read one list (whole array). Staff-only — these are internal factory queues.
+  // Read one blob (array or object). Staff-only. Absent → null (existing array callers check
+  // Array.isArray and skip on null, so this is back-compatible).
   app.get('/api/factory_lists/:k', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     if (!ALLOWED[req.params.k]) { reply.code(404); return { error: 'unknown list' }; }
     const r = await q('select v from factory_lists where k=$1', [req.params.k]);
-    return r.rows[0] ? r.rows[0].v : [];
+    return r.rows[0] ? r.rows[0].v : null;
   });
 
-  // Replace one list wholesale (matches the client's setBackorders(list) model).
+  // Replace one blob wholesale — accepts an array (setBackorders(list) model), the legacy {list:[…]}
+  // wrapper, or an arbitrary object (keyed setup maps / board state).
   app.post('/api/factory_lists/:k', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     if (!ALLOWED[req.params.k]) { reply.code(404); return { error: 'unknown list' }; }
-    const v = Array.isArray(req.body) ? req.body : (req.body && Array.isArray(req.body.list) ? req.body.list : []);
+    let v;
+    if (Array.isArray(req.body)) v = req.body;
+    else if (req.body && Array.isArray(req.body.list)) v = req.body.list;
+    else if (req.body && typeof req.body === 'object') v = req.body;
+    else v = [];
     await q(
       `insert into factory_lists (k, v, updated_at) values ($1,$2, now())
        on conflict (k) do update set v=excluded.v, updated_at=now()`,
       [req.params.k, JSON.stringify(v)]);
-    return { ok: true, count: v.length };
+    return { ok: true, count: Array.isArray(v) ? v.length : 1 };
   });
 }

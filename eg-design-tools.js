@@ -278,7 +278,7 @@
 
   function jsAttr(s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
   function setupAll() { try { return JSON.parse(localStorage.getItem(SETUP_KEY) || '{}') || {}; } catch (e) { return {}; } }
-  function setupSave(o) { try { localStorage.setItem(SETUP_KEY, JSON.stringify(o)); } catch (e) {} }
+  function setupSave(o) { try { localStorage.setItem(SETUP_KEY, JSON.stringify(o)); if (window.EGStore && EGStore.pushKV) EGStore.pushKV('neworder_setup', SETUP_KEY); } catch (e) {} }
   function getItemSetup(orderNum, sku) { var a = setupAll(); return a[orderNum + '|' + sku] || {}; }
   function setItemSetupField(orderNum, sku, field, val) {
     var a = setupAll(), k = orderNum + '|' + sku; a[k] = a[k] || {}; a[k][field] = val; setupSave(a);
@@ -2351,7 +2351,10 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-04-thread-pick-target-cursor';
+  window.EG_BUILD = '2026-07-05-server-persist-setup';
+  // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
+  // across devices + survive a cache clear (was per-browser eg_neworder_setup).
+  try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
   try { console.log('%cEGFULFILL build ' + window.EG_BUILD, 'color:#d4a017;font-weight:700'); } catch (e) {}
   window.EGDesignTools = {
     // Shared composite (chosen blank + design overlay) + lightbox, used by the factory

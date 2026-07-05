@@ -1928,6 +1928,27 @@
     // Mirror a whole factory list (backorders / purchase_orders) to the server so
     // the Purchases queue survives a refresh + reaches every board. Staff-only on
     // the server; a seller's call simply 403s and is ignored. Best-effort.
+    // Generic KV mirror: push/pull ANY localStorage blob (array OR object) to the shared factory_lists
+    // KV — so factory board state survives a cache-clear and is the same on every staff device.
+    pushKV: function(serverKey, localKey){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
+        var raw = localStorage.getItem(localKey); if (raw == null) return;
+        fetch('/api/factory_lists/' + serverKey, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, keepalive: true, body: raw }).catch(function(){});
+      } catch(e){}
+    },
+    hydrateKV: function(serverKey, localKey, cb){
+      try {
+        var tok = localStorage.getItem('eg_token') || ''; if (!tok) { if(cb)cb(); return; }
+        fetch('/api/factory_lists/' + serverKey, { headers: { Authorization: 'Bearer ' + tok } })
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(v){
+            var has = v && typeof v === 'object' && (Array.isArray(v) ? v.length : Object.keys(v).length);
+            if (has) { try { localStorage.setItem(localKey, JSON.stringify(v)); } catch(e){} }
+            if (cb) cb(v);
+          }).catch(function(){ if(cb)cb(); });
+      } catch(e){ if(cb)cb(); }
+    },
     _pushFactoryList: function(k, list){
       try {
         var tok = localStorage.getItem('eg_token') || ''; if (!tok) return;
@@ -3315,6 +3336,7 @@
         }
         try {
           localStorage.setItem('egfulfill_design_cards', JSON.stringify(cards));
+          if (this.pushKV) this.pushKV('design_cards', 'egfulfill_design_cards');
         } catch (quotaErr) {
           if (this.showUploadError) this.showUploadError('Design board', 'Local storage full — clear old cards/orders to free space');
           try {
