@@ -44,7 +44,13 @@
     'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(139,92,246,.22)!important}',
     'html[data-theme=dark] .toggle-on,html[data-theme=dark] .toggle.toggle-on{background:var(--eg-accent)!important}',
     'html[data-theme=dark] input[type=checkbox],html[data-theme=dark] input[type=radio],html[data-theme=dark] input[type=range]{accent-color:var(--eg-accent-lt)}',
-    'html[data-theme=dark] .eg-link,html[data-theme=dark] a.accent{color:var(--eg-accent-lt)!important}'
+    'html[data-theme=dark] .eg-link,html[data-theme=dark] a.accent{color:var(--eg-accent-lt)!important}',
+
+    /* ── DARK-MODE legibility patches (audit-found holes) ─────── */
+    /* seller dashboard filter buttons ("All Stores"/"This Month") — were black text on dark (invisible) */
+    'html[data-theme=dark] #dash-filter-row .eg-sel-btn,html[data-theme=dark] #dash-filter-row .btn{color:#e8e4dd!important}',
+    /* "New" status badge was missing its dark pill on orders.html (every sibling had it) */
+    'html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important}'
   ].join('\n');
   var s = document.createElement('style');
   s.id = 'eg-theme-accent';

@@ -73,10 +73,15 @@
   function canvasOf(target) {
     if (!target) return null;
     if (target.tagName === 'CANVAS') return target;
+    // the container needs to be a positioning context so the canvas can be absolute (out of flow)
+    try { if (getComputedStyle(target).position === 'static') target.style.position = 'relative'; } catch (e) {}
     var c = target.querySelector('canvas[data-egd]');
     if (!c) {
       c = document.createElement('canvas'); c.setAttribute('data-egd', '1');
-      c.style.cssText = 'display:block;width:100%;height:100%';
+      // absolute + inset:0 fills the parent WITHOUT contributing to its height — otherwise an in-flow
+      // canvas at height:100% feeds back through the ResizeObserver, growing a grid/flex cell unboundedly
+      // and pushing sibling content (the login form) down. This was the "fields jump down" bug.
+      c.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%';
       target.appendChild(c);
     }
     var r = target.getBoundingClientRect();
