@@ -260,7 +260,7 @@ html[data-theme=dark] #orders-search::placeholder,html[data-theme=dark] #hdr-sea
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
    shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -349,7 +349,7 @@ html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{b
 html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
 </style>
 <style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 </style>
 <style id="eg-card-dark-retro">/* eg-card-dark-retro */
 html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
@@ -3560,7 +3560,7 @@ function egConfirmModal(opts) {
   var confirmHover = danger ? '#b91c1c' : '#000';
   overlay.innerHTML =
     '<style>@keyframes egConfFade{from{opacity:0}to{opacity:1}}@keyframes egConfPop{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}</style>' +
-    '<div style="background:#fdfcfa;border:1px solid #40403d;border-radius:10px;box-shadow:3px 3px 0 #40403d,0 12px 36px rgba(0,0,0,.18);padding:20px 22px 16px;min-width:340px;max-width:420px;font-family:inherit;animation:egConfPop .18s cubic-bezier(.2,.9,.3,1.1)">'
+    '<div style="background:#fdfcfa;border:1px solid #40403d;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);padding:20px 22px 16px;min-width:340px;max-width:420px;font-family:inherit;animation:egConfPop .18s cubic-bezier(.2,.9,.3,1.1)">'
     + '<div style="display:flex;align-items:flex-start;gap:11px;margin-bottom:14px">'
       + '<div style="flex-shrink:0;width:30px;height:30px;border-radius:50%;background:'+(danger?'#fee2e2':'#fdfcfa')+';border:1.5px solid '+(danger?'#dc2626':'#40403d')+';display:flex;align-items:center;justify-content:center;margin-top:1px">'
         + '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3v4.5M7 9.5v.5" stroke="'+(danger?'#dc2626':'#191918')+'" stroke-width="1.6" stroke-linecap="round"/><circle cx="7" cy="7" r="6" stroke="'+(danger?'#dc2626':'#191918')+'" stroke-width="1.3"/></svg>'
@@ -3620,7 +3620,7 @@ function orderRowMenuOpen(ev, ordNo) {
   if (!opts.length) return;
   const menu = document.createElement('div');
   menu.id = 'order-row-menu';
-  menu.style.cssText = 'position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:3px 3px 0 #40403d;z-index:9999;padding:6px;min-width:230px;font-family:inherit';
+  menu.style.cssText = 'position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);z-index:9999;padding:6px;min-width:230px;font-family:inherit';
   menu.innerHTML = opts.map(o => {
     const hoverBg = o.danger ? '#fef2f2' : '#f6f5f4';
     const hoverColor = o.danger ? '#dc2626' : '#191918';
@@ -6681,7 +6681,7 @@ function dtplOpenMenu(e, tplId) {
   const r = btn.getBoundingClientRect();
   const menu = document.createElement('div');
   menu.id = 'dtpl-menu';
-  menu.style.cssText = 'position:fixed;top:' + (r.bottom + 4) + 'px;left:' + Math.max(8, Math.min(window.innerWidth - 220, r.right - 200)) + 'px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:10px;box-shadow:3px 3px 0 #40403d;min-width:200px;z-index:10000;padding:5px;font-family:inherit';
+  menu.style.cssText = 'position:fixed;top:' + (r.bottom + 4) + 'px;left:' + Math.max(8, Math.min(window.innerWidth - 220, r.right - 200)) + 'px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);min-width:200px;z-index:10000;padding:5px;font-family:inherit';
   menu.innerHTML = `
     <button onclick="event.stopPropagation();dtplRename('${tplId}')" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:13px;color:#191918;display:flex;align-items:center;gap:8px;font-family:inherit" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='transparent'">
       <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9 2l3 3-7 7H2v-3l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Rename

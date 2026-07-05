@@ -21,7 +21,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .stab{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid transparent;border-radius:8px;font-size:14px;font-weight:500;color:#6b7280;cursor:pointer;transition:all .15s;text-decoration:none;white-space:nowrap}
 .stab:hover{background:#f6f5f4;color:#191918}.stab.on{background:transparent;border:1px solid #191918;color:#191918;font-weight:600}.stab.stab-red{color:#dc2626}.stab.stab-red:hover{background:#fff5f5;color:#b91c1c}
 /* Each settings box → retro card: brighter beige + 2px borderline shadow */
-html:not([data-theme=dark]) [id^="panel-"] .card{background:#fdfcfa!important;border:1px solid #40403d!important;border-radius:12px!important;box-shadow:2px 2px 0 #40403d!important}
+html:not([data-theme=dark]) [id^="panel-"] .card{background:#fdfcfa!important;border:1px solid #40403d!important;border-radius:12px!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 .finput{width:100%;background:#f9f9f8;border:1.5px solid #e5e4e0;border-radius:8px;padding:8px 12px;font-size:14.5px;color:#191918;outline:none;font-family:inherit;box-sizing:border-box;transition:border-color .15s}
 .finput:focus{border-color:#111827;background:#fff}
 .tog{position:relative;width:36px;height:20px;background:#e5e4e0;border-radius:999px;cursor:pointer;transition:background .2s;flex-shrink:0}
@@ -209,7 +209,7 @@ html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px s
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
    shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -335,7 +335,7 @@ html[data-theme=dark] .tog::after{background:#b8b2a8!important}
 html[data-theme=dark] .tog.on::after{background:#d6d2ca!important}
 </style>
 <style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 </style>
 <style id="eg-card-dark-retro">/* eg-card-dark-retro */
 html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
@@ -1130,7 +1130,7 @@ function renderStores(){
       var line = c.server
         ? ((c.name || meta.name) + ' · ' + (c.lastSync ? ('synced ' + fmtAgo(c.lastSync)) : 'awaiting first sync'))
         : ((c.name || meta.name) + ' · connected ' + fmtAgo(c.connectedAt));
-      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:12px;box-shadow:3px 3px 0 #40403d">'
+      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)">'
         + platformIcon(k, 38)
         + '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(c.shop || c.name || meta.name)+'</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+line+'</div></div>'
         + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0d6e2e;font-weight:700;background:#eaf6ee;border:1px solid #bfe6cd;border-radius:999px;padding:3px 10px;flex-shrink:0"><span style="width:6px;height:6px;border-radius:50%;background:#0d6e2e"></span>Connected</span>'

@@ -445,7 +445,7 @@ html[data-theme=dark] .fstab.on{background:rgba(201,195,186,.14)!important;color
 html[data-theme=dark] .fstab.on svg{opacity:1!important;color:#c9c3ba!important}
 </style>
 <style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 </style>
 <style id="eg-card-dark-retro">/* eg-card-dark-retro */
 html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
@@ -485,7 +485,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 </style>
 <!-- Universal header CSS (ported from seller.html) -->
 <style id="eg-univ-header">
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -1983,7 +1983,7 @@ document.addEventListener('DOMContentLoaded', function(){
            card; the dark #191918 header sits flush against the tabs strip
            so the whole header reads as one unit. -->
       <div>
-        <div style="border:1px solid #40403d;border-radius:10px;overflow:hidden;box-shadow:2px 2px 0 #40403d;background:#fdfcfa;margin-bottom:18px">
+        <div style="border:1px solid #40403d;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.05);background:#fdfcfa;margin-bottom:18px">
           <!-- Dark identity band -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
             <div style="display:flex;align-items:center;gap:13px;min-width:0">
@@ -4980,7 +4980,7 @@ function admRowMenuOpen(ev, num) {
   if (!opts.length) return;
   var menu = document.createElement('div');
   menu.id = 'adm-row-menu';
-  menu.style.cssText = 'position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:3px 3px 0 #40403d;z-index:9999;padding:6px;min-width:220px;font-family:inherit';
+  menu.style.cssText = 'position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);z-index:9999;padding:6px;min-width:220px;font-family:inherit';
   menu.innerHTML = opts.map(function(o){
     var hoverBg = o.danger ? '#fef2f2' : '#f6f5f4';
     var hoverColor = o.danger ? '#dc2626' : '#191918';
@@ -10870,7 +10870,7 @@ window.addEventListener('storage', function(e){
         + '<button class="adm-add-tab-btn" title="Add status tab" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;background:none;border:none;border-radius:50%;color:#6b7280;cursor:pointer;font-family:inherit;padding:0;transition:color .12s,background .12s" onmouseover="this.style.color=\'#191918\';this.style.background=\'#f3eee2\'" onmouseout="this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
           + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
         + '</button>'
-        + '<div class="adm-add-tab-menu" style="display:none;position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:3px 3px 0 #40403d;padding:6px;min-width:180px;z-index:9999">'
+        + '<div class="adm-add-tab-menu" style="display:none;position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);padding:6px;min-width:180px;z-index:9999">'
           + missing.map(function(k){ return '<button data-add="' + k + '" style="display:block;width:100%;text-align:left;background:none;border:none;padding:7px 10px;border-radius:6px;font-size:13px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background=\'#f6f5f4\'" onmouseout="this.style.background=\'transparent\'">' + DEFS[k].label + '</button>'; }).join('')
         + '</div>'
       + '</div>'
