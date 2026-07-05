@@ -18,6 +18,9 @@
     '.ni.on{border:1.5px solid transparent!important}',
     /* page-title greeting → Fraunces serif (each board has one h1; inline section-title divs stay Inter) */
     "h1{font-family:'Fraunces',serif!important;font-optical-sizing:auto;letter-spacing:-.02em}",
+    /* topbar page-title → Fraunces 18px/600, uniform across boards (was 16px on admin/warehouse via
+       #page-title, 18px inline elsewhere, all Inter). Matches the 'Welcome back' greeting. */
+    "#page-title,header>div[style*='margin-right:auto']{font-family:'Fraunces',serif!important;font-optical-sizing:auto;font-size:18px!important;font-weight:600!important;letter-spacing:-.01em!important}",
     /* status pills read in monospace, like the login's labels/eyebrows */
     '.badge,.b-new,.b-queue,.b-prod,.b-qc,.b-packed,.b-shipped{font-family:' + MONO + '!important;letter-spacing:.02em}',
     /* table headers + filter buttons → monospace (Tavus table language) */
@@ -28,7 +31,7 @@
     'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
-    '[id^=panel-] label,[id^=afpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:11px}',
+    '[id^=panel-] label,[id^=afpanel-] label,[id^=wfpanel-] label,[id^=ofpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px}',
     /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
