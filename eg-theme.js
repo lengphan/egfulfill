@@ -29,6 +29,10 @@
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
     '[id^=panel-] label,[id^=afpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:11px}',
+    /* dashboard stat cards → accent-border LIFT on hover (replaces the bluish/offset drop-shadow) */
+    '.wcard,.stat-card{transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}',
+    'html:not([data-theme=dark]) .wcard:hover,html:not([data-theme=dark]) .stat-card:hover{border-color:var(--eg-accent)!important;box-shadow:0 6px 20px rgba(139,92,246,.16)!important;transform:translateY(-2px)!important}',
+    'html[data-theme=dark] .wcard:hover,html[data-theme=dark] .stat-card:hover{border-color:var(--eg-accent-lt)!important;box-shadow:0 8px 22px rgba(139,92,246,.28)!important;transform:translateY(-2px)!important}',
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
