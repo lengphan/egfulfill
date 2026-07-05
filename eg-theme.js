@@ -56,9 +56,8 @@
     'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
-    '.btn-dk,.btn-out,.btn-gold,.btn-green,.btn-amber,.btn-blue{border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
-    '.btn-dk:hover,.btn-out:hover,.btn-gold:hover,.btn-green:hover,.btn-amber:hover,.btn-blue:hover{transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #191918!important}',
-    '.btn-dk:active,.btn-out:active,.btn-gold:active,.btn-green:active,.btn-amber:active,.btn-blue:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #191918!important}',
+    /* buttons FLAT — no drop shadow, no press transform (small buttons stay simple/clean) */
+    '.btn-dk,.btn-out,.btn-gold,.btn-green,.btn-amber,.btn-blue{box-shadow:none!important;transform:none!important;transition:background .12s ease,border-color .12s ease,opacity .12s ease!important}',
 
     /* ── LIGHT-MODE ACCENT ─────────────────────────────────────── */
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
@@ -66,8 +65,9 @@
        `html:not([data-theme=dark]) .ni.on{border:1px solid #191918!important}` that outranks a bare .ni.on */
     'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border:1.5px solid transparent!important}',
     'html:not([data-theme=dark]) .ni.on svg{color:#7c3aed!important;opacity:1!important}',
-    'html:not([data-theme=dark]) .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
-    'html:not([data-theme=dark]) .btn-gold:hover{background:var(--eg-accent-dk)!important;border-color:var(--eg-accent-dk)!important}',
+    'html:not([data-theme=dark]) .btn-dk,html:not([data-theme=dark]) .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
+    'html:not([data-theme=dark]) .btn-dk:hover,html:not([data-theme=dark]) .btn-gold:hover{background:var(--eg-accent-dk)!important;border-color:var(--eg-accent-dk)!important}',
+    'html:not([data-theme=dark]) .btn-dk svg [stroke="white"]{stroke:#fff!important}',
     'html:not([data-theme=dark]) .btn-gold svg [stroke="white"]{stroke:#fff!important}',
     'html:not([data-theme=dark]) .input:focus,html:not([data-theme=dark]) .select:focus,html:not([data-theme=dark]) input:focus,html:not([data-theme=dark]) textarea:focus,html:not([data-theme=dark]) select:focus{border-color:var(--eg-accent)!important;box-shadow:0 0 0 3px var(--eg-accent-tint)!important}',
     'html:not([data-theme=dark]) .toggle-on,html:not([data-theme=dark]) .toggle.toggle-on{background:var(--eg-accent)!important}',
@@ -78,8 +78,8 @@
     'html[data-theme=dark] .ni:hover:not(.on){background:rgba(255,255,255,.05)!important;color:#f0ede6!important}',
     'html[data-theme=dark] .ni.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
     'html[data-theme=dark] .ni.on svg{color:var(--eg-accent-lt)!important;opacity:1!important}',
-    'html[data-theme=dark] .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
-    'html[data-theme=dark] .btn-gold:hover{background:var(--eg-accent-lt)!important;border-color:var(--eg-accent-lt)!important}',
+    'html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-gold{background:var(--eg-accent)!important;border-color:var(--eg-accent)!important;color:#fff!important}',
+    'html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-gold:hover{background:var(--eg-accent-lt)!important;border-color:var(--eg-accent-lt)!important}',
     'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(139,92,246,.22)!important}',
     'html[data-theme=dark] .toggle-on,html[data-theme=dark] .toggle.toggle-on{background:var(--eg-accent)!important}',
     'html[data-theme=dark] input[type=checkbox],html[data-theme=dark] input[type=radio],html[data-theme=dark] input[type=range]{accent-color:var(--eg-accent-lt)}',
