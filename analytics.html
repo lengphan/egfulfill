@@ -208,7 +208,7 @@ html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px s
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
    shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:2px 2px 0 #40403d;transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -297,7 +297,7 @@ html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{b
 html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
 </style>
 <style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 </style>
 <style id="eg-card-dark-retro">/* eg-card-dark-retro */
 html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}

@@ -88,14 +88,22 @@
     '.eg-scout-remove{position:absolute;top:6px;right:6px;z-index:3;width:28px;height:28px;border:none;background:none;color:transparent;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:color .12s}' +
     '.eg-scout-card:hover .eg-scout-remove{color:#40403d}' +
     '.eg-scout-remove:hover{color:#191918}' +
-    '.eg-scout-img{aspect-ratio:1/1;min-height:188px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
+    /* saved-card overlay X (top-right of image) — frosted dark, turns danger-red on hover */
+    '.eg-scout-x{position:absolute;top:9px;right:9px;z-index:3;width:30px;height:30px;border-radius:50%;background:rgba(17,24,39,.5);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background .12s,transform .1s}' +
+    '.eg-scout-x:hover{background:rgba(220,38,38,.92)}.eg-scout-x:active{transform:scale(.88)}' +
+    '.eg-scout-x svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round}' +
+    '.eg-scout-img{position:relative;aspect-ratio:1/1;min-height:188px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;overflow:hidden;text-decoration:none}' +
     '.eg-scout-img img{width:100%;height:100%;object-fit:cover;display:block}' +
     '.eg-scout-noimg{color:#c4c3be;font-size:12.5px}' +
+    /* frosted-glass monospace overlay on the image — favourites + created date (Tavus ID-pill style) */
+    '.eg-scout-imeta{position:absolute;left:8px;bottom:8px;z-index:3;display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:700;letter-spacing:.02em;color:#191918;background:rgba(255,255,255,.5);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.55);border-radius:7px;padding:4px 9px}' +
     '.eg-scout-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:10px;flex:1}' +
     '.eg-scout-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}' +
     '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:8px;padding:7px 3px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;min-width:0}' +
-    '.eg-scout-stat b{font-size:14.5px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.02em;max-width:100%;overflow:hidden;text-overflow:ellipsis}' +
-    '.eg-scout-stat i{font-size:8px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:uppercase;margin-top:3px;line-height:1.2}' +
+    /* value shows FULL (no ellipsis) — $100.3K fits via 13px + tight tabular figures */
+    '.eg-scout-stat b{font-size:13px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.03em;white-space:nowrap}' +
+    '.eg-scout-stat i{font-size:8px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.01em;text-transform:uppercase;margin-top:3px;line-height:1.15}' +
+    '.eg-scout-sub{display:block;font-size:7.5px;font-weight:700;color:#b8b2ab;letter-spacing:.03em;margin-top:1px;min-height:9px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
     '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
     '.eg-scout-tagwrap{display:flex;flex-direction:column}' +
@@ -108,7 +116,7 @@
     '.eg-scout-copy:hover{opacity:.85}' +
     '.eg-scout-actions{margin-top:auto}' +
     '.eg-scout-add{width:100%;background:#fff;border:1.5px solid #191918;color:#191918;border-radius:9px;padding:10px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:background .12s,color .12s}.eg-scout-add:hover{background:#191918;color:#fff}' +
-    '.eg-scout-make{background:#191918;color:#fff;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
+    '.eg-scout-make{width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:10px;font-size:13px;font-weight:650;cursor:pointer;font-family:inherit;transition:transform .1s,box-shadow .14s}' +
     '.eg-scout-make:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(17,24,39,.2)}' +
     '.eg-scout-save{background:#fff;border:1px solid #e5e4e0;color:#374151;border-radius:9px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .12s,border-color .12s,color .12s}' +
     '.eg-scout-save:hover{background:#f7f6f4}' +
@@ -299,19 +307,17 @@
       (favView ? '<button class="eg-scout-remove" type="button" data-i="' + i + '" title="Remove" aria-label="Remove">&times;</button>' : '') +
       (e.trending ? '<span class="eg-scout-trend">Trending</span>' : '') +
       '<button class="eg-scout-heart' + (saved ? ' on' : '') + '" type="button" data-i="' + i + '" title="Save to favorites" aria-label="Favorite"><svg viewBox="0 0 24 24"><path d="M12 20.7C7 17 3.5 13.9 3.5 9.7 3.5 7 5.5 5.2 7.9 5.2c1.5 0 2.9.7 4.1 2.2 1.2-1.5 2.6-2.2 4.1-2.2 2.4 0 4.4 1.8 4.4 4.5 0 4.2-3.5 7.3-8.5 11z"/></svg></button>' +
-      '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
+      '<a class="eg-scout-img" href="' + esc(l.url || '#') + '" target="_blank" rel="noopener">' + img +
+        '<span class="eg-scout-imeta"><span style="color:#ef4444">&#9829;</span> ' + _fmt(favs) + (created ? ' <span style="opacity:.4">·</span> ' + esc(created) : '') + '</span>' +
+      '</a>' +
       '<div class="eg-scout-body">' +
         '<div class="eg-scout-stats">' +
-          '<span class="eg-scout-stat"><b>' + _fmt(e.views24) + '</b><i>Views · 24h</i></span>' +
-          '<span class="eg-scout-stat"><b>' + _fmt(e.sold24) + '</b><i>Sold · 24h</i></span>' +
-          '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue</i></span>' +
-          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold</i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.views24) + '</b><i>Views<span class="eg-scout-sub">24h</span></i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.sold24) + '</b><i>Sold<span class="eg-scout-sub">24h</span></i></span>' +
+          '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue<span class="eg-scout-sub"></span></i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold<span class="eg-scout-sub"></span></i></span>' +
         '</div>' +
         '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
-        '<div class="eg-scout-meta">' +
-          '<span title="Favorites">&#9829; ' + _fmt(favs) + '</span>' +
-          '<span title="Created on Etsy">' + (created ? 'Created ' + esc(created) : '') + '</span>' +
-        '</div>' +
         tagHTML +
         '<div class="eg-scout-actions">' +
           '<button class="eg-scout-add" type="button" data-i="' + i + '">Add to store</button>' +
@@ -376,13 +382,13 @@
     var img = (p.images && p.images[0]) ? '<img src="' + esc(p.images[0]) + '" alt="" loading="lazy"/>' : '<div class="eg-scout-noimg">No image</div>';
     var variant = [p.color, p.size].filter(Boolean).join(' · ');
     return '<div class="eg-scout-card">' +
+      '<button class="eg-scout-x" type="button" data-i="' + i + '" title="Remove from saved" aria-label="Remove"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '<a class="eg-scout-img" href="' + esc(p.url || '#') + '" target="_blank" rel="noopener">' + img + '</a>' +
       '<div class="eg-scout-body">' +
         '<div class="eg-scout-title" title="' + esc(p.title || '') + '">' + esc(p.title || 'Untitled product') + '</div>' +
         '<div class="eg-scout-meta"><span>' + esc(p.product || 'No blank chosen') + (variant ? ' · ' + esc(variant) : '') + '</span><span>' + esc(p.store || '') + '</span></div>' +
         '<div class="eg-scout-actions">' +
           '<button class="eg-scout-make eg-scout-cont" type="button" data-i="' + i + '">Continue</button>' +
-          '<button class="eg-scout-save eg-scout-sremove" type="button" data-i="' + i + '">Remove</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -396,7 +402,7 @@
       var p = list[+b.getAttribute('data-i')];
       openPublish({ listing_id: p.listing_id, title: p.title, description: p.description, price: p.price, tags: p.tags, url: p.url, images: p.images });
     }); });
-    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-sremove'), function (b) { b.addEventListener('click', function () {
+    Array.prototype.forEach.call(grid.querySelectorAll('.eg-scout-x'), function (b) { b.addEventListener('click', function () {
       var all = _savedLoad(); all.splice(+b.getAttribute('data-i'), 1); try { localStorage.setItem('eg_scout_products', JSON.stringify(all)); } catch (e) {}
       updateFavCount(); renderSaved();
     }); });
