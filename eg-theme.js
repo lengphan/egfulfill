@@ -14,7 +14,7 @@
     /* sidebar nav → monospace uppercase, smooth transition, NO box border (kills the outlined-active look) */
     /* transparent 1.5px border on EVERY nav item (active or not) → kills the outlined-active box AND
        makes row height identical across all boards (some files reserved a border, some didn't) */
-    '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
+    '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
     '.ni.on{border:1.5px solid transparent!important}',
     /* page-title greeting → Fraunces serif (each board has one h1; inline section-title divs stay Inter) */
     "h1{font-family:'Fraunces',serif!important;font-optical-sizing:auto;letter-spacing:-.02em}",
@@ -24,7 +24,7 @@
     '.dtable th{font-family:' + MONO + '!important}',
     '.fb{font-family:' + MONO + '!important;letter-spacing:.02em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
-    '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px}',
+    '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important}',
     'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
