@@ -55,12 +55,10 @@
   .qa-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 500;font-size:19px;letter-spacing:-.01em;color:var(--ink);line-height:1.15}
   .qa-body{max-height:0;opacity:0;overflow:hidden;transition:max-height .42s ease,opacity .3s ease}
   .qa-a{padding:0 22px 22px 69px;font-size:14.5px;line-height:1.6;color:var(--ink2)}
-  /* hover (or keyboard focus) grows a card to fill the box; first card open by default until the list is hovered */
-  .qa-item:hover,.qa-item:focus-within{flex:1 1 0;background:#fdf4d9}
-  .qa-item:hover .qa-body,.qa-item:focus-within .qa-body{max-height:360px;opacity:1}
-  .qa-list:not(:hover) .qa-item:first-child{flex:1 1 0;background:#fdf4d9}
-  .qa-list:not(:hover) .qa-item:first-child .qa-body{max-height:360px;opacity:1}
-  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr;height:auto} .qa-img{height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} .qa-list{height:auto} .qa-item:hover,.qa-item:focus-within,.qa-list:not(:hover) .qa-item:first-child{flex:0 0 auto} }
+  /* the .open row (set by mouseenter/focus in JS — stable, no :hover-resize flicker) grows to fill the box */
+  .qa-item.open{flex:1 1 0;background:#fdf4d9}
+  .qa-item.open .qa-body{max-height:360px;opacity:1}
+  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr;height:auto} .qa-img{height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} .qa-list{height:auto} .qa-item.open{flex:0 0 auto} }
   @media(max-width:600px){ .hiw-arrow{transform:rotate(90deg);align-self:center} }
 </style>
 </head>
@@ -200,6 +198,19 @@
 <script src="eg-mkt.js"></script>
 <script>
   function hiwScroll(dir){var t=document.getElementById('hiwSteps');if(!t)return;var c=t.querySelector('.hiw-card');var w=(c?c.getBoundingClientRect().width:400)+22;t.scrollBy({left:dir*w,behavior:'smooth'});}
+  /* Q&A hover-to-open — driven by discrete mouseenter/focus so it can't flicker while the row resizes.
+     Opening a row stays open (Tavus-style) until another row is entered; keyboard + touch friendly. */
+  (function(){
+    var items=[].slice.call(document.querySelectorAll('.qa-item'));
+    if(!items.length) return;
+    function open(it){ items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
+    items.forEach(function(it){
+      it.addEventListener('mouseenter', function(){ open(it); });
+      it.addEventListener('focus', function(){ open(it); });
+      it.addEventListener('click', function(){ open(it); });
+    });
+    open(items[0]);
+  })();
 </script>
 </body>
 </html>

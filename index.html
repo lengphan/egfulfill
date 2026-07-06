@@ -111,7 +111,10 @@ tracking → seller</div>
           <p id="feat-p" style="font-size:16px;line-height:1.55;color:var(--ink2);max-width:46ch;margin:0 0 22px;min-height:3.1em">Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.</p>
           <a class="accent-btn" href="seller-signup.html">Start for free</a>
         </div>
-        <div class="fpanel-r"><canvas class="dith" width="150" height="150" data-seed="33" data-mode="fig"></canvas></div>
+        <div class="fpanel-r">
+          <div id="feat-dith" style="position:absolute;inset:0"></div>
+          <img id="feat-img" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none">
+        </div>
       </div>
       <div class="benefits" id="feat-benefits">
         <div class="benefit"><div class="bruler"><span class="bl">Benefit [1]</span><span class="rl"></span></div><h4>One inbox</h4><p>Every channel in a single queue, live.</p></div>
@@ -209,11 +212,11 @@ tracking → seller</div>
 </div>
 
 <script>window.FEAT={
-  channels:   { cat:'Channels',   h:'One inbox, every channel',  p:'Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.', b:[['One inbox','Every channel in a single queue, live.'],['Instant sync','New orders appear in seconds, not hours.'],['No CSVs','Nothing to import or reconcile by hand.']] },
-  design:     { cat:'Design',     h:'A design studio built in',   p:'Mockups, digitising and thread-matching, right where the order lives to approve.', b:[['Mockups','Preview on the real garment before print.'],['Thread match','Artwork colours mapped to in-stock thread.'],['One place','Approve without leaving the order.']] },
-  production: { cat:'Production',  h:'A vetted print network',     p:'DTG and embroidery on a vetted network, quality-scored so prints match the mockup.', b:[['Vetted presses','Only quality-scored partners take work.'],['DTG & emb','Both techniques on one network.'],['Consistent','What ships matches the mockup.']] },
-  delivery:   { cat:'Delivery',   h:'Tracking on autopilot',      p:'The cheapest label is bought automatically, with tracking pushed back to the buyer.', b:[['Auto labels','Cheapest rate bought per order.'],['Buyer updates','Tracking synced to the marketplace.'],['99.2% on-time','Delivery you can actually promise.']] },
-  team:       { cat:'Team',       h:'Seats for your whole team',  p:'Invite staff with scoped access — orders, design or full — on one prepaid wallet.', b:[['Scoped seats','Orders, design or full access.'],['Prepaid wallet','Fund once, fulfil all month.'],['Clear ledger','Every charge itemised.']] }
+  channels:   { cat:'Channels',   h:'One inbox, every channel',  img:'images/feat-channels.jpg',   pop:'violet', p:'Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.', b:[['One inbox','Every channel in a single queue, live.'],['Instant sync','New orders appear in seconds, not hours.'],['No CSVs','Nothing to import or reconcile by hand.']] },
+  design:     { cat:'Design',     h:'A design studio built in',   img:'images/feat-design.jpg',     pop:'pink',   p:'Mockups, digitising and thread-matching, right where the order lives to approve.', b:[['Mockups','Preview on the real garment before print.'],['Thread match','Artwork colours mapped to in-stock thread.'],['One place','Approve without leaving the order.']] },
+  production: { cat:'Production',  h:'A vetted print network',     img:'images/feat-production.jpg', pop:'amber',  p:'DTG and embroidery on a vetted network, quality-scored so prints match the mockup.', b:[['Vetted presses','Only quality-scored partners take work.'],['DTG & emb','Both techniques on one network.'],['Consistent','What ships matches the mockup.']] },
+  delivery:   { cat:'Delivery',   h:'Tracking on autopilot',      img:'images/feat-delivery.jpg',   pop:'blue',   p:'The cheapest label is bought automatically, with tracking pushed back to the buyer.', b:[['Auto labels','Cheapest rate bought per order.'],['Buyer updates','Tracking synced to the marketplace.'],['99.2% on-time','Delivery you can actually promise.']] },
+  team:       { cat:'Team',       h:'Seats for your whole team',  img:'images/feat-team.jpg',       pop:'teal',   p:'Invite staff with scoped access — orders, design or full — on one prepaid wallet.', b:[['Scoped seats','Orders, design or full access.'],['Prepaid wallet','Fund once, fulfil all month.'],['Clear ledger','Every charge itemised.']] }
 };</script>
 <script src="eg-mkt.js"></script>
 </body>

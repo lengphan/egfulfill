@@ -9,7 +9,19 @@ function setFeat(key, el){
   if(c) c.textContent=d.cat; if(h) h.textContent=d.h; if(p) p.textContent=d.p;
   var bn=document.getElementById('feat-benefits');
   if(bn && d.b) bn.innerHTML=d.b.map(function(x,i){ return '<div class="benefit"><div class="bruler"><span class="bl">Benefit ['+(i+1)+']</span><span class="rl"></span></div><h4>'+x[0]+'</h4><p>'+x[1]+'</p></div>'; }).join('');
+  // right panel: a procedural dither in the tab's accent (always painted, sits behind) + the tab's real
+  // artwork on top when images/feat-<key>.jpg exists; until then the img fails to load and the dither shows.
+  var dith=document.getElementById('feat-dith'), img=document.getElementById('feat-img');
+  if(dith && window.EGDither){ try{ EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }catch(e){} }
+  if(img){
+    img.onload=function(){ img.style.display='block'; };
+    img.onerror=function(){ img.style.display='none'; };
+    img.style.display='none';
+    if(d.img){ img.src=d.img; } else { img.removeAttribute('src'); }
+  }
 }
+// initialise the "What you get" panel for the default (active) tab on load (guarded to this page's panel)
+(function(){ if(window.FEAT && document.getElementById('feat-img')){ var t=document.querySelector('#ftabs .ftab.on')||document.querySelector('#ftabs .ftab'); if(t) setFeat('channels', t); } })();
 
 // Hero question typewriter — types/deletes rotating phrases into #hero-word (reduced-motion safe).
 (function(){

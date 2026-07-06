@@ -93,7 +93,7 @@
   .fpanel-l p{font-size:16px;line-height:1.55;color:var(--ink2);max-width:44ch;margin:0 0 26px}
   .accent-btn{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--violet);color:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:12px 20px;cursor:pointer;text-decoration:none;display:inline-flex;transition:transform .09s,box-shadow .09s}
   .accent-btn:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--ink)}
-  .fpanel-r{border-left:1.5px solid var(--ink);background:#0c0c0b;display:flex;min-height:250px;overflow:hidden}
+  .fpanel-r{position:relative;border-left:1.5px solid var(--ink);background:#0c0c0b;display:flex;min-height:250px;overflow:hidden}
   .fpanel-r canvas{width:100%;height:100%;background:#0c0c0b}
   .benefits{display:grid;grid-template-columns:repeat(3,1fr)}
   .benefit{padding:24px 26px;border-left:1.5px solid var(--ink)}
