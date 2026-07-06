@@ -143,7 +143,7 @@
   .marq-track{display:flex;width:max-content;animation:scroll 24s linear infinite}
   @media(prefers-reduced-motion:reduce){.marq-track{animation:none}}
   @keyframes scroll{to{transform:translateX(-50%)}}
-  .marq-item{font-family:var(--disp);font-size:23px;padding:16px 36px;border-right:1.5px solid var(--line);white-space:nowrap}
+  .marq-item{font-family:var(--disp);font-size:23px;padding:16px 30px;white-space:nowrap}
 
   /* pricing */
   .prgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
