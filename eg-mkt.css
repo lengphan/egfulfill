@@ -52,6 +52,18 @@
   .mkbanner .b-tag{background:var(--ink);color:var(--paper);padding:3px 8px;font-size:10px}
   .mkbanner a{margin-left:auto;color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--ink)}
 
+  /* CLOUD HERO — dithered image as a faint full-bleed background + centred typing question */
+  .hero-cloud{position:relative;overflow:hidden;border-bottom:1.5px solid var(--ink);padding:clamp(72px,11vw,150px) 0 clamp(52px,7vw,92px)}
+  .hero-bg{position:absolute;inset:0;z-index:0;opacity:.45;background:#e9e6df}
+  .hero-inner{position:relative;z-index:1;text-align:center}
+  .hero-inner .eyebrow{display:block;margin-bottom:20px}
+  .hero-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 72,'wght' 800;font-size:clamp(38px,7vw,88px);line-height:1.0;letter-spacing:-.03em;margin:0 auto;max-width:15ch;text-wrap:balance;color:var(--ink)}
+  .hero-q #hero-word{font-style:italic}
+  .hero-cur{display:inline-block;width:.06em;min-width:3px;height:.82em;background:var(--violet);margin-left:.04em;transform:translateY(.06em);animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){.hero-cur{animation:none}}
+  .hero-sub{font-size:clamp(15px,1.5vw,18px);line-height:1.55;color:var(--ink2);max-width:52ch;margin:26px auto 30px}
+  .hero-inner .accent-btn{margin:0 auto}
   /* hero folder tabs */
   .ftabs{display:flex;gap:5px;padding-left:20px;position:relative;z-index:2;flex-wrap:wrap}
   .ftab{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);border:1.5px solid var(--ink);border-bottom:none;background:#eceae4;padding:10px 34px 13px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 100%,16px 100%);margin-right:-16px}

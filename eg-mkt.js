@@ -1,17 +1,31 @@
 /* eg-mkt.js — shared marketing JS across index / howitworks / about:
    folder-tab hero swap (reads window.HERO) + procedural dither engine + terminal typewriter. */
 
-// Folder-tab hero content swap (only fires where a #ftabs + window.HERO exist).
-function setTab(key, el){
+// "What you get" folder-tab swap (reads window.FEAT; only fires where #ftabs + window.FEAT exist).
+function setFeat(key, el){
   document.querySelectorAll('#ftabs .ftab').forEach(function(t){ t.classList.toggle('on', t===el); });
-  var d = (window.HERO || {})[key]; if(!d) return;
-  var h=document.getElementById('hero-h'), p=document.getElementById('hero-p'), bn=document.getElementById('hero-benefits');
-  if(h) h.textContent = d.h;
-  if(p) p.textContent = d.p;
-  if(bn) bn.innerHTML = d.b.map(function(x,i){
-    return '<div class="benefit"><div class="bruler"><span class="bl">Benefit ['+(i+1)+']</span><span class="rl"></span></div><h4>'+x[0]+'</h4><p>'+x[1]+'</p></div>';
-  }).join('');
+  var d=(window.FEAT||{})[key]; if(!d) return;
+  var c=document.getElementById('feat-cat'), h=document.getElementById('feat-h'), p=document.getElementById('feat-p');
+  if(c) c.textContent=d.cat; if(h) h.textContent=d.h; if(p) p.textContent=d.p;
 }
+
+// Hero question typewriter — types/deletes rotating phrases into #hero-word (reduced-motion safe).
+(function(){
+  var el=document.getElementById('hero-word'); if(!el) return;
+  var words=['shipped itself','ran on autopilot','just handled itself','never touched a label'];
+  var reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce){ el.textContent=words[0]; return; }
+  var wi=0, ci=0, del=false; el.textContent='';
+  function tick(){
+    var w=words[wi];
+    ci += del ? -1 : 1;
+    el.textContent = w.slice(0, Math.max(0, ci));
+    if(!del && ci>=w.length){ del=true; return setTimeout(tick,1600); }
+    if(del && ci<=0){ del=false; wi=(wi+1)%words.length; return setTimeout(tick,220); }
+    setTimeout(tick, del?36:72);
+  }
+  tick();
+})();
 
 // Procedural dither engine (Bayer 4x4) — fills every canvas.dith. No image files needed.
 (function(){
