@@ -22,7 +22,7 @@
     /* sidebar nav → monospace uppercase, smooth transition, NO box border (kills the outlined-active look) */
     /* transparent 1.5px border on EVERY nav item (active or not) → kills the outlined-active box AND
        makes row height identical across all boards (some files reserved a border, some didn't) */
-    '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
+    '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12.5px!important;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
     '.ni.on{border:1.5px solid transparent!important}',
     /* page-title greeting → Fraunces serif (each board has one h1; inline section-title divs stay Inter) */
     "h1{font-family:'Fraunces',serif!important;font-optical-sizing:auto;letter-spacing:-.02em}",
@@ -30,18 +30,18 @@
        #page-title, 18px inline elsewhere, all Inter). Matches the 'Welcome back' greeting. */
     "#page-title,header>div[style*='margin-right:auto']{font-family:'Fraunces',serif!important;font-optical-sizing:auto;font-size:18px!important;font-weight:600!important;letter-spacing:-.01em!important}",
     /* status pills read in monospace, like the login's labels/eyebrows */
-    '.badge,.b-new,.b-queue,.b-prod,.b-qc,.b-packed,.b-shipped{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    '.badge,.b-new,.b-queue,.b-prod,.b-qc,.b-packed,.b-shipped{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* table headers + filter buttons → monospace (Tavus table language) */
     '.dtable th{font-family:' + MONO + '!important}',
-    '.fb{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    '.fb{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* unify EVERY other filter/menu control to the same monospace as the .fb filters (audit found these
        rendering in default Inter sans, so filter fonts looked mismatched board-to-board):
        .eg-sel-btn = wallet's enhanced-select buttons (All Banks / This Month); .seg = analytics
        Revenue|Orders|Profit segment; select[data-eg-select] = analytics native period/store pickers;
        .cat-pill / .sort-select = products catalog filters; .tab-sm = wallet tx All|Deposits|Charges. */
-    '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,.tab-btn,.tab-flag,.chat-tab,.filter-section-title,select[data-eg-select],#trend-period,#cat-sort{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,.tab-btn,.tab-flag,.chat-tab,.filter-section-title,select[data-eg-select],#trend-period,#cat-sort{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
-    '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important}',
+    '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12.5px!important}',
     'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
     'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
@@ -61,7 +61,7 @@
     '.eg-title-mono{font-family:' + MONO + '!important;font-weight:700;letter-spacing:-.01em;color:#191918}',
     /* .eg-meta — dot-separated metadata row: <div class="eg-meta"><span class="eg-meta-label">What you get</span><span class="eg-meta-item">PAL</span><span class="eg-meta-item">One-click</span></div> */
     '.eg-meta{display:flex;align-items:center;flex-wrap:wrap;font-family:' + MONO + '!important;font-size:12px;color:#6b7280}',
-    '.eg-meta-label{font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding-right:12px;margin-right:12px;border-right:1.5px solid #e5e4e0}',
+    '.eg-meta-label{font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding-right:12px;margin-right:12px;border-right:1.5px solid #e5e4e0}',
     '.eg-meta-item{font-weight:600;color:#374151}',
     '.eg-meta-item+.eg-meta-item::before{content:"·";color:#c4c3be;margin:0 8px}',
     /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
