@@ -1380,7 +1380,7 @@ function _fillSwitchCard(side, tier, cur){
   var tagEl=document.getElementById('bill-'+side+'-tagline');
   var btn=document.getElementById('bill-'+side+'-btn');
   if(!tier){ if(card) card.style.display='none'; return; }
-  if(card) card.style.display='';
+  if(card) card.style.display='flex';   /* keep the flex column (was '' → reverted to block, un-pinning the button) */
   var nm=tier.name||'';
   if(nameEl) nameEl.textContent = /plan$/i.test(nm) ? nm : (nm+' Plan');
   if(priceEl) priceEl.textContent = (tier.monthlyPrice!=null?tier.monthlyPrice:0);

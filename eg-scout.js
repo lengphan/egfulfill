@@ -104,8 +104,8 @@
     '.eg-scout-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}' +
     '.eg-scout-stat{background:rgba(0,0,0,.05);border-radius:8px;padding:9px 6px;display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1.1;min-width:0}' +
     /* value shows FULL (no ellipsis) — $100.3K fits easily in the wider 2x2 cell at 16px */
-    '.eg-scout-stat b{font-size:16px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}' +
-    '.eg-scout-stat i{font-size:8.5px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:3px;line-height:1.15}' +
+    '.eg-scout-stat b{font-size:20px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}' +
+    '.eg-scout-stat i{font-size:9.5px;color:#9ca3af;font-style:normal;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:4px;line-height:1.15}' +
     '.eg-scout-sub{display:block;font-size:8px;font-weight:700;color:#b8b2ab;letter-spacing:.03em;margin-top:1px;min-height:9px}' +
     '.eg-scout-title{font-size:13px;color:#191918;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:36px}' +
     '.eg-scout-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:#6b7280}' +
@@ -317,8 +317,8 @@
         '<div class="eg-scout-stats">' +
           '<span class="eg-scout-stat"><b>' + _fmt(e.views24) + '</b><i>Views<span class="eg-scout-sub">24h</span></i></span>' +
           '<span class="eg-scout-stat"><b>' + _fmt(e.sold24) + '</b><i>Sold<span class="eg-scout-sub">24h</span></i></span>' +
-          '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue<span class="eg-scout-sub"></span></i></span>' +
-          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold<span class="eg-scout-sub"></span></i></span>' +
+          '<span class="eg-scout-stat"><b>' + _money(e.revenue) + '</b><i>Revenue<span class="eg-scout-sub">All time</span></i></span>' +
+          '<span class="eg-scout-stat"><b>' + _fmt(e.totalSold) + '</b><i>Sold<span class="eg-scout-sub">All time</span></i></span>' +
         '</div>' +
         '<div class="eg-scout-title" title="' + esc(l.title || '') + '">' + esc(l.title || '') + '</div>' +
         tagHTML +

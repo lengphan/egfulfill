@@ -97,3 +97,32 @@
     else apply();
   }
 })();
+
+/* ── Header user block: fill avatar/name/email from the logged-in eg_user, replacing the hardcoded
+   'Phan'/'phanmylinh…' that was copy-pasted into every page's topbar. Runs on all pages that load this
+   script. Fail-open + guarded so it never wipes an SVG avatar or breaks a header. ── */
+(function () {
+  function fill() {
+    try {
+      var u = JSON.parse(localStorage.getItem('eg_user') || 'null');
+      if (!u) return;
+      var nm = u.name || u.email || '';
+      var initial = ((nm || '?').trim().charAt(0) || '?').toUpperCase();
+      var box = document.querySelector('.ibtn[onclick*="settings.html"]');
+      if (!box) return;
+      var avatar = box.firstElementChild;
+      if (avatar && !avatar.querySelector('*') && (avatar.textContent || '').trim().length <= 2) avatar.textContent = initial;
+      var info = box.children[1];
+      if (info) {
+        var nameEl = info.children[0], emailEl = info.children[1];
+        if (nameEl && !nameEl.querySelector('*')) nameEl.textContent = u.name || u.email || '';
+        if (emailEl && !emailEl.querySelector('*')) emailEl.textContent = u.email || '';
+      }
+    } catch (e) { /* fail-open */ }
+  }
+  try { window.egFillHeaderUser = fill; } catch (e) {}
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill);
+    else fill();
+  }
+})();
