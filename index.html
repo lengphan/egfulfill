@@ -107,8 +107,8 @@ tracking → seller</div>
       <div class="fpanel-top" style="grid-template-columns:1.2fr .8fr">
         <div class="fpanel-l">
           <span class="eyebrow" id="feat-cat">Channels</span>
-          <h3 id="feat-h" style="font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 800;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.02em;margin:12px 0 14px;line-height:1.03">One inbox for every channel</h3>
-          <p id="feat-p" style="font-size:16px;line-height:1.55;color:var(--ink2);max-width:46ch;margin:0 0 22px">Every marketplace order — Etsy, Shopify, TikTok — drops into a single queue the moment it's placed. No CSV exports, no tab-hopping.</p>
+          <h3 id="feat-h" style="font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 800;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.02em;margin:12px 0 14px;line-height:1.03;min-height:1.03em">One inbox, every channel</h3>
+          <p id="feat-p" style="font-size:16px;line-height:1.55;color:var(--ink2);max-width:46ch;margin:0 0 22px;min-height:3.1em">Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.</p>
           <a class="accent-btn" href="seller-signup.html">Start for free</a>
         </div>
         <div class="fpanel-r"><canvas class="dith" width="150" height="150" data-seed="33" data-mode="fig"></canvas></div>
@@ -138,7 +138,13 @@ tracking → seller</div>
 <section style="padding:0">
   <div style="padding:0 0 4px 0"></div>
   <div class="page" style="padding-bottom:14px"><span class="eyebrow">Syncs with the channels you already sell on</span></div>
+  <!-- 6 identical copies: the animation scrolls exactly 3 copies (-50%), so one repeating half always
+       exceeds the viewport on any screen — no blank gap, loops forever seamlessly -->
   <div class="marq"><div class="marq-track">
+    <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
+    <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
+    <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
+    <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
     <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
     <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
   </div></div>
@@ -203,11 +209,11 @@ tracking → seller</div>
 </div>
 
 <script>window.FEAT={
-  channels:   { cat:'Channels',   h:'One inbox for every channel',  p:'Every marketplace order — Etsy, Shopify, TikTok — drops into a single queue the moment it’s placed. No CSV exports, no tab-hopping.', b:[['One inbox','Every channel in a single queue, live.'],['Instant sync','New orders appear in seconds, not hours.'],['No CSVs','Nothing to import or reconcile by hand.']] },
-  design:     { cat:'Design',     h:'A design studio built in',       p:'Mockups, embroidery digitising and automatic thread-matching, right where the order lives — approve artwork without leaving the queue.', b:[['Mockups','Preview on the real garment before print.'],['Thread match','Artwork colours mapped to in-stock thread.'],['One place','Approve without leaving the order.']] },
-  production: { cat:'Production',  h:'A vetted print network',         p:'DTG and embroidery presses, quality-scored on every run, so what ships matches what you designed — every time.', b:[['Vetted presses','Only quality-scored partners take work.'],['DTG & emb','Both techniques on one network.'],['Consistent','What ships matches the mockup.']] },
-  delivery:   { cat:'Delivery',   h:'Tracking on autopilot',          p:'The cheapest label is bought automatically and tracking is pushed straight back to the marketplace and your buyer.', b:[['Auto labels','Cheapest rate bought per order.'],['Buyer updates','Tracking synced to the marketplace.'],['99.2% on-time','Delivery you can actually promise.']] },
-  team:       { cat:'Team',       h:'Seats for your whole team',      p:'Invite staff with scoped access — orders, design or full — and a prepaid wallet that auto-charges per order, no surprise invoices.', b:[['Scoped seats','Orders, design or full access.'],['Prepaid wallet','Fund once, fulfil all month.'],['Clear ledger','Every charge itemised.']] }
+  channels:   { cat:'Channels',   h:'One inbox, every channel',  p:'Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.', b:[['One inbox','Every channel in a single queue, live.'],['Instant sync','New orders appear in seconds, not hours.'],['No CSVs','Nothing to import or reconcile by hand.']] },
+  design:     { cat:'Design',     h:'A design studio built in',   p:'Mockups, digitising and thread-matching, right where the order lives to approve.', b:[['Mockups','Preview on the real garment before print.'],['Thread match','Artwork colours mapped to in-stock thread.'],['One place','Approve without leaving the order.']] },
+  production: { cat:'Production',  h:'A vetted print network',     p:'DTG and embroidery on a vetted network, quality-scored so prints match the mockup.', b:[['Vetted presses','Only quality-scored partners take work.'],['DTG & emb','Both techniques on one network.'],['Consistent','What ships matches the mockup.']] },
+  delivery:   { cat:'Delivery',   h:'Tracking on autopilot',      p:'The cheapest label is bought automatically, with tracking pushed back to the buyer.', b:[['Auto labels','Cheapest rate bought per order.'],['Buyer updates','Tracking synced to the marketplace.'],['99.2% on-time','Delivery you can actually promise.']] },
+  team:       { cat:'Team',       h:'Seats for your whole team',  p:'Invite staff with scoped access — orders, design or full — on one prepaid wallet.', b:[['Scoped seats','Orders, design or full access.'],['Prepaid wallet','Fund once, fulfil all month.'],['Clear ledger','Every charge itemised.']] }
 };</script>
 <script src="eg-mkt.js"></script>
 </body>

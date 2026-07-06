@@ -77,7 +77,9 @@
   .hero-cur{display:inline-block;width:.06em;min-width:3px;height:.82em;background:var(--violet);margin-left:.04em;transform:translateY(.06em);animation:blink 1s step-end infinite}
   @keyframes blink{50%{opacity:0}}
   @media(prefers-reduced-motion:reduce){.hero-cur{animation:none}}
-  .hero-sub{font-size:clamp(15px,1.5vw,18px);line-height:1.55;color:var(--ink2);max-width:52ch;margin:26px auto 30px}
+  .hero-sub{font-size:clamp(15.5px,1.55vw,19px);line-height:1.55;color:var(--ink);font-weight:450;max-width:48ch;margin:24px auto 30px;position:relative}
+  /* soft light halo behind the hero text so the busy dither can't fight legibility (keeps the subtitle readable) */
+  .hero-inner::before{content:'';position:absolute;z-index:-1;inset:-9% -8% -6% -8%;background:radial-gradient(ellipse 64% 62% at 50% 44%,rgba(244,242,239,.85),rgba(244,242,239,.45) 44%,transparent 72%);pointer-events:none}
   .hero-inner .accent-btn{margin:0 auto}
   /* hero folder tabs */
   .ftabs{display:flex;gap:5px;padding-left:20px;position:relative;z-index:2;flex-wrap:wrap}
@@ -154,7 +156,7 @@
 
   /* marquee */
   .marq{overflow:hidden;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);background:var(--paper)}
-  .marq-track{display:flex;width:max-content;animation:scroll 24s linear infinite}
+  .marq-track{display:flex;width:max-content;animation:scroll 60s linear infinite}
   @media(prefers-reduced-motion:reduce){.marq-track{animation:none}}
   @keyframes scroll{to{transform:translateX(-50%)}}
   .marq-item{font-family:var(--disp);font-size:23px;padding:16px 30px;white-space:nowrap}
