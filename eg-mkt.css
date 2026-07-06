@@ -28,24 +28,26 @@
   .promo-in{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:9px 0}
   .promo-in .b-tag{background:var(--ink);color:var(--paper);padding:3px 8px;font-size:10px}
   .promo-in a{margin-left:auto;color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--ink)}
-  .hdr-wrap{padding:12px 0;pointer-events:none}
+  .hdr-wrap{padding:13px 0;pointer-events:none}
+  /* header + promo extend WIDER than the body (Tavus near-full-bleed); body sections keep the 1500px .page */
+  .hdr-wrap .page,.promo .page{max-width:1810px;padding:0 clamp(20px,3vw,46px)}
   .hdr-wrap .page{position:relative}
   .hdr-wrap .mkhead-l,.hdr-wrap .mkright,.hdr-wrap .burger,.hdr-wrap #mobnav{pointer-events:auto}
   /* ONE connected bordered bar — logo + nav cells share vertical dividers (Tavus segmented header) */
   .mkhead{display:flex;align-items:stretch;justify-content:space-between;gap:14px}
   .mkhead-l{display:flex;align-items:stretch;border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper);overflow:hidden}
-  .mklogo-cell{display:flex;align-items:center;gap:7px;padding:11px 16px}
-  .mklogo{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 30,'wght' 900;font-size:23px;letter-spacing:-.02em;text-decoration:none;color:var(--ink);line-height:1}
-  .mkearly{font-family:var(--mono);font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--hot);border:1.5px solid var(--ink);padding:1px 5px}
+  .mklogo-cell{display:flex;align-items:center;gap:8px;padding:13px 20px}
+  .mklogo{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 30,'wght' 900;font-size:27px;letter-spacing:-.02em;text-decoration:none;color:var(--ink);line-height:1}
+  .mkearly{font-family:var(--mono);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--hot);border:1.5px solid var(--ink);padding:2px 6px}
   .mknav{display:flex;align-items:stretch;gap:0}
-  .mknav a{font-family:var(--mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--ink);border-left:1.5px solid var(--ink);padding:0 15px;text-decoration:none;display:inline-flex;align-items:center;gap:7px;background:transparent;transition:background .12s}
+  .mknav a{font-family:var(--mono);font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--ink);border-left:1.5px solid var(--ink);padding:0 19px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;background:transparent;transition:background .12s}
   .mknav a .sq{width:8px;height:8px;background:var(--ink);flex-shrink:0}
   .mknav a:hover{background:var(--amber)}
   /* login + start = one connected bar too (start is the accent-violet cell) */
   .mkright{margin-left:auto;display:flex;align-items:stretch;border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper);overflow:hidden}
-  .mklogin{font-family:var(--mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;background:transparent;padding:0 17px;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;transition:background .12s}
+  .mklogin{font-family:var(--mono);font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;background:transparent;padding:0 21px;color:var(--ink);text-decoration:none;display:inline-flex;align-items:center;transition:background .12s}
   .mklogin:hover{background:var(--amber)}
-  .mkstart{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;border-left:1.5px solid var(--ink);background:var(--violet);padding:0 17px;color:#fff;text-decoration:none;display:inline-flex;align-items:center;transition:filter .12s}
+  .mkstart{font-family:var(--mono);font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.05em;border-left:1.5px solid var(--ink);background:var(--violet);padding:0 21px;color:#fff;text-decoration:none;display:inline-flex;align-items:center;transition:filter .12s}
   .mkstart:hover{filter:brightness(1.12)}
   .burger{display:none;margin-left:auto;background:none;border:1.5px solid var(--ink);padding:8px;cursor:pointer;line-height:0}
   #mobnav{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:70;border:1.5px solid var(--ink);box-shadow:5px 6px 0 var(--ink);background:var(--paper);padding:10px;flex-direction:column;gap:4px}
@@ -57,9 +59,14 @@
   .mkbanner a{margin-left:auto;color:var(--ink);text-decoration:none;border-bottom:1.5px solid var(--ink)}
 
   /* CLOUD HERO — dithered image as a faint full-bleed background + centred typing question */
-  /* full-bleed to the very top: negative margin slides the cloud up UNDER the floating header (no gap, no separator) */
-  .hero-cloud{position:relative;overflow:hidden;margin-top:calc(-1 * var(--hdrh,67px));padding:clamp(104px,13vw,176px) 0 clamp(56px,7vw,96px)}
+  /* full-bleed to the very top: negative margin slides the cloud up UNDER the floating header (no gap, no separator).
+     min-height fills the viewport so the next section never peeks above the fold; content vertically centred. */
+  .hero-cloud{position:relative;overflow:hidden;margin-top:calc(-1 * var(--hdrh,83px));min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:clamp(122px,14vw,192px) 0 clamp(76px,9vw,120px)}
   .hero-bg{position:absolute;inset:0;z-index:0;opacity:.5;background:#e9e6df center/cover no-repeat}
+  /* slight living-dither shimmer: a 2nd, coarser dither of the same cloud that gently cross-fades over the base */
+  .hero-bg-alt{opacity:0}
+  @media(prefers-reduced-motion:no-preference){ .hero-bg-alt{animation:heroDither 6.5s ease-in-out infinite} }
+  @keyframes heroDither{0%,100%{opacity:0}50%{opacity:.4}}
   .hero-inner{position:relative;z-index:1;text-align:center}
   .hero-inner .eyebrow{display:block;margin-bottom:20px}
   .hero-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 110,'wght' 430,'SOFT' 0;font-size:clamp(40px,6.6vw,86px);line-height:1.05;letter-spacing:-.02em;margin:0 auto;max-width:20ch;text-wrap:balance;color:var(--ink)}
