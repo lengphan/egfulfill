@@ -33,6 +33,12 @@
     /* table headers + filter buttons → monospace (Tavus table language) */
     '.dtable th{font-family:' + MONO + '!important}',
     '.fb{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    /* unify EVERY other filter/menu control to the same monospace as the .fb filters (audit found these
+       rendering in default Inter sans, so filter fonts looked mismatched board-to-board):
+       .eg-sel-btn = wallet's enhanced-select buttons (All Banks / This Month); .seg = analytics
+       Revenue|Orders|Profit segment; select[data-eg-select] = analytics native period/store pickers;
+       .cat-pill / .sort-select = products catalog filters; .tab-sm = wallet tx All|Deposits|Charges. */
+    '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,select[data-eg-select]{font-family:' + MONO + '!important;letter-spacing:.02em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
     '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important}',
     'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
@@ -43,6 +49,13 @@
     /* ── Tavus DETAIL UTILITIES (opt-in classes — additive, touch nothing until used) ── */
     /* .eg-tag — bordered mono pill (version/status), e.g. <span class="eg-tag">v1.0.0</span> */
     '.eg-tag{display:inline-flex;align-items:center;font-family:' + MONO + '!important;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#191918;background:#fff;border:1.5px solid #191918;padding:2px 8px;line-height:1.5}',
+    /* Tavus colored category pills (RENDERING amber / PERCEPTION green / DIALOGUE pink): keep the .eg-tag
+       black border + mono uppercase, just swap the fill. Additive — <span class="eg-tag eg-tag-green">…</span> */
+    '.eg-tag-amber{background:#fde68a!important}',
+    '.eg-tag-green{background:#a7f3d0!important}',
+    '.eg-tag-pink{background:#fbcfe8!important}',
+    '.eg-tag-violet{background:#e3d9ff!important}',
+    '.eg-tag-blue{background:#bfdbfe!important}',
     /* .eg-title-mono — mono/pixelated display title, e.g. <h1 class="eg-title-mono">Trivia Master</h1> */
     '.eg-title-mono{font-family:' + MONO + '!important;font-weight:700;letter-spacing:-.01em;color:#191918}',
     /* .eg-meta — dot-separated metadata row: <div class="eg-meta"><span class="eg-meta-label">What you get</span><span class="eg-meta-item">PAL</span><span class="eg-meta-item">One-click</span></div> */
@@ -54,16 +67,17 @@
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
     'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
-    /* LESS-BORING stat cards: a colored top-accent BAND on each card, cycling 6 sticky-note colours by
-       position (Tavus colored-header vibe). Pure ::after, no markup change — touches no card logic. */
+    /* colored DOT marker per card (replaced the top band per user pref — Tavus "■ LABEL" vibe): a small
+       square in the top-right corner, cycling 6 vivid sticky-note colours by position. Pure ::after, no
+       markup/logic change. Square (not round) because the global border-radius:0 keeps corners sharp. */
     '.wcard,.stat-card{position:relative}',
-    '.wcard::after,.stat-card::after{content:"";position:absolute;top:0;left:0;right:0;height:7px;z-index:2;pointer-events:none;background:var(--eg-accent)}',
-    '.wcard:nth-child(6n+1)::after,.stat-card:nth-child(6n+1)::after{background:#7ed9b0}',
-    '.wcard:nth-child(6n+2)::after,.stat-card:nth-child(6n+2)::after{background:#f2a3c7}',
-    '.wcard:nth-child(6n+3)::after,.stat-card:nth-child(6n+3)::after{background:#f4c95d}',
-    '.wcard:nth-child(6n+4)::after,.stat-card:nth-child(6n+4)::after{background:#9db0f2}',
-    '.wcard:nth-child(6n+5)::after,.stat-card:nth-child(6n+5)::after{background:#f0a184}',
-    '.wcard:nth-child(6n+6)::after,.stat-card:nth-child(6n+6)::after{background:#c4a3e8}',
+    '.wcard::after,.stat-card::after{content:"";position:absolute;top:16px;right:16px;width:9px;height:9px;z-index:2;pointer-events:none;background:var(--eg-accent)}',
+    '.wcard:nth-child(6n+1)::after,.stat-card:nth-child(6n+1)::after{background:#34d399}',
+    '.wcard:nth-child(6n+2)::after,.stat-card:nth-child(6n+2)::after{background:#f472b6}',
+    '.wcard:nth-child(6n+3)::after,.stat-card:nth-child(6n+3)::after{background:#fbbf24}',
+    '.wcard:nth-child(6n+4)::after,.stat-card:nth-child(6n+4)::after{background:#818cf8}',
+    '.wcard:nth-child(6n+5)::after,.stat-card:nth-child(6n+5)::after{background:#fb7185}',
+    '.wcard:nth-child(6n+6)::after,.stat-card:nth-child(6n+6)::after{background:#a78bfa}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
     /* secondary/outlined buttons stay FLAT (no drop shadow) */
