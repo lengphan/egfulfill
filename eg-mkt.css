@@ -54,16 +54,16 @@
 
   /* hero folder tabs */
   .ftabs{display:flex;gap:5px;padding-left:20px;position:relative;z-index:2;flex-wrap:wrap}
-  .ftab{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);border:1.5px solid var(--ink);border-bottom:none;background:#eceae4;padding:9px 24px 12px;cursor:pointer;clip-path:polygon(13px 0,100% 0,calc(100% - 13px) 100%,0 100%);margin-right:-8px}
+  .ftab{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);border:1.5px solid var(--ink);border-bottom:none;background:#eceae4;padding:10px 34px 13px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 100%,16px 100%);margin-right:-16px}
   .ftab.on{background:var(--paper);color:var(--ink);z-index:3}
   .fpanel{border:1.5px solid var(--ink);box-shadow:7px 7px 0 var(--ink);background:var(--paper);margin-top:-1.5px}
   .fpanel-top{display:grid;grid-template-columns:1.1fr .9fr;border-bottom:1.5px solid var(--ink)}
-  .fpanel-l{padding:clamp(28px,4vw,46px)}
-  .fpanel-l h1{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 44,'wght' 900;font-size:clamp(34px,5vw,58px);margin:0 0 20px;letter-spacing:-.025em;line-height:.98;text-wrap:balance}
+  .fpanel-l{padding:clamp(24px,3.2vw,40px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
+  .fpanel-l h1{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 44,'wght' 900;font-size:clamp(32px,4.4vw,50px);margin:0 0 18px;letter-spacing:-.025em;line-height:.98;text-wrap:balance}
   .fpanel-l p{font-size:16px;line-height:1.55;color:var(--ink2);max-width:44ch;margin:0 0 26px}
   .accent-btn{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--violet);color:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:12px 20px;cursor:pointer;text-decoration:none;display:inline-flex;transition:transform .09s,box-shadow .09s}
   .accent-btn:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--ink)}
-  .fpanel-r{border-left:1.5px solid var(--ink);background:#0c0c0b;display:flex;min-height:300px;overflow:hidden}
+  .fpanel-r{border-left:1.5px solid var(--ink);background:#0c0c0b;display:flex;min-height:250px;overflow:hidden}
   .fpanel-r canvas{width:100%;height:100%;background:#0c0c0b}
   .benefits{display:grid;grid-template-columns:repeat(3,1fr)}
   .benefit{padding:24px 26px;border-left:1.5px solid var(--ink)}
