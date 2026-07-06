@@ -10,7 +10,7 @@
     :root{ --accent:#8b5cf6; --accent-dk:#7c3aed; --ink:#191918; --paper:#f0ede6; --dash:#bcb6aa; --muted:#6b7280; }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh;background:var(--paper);color:var(--ink);display:grid;grid-template-columns:.95fr 1.05fr}
-    .left{order:2;display:flex;flex-direction:column;justify-content:center;padding:40px 6vw;min-height:100vh}
+    .left{order:2;min-width:0;display:flex;flex-direction:column;justify-content:center;padding:40px 6vw;min-height:100vh}
     .brand{display:flex;align-items:center;gap:9px;margin-bottom:34px}
     .logo{font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:30px;line-height:1;color:var(--ink);text-decoration:none;letter-spacing:-.01em}
     .wrap{width:100%;max-width:430px}
@@ -47,7 +47,7 @@
     .foot a:hover{color:var(--ink)}
     .pagefoot{margin-top:30px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#a8a296;display:flex;gap:16px;align-items:center;text-transform:uppercase;letter-spacing:.04em}
     .pagefoot a{color:#a8a296;text-decoration:none}.pagefoot a:hover{color:var(--muted)}
-    .right{order:1;position:relative;overflow:hidden;background:var(--paper);border-right:1.5px solid var(--ink)}
+    .right{order:1;min-width:0;min-height:100vh;position:relative;overflow:hidden;background:var(--paper);border-right:1.5px solid var(--ink)}
     #mosaic{position:absolute;inset:0;display:grid}#mosaic i{display:block}
     @keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     .fu{animation:fu .35s cubic-bezier(.22,1,.36,1) both}
