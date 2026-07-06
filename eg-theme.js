@@ -68,6 +68,14 @@
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
     'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
+    /* ── PUBLIC / MARKETING pages (index, howitworks, about, help, seller-login, product-detail-public) ──
+       they carry their own retro classes (.eg-card/.bento-card/.floating-card/.btn-retro/.section-tag) with
+       ROUNDED corners + soft grey #40403d borders. Global border-radius:0 sharpens them; these rules blacken
+       the borders + harden the shadows + mono the eyebrow tags so the public pages match the app boards. */
+    '.eg-card,.bento-card,.floating-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
+    'html:not([data-theme=dark]) .btn-retro{background:var(--eg-accent)!important;color:#fff!important;border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important}',
+    '.btn-retro-ghost{border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;color:#191918!important}',
+    '.section-tag{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-weight:700!important;border:1.5px solid #191918!important;background:#fff!important;color:#191918!important}',
     /* Tavus card header = [colored dot] + title + separator line under it. The dot must sit INLINE before
        each card's title and a divider must attach under that title row — impossible with pure CSS across
        the varied inline-styled cards, so a deferred enhancer (end of file) injects them per card. This
