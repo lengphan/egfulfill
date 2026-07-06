@@ -3302,6 +3302,35 @@ document.addEventListener('DOMContentLoaded', function(){
             <button class="btn btn-out" style="font-size:13px" onclick="renderSpydeckCfg()">Reset</button>
             <button class="btn btn-dk" style="font-size:13px" onclick="saveSpydeckCfg(this)">Save add-on</button>
           </div>
+
+          <!-- Auto-Scout (ADMIN ONLY): daily keyword hunt -> auto-save top trending listings to Favorites -->
+          <div style="border-top:1px solid #f0ede9;margin:26px 0 16px"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <div style="font-size:15px;font-weight:700;color:#191918">Auto-Scout</div>
+            <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#7c3aed;background:#f3efff;border:1px solid #e4d9ff;padding:2px 7px;border-radius:20px">Admin only</span>
+          </div>
+          <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Each day, SpyDeck hunts your keywords and auto-saves the top trending listings straight to your <b>Favorites</b>. Runs once every 24h when you open the admin dashboard — sellers never see this.</div>
+          <div style="border:1px solid #e5e4e0;border-radius:10px;padding:4px 16px">
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 0;border-bottom:1px solid #f0ede9">
+              <span><span style="font-size:13.5px;color:#374151;font-weight:600">Enable daily auto-scout</span><span style="display:block;font-size:12px;color:#9ca3af;margin-top:1px">Fetch + favorite fresh trending products automatically.</span></span>
+              <input type="checkbox" id="as-enabled" style="width:17px;height:17px;accent-color:#8b5cf6;flex-shrink:0"/>
+            </label>
+            <div style="padding:14px 0;border-bottom:1px solid #f0ede9">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px">
+                <label style="font-size:11.5px;font-weight:600;color:#6b7280">Keywords to hunt (one per line or comma-separated)</label>
+                <button class="btn btn-out" style="font-size:11.5px;padding:4px 11px" onclick="suggestTrendingKw()">✨ Suggest trending</button>
+              </div>
+              <textarea id="as-kw" class="input" rows="4" style="background:#fff;resize:vertical;font-family:inherit;line-height:1.5" placeholder="personalized name necklace&#10;custom pet portrait&#10;retro groovy tee"></textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:center;padding:14px 0">
+              <div><label style="font-size:11.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:4px">Save per day</label><input class="input" id="as-per" type="number" min="1" max="50" step="1" value="10" style="background:#fff"/></div>
+              <div id="as-status" style="font-size:12.5px;color:#9ca3af;padding-top:22px">Not run yet.</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+            <button class="btn btn-out" style="font-size:13px" onclick="egAdminAutoScout(true,this)">Run scout now</button>
+            <button class="btn btn-dk" style="font-size:13px" onclick="saveAutoScoutCfg(this)">Save auto-scout</button>
+          </div>
         </div>
         <!-- Users (admin-only) -->
         <div id="afpanel-users" class="card fi" style="padding:22px 24px;display:none">
@@ -3939,13 +3968,73 @@ function saveSpydeckCfg(btn){
   if (btn){ var t = btn.textContent; btn.textContent = 'Saved ✓'; btn.disabled = true; setTimeout(function(){ btn.textContent = t; btn.disabled = false; }, 900); }
 }
 window.saveSpydeckCfg = saveSpydeckCfg;
+
+// ── Auto-Scout (ADMIN ONLY): daily keyword hunt → auto-favorite top trending listings ──
+var AS_KEY='eg_spydeck_autoscout';
+var AS_SUGGEST=['personalized name necklace','custom pet portrait sweatshirt','retro groovy smiley tee','embroidered crewneck sweatshirt','birth flower jewelry','custom neon sign','minimalist name ring','aesthetic photo phone case','macrame wall hanging','engraved cutting board','couple matching shirts','custom star map print','vintage band tee','funny cat mug','boho beaded earrings','custom dog bandana'];
+function _asLoad(){ try{ return JSON.parse(localStorage.getItem(AS_KEY)||'null')||{}; }catch(e){ return {}; } }
+function _asSave(c){ try{ localStorage.setItem(AS_KEY, JSON.stringify(c)); }catch(e){} }
+function _asBtn(btn,msg,keep){ if(!btn)return; if(btn._t==null) btn._t=btn.textContent; btn.textContent=msg; btn.disabled=!!keep; if(!keep) setTimeout(function(){ btn.textContent=btn._t; btn.disabled=false; },1500); }
+function renderAutoScoutCfg(){
+  var c=_asLoad(), en=document.getElementById('as-enabled'), kw=document.getElementById('as-kw'), per=document.getElementById('as-per'), st=document.getElementById('as-status');
+  if(en) en.checked=!!c.enabled;
+  if(kw) kw.value=(c.keywords||[]).join('\n');
+  if(per) per.value=c.perDay||10;
+  if(st) st.textContent = c.lastRun ? ('Last run '+new Date(c.lastRun).toLocaleString()+' · '+(c.lastAdded||0)+' saved') : 'Not run yet.';
+}
+window.renderAutoScoutCfg=renderAutoScoutCfg;
+function _asParseKw(s){ return (s||'').split(/[\n,]+/).map(function(x){return x.trim();}).filter(Boolean); }
+function saveAutoScoutCfg(btn){
+  var c=_asLoad(), en=document.getElementById('as-enabled'), kw=document.getElementById('as-kw'), per=document.getElementById('as-per');
+  c.enabled=en?en.checked:false; c.keywords=kw?_asParseKw(kw.value):[]; c.perDay=per?Math.max(1,Math.min(50,parseInt(per.value,10)||10)):10;
+  _asSave(c); _asBtn(btn,'Saved ✓');
+}
+window.saveAutoScoutCfg=saveAutoScoutCfg;
+function suggestTrendingKw(){
+  var kw=document.getElementById('as-kw'); if(!kw) return;
+  var pool=AS_SUGGEST, n=8, seed=(kw.value.length+3)%pool.length, out=[];
+  for(var i=0;i<n;i++){ var v=pool[(seed+i*3)%pool.length]; if(out.indexOf(v)<0) out.push(v); }
+  kw.value=out.join('\n');
+}
+window.suggestTrendingKw=suggestTrendingKw;
+function egAdminAutoScout(force, btn){
+  var c=_asLoad();
+  if(!force && (!c.enabled || !(c.keywords&&c.keywords.length))) return;
+  if(!c.keywords||!c.keywords.length){ _asBtn(btn,'Add keywords first'); return; }
+  var now=Date.now();
+  if(!force && c.lastRun && (now-c.lastRun) < 22*3600*1000) return;   // ~once per day
+  var per=Math.max(1,Math.min(50,c.perDay||10)), perKw=Math.max(1,Math.ceil(per/c.keywords.length));
+  var tok=''; try{ tok=localStorage.getItem('eg_token')||''; }catch(e){}
+  var base=window.EG_API_BASE||'';
+  var favs=[]; try{ favs=JSON.parse(localStorage.getItem('eg_scout_favs')||'[]'); }catch(e){}
+  var seen={}; favs.forEach(function(f){ if(f&&f.listing_id) seen[f.listing_id]=1; });
+  _asBtn(btn,'Scouting…',true);
+  Promise.all(c.keywords.map(function(kw){
+    return fetch(base+'/api/etsy/search?q='+encodeURIComponent(kw)+'&limit='+(perKw+2),{headers:{Authorization:'Bearer '+tok}})
+      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){return (d&&d.results)||[];}).catch(function(){return [];});
+  })).then(function(lists){
+    var added=0;
+    lists.forEach(function(res){ (res||[]).forEach(function(l){
+      if(l&&l.listing_id&&!seen[l.listing_id]&&added<per){ seen[l.listing_id]=1; added++;
+        favs.unshift({listing_id:l.listing_id,title:l.title,image:l.image,images:l.images||[],price:l.price,url:l.url,num_favorers:l.num_favorers,created:l.created||null,tags:l.tags||[],description:l.description||''}); }
+    }); });
+    try{ localStorage.setItem('eg_scout_favs', JSON.stringify(favs)); }catch(e){}
+    c.lastRun=now; c.lastAdded=added; _asSave(c);
+    var st=document.getElementById('as-status'); if(st) st.textContent='Last run '+new Date(now).toLocaleString()+' · '+added+' saved';
+    _asBtn(btn, added? ('Saved '+added+' to Favorites ✓') : 'No new finds — try more keywords');
+  }).catch(function(){ _asBtn(btn,'Scout failed — is Etsy connected?'); });
+}
+window.egAdminAutoScout=egAdminAutoScout;
+// run the daily scout ~3s after load, admins only, at most once/24h
+(function(){ try{ var u=JSON.parse(localStorage.getItem('eg_user')||'null'); if(u&&u.role==='admin'){ setTimeout(function(){ egAdminAutoScout(false); }, 3000); } }catch(e){} })();
+
 function admSettingsTab(name, el){
   // Existing 4 panels + the new 'platform' panel (additive — older callers
   // still work, none of the existing panel ids changed).
   ['profile','notif','threads','boards','platform','users','guides','plans'].forEach(function(t){
     var p = document.getElementById('afpanel-'+t); if(p) p.style.display = (t===name) ? '' : 'none';
   });
-  if (name === 'plans') { renderPlansEditor(); renderSpydeckCfg(); }
+  if (name === 'plans') { renderPlansEditor(); renderSpydeckCfg(); renderAutoScoutCfg(); }
   if (name === 'users' && window.EGAdminUsers) EGAdminUsers.load();
   if (name === 'platform' && window.egRefreshEtsy) egRefreshEtsy();
   document.querySelectorAll('#section-settings .fstab').forEach(function(a){ a.classList.remove('on'); });
