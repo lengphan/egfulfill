@@ -21,8 +21,8 @@
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased}
   a{color:inherit}
-  .page{max-width:1180px;margin:0 auto;padding:0 clamp(18px,5vw,48px)}
-  section{padding:clamp(46px,6.5vw,84px) 0}
+  .page{max-width:1500px;margin:0 auto;padding:0 clamp(18px,4vw,52px)}
+  section{padding:clamp(52px,7vw,104px) 0}
   .disp{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 34,'wght' 800}
   .eyebrow{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--grey2)}
   .sec-h{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:clamp(28px,4.2vw,44px);letter-spacing:-.02em;line-height:1.05;margin:10px 0 0;text-wrap:balance}
@@ -75,10 +75,10 @@
   .benefit h4{font-family:var(--disp);font-size:22px;margin:0 0 8px}
   .benefit p{font-size:13.5px;line-height:1.55;color:var(--ink2);margin:0}
 
-  /* research areas */
-  .rareas{background:#e9e6df;background-image:radial-gradient(rgba(25,25,24,.10) 1px,transparent 1px);background-size:4px 4px;border:1.5px solid var(--ink);box-shadow:7px 7px 0 var(--ink);padding:clamp(22px,3.5vw,40px)}
-  .rareas h2{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:clamp(26px,4vw,42px);text-align:center;margin:0 0 6px;letter-spacing:-.02em}
-  .rareas .sub{text-align:center;color:var(--ink2);max-width:56ch;margin:0 auto 30px;font-size:15px;line-height:1.5}
+  /* research areas — FULL-BLEED dithered section (Tavus): texture edge-to-edge, content in .page */
+  .rareas-full{background:#e9e6df;background-image:radial-gradient(rgba(25,25,24,.10) 1px,transparent 1px);background-size:4px 4px;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);padding:clamp(48px,6.5vw,96px) 0}
+  .rareas-full h2{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:clamp(28px,4.4vw,48px);text-align:center;margin:0 0 8px;letter-spacing:-.02em}
+  .rareas-full .sub{text-align:center;color:var(--ink2);max-width:60ch;margin:0 auto 36px;font-size:15.5px;line-height:1.5}
   .rgrid{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:16px;align-items:start}
   .rcol{display:flex;flex-direction:column;gap:16px}
   .rcard{border:1.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:#fff;overflow:hidden}
@@ -96,6 +96,9 @@
   .term-body canvas{width:100%;height:100%;background:#0c0c14;border-right:1.5px solid #2b2a40}
   .term-txt{padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;color:#7ef0b0;white-space:pre;overflow:hidden}
   .term-txt .p{color:#8f8be0}
+  .term-cursor{display:inline-block;width:8px;height:15px;background:#7ef0b0;margin-left:1px;vertical-align:text-bottom;animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){.term-cursor{animation:none}}
 
   /* feature cards */
   .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:34px}
@@ -242,11 +245,10 @@
   </div>
 </section>
 
-<!-- RESEARCH AREAS / PIPELINE -->
-<section style="padding-top:12px">
+<!-- RESEARCH AREAS / PIPELINE (full-bleed) -->
+<div class="rareas-full">
   <div class="page">
-    <div class="rareas">
-      <h2 class="disp">How the pipeline runs</h2>
+      <h2>How the pipeline runs</h2>
       <p class="sub">Every order moves through the same vetted path — and you watch it happen in real time.</p>
       <div class="rgrid">
         <div class="rcol">
@@ -257,13 +259,13 @@
           <div class="term-bar"><span class="g"></span>EG · FULFIL TERMINAL<span class="rl"></span></div>
           <div class="term-body">
             <canvas class="dith" width="120" height="160" data-seed="63" data-mode="fig"></canvas>
-            <div class="term-txt">├─ intake
+            <div class="term-txt" id="term-txt">├─ intake
 ├─ design
 ├─ print
 ├─ qc
 ├─ pack
 └─ ship
-<span class="p">eg$</span> fulfil run #4092
+eg$ fulfil run #4092
 [queue]  ok
 [design] ok
 [print]  ok
@@ -277,9 +279,8 @@ tracking → seller</div>
           <div class="rcard pink"><div class="rh"><span>Ship &amp; track</span><span class="rl"></span></div><div class="rb"><canvas class="dith" width="46" height="46" data-seed="52"></canvas><p>Cheapest label bought, tracking pushed to the marketplace.</p></div></div>
         </div>
       </div>
-    </div>
   </div>
-</section>
+</div>
 
 <!-- FEATURES -->
 <section>
@@ -444,6 +445,29 @@ function setTab(key, el){
   }
   function runDith(){ document.querySelectorAll('canvas.dith').forEach(draw); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',runDith); else runDith();
+})();
+
+// Terminal typewriter — types the CVI output the first time it scrolls into view (reduced-motion safe).
+(function(){
+  var el=document.getElementById('term-txt'); if(!el) return;
+  var full=el.textContent;
+  var cur=document.createElement('span'); cur.className='term-cursor';
+  var reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(reduce){ el.appendChild(cur); return; }
+  el.textContent=''; el.appendChild(cur);
+  var started=false;
+  function type(){
+    if(started) return; started=true;
+    var i=0;
+    (function step(){
+      el.textContent=full.slice(0,i); el.appendChild(cur);
+      if(i<full.length){ var ch=full[i]; i++; setTimeout(step, ch==='\n'?70:16); }
+    })();
+  }
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ type(); io.disconnect(); } }); },{threshold:0.35});
+    io.observe(el);
+  } else { type(); }
 })();
 </script>
 </body>
