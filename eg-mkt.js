@@ -7,12 +7,14 @@ function setFeat(key, el){
   var d=(window.FEAT||{})[key]; if(!d) return;
   var c=document.getElementById('feat-cat'), h=document.getElementById('feat-h'), p=document.getElementById('feat-p');
   if(c) c.textContent=d.cat; if(h) h.textContent=d.h; if(p) p.textContent=d.p;
+  var bn=document.getElementById('feat-benefits');
+  if(bn && d.b) bn.innerHTML=d.b.map(function(x,i){ return '<div class="benefit"><div class="bruler"><span class="bl">Benefit ['+(i+1)+']</span><span class="rl"></span></div><h4>'+x[0]+'</h4><p>'+x[1]+'</p></div>'; }).join('');
 }
 
 // Hero question typewriter — types/deletes rotating phrases into #hero-word (reduced-motion safe).
 (function(){
   var el=document.getElementById('hero-word'); if(!el) return;
-  var words=['shipped itself','ran on autopilot','just handled itself','never touched a label'];
+  var words=['shipped itself','printed itself','packed itself','tracked itself'];
   var reduce=window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
   if(reduce){ el.textContent=words[0]; return; }
   var wi=0, ci=0, del=false; el.textContent='';
@@ -20,9 +22,9 @@ function setFeat(key, el){
     var w=words[wi];
     ci += del ? -1 : 1;
     el.textContent = w.slice(0, Math.max(0, ci));
-    if(!del && ci>=w.length){ del=true; return setTimeout(tick,1600); }
-    if(del && ci<=0){ del=false; wi=(wi+1)%words.length; return setTimeout(tick,220); }
-    setTimeout(tick, del?36:72);
+    if(!del && ci>=w.length){ del=true; return setTimeout(tick,2400); }
+    if(del && ci<=0){ del=false; wi=(wi+1)%words.length; return setTimeout(tick,500); }
+    setTimeout(tick, del?55:100);
   }
   tick();
 })();

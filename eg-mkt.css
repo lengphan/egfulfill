@@ -57,8 +57,9 @@
   .hero-bg{position:absolute;inset:0;z-index:0;opacity:.45;background:#e9e6df}
   .hero-inner{position:relative;z-index:1;text-align:center}
   .hero-inner .eyebrow{display:block;margin-bottom:20px}
-  .hero-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 72,'wght' 800;font-size:clamp(38px,7vw,88px);line-height:1.0;letter-spacing:-.03em;margin:0 auto;max-width:15ch;text-wrap:balance;color:var(--ink)}
-  .hero-q #hero-word{font-style:italic}
+  .hero-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 110,'wght' 430,'SOFT' 0;font-size:clamp(40px,6.6vw,86px);line-height:1.05;letter-spacing:-.02em;margin:0 auto;max-width:20ch;text-wrap:balance;color:var(--ink)}
+  .hero-q #hero-word{font-style:italic;font-variation-settings:'opsz' 110,'wght' 500,'SOFT' 0}
+  .hero-rot{display:block;min-height:1.03em}   /* own line + reserved height so typing can't reflow the hero */
   .hero-cur{display:inline-block;width:.06em;min-width:3px;height:.82em;background:var(--violet);margin-left:.04em;transform:translateY(.06em);animation:blink 1s step-end infinite}
   @keyframes blink{50%{opacity:0}}
   @media(prefers-reduced-motion:reduce){.hero-cur{animation:none}}
@@ -66,9 +67,10 @@
   .hero-inner .accent-btn{margin:0 auto}
   /* hero folder tabs */
   .ftabs{display:flex;gap:5px;padding-left:20px;position:relative;z-index:2;flex-wrap:wrap}
-  .ftab{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);border:1.5px solid var(--ink);border-bottom:none;background:#eceae4;padding:10px 34px 13px;cursor:pointer;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 100%,16px 100%);margin-right:-16px}
-  .ftab.on{background:var(--paper);color:var(--ink);z-index:3}
-  .fpanel{border:1.5px solid var(--ink);box-shadow:7px 7px 0 var(--ink);background:var(--paper);margin-top:-1.5px}
+  .ftab{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);border:1.5px solid var(--ink);background:#eceae4;padding:11px 26px;cursor:pointer;margin-right:-1.5px;margin-bottom:-1.5px;position:relative;z-index:1}
+  .ftab:hover{color:var(--ink)}
+  .ftab.on{background:var(--paper);color:var(--ink);border-bottom-color:var(--paper);z-index:4}
+  .fpanel{border:1.5px solid var(--ink);box-shadow:7px 7px 0 var(--ink);background:var(--paper);position:relative}
   .fpanel-top{display:grid;grid-template-columns:1.1fr .9fr;border-bottom:1.5px solid var(--ink)}
   .fpanel-l{padding:clamp(24px,3.2vw,40px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
   .fpanel-l h1{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 44,'wght' 900;font-size:clamp(32px,4.4vw,50px);margin:0 0 18px;letter-spacing:-.025em;line-height:.98;text-wrap:balance}
