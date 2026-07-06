@@ -26,9 +26,9 @@
   ].map(function (r) { return r.map(function (v) { return (v + 0.5) / 64; }); });
 
   // Brand ramp (dark → light). The middle slot is the swappable "pop"; the rest is locked to the theme.
-  var INK = [25, 25, 24], VIO_DK = [110, 90, 158], VIO = [138, 118, 192], PAPER = [240, 237, 230];
+  var INK = [25, 25, 24], VIO_DK = [124, 58, 237], VIO = [139, 92, 246], PAPER = [240, 237, 230];
 
-  var POPS = { violet: '#8a76c0', coral: '#d98a6e', teal: '#6bb89a', amber: '#e0bd6a', blue: '#7c8fce', pink: '#d98aa8' };  /* muted vintage pops */
+  var POPS = { violet: '#8b5cf6', coral: '#ff5c39', teal: '#12b886', amber: '#ffd43b', blue: '#4c6ef5', pink: '#f06595' };
 
   // Named FULL palettes (dark→light). The muted grey/beige/black ramps read like the Tavus starter-kit
   // photos — desaturated, no colour dominance. Use these for card imagery; use `pop` names for accent art.
