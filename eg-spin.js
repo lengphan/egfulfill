@@ -6,8 +6,8 @@
 (function (global) {
   'use strict';
   var BAYER = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]].map(function(r){return r.map(function(v){return (v+0.5)/16;});});
-  var INK=[25,25,24], VIO_DK=[124,58,237], VIO=[139,92,246], PAPER=[240,237,230];
-  var POPS={violet:'#8b5cf6',coral:'#f6704f',mint:'#12b886',amber:'#f2b705',pink:'#f06595',sky:'#4c6ef5'};
+  var INK=[25,25,24], VIO_DK=[138, 61, 208], VIO=[159, 82, 224], PAPER=[240,237,230];
+  var POPS={violet:'#9f52e0',coral:'#f6704f',mint:'#12b886',amber:'#f2b705',pink:'#f06595',sky:'#4c6ef5'};
   function hex(h){h=String(h||'').replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];return [parseInt(h.slice(0,2),16)||0,parseInt(h.slice(2,4),16)||0,parseInt(h.slice(4,6),16)||0];}
   function palFor(pop){ if(pop==='noir')return [[25,25,24],[70,70,66],[130,128,120],[195,190,182],[240,237,230]]; if(pop==='dusk')return [[25,25,24],[58,56,64],[120,116,128],[176,170,186],[240,237,230]]; var P=POPS[pop]||pop||POPS.violet; return [INK,VIO_DK,VIO,hex(P),PAPER]; }
 

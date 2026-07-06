@@ -1,14 +1,14 @@
 // eg-theme.js — universal neon-purple ACCENT + monospace-label layer for the boards.
 // One source of truth: injected as a single <style> over the shared board classes so the accent is
 // identical on every board and future tweaks are a one-file edit. Loaded via <script src> on each board.
-// Palette locked with the login: --accent #8b5cf6 / --accent-dk #7c3aed / dark-mode --accent-lt #a78bfa.
+// Palette locked with the login: --accent #9f52e0 / --accent-dk #8a3dd0 / dark-mode --accent-lt #a78bfa.
 // Fonts (mono nav, Fraunces h1, mono badges) apply in BOTH themes; accent COLOURS have a light + a dark
 // variant. Base stays monotone — accent is SPARING (active nav, focus, toggles, emphasis button, links).
 (function () {
   if (document.getElementById('eg-theme-accent')) return;
   var MONO = "ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace";
   var css = [
-    ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff;--eg-sep:#e8e6e1}',
+    ':root{--eg-accent:#9f52e0;--eg-accent-dk:#8a3dd0;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff;--eg-sep:#e8e6e1}',
     'html[data-theme=dark]{--eg-sep:rgba(201,195,186,.22)}',
 
     /* ── SHARP CORNERS everywhere (retro/pixelated sticky-note vibe) ─── */
@@ -50,8 +50,8 @@
     '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,.tab-btn,.tab-flag,.chat-tab,.filter-section-title,select[data-eg-select],#trend-period,#cat-sort{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
     '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12.5px!important}',
-    'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
-    'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
+    'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#8a3dd0!important;border-color:transparent!important}',
+    'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(159, 82, 224,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
     '[id^=panel-] label,[id^=afpanel-] label,[id^=wfpanel-] label,[id^=ofpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px}',
 
@@ -101,8 +101,8 @@
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
     /* border MUST be set at THIS scoped specificity — each board carries its own
        `html:not([data-theme=dark]) .ni.on{border:1px solid #191918!important}` that outranks a bare .ni.on */
-    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border:1.5px solid transparent!important}',
-    'html:not([data-theme=dark]) .ni.on svg{color:#7c3aed!important;opacity:1!important}',
+    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#8a3dd0!important;border:1.5px solid transparent!important}',
+    'html:not([data-theme=dark]) .ni.on svg{color:#8a3dd0!important;opacity:1!important}',
     'html:not([data-theme=dark]) .btn-dk,html:not([data-theme=dark]) .btn-gold{background:var(--eg-accent)!important;color:#fff!important;border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
     'html:not([data-theme=dark]) .btn-dk:hover,html:not([data-theme=dark]) .btn-gold:hover{background:var(--eg-accent-dk)!important;transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #191918!important}',
     'html:not([data-theme=dark]) .btn-dk:active,html:not([data-theme=dark]) .btn-gold:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #191918!important}',
@@ -115,12 +115,12 @@
 
     /* ── DARK-MODE ACCENT (lighter purple for contrast on the dark base) ── */
     'html[data-theme=dark] .ni:hover:not(.on){background:rgba(255,255,255,.05)!important;color:#f0ede6!important}',
-    'html[data-theme=dark] .ni.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
+    'html[data-theme=dark] .ni.on{background:rgba(159, 82, 224,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
     'html[data-theme=dark] .ni.on svg{color:var(--eg-accent-lt)!important;opacity:1!important}',
     'html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-gold{background:var(--eg-accent)!important;color:#fff!important;border:1.5px solid #c9c3ba!important;box-shadow:3px 3px 0 #c9c3ba!important;transition:transform .09s ease,box-shadow .09s ease!important}',
     'html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-gold:hover{background:var(--eg-accent-lt)!important;transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #c9c3ba!important}',
     'html[data-theme=dark] .btn-dk:active,html[data-theme=dark] .btn-gold:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #c9c3ba!important}',
-    'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(139,92,246,.22)!important}',
+    'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(159, 82, 224,.22)!important}',
     'html[data-theme=dark] .toggle-on,html[data-theme=dark] .toggle.toggle-on{background:var(--eg-accent)!important}',
     'html[data-theme=dark] input[type=checkbox],html[data-theme=dark] input[type=radio],html[data-theme=dark] input[type=range]{accent-color:var(--eg-accent-lt)}',
     'html[data-theme=dark] .eg-link,html[data-theme=dark] a.accent{color:var(--eg-accent-lt)!important}',
