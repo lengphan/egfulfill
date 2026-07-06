@@ -20,38 +20,47 @@
   .hiw-steps::-webkit-scrollbar{height:9px}
   .hiw-steps::-webkit-scrollbar-track{background:#e7e4dd}
   .hiw-steps::-webkit-scrollbar-thumb{background:var(--ink)}
-  .hiw-card{scroll-snap-align:start;flex:0 0 clamp(286px,31vw,390px);border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper);display:flex;flex-direction:column;overflow:hidden}
+  .hiw-card{scroll-snap-align:start;flex:0 0 clamp(300px,44vw,580px);border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper);display:flex;flex-direction:column;overflow:hidden}
   .hiw-cat{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);padding:20px 22px 0}
   .hiw-card h3{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 62,'wght' 500;font-size:clamp(23px,2.3vw,29px);letter-spacing:-.01em;line-height:1.05;margin:9px 0 0;padding:0 22px;color:var(--ink)}
   .hiw-card p{font-size:14px;line-height:1.5;color:var(--ink2);margin:12px 0 20px;padding:0 22px}
   .hiw-mock{margin-top:auto;height:186px;border-top:1.5px solid var(--ink);overflow:hidden;position:relative;background:#0c0c0b}
   .hiw-mock [data-dither]{position:absolute;inset:0}
   .hiw-mock canvas{width:100%;height:100%;display:block}
-  .hiw-arrow{flex:0 0 auto;align-self:center;font-size:22px;color:var(--ink);opacity:.45;user-select:none}
+  /* full-width carousel with prev/next arrow buttons on both sides (Tavus PAL-Maker) */
+  .hiw-carousel{position:relative}
+  .hiw-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:48px;height:48px;border:1.5px solid var(--ink);background:var(--mint);box-shadow:3px 3px 0 var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--ink);transition:transform .09s,box-shadow .09s,background .12s}
+  .hiw-nav.prev{left:-12px}
+  .hiw-nav.next{right:-12px}
+  .hiw-nav:hover{background:#8fe3b6}
+  .hiw-nav:active{transform:translateY(-50%) translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+  @media(max-width:600px){ .hiw-nav{display:none} }
   /* Q&A — Tavus "Fully customizable" hover-to-open accordion */
   .qa-wrap{padding:clamp(24px,3.5vw,52px) 0 clamp(66px,9vw,120px)}
   .qa-head{text-align:center}
-  .qa-panel{display:grid;grid-template-columns:.9fr 1.1fr;border:1.5px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--paper);overflow:hidden;margin-top:clamp(28px,4vw,50px)}
-  .qa-img{position:relative;background:#0c0c0b;overflow:hidden;min-height:440px;border-right:1.5px solid var(--ink)}
+  /* fixed-height panel: the image column is a locked size; the rows flex-fill the same height, so opening
+     one row grows it to absorb ALL the free space (no gap at the bottom) while the others stay header-height */
+  .qa-panel{display:grid;grid-template-columns:.92fr 1.08fr;border:1.5px solid var(--ink);box-shadow:6px 6px 0 var(--ink);background:var(--paper);overflow:hidden;margin-top:clamp(28px,4vw,50px);height:clamp(474px,52vw,566px)}
+  .qa-img{position:relative;background:#0c0c0b;overflow:hidden;height:100%;border-right:1.5px solid var(--ink)}
   .qa-img [data-dither]{position:absolute;inset:0}
   .qa-img canvas{width:100%;height:100%;display:block}
-  .qa-list{display:flex;flex-direction:column}
-  .qa-item{border-bottom:1.5px solid var(--ink);background:var(--amber);transition:background .3s ease}
+  .qa-list{display:flex;flex-direction:column;height:100%}
+  .qa-item{flex:0 0 auto;display:flex;flex-direction:column;overflow:hidden;border-bottom:1.5px solid var(--ink);background:var(--amber);transition:flex-grow .42s ease,background .3s ease}
   .qa-item:last-child{border-bottom:none}
   .qa-item:focus{outline:none}
-  .qa-hd{display:flex;align-items:center;gap:13px;padding:17px 22px}
+  .qa-hd{display:flex;align-items:center;gap:13px;padding:0 22px;min-height:66px;flex-shrink:0}
   .qa-ava{width:34px;height:34px;border:1.5px solid var(--ink);flex-shrink:0;overflow:hidden;background:#0c0c0b;position:relative}
   .qa-ava [data-dither]{position:absolute;inset:0}
   .qa-ava canvas{width:100%;height:100%;display:block}
   .qa-q{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 500;font-size:19px;letter-spacing:-.01em;color:var(--ink);line-height:1.15}
-  .qa-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
-  .qa-a{padding:0 22px 20px 69px;font-size:14.5px;line-height:1.6;color:var(--ink2)}
-  /* hover (or keyboard focus) opens a card; the first card is open by default until you hover the list */
-  .qa-item:hover,.qa-item:focus-within{background:#fdf4d9}
-  .qa-item:hover .qa-body,.qa-item:focus-within .qa-body{max-height:360px}
-  .qa-list:not(:hover) .qa-item:first-child{background:#fdf4d9}
-  .qa-list:not(:hover) .qa-item:first-child .qa-body{max-height:360px}
-  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr} .qa-img{min-height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} }
+  .qa-body{max-height:0;opacity:0;overflow:hidden;transition:max-height .42s ease,opacity .3s ease}
+  .qa-a{padding:0 22px 22px 69px;font-size:14.5px;line-height:1.6;color:var(--ink2)}
+  /* hover (or keyboard focus) grows a card to fill the box; first card open by default until the list is hovered */
+  .qa-item:hover,.qa-item:focus-within{flex:1 1 0;background:#fdf4d9}
+  .qa-item:hover .qa-body,.qa-item:focus-within .qa-body{max-height:360px;opacity:1}
+  .qa-list:not(:hover) .qa-item:first-child{flex:1 1 0;background:#fdf4d9}
+  .qa-list:not(:hover) .qa-item:first-child .qa-body{max-height:360px;opacity:1}
+  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr;height:auto} .qa-img{height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} .qa-list{height:auto} .qa-item:hover,.qa-item:focus-within,.qa-list:not(:hover) .qa-item:first-child{flex:0 0 auto} }
   @media(max-width:600px){ .hiw-arrow{transform:rotate(90deg);align-self:center} }
 </style>
 </head>
@@ -98,41 +107,37 @@
 <!-- STEP CARDS (horizontal, scroll-snap) -->
 <section class="hiw-steps-wrap">
   <div class="page">
-    <div class="hiw-steps">
+    <div class="hiw-carousel">
+      <button class="hiw-nav prev" onclick="hiwScroll(-1)" aria-label="Previous step">◀</button>
+      <div class="hiw-steps" id="hiwSteps">
       <article class="hiw-card">
         <div class="hiw-cat">Step 01 · Sync</div>
         <h3>Every order lands in one queue</h3>
         <p>Etsy, Shopify and TikTok orders normalise into a single schema the moment they're placed — no CSV exports, no tab-hopping.</p>
         <div class="hiw-mock"><div data-dither="art" data-pop="teal" data-seed="7" data-pixel="4"></div></div>
-      </article>
-      <span class="hiw-arrow">▶</span>
-      <article class="hiw-card">
+      </article>      <article class="hiw-card">
         <div class="hiw-cat">Step 02 · Design</div>
         <h3>Approve the artwork</h3>
         <p>Mockups, embroidery digitising and automatic thread-matching sit right where the order lives — sign off without leaving the queue.</p>
         <div class="hiw-mock"><div data-dither="art" data-pop="pink" data-seed="19" data-pixel="4"></div></div>
-      </article>
-      <span class="hiw-arrow">▶</span>
-      <article class="hiw-card">
+      </article>      <article class="hiw-card">
         <div class="hiw-cat">Step 03 · Print</div>
         <h3>Printed on a vetted network</h3>
         <p>DTG or embroidery on quality-scored presses. What ships matches the mockup you approved — every single run.</p>
         <div class="hiw-mock"><div data-dither="art" data-pop="amber" data-seed="34" data-pixel="4"></div></div>
-      </article>
-      <span class="hiw-arrow">▶</span>
-      <article class="hiw-card">
+      </article>      <article class="hiw-card">
         <div class="hiw-cat">Step 04 · Check</div>
         <h3>Inspected against spec</h3>
         <p>Every piece is quality-checked and packed to spec before it leaves the floor — flagged back to you if anything looks off.</p>
         <div class="hiw-mock"><div data-dither="art" data-pop="blue" data-seed="48" data-pixel="4"></div></div>
-      </article>
-      <span class="hiw-arrow">▶</span>
-      <article class="hiw-card">
+      </article>      <article class="hiw-card">
         <div class="hiw-cat">Step 05 · Ship</div>
         <h3>Tracked to the door</h3>
         <p>The cheapest label is bought automatically and tracking is pushed straight back to the marketplace and your buyer.</p>
         <div class="hiw-mock"><div data-dither="art" data-pop="coral" data-seed="61" data-pixel="4"></div></div>
       </article>
+      </div>
+      <button class="hiw-nav next" onclick="hiwScroll(1)" aria-label="Next step">▶</button>
     </div>
   </div>
 </section>
@@ -149,23 +154,23 @@
       <div class="qa-img"><div data-dither="image" data-src="images/cloud-wallpaper.jpg" data-pop="dusk" data-fit="cover" data-pixel="3"></div></div>
       <div class="qa-list">
         <div class="qa-item" tabindex="0">
-          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="teal" data-seed="3" data-pixel="2"></span></span><span class="qa-q">Do I need to hold my own inventory?</span></div>
+          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="3" data-pixel="2"></span></span><span class="qa-q">Do I need to hold my own inventory?</span></div>
           <div class="qa-body"><div class="qa-a">No. Blanks are stocked across the vetted print network — you only pay for a garment when a customer actually orders it, so there's nothing to buy up front or warehouse.</div></div>
         </div>
         <div class="qa-item" tabindex="0">
-          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="pink" data-seed="12" data-pixel="2"></span></span><span class="qa-q">Which channels can I connect?</span></div>
+          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="12" data-pixel="2"></span></span><span class="qa-q">Which channels can I connect?</span></div>
           <div class="qa-body"><div class="qa-a">Etsy, Shopify, TikTok Shop, Amazon, WooCommerce and more. Every order drops into one shared queue the second it's placed — no tab-hopping between dashboards.</div></div>
         </div>
         <div class="qa-item" tabindex="0">
-          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="amber" data-seed="21" data-pixel="2"></span></span><span class="qa-q">How does billing work?</span></div>
+          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="21" data-pixel="2"></span></span><span class="qa-q">How does billing work?</span></div>
           <div class="qa-body"><div class="qa-a">A prepaid wallet auto-charges per order — blank, print and label itemised on every line. No monthly minimums and no surprise invoice at the end of the month.</div></div>
         </div>
         <div class="qa-item" tabindex="0">
-          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="blue" data-seed="30" data-pixel="2"></span></span><span class="qa-q">Can I approve artwork before it prints?</span></div>
+          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="30" data-pixel="2"></span></span><span class="qa-q">Can I approve artwork before it prints?</span></div>
           <div class="qa-body"><div class="qa-a">Always. Every order shows a mockup on the real garment with thread colours matched to stock — nothing goes to the press until you've signed it off.</div></div>
         </div>
         <div class="qa-item" tabindex="0">
-          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="coral" data-seed="44" data-pixel="2"></span></span><span class="qa-q">Can my team help run it?</span></div>
+          <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="44" data-pixel="2"></span></span><span class="qa-q">Can my team help run it?</span></div>
           <div class="qa-body"><div class="qa-a">Yes — invite staff with scoped access (orders, design, or full) on one shared wallet, so the right people can move work without seeing everything.</div></div>
         </div>
       </div>
@@ -193,5 +198,8 @@
 </div>
 
 <script src="eg-mkt.js"></script>
+<script>
+  function hiwScroll(dir){var t=document.getElementById('hiwSteps');if(!t)return;var c=t.querySelector('.hiw-card');var w=(c?c.getBoundingClientRect().width:400)+22;t.scrollBy({left:dir*w,behavior:'smooth'});}
+</script>
 </body>
 </html>
