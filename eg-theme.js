@@ -8,7 +8,8 @@
   if (document.getElementById('eg-theme-accent')) return;
   var MONO = "ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace";
   var css = [
-    ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff}',
+    ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff;--eg-sep:#e8e6e1}',
+    'html[data-theme=dark]{--eg-sep:rgba(201,195,186,.22)}',
 
     /* ── SHARP CORNERS everywhere (retro/pixelated sticky-note vibe) ─── */
     /* flatten every radius (beats inline styles via !important); functional round bits are restored below */
@@ -38,7 +39,7 @@
        .eg-sel-btn = wallet's enhanced-select buttons (All Banks / This Month); .seg = analytics
        Revenue|Orders|Profit segment; select[data-eg-select] = analytics native period/store pickers;
        .cat-pill / .sort-select = products catalog filters; .tab-sm = wallet tx All|Deposits|Charges. */
-    '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,select[data-eg-select]{font-family:' + MONO + '!important;letter-spacing:.02em}',
+    '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,.tab-btn,.tab-flag,.chat-tab,.filter-section-title,select[data-eg-select],#trend-period,#cat-sort{font-family:' + MONO + '!important;letter-spacing:.02em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
     '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.03em;font-size:12.5px!important}',
     'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
@@ -67,17 +68,14 @@
        no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
     'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
     'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
-    /* colored DOT marker per card (replaced the top band per user pref — Tavus "■ LABEL" vibe): a small
-       square in the top-right corner, cycling 6 vivid sticky-note colours by position. Pure ::after, no
-       markup/logic change. Square (not round) because the global border-radius:0 keeps corners sharp. */
-    '.wcard,.stat-card{position:relative}',
-    '.wcard::after,.stat-card::after{content:"";position:absolute;top:16px;right:16px;width:9px;height:9px;z-index:2;pointer-events:none;background:var(--eg-accent)}',
-    '.wcard:nth-child(6n+1)::after,.stat-card:nth-child(6n+1)::after{background:#34d399}',
-    '.wcard:nth-child(6n+2)::after,.stat-card:nth-child(6n+2)::after{background:#f472b6}',
-    '.wcard:nth-child(6n+3)::after,.stat-card:nth-child(6n+3)::after{background:#fbbf24}',
-    '.wcard:nth-child(6n+4)::after,.stat-card:nth-child(6n+4)::after{background:#818cf8}',
-    '.wcard:nth-child(6n+5)::after,.stat-card:nth-child(6n+5)::after{background:#fb7185}',
-    '.wcard:nth-child(6n+6)::after,.stat-card:nth-child(6n+6)::after{background:#a78bfa}',
+    /* Tavus card header = [colored dot] + title + separator line under it. The dot must sit INLINE before
+       each card's title and a divider must attach under that title row — impossible with pure CSS across
+       the varied inline-styled cards, so a deferred enhancer (end of file) injects them per card. This
+       styles the injected dot; the separator uses --eg-sep. Dot colours are assigned by the enhancer. */
+    '.eg-card-dot{display:inline-block;width:9px;height:9px;flex-shrink:0;background:var(--eg-accent)}',
+    /* filter dropdowns go BORDERLESS to match the clean orders.html filter row (no box outline), keeping
+       their chevron. Pairs with the monospace rule above so every board's filters read identically. */
+    '.sort-select,#cat-sort,#trend-period,select[data-eg-select],.eg-sel-btn{border:none!important;background-color:transparent!important;box-shadow:none!important}',
     /* neo-brutalist PRESS-DOWN primary buttons (Tavus CVI / login CTA): hard offset shadow at rest,
        presses into it on hover, fully seated on click */
     /* secondary/outlined buttons stay FLAT (no drop shadow) */
@@ -121,4 +119,39 @@
   s.id = 'eg-theme-accent';
   s.textContent = css;
   (document.head || document.documentElement).appendChild(s);
+
+  // ── Tavus card header: inject [colored dot] before each stat card's TITLE + a separator line under that
+  //    title row. Pure CSS can't target the (inline-styled, structurally varied) title, so we do it here.
+  //    title = the first UPPERCASE text element in the card (the eyebrow); dot colour cycles per card. ──
+  var EG_CARD_DOTS = ['#34d399', '#f472b6', '#fbbf24', '#818cf8', '#fb7185', '#a78bfa'];
+  function egEnhanceCards() {
+    var cards = document.querySelectorAll('.wcard,.stat-card');
+    for (var i = 0; i < cards.length; i++) {
+      var card = cards[i];
+      if (card.__egHdr) continue;
+      var els = card.querySelectorAll('div,span,h1,h2,h3,h4,p'), title = null;
+      for (var j = 0; j < els.length; j++) {
+        var el = els[j];
+        if (el.closest && el.closest('.drag-handle')) continue;
+        var txt = (el.textContent || '').trim();
+        if (!txt || txt.length > 42) continue;
+        try { if (getComputedStyle(el).textTransform === 'uppercase') { title = el; break; } } catch (e) {}
+      }
+      if (!title) continue;
+      card.__egHdr = true;
+      var dot = document.createElement('span');
+      dot.className = 'eg-card-dot';
+      dot.style.background = EG_CARD_DOTS[i % EG_CARD_DOTS.length];
+      title.style.display = 'flex';
+      title.style.alignItems = 'center';
+      title.style.gap = '7px';
+      title.insertBefore(dot, title.firstChild);
+      title.style.borderBottom = '1.5px solid var(--eg-sep)';
+      title.style.paddingBottom = '9px';
+      if (parseInt(getComputedStyle(title).marginBottom, 10) < 10) title.style.marginBottom = '12px';
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', egEnhanceCards);
+  else egEnhanceCards();
+  window.addEventListener('load', egEnhanceCards);
 })();
