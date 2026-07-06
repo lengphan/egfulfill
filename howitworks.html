@@ -204,14 +204,18 @@
     var list=document.querySelector('.qa-list');
     var items=[].slice.call(document.querySelectorAll('.qa-item'));
     if(!list||!items.length) return;
-    var cur=null;
-    function openRow(it){ if(!it||it===cur) return; cur=it; items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
-    // Drive off mousemove (fires only on REAL cursor movement), not :hover/mouseenter — so a row growing
-    // under a STATIONARY cursor can't retrigger and flicker. rAF-throttled; the cur guard skips no-op toggles.
-    var raf=0, tgt=null;
-    list.addEventListener('mousemove', function(e){ tgt=e.target; if(raf) return; raf=requestAnimationFrame(function(){ raf=0; openRow(tgt&&tgt.closest?tgt.closest('.qa-item'):null); }); });
-    items.forEach(function(it){ it.addEventListener('focus', function(){ openRow(it); }); it.addEventListener('click', function(){ openRow(it); }); });
-    openRow(items[0]);
+    var cur=null, ignoreEnterUntil=0;
+    function openRow(it){ if(!it||it===cur) return; cur=it; items.forEach(function(x){ x.classList.toggle('open', x===it); }); ignoreEnterUntil=Date.now()+340; }
+    // mouseenter opens a row on the FIRST hover; a short ignore-window after each open means the row-resize
+    // reflow (which can fire a spurious mouseenter on a shifted neighbour) can't retrigger → no flicker.
+    // Real cursor movement (mousemove — never fires on reflow) always wins, so sweeping between rows stays snappy.
+    list.addEventListener('mousemove', function(e){ var it=e.target&&e.target.closest?e.target.closest('.qa-item'):null; if(it) openRow(it); }, {passive:true});
+    items.forEach(function(it){
+      it.addEventListener('mouseenter', function(){ if(Date.now()>=ignoreEnterUntil) openRow(it); });
+      it.addEventListener('focus', function(){ openRow(it); });
+      it.addEventListener('click', function(){ openRow(it); });
+    });
+    openRow(items[0]); ignoreEnterUntil=0;
   })();
 </script>
 </body>
