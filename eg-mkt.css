@@ -3,9 +3,10 @@
   :root{
     --ground:#f4f2ef; --paper:#fdfcfa; --ink:#191918; --ink2:#40403d;
     --grey:#9ca3af; --grey2:#6b7280; --line:#e5e4e0;
-    --violet:#8b5cf6; --hot:#f76f9b;
-    --mint:#9be8bf; --pink:#f7bcd8; --amber:#f8d264; --indigo:#a9b6f2;
-    --coral:#f6b48c; --lilac:#cdbcf5; --sky:#b0d4f7;
+    /* muted "vintage" palette — desaturated dusty pops + a softer violet (Tavus-calm) */
+    --violet:#8a76c0; --hot:#e79bb0;
+    --mint:#bfe0cb; --pink:#efccd8; --amber:#eed9a0; --indigo:#bcc4e2;
+    --coral:#eec3ab; --lilac:#d4cce6; --sky:#c4d7ea;
     --disp:'Fraunces',Georgia,serif;
     --mono:'Departure Mono',ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace;
     --body:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;

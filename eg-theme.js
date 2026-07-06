@@ -1,14 +1,14 @@
 // eg-theme.js — universal neon-purple ACCENT + monospace-label layer for the boards.
 // One source of truth: injected as a single <style> over the shared board classes so the accent is
 // identical on every board and future tweaks are a one-file edit. Loaded via <script src> on each board.
-// Palette locked with the login: --accent #8b5cf6 / --accent-dk #7c3aed / dark-mode --accent-lt #a78bfa.
+// Palette locked with the login: --accent #8a76c0 / --accent-dk #6e5a9e / dark-mode --accent-lt #a99ccb.
 // Fonts (mono nav, Fraunces h1, mono badges) apply in BOTH themes; accent COLOURS have a light + a dark
 // variant. Base stays monotone — accent is SPARING (active nav, focus, toggles, emphasis button, links).
 (function () {
   if (document.getElementById('eg-theme-accent')) return;
   var MONO = "ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace";
   var css = [
-    ':root{--eg-accent:#8b5cf6;--eg-accent-dk:#7c3aed;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff;--eg-sep:#e8e6e1}',
+    ':root{--eg-accent:#8a76c0;--eg-accent-dk:#6e5a9e;--eg-accent-lt:#a99ccb;--eg-accent-tint:#f0edf7;--eg-sep:#e8e6e1}',
     'html[data-theme=dark]{--eg-sep:rgba(201,195,186,.22)}',
 
     /* ── SHARP CORNERS everywhere (retro/pixelated sticky-note vibe) ─── */
@@ -25,11 +25,13 @@
     '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12px!important;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
     /* Tavus-app sidebar: no divider line — instead a slightly DARKER warm nav bg against the brighter content
        (that tonal step is what separates them, Tavus-style), plus smaller/lighter nav icons. */
+    /* ONE bright background everywhere (sidebar = header = content), NO separator lines anywhere —
+       structure comes from the content boxes/cards, not tones or dividers (the clean Tavus canvas). */
     '.sidebar{border-right-width:0!important}',
-    'html:not([data-theme=dark]) .sidebar{background:#f1eee7!important}',
-    'html:not([data-theme=dark]) .sidebar-logo{border-bottom-color:rgba(0,0,0,.06)!important}',
-    'html:not([data-theme=dark]) body{background:#faf8f4!important}',   /* brighter content ground so the nav reads darker */
-    'html:not([data-theme=dark]) header{background:#faf8f4!important;border-bottom-color:rgba(0,0,0,.05)!important}',   /* header JOINS the bright content — only the sidebar is tinted (two tones, not three) */
+    'html:not([data-theme=dark]) .sidebar,html:not([data-theme=dark]) header{background:#faf8f4!important}',
+    'html:not([data-theme=dark]) body{background:#faf8f4!important}',
+    'header{border-bottom-width:0!important}',
+    '.sidebar-logo{border-bottom-width:0!important}',
     '.ni svg{width:15px!important;height:15px!important}',
     '.ni.on{border:1.5px solid transparent!important}',
     /* page-title greeting → Fraunces serif (each board has one h1; inline section-title divs stay Inter) */
@@ -50,8 +52,8 @@
     '.eg-sel-btn,.seg,.cat-pill,.sort-select,.tab-sm,.tab-btn,.tab-flag,.chat-tab,.filter-section-title,select[data-eg-select],#trend-period,#cat-sort{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* settings sub-nav (seller .stab / admin .fstab) → mono, ACCENT active state (kills the boxed-active look) */
     '.stab,.fstab{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12.5px!important}',
-    'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border-color:transparent!important}',
-    'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
+    'html:not([data-theme=dark]) .stab.on,html:not([data-theme=dark]) .fstab.on{background:var(--eg-accent-tint)!important;color:#6e5a9e!important;border-color:transparent!important}',
+    'html[data-theme=dark] .stab.on,html[data-theme=dark] .fstab.on{background:rgba(138,118,192,.17)!important;color:var(--eg-accent-lt)!important;border-color:transparent!important}',
     /* settings form labels → monospace uppercase, like the login field labels */
     '[id^=panel-] label,[id^=afpanel-] label,[id^=wfpanel-] label,[id^=ofpanel-] label{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px}',
 
@@ -101,8 +103,8 @@
     'html:not([data-theme=dark]) .ni:hover:not(.on){background:#efeee9!important;color:#191918!important}',
     /* border MUST be set at THIS scoped specificity — each board carries its own
        `html:not([data-theme=dark]) .ni.on{border:1px solid #191918!important}` that outranks a bare .ni.on */
-    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#7c3aed!important;border:1.5px solid transparent!important}',
-    'html:not([data-theme=dark]) .ni.on svg{color:#7c3aed!important;opacity:1!important}',
+    'html:not([data-theme=dark]) .ni.on{background:var(--eg-accent-tint)!important;color:#6e5a9e!important;border:1.5px solid transparent!important}',
+    'html:not([data-theme=dark]) .ni.on svg{color:#6e5a9e!important;opacity:1!important}',
     'html:not([data-theme=dark]) .btn-dk,html:not([data-theme=dark]) .btn-gold{background:var(--eg-accent)!important;color:#fff!important;border:1.5px solid #191918!important;box-shadow:3px 3px 0 #191918!important;transition:transform .09s ease,box-shadow .09s ease!important}',
     'html:not([data-theme=dark]) .btn-dk:hover,html:not([data-theme=dark]) .btn-gold:hover{background:var(--eg-accent-dk)!important;transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #191918!important}',
     'html:not([data-theme=dark]) .btn-dk:active,html:not([data-theme=dark]) .btn-gold:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #191918!important}',
@@ -115,12 +117,12 @@
 
     /* ── DARK-MODE ACCENT (lighter purple for contrast on the dark base) ── */
     'html[data-theme=dark] .ni:hover:not(.on){background:rgba(255,255,255,.05)!important;color:#f0ede6!important}',
-    'html[data-theme=dark] .ni.on{background:rgba(139,92,246,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
+    'html[data-theme=dark] .ni.on{background:rgba(138,118,192,.17)!important;color:var(--eg-accent-lt)!important;border:1.5px solid transparent!important}',
     'html[data-theme=dark] .ni.on svg{color:var(--eg-accent-lt)!important;opacity:1!important}',
     'html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-gold{background:var(--eg-accent)!important;color:#fff!important;border:1.5px solid #c9c3ba!important;box-shadow:3px 3px 0 #c9c3ba!important;transition:transform .09s ease,box-shadow .09s ease!important}',
     'html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-gold:hover{background:var(--eg-accent-lt)!important;transform:translate(1px,1px)!important;box-shadow:2px 2px 0 #c9c3ba!important}',
     'html[data-theme=dark] .btn-dk:active,html[data-theme=dark] .btn-gold:active{transform:translate(3px,3px)!important;box-shadow:0 0 0 #c9c3ba!important}',
-    'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(139,92,246,.22)!important}',
+    'html[data-theme=dark] .input:focus,html[data-theme=dark] .select:focus,html[data-theme=dark] input:focus,html[data-theme=dark] textarea:focus,html[data-theme=dark] select:focus{border-color:var(--eg-accent-lt)!important;box-shadow:0 0 0 3px rgba(138,118,192,.22)!important}',
     'html[data-theme=dark] .toggle-on,html[data-theme=dark] .toggle.toggle-on{background:var(--eg-accent)!important}',
     'html[data-theme=dark] input[type=checkbox],html[data-theme=dark] input[type=radio],html[data-theme=dark] input[type=range]{accent-color:var(--eg-accent-lt)}',
     'html[data-theme=dark] .eg-link,html[data-theme=dark] a.accent{color:var(--eg-accent-lt)!important}',
@@ -139,7 +141,7 @@
   // ── Tavus card header: inject [colored dot] before each stat card's TITLE + a separator line under that
   //    title row. Pure CSS can't target the (inline-styled, structurally varied) title, so we do it here.
   //    title = the first UPPERCASE text element in the card (the eyebrow); dot colour cycles per card. ──
-  var EG_CARD_DOTS = ['#34d399', '#f472b6', '#fbbf24', '#818cf8', '#fb7185', '#a78bfa'];
+  var EG_CARD_DOTS = ['#34d399', '#f472b6', '#fbbf24', '#818cf8', '#fb7185', '#a99ccb'];
   function egEnhanceCards() {
     var cards = document.querySelectorAll('.wcard,.stat-card');
     for (var i = 0; i < cards.length; i++) {
