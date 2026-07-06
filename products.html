@@ -693,11 +693,8 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       card.className = 'product-card fade-up visible';
       card.dataset.name = name; card.dataset.price = (price!=='—'?price:'');
       card.style.cssText = 'cursor:pointer;border:1.5px solid #191918;box-shadow:4px 4px 0 #191918;background:#fdfcfa;display:flex;flex-direction:column;overflow:hidden;border-radius:0';
-      // right panel = real photo if present, otherwise the pixelated spinning garment (placeholders => spin too)
-      var hasImg = p.img && !/placehold/i.test(p.img);
-      var imgHTML = hasImg
-        ? '<img src="'+esc2(p.img)+'" alt="'+esc2(name)+'" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML=\'<canvas data-spin=tshirt data-pop='+pop+' data-px=4 style=&quot;width:100%;height:100%;display:block&quot;></canvas>\';if(window.EGSpin)EGSpin.autoInit(this.parentNode);"/>'
-        : '<canvas data-spin="tshirt" data-pop="'+pop+'" data-px="4" style="width:100%;height:100%;display:block"></canvas>';
+      // pixelated spinning garment on EVERY card — no real photos (user wants the pixelated animation here)
+      var imgHTML = '<canvas data-spin="tshirt" data-pop="'+pop+'" data-px="4" style="width:100%;height:100%;display:block"></canvas>';
       card.innerHTML =
         '<div style="display:flex;align-items:center;gap:8px;border-bottom:1.5px solid #191918;padding:10px 14px">' +
           '<span style="width:11px;height:11px;background:'+dot+';flex-shrink:0"></span>' +

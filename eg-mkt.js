@@ -12,12 +12,12 @@ function setFeat(key, el){
   // right panel: a procedural dither in the tab's accent (always painted, sits behind) + the tab's real
   // artwork on top when images/feat-<key>.jpg exists; until then the img fails to load and the dither shows.
   var dith=document.getElementById('feat-dith'), img=document.getElementById('feat-img');
-  if(dith && window.EGDither){ try{ EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }catch(e){} }
-  if(img){
-    img.onload=function(){ img.style.display='block'; };
-    img.onerror=function(){ img.style.display='none'; };
-    img.style.display='none';
-    if(d.img){ img.src=d.img; } else { img.removeAttribute('src'); }
+  if(img) img.style.display='none';   // render a DITHERED version of the artwork into #feat-dith (not the raw photo)
+  if(dith && window.EGDither){
+    try{
+      if(d.img){ EGDither.image(dith, d.img, {pop:d.pop||'violet', pixel:3, fit:'cover'}); }   // dither the tab's image; auto-falls back to procedural art if it can't load
+      else { EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }
+    }catch(e){}
   }
 }
 // initialise the "What you get" panel for the default (active) tab on load (guarded to this page's panel)
