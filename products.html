@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Products – EGFULFILL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="eg-mkt.css"><!-- shared marketing header/footer + Departure Mono pixel nav -->
   <style>
     /* Page/section headlines in the Fraunces brand font (heavy, even spacing) */
     h1, h2[class*="text-3xl"], h2[class*="text-4xl"], h2[class*="text-5xl"] { font-family:'Fraunces', serif !important; font-weight:900 !important; font-optical-sizing:none; font-variation-settings:'opsz' 30, 'wght' 900 !important; letter-spacing:-0.01em !important; }
@@ -298,27 +299,39 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
   <script src="eg-spin.js"></script>
 
   <script src="eg-theme.js"></script>
+  <style id="eg-sharp-all">*,*::before,*::after{border-radius:0!important}</style>
 </head>
 <body>
 
-  <!-- NAV (shared canonical) -->
-  <nav style="background:#f7f5f0;position:sticky;top:0;z-index:50">
-    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-8">
-        <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:28px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
-        <div class="hidden md:flex items-center gap-6">
-          <a href="products.html" class="nav-link active" style="text-decoration:none">Products</a>
-          <a href="howitworks.html" class="nav-link" style="text-decoration:none">How It Works</a>
-          <a href="about.html" class="nav-link" style="text-decoration:none">About</a>
-          <a href="apidocs.html" class="nav-link" style="text-decoration:none">API Documentation</a>
+  <!-- STICKY TOP: full-width promo bar + floating split header (shared marketing header) -->
+  <div class="topstick">
+    <div class="promo"><div class="page"><div class="promo-in"><span class="b-tag">New</span> TikTok Shop sync is live — connect your shop in two minutes. <a href="howitworks.html">See how it works →</a></div></div></div>
+    <div class="hdr-wrap">
+      <div class="page">
+        <header class="mkhead">
+          <div class="mkhead-l">
+            <span class="mklogo-cell"><a class="mklogo" href="index.html">egfulfill</a></span>
+            <nav class="mknav">
+              <a href="products.html"><span class="sq"></span>Products</a>
+              <a href="howitworks.html"><span class="sq"></span>How it works</a>
+              <a href="index.html#pricing"><span class="sq"></span>Pricing</a>
+              <a href="apidocs.html"><span class="sq"></span>API docs</a>
+            </nav>
+          </div>
+          <div class="mkright"><a class="mklogin" href="seller-login.html">Log in</a><a class="mkstart" href="seller-signup.html">Start for free</a></div>
+          <button class="burger" onclick="var m=document.getElementById('mobnav');m.style.display=m.style.display==='flex'?'none':'flex'" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 5h14M2 9h14M2 13h14" stroke="#191918" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+        </header>
+        <div id="mobnav">
+          <a href="products.html">Products</a>
+          <a href="howitworks.html">How it works</a>
+          <a href="index.html#pricing">Pricing</a>
+          <a href="apidocs.html">API docs</a>
+          <a href="seller-login.html">Log in</a>
+          <a href="seller-signup.html" style="color:var(--violet)">Start for free →</a>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <a href="seller-login.html" class="nav-link hidden md:block" style="text-decoration:none">Log in</a>
-        <a href="seller-signup.html" class="btn-retro">Start for free</a>
-      </div>
     </div>
-  </nav>
+  </div>
 
   <!-- HERO -->
   <section style="background:#f7f5f0" class="pt-16 pb-10">
@@ -506,48 +519,23 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
     </div>
   </section>
 
-  <!-- FOOTER (shared canonical) -->
-  <footer style="background:#f7f5f0;border-top:1.5px solid #40403d;padding:56px 0 40px">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-        <div class="col-span-2 md:col-span-1">
-          <a href="index.html" style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-size:26px;line-height:1;color:#191918;text-decoration:none">egfulfill</a>
-          <p style="font-size:12.5px;color:#9ca3af;margin-top:10px">Print-on-demand fulfillment for creators &amp; brands.</p>
-        </div>
-        <div>
-          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Product</div>
-          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
-            <li><a href="products.html" style="text-decoration:none;color:inherit">Browse catalog</a></li>
-            <li><a href="design-maker.html" style="text-decoration:none;color:inherit">Design Maker</a></li>
-            <li><a href="howitworks.html" style="text-decoration:none;color:inherit">How it works</a></li>
-          </ul>
-        </div>
-        <div>
-          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Company</div>
-          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
-            <li><a href="about.html" style="text-decoration:none;color:inherit">About us</a></li>
-            <li><a href="seller-login.html" style="text-decoration:none;color:inherit">Log in</a></li>
-          </ul>
-        </div>
-        <div>
-          <div style="font-size:11.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">API Documentation</div>
-          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;font-size:13.5px;color:#6b7280">
-            <li><a href="apidocs.html" style="text-decoration:none;color:inherit">API docs</a></li>
-            <li><a href="help.html" style="text-decoration:none;color:inherit">Help center</a></li>
-            <li><a href="security.html" style="text-decoration:none;color:inherit">Security</a></li>
-          </ul>
-        </div>
+  <!-- FOOTER (shared marketing footer) -->
+  <div class="mkfoot">
+    <div class="page">
+      <div class="mkfoot-cta">
+        <div class="mkfoot-word">egfulfill</div>
+        <div class="r"><div class="tagline">Print-on-demand fulfilment for every order, from every channel — in one place.</div></div>
       </div>
-      <div style="border-top:1px solid #e5e4e0;padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
-        <p style="font-size:12px;color:#9ca3af;margin:0">© 2024 EGFULFILL, Inc. All rights reserved.</p>
-        <div style="display:flex;gap:18px;font-size:12px;color:#9ca3af">
-          <a href="privacy.html" style="text-decoration:none;color:inherit">Privacy</a>
-          <a href="terms.html" style="text-decoration:none;color:inherit">Terms</a>
-          <a href="ip-policy.html" style="text-decoration:none;color:inherit">IP Policy</a>
-        </div>
+      <div class="mkfoot-cols">
+        <div class="mkfoot-col"><h5>Product</h5><a href="products.html">Browse catalog</a><a href="howitworks.html">How it works</a><a href="index.html#pricing">Pricing</a><a href="apidocs.html">API docs</a></div>
+        <div class="mkfoot-col"><h5>Company</h5><a href="about.html">About</a><a href="security.html">Security</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
+        <div class="mkfoot-col"><h5>Channels</h5><a href="products.html">Etsy</a><a href="products.html">Shopify</a><a href="products.html">TikTok Shop</a><a href="products.html">Amazon</a></div>
+        <div class="mkfoot-col"><h5>Get started</h5><a href="seller-signup.html">Create account</a><a href="seller-login.html">Seller log in</a><a href="login.html">Staff log in</a><a href="help.html">Help centre</a></div>
       </div>
+      <div class="mkfoot-bar"><span>© 2026 EGFULFILL · Made for makers</span><span class="dots"><span></span><span></span><span></span></span></div>
     </div>
-  </footer>
+  </div>
+  <script src="eg-mkt.js"></script>
 
   <!-- Mobile filter overlay + drawer -->
   <div id="filter-overlay" class="filter-overlay" onclick="closeFilterDrawer()"></div>
