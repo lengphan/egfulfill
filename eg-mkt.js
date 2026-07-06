@@ -15,7 +15,7 @@ function setFeat(key, el){
   if(img) img.style.display='none';   // render a DITHERED version of the artwork into #feat-dith (not the raw photo)
   if(dith && window.EGDither){
     try{
-      if(d.img){ EGDither.image(dith, d.img, {pop:d.pop||'violet', pixel:3, fit:'cover', levels:14, contrast:0.94}); }   // LIGHT dither: many tones keep the artwork legible in the tab's palette (not a heavy 5-colour remap)
+      if(d.img){ EGDither.image(dith, d.img, {palette:EGDither.duotoneFor(d.pop||'violet'), pixel:3, fit:'cover', levels:16, contrast:1.05}); }   // LEGIBLE single-hue duotone in the tab's accent (not a violet+clashing-pop mess) + many tones = subtle dither
       else { EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }
     }catch(e){}
   }

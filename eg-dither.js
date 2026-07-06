@@ -53,6 +53,16 @@
     return [INK, VIO_DK, VIO, hex(P), PAPER];
   }
 
+  function mix(a, b, t) { return [Math.round(a[0] + (b[0] - a[0]) * t), Math.round(a[1] + (b[1] - a[1]) * t), Math.round(a[2] + (b[2] - a[2]) * t)]; }
+
+  // SINGLE-HUE duotone ramp (dark → accent → light) built from ONE pop colour. Mapping a photo through
+  // one coherent hue keeps it LEGIBLE (like a tinted print) — unlike ink·violet·POP·paper, which mixes two
+  // clashing hues (e.g. violet + teal) into unreadable noise. shadows tint dark, highlights tint to paper.
+  function duotoneFor(pop) {
+    var c = PALETTES[pop] ? PALETTES[pop][2] : hex(POPS[pop] || pop || POPS.violet);
+    return [mix(c, [17, 16, 20], 0.86), mix(c, [26, 22, 32], 0.52), c, mix(c, [249, 247, 242], 0.52), [245, 243, 238]];
+  }
+
   // Interpolate a coarse palette up to `steps` evenly-spaced tones. More tones = smaller quantisation
   // steps = a much SUBTLER (lighter) ordered-dither that still spans the exact same colour range.
   function expandPalette(pal, steps) {
@@ -206,7 +216,7 @@
     });
   }
 
-  var EGDither = { BAYER: BAYER, POPS: POPS, PALETTES: PALETTES, paletteFor: paletteFor, hex: hex, art: art, image: image, mount: mount, autoInit: autoInit, _dither: ditherBuffer };
+  var EGDither = { BAYER: BAYER, POPS: POPS, PALETTES: PALETTES, paletteFor: paletteFor, duotoneFor: duotoneFor, expandPalette: expandPalette, hex: hex, art: art, image: image, mount: mount, autoInit: autoInit, _dither: ditherBuffer };
   global.EGDither = EGDither;
   if (typeof module !== 'undefined' && module.exports) module.exports = EGDither;
 
