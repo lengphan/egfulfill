@@ -295,6 +295,7 @@ section[style*="background:white"],section[style*="background: white"],section[s
 section [style*="background:#fff"][style*="border-radius:1"],section [style*="background: #fff"][style*="border-radius:1"],section [style*="background:white"][style*="border-radius:1"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
 section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px solid #40403d!important;box-shadow:3px 3px 0 #40403d!important}
 </style>  <script src="eg-dither.js"></script>
+  <script src="eg-spin.js"></script>
 
   <script src="eg-theme.js"></script>
 </head>
@@ -695,7 +696,9 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       card.innerHTML =
         '<div style="position:absolute;top:12px;left:12px;z-index:5"><span class="badge-new">NEW</span></div>' +
         '<div class="product-img" style="height:260px;padding:0">' +
-          '<img src="' + img + '" alt="' + (p.name||'') + '" style="width:100%;height:100%;object-fit:cover" onerror="this.src=\'https://placehold.co/400x400/f0ede9/6b7280?text=' + fallback + '\'"/>' +
+          (p.img
+            ? '<img src="' + p.img + '" alt="' + (p.name||'') + '" style="width:100%;height:100%;object-fit:cover" onerror="this.src=\'https://placehold.co/400x400/f0ede9/6b7280?text=' + fallback + '\'"/>'
+            : '<canvas data-spin="tshirt" data-pop="violet" data-px="4" style="width:100%;height:100%;display:block"></canvas>') +
         '</div>' +
         '<div class="p-4">' +
           '<div class="text-sm font-semibold text-gray-900 mb-1">' + (p.name || 'Untitled') + '</div>' +
@@ -744,6 +747,7 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       grid.className = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4';
       live.forEach(function(p){ grid.appendChild(liveProductCard(p)); });
       sc.appendChild(grid);
+      if (window.EGSpin) EGSpin.autoInit(grid);   // animate the pixelated-garment fallbacks
       updateLiveCount(live.length);
     }
     function updateLiveCount(n) {
