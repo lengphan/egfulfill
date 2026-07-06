@@ -144,11 +144,40 @@ document.addEventListener('click',function(e){var nb=document.getElementById('ne
     try{ return (window.EGStore && EGStore.hasSpydeck) ? EGStore.hasSpydeck() : ((localStorage.getItem('eg_seller_plan')||'starter')!=='starter'); }catch(e){ return false; }
   }
   function renderLocked(el){
-    var teaser='';
-    for(var i=0;i<8;i++){ teaser+='<div style="background:#fff;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden"><div style="height:150px;background:#efece7"></div><div style="padding:12px 13px"><div style="height:11px;background:#eceae5;border-radius:5px;margin-bottom:8px"></div><div style="height:11px;width:60%;background:#eceae5;border-radius:5px;margin-bottom:14px"></div><div style="display:flex;gap:7px"><div style="flex:1;height:34px;background:#f4f2ef;border-radius:8px"></div><div style="flex:1;height:34px;background:#f4f2ef;border-radius:8px"></div></div></div></div>'; }
+    // A real-looking SpyDeck sneak peek behind the blur (not blank skeletons): sample Etsy bestsellers with
+    // product-photo-ish thumbnails, spy stats and Make/Save actions, so the teaser tells you what you're unlocking.
+    var TEASE=[
+      {t:'Personalized Birth Flower Necklace · Gold Filled Custom Name',g:'linear-gradient(135deg,#f3d9c9,#d9a88c)',sold:'1,240',rev:'$18.5k',fav:'4.9k',trend:true},
+      {t:'Custom Pet Portrait Sweatshirt from Your Photo',g:'linear-gradient(135deg,#cfe0d2,#9fbfa6)',sold:'980',rev:'$29.4k',fav:'3.2k',trend:false},
+      {t:'Retro Groovy Smiley Face Comfort Colors Tee',g:'linear-gradient(135deg,#f7e3a1,#e6c25a)',sold:'2,110',rev:'$42.1k',fav:'7.8k',trend:true},
+      {t:'Boho Macramé Wall Hanging · Handwoven Fiber Art',g:'linear-gradient(135deg,#e8ddcf,#c9b79c)',sold:'640',rev:'$12.8k',fav:'2.1k',trend:false},
+      {t:'Minimalist Name Ring · Dainty Stackable Band',g:'linear-gradient(135deg,#e6d6ea,#bfa6cf)',sold:'1,760',rev:'$21.1k',fav:'5.4k',trend:false},
+      {t:'Custom Neon Sign for Bedroom · LED Wall Decor',g:'linear-gradient(135deg,#cdd9f0,#93aee0)',sold:'520',rev:'$36.4k',fav:'1.9k',trend:true},
+      {t:'Embroidered Crewneck Sweatshirt · Vintage Aesthetic',g:'linear-gradient(135deg,#f2cdd8,#d99bb0)',sold:'1,340',rev:'$26.8k',fav:'4.1k',trend:false},
+      {t:'Personalized Cutting Board · Engraved Wedding Gift',g:'linear-gradient(135deg,#e9ddc6,#c9a875)',sold:'890',rev:'$17.6k',fav:'2.8k',trend:false},
+      {t:'Aesthetic Custom Photo Collage Phone Case',g:'linear-gradient(135deg,#d7e7e6,#a3c9c6)',sold:'1,050',rev:'$14.2k',fav:'3.6k',trend:false}
+    ];
+    function statBox(v,l){ return '<div style="flex:1;background:rgba(0,0,0,.05);border-radius:8px;padding:7px 4px;text-align:center;line-height:1.15"><div style="font-size:13px;font-weight:700;color:#191918">'+v+'</div><div style="font-size:8.5px;font-weight:600;color:#9ca3af;letter-spacing:.03em">'+l+'</div></div>'; }
+    var teaser=TEASE.map(function(p){
+      return '<div style="background:#fff;border:1px solid #e5e4e0;border-radius:14px;overflow:hidden;display:flex;flex-direction:column">'
+        + '<div style="position:relative;aspect-ratio:1/1;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.55),transparent 55%),'+p.g+'">'
+          + (p.trend?'<span style="position:absolute;top:8px;left:8px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.03em">TRENDING ↑</span>':'')
+          + '<span style="position:absolute;top:9px;right:9px;width:30px;height:30px;border-radius:50%;background:rgba(17,24,39,.42);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 20s-7-4.5-9.5-9C1 8 2.5 4.5 6 4.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3.5 0 5 3.5 3.5 6.5C19 15.5 12 20 12 20z" fill="#fff"/></svg></span>'
+          + '<span style="position:absolute;left:8px;bottom:8px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;font-weight:700;color:#fff;background:rgba(17,24,39,.5);border-radius:5px;padding:4px 8px">'+p.sold+' sold · 30d</span>'
+        + '</div>'
+        + '<div style="padding:11px 12px 13px">'
+          + '<div style="font-size:13px;font-weight:600;color:#191918;line-height:1.4;height:36px;overflow:hidden">'+p.t+'</div>'
+          + '<div style="display:flex;gap:6px;margin:10px 0 11px">'+statBox(p.sold,'SOLD')+statBox(p.rev,'REV / MO')+statBox(p.fav,'SAVES')+'</div>'
+          + '<div style="display:flex;gap:7px">'
+            + '<div style="flex:1.4;background:#191918;color:#fff;border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:650">Make this</div>'
+            + '<div style="flex:1;background:#fff;border:1px solid #e5e4e0;color:#374151;border-radius:9px;padding:9px;text-align:center;font-size:12px;font-weight:600">Save</div>'
+          + '</div>'
+        + '</div>'
+      + '</div>';
+    }).join('');
     el.innerHTML =
-      '<div style="position:relative;min-height:520px">'
-      + '<div aria-hidden="true" style="filter:blur(6px);pointer-events:none;user-select:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">'+teaser+'</div>'
+      '<div style="position:relative;min-height:560px">'
+      + '<div aria-hidden="true" style="filter:blur(4.5px);pointer-events:none;user-select:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">'+teaser+'</div>'
       + '<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:84px">'
         + '<div style="background:#fff;border:1px solid #e5e4e0;border-radius:18px;box-shadow:0 18px 50px rgba(17,24,39,.14);max-width:420px;width:100%;padding:30px 28px;text-align:center">'
           + '<div style="width:52px;height:52px;border-radius:14px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" stroke="#191918" stroke-width="1.7"/><path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="#191918" stroke-width="1.7" stroke-linecap="round"/></svg></div>'
