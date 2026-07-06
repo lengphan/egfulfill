@@ -41,12 +41,12 @@
       var t = (btn.textContent || '').trim();
       if (/^Upgrade to (Starter|Pro|Enterprise) ↑$/.test(t)) {
         if (nm) {
-          btn.textContent = 'Upgrade to ' + nm.shortName + ' ↑';
+          btn.textContent = 'Upgrade to ' + (nm.shortName || nm.name || 'the next plan') + ' ↑';
           btn.disabled = false;
           btn.style.opacity = '';
           btn.style.cursor = 'pointer';
         } else {
-          btn.textContent = 'You are on ' + m.shortName;
+          btn.textContent = 'You are on ' + ((m && (m.shortName || m.name)) || 'your plan');
           btn.disabled = true;
           btn.style.opacity = '0.55';
           btn.style.cursor = 'default';

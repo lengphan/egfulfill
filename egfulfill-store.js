@@ -2175,11 +2175,17 @@
     PLAN_OVERRIDE_KEY: 'eg_plan_tiers',
     getPlanTiers: function() {
       var base = this.PLAN_TIERS;
+      var out = base;
       try {
         var ov = JSON.parse(localStorage.getItem(this.PLAN_OVERRIDE_KEY) || 'null');
-        if (Array.isArray(ov)) return base.map(function(t){ var o = ov.find(function(x){ return x && x.id === t.id; }); return o ? Object.assign({}, t, o) : t; });
+        if (Array.isArray(ov)) out = base.map(function(t){ var o = ov.find(function(x){ return x && x.id === t.id; }); return o ? Object.assign({}, t, o) : t; });
       } catch (e) {}
-      return base;
+      // Backfill name/shortName so a partial admin override — or a wiped tier — can never render an
+      // "undefined" label (e.g. "Upgrade to undefined"). Falls back name → shortName → capitalised id.
+      return out.map(function(t){
+        var nm = t.name || t.shortName || (t.id ? t.id.charAt(0).toUpperCase() + t.id.slice(1) : 'Plan');
+        return Object.assign({}, t, { name: nm, shortName: t.shortName || nm });
+      });
     },
     setPlanTiers: function(tiers) {
       try { localStorage.setItem(this.PLAN_OVERRIDE_KEY, JSON.stringify(tiers || [])); window.dispatchEvent(new CustomEvent('eg-plan-changed', { detail:{} })); return true; } catch (e) { return false; }
