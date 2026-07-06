@@ -64,10 +64,10 @@
     '.eg-meta-label{font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;padding-right:12px;margin-right:12px;border-right:1.5px solid #e5e4e0}',
     '.eg-meta-item{font-weight:600;color:#374151}',
     '.eg-meta-item+.eg-meta-item::before{content:"·";color:#c4c3be;margin:0 8px}',
-    /* CARTOON-RETRO stat cards (user pick B): bold ink border + hard 4px offset shadow, STATIC —
-       no hover transform so drag-to-reorder still works. Dark mode uses the light retro ink (#c9c3ba). */
-    'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1.5px solid #191918!important;box-shadow:4px 4px 0 #191918!important}',
-    'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1.5px solid #c9c3ba!important;box-shadow:4px 4px 0 #c9c3ba!important}',
+    /* Dashboard cards: LIGHT & AIRY (Tavus app style) — thin soft border + whisper shadow, not the heavy
+       black offset (which read too heavy on the boards). STATIC — no hover transform so drag-reorder works. */
+    'html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{border:1px solid #e8e5df!important;box-shadow:0 1px 2px rgba(17,24,39,.05)!important}',
+    'html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border:1px solid #383631!important;box-shadow:0 1px 3px rgba(0,0,0,.3)!important}',
     /* ── PUBLIC / MARKETING pages (index, howitworks, about, help, seller-login, product-detail-public) ──
        they carry their own retro classes (.eg-card/.bento-card/.floating-card/.btn-retro/.section-tag) with
        ROUNDED corners + soft grey #40403d borders. Global border-radius:0 sharpens them; these rules blacken
