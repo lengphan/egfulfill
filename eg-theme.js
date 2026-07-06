@@ -23,8 +23,12 @@
     /* transparent 1.5px border on EVERY nav item (active or not) → kills the outlined-active box AND
        makes row height identical across all boards (some files reserved a border, some didn't) */
     '.ni{font-family:' + MONO + '!important;text-transform:uppercase;letter-spacing:.04em;font-size:12px!important;border:1.5px solid transparent!important;transition:background-color .16s ease,color .16s ease!important}',
-    /* Tavus-app sidebar: no divider line between the sidebar and the content, and smaller/lighter nav icons */
+    /* Tavus-app sidebar: no divider line — instead a slightly DARKER warm nav bg against the brighter content
+       (that tonal step is what separates them, Tavus-style), plus smaller/lighter nav icons. */
     '.sidebar{border-right-width:0!important}',
+    'html:not([data-theme=dark]) .sidebar{background:#eae6dd!important}',
+    'html:not([data-theme=dark]) .sidebar-logo{border-bottom-color:rgba(0,0,0,.06)!important}',
+    'html:not([data-theme=dark]) body{background:#faf8f4!important}',   /* brighter content ground so the nav reads darker */
     '.ni svg{width:15px!important;height:15px!important}',
     '.ni.on{border:1.5px solid transparent!important}',
     /* page-title greeting → Fraunces serif (each board has one h1; inline section-title divs stay Inter) */
