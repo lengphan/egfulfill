@@ -154,8 +154,7 @@ document.addEventListener('click',function(e){var nb=document.getElementById('ne
       {t:'Minimalist Name Ring · Dainty Stackable Band',g:'linear-gradient(135deg,#e6d6ea,#bfa6cf)',sold:'1,760',rev:'$21.1k',fav:'5.4k',trend:false},
       {t:'Custom Neon Sign for Bedroom · LED Wall Decor',g:'linear-gradient(135deg,#cdd9f0,#93aee0)',sold:'520',rev:'$36.4k',fav:'1.9k',trend:true},
       {t:'Embroidered Crewneck Sweatshirt · Vintage Aesthetic',g:'linear-gradient(135deg,#f2cdd8,#d99bb0)',sold:'1,340',rev:'$26.8k',fav:'4.1k',trend:false},
-      {t:'Personalized Cutting Board · Engraved Wedding Gift',g:'linear-gradient(135deg,#e9ddc6,#c9a875)',sold:'890',rev:'$17.6k',fav:'2.8k',trend:false},
-      {t:'Aesthetic Custom Photo Collage Phone Case',g:'linear-gradient(135deg,#d7e7e6,#a3c9c6)',sold:'1,050',rev:'$14.2k',fav:'3.6k',trend:false}
+      {t:'Personalized Cutting Board · Engraved Wedding Gift',g:'linear-gradient(135deg,#e9ddc6,#c9a875)',sold:'890',rev:'$17.6k',fav:'2.8k',trend:false}
     ];
     function statBox(v,l){ return '<div style="flex:1;background:rgba(0,0,0,.05);border-radius:8px;padding:7px 4px;text-align:center;line-height:1.15"><div style="font-size:13px;font-weight:700;color:#191918">'+v+'</div><div style="font-size:8.5px;font-weight:600;color:#9ca3af;letter-spacing:.03em">'+l+'</div></div>'; }
     var teaser=TEASE.map(function(p){
@@ -177,7 +176,7 @@ document.addEventListener('click',function(e){var nb=document.getElementById('ne
     }).join('');
     el.innerHTML =
       '<div style="position:relative;min-height:560px">'
-      + '<div aria-hidden="true" style="filter:blur(4.5px);pointer-events:none;user-select:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px">'+teaser+'</div>'
+      + '<div aria-hidden="true" style="filter:blur(4.5px);pointer-events:none;user-select:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">'+teaser+'</div>'
       + '<div style="position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:84px">'
         + '<div style="background:#fff;border:1px solid #e5e4e0;border-radius:18px;box-shadow:0 18px 50px rgba(17,24,39,.14);max-width:420px;width:100%;padding:30px 28px;text-align:center">'
           + '<div style="width:52px;height:52px;border-radius:14px;background:#f4f2ef;display:flex;align-items:center;justify-content:center;margin:0 auto 16px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5" stroke="#191918" stroke-width="1.7"/><path d="M8 10.5V8a4 4 0 018 0v2.5" stroke="#191918" stroke-width="1.7" stroke-linecap="round"/></svg></div>'
