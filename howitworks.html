@@ -201,15 +201,17 @@
   /* Q&A hover-to-open — driven by discrete mouseenter/focus so it can't flicker while the row resizes.
      Opening a row stays open (Tavus-style) until another row is entered; keyboard + touch friendly. */
   (function(){
+    var list=document.querySelector('.qa-list');
     var items=[].slice.call(document.querySelectorAll('.qa-item'));
-    if(!items.length) return;
-    function open(it){ items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
-    items.forEach(function(it){
-      it.addEventListener('mouseenter', function(){ open(it); });
-      it.addEventListener('focus', function(){ open(it); });
-      it.addEventListener('click', function(){ open(it); });
-    });
-    open(items[0]);
+    if(!list||!items.length) return;
+    var cur=null;
+    function openRow(it){ if(!it||it===cur) return; cur=it; items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
+    // Drive off mousemove (fires only on REAL cursor movement), not :hover/mouseenter — so a row growing
+    // under a STATIONARY cursor can't retrigger and flicker. rAF-throttled; the cur guard skips no-op toggles.
+    var raf=0, tgt=null;
+    list.addEventListener('mousemove', function(e){ tgt=e.target; if(raf) return; raf=requestAnimationFrame(function(){ raf=0; openRow(tgt&&tgt.closest?tgt.closest('.qa-item'):null); }); });
+    items.forEach(function(it){ it.addEventListener('focus', function(){ openRow(it); }); it.addEventListener('click', function(){ openRow(it); }); });
+    openRow(items[0]);
   })();
 </script>
 </body>
