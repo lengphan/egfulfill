@@ -505,21 +505,6 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 </style>  <script src="eg-dither.js"></script>
 
   <script src="eg-theme.js"></script>
-  <style id="eg-seller-rebuild">
-  /* ===== Seller board — Tavus-cohesive UI rebuild (PRESENTATION ONLY — no logic, markup, IDs or handlers touched) ===== */
-  /* one bright canvas with a faint fixed aura */
-  html:not([data-theme=dark]) body{background-color:#faf8f4!important;background-image:radial-gradient(42% 30% at 100% 0%,rgba(155,232,191,.13),transparent 58%),radial-gradient(40% 34% at 0% 100%,rgba(159, 82, 224,.06),transparent 58%)!important;background-attachment:fixed!important;background-repeat:no-repeat!important}
-  /* header joins the canvas — no fill, no divider */
-  html:not([data-theme=dark]) header{background:transparent!important;border-bottom:0!important}
-  /* every card = one uniform light box (thin line + whisper shadow, sharp) */
-  html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .ccard{background:#fff!important;border:1px solid #e8e5df!important;box-shadow:0 1px 2px rgba(17,24,39,.05)!important}
-  html:not([data-theme=dark]) .wcard:hover,html:not([data-theme=dark]) .card:hover{box-shadow:0 2px 8px rgba(17,24,39,.07)!important}
-  @media(min-width:861px){
-    /* sidebar → a bordered sticky BOX with a small margin (not a full-bleed panel); content nudged to clear it */
-    html:not([data-theme=dark]) .sidebar{top:14px!important;left:14px!important;height:calc(100vh - 28px)!important;background:#fff!important;border:1px solid #e8e5df!important;box-shadow:0 1px 3px rgba(17,24,39,.06)!important}
-    [style*="margin-left:220px"]{margin-left:250px!important}
-  }
-  </style>
 </head>
 <body>
 

@@ -1,7 +1,7 @@
   /* Departure Mono — free OFL pixel/raster monospace, our stand-in for Tavus's (paid) FK Raster nav font */
   @font-face{font-family:'Departure Mono';src:url('fonts/DepartureMono-Regular.woff2') format('woff2');font-weight:400 700;font-style:normal;font-display:swap}
   :root{
-    --ground:#f4f2ef; --paper:#fdfcfa; --ink:#191918; --ink2:#40403d;
+    --ground:#faf9f7; --paper:#fdfcfa; --ink:#191918; --ink2:#40403d;
     --grey:#9ca3af; --grey2:#6b7280; --line:#e5e4e0;
     --violet:#9f52e0; --hot:#f76f9b;
     --mint:#9be8bf; --pink:#f7bcd8; --amber:#f8d264; --indigo:#a9b6f2;

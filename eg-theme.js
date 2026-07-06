@@ -131,6 +131,42 @@
     /* "New" status badge was missing its dark pill on orders.html (every sibling had it) */
     'html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important}'
   ].join('\n');
+
+  // ── SELLER boards → lighter, unified "Tavus" ground (white sidebar, no beige tone) ──
+  // Factory boards (factory/operator/warehouse/admin/designer) keep their current tone until the seller
+  // look is signed off. Marketing pages have no `.sidebar`, so the `:has(.sidebar)` guard skips them.
+  var _page = (location.pathname.split('/').pop() || '').toLowerCase();
+  var _isFactory = ['factory.html', 'operator.html', 'warehouse.html', 'admin.html', 'designer.html'].indexOf(_page) !== -1;
+  if (!_isFactory) {
+    css += '\n' + [
+      /* one light near-white canvas + a whisper of violet aura — NOT the darker beige nav tone */
+      'html:not([data-theme=dark]) body:has(.sidebar){background-color:#faf9f7!important;background-image:radial-gradient(46% 32% at 100% 0,rgba(159,82,224,.05),transparent 60%)!important;background-attachment:fixed!important;background-repeat:no-repeat!important}',
+      /* header + sidebar join the light canvas (no fill, no dividers) — separation is the white cards */
+      'html:not([data-theme=dark]) body:has(.sidebar) header{background:transparent!important;border-bottom:0!important}',
+      /* flush, full-height WHITE sidebar (Tavus-style) — whisper right border, no beige, no heavy shadow */
+      'html:not([data-theme=dark]) aside.sidebar{background:#fff!important;border-right:1px solid #efece6!important;box-shadow:none!important}',
+      'html:not([data-theme=dark]) aside.sidebar .sidebar-logo{border-bottom-color:#efece6!important}',
+      'html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .ccard{background:#fff!important;border:1px solid #ecebe6!important;box-shadow:0 1px 2px rgba(17,24,39,.04)!important}',
+      /* nav ICONS → outline / stroked (not solid fills) */
+      'html:not([data-theme=dark]) .ni svg,html:not([data-theme=dark]) .ni svg *{fill:none!important;stroke:currentColor!important;stroke-width:1.3px!important;stroke-linecap:round!important;stroke-linejoin:round!important}',
+
+      /* ── UNIFIED header control cluster: one quiet language, all 32px tall, sharp ── */
+      /* every icon action (search · EN · theme · notifications · profile) = a uniform 32px pill */
+      'html:not([data-theme=dark]) body:has(.sidebar) header .ibtn{height:32px!important;padding:0 9px!important;color:#6b7280!important;display:inline-flex!important;align-items:center!important;transition:background .14s ease,color .14s ease!important}',
+      'html:not([data-theme=dark]) body:has(.sidebar) header .ibtn:hover{background:#f1eee9!important;color:#191918!important}',
+      /* balance chip → same quiet 32px chip (drop the heavy dark border + offset shadow) */
+      'html:not([data-theme=dark]) body:has(.sidebar) .bal-chip{height:32px!important;padding:0 13px!important;background:#fff!important;border:1px solid #e2ded7!important;box-shadow:none!important;color:#191918!important;transition:background .14s ease!important}',
+      'html:not([data-theme=dark]) body:has(.sidebar) .bal-chip:hover{background:#f6f4f0!important;transform:none!important}',
+      /* + New = the SINGLE accent in the cluster, matched to 32px */
+      'html:not([data-theme=dark]) body:has(.sidebar) header .btn-dk{height:32px!important;padding:0 14px!important}',
+      /* thin, quiet vertical dividers between control groups */
+      'html:not([data-theme=dark]) body:has(.sidebar) header div[style*="width:1px"]{background:#e6e2db!important;height:20px!important}',
+
+      /* desktop: a comfortable gutter between the sidebar and the content (airy Tavus spacing) */
+      '@media(min-width:861px){body:has(.sidebar) [style*="margin-left:220px"]{margin-left:250px!important}}'
+    ].join('\n');
+  }
+
   var s = document.createElement('style');
   s.id = 'eg-theme-accent';
   s.textContent = css;

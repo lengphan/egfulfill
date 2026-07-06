@@ -15,7 +15,7 @@ function setFeat(key, el){
   if(img) img.style.display='none';   // render a DITHERED version of the artwork into #feat-dith (not the raw photo)
   if(dith && window.EGDither){
     try{
-      if(d.img){ EGDither.image(dith, d.img, {pop:d.pop||'violet', pixel:3, fit:'cover'}); }   // dither the tab's image; auto-falls back to procedural art if it can't load
+      if(d.img){ EGDither.image(dith, d.img, {pop:d.pop||'violet', pixel:3, fit:'cover', levels:14, contrast:0.94}); }   // LIGHT dither: many tones keep the artwork legible in the tab's palette (not a heavy 5-colour remap)
       else { EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }
     }catch(e){}
   }

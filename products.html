@@ -334,15 +334,8 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
   </div>
 
   <!-- HERO -->
-  <section style="background:#f7f5f0" class="pt-16 pb-10">
+  <section style="background:#f7f5f0" class="pt-10 pb-10">
     <div class="max-w-7xl mx-auto px-6">
-      <div class="text-center max-w-2xl mx-auto fade-up">
-        <h1 class="text-5xl font-bold text-gray-900 mb-4" style="letter-spacing:-0.08rem;line-height:1.1">
-          Everything you need.<br/>Print-ready.
-        </h1>
-        <p class="text-lg text-gray-500 mb-8">Browse our full catalog of high-quality products. Upload your design, set your price, and we handle the rest.</p>
-      </div>
-
       <!-- Search + sort row — full width -->
       <div class="flex items-center gap-3 mt-4 mb-10 fade-up delay-1">
         <div class="search-box" style="flex:1">
@@ -497,24 +490,6 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       </div><!-- close sections-container -->
       </div><!-- close flex:1 product column -->
       </div><!-- close flex gap-6 sidebar+grid row -->
-
-      <!-- CTA BANNER -->
-      <div class="cta-section p-10 md:p-14 fade-up" style="text-align:center;margin-top:64px">
-        <h2 class="text-3xl md:text-4xl font-bold text-white mb-4" style="letter-spacing:-0.06rem">
-          Ready to start selling?
-        </h2>
-        <p class="text-gray-400 mb-8 max-w-md mx-auto text-sm leading-relaxed">
-          Create your free account, upload your design, and launch your store in minutes. We print, pack, and ship every order.
-        </p>
-        <div class="flex items-center justify-center gap-3 flex-wrap">
-          <button onclick="window.location='seller-signup.html'" style="background:white;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-            Start for free →
-          </button>
-          <button style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
-            Browse all 491 products
-          </button>
-        </div>
-      </div>
 
     </div>
   </section>
@@ -693,8 +668,13 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       card.className = 'product-card fade-up visible';
       card.dataset.name = name; card.dataset.price = (price!=='—'?price:'');
       card.style.cssText = 'cursor:pointer;border:1.5px solid #191918;box-shadow:4px 4px 0 #191918;background:#fdfcfa;display:flex;flex-direction:column;overflow:hidden;border-radius:0';
-      // pixelated spinning garment on EVERY card — no real photos (user wants the pixelated animation here)
-      var imgHTML = '<canvas data-spin="tshirt" data-pop="'+pop+'" data-px="4" style="width:100%;height:100%;display:block"></canvas>';
+      // Product image is SWAPPABLE: a real photo when the product has one (set via product-create / factory),
+      // else a black/grey pixelated spinning garment (mono) on a light panel.
+      var pImg = p.img || p.image || p.hero || (Array.isArray(p.images)&&p.images[0]) || '';
+      var hasImg = pImg && !/placehold/i.test(pImg);
+      var imgHTML = hasImg
+        ? '<img src="'+esc2(pImg)+'" alt="'+esc2(name)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">'
+        : '<canvas data-spin="tshirt" data-mono="1" data-px="4" style="width:100%;height:100%;display:block"></canvas>';
       card.innerHTML =
         '<div style="display:flex;align-items:center;gap:8px;border-bottom:1.5px solid #191918;padding:10px 14px">' +
           '<span style="width:11px;height:11px;background:'+dot+';flex-shrink:0"></span>' +
@@ -710,7 +690,7 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
             '</ul>'+
             '<button class="card-cta" onclick="window.location=\'product-detail-public.html?name=\'+encodeURIComponent(this.closest(\'.product-card\').dataset.name)" style="margin-top:auto;align-self:flex-start;font-family:'+mono+';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1.5px solid #191918;background:#fff;color:#191918;box-shadow:3px 3px 0 #191918;padding:8px 15px;cursor:pointer;border-radius:0">View product →</button>'+
           '</div>' +
-          '<div style="width:44%;max-width:238px;flex-shrink:0;border-left:1.5px solid #191918;background:#0c0c0b;overflow:hidden">'+imgHTML+'</div>' +
+          '<div style="width:44%;max-width:238px;flex-shrink:0;border-left:1.5px solid #191918;background:#f0ede6;overflow:hidden">'+imgHTML+'</div>' +
         '</div>';
       wireProductCard(card);
       return card;

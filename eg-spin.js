@@ -12,15 +12,16 @@
   function palFor(pop){ if(pop==='noir')return [[25,25,24],[70,70,66],[130,128,120],[195,190,182],[240,237,230]]; if(pop==='dusk')return [[25,25,24],[58,56,64],[120,116,128],[176,170,186],[240,237,230]]; var P=POPS[pop]||pop||POPS.violet; return [INK,VIO_DK,VIO,hex(P),PAPER]; }
 
   // Draw a t-shirt silhouette (grayscale, with soft shading) into a low-res context, squashed by sx (fake spin).
-  function garment(o, W, H, sx, shade){
+  function garment(o, W, H, sx, shade, mono){
     o.clearRect(0,0,W,H);
     o.save();
     o.translate(W/2, 0); o.scale(Math.max(0.05, Math.abs(sx)), 1); o.translate(-W/2, 0);
     var cx=W/2, bw=W*0.44, halfB=bw/2, topY=H*0.24, botY=H*0.82, shoulderY=topY+H*0.10, sleeveY=topY+H*0.20, neck=W*0.10;
-    // subtle left/right shading (a lit edge) so the dither reads as a 3D-ish garment
+    // subtle left/right shading; mono = a DARK garment (renders as black/grey dots on a LIGHT bg, no dark panel)
     var g=o.createLinearGradient(cx-halfB-W*0.16,0,cx+halfB+W*0.16,0);
-    var edge = sx<0 ? '#7c7c78' : '#f2efe8';
-    g.addColorStop(0, edge); g.addColorStop(0.5,'#e7e3db'); g.addColorStop(1, sx<0?'#f2efe8':'#7c7c78');
+    var edge = mono ? (sx<0?'#26251f':'#59564f') : (sx<0 ? '#7c7c78' : '#f2efe8');
+    var midg = mono ? '#3d3b35' : '#e7e3db';
+    g.addColorStop(0, edge); g.addColorStop(0.5, midg); g.addColorStop(1, mono ? (sx<0?'#59564f':'#26251f') : (sx<0?'#f2efe8':'#7c7c78'));
     o.fillStyle=g;
     o.beginPath();
     o.moveTo(cx-neck, topY);
@@ -61,19 +62,20 @@
   function mount(cv){
     if(cv.__egSpin) return; cv.__egSpin=true;
     var d=cv.dataset, pop=d.pop||'violet', px=d.px?+d.px:4, speed=d.speed?+d.speed:0.5;
-    var palette=palFor(pop);
+    var mono=d.mono==='1'||d.mono==='true';
+    var palette= mono ? palFor('noir') : palFor(pop);
     var reduce = global.matchMedia && global.matchMedia('(prefers-reduced-motion:reduce)').matches;
     function size(){ var r=cv.getBoundingClientRect(); var W=Math.max(2,Math.round(r.width)), H=Math.max(2,Math.round(r.height)); cv.width=W; cv.height=H; return {W:W,H:H,cw:Math.max(2,Math.ceil(W/px)),ch:Math.max(2,Math.ceil(H/px))}; }
     var m=size();
     var main={canvas:cv,ctx:cv.getContext('2d')};
     var oc=document.createElement('canvas'); var off={canvas:oc,ctx:oc.getContext('2d')};
-    var bg=palette[0];   // darkest = background
+    var bg= mono ? palette[palette.length-1] : palette[0];   // mono: LIGHT bg (black/grey dots on light)
     function frame(t){
       m=size(); oc.width=m.cw; oc.height=m.ch;
       off.ctx.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')'; off.ctx.fillRect(0,0,m.cw,m.ch);
       var sx = reduce ? 0.82 : Math.cos(t/1000*speed*Math.PI);   // -1..1 spin
       var shade = 0.6 + 0.4*Math.abs(sx);
-      garment(off.ctx, m.cw, m.ch, sx, shade);
+      garment(off.ctx, m.cw, m.ch, sx, shade, mono);
       ditherInto(main, off, m, palette);
     }
     var visible=true, io;

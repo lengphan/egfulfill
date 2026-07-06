@@ -53,6 +53,18 @@
     return [INK, VIO_DK, VIO, hex(P), PAPER];
   }
 
+  // Interpolate a coarse palette up to `steps` evenly-spaced tones. More tones = smaller quantisation
+  // steps = a much SUBTLER (lighter) ordered-dither that still spans the exact same colour range.
+  function expandPalette(pal, steps) {
+    if (!steps || steps <= pal.length) return pal;
+    var out = [], seg = pal.length - 1;
+    for (var i = 0; i < steps; i++) {
+      var t = (i / (steps - 1)) * seg, lo = Math.floor(t), hi = Math.min(lo + 1, seg), f = t - lo, a = pal[lo], b = pal[hi];
+      out.push([Math.round(a[0] + (b[0] - a[0]) * f), Math.round(a[1] + (b[1] - a[1]) * f), Math.round(a[2] + (b[2] - a[2]) * f)]);
+    }
+    return out;
+  }
+
   var lum = function (r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 
   // Quantise a low-res grayscale/colour buffer through `palette` with Bayer dithering, in place.
@@ -149,7 +161,9 @@
       var img = o.getImageData(0, 0, cw, ch), d = img.data;
       var k = opts.contrast || 1;
       if (k !== 1) for (var i = 0; i < d.length; i += 4) { for (var c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, (d[i + c] - 128) * k + 128)); }
-      ditherBuffer(d, cw, ch, opts.palette || paletteFor(opts.pop));
+      var pal = opts.palette || paletteFor(opts.pop);
+      if (opts.levels) pal = expandPalette(pal, opts.levels);   // more tones → lighter, cleaner dither
+      ditherBuffer(d, cw, ch, pal);
       o.putImageData(img, 0, 0);
       paintInto(target, m, off);
     };
