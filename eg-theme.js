@@ -162,6 +162,12 @@
       /* thin, quiet vertical dividers between control groups */
       'html:not([data-theme=dark]) body:has(.sidebar) header div[style*="width:1px"]{background:#e6e2db!important;height:20px!important}',
 
+      /* ── clean Tavus-style list rows (orders + every seller table): airy, hairline, no header fill ── */
+      'html:not([data-theme=dark]) body:has(.sidebar) .dtable th{background:#fff!important;border-bottom:1px solid #edeae4!important;color:#a8a49d!important;padding-top:13px!important;padding-bottom:11px!important}',
+      'html:not([data-theme=dark]) body:has(.sidebar) .dtable td{border-bottom:1px solid #f3f1ec!important;padding-top:13px!important;padding-bottom:13px!important}',
+      'html:not([data-theme=dark]) body:has(.sidebar) .dtable tr.main-row:hover td,html:not([data-theme=dark]) body:has(.sidebar) .dtable tr.main-row:hover td[data-col="actions"]{background:#faf8f4!important}',
+      'html:not([data-theme=dark]) body:has(.sidebar) .dtable tr:last-child td{border-bottom:none!important}',
+
       /* desktop: a comfortable gutter between the sidebar and the content (airy Tavus spacing) */
       '@media(min-width:861px){body:has(.sidebar) [style*="margin-left:220px"]{margin-left:250px!important}}'
     ].join('\n');
