@@ -36,10 +36,14 @@ egful.store {
 	handle {
 		root * /srv
 		try_files {path} {path}.html /index.html
-		# Force browsers to revalidate HTML/JS/CSS every load (cheap 304s) so a
-		# `git pull` deploy is picked up immediately — no more stale cached eg-*.js
-		# on one board while another board has the new build.
-		header Cache-Control "no-cache"
+		# Fonts + images rarely change and were being re-fetched every load under a blanket
+		# no-cache — which re-swapped the Departure Mono font on EVERY page (a per-page
+		# flash) and reloaded images slowly. Long-cache those; keep HTML/JS/CSS on no-cache
+		# so a `git pull` deploy is still picked up immediately (cheap 304s).
+		@assets path *.woff2 *.woff *.ttf *.otf *.jpg *.jpeg *.png *.webp *.gif *.svg *.ico
+		@dynamic not path *.woff2 *.woff *.ttf *.otf *.jpg *.jpeg *.png *.webp *.gif *.svg *.ico
+		header @assets Cache-Control "public, max-age=2592000"
+		header @dynamic Cache-Control "no-cache"
 		file_server
 	}
 }

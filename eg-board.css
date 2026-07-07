@@ -5,7 +5,7 @@
    Loaded AFTER eg-theme.js (wins the cascade) + paired with eg-board.js (tags + relabels the live controls).
    Presentation only — no markup/logic rewrite. Scoped to html.eg-board-on. */
 
-@font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:block}
 
 :root{
   --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfa; --bos-panel:#f7f6f4;  /* "barely" near-white ground */
