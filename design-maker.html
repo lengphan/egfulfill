@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="eg-board-on">
 <head>
   <script src="eg-guard.js"></script>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
@@ -86,6 +86,32 @@ html[data-theme=dark] .ptable td{border-bottom-color:#282624!important}
 html[data-theme=dark] .ptable th{border-bottom-color:#302e2c!important}
 html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#302e2c!important}
 html[data-theme=dark] [style*="border-bottom:1px solid #f0ede9"]{border-bottom-color:#282624!important}
+</style>
+<style id="eg-dm-board">
+/* Board OS light-touch theming for the bespoke Design-Maker chrome that eg-board.css
+   doesn't reach (tool rail, panel labels, pos-pills, rounded pop-ups). Scoped to
+   html.eg-board-on so it's inert without the theme. Presentation only — no handlers,
+   no canvas, no colour-picker swatches touched. */
+/* section labels -> Departure Mono, matching the shared theme's eyebrow language */
+html.eg-board-on .panel-label,html.eg-board-on .lcard-label,html.eg-board-on .modal-label{
+  font-family:var(--bos-mono)!important;letter-spacing:.06em!important}
+/* left tool rail: sharpen the buttons; active state carries the cobalt accent (was dark ink) */
+html.eg-board-on .tool-btn{border-radius:0!important}
+html.eg-board-on .tool-btn.on{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on .tool-btn span{font-family:var(--bos-mono)!important;letter-spacing:.03em!important}
+/* position pills: sharp track + cells; selected pill = cobalt accent */
+html.eg-board-on:not([data-theme=dark]) .pos-pill{border-radius:0!important;font-family:var(--bos-mono)!important;
+  text-transform:uppercase!important;letter-spacing:.03em!important;font-size:10.5px!important}
+html.eg-board-on:not([data-theme=dark]) .pos-pill.on{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on:not([data-theme=dark]) [style*="border-radius:100px"]:has(.pos-pill){border-radius:0!important;
+  border:1.5px solid var(--bos-ink)!important;box-shadow:2px 2px 0 var(--bos-ink)!important}
+/* rounded floating chrome pop-ups -> sharpen (product picker, zoom, select/undo cluster, dropzone) */
+html.eg-board-on #product-picker-menu{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important}
+html.eg-board-on #product-picker-menu .ppitem,html.eg-board-on #product-picker-menu .pp-img{border-radius:0!important}
+html.eg-board-on #dropzone{border-radius:0!important}
+html.eg-board-on .canvas-area [style*="border-radius:8px"]{border-radius:0!important}
+/* right-panel technique/tab pills (dm-tech-pills) render as .pill-btn — eg-board.css already sharpens
+   those; nothing extra needed here. Design-controls Flip/Center use .btn-out (themed by eg-board.css). */
 </style>
 <style id="eg-outline-btns">
 .btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
@@ -190,6 +216,8 @@ html[data-theme=dark] [style*="dashed"]{border-color:rgba(201,195,186,.22)!impor
 </style>  <script src="eg-dither.js"></script>
 
   <script src="eg-theme.js"></script>
+  <link rel="stylesheet" href="eg-board.css">
+  <script src="eg-board.js" defer></script>
 </head>
 <body>
 
