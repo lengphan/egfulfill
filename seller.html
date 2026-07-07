@@ -898,11 +898,10 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div class="card" id="cc-pipeline" style="padding:22px 24px;display:flex;flex-direction:column">
         <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Order Pipeline</div>
         <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px">Current fulfillment status</div>
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
-          <div style="max-width:220px;margin:0 auto;width:100%">
-            <canvas id="pchart"></canvas>
-          </div>
-          <div id="pleg" style="margin-top:16px;display:flex;flex-direction:column;gap:7px"></div>
+        <div id="pterm" class="pterm">
+          <div class="pt-prompt"><span class="pt-usr">eg@fulfill</span> <span class="pt-path">~</span> % <span class="pt-cmd"></span><span class="pt-cur">&nbsp;</span></div>
+          <div class="pt-rows"></div>
+          <div class="pt-foot"></div>
         </div>
       </div>
     </div>
@@ -1628,31 +1627,58 @@ function updateTrendChart() {
 
 /* ── Pipeline donut ── */
 function initPC() {
-  const ctx = document.getElementById('pchart').getContext('2d');
-  // Seller-facing pipeline stages — align to the dashboard's own status taxonomy (SC / SELLER_STATUS:
-  // New → In Review → In Production → Shipped), NOT the factory-internal In Queue/Printing/QC labels.
-  const labs = ['New','In Review','In Production','Shipped'];
-  // Demo distribution — busy account with most orders already shipped.
-  // Non-demo: pipeline starts empty until real orders flow through.
-  const vals = IS_DEMO ? [47, 124, 86, 873] : [0, 0, 0, 0];
-  const cols = dashPal().donut;
-  new Chart(ctx, {
-    type:'doughnut',
-    data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderWidth:0,hoverOffset:4}]},
-    options:{responsive:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed}`}}}}
-  });
-  const total = vals.reduce((a,b)=>a+b,0);
-  document.getElementById('pleg').innerHTML = labs.map((l,i)=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span data-sw style="width:8px;height:8px;border-radius:50%;background:${cols[i]};display:inline-block;flex-shrink:0"></span>
-        <span style="color:#6b7280">${l}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px">
-        <span style="font-weight:700;color:#374151">${vals[i]}</span>
-        <span style="color:#d1d5db">${total ? Math.round(vals[i]/total*100) : 0}%</span>
-      </div>
-    </div>`).join('');
+  var host = document.getElementById('pterm'); if (!host) return;
+  if (!document.getElementById('pterm-css')) {
+    var st = document.createElement('style'); st.id = 'pterm-css';
+    st.textContent =
+        ".pterm{flex:1;background:#17161a;border:1px solid #000;padding:16px 18px;font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;color:#b9b6af;display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-height:210px}"
+      + ".pt-prompt{white-space:nowrap;color:#8b877f}.pt-usr{color:#63e6a6}.pt-path{color:#7a8aff}.pt-cmd{color:#e7e4dd}"
+      + ".pt-cur{display:inline-block;width:7px;height:13px;background:#63e6a6;vertical-align:-2px;margin-left:1px;animation:ptblink 1.05s steps(1) infinite}@keyframes ptblink{50%{opacity:0}}"
+      + ".pt-rows{margin:13px 0;display:flex;flex-direction:column;gap:6px}"
+      + ".pt-row{display:grid;grid-template-columns:98px 1fr 30px 34px;align-items:center;gap:8px;opacity:0;transform:translateX(-6px);transition:opacity .35s ease,transform .35s ease}.pt-row.in{opacity:1;transform:none}"
+      + ".pt-lab{color:#8b877f;text-transform:uppercase;letter-spacing:.03em;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+      + ".pt-bar{white-space:nowrap;overflow:hidden}.pt-bar .f{color:#63e6a6}.pt-bar .e{color:#3a3841}"
+      + ".pt-n{color:#f2efe9;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}"
+      + ".pt-pct{color:#6b6862;text-align:right;font-size:10.5px;font-variant-numeric:tabular-nums}"
+      + ".pt-foot{color:#8b877f;margin-top:3px;white-space:nowrap}.pt-foot .hi{color:#63e6a6;font-weight:700}";
+    document.head.appendChild(st);
+  }
+  // Seller-facing pipeline stages — the dashboard's own taxonomy (New → In Review → In Production → Shipped).
+  var labs = ['New', 'In Review', 'In Production', 'Shipped'];
+  var vals = IS_DEMO ? [47, 124, 86, 873] : [0, 0, 0, 0];
+  var total = vals.reduce(function (a, b) { return a + b; }, 0);
+  var SEG = 10, FULL = '█', EMPTY = '░';
+  var RM = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var rowsEl = host.querySelector('.pt-rows'), footEl = host.querySelector('.pt-foot'), cmdEl = host.querySelector('.pt-cmd');
+  rowsEl.innerHTML = labs.map(function (l, i) {
+    return '<div class="pt-row" data-i="' + i + '"><span class="pt-lab">' + l + '</span>'
+      + '<span class="pt-bar"><span class="f"></span><span class="e">' + new Array(SEG + 1).join(EMPTY) + '</span></span>'
+      + '<span class="pt-n">0</span><span class="pt-pct">0%</span></div>';
+  }).join('');
+  var shipped = vals[3], inflight = total - shipped;
+  footEl.innerHTML = total ? ('› <span class="hi">' + inflight + '</span> in flight · ' + shipped + ' shipped')
+                           : '› pipeline clear · awaiting orders';
+  var rows = [].slice.call(rowsEl.querySelectorAll('.pt-row'));
+  function fillRow(row) {
+    var i = +row.getAttribute('data-i'), target = vals[i], pct = total ? Math.round(target / total * 100) : 0, fill = Math.round(pct / 100 * SEG);
+    var fEl = row.querySelector('.f'), eEl = row.querySelector('.e'), nEl = row.querySelector('.pt-n'), pEl = row.querySelector('.pt-pct');
+    if (RM) { fEl.textContent = new Array(fill + 1).join(FULL); eEl.textContent = new Array(SEG - fill + 1).join(EMPTY); nEl.textContent = target; pEl.textContent = pct + '%'; return; }
+    var t0 = null, dur = 650;
+    function step(ts) {
+      if (t0 === null) t0 = ts; var p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3), cf = Math.round(fill * e);
+      fEl.textContent = new Array(cf + 1).join(FULL); eEl.textContent = new Array(SEG - cf + 1).join(EMPTY);
+      nEl.textContent = Math.round(target * e); pEl.textContent = Math.round(pct * e) + '%';
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  var CMD = 'orders --pipeline';
+  if (RM) { cmdEl.textContent = CMD; rows.forEach(function (r) { r.classList.add('in'); fillRow(r); }); return; }
+  cmdEl.textContent = ''; var ci = 0;
+  (function type() {
+    if (ci <= CMD.length) { cmdEl.textContent = CMD.slice(0, ci); ci++; setTimeout(type, 34); }
+    else { rows.forEach(function (r, i) { setTimeout(function () { r.classList.add('in'); fillRow(r); }, 120 + i * 140); }); }
+  })();
 }
 
 /* ── Recent orders ── */
