@@ -139,8 +139,8 @@
   var _isFactory = ['factory.html', 'operator.html', 'warehouse.html', 'admin.html', 'designer.html'].indexOf(_page) !== -1;
   if (!_isFactory) {
     css += '\n' + [
-      /* one light near-white canvas + a whisper of violet aura — NOT the darker beige nav tone */
-      'html:not([data-theme=dark]) body:has(.sidebar){background-color:#faf9f7!important;background-image:radial-gradient(46% 32% at 100% 0,rgba(159,82,224,.05),transparent 60%)!important;background-attachment:fixed!important;background-repeat:no-repeat!important}',
+      /* one BRIGHT near-white canvas (no tint, no aura) — cards are pure #fff, separated by their thin border */
+      'html:not([data-theme=dark]) body:has(.sidebar){background-color:#fcfcfc!important;background-image:none!important}',
       /* header + sidebar join the light canvas (no fill, no dividers) — separation is the white cards */
       'html:not([data-theme=dark]) body:has(.sidebar) header{background:transparent!important;border-bottom:0!important}',
       /* flush, full-height WHITE sidebar (Tavus-style) — whisper right border, no beige, no heavy shadow */
