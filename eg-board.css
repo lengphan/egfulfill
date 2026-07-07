@@ -77,8 +77,8 @@ html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!i
   font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
-html.eg-board-on .bos-controls > * + *::before{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
-html.eg-board-on[data-theme=dark] .bos-controls > * + *::before{background:#403d48!important}
+html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
+html.eg-board-on[data-theme=dark] .bos-controls > * + *::after{background:#403d48!important}
 html.eg-board-on .bos-controls > *:hover{background:var(--bos-hover)!important}
 /* force EVERY control cell to the full block height so the ink dividers connect top-to-bottom (beats
    eg-theme's older `header .ibtn{height:32px}`, which left short, floating, misaligned dividers) */
@@ -90,10 +90,23 @@ html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ ma
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
 html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:11px!important;
   font-weight:400!important;letter-spacing:.04em!important;text-transform:uppercase!important;font-variant-numeric:tabular-nums}
-/* theme: hide the pill; the mode label follows the theme */
+/* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
+   icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
+   values (#balance-val / #notif-dot / #hdr-lang-code) stay as real children so they still update. ── */
+html.eg-board-on #hdr-search-btn > svg{display:none!important}
+html.eg-board-on #hdr-search-btn::before{content:'SEARCH'}
+/* language cell already shows #hdr-lang-code "EN" natively */
 html.eg-board-on #hdr-theme-track{display:none!important}
-html.eg-board-on:not([data-theme=dark]) .bos-mode::after{content:'NIGHT'}
-html.eg-board-on[data-theme=dark] .bos-mode::after{content:'DAY'}
+html.eg-board-on:not([data-theme=dark]) #pref-btn::before{content:'NIGHT'}
+html.eg-board-on[data-theme=dark] #pref-btn::before{content:'DAY'}
+html.eg-board-on .bos-controls button:has(#notif-dot) > svg{display:none!important}
+html.eg-board-on .bos-controls button:has(#notif-dot)::before{content:'ALERTS'}
+html.eg-board-on .bos-controls .bal-chip::before{content:'BALANCE:\00a0'}
+/* user cell: keep only the first name (drop avatar block + email line) */
+html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
+html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
+/* every pseudo label inherits the mono cell type */
+html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:11px!important;letter-spacing:.04em!important;text-transform:uppercase!important}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}

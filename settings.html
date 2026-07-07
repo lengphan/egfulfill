@@ -381,17 +381,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 
     <a class="ni on" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</a>
   </nav>
-  <div style="padding:10px 12px;border-top:1px solid #f0ede9;flex-shrink:0">
-    <div style="display:flex;align-items:center;gap:9px">
-      <div id="sb-avatar" style="width:30px;height:30px;background:#111827;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">EG</div>
-      <div style="min-width:0;flex:1">
-        <div id="sb-store-name" style="font-size:13.5px;font-weight:600;color:#191918;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">My Store</div>
-        <div style="font-size:12px;color:#9ca3af">Starter Plan</div>
-      </div>
-      <button title="Log out" onclick="doLogout()" style="background:none;border:none;cursor:pointer;padding:5px;border-radius:7px;color:#9ca3af;line-height:0;flex-shrink:0;transition:background .15s,color .15s" onmouseover="this.style.background='#fff5f5';this.style.color='#dc2626'" onmouseout="this.style.background='none';this.style.color='#9ca3af'">
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 7.5H2M5.5 4.5l-3 3 3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 2.5H12a1 1 0 011 1v8a1 1 0 01-1 1H5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      </button>
-    </div>
+  <div class="side-foot" style="margin:6px 8px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:2px">
+    <a href="#" class="ni" onclick="event.preventDefault();try{if(window.EGAuth&&EGAuth.signOut)EGAuth.signOut()}catch(e){}try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user')}catch(e){}location.href='seller-login.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg>Log out</a>
   </div>
 </aside>
 

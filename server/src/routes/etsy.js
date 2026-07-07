@@ -3,10 +3,13 @@
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
 
-const KEYSTRING   = process.env.ETSY_KEYSTRING || '';
+const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 // Etsy's x-api-key header for API data calls must be "keystring:shared_secret"
 // (the shared secret is NOT needed for the PKCE token exchange, only here).
-const SHARED_SECRET = process.env.ETSY_SHARED_SECRET || '';
+// .trim() so a trailing newline/space in .env can't corrupt the x-api-key and get the
+// request silently rejected (hygiene — it is NOT the cause of address redaction; that is
+// Etsy's server-side PII gate on the app tier, per the 2024-10-21 v3 3.0.0 policy).
+const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
 const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
 // Force the canonical (non-www) host: the served config, the authorize redirect_uri,
 // and the browser's post-Caddy origin must all agree, or Etsy rejects the token

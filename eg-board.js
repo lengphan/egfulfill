@@ -49,30 +49,9 @@
     if (!rc) return;
     rc.classList.add('bos-controls');
 
-    // ── relabel each control to ■ + UPPERCASE label (icons out, lettering in) ──
-    relabel(document.getElementById('hdr-search-btn'), 'SEARCH');
-    relabel(document.getElementById('hdr-lang-btn'), '', '#hdr-lang-code');         // ■ + EN
-
-    // theme: KEEP #hdr-theme-track in the DOM (toggleTheme drives it) but hide it via CSS; add a mode label
-    var pref = document.getElementById('pref-btn');
-    if (pref && !pref.querySelector('.bos-mode')) {
-      pref.insertBefore(sq(), pref.firstChild);
-      var m = document.createElement('span'); m.className = 'bos-lbl bos-mode'; pref.appendChild(m);   // text set by CSS per data-theme
-    }
-
-    var nd = document.getElementById('notif-dot');
-    var notifBtn = nd && nd.closest ? nd.closest('button, .ibtn') : null;
-    relabel(notifBtn, 'ALERTS', '#notif-dot');
-
-    relabel(document.querySelector('.bal-chip'), 'BALANCE:', '#balance-val');
-
-    // user cell → ■ + first name (email already dropped)
-    var user = rc.querySelector('.ibtn[onclick*="settings"]');
-    if (user) {
-      var nmEl = user.querySelector('div:nth-of-type(2) > div:first-child');
-      var name = (nmEl && nmEl.textContent.trim()) || 'Account';
-      relabel(user, name);
-    }
+    // Control labels (SEARCH / EN / NIGHT / ALERTS / BALANCE / name) are now rendered purely in
+    // CSS (eg-board.css "FIRST-PAINT header labels") so they paint on the first frame with no JS
+    // relabel — that post-paint swap was the header FOUC. Nothing to relabel here anymore.
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
