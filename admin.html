@@ -1415,22 +1415,31 @@ document.addEventListener('DOMContentLoaded', function(){
 
     <!-- ===== SPYDECK ===== -->
   <div id="section-spydeck" class="section fi">
-    <div style="margin-bottom:18px">
-      <div style="font-size:20px;font-weight:800;color:#191918">SpyDeck</div>
-      <div style="font-size:13px;color:#6b7280;margin-top:2px">Research trending products, auto-scout keywords to Favorites, and manage the seller add-on.</div>
+    <div style="margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#191918">SpyDeck</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:2px">Research trending products, auto-scout keywords to Favorites, and manage the seller add-on.</div>
+      </div>
+      <button onclick="openSpyCfg()" title="SpyDeck settings — add-on pricing & Auto-Scout" class="btn btn-out" style="font-size:13px;flex-shrink:0;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>Settings</button>
     </div>
 
     <!-- Scout tool mounts here (shared eg-scout engine) -->
     <div id="admin-spy-mount"></div>
 
-    <!-- Add-on pricing + Auto-Scout config (relocated from Settings → Plans) -->
-    <div class="card fi" style="padding:22px 24px;max-width:720px;margin-top:22px">
+    <!-- Add-on pricing + Auto-Scout config — behind the gear icon (settings modal), not below the results -->
+    <div id="spy-cfg-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)closeSpyCfg()">
+    <div style="background:#fff;border:1.5px solid #191918;width:min(720px,94vw);max-height:88vh;overflow-y:auto;box-shadow:6px 6px 0 #191918">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 22px;border-bottom:1px solid #e5e4e0;position:sticky;top:0;background:#fff;z-index:1">
+      <div style="font-size:15px;font-weight:700;color:#191918;font-family:'DepartureMono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.03em">SpyDeck Settings</div>
+      <button onclick="closeSpyCfg()" title="Close" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;line-height:0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+    </div>
+    <div style="padding:22px 24px">
       <!-- SpyDeck add-on pricing: bundle it into Pro/Enterprise free, or sell it standalone.
            Backed by EGStore.getSpydeckConfig()/setSpydeckConfig(); the seller Billing page +
            the SpyDeck gate (EGStore.hasSpydeck) read the same config. -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <div style="font-size:15px;font-weight:700;color:#191918">SpyDeck add-on</div>
-        <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#7c3aed;background:#f3efff;border:1px solid #e4d9ff;padding:2px 7px;border-radius:20px">Research</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2439c8;background:#eef1fe;border:1px solid #d7defb;padding:2px 7px;border-radius:20px">Research</span>
       </div>
       <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Bundle SpyDeck into Pro &amp; Enterprise for free, or sell it à-la-carte to any seller as a standalone monthly add-on.</div>
       <div style="border:1px solid #e5e4e0;border-radius:10px;padding:4px 16px">
@@ -1452,7 +1461,7 @@ document.addEventListener('DOMContentLoaded', function(){
       <div style="border-top:1px solid #f0ede9;margin:26px 0 16px"></div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
         <div style="font-size:15px;font-weight:700;color:#191918">Auto-Scout</div>
-        <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#7c3aed;background:#f3efff;border:1px solid #e4d9ff;padding:2px 7px;border-radius:20px">Admin only</span>
+        <span style="font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#2439c8;background:#eef1fe;border:1px solid #d7defb;padding:2px 7px;border-radius:20px">Admin only</span>
       </div>
       <div style="font-size:13.5px;color:#6b7280;margin-bottom:14px">Each day, SpyDeck hunts your keywords and auto-saves the top trending listings straight to your <b>Favorites</b>. Runs once every 24h when you open the admin dashboard — sellers never see this.</div>
       <div style="border:1px solid #e5e4e0;border-radius:10px;padding:4px 16px">
@@ -1476,6 +1485,8 @@ document.addEventListener('DOMContentLoaded', function(){
         <button class="btn btn-out" style="font-size:13px" onclick="egAdminAutoScout(true,this)">Run scout now</button>
         <button class="btn btn-dk" style="font-size:13px" onclick="saveAutoScoutCfg(this)">Save auto-scout</button>
       </div>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -3985,6 +3996,10 @@ function savePlansEditor(btn){
   if (btn){ var _t = btn.textContent; btn.textContent = 'Saved ✓'; btn.disabled = true; setTimeout(function(){ btn.textContent = _t; btn.disabled = false; }, 900); }
 }
 window.savePlansEditor = savePlansEditor;
+// ── SpyDeck settings modal (gear icon → popup) ──
+function openSpyCfg(){ var m=document.getElementById('spy-cfg-modal'); if(!m)return; m.classList.remove('modal-hidden'); var card=m.firstElementChild; if(card)card.scrollTop=0; if(typeof renderSpydeckCfg==='function')renderSpydeckCfg(); if(typeof renderAutoScoutCfg==='function')renderAutoScoutCfg(); }
+function closeSpyCfg(){ var m=document.getElementById('spy-cfg-modal'); if(m)m.classList.add('modal-hidden'); }
+window.openSpyCfg=openSpyCfg; window.closeSpyCfg=closeSpyCfg;
 // ── SpyDeck add-on config (bundle-with-Pro toggle + standalone price) ──
 function renderSpydeckCfg(){
   if (typeof EGStore === 'undefined' || !EGStore.getSpydeckConfig) return;

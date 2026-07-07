@@ -266,22 +266,28 @@
     var rt; window.addEventListener('resize',function(){ clearTimeout(rt); rt=setTimeout(render,120); });
     render();
   })();
-  /* Q&A hover-to-open — smooth, one hover, no flicker. The ONLY thing that opens a row is the user
-     genuinely MOVING the pointer onto a header. While a row animates open, other headers slide under a
-     (stationary) cursor and the browser fires spurious mouseenters — we ignore those by requiring a real
-     mousemove within the last beat. No fallbacks, no alternatives. */
+  /* Q&A hover-to-open — smooth in BOTH directions, no flicker. Opening a row grows it (flex:1 1 0),
+     which reflows the list so header boundaries slide under the moving pointer and fire spurious
+     mouseenters — worst on an up-sweep, where the previously-open row sits below the cursor. Instead of
+     trying to tell "real move" from "layout slid" (impossible while the pointer is still moving), we open
+     the header the pointer SETTLES on: every mouseenter (re)arms a short intent timer to the newest
+     header, so a fast transit collapses to a single open once motion stops. */
   (function(){
     var items=[].slice.call(document.querySelectorAll('.qa-item'));
     if(!items.length) return;
-    var movedAt=-1;
-    document.addEventListener('mousemove', function(){ movedAt=(window.performance?performance.now():Date.now()); }, {passive:true});
-    function nowMs(){ return window.performance?performance.now():Date.now(); }
+    var INTENT=90;              // ms the pointer must settle on a header before it opens (< the .42s row anim)
+    var timer=null, pending=null;
     function openRow(it){ if(!it||it.classList.contains('open')) return; items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
+    function arm(it){ pending=it; if(timer) clearTimeout(timer); timer=setTimeout(function(){ timer=null; if(pending) openRow(pending); }, INTENT); }
+    function disarm(){ if(timer){ clearTimeout(timer); timer=null; } pending=null; }
     items.forEach(function(it){
       var hd=it.querySelector('.qa-hd')||it;   // bind to the FIXED-height header, not the resizing row
-      hd.addEventListener('mouseenter', function(){ if(nowMs()-movedAt < 150) openRow(it); });   // genuine hover only (< the 420ms open animation, so slide-unders are ignored)
-      it.addEventListener('focus', function(){ openRow(it); });
+      hd.addEventListener('mouseenter', function(){ arm(it); });     // settle-to-open: transit enters just re-arm to the newest header
+      hd.addEventListener('mouseleave', function(){ if(pending===it) disarm(); });   // pointer left before it settled → cancel this open
+      it.addEventListener('focus', function(){ disarm(); openRow(it); });   // keyboard: open immediately
     });
+    var list=items[0].parentNode;
+    if(list) list.addEventListener('mouseleave', disarm);   // pointer off the whole list → drop any pending open (keep last opened)
     openRow(items[0]);   // start with the first open so the panel is filled
   })();
 </script>

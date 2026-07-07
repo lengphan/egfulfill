@@ -260,19 +260,20 @@ html.eg-board-on[data-theme=dark] header > span,html.eg-board-on[data-theme=dark
 /* content cards + KPI frames */
 html.eg-board-on[data-theme=dark] .card,html.eg-board-on[data-theme=dark] .ccard,html.eg-board-on[data-theme=dark] .stat-card,html.eg-board-on[data-theme=dark] .wcard{
   background:#201e24!important;border-color:#45424e!important;color:#e8e4dd!important}
-/* KPI sticky notes → dark-tinted pops (keep the per-tile variety, readable) */
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+1){background:#15302a!important}
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+2){background:#331f29!important}
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+3){background:#322b1a!important}
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+4){background:#281f33!important}
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+5){background:#1c2436!important}
-html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n){background:#331f1c!important}
+/* KPI sticky notes → rich, saturated pastel-on-dark pops (deeper versions of the light mint/rose/amber/indigo/blue/coral) */
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+1){background:#123f33!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+2){background:#45222f!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+3){background:#403214!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+4){background:#2f2148!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+5){background:#1c2b52!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n){background:#472317!important}
 html.eg-board-on[data-theme=dark] .wcard .eg-card-dot{background:#e8e4dd!important}
 html.eg-board-on[data-theme=dark] .wcard *:has(> .eg-card-dot){border-bottom-color:#5a5660!important}
-/* tables */
+/* tables — rows read as a subtle raise off the dark ground, hover a touch brighter (expand-row stays transparent) */
 html.eg-board-on[data-theme=dark] .dtable th{border-bottom-color:#5a5660!important;color:#d8d4cc!important}
 html.eg-board-on[data-theme=dark] .dtable td{border-bottom-color:#302e37!important;color:#c8c3bb!important}
-html.eg-board-on[data-theme=dark] .dtable tr.main-row:hover td{background:#2a2830!important}
+html.eg-board-on[data-theme=dark] .dtable tr.main-row td{background:#232128!important}
+html.eg-board-on[data-theme=dark] .dtable tr.main-row:hover td{background:#2d2a34!important}
 /* the old beige inner boxes → dark surface */
 html.eg-board-on[data-theme=dark] [style*="background:#eeede9"],html.eg-board-on[data-theme=dark] [style*="background:#f0ede9"],
 html.eg-board-on[data-theme=dark] [style*="background:#f6f5f4"],html.eg-board-on[data-theme=dark] [style*="background:#f7f5f0"],
@@ -368,4 +369,4 @@ html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #supe
 html.eg-board-on .egdt-varstrip select{border:none!important;background:transparent!important;padding:2px 2px!important}
 /* LEFT-ALIGN the content so it hugs the sidebar (centring left a big gap next to the nav on wide
    monitors) + a moderate cap so the right side doesn't stretch. Whitespace collects on the far right. */
-html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:none!important;margin-left:0!important;margin-right:0!important}
+html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1520px!important;margin-left:0!important;margin-right:0!important}
