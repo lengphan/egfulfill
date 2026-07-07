@@ -198,7 +198,7 @@ html[data-theme=dark] [style*="border-right:1px solid #e5e4e0"]{border-right-col
 /* Order-detail modal is TOP-anchored (not centered) so switching the Edit Items /
    Edit All tabs — which changes the body height — keeps the header + tabs perfectly
    still instead of re-centering and jumping the whole panel up/down. */
-#order-detail-modal{align-items:flex-start;padding:3vh 0}
+#order-detail-modal{align-items:center;padding:3vh 0}
 @keyframes odmFade{from{opacity:0}to{opacity:1}}
 html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
 html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
@@ -8322,7 +8322,7 @@ async function confirmImport() {
 </script>
 <!-- Order Detail Modal -->
 <div id="order-detail-modal" class="modal-overlay modal-hidden" onclick="if(event.target===this)closeDetailModal()">
-  <div style="background:#fff;border:1px solid #e5e4e0;border-radius:16px;width:min(1080px,95vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);position:relative;overflow:hidden">
+  <div style="background:#fff;border:1px solid #e5e4e0;border-radius:16px;width:min(1080px,95vw);height:min(720px,90vh);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.15);position:relative;overflow:hidden">
     <!-- Header — status left, "Order #id" right -->
     <div style="padding:15px 22px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:14px">
       <div id="odm-title" style="font-size:16px;letter-spacing:-.01em">Order #—</div>

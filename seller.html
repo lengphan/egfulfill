@@ -895,9 +895,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       </div>
 
       <!-- RIGHT: Order Pipeline — stretches to match left card height -->
-      <div class="card" id="cc-pipeline" style="padding:22px 24px;display:flex;flex-direction:column">
-        <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Order Pipeline</div>
-        <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px">Current fulfillment status</div>
+      <div class="card" id="cc-pipeline" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
+        <div class="pt-titlebar"><span class="pt-dot"></span><span class="pt-dot"></span><span class="pt-dot"></span><span class="pt-tt">order-pipeline · live</span></div>
         <div id="pterm" class="pterm">
           <div class="pt-prompt"><span class="pt-usr">eg@fulfill</span> <span class="pt-path">~</span> % <span class="pt-cmd"></span><span class="pt-cur">&nbsp;</span></div>
           <div class="pt-rows"></div>
@@ -1631,16 +1630,18 @@ function initPC() {
   if (!document.getElementById('pterm-css')) {
     var st = document.createElement('style'); st.id = 'pterm-css';
     st.textContent =
-        ".pterm{flex:1;background:#17161a;border:1px solid #000;padding:16px 18px;font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;color:#b9b6af;display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-height:210px}"
-      + ".pt-prompt{white-space:nowrap;color:#8b877f}.pt-usr{color:#63e6a6}.pt-path{color:#7a8aff}.pt-cmd{color:#e7e4dd}"
-      + ".pt-cur{display:inline-block;width:7px;height:13px;background:#63e6a6;vertical-align:-2px;margin-left:1px;animation:ptblink 1.05s steps(1) infinite}@keyframes ptblink{50%{opacity:0}}"
+        "#cc-pipeline{background:#17161a!important;border:1px solid var(--bos-ink)!important}"
+      + ".pt-titlebar{background:#100f13;border-bottom:1px solid #2a2830;padding:9px 14px;display:flex;align-items:center;gap:7px;flex-shrink:0}.pt-dot{width:9px;height:9px;border-radius:50%;background:#39373f}.pt-tt{margin-left:6px;font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:10px;color:#6b6862;letter-spacing:.05em}"
+      + ".pterm{flex:1;background:#17161a;padding:18px 20px;font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:12px;line-height:1.7;color:#b9b6af;display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-height:190px}"
+      + ".pt-prompt{white-space:nowrap;color:#8b877f}.pt-usr{color:#63e6a6}.pt-path{color:#6d8cff}.pt-cmd{color:#e7e4dd}"
+      + ".pt-cur{display:inline-block;width:7px;height:13px;background:#6d8cff;vertical-align:-2px;margin-left:1px;animation:ptblink 1.05s steps(1) infinite}@keyframes ptblink{50%{opacity:0}}"
       + ".pt-rows{margin:13px 0;display:flex;flex-direction:column;gap:6px}"
       + ".pt-row{display:grid;grid-template-columns:98px 1fr 30px 34px;align-items:center;gap:8px;opacity:0;transform:translateX(-6px);transition:opacity .35s ease,transform .35s ease}.pt-row.in{opacity:1;transform:none}"
       + ".pt-lab{color:#8b877f;text-transform:uppercase;letter-spacing:.03em;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
-      + ".pt-bar{white-space:nowrap;overflow:hidden}.pt-bar .f{color:#63e6a6}.pt-bar .e{color:#3a3841}"
+      + ".pt-bar{white-space:nowrap;overflow:hidden}.pt-bar .f{color:#6d8cff}.pt-bar .e{color:#3a3841}"
       + ".pt-n{color:#f2efe9;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}"
       + ".pt-pct{color:#6b6862;text-align:right;font-size:10.5px;font-variant-numeric:tabular-nums}"
-      + ".pt-foot{color:#8b877f;margin-top:3px;white-space:nowrap}.pt-foot .hi{color:#63e6a6;font-weight:700}";
+      + ".pt-foot{color:#8b877f;margin-top:3px;white-space:nowrap}.pt-foot .hi{color:#6d8cff;font-weight:700}";
     document.head.appendChild(st);
   }
   // Seller-facing pipeline stages — the dashboard's own taxonomy (New → In Review → In Production → Shipped).

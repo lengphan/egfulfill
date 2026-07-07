@@ -314,7 +314,7 @@ html.eg-board-on:not([data-theme=dark]) body{background:var(--bos-ground)!import
 html.eg-board-on aside.sidebar > div[onclick]{border-radius:0!important;font-family:var(--bos-mono)!important}
 html.eg-board-on aside.sidebar > div[onclick] div{font-family:var(--bos-mono)!important;letter-spacing:.01em!important}
 html.eg-board-on aside.sidebar > div[onclick] [style*="border-radius:8px"],html.eg-board-on aside.sidebar > div[onclick] [style*="border-radius:50%"]{border-radius:0!important}
-html.eg-board-on:not([data-theme=dark]) .input,html.eg-board-on:not([data-theme=dark]) .select,html.eg-board-on:not([data-theme=dark]) .finput{background:#fff!important;border:1px solid var(--bos-ink)!important;color:var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .input,html.eg-board-on:not([data-theme=dark]) .select,html.eg-board-on:not([data-theme=dark]) .finput{background:#fff!important;border:1px solid #d0ccc4!important;color:var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .pill-btn{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important;padding:5px 12px!important}
 html.eg-board-on:not([data-theme=dark]) .tab-sm,html.eg-board-on:not([data-theme=dark]) .stab,html.eg-board-on:not([data-theme=dark]) .chat-tab{color:var(--bos-grey)!important}
 html.eg-board-on:not([data-theme=dark]) .tab-sm.on,html.eg-board-on:not([data-theme=dark]) .stab.on,html.eg-board-on:not([data-theme=dark]) .chat-tab.on{background:#fff!important;color:var(--bos-ink)!important;border:1px solid var(--bos-ink)!important;box-shadow:none!important}
@@ -345,7 +345,7 @@ html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .b
    directly + sharpen/frame the modal shells. ── */
 /* fields stay sharp but keep a READABLE sans face — mono was too hard to read for values/addresses/order details */
 html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important}
-html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1px solid #d0ccc4!important;background:#fff!important;color:var(--bos-ink)!important}
 html.eg-board-on label{font-family:var(--bos-mono)!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
@@ -367,6 +367,4 @@ html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #supe
 html.eg-board-on .egdt-varstrip select{border:none!important;background:transparent!important;padding:2px 2px!important}
 /* LEFT-ALIGN the content so it hugs the sidebar (centring left a big gap next to the nav on wide
    monitors) + a moderate cap so the right side doesn't stretch. Whitespace collects on the far right. */
-html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1440px!important;margin-left:0!important;margin-right:auto!important}
-/* cap the sticky top bar to the same width so its control cluster lines up with the content's right edge */
-html.eg-board-on body:has(.sidebar) header[style*="sticky"]{max-width:1440px!important}
+html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:none!important;margin-left:0!important;margin-right:0!important}
