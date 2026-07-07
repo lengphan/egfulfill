@@ -29,13 +29,7 @@
 
     var header = document.querySelector('header');
     var rc = header && header.querySelector('div[style*="margin-left:auto"]');
-    var sidebar = document.querySelector('aside.sidebar') || document.querySelector('.sidebar');
-
-    // move the sidebar "Log out" into the controls block, so the rail can end at Settings
-    if (sidebar && rc) {
-      var logout = [].slice.call(sidebar.querySelectorAll('a.ni')).filter(function (a) { return /log\s?out/i.test(a.textContent || ''); })[0];
-      if (logout) { logout.classList.add('bos-logout'); relabel(logout, ''); logout.appendChild(lbl('OUT')); rc.appendChild(logout); }
-    }
+    // Log out stays in the left rail (per feedback) — nothing relocated.
     if (!rc) return;
     rc.classList.add('bos-controls');
 

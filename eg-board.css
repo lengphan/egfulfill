@@ -28,9 +28,11 @@ html.eg-board-on body{background:var(--bos-ground)!important}
 html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
 html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
-html.eg-board-on .ni{border:none!important;border-bottom:1.5px solid var(--bos-line)!important;border-radius:0!important;
-  font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
+/* full-length ink separators between rows — same treatment as the top controls block */
+html.eg-board-on .ni{border:none!important;border-bottom:1.5px solid var(--bos-ink)!important;border-radius:0!important;
+  font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
   padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
+html.eg-board-on aside.sidebar nav a.ni:last-child{border-bottom:none!important}
 html.eg-board-on .ni svg{display:none!important}
 /* keep intentionally-hidden nav rows hidden (e.g. Product Templates) */
 html.eg-board-on .ni[style*="display:none"]{display:none!important}
@@ -57,11 +59,10 @@ html.eg-board-on .bos-controls > *:first-child{border-left:none!important}
 html.eg-board-on .bos-controls > *:hover{background:var(--bos-amber)!important}
 /* kill the old thin grey vertical-divider spacers */
 html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
-/* ■ marker + label */
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
-html.eg-board-on .bos-lbl{font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase;letter-spacing:.04em;color:inherit;line-height:1}
-html.eg-board-on #hdr-lang-code{font-family:var(--bos-mono)!important;font-size:11px!important}
-html.eg-board-on #balance-val{font-family:var(--bos-mono)!important;font-size:11px!important;font-variant-numeric:tabular-nums}
+/* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
+html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:11px!important;
+  font-weight:400!important;letter-spacing:.04em!important;text-transform:uppercase!important;font-variant-numeric:tabular-nums}
 /* theme: hide the pill; the mode label follows the theme */
 html.eg-board-on #hdr-theme-track{display:none!important}
 html.eg-board-on:not([data-theme=dark]) .bos-mode::after{content:'NIGHT'}
@@ -84,9 +85,10 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
 /* hide the now-redundant mobile hamburger on desktop (rail is always visible) */
 @media(min-width:861px){ html.eg-board-on #mob-ham{display:none!important} }
 
-/* ════ STAT TILES (existing .stat-card / .wcard) ════ */
+/* ════ STAT TILES — LIGHTENED (was 1.5px ink + 3px hard offset = too heavy) ════
+   Now a thin light border + a whisper offset: keeps a hint of the neo-brutalist shift without the weight. */
 html.eg-board-on .stat-card,html.eg-board-on .wcard,html.eg-board-on .card,html.eg-board-on .ccard{
-  background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important}
+  background:#fff!important;border:1px solid #e4e2dc!important;box-shadow:2px 2px 0 rgba(25,25,24,.06)!important;border-radius:0!important}
 
 /* ════ TABLES (existing .dtable) ════ */
 html.eg-board-on .dtable{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important}
