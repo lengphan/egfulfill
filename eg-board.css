@@ -1,0 +1,108 @@
+/* eg-board.css — BOARD OS v2 (draft): the marketing language, on the seller boards.
+   Sharp · 1.5px ink borders + hard offset shadow · Departure Mono for data/labels/nav · one violet accent.
+   Loaded AFTER eg-theme.js (so it wins the cascade) + paired with eg-board.js, which builds the sticky
+   connected-tab header from the existing sidebar nav and re-parents the live top-bar controls.
+   Presentation only — no markup/logic rewrite. Scoped to .eg-board-on (set by eg-board.js). */
+
+@font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
+
+:root{
+  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfc; --bos-panel:#f7f6f4;
+  --bos-violet:#9f52e0; --bos-violet-dk:#8a3dd0; --bos-amber:#f8d264;
+  --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
+  --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
+  --bos-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+/* ── hide the old chrome once the new header is built (JS also sets display:none inline as a backstop) ── */
+html.eg-board-on aside.sidebar{display:none!important}
+html.eg-board-on header:not(.bos-top){display:none!important}
+/* content no longer clears a sidebar */
+html.eg-board-on [style*="margin-left:220px"]{margin-left:0!important}
+html.eg-board-on body.eg-board-on{background:var(--bos-ground)!important}
+html.eg-board-on body:has(.bos-top){background:var(--bos-ground)!important}
+
+/* ════ STICKY CONNECTED-TAB HEADER ════ */
+.bos-top{position:sticky;top:0;z-index:70;display:flex;align-items:stretch;gap:12px;padding:13px 16px;
+  background:var(--bos-ground);border-bottom:1.5px solid var(--bos-ink)}
+.bos-navblock{display:flex;align-items:stretch;border:1.5px solid var(--bos-ink);box-shadow:3px 3px 0 var(--bos-ink);
+  background:#fff;overflow:hidden;min-width:0;flex:1 1 auto}
+.bos-logo{display:flex;align-items:center;padding:0 15px;font-family:'Fraunces',Georgia,serif;font-weight:900;
+  font-optical-sizing:auto;font-size:20px;letter-spacing:-.01em;color:var(--bos-ink);text-decoration:none;
+  border-right:1.5px solid var(--bos-ink);flex-shrink:0}
+.bos-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1 1 auto}
+.bos-tabs::-webkit-scrollbar{display:none}
+.bos-tab{display:inline-flex;align-items:center;gap:7px;font-family:var(--bos-mono);font-size:11.5px;
+  text-transform:uppercase;letter-spacing:.04em;color:var(--bos-ink);border-left:1.5px solid var(--bos-ink);
+  padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;background:#fff;text-decoration:none;
+  transition:background .12s,color .12s}
+.bos-tab:first-child{border-left:none}
+.bos-tab .sq{width:7px;height:7px;background:var(--bos-ink);flex-shrink:0}
+.bos-tab .txt{line-height:1}
+.bos-tab .ct{font-size:9.5px;background:var(--bos-ink);color:#fff;padding:0 5px;line-height:15px;border-radius:0}
+.bos-tab:not(.on):hover{background:var(--bos-amber)}
+.bos-tab.on{background:var(--bos-violet);color:#fff}
+.bos-tab.on .sq{background:#fff}
+.bos-tab.on .ct{background:#fff;color:var(--bos-violet)}
+
+/* right cluster: re-parented live controls (search · EN · theme · notif · balance · + New · user) wrapped
+   in one connected bordered block. We keep the existing controls + handlers; just frame + mono them. */
+.bos-right{display:flex;align-items:stretch;border:1.5px solid var(--bos-ink);
+  box-shadow:3px 3px 0 var(--bos-ink);background:#fff;overflow:hidden;flex-shrink:0}
+.bos-right>div[style*="margin-left:auto"]{margin-left:0!important;display:flex;align-items:center;gap:0!important;height:44px}
+/* dividers between the control cells */
+.bos-right>div[style*="margin-left:auto"]>*{border-left:1.5px solid var(--bos-line);height:44px;
+  display:flex;align-items:center;padding:0 11px!important;margin:0!important;border-radius:0!important}
+.bos-right>div[style*="margin-left:auto"]>*:first-child{border-left:none}
+/* neutralize the old vertical-divider spacer divs */
+.bos-right>div[style*="margin-left:auto"]>div[style*="width:1px"]{display:none!important}
+/* balance chip + New button read as connected cells */
+.eg-board-on .bal-chip{border:none!important;box-shadow:none!important;background:#fff!important;font-family:var(--bos-mono)!important;font-size:12px!important;border-radius:0!important}
+.eg-board-on .bos-right .btn-dk{border:none!important;box-shadow:none!important;background:var(--bos-violet)!important;color:#fff!important;border-radius:0!important;height:44px;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;transform:none!important}
+.bos-right .bos-logout{color:var(--bos-grey)!important;background:none!important}
+.bos-right .bos-logout:hover{background:var(--bos-amber)!important;color:var(--bos-ink)!important}
+.bos-right .bos-logout .txt,.bos-right .bos-logout{font-family:var(--bos-mono)!important;font-size:0!important}
+.bos-right .bos-logout svg{width:15px!important;height:15px!important}
+/* compact user cell on the board bar: avatar + name only (drop the long email that ate the tab space) */
+.bos-right .ibtn>div:nth-of-type(2)>div:nth-of-type(2){display:none!important}
+.bos-right .ibtn>div:nth-of-type(2)>div:nth-of-type(1){font-family:var(--bos-mono)!important;font-size:12px!important}
+
+@media(max-width:900px){ .bos-tab .txt{display:none} .bos-tab{padding:0 12px} }
+
+/* ════ STAT TILES (existing .stat-card / .wcard) ════ */
+html.eg-board-on .stat-card,html.eg-board-on .wcard,html.eg-board-on .card,html.eg-board-on .ccard{
+  background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important}
+/* the eg-theme injected "card header dot + rule" already gives each tile a labeled top row; keep it, just
+   make the label mono + the rule ink */
+html.eg-board-on .stat-card .eg-card-dot,html.eg-board-on .wcard .eg-card-dot{border-radius:0!important}
+
+/* ════ TABLES (existing .dtable) ════ */
+html.eg-board-on .dtable{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important}
+html.eg-board-on .dtable th{background:var(--bos-panel)!important;border-bottom:1.5px solid var(--bos-ink)!important;
+  color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;font-size:10px!important;letter-spacing:.06em!important;
+  text-transform:uppercase;font-weight:400!important;padding:11px 14px!important}
+html.eg-board-on .dtable td{border-bottom:1px solid var(--bos-line)!important;padding:12px 14px!important}
+html.eg-board-on .dtable tr.main-row:hover td{background:#faf8f4!important}
+html.eg-board-on .dtable tr:last-child td{border-bottom:none!important}
+
+/* ════ STATUS BADGES (existing .b-*) → bordered pixel-pills in the stage pop ════ */
+html.eg-board-on .badge,html.eg-board-on .b-new,html.eg-board-on .b-queue,html.eg-board-on .b-prod,
+html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.eg-board-on .b-shipped{
+  font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.05em!important;
+  border:1.5px solid var(--bos-ink)!important;border-radius:0!important;padding:2px 8px!important;font-weight:400!important}
+html.eg-board-on .b-new{background:var(--bos-blue)!important;color:#fff!important;border-color:var(--bos-blue)!important}
+html.eg-board-on .b-queue{background:#fff!important;color:var(--bos-ink)!important}
+html.eg-board-on .b-prod{background:var(--bos-amberp)!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
+html.eg-board-on .b-qc{background:var(--bos-violet)!important;color:#fff!important;border-color:var(--bos-violet)!important}
+html.eg-board-on .b-packed{background:var(--bos-pink)!important;color:#fff!important;border-color:var(--bos-pink)!important}
+html.eg-board-on .b-shipped{background:var(--bos-mint)!important;color:#fff!important;border-color:var(--bos-mint)!important}
+
+/* ════ BUTTONS ════ */
+html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)!important;color:#fff!important;
+  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important;
+  font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
+html.eg-board-on .btn-out{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;
+  border-radius:0!important;background:#fff!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
+
+/* section titles that use Fraunces already — nudge the greeting + page eyebrows to the mono family where they read as labels */
+html.eg-board-on .eg-tag,html.eg-board-on .badge{border-radius:0!important}
