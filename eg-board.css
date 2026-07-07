@@ -72,11 +72,13 @@ html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-boar
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
   border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
-html.eg-board-on .bos-controls > *{border-left:1px solid #e2dfd8!important;border-radius:0!important;margin:0!important;
+html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
   font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
-html.eg-board-on .bos-controls > *:first-child{border-left:none!important}
+/* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
+html.eg-board-on .bos-controls > * + *::before{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
+html.eg-board-on[data-theme=dark] .bos-controls > * + *::before{background:#403d48!important}
 html.eg-board-on .bos-controls > *:hover{background:var(--bos-hover)!important}
 /* force EVERY control cell to the full block height so the ink dividers connect top-to-bottom (beats
    eg-theme's older `header .ibtn{height:32px}`, which left short, floating, misaligned dividers) */
@@ -95,6 +97,10 @@ html.eg-board-on[data-theme=dark] .bos-mode::after{content:'DAY'}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
+/* balance is a plain connected cell now — kill the .bal-chip pill's OWN border/radius/shadow/fill (from eg-theme + page CSS)
+   so it stops floating a nested box on top of the continuous tab block. High specificity beats eg-theme's body:has() rule. */
+html.eg-board-on body:has(.sidebar) .bos-controls .bal-chip{border:none!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;height:44px!important;padding:0 13px!important}
+html.eg-board-on[data-theme=dark] body:has(.sidebar) .bos-controls .bal-chip{background:transparent!important;border:none!important;box-shadow:none!important}
 /* + New = the single accent cell — the violet must BLEED to fill the whole cell (was sitting 2px short).
    Scope to the wrapper that actually holds #new-menu-btn (the SEARCH wrapper is also position:relative!) */
 html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important;align-items:stretch!important}
