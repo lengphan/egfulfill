@@ -24,7 +24,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .dtable tr:hover td{background:#fafaf9}.dtable tr:last-child td{border-bottom:none}
 .gw-card{background:#fff;border:1.5px solid #e5e4e0;border-radius:11px;padding:14px 16px;transition:border-color .18s,box-shadow .18s;position:relative;display:flex;align-items:center;gap:12px}
 .gw-card:hover{border-color:#9ca3af;box-shadow:0 2px 10px rgba(0,0,0,.07)}
-.gw-card.connected{border-color:#d8d4cd;background:#f0ede9}
+.gw-card.connected{border-color:#d8d4cd;background:#e7f7ef}
 .pill-btn{padding:5px 13px;border-radius:999px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid #e5e4e0;background:#fff;color:#6b7280;transition:all .15s;white-space:nowrap}
 .pill-btn:hover{border-color:#9ca3af;color:#374151}
 .pill-btn.active{background:#111827;color:#fff;border-color:#111827}
@@ -310,7 +310,7 @@ html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{b
 html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
 </style>
 <style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
+html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fff!important;border:1px solid #191918!important;box-shadow:none!important;border-radius:0!important}
 </style>
 <style id="eg-card-dark-retro">/* eg-card-dark-retro */
 html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
@@ -432,10 +432,10 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Current Balance</div>
         <div id="wallet-bal-big" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:10px">$0.00</div>
         <div style="display:flex;gap:6px">
-          <button onclick="openDepositModal()" style="flex:1;background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          <button onclick="openDepositModal()" style="flex:1;background:#191918;color:#fff;border:none;border-radius:0;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Add funds
           </button>
-          <button onclick="openWithdrawModal()" style="flex:1;background:#fff;color:#191918;border:1.5px solid #40403d;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
+          <button onclick="openWithdrawModal()" style="flex:1;background:#fff;color:#191918;border:1.5px solid #40403d;border-radius:0;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 9V1M1 5l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Withdraw
           </button>
         </div>
@@ -458,16 +458,16 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     </div>
 
     <!-- ④ Unfunded Orders — hidden until needed -->
-    <div id="unfunded-section" class="card fi" style="display:none;overflow:hidden;border:1px solid #fca5a5;margin-bottom:16px;animation-delay:.12s">
+    <div id="unfunded-section" class="card fi" style="display:none;overflow:hidden;border:1.5px solid #191918;border-radius:0;margin-bottom:16px;animation-delay:.12s">
       <!-- Alert header bar -->
-      <div style="padding:11px 20px;background:#fff5f5;border-bottom:1px solid #fecaca;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="padding:11px 20px;background:#fdeee7;border-bottom:1px solid #e7e5e0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="width:7px;height:7px;background:#191918;border-radius:50%;animation:pulse 1.5s ease-in-out infinite;display:inline-block;flex-shrink:0"></span>
-        <strong style="font-size:14.5px;font-weight:700;color:#dc2626;white-space:nowrap">Unfunded Orders</strong>
-        <span id="unfunded-count" style="background:#dc2626;color:#fff;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">10 paused</span>
-        <span style="font-size:14px;color:#b91c1c;flex:1;min-width:160px">Paused orders awaiting funds — fulfillment resumes on payment</span>
+        <strong style="font-size:14.5px;font-weight:700;color:#191918;white-space:nowrap">Unfunded Orders</strong>
+        <span id="unfunded-count" style="background:#191918;color:#fff;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap">10 paused</span>
+        <span style="font-size:14px;color:#6b7280;flex:1;min-width:160px">Paused orders awaiting funds — fulfillment resumes on payment</span>
         <button onclick="selectAllOrders()" id="sel-all-unfunded" style="font-size:13px;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline;white-space:nowrap">Select all</button>
-        <button id="fund-btn" onclick="fundSelected()" disabled style="background:#dc2626;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:13.5px;font-weight:600;cursor:not-allowed;font-family:inherit;opacity:.4;white-space:nowrap;transition:all .15s">Fund Selected</button>
-        <button onclick="dismissUnfunded()" title="Dismiss" style="background:none;border:1px solid #fca5a5;border-radius:6px;padding:4px 9px;cursor:pointer;color:#dc2626;font-size:14px;line-height:1;font-family:inherit;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background=''">✕</button>
+        <button id="fund-btn" onclick="fundSelected()" disabled style="background:#9f52e0;color:#fff;border:none;border-radius:0;padding:6px 14px;font-size:13.5px;font-weight:600;cursor:not-allowed;font-family:inherit;opacity:.4;white-space:nowrap;transition:all .15s">Fund Selected</button>
+        <button onclick="dismissUnfunded()" title="Dismiss" style="background:none;border:1px solid #191918;border-radius:0;padding:4px 9px;cursor:pointer;color:#191918;font-size:14px;line-height:1;font-family:inherit;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background=''">✕</button>
       </div>
 
       <!-- Table -->
@@ -487,14 +487,14 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <tbody>
 
             <!-- ── #FF-8822 ── -->
-            <tr id="row-8822" style="background:#fff8f8">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8822" data-amt="280" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8822" style="background:#fff">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8822" data-amt="280" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8822</td>
               <td style="font-weight:600;color:#374151">Marco Rossi</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Etsy</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 11 days · since Apr 15 <button onclick="toggleItems('ir-8822',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#f6f5f4'">4 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$280.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8822',280)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Etsy</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 11 days · since Apr 15 <button onclick="toggleItems('ir-8822',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#fff'">4 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$280.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8822',280)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <tr class="ir-8822" style="display:none;background:#fffbf5">
               <td style="padding:5px 10px 5px 16px;border-bottom:none"></td>
@@ -512,14 +512,14 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </tr>
 
             <!-- ── #FF-8825 ── -->
-            <tr id="row-8825" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8825" data-amt="350" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8825" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8825" data-amt="350" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8825</td>
               <td style="font-weight:600;color:#374151">Tyler Brooks</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● WooCommerce</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 10 days · since Apr 16 <button onclick="toggleItems('ir-8825',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#f6f5f4'">5 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$350.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8825',350)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● WooCommerce</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 10 days · since Apr 16 <button onclick="toggleItems('ir-8825',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#fff'">5 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$350.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8825',350)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <tr class="ir-8825" style="display:none;background:#fffbf5">
               <td style="padding:5px 10px 5px 16px;border-bottom:none"></td>
@@ -544,14 +544,14 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </tr>
 
             <!-- ── #FF-8821 ── -->
-            <tr id="row-8821" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8821" data-amt="210" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8821" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8821" data-amt="210" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8821</td>
               <td style="font-weight:600;color:#374151">James Liu</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Shopify</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 10 days · since Apr 16 <button onclick="toggleItems('ir-8821',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#f6f5f4'">3 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$210.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8821',210)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Shopify</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 10 days · since Apr 16 <button onclick="toggleItems('ir-8821',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit;transition:background .12s" onmouseover="this.style.background='#ece9e5'" onmouseout="this.style.background='#fff'">3 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$210.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8821',210)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <tr class="ir-8821" style="display:none;background:#fffbf5">
               <td style="padding:5px 10px 5px 16px;border-bottom:none"></td>
@@ -569,74 +569,74 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </tr>
 
             <!-- ── #FF-8819 ── -->
-            <tr id="row-8819" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8819" data-amt="195" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8819" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8819" data-amt="195" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8819</td>
               <td style="font-weight:600;color:#374151">Sophie Chen</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Amazon</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 9 days · since Apr 17 <button onclick="toggleItems('ir-8819',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$195.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8819',195)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Amazon</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 9 days · since Apr 17 <button onclick="toggleItems('ir-8819',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$195.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8819',195)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8817 ── -->
-            <tr id="row-8817" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8817" data-amt="420" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8817" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8817" data-amt="420" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8817</td>
               <td style="font-weight:600;color:#374151">Lena Müller</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Etsy</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 8 days · since Apr 18 <button onclick="toggleItems('ir-8817',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">6 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$420.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8817',420)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Etsy</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 8 days · since Apr 18 <button onclick="toggleItems('ir-8817',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">6 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$420.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8817',420)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8815 ── -->
-            <tr id="row-8815" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8815" data-amt="165" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8815" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8815" data-amt="165" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8815</td>
               <td style="font-weight:600;color:#374151">Ryan Park</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Shopify</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 7 days · since Apr 19 <button onclick="toggleItems('ir-8815',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$165.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8815',165)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Shopify</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 7 days · since Apr 19 <button onclick="toggleItems('ir-8815',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$165.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8815',165)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8813 ── -->
-            <tr id="row-8813" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8813" data-amt="310" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8813" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8813" data-amt="310" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8813</td>
               <td style="font-weight:600;color:#374151">Ava Williams</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● WooCommerce</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 6 days · since Apr 20 <button onclick="toggleItems('ir-8813',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">3 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$310.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8813',310)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● WooCommerce</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 6 days · since Apr 20 <button onclick="toggleItems('ir-8813',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">3 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$310.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8813',310)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8811 ── -->
-            <tr id="row-8811" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8811" data-amt="245" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8811" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8811" data-amt="245" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8811</td>
               <td style="font-weight:600;color:#374151">Noah Kim</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Shopify</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 5 days · since Apr 21 <button onclick="toggleItems('ir-8811',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$245.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8811',245)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Shopify</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 5 days · since Apr 21 <button onclick="toggleItems('ir-8811',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$245.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8811',245)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8809 ── -->
-            <tr id="row-8809" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8809" data-amt="390" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8809" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8809" data-amt="390" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8809</td>
               <td style="font-weight:600;color:#374151">Mia Tanaka</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Etsy</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 4 days · since Apr 22 <button onclick="toggleItems('ir-8809',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">4 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$390.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8809',390)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Etsy</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 4 days · since Apr 22 <button onclick="toggleItems('ir-8809',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">4 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$390.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8809',390)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
             <!-- ── #FF-8807 ── -->
-            <tr id="row-8807" style="background:#fff8f8;border-top:2px solid #e5e4e0">
-              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8807" data-amt="175" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#dc2626;cursor:pointer"/></td>
+            <tr id="row-8807" style="background:#fff;border-top:1px solid #e7e5e0">
+              <td style="padding:11px 10px 11px 16px"><input type="checkbox" class="uf-chk" data-order="8807" data-amt="175" onchange="updateFundTotal()" style="width:14px;height:14px;accent-color:#9f52e0;cursor:pointer"/></td>
               <td style="font-family:monospace;font-weight:700;color:#191918">#FF-8807</td>
               <td style="font-weight:600;color:#374151">Ethan Moore</td>
-              <td><span style="background:#f0ede9;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap">● Amazon</span></td>
-              <td style="color:#9ca3af;font-size:13px">paused 3 days · since Apr 23 <button onclick="toggleItems('ir-8807',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#f6f5f4;border:1px solid #e5e4e0;border-radius:4px;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
-              <td style="text-align:right;padding-right:16px;font-weight:800;color:#dc2626;font-size:14.5px">$175.00</td>
-              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8807',175)" style="background:#fff;border:1.5px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#fff5f5'" onmouseout="this.style.background='#fff'">Fund →</button></td>
+              <td><span style="background:transparent;border:1px solid #191918;color:#374151;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:0;white-space:nowrap;font-family:'DepartureMono',monospace;text-transform:uppercase">● Amazon</span></td>
+              <td style="color:#9ca3af;font-size:13px">paused 3 days · since Apr 23 <button onclick="toggleItems('ir-8807',this)" style="margin-left:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #191918;border-radius:0;padding:1px 7px;cursor:pointer;font-family:inherit">2 items ▾</button></td>
+              <td style="text-align:right;padding-right:16px;font-weight:800;color:#191918;font-size:14.5px">$175.00</td>
+              <td style="text-align:right;padding-right:16px"><button onclick="fundOrder('8807',175)" style="background:#fff;border:1.5px solid #191918;color:#191918;border-radius:0;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">Fund →</button></td>
             </tr>
 
           </tbody>
@@ -644,11 +644,11 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       </div>
 
       <!-- Footer: selected total -->
-      <div style="padding:10px 20px;background:#fafaf9;border-top:1px solid #fecaca;display:flex;align-items:center;justify-content:space-between">
+      <div style="padding:10px 20px;background:#fafaf9;border-top:1px solid #e7e5e0;display:flex;align-items:center;justify-content:space-between">
         <div style="font-size:13.5px;color:#9ca3af" id="fund-footer-label">Select orders above to fund them</div>
         <div style="display:flex;align-items:center;gap:10px">
           <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Selected total</div>
-          <div id="fund-total" style="font-size:18px;font-weight:800;color:#dc2626;line-height:1">$0.00</div>
+          <div id="fund-total" style="font-size:18px;font-weight:800;color:#191918;line-height:1">$0.00</div>
         </div>
       </div>
     </div>

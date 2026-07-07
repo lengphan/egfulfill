@@ -406,23 +406,23 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <!-- KPI CARDS -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px" class="fi">
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total Revenue</div>
-        <div id="an-revenue" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Total Revenue</div>
+        <div id="an-revenue" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1;font-family:'DepartureMono',ui-monospace,monospace">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-revenue-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total Orders</div>
-        <div id="an-orders" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">0</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Total Orders</div>
+        <div id="an-orders" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1;font-family:'DepartureMono',ui-monospace,monospace">0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-orders-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Avg Order Value</div>
-        <div id="an-aov" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Avg Order Value</div>
+        <div id="an-aov" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1;font-family:'DepartureMono',ui-monospace,monospace">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-aov-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Net Profit</div>
-        <div id="an-profit" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Net Profit</div>
+        <div id="an-profit" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1;font-family:'DepartureMono',ui-monospace,monospace">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-profit-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
     </div>
@@ -434,7 +434,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div style="font-size:15px;font-weight:700;color:#191918">Revenue Over Time</div>
           <div style="font-size:13px;color:#9ca3af;margin-top:2px">Daily revenue across all platforms</div>
         </div>
-        <div style="display:flex;align-items:center;background:#f6f5f4;border-radius:7px;padding:2px;gap:1px">
+        <div style="display:flex;align-items:center;background:transparent;border-radius:0;padding:2px;gap:1px">
           <button class="seg on" onclick="toggleMetric(this,'revenue')">Revenue</button>
           <button class="seg" onclick="toggleMetric(this,'orders')">Orders</button>
           <button class="seg" onclick="toggleMetric(this,'profit')">Profit</button>
@@ -455,11 +455,11 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="font-size:13px;color:#9ca3af;margin-bottom:18px">% of revenue by platform</div>
         <canvas id="pieChart" style="max-height:160px"></canvas>
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#6366f1;display:inline-block"></span>Shopify</span><span style="font-weight:600;color:#191918">0%</span></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#7a92c4;display:inline-block"></span>Etsy</span><span style="font-weight:600;color:#191918">0%</span></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block"></span>WooCommerce</span><span style="font-weight:600;color:#191918">0%</span></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#f43f5e;display:inline-block"></span>Amazon</span><span style="font-weight:600;color:#191918">0%</span></div>
-          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#8b5cf6;display:inline-block"></span>Other</span><span style="font-weight:600;color:#191918">0%</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:0;background:#4c6ef5;display:inline-block"></span>Shopify</span><span style="font-weight:600;color:#191918">0%</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:0;background:#12b886;display:inline-block"></span>Etsy</span><span style="font-weight:600;color:#191918">0%</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:0;background:#f2b705;display:inline-block"></span>WooCommerce</span><span style="font-weight:600;color:#191918">0%</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:0;background:#f06595;display:inline-block"></span>Amazon</span><span style="font-weight:600;color:#191918">0%</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13.5px"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:0;background:#9f52e0;display:inline-block"></span>Other</span><span style="font-weight:600;color:#191918">0%</span></div>
         </div>
       </div>
     </div>
@@ -530,7 +530,7 @@ function chartPalette(){
   const dark = document.documentElement.getAttribute('data-theme')==='dark';
   return dark
     ? {line:'#c9c3ba', grid:'rgba(255,255,255,.08)', tick:'#7a7874', fillTop:'rgba(201,195,186,.16)', fillBottom:'rgba(201,195,186,0)'}
-    : {line:'#111827', grid:'#ececea', tick:'#9ca3af', fillTop:'rgba(17,24,39,.18)', fillBottom:'rgba(17,24,39,0)'};
+    : {line:'#111827', grid:'#e7e5e0', tick:'#191918', fillTop:'rgba(17,24,39,.18)', fillBottom:'rgba(17,24,39,0)'};
 }
 function revGrad(p){const g=revCtx.createLinearGradient(0,0,0,280);g.addColorStop(0,p.fillTop);g.addColorStop(1,p.fillBottom);return g;}
 let _cp = chartPalette();
@@ -538,7 +538,7 @@ const revChartObj = new Chart(revCtx,{type:'line',data:{labels,datasets:[{data:r
 
 // Platform bar chart
 const platCtx = document.getElementById('platChart').getContext('2d');
-const platChartObj = new Chart(platCtx,{type:'bar',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','eBay'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#6366f1','#7a92c4','#10b981','#f43f5e','#8b5cf6'],borderRadius:6,borderSkipped:false}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:_cp.tick}},y:{grid:{color:_cp.grid,lineWidth:1,drawBorder:false},ticks:{font:{size:11},color:_cp.tick}}}}});
+const platChartObj = new Chart(platCtx,{type:'bar',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','eBay'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#4c6ef5','#12b886','#f2b705','#f06595','#9f52e0'],borderRadius:0,borderSkipped:false}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:11},color:_cp.tick}},y:{grid:{color:_cp.grid,lineWidth:1,drawBorder:false},ticks:{font:{size:11},color:_cp.tick}}}}});
 
 // Re-apply chart colors when the theme changes
 function restyleCharts(){
@@ -561,7 +561,7 @@ function restyleCharts(){
 
 // Pie chart
 const pieCtx = document.getElementById('pieChart').getContext('2d');
-const pieChartObj = new Chart(pieCtx,{type:'doughnut',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','Other'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#6366f1','#7a92c4','#10b981','#f43f5e','#8b5cf6'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}},cutout:'68%'}});
+const pieChartObj = new Chart(pieCtx,{type:'doughnut',data:{labels:['Shopify','Etsy','WooCommerce','Amazon','Other'],datasets:[{data:[0,0,0,0,0],backgroundColor:['#4c6ef5','#12b886','#f2b705','#f06595','#9f52e0'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+'%'}}},cutout:'68%'}});
 
 // ── Real reports filtering — by store/platform + date range (mirrors the dashboard) ──
 function _anSet(id,v){ var el=document.getElementById(id); if(el) el.textContent=v; }

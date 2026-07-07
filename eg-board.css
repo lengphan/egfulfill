@@ -20,7 +20,7 @@ html.eg-board-on body{background:var(--bos-ground)!important}
 /* ════ VERTICAL SIDEBAR RAIL (main pages) ════ */
 @media(min-width:861px){
   html.eg-board-on aside.sidebar{
-    width:212px!important;top:14px!important;left:14px!important;bottom:auto!important;
+    width:212px!important;top:50%!important;left:14px!important;bottom:auto!important;transform:translateY(-50%)!important;
     height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
     background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
     border-radius:0!important}

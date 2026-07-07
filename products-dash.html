@@ -429,7 +429,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div style="width:200px;flex-shrink:0">
           <div class="card" style="overflow:hidden">
             <div style="padding:11px 14px 8px;border-bottom:1px solid #f0ede9">
-              <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em">Categories</div>
+              <div style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.07em;font-family:'DepartureMono',monospace">Categories</div>
             </div>
             <div style="padding:5px" id="cat-sidebar-list"></div>
           </div>
@@ -457,12 +457,12 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
               <table style="width:100%;border-collapse:collapse" id="cat-table">
                 <thead>
                   <tr>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:#fafaf9;white-space:nowrap;width:48px"></th>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:#fafaf9;white-space:nowrap">Product</th>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:#fafaf9;white-space:nowrap">Colors</th>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:#fafaf9;white-space:nowrap">Sizes</th>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:#fafaf9;white-space:nowrap">From</th>
-                    <th style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:#fafaf9;white-space:nowrap"></th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace;width:48px"></th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Product</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Colors</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Sizes</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">From</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace"></th>
                   </tr>
                 </thead>
                 <tbody id="cat-tbody"></tbody>
@@ -485,7 +485,7 @@ const PRODUCTS=[
   {id:2,img:'images/395_fm.jpg',name:'Gildan Hoodie 18500',sku:'G18500',cat:'apparel',price:'$18.50',margin:'~$30–50',sales:198,tag:'Top seller',tagCls:'background:#fef9c3;color:#374151',published:true},
   {id:3,img:'images/372_fm.jpg',name:'Gildan Crewneck 18000',sku:'G18000',cat:'apparel',price:'$14.00',margin:'~$22–38',sales:145,tag:'Popular',tagCls:'background:#ede9fe;color:#7c3aed',published:true},
   {id:4,img:'images/1610_fm.jpg',name:'Comfort Colors Crewneck 1566',sku:'CC1566',cat:'apparel',price:'$19.50',margin:'~$28–45',sales:87,tag:'Premium',tagCls:'background:#fdf4ff;color:#9333ea',published:true},
-  {id:5,img:'images/1822_fm.jpg',name:'Comfort Colors Tee 1717',sku:'CC1717',cat:'apparel',price:'$14.00',margin:'~$20–35',sales:224,tag:'Trending',tagCls:'background:#f0ede9;color:#374151',published:true},
+  {id:5,img:'images/1822_fm.jpg',name:'Comfort Colors Tee 1717',sku:'CC1717',cat:'apparel',price:'$14.00',margin:'~$20–35',sales:224,tag:'Trending',tagCls:'background:#fff;border:1px solid #191918;color:#191918',published:true},
   {id:6,img:'images/29_fm.jpg',name:'Next Level Tee 3600',sku:'NL3600',cat:'apparel',price:'$11.00',margin:'~$18–32',sales:176,tag:'Soft feel',tagCls:'background:#f0fdf4;color:#16a34a',published:true},
   {id:7,img:'images/122267_b_fm.jpg',name:'Jogger Pants',sku:'JP100',cat:'apparel',price:'$16.80',margin:'~$24–40',sales:52,tag:'New',tagCls:'background:#dbeafe;color:#1d4ed8',published:false},
   {id:8,img:'images/82220_f_fm.jpg',name:'Canvas Tote Bag',sku:'TOTE01',cat:'accessories',price:'$6.50',margin:'~$12–22',sales:201,tag:'Eco-friendly',tagCls:'background:#dcfce7;color:#15803d',published:true},
@@ -508,20 +508,20 @@ function renderProducts(prods){
   const tDesign = T ? T.design : 'Design';
   document.getElementById('prod-grid').innerHTML=prods.map(p=>`
     <div class="prod-card">
-      <div style="aspect-ratio:1/1;overflow:hidden;position:relative;background:#f6f5f4">
+      <div style="aspect-ratio:1/1;overflow:hidden;position:relative;background:#fcfcfc">
         <img src="${p.img}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>
-        ${p.published?'':'<span style="position:absolute;top:8px;right:8px;background:#fff;border:1px solid #e5e4e0;font-size:11px;font-weight:600;color:#6b7280;padding:2px 6px;border-radius:5px">Draft</span>'}
+        ${p.published?'':'<span style="position:absolute;top:8px;right:8px;background:#fff;border:1px solid #191918;font-size:11px;font-weight:600;color:#191918;padding:2px 6px;border-radius:0;font-family:\'DepartureMono\',monospace">Draft</span>'}
       </div>
       <div style="padding:12px">
-        <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">${p.sku}</div>
+        <div style="font-size:11px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;font-family:'DepartureMono',monospace">${p.sku}</div>
         <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:6px;line-height:1.4">${p.name}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
           <div><span style="font-size:13px;color:#374151">${tBase} <strong>${p.price}</strong></span></div>
-          <span style="font-size:11.5px;padding:2px 6px;border-radius:5px;font-weight:600;${p.tagCls}">${p.tag}</span>
+          <span style="font-size:11.5px;padding:2px 6px;border-radius:0;font-weight:600;${p.tagCls}">${p.tag}</span>
         </div>
-        <div style="font-size:12px;color:#9ca3af;margin-bottom:10px">${tMargin} ${p.margin} · ${p.sales} ${tSold}</div>
+        <div style="font-size:12px;color:#191918;margin-bottom:10px;font-family:'DepartureMono',monospace">${tMargin} ${p.margin} · ${p.sales} ${tSold}</div>
         <div style="display:flex;gap:6px">
-          <button onclick="window.location='product-detail.html?id=${p.id}&name='+encodeURIComponent('${p.name}')" style="flex:1;background:#111827;color:#fff;border:none;border-radius:7px;padding:6px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">${tDesign}</button>
+          <button onclick="window.location='product-detail.html?id=${p.id}&name='+encodeURIComponent('${p.name}')" style="flex:1;background:#111827;color:#fff;border:none;border-radius:0;padding:6px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">${tDesign}</button>
 
         </div>
       </div>
@@ -605,9 +605,9 @@ function catThumbFail(imgEl, letters){
 function catThumb(p){
   var letters = (p.catLabel||'?').slice(0,3).toUpperCase();
   if (p.img) {
-    return '<div style="width:52px;height:52px;border-radius:8px;background:#f6f5f4;border:1px solid rgba(0,0,0,.06);overflow:hidden;flex-shrink:0"><img src="' + p.img + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="catThumbFail(this,\'' + letters + '\')"/></div>';
+    return '<div style="width:52px;height:52px;border-radius:0;background:#fcfcfc;border:1px solid rgba(0,0,0,.06);overflow:hidden;flex-shrink:0"><img src="' + p.img + '" style="width:100%;height:100%;object-fit:cover;display:block" onerror="catThumbFail(this,\'' + letters + '\')"/></div>';
   }
-  return '<div style="width:52px;height:52px;border-radius:8px;background:#f3f3f1;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:#9ca3af">' + letters + '</div>';
+  return '<div style="width:52px;height:52px;border-radius:0;background:#f3f3f1;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700;color:#9ca3af">' + letters + '</div>';
 }
 
 function catAddProduct(e,pid,pname){
@@ -649,8 +649,8 @@ function renderCatalog(){
   }
   tbody.innerHTML=prods.map(function(p){
     var esc=p.name.replace(/'/g,"\\'");
-    var viewBtn='<button onclick="event.stopPropagation();window.location=\'product-detail.html?id='+p.id+'&name=\'+encodeURIComponent(\''+esc+'\')" style="padding:5px 11px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid #c9c4bc;background:transparent;color:#374151;white-space:nowrap;transition:all .15s" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#c9c4bc\';this.style.color=\'#374151\'">View product details</button>';
-    var createBtn='<button class="cat-create" onclick="event.stopPropagation();window.location=\'design-maker.html?id='+p.id+'&name=\'+encodeURIComponent(\''+esc+'\')" style="padding:5px 12px;border-radius:7px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid #111827;background:#111827;color:#fff;white-space:nowrap;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">+ Create product</button>';
+    var viewBtn='<button onclick="event.stopPropagation();window.location=\'product-detail.html?id='+p.id+'&name=\'+encodeURIComponent(\''+esc+'\')" style="padding:5px 11px;border-radius:0;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid #c9c4bc;background:transparent;color:#374151;white-space:nowrap;transition:all .15s" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#c9c4bc\';this.style.color=\'#374151\'">View product details</button>';
+    var createBtn='<button class="cat-create" onclick="event.stopPropagation();window.location=\'design-maker.html?id='+p.id+'&name=\'+encodeURIComponent(\''+esc+'\')" style="padding:5px 12px;border-radius:0;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1.5px solid #111827;background:#111827;color:#fff;white-space:nowrap;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">+ Create product</button>';
     var actions='<div style="display:flex;gap:8px;justify-content:flex-end;align-items:center">'+viewBtn+createBtn+'</div>';
     var main='<tr class="cat-prow" style="cursor:pointer;transition:background .12s" onclick="catToggleRow('+p.id+')">'+
       '<td style="padding:10px 6px 10px 14px;border-bottom:1px solid #f0ede9;vertical-align:middle;width:60px">'+catThumb(p)+'</td>'+
