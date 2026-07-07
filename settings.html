@@ -738,7 +738,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:4px">Connected Stores</div>
           <div style="font-size:13.5px;color:#6b7280;margin-bottom:16px">Link a sales channel so its orders sync into EGFULFILL automatically.</div>
           <div id="stores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>
-          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Available platforms</div>
+          <div style="font-size:11.5px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;font-family:'DepartureMono',ui-monospace,monospace">Available platforms</div>
           <div id="connect-tiles" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(232px, 1fr));gap:10px"></div>
         </div>
       </div>
@@ -1277,8 +1277,8 @@ function renderStores(){
   var conns = mergedConns();
   var keys = Object.keys(conns);
   if (!keys.length) {
-    list.innerHTML = '<div style="border:1.5px dashed #d8d4cd;border-radius:12px;padding:28px 20px;text-align:center;background:#fbfaf8">'
-      + '<span style="display:inline-flex;width:44px;height:44px;border-radius:12px;background:#f3eee2;border:1px solid #e5e4e0;align-items:center;justify-content:center;margin-bottom:11px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.5 8.5h15l-1 10.5a1 1 0 01-1 .9H6.5a1 1 0 01-1-.9l-1-10.5z" stroke="#b0aaa4" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.5 8.5V6a3.5 3.5 0 017 0v2.5" stroke="#b0aaa4" stroke-width="1.5"/></svg></span>'
+    list.innerHTML = '<div style="border:1px dashed #111;border-radius:0;padding:28px 20px;text-align:center;background:#fbfaf8">'
+      + '<span style="display:inline-flex;width:44px;height:44px;border-radius:0;background:#f3eee2;border:1px solid #111;align-items:center;justify-content:center;margin-bottom:11px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4.5 8.5h15l-1 10.5a1 1 0 01-1 .9H6.5a1 1 0 01-1-.9l-1-10.5z" stroke="#b0aaa4" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.5 8.5V6a3.5 3.5 0 017 0v2.5" stroke="#b0aaa4" stroke-width="1.5"/></svg></span>'
       + '<div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px">No stores connected yet</div>'
       + '<div style="font-size:12.5px;color:#9ca3af">Pick a platform below to start syncing orders automatically.</div></div>';
   } else {
@@ -1288,11 +1288,11 @@ function renderStores(){
       var line = c.server
         ? ((c.name || meta.name) + ' · ' + (c.lastSync ? ('synced ' + fmtAgo(c.lastSync)) : 'awaiting first sync'))
         : ((c.name || meta.name) + ' · connected ' + fmtAgo(c.connectedAt));
-      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)">'
+      return '<div style="display:flex;align-items:center;gap:13px;padding:14px 16px;background:#fdfcfa;border:1px solid #111;border-radius:0;box-shadow:none">'
         + platformIcon(k, 38)
         + '<div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(c.shop || c.name || meta.name)+'</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+line+'</div></div>'
         + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0d6e2e;font-weight:700;background:#eaf6ee;border:1px solid #bfe6cd;border-radius:999px;padding:3px 10px;flex-shrink:0"><span style="width:6px;height:6px;border-radius:50%;background:#0d6e2e"></span>Connected</span>'
-        + (c.server ? '<button onclick="syncStore(\''+k+'\',this)" title="Pull new orders now" style="font-size:12.5px;font-weight:700;color:#191918;background:#f4f2ef;border:1px solid #40403d;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;flex-shrink:0">Sync</button>' : '')
+        + (c.server ? '<button onclick="syncStore(\''+k+'\',this)" title="Pull new orders now" style="font-size:12.5px;font-weight:700;color:#191918;background:#f4f2ef;border:1px solid #111;border-radius:0;padding:6px 12px;cursor:pointer;font-family:inherit;flex-shrink:0">Sync</button>' : '')
         + '<button onclick="disconnectStore(\''+k+'\')" style="font-size:12.5px;font-weight:600;color:#6b7280;background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 6px;flex-shrink:0" onmouseover="this.style.color=\'#b83c3c\'" onmouseout="this.style.color=\'#6b7280\'">Disconnect</button>'
         + '</div>';
     }).join('');
@@ -1307,10 +1307,10 @@ function renderTiles(){
     var already = !!conns[p];
     var cta = already
       ? '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0d6e2e;font-weight:700;flex-shrink:0"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-6" stroke="#0d6e2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Connected</span>'
-      : '<span style="display:inline-flex;align-items:center;gap:5px;background:#191918;color:#fff;font-size:12.5px;font-weight:700;border-radius:8px;padding:7px 13px;flex-shrink:0">Connect<svg width="11" height="11" viewBox="0 0 13 13" fill="none"><path d="M3 6.5h7M6.5 3l3.5 3.5-3.5 3.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+      : '<span style="display:inline-flex;align-items:center;gap:5px;background:#2f4bf0;color:#fff;font-size:12.5px;font-weight:700;border-radius:0;padding:7px 13px;flex-shrink:0">Connect<svg width="11" height="11" viewBox="0 0 13 13" fill="none"><path d="M3 6.5h7M6.5 3l3.5 3.5-3.5 3.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
     return '<button '+(already?'disabled':'onclick="EGConnect.start(\''+p+'\',{onComplete:onStoreConnected})"')
-      + ' style="display:flex;align-items:center;gap:11px;padding:13px 15px;background:#fdfcfa;border:1.5px solid #e5e4e0;border-radius:12px;cursor:'+(already?'default':'pointer')+';font-family:inherit;text-align:left;width:100%;'+(already?'opacity:.7;':'')+'transition:border-color .14s,transform .08s,box-shadow .08s" '
-      + (already?'':'onmouseover="this.style.borderColor=\'#191918\';this.style.transform=\'translateY(-1px)\';this.style.boxShadow=\'0 3px 0 #40403d\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.transform=\'none\';this.style.boxShadow=\'none\'"')+'>'
+      + ' style="display:flex;align-items:center;gap:11px;padding:13px 15px;background:#fdfcfa;border:1px solid #111;border-radius:0;cursor:'+(already?'default':'pointer')+';font-family:inherit;text-align:left;width:100%;'+(already?'opacity:.7;':'')+'transition:border-color .14s,transform .08s,box-shadow .08s" '
+      + (already?'':'onmouseover="this.style.borderColor=\'#2f4bf0\';this.style.transform=\'translateY(-1px)\';this.style.boxShadow=\'0 3px 0 #2f4bf0\'" onmouseout="this.style.borderColor=\'#111\';this.style.transform=\'none\';this.style.boxShadow=\'none\'"')+'>'
       + platformIcon(p, 34)
       + '<span style="flex:1;min-width:0;font-size:14px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(PLATFORM_NAMES[p] || meta.name || p)+'</span>'
       + cta
@@ -1320,9 +1320,9 @@ function renderTiles(){
   // as "not yet supported, ask us".
   tiles.push(
     '<button onclick="EGConnect.start(\'other\',{onComplete:onStoreConnected})" '
-    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 15px;background:transparent;border:1.5px dashed #c9c3ba;border-radius:12px;cursor:pointer;font-family:inherit;color:#6b7280;font-size:13px;font-weight:600;width:100%;transition:border-color .14s,color .14s,background .14s" '
-    + 'onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\';this.style.background=\'#fafaf9\'" '
-    + 'onmouseout="this.style.borderColor=\'#c9c3ba\';this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
+    + 'style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 15px;background:transparent;border:1px dashed #111;border-radius:0;cursor:pointer;font-family:inherit;color:#6b7280;font-size:13px;font-weight:600;width:100%;transition:border-color .14s,color .14s,background .14s" '
+    + 'onmouseover="this.style.borderColor=\'#2f4bf0\';this.style.color=\'#2f4bf0\';this.style.background=\'#fafaf9\'" '
+    + 'onmouseout="this.style.borderColor=\'#111\';this.style.color=\'#6b7280\';this.style.background=\'transparent\'">'
       + '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>'
       + 'Other platform'
     + '</button>'
