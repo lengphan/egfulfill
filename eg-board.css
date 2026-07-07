@@ -120,11 +120,13 @@ html.eg-board-on[data-theme=dark] body:has(.sidebar) .bos-controls .bal-chip{bac
 /* + New = the single accent cell — the violet must BLEED to fill the whole cell (was sitting 2px short).
    Scope to the wrapper that actually holds #new-menu-btn (the SEARCH wrapper is also position:relative!) */
 html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important;align-items:stretch!important}
-html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:var(--bos-violet)!important}
-html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-violet-dk)!important}
-html.eg-board-on .bos-controls #new-menu-btn{background:var(--bos-violet)!important;color:#fff!important;border:none!important;box-shadow:none!important;
+/* +New: un-filled cell (the solid colour block read clunky in the connected bar) — cobalt lettering + icons instead */
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-hover)!important}
+html.eg-board-on .bos-controls #new-menu-btn{background:transparent!important;color:var(--bos-violet)!important;border:none!important;box-shadow:none!important;
   border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;
   transform:none!important;padding:0 15px!important;justify-content:center!important}
+html.eg-board-on .bos-controls #new-menu-btn svg path{stroke:var(--bos-violet)!important}
 /* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
 html.eg-board-on .bos-logout{color:var(--bos-grey)!important}
 html.eg-board-on .bos-logout svg{display:none!important}
@@ -252,7 +254,7 @@ html.eg-board-on[data-theme=dark] header{background:#161418!important;border-bot
 html.eg-board-on[data-theme=dark] .bos-controls{background:#201e24!important;border-color:#403d48!important}
 html.eg-board-on[data-theme=dark] .bos-controls > *{background:#201e24!important;color:#d8d4cc!important;border-left-color:#403d48!important}
 html.eg-board-on[data-theme=dark] .bos-controls > *:hover{background:#2c2a33!important}
-html.eg-board-on[data-theme=dark] .bos-controls #new-menu-btn,html.eg-board-on[data-theme=dark] .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:var(--bos-violet)!important}
+html.eg-board-on[data-theme=dark] .bos-controls #new-menu-btn,html.eg-board-on[data-theme=dark] .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important}
 html.eg-board-on[data-theme=dark] #hdr-search{background:#2c2a33!important;border-color:#403d48!important;color:#e8e4dd!important}
 html.eg-board-on[data-theme=dark] header > span,html.eg-board-on[data-theme=dark] header #page-title{color:#f0ede6!important}
 /* content cards + KPI frames */
@@ -341,7 +343,8 @@ html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .b
 /* ── MODALS / POP-UPS ── their fields, card frames + labels use INLINE styles that the class-based
    rules never reached, so they kept rounded grey inputs + sans fonts. Theme the native controls
    directly + sharpen/frame the modal shells. ── */
-html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important;font-family:var(--bos-mono)!important}
+/* fields stay sharp but keep a READABLE sans face — mono was too hard to read for values/addresses/order details */
+html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important}
 html.eg-board-on label{font-family:var(--bos-mono)!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
@@ -358,6 +361,8 @@ html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #supe
 /* the item variant strip (Product · Colour · Size · Method) is meant to be borderless selects
    separated by · dots; the broad select{border} rule above re-boxed them — strip it back */
 html.eg-board-on .egdt-varstrip select{border:none!important;background:transparent!important;padding:2px 2px!important}
-/* tighten the over-wide content column (was max-width:1600/1400) so data reads easier + the right
-   side stops stretching on wide monitors. Header bar stays full-width; content centres under it. */
-html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1280px!important}
+/* LEFT-ALIGN the content so it hugs the sidebar (centring left a big gap next to the nav on wide
+   monitors) + a moderate cap so the right side doesn't stretch. Whitespace collects on the far right. */
+html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1440px!important;margin-left:0!important;margin-right:auto!important}
+/* cap the sticky top bar to the same width so its control cluster lines up with the content's right edge */
+html.eg-board-on body:has(.sidebar) header[style*="sticky"]{max-width:1440px!important}
