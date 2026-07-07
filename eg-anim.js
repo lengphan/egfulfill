@@ -14,7 +14,7 @@
   var EASE = 'cubic-bezier(.2,.7,.2,1)';
 
   function ready(fn) { if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
-  function prep(c, y) { c.style.opacity = '0'; c.style.transform = 'translateY(' + y + 'px)'; c.style.transition = 'opacity .55s ' + EASE + ',transform .55s ' + EASE; }
+  function prep(c, y) { c.style.opacity = '0'; c.style.transform = 'translateY(' + y + 'px)'; c.style.transition = 'opacity .6s ' + EASE + ',transform .6s ' + EASE; }
   function reveal(c) { c.style.opacity = ''; c.style.transform = ''; }
 
   ready(function () {
@@ -23,8 +23,8 @@
     var above = [], below = [];
     all.forEach(function (c) { var r = c.getBoundingClientRect(); (r.top < vh * 0.92 ? above : below).push(c); });
 
-    // 1 — staggered load-in
-    above.forEach(function (c, i) { prep(c, 12); setTimeout(function () { reveal(c); }, 50 + i * 50); });
+    // 1 — staggered load-in (bigger travel + a touch more delay so it's clearly visible)
+    above.forEach(function (c, i) { prep(c, 24); setTimeout(function () { reveal(c); }, 80 + i * 80); });
 
     // 2 — scroll reveal
     if ('IntersectionObserver' in window) {
