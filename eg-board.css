@@ -8,7 +8,7 @@
 @font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
 
 :root{
-  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#f1eee7; --bos-panel:#f7f6f4;
+  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#faf8f3; --bos-panel:#f7f6f4;
   --bos-violet:#9f52e0; --bos-violet-dk:#8a3dd0; --bos-amber:#f8d264;
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
