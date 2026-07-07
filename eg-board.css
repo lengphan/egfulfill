@@ -1,8 +1,9 @@
 /* eg-board.css — BOARD OS v2 (draft): the marketing language, on the seller boards.
-   Sharp · 1.5px ink borders + hard offset shadow · Departure Mono for data/labels/nav · one violet accent.
-   Loaded AFTER eg-theme.js (so it wins the cascade) + paired with eg-board.js, which builds the sticky
-   connected-tab header from the existing sidebar nav and re-parents the live top-bar controls.
-   Presentation only — no markup/logic rewrite. Scoped to .eg-board-on (set by eg-board.js). */
+   LAYOUT: a VERTICAL sticky sidebar rail (main pages, stacked ■ tabs, ends after the last item) + a top-bar
+   "page settings" block (SEARCH · EN · NIGHT · ALERTS · BALANCE · + NEW · account · out) as one connected
+   bordered strip with ink dividers + ■ dot-and-label cells. Sharp · 1.5px ink · hard offset shadow · one violet.
+   Loaded AFTER eg-theme.js (wins the cascade) + paired with eg-board.js (tags + relabels the live controls).
+   Presentation only — no markup/logic rewrite. Scoped to html.eg-board-on. */
 
 @font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
 
@@ -13,68 +14,79 @@
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
 }
+html.eg-board-on body{background:var(--bos-ground)!important}
 
-/* ── hide the old chrome once the new header is built (JS also sets display:none inline as a backstop) ── */
-html.eg-board-on aside.sidebar{display:none!important}
-html.eg-board-on header:not(.bos-top){display:none!important}
-/* content no longer clears a sidebar */
-html.eg-board-on [style*="margin-left:220px"]{margin-left:0!important}
-html.eg-board-on body.eg-board-on{background:var(--bos-ground)!important}
-html.eg-board-on body:has(.bos-top){background:var(--bos-ground)!important}
+/* ════ VERTICAL SIDEBAR RAIL (main pages) ════ */
+@media(min-width:861px){
+  html.eg-board-on aside.sidebar{
+    width:212px!important;top:14px!important;left:14px!important;bottom:auto!important;
+    height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
+    background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
+    border-radius:0!important}
+  html.eg-board-on [style*="margin-left:220px"]{margin-left:242px!important}
+}
+html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
+html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
+/* each nav row = a bordered cell with a ■ marker (icon out) */
+html.eg-board-on .ni{border:none!important;border-bottom:1.5px solid var(--bos-line)!important;border-radius:0!important;
+  font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
+  padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
+html.eg-board-on .ni svg{display:none!important}
+/* keep intentionally-hidden nav rows hidden (e.g. Product Templates) */
+html.eg-board-on .ni[style*="display:none"]{display:none!important}
+/* titles alone — no ■ marker (cleaner, less cluttered) */
+html.eg-board-on .ni.on{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on .ni:not(.on):hover{background:var(--bos-amber)!important;color:var(--bos-ink)!important}
+html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:var(--bos-mono)!important;border-radius:0!important;font-size:10px!important}
+/* Profile is reachable from the account cell; hide it + the ACCOUNT section header so the rail ends at Settings */
+html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
+html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
+  text-transform:uppercase;color:var(--bos-grey2)!important;padding:9px 15px 5px!important;border-bottom:1.5px solid var(--bos-line)!important}
 
-/* ════ STICKY CONNECTED-TAB HEADER ════ */
-.bos-top{position:sticky;top:0;z-index:70;display:flex;align-items:stretch;gap:12px;padding:13px 16px;
-  background:var(--bos-ground);border-bottom:1.5px solid var(--bos-ink)}
-.bos-navblock{display:flex;align-items:stretch;border:1.5px solid var(--bos-ink);box-shadow:3px 3px 0 var(--bos-ink);
-  background:#fff;overflow:hidden;min-width:0;flex:1 1 auto}
-.bos-logo{display:flex;align-items:center;padding:0 15px;font-family:'Fraunces',Georgia,serif;font-weight:900;
-  font-optical-sizing:auto;font-size:20px;letter-spacing:-.01em;color:var(--bos-ink);text-decoration:none;
-  border-right:1.5px solid var(--bos-ink);flex-shrink:0}
-.bos-tabs{display:flex;align-items:stretch;overflow-x:auto;scrollbar-width:none;min-width:0;flex:1 1 auto}
-.bos-tabs::-webkit-scrollbar{display:none}
-.bos-tab{display:inline-flex;align-items:center;gap:7px;font-family:var(--bos-mono);font-size:11.5px;
-  text-transform:uppercase;letter-spacing:.04em;color:var(--bos-ink);border-left:1.5px solid var(--bos-ink);
-  padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;background:#fff;text-decoration:none;
-  transition:background .12s,color .12s}
-.bos-tab:first-child{border-left:none}
-.bos-tab .sq{width:7px;height:7px;background:var(--bos-ink);flex-shrink:0}
-.bos-tab .txt{line-height:1}
-.bos-tab .ct{font-size:9.5px;background:var(--bos-ink);color:#fff;padding:0 5px;line-height:15px;border-radius:0}
-.bos-tab:not(.on):hover{background:var(--bos-amber)}
-.bos-tab.on{background:var(--bos-violet);color:#fff}
-.bos-tab.on .sq{background:#fff}
-.bos-tab.on .ct{background:#fff;color:var(--bos-violet)}
+/* ════ TOP BAR — connected "page settings" block ════ */
+html.eg-board-on header{background:var(--bos-ground)!important;border-bottom:1.5px solid var(--bos-ink)!important;
+  height:auto!important;min-height:56px!important;padding:11px 18px!important;gap:12px!important}
+html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
+  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:hidden;flex-wrap:nowrap}
+/* every cell: ink divider, fixed height, mono, ■ + label layout */
+html.eg-board-on .bos-controls > *{border-left:1.5px solid var(--bos-ink)!important;border-radius:0!important;margin:0!important;
+  height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
+  font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
+  color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
+html.eg-board-on .bos-controls > *:first-child{border-left:none!important}
+html.eg-board-on .bos-controls > *:hover{background:var(--bos-amber)!important}
+/* kill the old thin grey vertical-divider spacers */
+html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
+/* ■ marker + label */
+html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
+html.eg-board-on .bos-lbl{font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase;letter-spacing:.04em;color:inherit;line-height:1}
+html.eg-board-on #hdr-lang-code{font-family:var(--bos-mono)!important;font-size:11px!important}
+html.eg-board-on #balance-val{font-family:var(--bos-mono)!important;font-size:11px!important;font-variant-numeric:tabular-nums}
+/* theme: hide the pill; the mode label follows the theme */
+html.eg-board-on #hdr-theme-track{display:none!important}
+html.eg-board-on:not([data-theme=dark]) .bos-mode::after{content:'NIGHT'}
+html.eg-board-on[data-theme=dark] .bos-mode::after{content:'DAY'}
+/* alerts count sits inline after the label */
+html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
+  border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
+/* + New = the single accent cell */
+html.eg-board-on .bos-controls #new-menu-btn{background:var(--bos-violet)!important;color:#fff!important;border:none!important;box-shadow:none!important;
+  border-radius:0!important;height:42px!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;
+  transform:none!important;padding:0 13px!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]:hover{background:#fff!important}
+/* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
+html.eg-board-on .bos-logout{color:var(--bos-grey)!important}
+html.eg-board-on .bos-logout svg{display:none!important}
 
-/* right cluster: re-parented live controls (search · EN · theme · notif · balance · + New · user) wrapped
-   in one connected bordered block. We keep the existing controls + handlers; just frame + mono them. */
-.bos-right{display:flex;align-items:stretch;border:1.5px solid var(--bos-ink);
-  box-shadow:3px 3px 0 var(--bos-ink);background:#fff;overflow:hidden;flex-shrink:0}
-.bos-right>div[style*="margin-left:auto"]{margin-left:0!important;display:flex;align-items:center;gap:0!important;height:44px}
-/* dividers between the control cells */
-.bos-right>div[style*="margin-left:auto"]>*{border-left:1.5px solid var(--bos-line);height:44px;
-  display:flex;align-items:center;padding:0 11px!important;margin:0!important;border-radius:0!important}
-.bos-right>div[style*="margin-left:auto"]>*:first-child{border-left:none}
-/* neutralize the old vertical-divider spacer divs */
-.bos-right>div[style*="margin-left:auto"]>div[style*="width:1px"]{display:none!important}
-/* balance chip + New button read as connected cells */
-.eg-board-on .bal-chip{border:none!important;box-shadow:none!important;background:#fff!important;font-family:var(--bos-mono)!important;font-size:12px!important;border-radius:0!important}
-.eg-board-on .bos-right .btn-dk{border:none!important;box-shadow:none!important;background:var(--bos-violet)!important;color:#fff!important;border-radius:0!important;height:44px;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;transform:none!important}
-.bos-right .bos-logout{color:var(--bos-grey)!important;background:none!important}
-.bos-right .bos-logout:hover{background:var(--bos-amber)!important;color:var(--bos-ink)!important}
-.bos-right .bos-logout .txt,.bos-right .bos-logout{font-family:var(--bos-mono)!important;font-size:0!important}
-.bos-right .bos-logout svg{width:15px!important;height:15px!important}
-/* compact user cell on the board bar: avatar + name only (drop the long email that ate the tab space) */
-.bos-right .ibtn>div:nth-of-type(2)>div:nth-of-type(2){display:none!important}
-.bos-right .ibtn>div:nth-of-type(2)>div:nth-of-type(1){font-family:var(--bos-mono)!important;font-size:12px!important}
-
-@media(max-width:900px){ .bos-tab .txt{display:none} .bos-tab{padding:0 12px} }
+/* keep the page title readable next to the block */
+html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'Fraunces',Georgia,serif!important;font-weight:600!important;font-size:18px!important}
+/* hide the now-redundant mobile hamburger on desktop (rail is always visible) */
+@media(min-width:861px){ html.eg-board-on #mob-ham{display:none!important} }
 
 /* ════ STAT TILES (existing .stat-card / .wcard) ════ */
 html.eg-board-on .stat-card,html.eg-board-on .wcard,html.eg-board-on .card,html.eg-board-on .ccard{
   background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important}
-/* the eg-theme injected "card header dot + rule" already gives each tile a labeled top row; keep it, just
-   make the label mono + the rule ink */
-html.eg-board-on .stat-card .eg-card-dot,html.eg-board-on .wcard .eg-card-dot{border-radius:0!important}
 
 /* ════ TABLES (existing .dtable) ════ */
 html.eg-board-on .dtable{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important}
@@ -103,6 +115,3 @@ html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)
   font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
 html.eg-board-on .btn-out{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;
   border-radius:0!important;background:#fff!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
-
-/* section titles that use Fraunces already — nudge the greeting + page eyebrows to the mono family where they read as labels */
-html.eg-board-on .eg-tag,html.eg-board-on .badge{border-radius:0!important}

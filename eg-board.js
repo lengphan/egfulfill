@@ -1,90 +1,70 @@
-/* eg-board.js — BOARD OS v2 (draft): builds the sticky connected-tab header from the existing sidebar nav,
-   then RE-PARENTS the live top-bar controls into it (so every handler/id — search, + New menu, balance,
-   notifications, user — keeps working untouched) and hides the old sidebar + top bar.
-   Presentation only: no data, no logic, no markup rewrite beyond moving existing nodes. Paired with eg-board.css. */
+/* eg-board.js — BOARD OS v2: the sidebar stays (restyled by eg-board.css as a VERTICAL connected-tab rail);
+   the top-bar right cluster becomes a connected "page settings" block with ■ dot+label cells
+   (SEARCH · EN · NIGHT · ALERTS · BALANCE · + NEW · account · out).
+   Presentation only — every control keeps its element, id and click handler; the dynamic spans
+   (#balance-val, #notif-dot, #hdr-lang-code) are MOVED, never recreated, so live updates keep working. */
 (function () {
   'use strict';
-  if (window.__egBoardBuilt) return;
-  window.EG_BOARD_BUILD = '2025-board-os-v2';
+  if (window.__egBoardInit) return;
+  window.EG_BOARD_BUILD = '2025-board-os-v2b';
 
-  function textOf(a) {
-    var t = '';
-    [].forEach.call(a.childNodes, function (n) { if (n.nodeType === 3) t += n.textContent; });
-    return t.trim();
+  function sq() { var s = document.createElement('span'); s.className = 'bos-sq'; return s; }
+  function lbl(t) { var s = document.createElement('span'); s.className = 'bos-lbl'; s.textContent = t; return s; }
+  // rebuild a control's inner content as [square][label][kept dynamic span] — handler stays on the element
+  function relabel(el, text, keepSel) {
+    if (!el) return;
+    var keep = keepSel ? el.querySelector(keepSel) : null;
+    el.innerHTML = '';
+    el.appendChild(sq());
+    if (text) el.appendChild(lbl(text));
+    if (keep) el.appendChild(keep);
   }
 
-  function build() {
-    if (window.__egBoardBuilt) return;
+  function init() {
+    if (window.__egBoardInit) return;
+    window.__egBoardInit = true;
+    var html = document.documentElement;
+    html.classList.add('eg-board-on');
+    if (document.body) document.body.classList.add('eg-board-on');
+
+    var header = document.querySelector('header');
+    var rc = header && header.querySelector('div[style*="margin-left:auto"]');
     var sidebar = document.querySelector('aside.sidebar') || document.querySelector('.sidebar');
-    var oldHeader = document.querySelector('header');
-    if (!sidebar || !oldHeader) return;                       // not a standard board shape → do nothing
-    var nav = sidebar.querySelector('nav') || sidebar;
-    var items = [].slice.call(nav.querySelectorAll('a.ni'));
-    if (!items.length) return;
-    window.__egBoardBuilt = true;
 
-    var top = document.createElement('header');
-    top.className = 'bos-top';
-    top.id = 'eg-board-top';
+    // move the sidebar "Log out" into the controls block, so the rail can end at Settings
+    if (sidebar && rc) {
+      var logout = [].slice.call(sidebar.querySelectorAll('a.ni')).filter(function (a) { return /log\s?out/i.test(a.textContent || ''); })[0];
+      if (logout) { logout.classList.add('bos-logout'); relabel(logout, ''); logout.appendChild(lbl('OUT')); rc.appendChild(logout); }
+    }
+    if (!rc) return;
+    rc.classList.add('bos-controls');
 
-    // ── nav block: logo cell + connected tabs ──
-    var navblock = document.createElement('div');
-    navblock.className = 'bos-navblock';
-    var logo = document.createElement('a');
-    logo.className = 'bos-logo';
-    logo.href = 'seller.html';
-    logo.textContent = 'eg';
-    navblock.appendChild(logo);
+    // ── relabel each control to ■ + UPPERCASE label (icons out, lettering in) ──
+    relabel(document.getElementById('hdr-search-btn'), 'SEARCH');
+    relabel(document.getElementById('hdr-lang-btn'), '', '#hdr-lang-code');         // ■ + EN
 
-    var tabs = document.createElement('div');
-    tabs.className = 'bos-tabs';
-    var logoutNode = null;
-    items.forEach(function (a) {
-      if (a.offsetParent === null && a.style.display === 'none') return;   // skip hidden nav rows
-      var label = textOf(a);
-      if (!label) return;
-      if (/^log\s?out$/i.test(label)) { logoutNode = a; return; }          // move logout to the right cluster
-      if (/^profile$/i.test(label)) return;                                // covered by the user block
+    // theme: KEEP #hdr-theme-track in the DOM (toggleTheme drives it) but hide it via CSS; add a mode label
+    var pref = document.getElementById('pref-btn');
+    if (pref && !pref.querySelector('.bos-mode')) {
+      pref.insertBefore(sq(), pref.firstChild);
+      var m = document.createElement('span'); m.className = 'bos-lbl bos-mode'; pref.appendChild(m);   // text set by CSS per data-theme
+    }
 
-      var tab = document.createElement('a');
-      tab.className = 'bos-tab' + (a.classList.contains('on') ? ' on' : '');
-      tab.href = a.getAttribute('href') || '#';
-      var oc = a.getAttribute('onclick'); if (oc) tab.setAttribute('onclick', oc);
-      var tgt = a.getAttribute('target'); if (tgt) tab.setAttribute('target', tgt);
+    var nd = document.getElementById('notif-dot');
+    var notifBtn = nd && nd.closest ? nd.closest('button, .ibtn') : null;
+    relabel(notifBtn, 'ALERTS', '#notif-dot');
 
-      var sq = document.createElement('span'); sq.className = 'sq'; tab.appendChild(sq);
-      var tx = document.createElement('span'); tx.className = 'txt'; tx.textContent = label; tab.appendChild(tx);
+    relabel(document.querySelector('.bal-chip'), 'BALANCE:', '#balance-val');
 
-      var badge = a.querySelector('[data-badge]');
-      if (badge) {
-        var raw = (badge.textContent || '').trim();
-        if (raw && raw !== '0') {
-          var ct = document.createElement('span'); ct.className = 'ct';
-          var bk = badge.getAttribute('data-badge'); if (bk) ct.setAttribute('data-badge', bk);   // keep it live-updatable
-          ct.textContent = raw; tab.appendChild(ct);
-        }
-      }
-      tabs.appendChild(tab);
-    });
-    navblock.appendChild(tabs);
-    top.appendChild(navblock);
-
-    // ── right cluster: RE-PARENT the existing controls (keeps all handlers/ids) ──
-    var rwrap = document.createElement('div');
-    rwrap.className = 'bos-right';
-    var right = oldHeader.querySelector('div[style*="margin-left:auto"]');
-    if (right) rwrap.appendChild(right);                       // move, don't clone → handlers intact
-    if (logoutNode) { logoutNode.classList.add('bos-logout'); rwrap.appendChild(logoutNode); }
-    top.appendChild(rwrap);
-
-    // ── swap the chrome ──
-    document.body.insertBefore(top, document.body.firstChild);
-    sidebar.style.display = 'none';
-    oldHeader.style.display = 'none';
-    document.documentElement.classList.add('eg-board-on');
-    document.body.classList.add('eg-board-on');
+    // user cell → ■ + first name (email already dropped)
+    var user = rc.querySelector('.ibtn[onclick*="settings"]');
+    if (user) {
+      var nmEl = user.querySelector('div:nth-of-type(2) > div:first-child');
+      var name = (nmEl && nmEl.textContent.trim()) || 'Account';
+      relabel(user, name);
+    }
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
-  else build();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
