@@ -350,6 +350,8 @@ html.eg-board-on label{font-family:var(--bos-mono)!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
 html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
+/* settings Billing / API-Keys inner sub-panels were still rounded grey inside the sharp outer cards — square + 1px-black-frame them */
+html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:10px"],html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:12px"]{border:1px solid var(--bos-ink)!important;border-radius:0!important;box-shadow:none!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
    inside fields were hard to read. Mono stays as the accent on labels/eyebrows/nav/chrome. */
 /* content-card headings (Order Pipeline, Recent Orders, Last 6 Months, etc.) -> mono to match the theme */
