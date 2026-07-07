@@ -79,6 +79,9 @@ html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!i
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
 html.eg-board-on[data-theme=dark] .bos-controls > * + *::after{background:#403d48!important}
+/* some factory headers nest an inline <script> among the controls; the display:flex on
+   .bos-controls > * would otherwise reveal its source text — keep script/style hidden */
+html.eg-board-on .bos-controls script,html.eg-board-on .bos-controls style{display:none!important}
 html.eg-board-on .bos-controls > *:hover{background:var(--bos-hover)!important}
 /* force EVERY control cell to the full block height so the ink dividers connect top-to-bottom (beats
    eg-theme's older `header .ibtn{height:32px}`, which left short, floating, misaligned dividers) */

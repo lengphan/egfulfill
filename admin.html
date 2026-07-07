@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="eg-board-on">
 <head>
   <script src="eg-guard.js"></script>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
@@ -518,6 +518,8 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>  <script src="eg-dither.js"></script>
 
   <script src="eg-theme.js"></script>
+  <link rel="stylesheet" href="eg-board.css">
+  <script src="eg-board.js" defer></script>
 </head>
 <body data-eg-role="admin">
 
@@ -608,7 +610,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <div style="display:flex;align-items:center;gap:10px">
       <div id="page-title" style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em">Overview</div>
     </div>
-    <div style="display:flex;align-items:center;gap:4px">
+    <div class="bos-controls" style="display:flex;align-items:center;gap:4px">
       <div style="display:flex;align-items:center;gap:4px;position:relative">
         <div id="adm-hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
           <div style="position:relative;margin-right:4px">

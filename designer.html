@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="eg-board-on">
 <head>
   <script src="eg-guard.js"></script>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
@@ -337,6 +337,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
 </style>
 <script src="eg-theme.js"></script>
+<link rel="stylesheet" href="eg-board.css">
+<script src="eg-board.js" defer></script>
 </head>
 <body>
 
@@ -376,7 +378,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
 <!-- TOPBAR -->
 <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px 0 230px;position:fixed;left:0;right:0;top:0;z-index:35;gap:8px;flex-shrink:0">
   <div id="hdr-title" style="font-size:16px;font-weight:700;color:#191918;letter-spacing:-0.02em;flex-shrink:0">Board</div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+  <div class="bos-controls" style="margin-left:auto;display:flex;align-items:center;gap:4px">
     <div style="display:flex;align-items:center;gap:4px;position:relative">
       <div id="dsn-hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
         <div style="position:relative;margin-right:4px">
