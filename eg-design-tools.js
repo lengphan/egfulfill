@@ -802,6 +802,55 @@
   }
   function opt(val, label, sel) { return '<option value="' + esc(val) + '"' + (sel ? ' selected' : '') + '>' + esc(label) + '</option>'; }
 
+  // ── Custom variant dropdown (matches the +New menu #new-menu-dd) ────────────
+  // Replaces the native <select> in the item variant strip with a white menu,
+  // 1px black border + offset shadow, thin-line-separated items, ALL options
+  // always visible (first option never hidden), in a readable sans face. The
+  // menu is position:fixed so it escapes the strip's overflow:hidden.
+  function _ensureVddCss() {
+    if (document.getElementById('egdt-vdd-css')) return;
+    var st = document.createElement('style'); st.id = 'egdt-vdd-css';
+    st.textContent =
+      '.egdt-vdd{position:relative;display:inline-flex;align-items:center;flex-shrink:0}' +
+      '.egdt-vdd-btn{border:none;background:transparent;font-family:inherit;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 2px;outline:none}' +
+      '.egdt-vdd-btn svg{flex-shrink:0;opacity:.5}' +
+      '.egdt-vdd-menu{display:none;position:fixed;z-index:99999;background:#fff;border:1.5px solid #191918;box-shadow:3px 3px 0 rgba(25,25,24,.16);min-width:130px;max-height:280px;overflow-y:auto}' +
+      '.egdt-vdd-menu.open{display:block}' +
+      '.egdt-vdd-item{padding:8px 13px;font-size:12.5px;color:#191918;cursor:pointer;border-bottom:1px solid #e7e5e0;white-space:nowrap}' +
+      '.egdt-vdd-item:last-child{border-bottom:none}' +
+      '.egdt-vdd-item.sel{font-weight:700}' +
+      '.egdt-vdd-item:hover{background:#f2f0eb}';
+    document.head.appendChild(st);
+  }
+  // _vdd(cur, ph, w, items) -> HTML. items = [{label, click}] where click is the
+  // FULL onclick JS with the value already baked in. `cur` is the current value
+  // shown on the button (placeholder `ph` when empty).
+  function _vdd(cur, ph, w, items) {
+    _ensureVddCss();
+    return '<div class="egdt-vdd" style="width:' + w + 'px;max-width:' + w + 'px">' +
+      '<button type="button" class="egdt-vdd-btn" title="' + esc(ph) + '" onclick="EGDesignTools._vddOpen(event,this)">' +
+      (cur ? esc(cur) : esc(ph)) +
+      '<svg width=9 height=9 viewBox="0 0 10 10" fill=none><path d="M2 3.5 5 6.5 8 3.5" stroke=currentColor stroke-width=1.3 stroke-linecap=round/></svg>' +
+      '</button><div class="egdt-vdd-menu">' +
+      items.map(function (it) {
+        return '<div class="egdt-vdd-item' + (it.label === cur ? ' sel' : '') + '" onclick="' + it.click + ';EGDesignTools._vddClose()">' + esc(it.label) + '</div>';
+      }).join('') +
+      '</div></div>';
+  }
+  function _vddOpen(ev, btn) {
+    ev.stopPropagation();
+    EGDesignTools._vddClose();
+    var m = btn.nextElementSibling, r = btn.getBoundingClientRect();
+    m.style.left = r.left + 'px';
+    m.style.top = (r.bottom + 3) + 'px';
+    m.style.minWidth = Math.max(130, r.width) + 'px';
+    m.classList.add('open');
+    setTimeout(function () { document.addEventListener('click', EGDesignTools._vddClose, { once: true }); }, 0);
+  }
+  function _vddClose() {
+    [].forEach.call(document.querySelectorAll('.egdt-vdd-menu.open'), function (m) { m.classList.remove('open'); });
+  }
+
   // Full right-side action cluster for an item row. Drop-in replacement for the
   // boards' hand-written Upload/Templates/Design Maker button group, plus the
   // product + print-method pickers when the order is still "new".
@@ -880,23 +929,29 @@
       // the Etsy variant — so they start empty until picked. (Lists stay full.)
       var _curColor = _synced ? (setup.color || '') : vo.curColor;
       var _curSize = _synced ? (setup.size || '') : vo.curSize;
-      var colorOpts = (_curColor ? '' : '<option value="">Color</option>') + vo.colors.map(function (c) { return opt(c, c, c === _curColor); }).join('');
-      var sizeOpts = (_curSize ? '' : '<option value="">Size</option>') + vo.sizes.map(function (s) { return opt(s, s, s === _curSize); }).join('');
       // One unified box — Product · Color · Size · Method on a single line,
-      // dot-separated, mirroring the seller-side variation pill. The selects are
-      // borderless/transparent so they read as one continuous control.
-      // Lettering + dot dividers BOTH light (the dot matches the placeholder lettering).
-      var selIn = 'border:none;background:transparent;font-size:11.5px;font-weight:600;color:#9ca3af;font-family:inherit;cursor:pointer;outline:none;padding:2px 2px;text-overflow:ellipsis;-webkit-appearance:none;-moz-appearance:none;appearance:none';
+      // dot-separated, mirroring the seller-side variation pill. Native <select>s
+      // are replaced with the custom _vdd dropdowns (white menu, black border,
+      // offset shadow, all options always visible) so the value list reads clearly.
       var _dot = '<span style="color:#c9c3ba;font-weight:600;padding:0 5px;flex-shrink:0">·</span>';
-      // Fixed-width box: each variant select is LOCKED to a set width and clips overflow,
-      // so a long product title can't stretch the row. Stretched a touch overall, with the
-      // PRODUCT name given the most width. The full value is one click away in the editor.
-      var _selW = function (w) { return selIn + ';width:' + w + 'px;max-width:' + w + 'px;flex-shrink:0'; };
+      var _numJs = jsAttr(num), _skuJs = jsAttr(sku);
+      // Product items — the full catalog; onclick bakes in the product name.
+      var _prodItems = [];
+      prods.forEach(function (p) {
+        var v = p.name || p.sku || p.id || ''; if (!v) return;
+        _prodItems.push({ label: p.name || p.sku || v, click: "EGDesignTools.onSetProduct('" + _numJs + "','" + _skuJs + "','" + jsAttr(v) + "')" });
+      });
+      var _colorItems = vo.colors.map(function (c) { return { label: c, click: "EGDesignTools.onSetVariant('" + _numJs + "','" + _skuJs + "','color','" + jsAttr(c) + "')" }; });
+      var _sizeItems = vo.sizes.map(function (s) { return { label: s, click: "EGDesignTools.onSetVariant('" + _numJs + "','" + _skuJs + "','size','" + jsAttr(s) + "')" }; });
+      var _methodItems = _pmCodes.map(function (m) { return { label: PRINT_LABELS[m] || m, click: "EGDesignTools.onSetPrint('" + _numJs + "','" + _skuJs + "','" + jsAttr(m) + "')" }; });
+      // Current values shown on each button (placeholder when unchosen). Method
+      // shows its readable label to match the menu items.
+      var _curMethodLabel = curPt ? (PRINT_LABELS[curPt] || curPt) : '';
       pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
-        + '<select title="Base product" style="' + _selW(190) + '" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
-        + '<select title="Colour" style="' + _selW(78) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>' + _dot
-        + '<select title="Size" style="' + _selW(46) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>' + _dot
-        + '<select title="Print method" style="' + _selW(98) + '" onchange="EGDesignTools.onSetPrint(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + ptOpts + '</select>'
+        + _vdd(curProd, 'Product', 190, _prodItems) + _dot
+        + _vdd(_curColor, 'Color', 78, _colorItems) + _dot
+        + _vdd(_curSize, 'Size', 46, _sizeItems) + _dot
+        + _vdd(_curMethodLabel, 'Method', 98, _methodItems)
         + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
@@ -2355,7 +2410,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-07-varstrip-borderless';
+  window.EG_BUILD = '2026-07-07-varstrip-custom-dd';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
@@ -2572,6 +2627,7 @@
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
     itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    _vdd: _vdd, _vddOpen: _vddOpen, _vddClose: _vddClose,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
     qpAddText: qpAddText, _qpPickFile: _qpPickFile, _qpFileChange: _qpFileChange, _qpDrop: _qpDrop, _qpLoadById: _qpLoadById,

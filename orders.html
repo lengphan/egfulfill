@@ -2668,6 +2668,17 @@ function openDetailModal(ordNo) {
       ? `<option value="" selected>${_curBlankName.replace(/</g,'&lt;')}</option>` : '';
     const blankOptsHtml = `<option value=""${(_blankSelId||_blankInject)?'':' selected'}>Blank Product</option>` + _blankInject + _blankList.map(p =>
       `<option value="${p.id}" ${String(p.id)===String(_blankSelId)?'selected':''}>${String(p.name||p.skuBase||'').replace(/</g,'&lt;')}</option>`).join('');
+    // Custom-dropdown item lists (mirror the native <option>s above) — value baked
+    // into each onclick, first/placeholder option NEVER hidden. odmSetBlank takes
+    // the product ID; Colour/Size/Method take the value directly.
+    const _sqAttr = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const _vddBlankItems = _blankList.map(p => ({ label: String(p.name || p.skuBase || ''), click: `odmSetBlank(${idx},'${_sqAttr(p.id)}')` }));
+    const _vddBlankCur = _blankSelId ? String((_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).name || (_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).skuBase || '') : (_curBlankName && !_odmUnchosen ? _curBlankName : '');
+    const _vddColorItems = variantOpts.colors.map(c => ({ label: c, click: `odmSetVariant(${idx},'color','${_sqAttr(c)}')` }));
+    const _vddSizeItems  = variantOpts.sizes.map(s => ({ label: s, click: `odmSetVariant(${idx},'size','${_sqAttr(s)}')` }));
+    const _vddMethodDefs = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']];
+    const _vddMethodItems = _vddMethodDefs.map(([v,l]) => ({ label: l, click: `odmSetItemTech(${idx},'${_sqAttr(v)}')` }));
+    const _vddMethodCur = (!_odmUnchosen && item.tech) ? ((_vddMethodDefs.find(m => m[0] === item.tech) || [])[1] || item.tech) : '';
     // Compact Upload / Templates / Design Lab trio — mirrors the inline expanded row
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
@@ -2759,20 +2770,21 @@ function openDetailModal(ordNo) {
       <!-- variant strip + qty stepper pushed right into the blank space. -->
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;flex:0 0 auto;${odmPillLocked?'opacity:.85':''}">
-          <select ${variantDisabled} onchange="odmSetBlank(${idx},this.value)" title="Base product / blank" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:172px">${blankOptsHtml}</select>
+          ${odmPillLocked
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:172px">${(_vddBlankCur||'Blank Product').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(_vddBlankCur, 'Blank Product', 172, _vddBlankItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'color',this.value)" title="Color" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:92px">${colorOptsHtml || `<option>${curColor || '—'}</option>`}</select>
+          ${odmPillLocked
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curColor||'—').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(curColor, 'Color', 92, _vddColorItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
-          <select ${variantDisabled} onchange="odmSetVariant(${idx},'size',this.value)" title="Size" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:52px">${sizeOptsHtml || `<option>${curSize || '—'}</option>`}</select>
+          ${odmPillLocked
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curSize||'—').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(curSize, 'Size', 52, _vddSizeItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
-          <select ${variantDisabled} onchange="odmSetItemTech(${idx},this.value)" title="Print method" style="${odmPillSelStyle};font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;width:104px">
-            ${_odmUnchosen?'<option value="" selected>Type</option>':''}
-            <option value="DTG"${(!_odmUnchosen&&item.tech==='DTG')?' selected':''}>DTG</option>
-            <option value="DTF"${(!_odmUnchosen&&item.tech==='DTF')?' selected':''}>DTF</option>
-            <option value="EMB"${(!_odmUnchosen&&item.tech==='EMB')?' selected':''}>Embroidery</option>
-            <option value="APL"${(!_odmUnchosen&&item.tech==='APL')?' selected':''}>Applique</option>
-            <option value="LSR"${(!_odmUnchosen&&item.tech==='LSR')?' selected':''}>Laser</option>
-          </select>
+          ${odmPillLocked
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(_vddMethodCur||'Type').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(_vddMethodCur, 'Type', 104, _vddMethodItems)}
         </div>
         ${_odmAllMode ? '<span style="font-size:11.5px;color:#9ca3af;font-weight:600;flex-shrink:0">One design for all ↑</span>' : designActions}
         <div style="margin-left:auto;display:inline-flex;align-items:center;gap:1px;flex-shrink:0" title="Quantity">
