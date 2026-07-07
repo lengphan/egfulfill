@@ -266,24 +266,23 @@
     var rt; window.addEventListener('resize',function(){ clearTimeout(rt); rt=setTimeout(render,120); });
     render();
   })();
-  /* Q&A hover-to-open — driven by discrete mouseenter/focus so it can't flicker while the row resizes.
-     Opening a row stays open (Tavus-style) until another row is entered; keyboard + touch friendly. */
+  /* Q&A hover-to-open — smooth, one hover, no flicker. The ONLY thing that opens a row is the user
+     genuinely MOVING the pointer onto a header. While a row animates open, other headers slide under a
+     (stationary) cursor and the browser fires spurious mouseenters — we ignore those by requiring a real
+     mousemove within the last beat. No fallbacks, no alternatives. */
   (function(){
-    var list=document.querySelector('.qa-list');
     var items=[].slice.call(document.querySelectorAll('.qa-item'));
-    if(!list||!items.length) return;
-    var cur=null, ignoreEnterUntil=0;
-    function openRow(it){ if(!it||it===cur) return; cur=it; items.forEach(function(x){ x.classList.toggle('open', x===it); }); ignoreEnterUntil=Date.now()+340; }
-    // mouseenter opens a row on the FIRST hover; a short ignore-window after each open means the row-resize
-    // reflow (which can fire a spurious mouseenter on a shifted neighbour) can't retrigger → no flicker.
-    // Real cursor movement (mousemove — never fires on reflow) always wins, so sweeping between rows stays snappy.
-    list.addEventListener('mousemove', function(e){ var it=e.target&&e.target.closest?e.target.closest('.qa-item'):null; if(it) openRow(it); }, {passive:true});
+    if(!items.length) return;
+    var movedAt=-1;
+    document.addEventListener('mousemove', function(){ movedAt=(window.performance?performance.now():Date.now()); }, {passive:true});
+    function nowMs(){ return window.performance?performance.now():Date.now(); }
+    function openRow(it){ if(!it||it.classList.contains('open')) return; items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
     items.forEach(function(it){
-      it.addEventListener('mouseenter', function(){ if(Date.now()>=ignoreEnterUntil) openRow(it); });
+      var hd=it.querySelector('.qa-hd')||it;   // bind to the FIXED-height header, not the resizing row
+      hd.addEventListener('mouseenter', function(){ if(nowMs()-movedAt < 150) openRow(it); });   // genuine hover only (< the 420ms open animation, so slide-unders are ignored)
       it.addEventListener('focus', function(){ openRow(it); });
-      it.addEventListener('click', function(){ openRow(it); });
     });
-    openRow(items[0]); ignoreEnterUntil=0;
+    openRow(items[0]);   // start with the first open so the panel is filled
   })();
 </script>
 </body>
