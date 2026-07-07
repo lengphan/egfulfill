@@ -50,7 +50,7 @@
           if (r < 0.5) continue;
           x.beginPath();
           x.arc(xx, yy, r, 0, 6.2832);
-          x.fillStyle = 'rgba(159,82,224,' + (0.10 + 0.24 * f) + ')';  // soft violet, low alpha
+          x.fillStyle = 'rgba(150,142,126,' + (0.10 + 0.22 * f) + ')';  // soft warm GREIGE (beige/grey — matches the marketing tone, not violet)
           x.fill();
         }
       }

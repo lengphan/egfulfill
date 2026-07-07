@@ -8,7 +8,7 @@
 @font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
 
 :root{
-  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfc; --bos-panel:#f7f6f4;
+  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#f1eee7; --bos-panel:#f7f6f4;
   --bos-violet:#9f52e0; --bos-violet-dk:#8a3dd0; --bos-amber:#f8d264;
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
@@ -22,7 +22,7 @@ html.eg-board-on body{background:var(--bos-ground)!important}
   html.eg-board-on aside.sidebar{
     width:212px!important;top:50%!important;left:14px!important;bottom:auto!important;transform:translateY(-50%)!important;
     height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
-    background:#fff!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
+    background:#faf8f3!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
     border-radius:0!important}
   html.eg-board-on [style*="margin-left:220px"]{margin-left:242px!important}
 }
@@ -307,7 +307,11 @@ html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-b
 html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble{box-shadow:none!important}
 html.eg-board-on .cat-row{font-family:var(--bos-mono)!important}
 /* light-mode colour + fill */
-html.eg-board-on:not([data-theme=dark]) body,html.eg-board-on:not([data-theme=dark]) aside.sidebar{background:var(--bos-ground)!important}
+html.eg-board-on:not([data-theme=dark]) body{background:var(--bos-ground)!important}
+/* factory sidebar account chip (avatar · name · email · logout arrow) -> Board OS mono + sharp */
+html.eg-board-on aside.sidebar > div[onclick]{border-radius:0!important;font-family:var(--bos-mono)!important}
+html.eg-board-on aside.sidebar > div[onclick] div{font-family:var(--bos-mono)!important;letter-spacing:.01em!important}
+html.eg-board-on aside.sidebar > div[onclick] [style*="border-radius:8px"],html.eg-board-on aside.sidebar > div[onclick] [style*="border-radius:50%"]{border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) .input,html.eg-board-on:not([data-theme=dark]) .select,html.eg-board-on:not([data-theme=dark]) .finput{background:#fff!important;border:1px solid var(--bos-ink)!important;color:var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .pill-btn{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important;padding:5px 12px!important}
 html.eg-board-on:not([data-theme=dark]) .tab-sm,html.eg-board-on:not([data-theme=dark]) .stab,html.eg-board-on:not([data-theme=dark]) .chat-tab{color:var(--bos-grey)!important}
