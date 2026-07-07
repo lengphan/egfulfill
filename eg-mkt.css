@@ -3,7 +3,7 @@
   :root{
     --ground:#faf9f7; --paper:#fdfcfa; --ink:#191918; --ink2:#40403d;
     --grey:#9ca3af; --grey2:#6b7280; --line:#e5e4e0;
-    --violet:#9f52e0; --hot:#f76f9b;
+    --violet:#2f4bf0; --hot:#f76f9b;  /* accent -> cobalt (was #9f52e0) */
     --mint:#9be8bf; --pink:#f7bcd8; --amber:#f8d264; --indigo:#a9b6f2;
     --coral:#f6b48c; --lilac:#cdbcf5; --sky:#b0d4f7;
     --disp:'Fraunces',Georgia,serif;

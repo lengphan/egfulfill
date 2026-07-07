@@ -8,8 +8,8 @@
 @font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:swap}
 
 :root{
-  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#faf8f3; --bos-panel:#f7f6f4;
-  --bos-violet:#ef5a4d; --bos-violet-dk:#dc4a3c; --bos-amber:#f8d264;  /* "violet" token now carries the coral accent */
+  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfa; --bos-panel:#f7f6f4;  /* "barely" near-white ground */
+  --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-amber:#f8d264;  /* "violet" token now carries the COBALT accent */
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
@@ -22,7 +22,7 @@ html.eg-board-on body{background:var(--bos-ground)!important}
   html.eg-board-on aside.sidebar{
     width:212px!important;top:50%!important;left:14px!important;bottom:auto!important;transform:translateY(-50%)!important;
     height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
-    background:#faf8f3!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
+    background:#fcfcfa!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
     border-radius:0!important}
   html.eg-board-on [style*="margin-left:220px"]{margin-left:242px!important}
 }
@@ -358,3 +358,6 @@ html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #supe
 /* the item variant strip (Product · Colour · Size · Method) is meant to be borderless selects
    separated by · dots; the broad select{border} rule above re-boxed them — strip it back */
 html.eg-board-on .egdt-varstrip select{border:none!important;background:transparent!important;padding:2px 2px!important}
+/* tighten the over-wide content column (was max-width:1600/1400) so data reads easier + the right
+   side stops stretching on wide monitors. Header bar stays full-width; content centres under it. */
+html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1280px!important}
