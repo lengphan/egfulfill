@@ -526,13 +526,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         shopName = shop?.shop_name || ('Etsy shop ' + shopId);
       } catch (e) { shopId = userId; shopName = 'Etsy shop ' + userId; }
 
+      // NB: last_sync_at=null on reconnect → the next sync is a FULL pull, so a newly-granted scope
+      // (e.g. address_r just approved by Etsy) BACKFILLS shipping addresses onto existing unshipped orders.
       await q(
         `insert into platform_connections (platform, shop_id, shop_name, access_token, refresh_token, token_expires_at, scopes, connected_by)
          values ('etsy',$1,$2,$3,$4,$5,$6,$7)
          on conflict (platform, shop_id) do update set
            shop_name=excluded.shop_name, access_token=excluded.access_token,
            refresh_token=excluded.refresh_token, token_expires_at=excluded.token_expires_at,
-           scopes=excluded.scopes, connected_by=excluded.connected_by, updated_at=now()`,
+           scopes=excluded.scopes, connected_by=excluded.connected_by,
+           last_sync_at=null, updated_at=now()`,
         [shopId, shopName, t.access_token, t.refresh_token, expires, SCOPES, req.user.sub]
       );
       return { ok: true, shop_id: shopId, shop_name: shopName };
