@@ -93,9 +93,11 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
 /* hide the now-redundant mobile hamburger on desktop (rail is always visible) */
 @media(min-width:861px){ html.eg-board-on #mob-ham{display:none!important} }
 
-/* ════ CONTENT cards (chart, pipeline, panels) — light + clean ════ */
+/* ════ UNIFIED CARD SYSTEM — one frame language, two fills:
+   every card = thin 1px BLACK frame, NO shadow, sharp. WHITE fill = content/data panel;
+   PASTEL fill (KPI tiles below) = a metric. ════ */
 html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
-  background:#fff!important;border:1px solid #e4e2dc!important;box-shadow:2px 2px 0 rgba(25,25,24,.06)!important;border-radius:0!important}
+  background:#fff!important;border:1px solid var(--bos-ink)!important;box-shadow:none!important;border-radius:0!important}
 /* ════ KPI TILES → flat framed cards (Tavus "Sparrow" card): pastel fill, THIN BLACK FRAME, NO shadow,
    Departure-Mono header on a black divider line ════ */
 html.eg-board-on .wcard{border:1px solid var(--bos-ink)!important;box-shadow:none!important;border-radius:0!important}
@@ -171,6 +173,9 @@ html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-fami
 /* KPI card header underline → a full-width BLACK frame line (matches the Tavus "Sparrow" card header rule) */
 html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-ink)!important;border-bottom-width:1px!important}
 
+/* SEARCH label — center it with the SAME 13px side padding as EN/NIGHT/ALERTS (was hugging the dividers) */
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search-btn){justify-content:center!important;gap:0!important;padding:0 13px!important}
+html.eg-board-on #hdr-search-btn{padding:0!important;margin:0!important;justify-content:center!important}
 /* expanded SEARCH box — give it breathing room so it doesn't hug the cell/button */
 html.eg-board-on #hdr-search-wrap > div{margin:0 8px!important}
 html.eg-board-on #hdr-search{background:#faf9f7!important;border:1px solid #e2dfd8!important;border-radius:0!important}
