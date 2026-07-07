@@ -27,9 +27,25 @@
     html.classList.add('eg-board-on');
     if (document.body) document.body.classList.add('eg-board-on');
 
+    // ── unify the rail footer: drop the "Starter Plan / Upgrade" box + guarantee a Log out row ──
+    var sidebar = document.querySelector('aside.sidebar') || document.querySelector('.sidebar');
+    if (sidebar) {
+      [].slice.call(sidebar.children).forEach(function (el) {
+        if (el.tagName === 'DIV' && !el.classList.contains('side-foot') && /upgrade to (pro|plan)|starter plan|growth plan|current plan/i.test(el.textContent || '')) el.remove();
+      });
+      var hasLogout = [].slice.call(sidebar.querySelectorAll('a.ni')).some(function (a) { return /log\s?out/i.test(a.textContent || ''); });
+      if (!hasLogout) {
+        var nav = sidebar.querySelector('nav') || sidebar;
+        var lo = document.createElement('a');
+        lo.className = 'ni'; lo.href = '#';
+        lo.setAttribute('onclick', "event.preventDefault();try{if(window.EGAuth&&EGAuth.signOut)EGAuth.signOut()}catch(e){}try{localStorage.removeItem('eg_token');localStorage.removeItem('eg_user')}catch(e){}location.href='seller-login.html'");
+        lo.textContent = 'Log out';
+        nav.appendChild(lo);
+      }
+    }
+
     var header = document.querySelector('header');
     var rc = header && header.querySelector('div[style*="margin-left:auto"]');
-    // Log out stays in the left rail (per feedback) — nothing relocated.
     if (!rc) return;
     rc.classList.add('bos-controls');
 

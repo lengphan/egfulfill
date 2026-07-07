@@ -29,11 +29,14 @@ html.eg-board-on body{background:var(--bos-ground)!important}
 html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
 html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
-/* full-width, LIGHT hairline separators between rows (the bold ink is on the box edge only) */
-html.eg-board-on .ni{border:none!important;border-bottom:1px solid #e2dfd8!important;border-radius:0!important;
+/* INSET light hairline separators between rows (don't reach the box edges — 16px inset, unified) */
+html.eg-board-on .ni{border:none!important;position:relative!important;border-radius:0!important;
   font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
   padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
-html.eg-board-on aside.sidebar nav a.ni:last-child{border-bottom:none!important}
+/* the inset separator itself (16px in on each side); not on the active row or the last row */
+html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:#e2dfd8;pointer-events:none}
+html.eg-board-on .ni.on::after,html.eg-board-on aside.sidebar nav a.ni:last-of-type::after,html.eg-board-on .side-foot > a.ni:last-child::after{display:none!important}
+html.eg-board-on[data-theme=dark] .ni::after{background:#302e37!important}
 html.eg-board-on .ni svg{display:none!important}
 /* keep intentionally-hidden nav rows hidden (e.g. Product Templates) */
 html.eg-board-on .ni[style*="display:none"]{display:none!important}
@@ -46,8 +49,12 @@ html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
 /* sidebar footer (.side-foot: Profile[hidden] + Log out) — make it full-width + connected to the nav, put
    ONE full-width separator line ABOVE Log out (between Settings and Log out), and NONE below Log out */
 html.eg-board-on .side-foot{margin:0!important;padding:0!important;gap:0!important}
-html.eg-board-on .side-foot > a.ni{border-bottom:none!important}
-html.eg-board-on .side-foot > a.ni:last-child{border-top:1px solid #e2dfd8!important}
+html.eg-board-on .side-foot > a.ni{border:none!important}
+/* Log out (in nav OR footer): an INSET separator ABOVE it, none below; suppress the divider of the row before it */
+html.eg-board-on a.ni[onclick*="signOut"]::after{display:none!important}
+html.eg-board-on a.ni:has(+ a.ni[onclick*="signOut"])::after{display:none!important}
+html.eg-board-on a.ni[onclick*="signOut"]::before{content:'';position:absolute;left:16px;right:16px;top:0;height:1px;background:#e2dfd8;pointer-events:none}
+html.eg-board-on[data-theme=dark] a.ni[onclick*="signOut"]::before{background:#302e37!important}
 /* Settings is the last row in <nav>; keep it borderless so the line-above-Log-out is the only separator */
 html.eg-board-on aside.sidebar nav a.ni:last-of-type{border-bottom:none!important}
 /* SEARCH cell: lock to the block height so it can't float/misalign; keep its dropdown able to escape */
@@ -57,9 +64,11 @@ html.eg-board-on #hdr-search-btn{height:100%!important}
 html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
   text-transform:uppercase;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
 
-/* ════ TOP BAR — connected "page settings" block ════ */
-html.eg-board-on header{background:var(--bos-ground)!important;border-bottom:1.5px solid var(--bos-ink)!important;
+/* ════ TOP BAR — connected "page settings" block. NO header band/colour — transparent, matches the ground ════ */
+html.eg-board-on header{background:transparent!important;border-bottom:none!important;
   height:auto!important;min-height:56px!important;padding:11px 18px!important;gap:12px!important}
+/* out-specify the beige-neutraliser (which also matches the header's inline #f7f5f0) so the header stays clear */
+html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-board-on[data-theme=dark] header[style*="background"]{background:transparent!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
   border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
