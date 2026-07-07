@@ -333,3 +333,7 @@ html.eg-board-on[data-theme=dark] .tab-sm.on,html.eg-board-on[data-theme=dark] .
 html.eg-board-on[data-theme=dark] .chat-bubble.them{background:#201e24!important;color:#e8e4dd!important;border:1px solid #45424e!important}
 html.eg-board-on[data-theme=dark] .chat-bubble.me{background:var(--bos-violet)!important;color:#fff!important}
 html.eg-board-on[data-theme=dark] #conv-menu,html.eg-board-on[data-theme=dark] .dtpl-panel,html.eg-board-on[data-theme=dark] .up-panel{background:#201e24!important;border:1.5px solid #45424e!important;box-shadow:3px 3px 0 #000!important}
+
+/* tactile press — primary buttons travel 1px into their frame on click (pairs with eg-anim.js) */
+html.eg-board-on .btn,html.eg-board-on .btn-dk,html.eg-board-on .btn-out,html.eg-board-on .btn-green,html.eg-board-on .btn-amber,html.eg-board-on .btn-gold,html.eg-board-on .bos-controls > div:has(#new-menu-btn){transition:transform .08s ease,box-shadow .08s ease,background .15s ease}
+html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .btn-out:active,html.eg-board-on .btn-green:active,html.eg-board-on .btn-amber:active,html.eg-board-on .btn-gold:active{transform:translateY(1px)!important}
