@@ -9,7 +9,7 @@
 
 :root{
   --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#faf8f3; --bos-panel:#f7f6f4;
-  --bos-violet:#9f52e0; --bos-violet-dk:#8a3dd0; --bos-amber:#f8d264;
+  --bos-violet:#ef5a4d; --bos-violet-dk:#dc4a3c; --bos-amber:#f8d264;  /* "violet" token now carries the coral accent */
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
@@ -337,3 +337,15 @@ html.eg-board-on[data-theme=dark] #conv-menu,html.eg-board-on[data-theme=dark] .
 /* tactile press — primary buttons travel 1px into their frame on click (pairs with eg-anim.js) */
 html.eg-board-on .btn,html.eg-board-on .btn-dk,html.eg-board-on .btn-out,html.eg-board-on .btn-green,html.eg-board-on .btn-amber,html.eg-board-on .btn-gold,html.eg-board-on .bos-controls > div:has(#new-menu-btn){transition:transform .08s ease,box-shadow .08s ease,background .15s ease}
 html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .btn-out:active,html.eg-board-on .btn-green:active,html.eg-board-on .btn-amber:active,html.eg-board-on .btn-gold:active{transform:translateY(1px)!important}
+
+/* ── MODALS / POP-UPS ── their fields, card frames + labels use INLINE styles that the class-based
+   rules never reached, so they kept rounded grey inputs + sans fonts. Theme the native controls
+   directly + sharpen/frame the modal shells. ── */
+html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important;font-family:var(--bos-mono)!important}
+html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important}
+html.eg-board-on label{font-family:var(--bos-mono)!important}
+html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
+/* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
+html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
+/* mono-ify the modal's inline bold labels + headings (they are divs, not <label>) */
+html.eg-board-on [style*="0 20px 60px"] [style*="font-weight:6"],html.eg-board-on [style*="0 20px 60px"] [style*="font-weight:7"],html.eg-board-on [style*="0 20px 50px"] [style*="font-weight:6"],html.eg-board-on [style*="0 20px 50px"] [style*="font-weight:7"]{font-family:var(--bos-mono)!important}
