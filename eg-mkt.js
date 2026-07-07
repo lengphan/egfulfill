@@ -28,7 +28,7 @@ function setFeat(key, el){
   if(img) img.style.display='none';   // render a DITHERED version of the artwork into #feat-dith (not the raw photo)
   if(dith && window.EGDither){
     try{
-      if(d.img){ EGDither.image(dith, d.img, {palette:EGDither.duotoneFor(d.pop||'violet'), pixel:3, fit:'cover', levels:16, contrast:1.05}); }   // LEGIBLE single-hue duotone in the tab's accent (not a violet+clashing-pop mess) + many tones = subtle dither
+      if(d.img){ EGDither.image(dith, d.img, {palette:EGDither.duotoneFor(d.pop||'violet'), pixel:2, fit:'cover', levels:18, mix:0.22}); }   // the source art is already pixel-styled + colourful — keep it mostly intact (mix:0.22) with only a whisper of the tab-accent dither
       else { EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }
     }catch(e){}
   }

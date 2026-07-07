@@ -173,7 +173,12 @@
       if (k !== 1) for (var i = 0; i < d.length; i += 4) { for (var c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, (d[i + c] - 128) * k + 128)); }
       var pal = opts.palette || (opts.duotone ? duotoneFor(opts.pop) : paletteFor(opts.pop));
       if (opts.levels) pal = expandPalette(pal, opts.levels);   // more tones → lighter, cleaner dither
+      // mix < 1 keeps that fraction of the REAL photo (its detail + colour) under a lighter dither texture,
+      // instead of a full palette remap that filters everything out.
+      var mix = (opts.mix != null) ? opts.mix : 1;
+      var orig = mix < 1 ? new Uint8ClampedArray(d) : null;
       ditherBuffer(d, cw, ch, pal);
+      if (orig) for (var q = 0; q < d.length; q += 4) { d[q] = orig[q] + (d[q] - orig[q]) * mix; d[q + 1] = orig[q + 1] + (d[q + 1] - orig[q + 1]) * mix; d[q + 2] = orig[q + 2] + (d[q + 2] - orig[q + 2]) * mix; }
       o.putImageData(img, 0, 0);
       paintInto(target, m, off);
     };
@@ -213,6 +218,7 @@
         fit: d.fit || 'cover',
         contrast: d.contrast ? +d.contrast : 1,
         levels: d.levels ? +d.levels : undefined,
+        mix: d.mix ? +d.mix : undefined,                     // <1 keeps the real photo under a light dither
         duotone: d.duotone === '1' || d.duotone === 'true'   // single-hue ramp = coherent, legible
       });
     });
