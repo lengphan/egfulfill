@@ -43,6 +43,16 @@ html.eg-board-on .ni:not(.on):hover{background:var(--bos-hover)!important;color:
 html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:var(--bos-mono)!important;border-radius:0!important;font-size:10px!important}
 /* Profile is reachable from the account cell; hide it + the ACCOUNT section header so the rail ends at Settings */
 html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
+/* sidebar footer (.side-foot: Profile[hidden] + Log out) — make it full-width + connected to the nav, put
+   ONE full-width separator line ABOVE Log out (between Settings and Log out), and NONE below Log out */
+html.eg-board-on .side-foot{margin:0!important;padding:0!important;gap:0!important}
+html.eg-board-on .side-foot > a.ni{border-bottom:none!important}
+html.eg-board-on .side-foot > a.ni:last-child{border-top:1px solid #e2dfd8!important}
+/* Settings is the last row in <nav>; keep it borderless so the line-above-Log-out is the only separator */
+html.eg-board-on aside.sidebar nav a.ni:last-of-type{border-bottom:none!important}
+/* SEARCH cell: lock to the block height so it can't float/misalign; keep its dropdown able to escape */
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search-btn){height:44px!important;overflow:visible!important}
+html.eg-board-on #hdr-search-btn{height:100%!important}
 /* section label (ACCOUNT) — no border of its own; the ink row-dividers above/below do the separating */
 html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
   text-transform:uppercase;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
