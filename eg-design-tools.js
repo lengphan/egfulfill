@@ -830,7 +830,6 @@
     return '<div class="egdt-vdd" style="width:' + w + 'px;max-width:' + w + 'px">' +
       '<button type="button" class="egdt-vdd-btn" title="' + esc(ph) + '" onclick="EGDesignTools._vddOpen(event,this)">' +
       (cur ? esc(cur) : esc(ph)) +
-      '<svg width=9 height=9 viewBox="0 0 10 10" fill=none><path d="M2 3.5 5 6.5 8 3.5" stroke=currentColor stroke-width=1.3 stroke-linecap=round/></svg>' +
       '</button><div class="egdt-vdd-menu">' +
       items.map(function (it) {
         return '<div class="egdt-vdd-item' + (it.label === cur ? ' sel' : '') + '" onclick="' + it.click + ';EGDesignTools._vddClose()">' + esc(it.label) + '</div>';
@@ -946,7 +945,7 @@
       var _methodItems = _pmCodes.map(function (m) { return { label: PRINT_LABELS[m] || m, click: "EGDesignTools.onSetPrint('" + _numJs + "','" + _skuJs + "','" + jsAttr(m) + "')" }; });
       // Current values shown on each button (placeholder when unchosen). Method
       // shows its readable label to match the menu items.
-      var _curMethodLabel = curPt ? (PRINT_LABELS[curPt] || curPt) : '';
+      var _curMethodLabel = curPt ? (PRINT_LABELS[String(curPt).toUpperCase()] || curPt) : '';
       pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
         + _vdd(curProd, 'Product', 190, _prodItems) + _dot
         + _vdd(_curColor, 'Color', 78, _colorItems) + _dot
@@ -2410,7 +2409,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-07-varstrip-custom-dd';
+  window.EG_BUILD = '2026-07-07-vdd-nochevron-fulllabels';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}

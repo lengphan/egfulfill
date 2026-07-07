@@ -2678,7 +2678,7 @@ function openDetailModal(ordNo) {
     const _vddSizeItems  = variantOpts.sizes.map(s => ({ label: s, click: `odmSetVariant(${idx},'size','${_sqAttr(s)}')` }));
     const _vddMethodDefs = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']];
     const _vddMethodItems = _vddMethodDefs.map(([v,l]) => ({ label: l, click: `odmSetItemTech(${idx},'${_sqAttr(v)}')` }));
-    const _vddMethodCur = (!_odmUnchosen && item.tech) ? ((_vddMethodDefs.find(m => m[0] === item.tech) || [])[1] || item.tech) : '';
+    const _vddMethodCur = (!_odmUnchosen && item.tech) ? ((_vddMethodDefs.find(m => m[0] === String(item.tech).toUpperCase()) || [])[1] || item.tech) : '';
     // Compact Upload / Templates / Design Lab trio — mirrors the inline expanded row
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
