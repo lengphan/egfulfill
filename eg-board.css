@@ -42,14 +42,15 @@ html.eg-board-on .ni:not(.on):hover{background:var(--bos-amber)!important;color:
 html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:var(--bos-mono)!important;border-radius:0!important;font-size:10px!important}
 /* Profile is reachable from the account cell; hide it + the ACCOUNT section header so the rail ends at Settings */
 html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
+/* section label (ACCOUNT) — no border of its own; the ink row-dividers above/below do the separating */
 html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
-  text-transform:uppercase;color:var(--bos-grey2)!important;padding:9px 15px 5px!important;border-bottom:1.5px solid var(--bos-line)!important}
+  text-transform:uppercase;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
 
 /* ════ TOP BAR — connected "page settings" block ════ */
 html.eg-board-on header{background:var(--bos-ground)!important;border-bottom:1.5px solid var(--bos-ink)!important;
   height:auto!important;min-height:56px!important;padding:11px 18px!important;gap:12px!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
-  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:hidden;flex-wrap:nowrap}
+  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{border-left:1.5px solid var(--bos-ink)!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
@@ -57,6 +58,10 @@ html.eg-board-on .bos-controls > *{border-left:1.5px solid var(--bos-ink)!import
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 html.eg-board-on .bos-controls > *:first-child{border-left:none!important}
 html.eg-board-on .bos-controls > *:hover{background:var(--bos-amber)!important}
+/* force EVERY control cell to the full block height so the ink dividers connect top-to-bottom (beats
+   eg-theme's older `header .ibtn{height:32px}`, which left short, floating, misaligned dividers) */
+html.eg-board-on body:has(.sidebar) header .bos-controls{height:44px!important;align-items:stretch!important}
+html.eg-board-on body:has(.sidebar) header .bos-controls > *{height:44px!important;min-height:0!important;align-self:stretch!important}
 /* kill the old thin grey vertical-divider spacers */
 html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
@@ -90,26 +95,33 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
 html.eg-board-on .stat-card,html.eg-board-on .wcard,html.eg-board-on .card,html.eg-board-on .ccard{
   background:#fff!important;border:1px solid #e4e2dc!important;box-shadow:2px 2px 0 rgba(25,25,24,.06)!important;border-radius:0!important}
 
-/* ════ TABLES (existing .dtable) ════ */
-html.eg-board-on .dtable{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important}
-html.eg-board-on .dtable th{background:var(--bos-panel)!important;border-bottom:1.5px solid var(--bos-ink)!important;
+/* ════ TABLES (existing .dtable) — the card frames it, so the table itself is BORDERLESS (no inner box) ════ */
+html.eg-board-on .dtable{border:none!important;box-shadow:none!important;background:transparent!important}
+html.eg-board-on .dtable th{background:transparent!important;border-bottom:1.5px solid var(--bos-ink)!important;
   color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;font-size:10px!important;letter-spacing:.06em!important;
   text-transform:uppercase;font-weight:400!important;padding:11px 14px!important}
-html.eg-board-on .dtable td{border-bottom:1px solid var(--bos-line)!important;padding:12px 14px!important}
+html.eg-board-on .dtable td{border-bottom:1px solid var(--bos-line)!important;padding:12px 14px!important;background:transparent!important}
 html.eg-board-on .dtable tr.main-row:hover td{background:#faf8f4!important}
 html.eg-board-on .dtable tr:last-child td{border-bottom:none!important}
+/* expand-row (the item breakdown) inside a mini-table: no stray borders, light inset only */
+html.eg-board-on .dtable tr.exp-row td{border-top:none!important;background:#fbfaf8!important}
 
-/* ════ STATUS BADGES (existing .b-*) → bordered pixel-pills in the stage pop ════ */
-html.eg-board-on .badge,html.eg-board-on .b-new,html.eg-board-on .b-queue,html.eg-board-on .b-prod,
-html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.eg-board-on .b-shipped{
+/* ════ STATUS BADGES → ONE clean pixel-pill system (covers BOTH the orders `.b-*` and the seller
+   dashboard `.b-s-*` variants). The old inline coloured DOT inside each pill is hidden — the pill's
+   own fill carries the stage colour now, so no stray "■" in front of the label. ════ */
+html.eg-board-on .badge,html.eg-board-on [class*="b-s-"],html.eg-board-on .b-new,html.eg-board-on .b-queue,
+html.eg-board-on .b-prod,html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.eg-board-on .b-shipped{
   font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.05em!important;
-  border:1.5px solid var(--bos-ink)!important;border-radius:0!important;padding:2px 8px!important;font-weight:400!important}
-html.eg-board-on .b-new{background:var(--bos-blue)!important;color:#fff!important;border-color:var(--bos-blue)!important}
-html.eg-board-on .b-queue{background:#fff!important;color:var(--bos-ink)!important}
-html.eg-board-on .b-prod{background:var(--bos-amberp)!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
-html.eg-board-on .b-qc{background:var(--bos-violet)!important;color:#fff!important;border-color:var(--bos-violet)!important}
-html.eg-board-on .b-packed{background:var(--bos-pink)!important;color:#fff!important;border-color:var(--bos-pink)!important}
-html.eg-board-on .b-shipped{background:var(--bos-mint)!important;color:#fff!important;border-color:var(--bos-mint)!important}
+  border:1.5px solid var(--bos-ink)!important;border-radius:0!important;padding:2px 8px!important;font-weight:400!important;gap:0!important}
+/* hide the inline coloured dot some badges render before their label */
+html.eg-board-on .badge>span[style*="border-radius:50%"],html.eg-board-on [class*="b-s-"]>span[style*="border-radius:50%"]{display:none!important}
+/* stage colours — orders table + seller dashboard share the same fills */
+html.eg-board-on .b-new,html.eg-board-on .b-s-new{background:var(--bos-blue)!important;color:#fff!important;border-color:var(--bos-blue)!important}
+html.eg-board-on .b-queue,html.eg-board-on .b-s-queue,html.eg-board-on .b-s-active{background:#fff!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
+html.eg-board-on .b-prod,html.eg-board-on .b-s-prod,html.eg-board-on .b-s-printing{background:var(--bos-amberp)!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
+html.eg-board-on .b-qc,html.eg-board-on .b-s-qc,html.eg-board-on .b-s-review{background:var(--bos-violet)!important;color:#fff!important;border-color:var(--bos-violet)!important}
+html.eg-board-on .b-packed,html.eg-board-on .b-s-packed{background:var(--bos-pink)!important;color:#fff!important;border-color:var(--bos-pink)!important}
+html.eg-board-on .b-shipped,html.eg-board-on .b-s-shipped,html.eg-board-on .b-s-fulfilled{background:var(--bos-mint)!important;color:#fff!important;border-color:var(--bos-mint)!important}
 
 /* ════ BUTTONS ════ */
 html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)!important;color:#fff!important;
@@ -117,3 +129,25 @@ html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)
   font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
 html.eg-board-on .btn-out{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;
   border-radius:0!important;background:#fff!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important}
+
+/* ════ DRAG-TO-REORDER handles — sharp + unobtrusive (was a rounded grey box + soft shadow on hover) ════ */
+html.eg-board-on .wcard .drag-handle,html.eg-board-on .ccard-handle,html.eg-board-on .sec-handle{
+  border-radius:0!important;box-shadow:none!important;background:transparent!important;border:none!important;color:#cbcac4!important}
+html.eg-board-on .wcard:hover .drag-handle,html.eg-board-on .ccard:hover .ccard-handle,html.eg-board-on .sec-block:hover .sec-handle{background:transparent!important;opacity:.55!important}
+html.eg-board-on .wcard .drag-handle:hover,html.eg-board-on .ccard-handle:hover,html.eg-board-on .sec-handle:hover{color:var(--bos-ink)!important;background:transparent!important;opacity:1!important}
+/* drop-target outline → sharp, not rounded */
+html.eg-board-on .sec-block.sec-drag-over::before{border-radius:0!important;border-color:var(--bos-ink)!important}
+html.eg-board-on .ccard.cc-drag-over{outline-color:var(--bos-ink)!important}
+
+/* ════ + NEW dropdown → Tavus-style sharp bordered menu: mono uppercase, no icons, no subtitles (redirects kept) ════ */
+html.eg-board-on #new-menu-dd{border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
+  border-radius:0!important;padding:0!important;background:#fff!important;min-width:210px!important;overflow:hidden}
+html.eg-board-on #new-menu-dd > div{border-radius:0!important;border-bottom:1.5px solid var(--bos-ink)!important;padding:0!important;align-items:stretch!important;gap:0!important}
+html.eg-board-on #new-menu-dd > div:last-child{border-bottom:none!important}
+html.eg-board-on #new-menu-dd > div:hover{background:var(--bos-amber)!important}
+/* hide the icon square + the subtitle line — leave the title only, in mono uppercase */
+html.eg-board-on #new-menu-dd > div > div:first-child{display:none!important}
+html.eg-board-on #new-menu-dd > div > div:last-child > div:last-child{display:none!important}
+html.eg-board-on #new-menu-dd > div > div:last-child{padding:13px 16px!important}
+html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-family:var(--bos-mono)!important;font-size:11.5px!important;
+  text-transform:uppercase!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
