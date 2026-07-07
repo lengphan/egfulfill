@@ -187,3 +187,52 @@ html.eg-board-on [style*="border-left:3px solid #111827"]{border-left-color:var(
 html.eg-board-on [style*="border-left:3px solid #4b5563"]{border-left-color:var(--bos-amberp)!important}
 html.eg-board-on [style*="border-left:3px solid #9ca3af"]{border-left-color:var(--bos-violet)!important}
 html.eg-board-on [style*="border-left:3px solid #d1d5db"]{border-left-color:var(--bos-mint)!important}
+
+/* ════ NEUTRALISE the old beige inner boxes (ITEMS/ORDER, RETURN RATE, etc.) — were warm/faded ════ */
+html.eg-board-on:not([data-theme=dark]) [style*="background:#eeede9"],
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f0ede9"],
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f6f5f4"],
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f7f5f0"],
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f4f2ef"],
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f6f4f0"]{background:#f2f2f0!important}
+
+/* ══════════════════ DARK MODE — Board OS (shared across every board) ══════════════════
+   The whole board goes dark, not just the header: dark ground, dark surfaces, light frames + text. */
+html.eg-board-on[data-theme=dark] body{background:#161418!important}
+/* sidebar rail */
+html.eg-board-on[data-theme=dark] aside.sidebar{background:#201e24!important;border-color:#403d48!important}
+html.eg-board-on[data-theme=dark] aside.sidebar .sidebar-logo{border-bottom-color:#403d48!important}
+html.eg-board-on[data-theme=dark] .ni{color:#d8d4cc!important;border-bottom-color:#302e37!important}
+html.eg-board-on[data-theme=dark] .ni.on{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on[data-theme=dark] .ni:not(.on):hover{background:#2c2a33!important;color:#f0ede6!important}
+html.eg-board-on[data-theme=dark] aside.sidebar nav > div:not(.ni){color:#7d7885!important}
+/* top controls block */
+html.eg-board-on[data-theme=dark] header{background:#161418!important;border-bottom-color:#403d48!important}
+html.eg-board-on[data-theme=dark] .bos-controls{background:#201e24!important;border-color:#403d48!important}
+html.eg-board-on[data-theme=dark] .bos-controls > *{background:#201e24!important;color:#d8d4cc!important;border-left-color:#403d48!important}
+html.eg-board-on[data-theme=dark] .bos-controls > *:hover{background:#2c2a33!important}
+html.eg-board-on[data-theme=dark] .bos-controls #new-menu-btn,html.eg-board-on[data-theme=dark] .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:var(--bos-violet)!important}
+html.eg-board-on[data-theme=dark] #hdr-search{background:#2c2a33!important;border-color:#403d48!important;color:#e8e4dd!important}
+html.eg-board-on[data-theme=dark] header > span,html.eg-board-on[data-theme=dark] header #page-title{color:#f0ede6!important}
+/* content cards + KPI frames */
+html.eg-board-on[data-theme=dark] .card,html.eg-board-on[data-theme=dark] .ccard,html.eg-board-on[data-theme=dark] .stat-card,html.eg-board-on[data-theme=dark] .wcard{
+  background:#201e24!important;border-color:#45424e!important;color:#e8e4dd!important}
+/* KPI sticky notes → dark-tinted pops (keep the per-tile variety, readable) */
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+1){background:#15302a!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+2){background:#331f29!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+3){background:#322b1a!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+4){background:#281f33!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n+5){background:#1c2436!important}
+html.eg-board-on[data-theme=dark] .wcard:nth-of-type(6n){background:#331f1c!important}
+html.eg-board-on[data-theme=dark] .wcard .eg-card-dot{background:#e8e4dd!important}
+html.eg-board-on[data-theme=dark] .wcard *:has(> .eg-card-dot){border-bottom-color:#5a5660!important}
+/* tables */
+html.eg-board-on[data-theme=dark] .dtable th{border-bottom-color:#5a5660!important;color:#d8d4cc!important}
+html.eg-board-on[data-theme=dark] .dtable td{border-bottom-color:#302e37!important;color:#c8c3bb!important}
+html.eg-board-on[data-theme=dark] .dtable tr.main-row:hover td{background:#2a2830!important}
+/* the old beige inner boxes → dark surface */
+html.eg-board-on[data-theme=dark] [style*="background:#eeede9"],html.eg-board-on[data-theme=dark] [style*="background:#f0ede9"],
+html.eg-board-on[data-theme=dark] [style*="background:#f6f5f4"],html.eg-board-on[data-theme=dark] [style*="background:#f7f5f0"],
+html.eg-board-on[data-theme=dark] [style*="background:#f4f2ef"],html.eg-board-on[data-theme=dark] [style*="background:#fafaf9"]{background:#2a2830!important}
+/* generic light text/number colours that were hard-coded dark ink → light in dark mode */
+html.eg-board-on[data-theme=dark] [style*="color:#191918"],html.eg-board-on[data-theme=dark] [style*="color:#111827"]{color:#e8e4dd!important}
