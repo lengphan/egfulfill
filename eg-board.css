@@ -246,3 +246,18 @@ html.eg-board-on[data-theme=dark] [style*="background:#f6f5f4"],html.eg-board-on
 html.eg-board-on[data-theme=dark] [style*="background:#f4f2ef"],html.eg-board-on[data-theme=dark] [style*="background:#fafaf9"]{background:#2a2830!important}
 /* generic light text/number colours that were hard-coded dark ink → light in dark mode */
 html.eg-board-on[data-theme=dark] [style*="color:#191918"],html.eg-board-on[data-theme=dark] [style*="color:#111827"]{color:#e8e4dd!important}
+
+/* ════ ORDERS / data tables — the DATA itself on-theme (was Inter / system-mono) ════ */
+/* order IDs + age + money + store-source → Departure Mono */
+html.eg-board-on .dtable td[data-col="order"] > div{font-family:var(--bos-mono)!important}
+html.eg-board-on .dtable td[data-col="total"]{font-family:var(--bos-mono)!important;font-variant-numeric:tabular-nums}
+html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em}
+/* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
+html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
+html.eg-board-on:not([data-theme=dark]) .fb:hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .filter-btn.active,html.eg-board-on:not([data-theme=dark]) .fb.active{border-bottom:2px solid var(--bos-ink)!important;color:var(--bos-ink)!important;background:transparent!important;box-shadow:none!important;border-radius:0!important}
+/* order-search input → mono + sharp */
+html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-mono)!important;font-size:12px!important;border-radius:0!important}
+html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:0!important}
+/* the small in-row action buttons (Push, etc.) + Export → sharp mono framed */
+html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em;border-radius:0!important}
