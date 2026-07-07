@@ -289,3 +289,40 @@ html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-mono)
 html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:0!important}
 /* the small in-row action buttons (Push, etc.) + Export → sharp mono framed */
 html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em;border-radius:0!important}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   THEME AUDIT — shared off-theme fixes (board-theme-audit sweep). Shape/type rules
+   apply in BOTH modes; colour/fill rules are light-scoped with dark variants below so
+   nothing renders white-on-dark. (.bal-chip fill from the plan intentionally dropped —
+   the balance is a plain connected cell now; #new-menu-dd left to its own rules above.)
+   ══════════════════════════════════════════════════════════════════════════════ */
+/* shape + type — safe in both themes */
+html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:0!important;font-family:var(--bos-mono)!important}
+html.eg-board-on .badge,html.eg-board-on .pill-btn,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:400!important}
+html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important}
+html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:0!important}
+html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble{box-shadow:none!important}
+html.eg-board-on .cat-row{font-family:var(--bos-mono)!important}
+/* light-mode colour + fill */
+html.eg-board-on:not([data-theme=dark]) body,html.eg-board-on:not([data-theme=dark]) aside.sidebar{background:var(--bos-ground)!important}
+html.eg-board-on:not([data-theme=dark]) .input,html.eg-board-on:not([data-theme=dark]) .select,html.eg-board-on:not([data-theme=dark]) .finput{background:#fff!important;border:1px solid var(--bos-ink)!important;color:var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .pill-btn{border:1.5px solid var(--bos-ink)!important;background:#fff!important;color:var(--bos-ink)!important;padding:5px 12px!important}
+html.eg-board-on:not([data-theme=dark]) .tab-sm,html.eg-board-on:not([data-theme=dark]) .stab,html.eg-board-on:not([data-theme=dark]) .chat-tab{color:var(--bos-grey)!important}
+html.eg-board-on:not([data-theme=dark]) .tab-sm.on,html.eg-board-on:not([data-theme=dark]) .stab.on,html.eg-board-on:not([data-theme=dark]) .chat-tab.on{background:#fff!important;color:var(--bos-ink)!important;border:1px solid var(--bos-ink)!important;box-shadow:none!important}
+html.eg-board-on:not([data-theme=dark]) .cat-row{color:var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .prod-card,html.eg-board-on:not([data-theme=dark]) .gw-card,html.eg-board-on:not([data-theme=dark]) .dl-path-card{background:#fff!important;border:1px solid var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .chat-bubble.them{background:#fff!important;color:var(--bos-ink)!important;border:1px solid var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .chat-bubble.me{background:var(--bos-ink)!important;color:#fff!important;border:1px solid var(--bos-ink)!important}
+html.eg-board-on:not([data-theme=dark]) .conv-item{border-bottom:1px solid var(--bos-line)!important}
+html.eg-board-on:not([data-theme=dark]) #conv-menu,html.eg-board-on:not([data-theme=dark]) .dtpl-panel,html.eg-board-on:not([data-theme=dark]) .up-panel{box-shadow:3px 3px 0 var(--bos-ink)!important;border:1.5px solid var(--bos-ink)!important;background:#fff!important}
+html.eg-board-on:not([data-theme=dark]) [style*="color:#9ca3af"]{color:var(--bos-grey)!important}
+html.eg-board-on:not([data-theme=dark]) [style*="background:#faf9f7"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fdfcfa"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fafaf9"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e9e6e0"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e8e6e1"],html.eg-board-on:not([data-theme=dark]) [style*="background:#ece9e3"]{background:#f2f2f0!important}
+html.eg-board-on:not([data-theme=dark]) [style*="border-color:#f0ede9"],html.eg-board-on:not([data-theme=dark]) [style*="border-bottom:1px solid #f0ede9"],html.eg-board-on:not([data-theme=dark]) [style*="1px solid #f3f0eb"],html.eg-board-on:not([data-theme=dark]) [style*="1px solid #f3f3f1"]{border-color:var(--bos-line)!important}
+/* dark-mode variants for the new classes (don't leave them white-on-dark) */
+html.eg-board-on[data-theme=dark] .input,html.eg-board-on[data-theme=dark] .select,html.eg-board-on[data-theme=dark] .finput{background:#201e24!important;border:1px solid #45424e!important;color:#e8e4dd!important}
+html.eg-board-on[data-theme=dark] .prod-card,html.eg-board-on[data-theme=dark] .gw-card,html.eg-board-on[data-theme=dark] .dl-path-card{background:#201e24!important;border:1px solid #45424e!important}
+html.eg-board-on[data-theme=dark] .pill-btn{background:#201e24!important;border:1.5px solid #45424e!important;color:#e8e4dd!important}
+html.eg-board-on[data-theme=dark] .tab-sm.on,html.eg-board-on[data-theme=dark] .stab.on,html.eg-board-on[data-theme=dark] .chat-tab.on{background:#2c2a33!important;color:#e8e4dd!important;border:1px solid #45424e!important}
+html.eg-board-on[data-theme=dark] .chat-bubble.them{background:#201e24!important;color:#e8e4dd!important;border:1px solid #45424e!important}
+html.eg-board-on[data-theme=dark] .chat-bubble.me{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on[data-theme=dark] #conv-menu,html.eg-board-on[data-theme=dark] .dtpl-panel,html.eg-board-on[data-theme=dark] .up-panel{background:#201e24!important;border:1.5px solid #45424e!important;box-shadow:3px 3px 0 #000!important}
