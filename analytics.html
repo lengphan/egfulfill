@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="eg-board-on">
 <head>
   <script src="eg-guard.js"></script>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
@@ -322,6 +322,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 </style>  <script src="eg-dither.js"></script>
 
   <script src="eg-theme.js"></script>
+  <link rel="stylesheet" href="eg-board.css">
+  <script src="eg-board.js" defer></script>
 </head>
 <body>
 
@@ -351,7 +353,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   <!-- TOPBAR -->
   <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
     <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-    <div style="font-size:18px;font-weight:700;color:#191918;letter-spacing:-.01em;margin-right:auto">Reports</div><div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+    <div style="font-size:18px;font-weight:700;color:#191918;letter-spacing:-.01em;margin-right:auto">Reports</div><div class="bos-controls" style="margin-left:auto;display:flex;align-items:center;gap:4px">
       <div style="display:flex;align-items:center;gap:4px;position:relative">
         <div id="hdr-search-wrap" style="overflow:hidden;max-width:0;opacity:0;transition:max-width .25s cubic-bezier(.4,0,.2,1),opacity .18s;display:flex;align-items:center">
           <div style="position:relative;margin-right:4px">
