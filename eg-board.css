@@ -12,6 +12,7 @@
   --bos-violet:#9f52e0; --bos-violet-dk:#8a3dd0; --bos-amber:#f8d264;
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
+  --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
   --bos-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 html.eg-board-on body{background:var(--bos-ground)!important}
@@ -38,7 +39,7 @@ html.eg-board-on .ni svg{display:none!important}
 html.eg-board-on .ni[style*="display:none"]{display:none!important}
 /* titles alone — no ■ marker (cleaner, less cluttered) */
 html.eg-board-on .ni.on{background:var(--bos-violet)!important;color:#fff!important}
-html.eg-board-on .ni:not(.on):hover{background:var(--bos-amber)!important;color:var(--bos-ink)!important}
+html.eg-board-on .ni:not(.on):hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:var(--bos-mono)!important;border-radius:0!important;font-size:10px!important}
 /* Profile is reachable from the account cell; hide it + the ACCOUNT section header so the rail ends at Settings */
 html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
@@ -57,7 +58,7 @@ html.eg-board-on .bos-controls > *{border-left:1px solid #e2dfd8!important;borde
   font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 html.eg-board-on .bos-controls > *:first-child{border-left:none!important}
-html.eg-board-on .bos-controls > *:hover{background:var(--bos-amber)!important}
+html.eg-board-on .bos-controls > *:hover{background:var(--bos-hover)!important}
 /* force EVERY control cell to the full block height so the ink dividers connect top-to-bottom (beats
    eg-theme's older `header .ibtn{height:32px}`, which left short, floating, misaligned dividers) */
 html.eg-board-on body:has(.sidebar) header .bos-controls{height:44px!important;align-items:stretch!important}
@@ -95,8 +96,12 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
 /* ════ CONTENT cards (chart, pipeline, panels) — light + clean ════ */
 html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
   background:#fff!important;border:1px solid #e4e2dc!important;box-shadow:2px 2px 0 rgba(25,25,24,.06)!important;border-radius:0!important}
-/* ════ KPI TILES → sticky notes: soft pastel fills + ink edge + hard offset (Tavus) ════ */
-html.eg-board-on .wcard{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important}
+/* ════ KPI TILES → flat framed cards (Tavus "Sparrow" card): pastel fill, THIN BLACK FRAME, NO shadow,
+   Departure-Mono header on a black divider line ════ */
+html.eg-board-on .wcard{border:1px solid var(--bos-ink)!important;box-shadow:none!important;border-radius:0!important}
+/* the card's eyebrow/label → Departure Mono; its underline → a full-width black frame line */
+html.eg-board-on .wcard .eg-card-dot{background:var(--bos-ink)!important}
+html.eg-board-on .wcard > div:first-child,html.eg-board-on .wcard [style*="text-transform:uppercase"]:first-child{font-family:var(--bos-mono)!important;letter-spacing:.04em!important}
 html.eg-board-on .wcard:nth-of-type(6n+1){background:#e7f7ef!important}
 html.eg-board-on .wcard:nth-of-type(6n+2){background:#fdecf3!important}
 html.eg-board-on .wcard:nth-of-type(6n+3){background:#fdf4de!important}
@@ -148,15 +153,32 @@ html.eg-board-on .wcard .drag-handle:hover,html.eg-board-on .ccard-handle:hover,
 html.eg-board-on .sec-block.sec-drag-over::before{border-radius:0!important;border-color:var(--bos-ink)!important}
 html.eg-board-on .ccard.cc-drag-over{outline-color:var(--bos-ink)!important}
 
-/* ════ + NEW dropdown → Tavus-style sharp bordered menu: mono uppercase, no icons, no subtitles (redirects kept) ════ */
-html.eg-board-on #new-menu-dd{border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
+/* ════ + NEW dropdown → Tavus-style: an EXTENSION of the button box (connected, no gap; separated by just
+   the line), mono uppercase, no icons/subtitles (redirects kept), very subtle shadow ════ */
+html.eg-board-on #new-menu-dd{top:100%!important;margin-top:0!important;right:0!important;
+  border:1.5px solid var(--bos-ink)!important;border-top:none!important;box-shadow:3px 3px 0 rgba(25,25,24,.14)!important;
   border-radius:0!important;padding:0!important;background:#fff!important;min-width:210px!important;overflow:hidden}
-html.eg-board-on #new-menu-dd > div{border-radius:0!important;border-bottom:1.5px solid var(--bos-ink)!important;padding:0!important;align-items:stretch!important;gap:0!important}
+html.eg-board-on #new-menu-dd > div{border-radius:0!important;border-bottom:1px solid var(--bos-line)!important;padding:0!important;align-items:stretch!important;gap:0!important}
 html.eg-board-on #new-menu-dd > div:last-child{border-bottom:none!important}
-html.eg-board-on #new-menu-dd > div:hover{background:var(--bos-amber)!important}
+html.eg-board-on #new-menu-dd > div:hover{background:var(--bos-hover)!important}
 /* hide the icon square + the subtitle line — leave the title only, in mono uppercase */
 html.eg-board-on #new-menu-dd > div > div:first-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:last-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child{padding:13px 16px!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-family:var(--bos-mono)!important;font-size:11.5px!important;
   text-transform:uppercase!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
+
+/* KPI card header underline → a full-width BLACK frame line (matches the Tavus "Sparrow" card header rule) */
+html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-ink)!important;border-bottom-width:1px!important}
+
+/* expanded SEARCH box — give it breathing room so it doesn't hug the cell/button */
+html.eg-board-on #hdr-search-wrap > div{margin:0 8px!important}
+html.eg-board-on #hdr-search{background:#faf9f7!important;border:1px solid #e2dfd8!important;border-radius:0!important}
+
+/* ════ dashboard STATUS-BREAKDOWN mini-cards (In Queue/Printing/QC/Shipped) — were the old grey rails +
+   sans labels; now Departure-Mono labels + Board OS stage-colour rails ════ */
+html.eg-board-on [style*="border-left:3px solid"] [style*="uppercase"]{font-family:var(--bos-mono)!important;letter-spacing:.05em!important}
+html.eg-board-on [style*="border-left:3px solid #111827"]{border-left-color:var(--bos-blue)!important}
+html.eg-board-on [style*="border-left:3px solid #4b5563"]{border-left-color:var(--bos-amberp)!important}
+html.eg-board-on [style*="border-left:3px solid #9ca3af"]{border-left-color:var(--bos-violet)!important}
+html.eg-board-on [style*="border-left:3px solid #d1d5db"]{border-left-color:var(--bos-mint)!important}
