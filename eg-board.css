@@ -351,3 +351,7 @@ html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],
 html.eg-board-on [style*="0 20px 60px"] [style*="font-weight:6"],html.eg-board-on [style*="0 20px 60px"] [style*="font-weight:7"],html.eg-board-on [style*="0 20px 50px"] [style*="font-weight:6"],html.eg-board-on [style*="0 20px 50px"] [style*="font-weight:7"]{font-family:var(--bos-mono)!important}
 /* content-card headings (Order Pipeline, Recent Orders, Last 6 Months, etc.) -> mono to match the theme */
 html.eg-board-on .card [style*="font-weight:700"],html.eg-board-on .ccard [style*="font-weight:700"]{font-family:var(--bos-mono)!important}
+/* SpyDeck (#superspy-mount / #admin-spy-mount): mono the card text + sharpen corners so it matches the
+   theme. SCOPED to the mount so nothing else is affected; layout, colours + logic left untouched. */
+html.eg-board-on #superspy-mount [style*="border-radius"],html.eg-board-on #admin-spy-mount [style*="border-radius"]{border-radius:0!important}
+html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #superspy-mount [style*="font-weight:6"],html.eg-board-on #admin-spy-mount [style*="font-weight:7"],html.eg-board-on #admin-spy-mount [style*="font-weight:6"]{font-family:var(--bos-mono)!important}
