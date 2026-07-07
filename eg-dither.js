@@ -147,7 +147,7 @@
       o.fillStyle = rg; o.fillRect(0, 0, cw, ch);
     }
     var img = o.getImageData(0, 0, cw, ch);
-    ditherBuffer(img.data, cw, ch, opts.palette || paletteFor(opts.pop));
+    ditherBuffer(img.data, cw, ch, opts.palette || (opts.duotone ? duotoneFor(opts.pop) : paletteFor(opts.pop)));
     o.putImageData(img, 0, 0);
     paintInto(target, m, off);
   }
@@ -171,7 +171,7 @@
       var img = o.getImageData(0, 0, cw, ch), d = img.data;
       var k = opts.contrast || 1;
       if (k !== 1) for (var i = 0; i < d.length; i += 4) { for (var c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, (d[i + c] - 128) * k + 128)); }
-      var pal = opts.palette || paletteFor(opts.pop);
+      var pal = opts.palette || (opts.duotone ? duotoneFor(opts.pop) : paletteFor(opts.pop));
       if (opts.levels) pal = expandPalette(pal, opts.levels);   // more tones → lighter, cleaner dither
       ditherBuffer(d, cw, ch, pal);
       o.putImageData(img, 0, 0);
@@ -211,7 +211,9 @@
         pixel: d.pixel ? +d.pixel : undefined,
         seed: d.seed ? +d.seed : undefined,
         fit: d.fit || 'cover',
-        contrast: d.contrast ? +d.contrast : 1
+        contrast: d.contrast ? +d.contrast : 1,
+        levels: d.levels ? +d.levels : undefined,
+        duotone: d.duotone === '1' || d.duotone === 'true'   // single-hue ramp = coherent, legible
       });
     });
   }

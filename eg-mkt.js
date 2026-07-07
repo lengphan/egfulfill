@@ -1,6 +1,19 @@
 /* eg-mkt.js — shared marketing JS across index / howitworks / about:
    folder-tab hero swap (reads window.HERO) + procedural dither engine + terminal typewriter. */
 
+// Keep --hdrh synced to the REAL sticky-header (promo + nav) height so the hero cloud pulls up flush
+// behind it — otherwise the stale 83px fallback leaves a blank strip below the header.
+(function () {
+  function setHdr() {
+    var t = document.querySelector('.topstick'); if (!t) return;
+    var h = Math.round(t.getBoundingClientRect().height);
+    if (h) document.documentElement.style.setProperty('--hdrh', h + 'px');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setHdr); else setHdr();
+  window.addEventListener('load', setHdr);
+  window.addEventListener('resize', setHdr);
+})();
+
 // "What you get" folder-tab swap (reads window.FEAT; only fires where #ftabs + window.FEAT exist).
 function setFeat(key, el){
   document.querySelectorAll('#ftabs .ftab').forEach(function(t){ t.classList.toggle('on', t===el); });

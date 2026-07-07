@@ -10,7 +10,8 @@
     --mono:'Departure Mono',ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace;
     --body:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
   }
-  *{box-sizing:border-box;border-radius:0}
+  *{box-sizing:border-box}
+  *,*::before,*::after{border-radius:0!important}   /* SHARP edges everywhere — beats inline/specific radii */
   html{scroll-behavior:smooth}
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased;font-synthesis:none}
   a{color:inherit}
