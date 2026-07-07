@@ -48,7 +48,7 @@ html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:v
 html.eg-board-on aside.sidebar a.ni[href*="tab=profile"]{display:none!important}
 /* sidebar footer (.side-foot: Profile[hidden] + Log out) — make it full-width + connected to the nav, put
    ONE full-width separator line ABOVE Log out (between Settings and Log out), and NONE below Log out */
-html.eg-board-on .side-foot{margin:0!important;padding:0!important;gap:0!important}
+html.eg-board-on .side-foot{margin:0!important;padding:0 0 0 15px!important;gap:0!important}
 html.eg-board-on .side-foot > a.ni{border:none!important}
 /* Log out (in nav OR footer): an INSET separator ABOVE it, none below; suppress the divider of the row before it */
 html.eg-board-on a.ni[onclick*="signOut"]::after{display:none!important}
