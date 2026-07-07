@@ -355,3 +355,6 @@ html.eg-board-on .card [style*="font-weight:700"],html.eg-board-on .ccard [style
    theme. SCOPED to the mount so nothing else is affected; layout, colours + logic left untouched. */
 html.eg-board-on #superspy-mount [style*="border-radius"],html.eg-board-on #admin-spy-mount [style*="border-radius"]{border-radius:0!important}
 html.eg-board-on #superspy-mount [style*="font-weight:7"],html.eg-board-on #superspy-mount [style*="font-weight:6"],html.eg-board-on #admin-spy-mount [style*="font-weight:7"],html.eg-board-on #admin-spy-mount [style*="font-weight:6"]{font-family:var(--bos-mono)!important}
+/* the item variant strip (Product · Colour · Size · Method) is meant to be borderless selects
+   separated by · dots; the broad select{border} rule above re-boxed them — strip it back */
+html.eg-board-on .egdt-varstrip select{border:none!important;background:transparent!important;padding:2px 2px!important}

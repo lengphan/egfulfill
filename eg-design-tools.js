@@ -892,7 +892,7 @@
       // so a long product title can't stretch the row. Stretched a touch overall, with the
       // PRODUCT name given the most width. The full value is one click away in the editor.
       var _selW = function (w) { return selIn + ';width:' + w + 'px;max-width:' + w + 'px;flex-shrink:0'; };
-      pickers = '<div style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:1px solid #e5e4e0;border-radius:8px;padding:4px 12px;background:#fff;max-width:100%;overflow:hidden">'
+      pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
         + '<select title="Base product" style="' + _selW(190) + '" onchange="EGDesignTools.onSetProduct(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',this.value)">' + prodOpts + '</select>' + _dot
         + '<select title="Colour" style="' + _selW(78) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'color\',this.value)">' + colorOpts + '</select>' + _dot
         + '<select title="Size" style="' + _selW(46) + '" onchange="EGDesignTools.onSetVariant(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'size\',this.value)">' + sizeOpts + '</select>' + _dot
@@ -2355,7 +2355,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-05-designlab-dither';
+  window.EG_BUILD = '2026-07-07-varstrip-borderless';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
