@@ -283,7 +283,7 @@ html.eg-board-on[data-theme=dark] [style*="color:#191918"],html.eg-board-on[data
 /* ════ ORDERS / data tables — the DATA itself on-theme (was Inter / system-mono) ════ */
 /* order IDs + age + money + store-source → Departure Mono */
 html.eg-board-on .dtable td[data-col="order"] > div{font-family:var(--bos-mono)!important}
-html.eg-board-on .dtable td[data-col="total"]{font-family:var(--bos-mono)!important;font-variant-numeric:tabular-nums}
+html.eg-board-on .dtable td[data-col="total"]{font-variant-numeric:tabular-nums}
 html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em}
 /* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
 html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
@@ -302,7 +302,7 @@ html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tra
    the balance is a plain connected cell now; #new-menu-dd left to its own rules above.)
    ══════════════════════════════════════════════════════════════════════════════ */
 /* shape + type — safe in both themes */
-html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:0!important;font-family:var(--bos-mono)!important}
+html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:0!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
 html.eg-board-on .badge,html.eg-board-on .pill-btn,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:400!important}
 html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important}
 html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:0!important}
@@ -349,7 +349,7 @@ html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=rad
 html.eg-board-on label{font-family:var(--bos-mono)!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
-html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
+html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
    inside fields were hard to read. Mono stays as the accent on labels/eyebrows/nav/chrome. */
 /* content-card headings (Order Pipeline, Recent Orders, Last 6 Months, etc.) -> mono to match the theme */
