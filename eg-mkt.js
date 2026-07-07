@@ -28,7 +28,7 @@ function setFeat(key, el){
   if(img) img.style.display='none';   // render a DITHERED version of the artwork into #feat-dith (not the raw photo)
   if(dith && window.EGDither){
     try{
-      if(d.img){ EGDither.image(dith, d.img, {palette:EGDither.duotoneFor(d.pop||'violet'), pixel:2, fit:'cover', levels:18, mix:0.22}); }   // the source art is already pixel-styled + colourful — keep it mostly intact (mix:0.22) with only a whisper of the tab-accent dither
+      if(d.img){ EGDither.image(dith, d.img, {color:true, levels:5, pixel:2, fit:'cover', contrast:1.08}); }   // Tavus-style COLOUR dither: keeps the photo's real hues + detail, adds a rich retro stipple (not a monochrome filter)
       else { EGDither.art(dith, {pop:d.pop||'violet', seed:33, pixel:4}); }
     }catch(e){}
   }

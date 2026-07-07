@@ -77,6 +77,23 @@
 
   var lum = function (r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 
+  // COLOUR ordered-dither (the Tavus look): reduce each R/G/B channel to `levels` steps with a Bayer
+  // threshold. Keeps the photo's real hues + detail while adding a rich retro stipple — NOT a monochrome
+  // filter. In place. `levels` per channel (≈4–6 gives a visible, tasteful grain).
+  function ditherColorBuffer(d, w, h, levels) {
+    var n = Math.max(1, (levels || 5) - 1);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var i = (y * w + x) * 4, t = BAYER[y & 7][x & 7];
+        for (var c = 0; c < 3; c++) {
+          var lv = d[i + c] / 255 * n, lo = Math.floor(lv), frac = lv - lo;
+          d[i + c] = Math.round((frac > t ? Math.min(lo + 1, n) : lo) / n * 255);
+        }
+        d[i + 3] = 255;
+      }
+    }
+  }
+
   // Quantise a low-res grayscale/colour buffer through `palette` with Bayer dithering, in place.
   function ditherBuffer(d, w, h, palette) {
     var n = palette.length - 1;
@@ -171,14 +188,18 @@
       var img = o.getImageData(0, 0, cw, ch), d = img.data;
       var k = opts.contrast || 1;
       if (k !== 1) for (var i = 0; i < d.length; i += 4) { for (var c = 0; c < 3; c++) d[i + c] = Math.max(0, Math.min(255, (d[i + c] - 128) * k + 128)); }
-      var pal = opts.palette || (opts.duotone ? duotoneFor(opts.pop) : paletteFor(opts.pop));
-      if (opts.levels) pal = expandPalette(pal, opts.levels);   // more tones → lighter, cleaner dither
-      // mix < 1 keeps that fraction of the REAL photo (its detail + colour) under a lighter dither texture,
-      // instead of a full palette remap that filters everything out.
-      var mix = (opts.mix != null) ? opts.mix : 1;
-      var orig = mix < 1 ? new Uint8ClampedArray(d) : null;
-      ditherBuffer(d, cw, ch, pal);
-      if (orig) for (var q = 0; q < d.length; q += 4) { d[q] = orig[q] + (d[q] - orig[q]) * mix; d[q + 1] = orig[q + 1] + (d[q + 1] - orig[q + 1]) * mix; d[q + 2] = orig[q + 2] + (d[q + 2] - orig[q + 2]) * mix; }
+      if (opts.color) {
+        // Tavus-style: dither in COLOUR (keep the real hues + detail, add a rich stipple)
+        ditherColorBuffer(d, cw, ch, opts.levels || 5);
+      } else {
+        var pal = opts.palette || (opts.duotone ? duotoneFor(opts.pop) : paletteFor(opts.pop));
+        if (opts.levels) pal = expandPalette(pal, opts.levels);   // more tones → lighter, cleaner dither
+        // mix < 1 keeps that fraction of the REAL photo under a lighter dither texture (monochrome path).
+        var mix = (opts.mix != null) ? opts.mix : 1;
+        var orig = mix < 1 ? new Uint8ClampedArray(d) : null;
+        ditherBuffer(d, cw, ch, pal);
+        if (orig) for (var q = 0; q < d.length; q += 4) { d[q] = orig[q] + (d[q] - orig[q]) * mix; d[q + 1] = orig[q + 1] + (d[q + 1] - orig[q + 1]) * mix; d[q + 2] = orig[q + 2] + (d[q + 2] - orig[q + 2]) * mix; }
+      }
       o.putImageData(img, 0, 0);
       paintInto(target, m, off);
     };
@@ -219,6 +240,7 @@
         contrast: d.contrast ? +d.contrast : 1,
         levels: d.levels ? +d.levels : undefined,
         mix: d.mix ? +d.mix : undefined,                     // <1 keeps the real photo under a light dither
+        color: d.color === '1' || d.color === 'true',        // per-channel colour dither (keeps hues + detail)
         duotone: d.duotone === '1' || d.duotone === 'true'   // single-hue ramp = coherent, legible
       });
     });
