@@ -28,8 +28,8 @@ html.eg-board-on body{background:var(--bos-ground)!important}
 html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
 html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
-/* full-length ink separators between rows — same treatment as the top controls block */
-html.eg-board-on .ni{border:none!important;border-bottom:1.5px solid var(--bos-ink)!important;border-radius:0!important;
+/* full-width, LIGHT hairline separators between rows (the bold ink is on the box edge only) */
+html.eg-board-on .ni{border:none!important;border-bottom:1px solid #e2dfd8!important;border-radius:0!important;
   font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
   padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
 html.eg-board-on aside.sidebar nav a.ni:last-child{border-bottom:none!important}
@@ -52,7 +52,7 @@ html.eg-board-on header{background:var(--bos-ground)!important;border-bottom:1.5
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
   border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
-html.eg-board-on .bos-controls > *{border-left:1.5px solid var(--bos-ink)!important;border-radius:0!important;margin:0!important;
+html.eg-board-on .bos-controls > *{border-left:1px solid #e2dfd8!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
   font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
@@ -75,12 +75,14 @@ html.eg-board-on[data-theme=dark] .bos-mode::after{content:'DAY'}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
-/* + New = the single accent cell */
+/* + New = the single accent cell — the violet must BLEED to fill the whole cell (was sitting 2px short).
+   Scope to the wrapper that actually holds #new-menu-btn (the SEARCH wrapper is also position:relative!) */
+html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important;align-items:stretch!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:var(--bos-violet)!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-violet-dk)!important}
 html.eg-board-on .bos-controls #new-menu-btn{background:var(--bos-violet)!important;color:#fff!important;border:none!important;box-shadow:none!important;
-  border-radius:0!important;height:42px!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;
-  transform:none!important;padding:0 13px!important}
-html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important}
-html.eg-board-on .bos-controls > div[style*="position:relative"]:hover{background:#fff!important}
+  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;
+  transform:none!important;padding:0 15px!important;justify-content:center!important}
 /* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
 html.eg-board-on .bos-logout{color:var(--bos-grey)!important}
 html.eg-board-on .bos-logout svg{display:none!important}
@@ -90,10 +92,17 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
 /* hide the now-redundant mobile hamburger on desktop (rail is always visible) */
 @media(min-width:861px){ html.eg-board-on #mob-ham{display:none!important} }
 
-/* ════ STAT TILES — LIGHTENED (was 1.5px ink + 3px hard offset = too heavy) ════
-   Now a thin light border + a whisper offset: keeps a hint of the neo-brutalist shift without the weight. */
-html.eg-board-on .stat-card,html.eg-board-on .wcard,html.eg-board-on .card,html.eg-board-on .ccard{
+/* ════ CONTENT cards (chart, pipeline, panels) — light + clean ════ */
+html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
   background:#fff!important;border:1px solid #e4e2dc!important;box-shadow:2px 2px 0 rgba(25,25,24,.06)!important;border-radius:0!important}
+/* ════ KPI TILES → sticky notes: soft pastel fills + ink edge + hard offset (Tavus) ════ */
+html.eg-board-on .wcard{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important}
+html.eg-board-on .wcard:nth-of-type(6n+1){background:#e7f7ef!important}
+html.eg-board-on .wcard:nth-of-type(6n+2){background:#fdecf3!important}
+html.eg-board-on .wcard:nth-of-type(6n+3){background:#fdf4de!important}
+html.eg-board-on .wcard:nth-of-type(6n+4){background:#f1eafe!important}
+html.eg-board-on .wcard:nth-of-type(6n+5){background:#e9eefe!important}
+html.eg-board-on .wcard:nth-of-type(6n){background:#fdeee7!important}
 
 /* ════ TABLES (existing .dtable) — the card frames it, so the table itself is BORDERLESS (no inner box) ════ */
 html.eg-board-on .dtable{border:none!important;box-shadow:none!important;background:transparent!important}
