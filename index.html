@@ -91,10 +91,12 @@ tracking → seller</div>
   </div>
 </div>
 
-<!-- WHAT YOU GET (folder tabs, repurposed from the old hero) -->
+<!-- WHAT YOU GET (folder tabs) — full-bleed image background runs from here to pricing -->
+<div class="wyg-bg">
 <section>
   <div class="page">
     <div class="sec-head"><span class="eyebrow">What you get</span><h2 class="sec-h">Everything fulfilment needs.</h2></div>
+    <div class="wyg-card">
     <div class="ftabs" id="ftabs" style="margin-top:24px">
       <button class="ftab on" onclick="setFeat('channels',this)">Channels</button>
       <button class="ftab" onclick="setFeat('design',this)">Design</button>
@@ -103,16 +105,12 @@ tracking → seller</div>
       <button class="ftab" onclick="setFeat('team',this)">Team</button>
     </div>
     <div class="fpanel">
-      <div class="fpanel-top" style="grid-template-columns:1.2fr .8fr">
+      <div class="fpanel-top" style="grid-template-columns:1fr">
         <div class="fpanel-l">
           <span class="eyebrow" id="feat-cat">Channels</span>
           <h3 id="feat-h" style="font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 800;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.02em;margin:12px 0 14px;line-height:1.03;min-height:1.03em">One inbox, every channel</h3>
           <p id="feat-p" style="font-size:16px;line-height:1.55;color:var(--ink2);max-width:46ch;margin:0 0 22px;min-height:3.1em">Every Etsy, Shopify and TikTok order lands in one live queue — no CSV exports.</p>
           <a class="accent-btn" href="seller-signup.html">Start for free</a>
-        </div>
-        <div class="fpanel-r">
-          <div id="feat-dith" style="position:absolute;inset:0"></div>
-          <img id="feat-img" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none">
         </div>
       </div>
       <div class="benefits" id="feat-benefits">
@@ -120,6 +118,7 @@ tracking → seller</div>
         <div class="benefit"><div class="bruler"><span class="bl">Benefit [2]</span><span class="rl"></span></div><h4>Instant sync</h4><p>New orders appear in seconds, not hours.</p></div>
         <div class="benefit"><div class="bruler"><span class="bl">Benefit [3]</span><span class="rl"></span></div><h4>No CSVs</h4><p>Nothing to import or reconcile by hand.</p></div>
       </div>
+    </div>
     </div>
   </div>
 </section>
@@ -151,6 +150,7 @@ tracking → seller</div>
     <span class="marq-item">Etsy</span><span class="marq-item">Shopify</span><span class="marq-item">TikTok Shop</span><span class="marq-item">Amazon</span><span class="marq-item">WooCommerce</span><span class="marq-item">eBay</span><span class="marq-item">Wix</span>
   </div></div>
 </section>
+</div><!-- /wyg-bg -->
 
 <!-- PRICING -->
 <section id="pricing">

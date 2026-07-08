@@ -34,7 +34,7 @@ function setFeat(key, el){
   }
 }
 // initialise the "What you get" panel for the default (active) tab on load (guarded to this page's panel)
-(function(){ if(window.FEAT && document.getElementById('feat-img')){ var t=document.querySelector('#ftabs .ftab.on')||document.querySelector('#ftabs .ftab'); if(t) setFeat('channels', t); } })();
+(function(){ if(window.FEAT && document.getElementById('feat-h')){ var t=document.querySelector('#ftabs .ftab.on')||document.querySelector('#ftabs .ftab'); if(t) setFeat('channels', t); } })();
 
 // Hero question typewriter — types/deletes rotating phrases into #hero-word (reduced-motion safe).
 (function(){

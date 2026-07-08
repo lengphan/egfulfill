@@ -106,6 +106,13 @@
   .benefit h4{font-family:var(--disp);font-size:22px;margin:0 0 8px}
   .benefit p{font-size:13.5px;line-height:1.55;color:var(--ink2);margin:0}
 
+  /* What You Get: full-bleed image background (runs from the section to pricing) with a
+     light paper scrim for legibility; the folder-tab "bookmark" card sits narrower + floats. */
+  .wyg-bg{background:linear-gradient(rgba(244,242,239,.46),rgba(244,242,239,.46)),url('images/wyg-bg.png') center center/cover no-repeat}
+  .wyg-card{max-width:1040px;margin:0 auto;animation:wygFloat 7s ease-in-out infinite;will-change:transform}
+  @keyframes wygFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @media(prefers-reduced-motion:reduce){.wyg-card{animation:none}}
+
   /* research areas — FULL-BLEED dithered section (Tavus): texture edge-to-edge, content in .page */
   .rareas-full{background:#e9e6df;background-image:radial-gradient(rgba(25,25,24,.10) 1px,transparent 1px);background-size:4px 4px;padding:clamp(48px,6.5vw,96px) 0}
   .rareas-full h2{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 88,'wght' 455;font-size:clamp(31px,4.8vw,52px);text-align:center;margin:0 0 10px;letter-spacing:-.012em;line-height:1.08}
