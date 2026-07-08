@@ -1177,7 +1177,7 @@ function renderOrders(ordersOverride) {
       // the design action buttons (Upload / Templates / Design Lab) from the
       // setup pills to reduce clutter.
       return `
-        <div id="item-wrap-${o.no}-${escSku}"${_itemComplete?' class="egdt-complete"':''} onclick="event.stopPropagation()" style="display:grid;grid-template-columns:11px 18px 56px 270px minmax(380px,620px) 24px auto 1fr 26px;gap:14px;align-items:center;padding:11px 8px;background:transparent;${isLastItem?'':'border-bottom:1px solid #f0ede9;'}${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}"${_itemComplete?' class="egdt-complete"':''} onclick="event.stopPropagation()" style="display:grid;grid-template-columns:11px 18px 56px 270px minmax(380px,620px) 24px auto 1fr 26px;gap:14px;align-items:center;padding:16px 8px;background:transparent;${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <span class="egdt-dot" aria-hidden="true"></span>
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onclick="event.stopPropagation()" onchange="updatePushBtn(${o.no})" style="width:14px;height:14px;cursor:pointer;accent-color:#111827;${needsSetup?'':'opacity:.35;pointer-events:none'}">
           ${itemCompositeThumb(o, item, 52)}
@@ -1205,7 +1205,7 @@ function renderOrders(ordersOverride) {
       <td colspan="10" style="padding:0;background:transparent">
         <div style="background:transparent;padding:8px 20px 12px 60px">
           ${expItemsHtml}
-          ${needsSetup ? `<button onclick="event.stopPropagation();orderAddInlineItem(${o.no})" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#191918;background:transparent;border:1px dashed #c4c3be;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor='#191918';this.style.background='#fff'" onmouseout="this.style.borderColor='#c4c3be';this.style.background='transparent'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button>` : ''}
+          ${needsSetup ? `<div class="egdt-additem-node" onclick="event.stopPropagation()" style="position:relative;padding:6px 8px 4px 0"><span class="egdt-dot egdt-dot-add" aria-hidden="true"></span><button onclick="event.stopPropagation();orderAddInlineItem(${o.no})" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#6b7280;background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;transition:color .15s" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button></div>` : ''}
         </div>
       </td>
     </tr>`);

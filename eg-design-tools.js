@@ -882,15 +882,34 @@
   function _ensureRowDotCss() {
     if (typeof document === 'undefined' || document.getElementById('egdt-rowdot-css')) return;
     var st = document.createElement('style'); st.id = 'egdt-rowdot-css';
+    // TIMELINE NODE: the round status dot sits ON the vertical spine (drawn by
+    // eg-board.css at var(--egdt-spine-x) from the spine container's border-box
+    // left). We position the dot ABSOLUTELY on that spine x, vertically centred in
+    // its row, above the spine (z-index), with a background-coloured ring so the
+    // line reads as passing behind the node instead of being cut by it.
+    // The item rows are normal-flow children of the spine container, so their own
+    // content edge sits --egdt-row-inset (the container's left padding) inside it —
+    // 44px for the seller wrapper, 14px for the factory <td> (the global `.dtable td`
+    // rule forces 14px padding, overriding the inline padding:0). So the dot's left
+    // WITHIN its row = spine-x − row-inset, landing it on the spine x on screen for
+    // both contexts. The one shared spine x is the only geometry that matters.
+    var DOTX = 'calc(var(--egdt-spine-x,22px) - var(--egdt-row-inset,14px))';
     st.textContent =
-      // The dot itself (shared by factory rows + seller item-wraps).
-      '.egdt-dot{width:9px;height:9px;border-radius:50%;background:#c4c3be;flex-shrink:0;display:inline-block;transition:background .15s}' +
-      // Factory board rows (itemRowLayout emits .egdt-item-row with a leading dot).
+      // Base node — round, grey by default, background-coloured ring, on top of the spine.
+      '.egdt-dot{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#c4c3be;z-index:2;box-shadow:0 0 0 3px var(--egdt-node-ring,#fbfaf8);transition:background .15s}' +
+      // Factory board rows (itemRowLayout emits .egdt-item-row; row is position:relative).
+      '.egdt-item-row .egdt-dot{left:' + DOTX + '}' +
       '.egdt-item-row.egdt-complete .egdt-dot{background:#2f4bf0}' +
       '.egdt-item-row:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
-      // Seller item rows (orders.html item-wrap grid, dot has class .egdt-dot).
+      // Seller item rows (orders.html item-wrap grid; wrapper adds 44px left pad → inset).
+      '[id^="item-wrap-"]{position:relative}' +
+      '[id^="item-wrap-"] .egdt-dot{left:' + DOTX + '}' +
       '[id^="item-wrap-"].egdt-complete .egdt-dot{background:#2f4bf0}' +
-      '[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}';
+      '[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
+      // "Add item" node — the final grey node on the spine. Its container also sits at
+      // the spine container's content edge, so it carries the same row-inset as the
+      // rows. ALWAYS grey — it's an action, not a status.
+      '.egdt-additem-node .egdt-dot-add{left:' + DOTX + ';background:#c4c3be}';
     document.head.appendChild(st);
   }
   // Completeness of a line item — TRUE only when it is a real, fully-configured
@@ -1077,8 +1096,10 @@
     // Uses p.complete when the board passes it, else the value itemActions just
     // stashed for this same line. Sits before the checkbox; nothing else changes.
     var complete = (p.complete != null) ? !!p.complete : _lastItemComplete;
-    var dot = '<span class="egdt-dot" style="margin-right:10px" aria-hidden="true"></span>';
-    return '<div class="egdt-item-row' + (complete ? ' egdt-complete' : '') + '" style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 20px;position:relative;' + (p.sep || '') + '">'
+    var dot = '<span class="egdt-dot" aria-hidden="true"></span>';
+    // NB: p.sep (the board's inter-row border-bottom) is intentionally NOT applied
+    // here — the timeline has no horizontal separators between item rows.
+    return '<div class="egdt-item-row' + (complete ? ' egdt-complete' : '') + '" style="display:flex;align-items:center;gap:0;padding:16px 14px 16px 40px;position:relative;">'
       + dot + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
       + '</div>';
   }
@@ -1121,13 +1142,21 @@
     } catch (e) {}
     refreshBoard();
   }
+  // The "Add item" affordance is the FINAL NODE of the timeline: a muted grey dot
+  // sitting ON the spine (same x + size as the item status dots — but always grey,
+  // since it's an action, not a status) with a clickable "Add item" label beside
+  // it. The spine (drawn by eg-board.css) runs down to this dot. Same addItem
+  // handler as before. Uses .egdt-additem-node so eg-board.css can place the dot on
+  // the spine at var(--egdt-spine-x), matching the item rows exactly.
   function addItemButton(o) {
     if (!isNewOrder(o)) return '';
     var num = (o && (o.num || o.id)) || '';
-    return '<div style="padding:4px 14px 10px 28px" onclick="event.stopPropagation()">'
+    return '<div class="egdt-additem-node" onclick="event.stopPropagation()" '
+      + 'style="position:relative;padding:8px 14px 12px 40px">'
+      + '<span class="egdt-dot egdt-dot-add" aria-hidden="true"></span>'
       + '<button onclick="EGDesignTools.addItem(\'' + jsAttr(num) + '\')" title="Add another line item to this order" '
-      + 'style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#191918;background:transparent;border:1px dashed #c4c3be;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;transition:border-color .15s,background .15s" '
-      + 'onmouseover="this.style.borderColor=\'#191918\';this.style.background=\'#fff\'" onmouseout="this.style.borderColor=\'#c4c3be\';this.style.background=\'transparent\'">'
+      + 'style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#6b7280;background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;transition:color .15s" '
+      + 'onmouseover="this.style.color=\'#191918\'" onmouseout="this.style.color=\'#6b7280\'">'
       + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add item</button></div>';
   }
 
@@ -2495,7 +2524,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-08-rowdot';
+  window.EG_BUILD = '2026-07-09-rowtimeline';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}

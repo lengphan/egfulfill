@@ -356,35 +356,50 @@ html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px sol
 /* order-table expanded detail row: was stark #fff (td + inner div) — now transparent so it inherits
    the theme ground in BOTH light + dark, matching its parent row; just fix the beige border colour */
 html.eg-board-on .dtable tr.exp-row td{background:transparent!important;border-top-color:var(--bos-line)!important;border-bottom-color:var(--bos-line)!important}
-/* ── Expanded item rows → Indented Hairline + CONNECTED LADDER (STYLING ONLY) ──
-   Setup rows sit under the parent order, indented past a thin vertical guide; each row's
-   separator is a RUNG that runs from the guide all the way across — so the tree branch and
-   the row divider are ONE connected hairline (no floating ticks, no card frames, no band).
-   EVERY line here is a single 1px hairline (var(--bos-line)). Selected rows get only a
-   faint accent tint (the checkbox carries selection). Seller items = [id^="item-wrap-"];
-   factory items = .egdt-item-row (EGDesignTools.itemRowLayout). Consistent on all boards. */
+/* ── Expanded item rows → TIMELINE / THREAD (STYLING ONLY) ──
+   The item rows read like a chat-message timeline: a SINGLE continuous vertical SPINE runs
+   down the left of the expanded item area and connects UP to the parent order row's bottom
+   border, so the item lines visibly hang off their parent order. Each row's round status
+   dot (.egdt-dot) sits ON the spine as a NODE (positioned by eg-design-tools.js at the same
+   x). There are NO horizontal rung/separator lines between item rows anymore.
+   Shared spine x = --egdt-spine-x (22px from the spine container's left edge). Seller items
+   = [id^="item-wrap-"] inside the exp-row wrapper div; factory items = .egdt-item-row
+   (EGDesignTools.itemRowLayout) directly in the detail <td>. Consistent on all boards. */
+/* --egdt-spine-x = x of the spine from the spine container's BORDER-box left (where the
+   ::before spine is anchored). --egdt-row-inset = the container's left padding, i.e. how far
+   the item rows' own content edge sits inside that border box; the dot subtracts it so the
+   round node lands EXACTLY on the spine x on screen. Seller wrapper pads 44px; the factory
+   detail <td> is forced to 14px padding by the global `.dtable td` rule (its inline
+   padding:0 is overridden), so the inset is 14px, NOT 0. */
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]),
+html.eg-board-on tr[id^="op-detail-"] > td,
+html.eg-board-on tr[id^="wh-detail-"] > td{--egdt-spine-x:22px;--egdt-node-ring:#fbfaf8}
+html.eg-board-on tr[id^="op-detail-"] > td,
+html.eg-board-on tr[id^="wh-detail-"] > td{--egdt-node-ring:#fafaf9;--egdt-row-inset:14px}
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){--egdt-row-inset:44px}
+html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]),
+html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td,
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td{--egdt-node-ring:var(--bos-ground,#191817)}
 /* seller (orders.html): item-wrap grids live inside the exp-row wrapper div */
 html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 12px 44px!important}
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:22px;top:0;bottom:16px;width:1px;background:var(--bos-line)}
-html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:11px 6px!important}
-html.eg-board-on [id^="item-wrap-"]::after{content:"";position:absolute;left:-22px;right:0;bottom:0;height:1px;background:var(--bos-line)}
+/* ONE continuous spine: starts above the first row (top:-1px, tucked under the parent
+   row's bottom border so it reads as hanging off it) and stops at the last dot's centre. */
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:var(--egdt-spine-x);top:-1px;bottom:26px;height:auto;width:1.5px;background:var(--bos-line);z-index:0}
+html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
 html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
 html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
-/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> */
+/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> (padding:0) */
 html.eg-board-on tr[id^="op-detail-"] > td,
 html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important}
 html.eg-board-on tr[id^="op-detail-"] > td::before,
-html.eg-board-on tr[id^="wh-detail-"] > td::before{content:"";position:absolute;left:22px;top:0;bottom:16px;width:1px;background:var(--bos-line)}
+html.eg-board-on tr[id^="wh-detail-"] > td::before{content:"";position:absolute;left:var(--egdt-spine-x);top:-1px;bottom:32px;height:auto;width:1.5px;background:var(--bos-line);z-index:0}
 html.eg-board-on .egdt-item-row{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
-html.eg-board-on .egdt-item-row::after{content:"";position:absolute;left:22px;right:14px;bottom:0;height:1px;background:var(--bos-line)}
 html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
 html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
-/* dark — same thin hairlines, faint light tint */
+/* dark — same spine hairline, faint light tint */
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before,
-html[data-theme=dark].eg-board-on [id^="item-wrap-"]::after,
 html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td::before,
-html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td::before,
-html[data-theme=dark].eg-board-on .egdt-item-row::after{background:#3a3631!important}
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td::before{background:#3a3631!important}
 html[data-theme=dark].eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked),
 html[data-theme=dark].eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(201,195,186,.06)!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
@@ -428,13 +443,10 @@ html.eg-board-on .stat-card [style*="text-transform: uppercase"]{
   padding-bottom:8px!important;margin-bottom:12px!important;
   border-bottom:1px solid var(--bos-ink)!important;
   color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;letter-spacing:.05em!important;
-  white-space:nowrap!important;overflow:hidden!important;padding-right:24px!important}
-/* the hairline strip: give it a clean finished end + a touch of height so it never reads
-   as a clipped/faded fragment; the padding-right above keeps it clear of the drag-handle */
-html.eg-board-on .wcard [style*="text-transform:uppercase"]::after,
-html.eg-board-on .wcard [style*="text-transform: uppercase"]::after,
-html.eg-board-on .stat-card [style*="text-transform:uppercase"]::after,
-html.eg-board-on .stat-card [style*="text-transform: uppercase"]::after{height:9px!important;align-self:center!important;border-right:1px solid var(--bos-ink)!important}
+  white-space:nowrap!important;overflow:hidden!important}
+/* the hairline strip runs FULL WIDTH to the content edge (matches the value line below) — no
+   vertical end-cap. Base rule below already sets flex:1;align-self:stretch so it fills the row;
+   the card's own padding keeps it clear of the corner drag-handle without a padding-right hack. */
 /* small cobalt accent square — the "window" dot. Many cards already ship a leading
    ■ marker (span.eg-card-dot), which line ~148 forces to ink; recolour THAT to cobalt
    + fix its size so it reads as the title-bar accent (no doubled square). */
