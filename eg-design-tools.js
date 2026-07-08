@@ -872,12 +872,72 @@
     var sku = itemDK(it);
     return isNewOrder(o) ? _trashHtml(num, sku) : '';
   }
+
+  // ── Row STATUS DOT (per-row completeness + selection indicator) ─────────────
+  // A small cobalt dot at the start of each item row. It lights up (#2f4bf0)
+  // when the row is SELECTED (checkbox checked, driven by pure CSS :has()) OR
+  // when the line is FULLY CONFIGURED (blank + colour + size + method all set);
+  // otherwise it stays light grey (#c4c3be). itemComplete() computes the
+  // completeness half; the selection half is CSS-only so it's live without JS.
+  function _ensureRowDotCss() {
+    if (typeof document === 'undefined' || document.getElementById('egdt-rowdot-css')) return;
+    var st = document.createElement('style'); st.id = 'egdt-rowdot-css';
+    st.textContent =
+      // The dot itself (shared by factory rows + seller item-wraps).
+      '.egdt-dot{width:9px;height:9px;border-radius:50%;background:#c4c3be;flex-shrink:0;display:inline-block;transition:background .15s}' +
+      // Factory board rows (itemRowLayout emits .egdt-item-row with a leading dot).
+      '.egdt-item-row.egdt-complete .egdt-dot{background:#2f4bf0}' +
+      '.egdt-item-row:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
+      // Seller item rows (orders.html item-wrap grid, dot has class .egdt-dot).
+      '[id^="item-wrap-"].egdt-complete .egdt-dot{background:#2f4bf0}' +
+      '[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}';
+    document.head.appendChild(st);
+  }
+  // Completeness of a line item — TRUE only when it is a real, fully-configured
+  // line: NOT a new/unset placeholder AND its blank(product) + colour + size +
+  // method are all present. Mirrors exactly how itemActions decides picker vs.
+  // real values (setup store for factory picks, variantOptions for colour/size,
+  // synced Etsy variants ignored until the factory picks them). Display-only.
+  function itemComplete(o, it) {
+    try {
+      o = o || {}; it = it || {};
+      var num = o.num || o.id || '';
+      var sku = (typeof itemDK === 'function') ? itemDK(it) : ((it && (it._dk || it.sku)) || '');
+      // Locked/in-review lines already left setup — their variant/method are
+      // baked onto the item, so treat them as complete (they render the read-only
+      // Method/values metaRow, never a picker).
+      if (!isNewOrder(o)) return true;
+      var setup = getItemSetup(num, sku) || {};
+      var _synced = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
+      // BLANK / product: factory's own pick (setup.product), else the item's blank
+      // (suppressed for synced orders, which come in unset).
+      var blank = setup.product || (_synced ? '' : (it.blank || (typeof _productNameForSku === 'function' ? _productNameForSku(it.sku) : ''))) || '';
+      // COLOUR + SIZE: synced → only the factory's setup counts; manual → the
+      // resolved variant value (item value / SKU parse).
+      var vo = (typeof variantOptions === 'function') ? variantOptions(num, sku, it) : { curColor: (it.color || ''), curSize: (it.size || '') };
+      var color = _synced ? (setup.color || '') : (vo.curColor || '');
+      var size = _synced ? (setup.size || '') : (vo.curSize || '');
+      // METHOD: factory pick, else the item's own method (suppressed for synced).
+      var method = (setup.printType || (_synced ? '' : (it.type || it.printType || it.tech || '')) || '').toString();
+      return !!(blank && color && size && method);
+    } catch (e) { return false; }
+  }
+  // Set synchronously by itemActions (which has o/it) so itemRowLayout — called
+  // immediately after in the same board render — can stamp .egdt-complete on the
+  // row without the boards needing to pass o/it. Safe: JS evaluates the
+  // itemRowLayout({ selector: itemActions(o,it) }) argument (running itemActions)
+  // BEFORE calling itemRowLayout, so this always reflects the current line.
+  var _lastItemComplete = false;
+
   function itemActions(o, it, opts) {
     opts = opts || {};
     o = o || {}; it = it || {};
     var num = o.num || o.id || '';
     assignDesignKeys(o.items);            // ensure every line has a stable _dk
     var sku = itemDK(it);                  // the per-line key (sku, sku#1, …) — drives all state below
+    // Stash this line's completeness so itemRowLayout (called right after, in the
+    // same board render) can light the row's status dot — no o/it plumbing needed.
+    try { _lastItemComplete = itemComplete(o, it); } catch (e) { _lastItemComplete = false; }
     var name = it.name || '';
     var tech = it.type || it.printType || it.tech || '';
     // Auto-darken Upload once a design is attached (raw design cached, an adopted
@@ -1001,6 +1061,7 @@
   // p: { setup, sep, checkbox, thumb, title, meta, designLink, selector, status, trash }
   function itemRowLayout(p) {
     p = p || {};
+    _ensureRowDotCss();
     var nameBlock = '<div style="' + (p.setup ? 'width:240px;flex:0 0 240px' : 'flex:1') + ';min-width:0;margin-right:16px">'
       + '<div style="font-size:13.5px;font-weight:600;color:#191918;max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (p.title || '') + '</div>'
       + '<div style="font-size:11.5px;color:#b0aead;margin-top:2px;display:flex;align-items:center;gap:0;flex-wrap:nowrap">'
@@ -1011,8 +1072,14 @@
     // the order is still in setup; locked orders just show the meta row.
     var center = p.setup ? '<div style="flex:1;display:flex;align-items:center;justify-content:flex-start;min-width:0">' + (p.selector || '') + '</div>' : '';
     var trash = p.trash ? '<span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center">' + p.trash + '</span>' : '';
-    return '<div class="egdt-item-row" style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 44px;position:relative;' + (p.sep || '') + '">'
-      + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
+    // Status dot at the very start of the row — grey by default, cobalt when the
+    // line is complete (class below) OR its checkbox is checked (CSS :has()).
+    // Uses p.complete when the board passes it, else the value itemActions just
+    // stashed for this same line. Sits before the checkbox; nothing else changes.
+    var complete = (p.complete != null) ? !!p.complete : _lastItemComplete;
+    var dot = '<span class="egdt-dot" style="margin-right:10px" aria-hidden="true"></span>';
+    return '<div class="egdt-item-row' + (complete ? ' egdt-complete' : '') + '" style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 20px;position:relative;' + (p.sep || '') + '">'
+      + dot + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
       + '</div>';
   }
 
@@ -2428,7 +2495,10 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-08-varstrip-labeled-cols';
+  window.EG_BUILD = '2026-07-08-rowdot';
+  // Inject the row status-dot CSS once at load so the seller item-wraps get the
+  // :has()/complete rules even before any factory itemRowLayout runs.
+  try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
@@ -2648,7 +2718,7 @@
     },
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, itemComplete: itemComplete, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     _vdd: _vdd, _vddOpen: _vddOpen, _vddClose: _vddClose,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
