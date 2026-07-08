@@ -338,6 +338,15 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   <link rel="stylesheet" href="eg-board.css">
   <script src="eg-board.js" defer></script>
   <script src="eg-anim.js" defer></script>
+<style id="eg-board-cards-fix">
+/* Unify the Design Lab family cards with the board look (flat, ink-framed, squared). Loaded LAST so it wins over the local soft-card styles. */
+html.eg-board-on .card,html.eg-board-on .dcard,html.eg-board-on .tcard,html.eg-board-on .stat-card,html.eg-board-on .ccard{background:#fff!important;border:1.5px solid #191918!important;border-radius:0!important;box-shadow:none!important}
+html.eg-board-on .dcard,html.eg-board-on .tcard{transition:box-shadow .12s,transform .12s!important}
+html.eg-board-on .dcard:hover,html.eg-board-on .tcard:hover{box-shadow:4px 4px 0 #191918!important;transform:translate(-1px,-1px)!important;border-color:#191918!important}
+html.eg-board-on .stat-card::before{display:none!important}
+html[data-theme=dark].eg-board-on .card,html[data-theme=dark].eg-board-on .dcard,html[data-theme=dark].eg-board-on .tcard,html[data-theme=dark].eg-board-on .stat-card,html[data-theme=dark].eg-board-on .ccard{background:transparent!important;border-color:#c9c3ba!important;box-shadow:none!important}
+html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on .tcard:hover{box-shadow:4px 4px 0 #c9c3ba!important;border-color:#c9c3ba!important}
+</style>
 </head>
 <body>
 
