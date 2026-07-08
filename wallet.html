@@ -742,46 +742,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 <!-- Add Funds modal is auto-injected by eg-addfunds.js (the single SHARED window, incl.
      the PingPong method) — no inline copy here, so wallet never lags behind the others. -->
 
-<!-- WITHDRAW MODAL -->
-<div id="withdraw-modal" style="display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center">
-  <div onclick="closeWithdrawModal()" style="position:fixed;inset:0;background:rgba(0,0,0,.42)"></div>
-  <div style="background:#fdfcfa;border:1px solid #40403d;border-radius:12px;width:420px;max-width:calc(100vw - 32px);box-shadow:0 1px 2px rgba(0,0,0,.05),0 24px 64px rgba(0,0,0,.22);padding:24px;position:relative;animation:fadeUp .22s cubic-bezier(.22,1,.36,1)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-size:16px;font-weight:700;color:#191918">Withdraw Funds</div>
-      <button onclick="closeWithdrawModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background=''"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
-    </div>
-    <div style="background:#f3eee2;border:1px solid #d8d4cd;border-radius:8px;padding:12px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:12.5px;color:#6b7280;font-weight:600">Available balance</div>
-      <div id="wd-avail" style="font-size:18px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums">$0.00</div>
-    </div>
-    <div style="margin-bottom:14px">
-      <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>
-      <select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'">
-        <option value="vietqr">BIDV</option>
-        <option value="paypal">PayPal — card or balance</option>
-        <option value="pingpong">PingPong (Connected)</option>
-        <option value="bank">Bank Transfer (manual)</option>
-      </select>
-    </div>
-    <div style="margin-bottom:6px">
-      <label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>
-      <div style="position:relative">
-        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:600;color:#9ca3af">$</span>
-        <input id="wd-amount" type="number" min="50" step="0.01" placeholder="50.00" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:10px 12px 10px 28px;font-size:17px;font-family:inherit;outline:none;box-sizing:border-box;font-weight:700" onfocus="this.style.borderColor='#191918'" onblur="this.style.borderColor='#e5e4e0'" oninput="_wdValidate()"/>
-      </div>
-      <div id="wd-helper" style="font-size:12px;color:#9ca3af;margin-top:5px;font-weight:500">Minimum withdrawal: $50.00</div>
-      <div style="display:flex;gap:6px;margin-top:8px">
-        <button onclick="_wdSet(50)" style="flex:1;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:6px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">$50</button>
-        <button onclick="_wdSet(100)" style="flex:1;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:6px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">$100</button>
-        <button onclick="_wdSet(250)" style="flex:1;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:6px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">$250</button>
-        <button onclick="_wdSetMax()" style="flex:1;background:#fff;border:1px solid #e5e4e0;border-radius:6px;padding:6px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">Max</button>
-      </div>
-    </div>
-    <button id="wd-submit" onclick="submitWithdraw()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 12V1M2 8l4.5 4.5L11 8" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Withdraw
-    </button>
-  </div>
-</div>
+<!-- WITHDRAW MODAL is auto-injected by eg-withdraw.js (the single SHARED window,
+     used identically by the factory wallet on admin.html / warehouse.html). -->
 
 <!-- Add Bank Connection modal -->
 <div id="addbank-modal" style="display:none;position:fixed;inset:0;z-index:300;align-items:center;justify-content:center">
@@ -944,9 +906,10 @@ async function hydrateWalletTx() {
   try {
     var res = await Promise.all([
       fetch(base + '/api/wallet', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch(base + '/api/topups', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch(base + '/api/topups', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch(base + '/api/wallet/withdrawals', { headers: H }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]);
-    var wallet = res[0], tops = res[1], out = [];
+    var wallet = res[0], tops = res[1], withs = res[2], out = [];
     // Confirmed ledger movements — running balance walked back from the current total.
     if (wallet && Array.isArray(wallet.ledger)) {
       var bal = Number(wallet.balance) || 0;
@@ -977,6 +940,23 @@ async function hydrateWalletTx() {
           ref: t.ref || '', txnId: '',
           method: t.method || '—',
           type: 'deposit', amount: Number(t.amount_usd) || 0, balance: 0,
+          pending: !isRej, rejected: isRej
+        });
+      });
+    }
+    // Withdrawal requests: pending → "awaiting approval", rejected → "rejected".
+    // Approved ones are SKIPPED here — they already show as the negative ledger row above.
+    if (Array.isArray(withs)) {
+      withs.forEach(function (w) {
+        if (w.status === 'approved') return;
+        var isRej = w.status === 'rejected';
+        out.push({
+          _ts: ts(w.created_at),
+          date: fmt(w.created_at),
+          desc: (w.method || 'Wallet') + ' withdrawal — ' + (isRej ? 'rejected by admin' : 'awaiting approval'),
+          ref: 'WD-' + w.id, txnId: '',
+          method: w.method || '—',
+          type: 'charge', amount: Number(w.amount) || 0, balance: 0,
           pending: !isRej, rejected: isRej
         });
       });
@@ -1090,72 +1070,11 @@ function submitAddBank() {
 }
 
 
-/* ── Withdraw ── Minimum $50 + can't exceed available balance.
-   On submit: debits localStorage eg_balance and updates every visible
-   balance display (wallet card + header pill + modal field). */
-const WITHDRAW_MIN = 50;
-function openWithdrawModal() {
-  const bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
-  const wdAvail = document.getElementById('wd-avail');
-  if (wdAvail) wdAvail.textContent = '$' + bal.toFixed(2);
-  const amt = document.getElementById('wd-amount');
-  if (amt) amt.value = '';
-  _wdValidate();
-  document.getElementById('withdraw-modal').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-function closeWithdrawModal() {
-  document.getElementById('withdraw-modal').style.display = 'none';
-  document.body.style.overflow = '';
-}
-function _wdSet(n) { const el = document.getElementById('wd-amount'); if (el) { el.value = n; _wdValidate(); } }
-function _wdSetMax() {
-  const bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
-  _wdSet(bal.toFixed(2));
-}
-function _wdValidate() {
-  const amt = parseFloat(document.getElementById('wd-amount').value || '0') || 0;
-  const bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
-  const helper = document.getElementById('wd-helper');
-  const btn = document.getElementById('wd-submit');
-  if (!helper || !btn) return;
-  let msg = 'Minimum withdrawal: $' + WITHDRAW_MIN.toFixed(2);
-  let color = '#9ca3af';
-  let disabled = !amt;
-  if (amt > 0 && amt < WITHDRAW_MIN) { msg = 'Below minimum — must withdraw at least $' + WITHDRAW_MIN.toFixed(2); color = '#dc2626'; disabled = true; }
-  else if (amt > bal) { msg = 'Exceeds available balance ($' + bal.toFixed(2) + ')'; color = '#dc2626'; disabled = true; }
-  else if (amt >= WITHDRAW_MIN) { msg = 'You\'ll receive $' + amt.toFixed(2) + ' · new balance $' + (bal - amt).toFixed(2); color = '#15803d'; disabled = false; }
-  helper.textContent = msg;
-  helper.style.color = color;
-  btn.disabled = disabled;
-  btn.style.opacity = disabled ? '0.45' : '1';
-  btn.style.cursor = disabled ? 'not-allowed' : 'pointer';
-}
-function submitWithdraw() {
-  const amount = parseFloat(document.getElementById('wd-amount').value || '0') || 0;
-  const before = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
-  // Re-check both gates server-side-style — never trust the client form alone.
-  if (amount < WITHDRAW_MIN) { alert('Minimum withdrawal is $' + WITHDRAW_MIN.toFixed(2) + '.'); return; }
-  if (amount > before) { alert('Withdrawal exceeds available balance ($' + before.toFixed(2) + ').'); return; }
-  const target = parseFloat((before - amount).toFixed(2));
-  try { localStorage.setItem('eg_balance', target.toFixed(2)); }
-  catch(e) { alert('Withdrawal failed — storage rejected the write.'); return; }
-  const verify = parseFloat(localStorage.getItem('eg_balance') || 'NaN');
-  if (isNaN(verify) || Math.abs(verify - target) > 0.005) { alert('Withdrawal didn\'t persist — balance unchanged.'); return; }
-  // Hydrate every balance display.
-  document.querySelectorAll('#balance-val').forEach(el => el.textContent = '$' + verify.toFixed(2));
-  document.querySelectorAll('#qtm-current-bal').forEach(el => el.textContent = '$' + verify.toFixed(2));
-  const bigBal = document.getElementById('wallet-bal-big');
-  if (bigBal) bigBal.textContent = '$' + verify.toFixed(2);
-  closeWithdrawModal();
-  alert('Withdrawal of $' + amount.toFixed(2) + ' initiated. New balance: $' + verify.toFixed(2));
-}
-window.openWithdrawModal = openWithdrawModal;
-window.closeWithdrawModal = closeWithdrawModal;
-window.submitWithdraw = submitWithdraw;
-window._wdSet = _wdSet;
-window._wdSetMax = _wdSetMax;
-window._wdValidate = _wdValidate;
+/* ── Withdraw ── The whole flow (modal markup, $50-min / $500-max validation,
+   POST /api/wallet/withdraw creating a PENDING request that needs admin approval)
+   now lives in the SHARED eg-withdraw.js — one implementation across seller +
+   factory wallets. It exposes window.openWithdrawModal, which the Withdraw button
+   calls. hydrateWalletTx() below surfaces the pending request in the history. */
 
 /* ── Gateways ── */
 function connectGateway(gw) {
@@ -1380,6 +1299,7 @@ document.addEventListener('click',function(){ document.querySelectorAll('.eg-sel
 </script>
 <script src="egfulfill-store.js"></script>
 <script src="eg-addfunds.js"></script>
+<script src="eg-withdraw.js" defer></script>
 <script defer src="eg-seller-plan.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-new-order.js"></script>

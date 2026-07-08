@@ -12,6 +12,7 @@
 <script src="eg-guides.js"></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
+<script src="eg-withdraw.js" defer></script>
 <script src="eg-chat-extras.js"></script>
 <script src="egfulfill-drag.js"></script>
 <script src="egfulfill-tracking.js"></script>
@@ -2231,12 +2232,19 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Export CSV
         </button>
+        <button onclick="openWithdrawModal({account:'factory'})" style="background:#fff;border:1px solid #40403d;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M6.5 12V1M2 8l4.5 4.5L11 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Withdraw
+        </button>
         <button onclick="walRefresh()" style="background:#191918;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6a4 4 0 014-4M10 6a4 4 0 01-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M5 1l1 1-1 1M7 11l-1-1 1-1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Refresh
         </button>
       </div>
     </div>
+
+    <!-- Pending withdrawal requests (seller + factory payouts awaiting approval) — only shown when any exist -->
+    <div id="adm-pending-withdrawals" style="display:none;margin-bottom:20px"></div>
 
     <!-- Tab strip — dark-underline active, no faded gray line under the row -->
     <div style="display:flex;gap:0;margin-bottom:18px">
@@ -12276,7 +12284,82 @@ function walRefresh() {
     if (big) big.textContent = '$' + v.toFixed(2);
   }
   walRenderLedger();
+  if (typeof admRenderPendingWithdrawals === 'function') admRenderPendingWithdrawals();
 }
+
+// ── Pending withdrawal requests (seller + factory payouts) ───────────────────
+// Warehouse is staff, so it can approve/reject payouts too — same server endpoints
+// as admin. Approve debits the wallet (server-side negative ledger row, idempotent).
+function admRenderPendingWithdrawals() {
+  var box = document.getElementById('adm-pending-withdrawals'); if (!box) return;
+  var tok = localStorage.getItem('eg_token'); if (!tok) { box.style.display = 'none'; return; }
+  fetch('/api/wallet/withdrawals?status=pending', { headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.ok ? r.json() : []; })
+    .then(function (list) {
+      if (!Array.isArray(list) || !list.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      var rows = list.map(function (t) {
+        var d = new Date(t.created_at || Date.now());
+        var when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        var who = (t.account === 'factory' ? 'Factory wallet' : (t.requester_email || t.account || 'Seller'));
+        return '<tr style="border-top:1px solid #f3f3f1">'
+          + '<td style="font-size:12.5px;color:#9ca3af;padding:10px 12px 10px 16px;white-space:nowrap">' + when + '</td>'
+          + '<td style="font-size:13px;color:#191918;padding:10px 12px">' + String(who).replace(/</g, '&lt;') + '</td>'
+          + '<td style="font-size:12.5px;color:#6b7280;padding:10px 12px">' + (t.dest || t.method || '—').toString().replace(/</g, '&lt;') + '</td>'
+          + '<td style="font-weight:700;color:#b45309;padding:10px 12px;text-align:right;white-space:nowrap">–$' + Number(t.amount || 0).toFixed(2) + '</td>'
+          + '<td style="padding:10px 16px 10px 12px;text-align:right;white-space:nowrap">'
+            + '<button onclick="admApproveWithdrawal(\'' + t.id + '\')" style="background:#191918;color:#fff;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">Approve</button> '
+            + '<button onclick="admRejectWithdrawal(\'' + t.id + '\')" title="Reject" style="background:#fff;border:1.5px solid #e5e4e0;color:#6b7280;border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Reject</button>'
+          + '</td></tr>';
+      }).join('');
+      box.style.display = 'block';
+      box.innerHTML = '<div class="card" style="overflow:hidden;border:1px solid #fcd9a8;background:#fffdf8">'
+        + '<div style="padding:12px 16px;border-bottom:1px solid #f3ead6;display:flex;align-items:center;gap:8px">'
+          + '<span style="font-size:14.5px;font-weight:700;color:#191918">Pending withdrawals</span>'
+          + '<span style="background:#b45309;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px">' + list.length + '</span>'
+          + '<span style="font-size:12.5px;color:#9ca3af;margin-left:4px">Approve to debit the wallet and send the payout — or reject to cancel.</span></div>'
+        + '<table style="width:100%;border-collapse:collapse"><tbody>' + rows + '</tbody></table></div>';
+    })
+    .catch(function () { box.style.display = 'none'; });
+}
+function admApproveWithdrawal(id) {
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/wallet/withdrawals/' + id + '/approve', { method: 'POST', headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res || res.error) { alert('Could not approve: ' + ((res && res.error) || 'error')); return; }
+      try {
+        if (res.withdrawal && res.withdrawal.account === 'factory' && window.EGStore) {
+          var b = Math.max(0, (EGStore.getFactoryBalance() - (Number(res.withdrawal.amount) || 0)));
+          localStorage.setItem('eg_factory_balance', b.toFixed(2));
+          EGStore._appendFactoryLedger && EGStore._appendFactoryLedger({ type: 'withdrawal', amount: -(Number(res.withdrawal.amount) || 0), ts: Date.now(), label: 'Factory withdrawal', by: 'warehouse' });
+          window.dispatchEvent(new CustomEvent('eg-factory-balance-changed'));
+        }
+      } catch (e) {}
+      admRenderPendingWithdrawals();
+      if (typeof walRefresh === 'function') walRefresh();
+    })
+    .catch(function (e) { alert('Error: ' + e.message); });
+}
+function admRejectWithdrawal(id) {
+  if (!confirm('Reject this withdrawal request? No funds will be withdrawn.')) return;
+  var tok = localStorage.getItem('eg_token');
+  fetch('/api/wallet/withdrawals/' + id + '/reject', { method: 'POST', headers: { Authorization: 'Bearer ' + tok } })
+    .then(function (r) { return r.json(); })
+    .then(function () { admRenderPendingWithdrawals(); })
+    .catch(function (e) { alert('Error: ' + e.message); });
+}
+window.admApproveWithdrawal = admApproveWithdrawal;
+window.admRejectWithdrawal = admRejectWithdrawal;
+window.admRenderPendingWithdrawals = admRenderPendingWithdrawals;
+// Factory pages withdraw FROM the shared factory wallet.
+window.EG_WITHDRAW_ACCOUNT = 'factory';
+window.addEventListener('eg-withdrawals-changed', admRenderPendingWithdrawals);
+document.addEventListener('DOMContentLoaded', admRenderPendingWithdrawals);
+setInterval(function () {
+  var s = document.getElementById('section-balance');
+  if (s && s.classList.contains('active')) admRenderPendingWithdrawals();
+}, 10000);
+
 // Pull confirmed seller top-ups from the server into the shared factory ledger so
 // the WAREHOUSE board sees the same money state as admin (deduped by topupId).
 function whReconcileTopups() {

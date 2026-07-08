@@ -458,12 +458,12 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
               <table style="width:100%;border-collapse:collapse" id="cat-table">
                 <thead>
                   <tr>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace;width:48px"></th>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Product</th>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Colors</th>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">Sizes</th>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace">From</th>
-                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap;font-family:'DepartureMono',monospace"></th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap;width:48px"></th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap">Product</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap">Colors</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:left;background:transparent;white-space:nowrap">Sizes</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap">From</th>
+                    <th style="font-size:12px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid #e5e4e0;text-align:right;background:transparent;white-space:nowrap"></th>
                   </tr>
                 </thead>
                 <tbody id="cat-tbody"></tbody>
@@ -593,7 +593,7 @@ function catRenderSidebar(){
     rows += '<a class="cat-row ' + (_catActiveCat===slug?'on':'') + '" href="#" onclick="catFilter(event,\'' + slug + '\')"><span>' + groups[slug].label + '</span><span class="cat-count">' + groups[slug].count + '</span></a>';
   });
   if (!prods.length) {
-    rows += '<div style="padding:14px 10px;font-size:12.5px;color:#9ca3af;text-align:center;line-height:1.45">No products yet.<br>Operator publishes the catalog.</div>';
+    rows += '<div style="padding:14px 10px;font-size:12.5px;color:#6b7280;text-align:center;line-height:1.45">No products yet.<br>Operator publishes the catalog.</div>';
   }
   list.innerHTML = rows;
 }
@@ -645,7 +645,7 @@ function renderCatalog(){
   if(!tbody) return;
   if(!prods.length){
     var msg = all.length ? 'No products found in this category.' : 'No products published yet — operator publishes to the catalog.';
-    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af;font-size:14px">' + msg + '</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:#6b7280;font-size:14px">' + msg + '</td></tr>';
     return;
   }
   tbody.innerHTML=prods.map(function(p){

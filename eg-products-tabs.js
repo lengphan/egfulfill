@@ -30,6 +30,7 @@
       ".epx-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}" +
       ".epx-tab{font-family:" + mono + ";font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding:9px 15px;border:1.5px solid #191918;background:#fff;color:#191918;cursor:pointer;border-radius:0;display:flex;align-items:center;gap:7px;transition:background .12s,color .12s}" +
       ".epx-tab.on{background:#191918;color:#fff}" +
+      ".epx-tab.epx-tab-create{margin-left:auto}" +   /* push +Create to the far right, away from the view tabs */
       ".epx-tab .n{font-size:10px;min-width:16px;height:16px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;background:#2f4bf0;color:#fff;border-radius:9px;font-variant-numeric:tabular-nums}" +
       ".epx-tab.on .n{background:#fff;color:#191918}" +
       /* re-theme the board's own Catalog search + selects (they carry inline soft styles) */
@@ -79,8 +80,9 @@
   var _tabs, _newin, _favs, _grid, _header, _searchTimer, _newinLoaded = false, _io;
 
   function cardHTML(s) {
+    // Use the style's image; on load-error (or missing) fall back to the garment placeholder.
     var img = s.image
-      ? '<img src="' + esc(s.image) + '" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.ph\').style.display=\'flex\'">'
+      ? '<img src="' + esc(s.image) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';var p=this.parentNode.querySelector(\'.ph\');if(p)p.style.display=\'flex\'">'
       : '';
     var phStyle = s.image ? 'display:none' : 'display:flex';
     var meta = [esc(s.brand || ''), s.category ? esc(s.category) : ''].filter(Boolean).join(' · ');
@@ -161,13 +163,43 @@
   function setFavCount(n) { _favCount = n; var el = $('epx-fav-n'); if (el) { el.textContent = n; el.style.display = n ? '' : 'none'; } }
   function bumpFav(d) { setFavCount(Math.max(0, _favCount + d)); }
 
+  function _setVal(id, v) { var e = $(id); if (e && v != null && v !== '') { e.value = v; return true; } return false; }
+
+  function _prefillFromStyle(d) {
+    if (!d) return;
+    _setVal('npm-name', d.title);
+    _setVal('npm-notes', d.description);
+    if (d.price != null && d.price !== '') _setVal('npm-price', d.price);
+    var colors = Array.isArray(d.colors) ? d.colors.join(', ') : '';
+    var sizes = Array.isArray(d.sizes) ? d.sizes.join(', ') : '';
+    _setVal('npm-bulk-colors', colors);
+    _setVal('npm-bulk-sizes', sizes);
+    // Build the variant rows from the bulk color/size fields (clears them afterward).
+    if ((colors || sizes) && typeof window.npmBulkGenerate === 'function') { try { window.npmBulkGenerate(); } catch (e) {} }
+    if (d.image && typeof window.npmPaSetImage === 'function') { try { window.npmPaSetImage(d.image); } catch (e) {} }
+    if (typeof window.autoNpmSKU === 'function') { try { window.autoNpmSKU(); } catch (e) {} }
+  }
+
   function addToCatalog(s) {
-    if (typeof window.openNewProductModal === 'function') {
-      try { window.openNewProductModal(); } catch (e) {}
-      setTimeout(function () {
-        var n = $('npm-name'); if (n && s.title) { n.value = s.title; if (typeof autoNpmSKU === 'function') { try { autoNpmSKU(); } catch (e) {} } }
-      }, 250);
-    }
+    if (typeof window.openNewProductModal !== 'function') return;
+    try { window.openNewProductModal(); } catch (e) {}
+    // Prefill the name immediately (feels instant), then enrich from the live S&S style.
+    setTimeout(function () {
+      var n = $('npm-name'); if (n && s.title) { n.value = s.title; if (typeof window.autoNpmSKU === 'function') { try { window.autoNpmSKU(); } catch (e) {} } }
+    }, 250);
+    if (!s || !s.styleID) return;
+    fetch('/api/ss/style/' + encodeURIComponent(s.styleID), { headers: hdr() })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || d.error) { if (d && d.title == null) return; }
+        // Merge in the card's own title/image as sensible fallbacks.
+        if (d) {
+          if (!d.title) d.title = s.title;
+          if (!d.image) d.image = s.image;
+          _prefillFromStyle(d);
+        }
+      })
+      .catch(function () {});
   }
 
   function show(t) {
@@ -203,7 +235,7 @@
       '<button class="epx-tab on" data-t="newin">New In</button>' +
       '<button class="epx-tab" data-t="favorites">Favorites <span class="n" id="epx-fav-n" style="display:none"></span></button>' +
       '<button class="epx-tab" data-t="catalog">Catalog</button>' +
-      '<button class="epx-tab" data-t="create">+ Create Product</button>';
+      '<button class="epx-tab epx-tab-create" data-t="create">+ Create Product</button>';
     sec.insertBefore(_tabs, sec.firstChild);
     _tabs.addEventListener('click', function (e) { var b = e.target.closest('.epx-tab'); if (b) show(b.dataset.t); });
 

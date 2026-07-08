@@ -151,6 +151,54 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
   });
 
+  // ── ONE style's detail — colors, sizes, price + description (powers "Add to catalog") ─
+  // Hits S&S directly (per-style product feed is small). Returns everything the
+  // create-product modal needs to prefill: distinct colors/sizes, a min price, an image
+  // and a description (fetched from /styles/:id when the field is available).
+  app.get('/api/ss/style/:id', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
+    const id = String(req.params.id || '').trim();
+    if (!id) { reply.code(400); return { error: 'styleID required' }; }
+    try {
+      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) +
+        '&fields=sku,colorName,sizeName,piecePrice,customerPrice,colorFrontImage,styleName,brandName');
+      if (!pr.ok || !Array.isArray(pr.data)) { reply.code(pr.status || 502); return { error: 'S&S style fetch failed (' + pr.status + ')' }; }
+      const rows = pr.data;
+
+      // Distinct colors + sizes, order-preserving (first-seen wins).
+      const colors = [], sizes = [], cseen = new Set(), sseen = new Set();
+      let price = null, brand = null, styleName = null, image = null;
+      for (const p of rows) {
+        const c = p.colorName; if (c && !cseen.has(c)) { cseen.add(c); colors.push(c); }
+        const s = p.sizeName;  if (s && !sseen.has(s)) { sseen.add(s); sizes.push(s); }
+        const cp = num(p.customerPrice ?? p.piecePrice);
+        if (cp != null && (price == null || cp < price)) price = cp;
+        if (!brand && p.brandName) brand = p.brandName;
+        if (!styleName && p.styleName) styleName = p.styleName;
+        if (!image) { const im = ssImg(p.colorFrontImage); if (im) image = im; }
+      }
+
+      // Style-level metadata (descriptive title + description); best-effort — some
+      // accounts/styles omit `description`, so we guard and fall back gracefully.
+      let title = ((brand ? brand + ' ' : '') + (styleName || '')).trim() || styleName || ('Style ' + id);
+      let description = '';
+      try {
+        const sr = await ssGet('/styles/' + encodeURIComponent(id) + '?fields=styleID,brandName,title,baseCategory,description,styleImage');
+        const meta = Array.isArray(sr.data) ? sr.data[0] : sr.data;
+        if (sr.ok && meta) {
+          const mBrand = meta.brandName || brand || '';
+          const mTitle = meta.title || styleName || '';
+          const t = ((mBrand ? mBrand + ' ' : '') + mTitle).trim();
+          if (t) title = t;
+          if (meta.description) description = String(meta.description);
+          if (!image) { const im = ssImg(meta.styleImage); if (im) image = im; }
+        }
+      } catch (e) {}
+
+      return { styleID: id, title, brand: brand || null, description, image, price, colors, sizes };
+    } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────
   app.get('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
     try {

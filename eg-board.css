@@ -411,3 +411,62 @@ html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!importan
 html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:5px 5px 0 #3a3631!important}
 html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:2px 2px 0 #3a3631!important}
 html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-on .stat-card:active{box-shadow:0 0 0 #3a3631!important}
+
+/* ── RETRO-WINDOW "title bar" chrome on the stat cards ──────────────────────────
+   Each card's mono eyebrow label reads like an old window title bar: a small cobalt
+   accent square, the label, then a strip of repeating ink hairlines filling the rest
+   of the row, all sitting on a thin bottom rule. Each overview card carries EXACTLY
+   ONE `text-transform:uppercase` element (the eyebrow) at a varying nesting depth, so
+   we target it as the sole such descendant of the card — no direct-child assumption,
+   no markup depth assumed. Both `:uppercase` and `: uppercase` (the value the browser
+   re-serialises the inline style attribute to) are matched. Presentation only. */
+html.eg-board-on .wcard [style*="text-transform:uppercase"],
+html.eg-board-on .wcard [style*="text-transform: uppercase"],
+html.eg-board-on .stat-card [style*="text-transform:uppercase"],
+html.eg-board-on .stat-card [style*="text-transform: uppercase"]{
+  display:flex!important;align-items:center!important;gap:8px!important;
+  padding-bottom:8px!important;margin-bottom:12px!important;
+  border-bottom:1px solid var(--bos-ink)!important;
+  color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;letter-spacing:.05em!important;
+  white-space:nowrap!important;overflow:hidden!important}
+/* small cobalt accent square — the "window" dot. Many cards already ship a leading
+   ■ marker (span.eg-card-dot), which line ~148 forces to ink; recolour THAT to cobalt
+   + fix its size so it reads as the title-bar accent (no doubled square). */
+html.eg-board-on .wcard [style*="text-transform:uppercase"] > .eg-card-dot,
+html.eg-board-on .wcard [style*="text-transform: uppercase"] > .eg-card-dot,
+html.eg-board-on .stat-card [style*="text-transform:uppercase"] > .eg-card-dot,
+html.eg-board-on .stat-card [style*="text-transform: uppercase"] > .eg-card-dot{
+  background:var(--bos-violet)!important;flex:0 0 auto!important;width:8px!important;height:8px!important;
+  border-radius:0!important;margin:0!important;display:block!important}
+/* cards WITHOUT a built-in ■ marker get a cobalt accent square from ::before instead;
+   cards that already have .eg-card-dot suppress it via the :has() guard so it never doubles */
+html.eg-board-on .wcard [style*="text-transform:uppercase"]:not(:has(> .eg-card-dot))::before,
+html.eg-board-on .wcard [style*="text-transform: uppercase"]:not(:has(> .eg-card-dot))::before,
+html.eg-board-on .stat-card [style*="text-transform:uppercase"]:not(:has(> .eg-card-dot))::before,
+html.eg-board-on .stat-card [style*="text-transform: uppercase"]:not(:has(> .eg-card-dot))::before{
+  content:""!important;flex:0 0 auto!important;width:8px!important;height:8px!important;
+  background:var(--bos-violet)!important;display:block!important}
+/* strip of repeating horizontal ink hairlines filling the row next to the label */
+html.eg-board-on .wcard [style*="text-transform:uppercase"]::after,
+html.eg-board-on .wcard [style*="text-transform: uppercase"]::after,
+html.eg-board-on .stat-card [style*="text-transform:uppercase"]::after,
+html.eg-board-on .stat-card [style*="text-transform: uppercase"]::after{
+  content:""!important;flex:1 1 auto!important;align-self:stretch!important;min-width:18px!important;
+  margin-left:2px!important;background:repeating-linear-gradient(var(--bos-ink) 0 1px,transparent 1px 3px)!important}
+/* dark mode — light ink hairlines + rule, keep the cobalt dot */
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform:uppercase"],
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform: uppercase"],
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform:uppercase"],
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform: uppercase"]{
+  border-bottom-color:#5a5660!important;color:#d8d4cc!important}
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform:uppercase"]::after,
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform: uppercase"]::after,
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform:uppercase"]::after,
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform: uppercase"]::after{
+  background:repeating-linear-gradient(#5a5660 0 1px,transparent 1px 3px)!important}
+/* keep the accent square COBALT in dark mode (line ~270 forces .eg-card-dot to light ink) */
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform:uppercase"] > .eg-card-dot,
+html[data-theme=dark].eg-board-on .wcard [style*="text-transform: uppercase"] > .eg-card-dot,
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform:uppercase"] > .eg-card-dot,
+html[data-theme=dark].eg-board-on .stat-card [style*="text-transform: uppercase"] > .eg-card-dot{
+  background:var(--bos-violet)!important}

@@ -933,12 +933,23 @@
       // the Etsy variant — so they start empty until picked. (Lists stay full.)
       var _curColor = _synced ? (setup.color || '') : vo.curColor;
       var _curSize = _synced ? (setup.size || '') : vo.curSize;
-      // One unified box — Product · Color · Size · Method on a single line,
-      // dot-separated, mirroring the seller-side variation pill. Native <select>s
-      // are replaced with the custom _vdd dropdowns (white menu, black border,
-      // offset shadow, all options always visible) so the value list reads clearly.
-      var _dot = '<span style="color:#c9c3ba;font-weight:600;padding:0 5px;flex-shrink:0">·</span>';
+      // Labeled, fixed-width columns — BLANK · COLOR · SIZE · METHOD each get a
+      // tiny uppercase mono micro-label above the live control, and every column
+      // has a fixed width so the fields line up across rows regardless of the
+      // blank name's length (long names truncate with ellipsis). The controls
+      // stay the custom _vdd dropdowns (white menu, black border, offset shadow,
+      // all options visible) — only the layout changes; selection logic is intact.
       var _numJs = jsAttr(num), _skuJs = jsAttr(sku);
+      // Mono micro-label above each column (DepartureMono for LABELS only).
+      var _mlbl = 'display:block;font-family:\'DepartureMono\',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8.5px;font-weight:600;color:#a8a5a0;text-transform:uppercase;letter-spacing:.09em;line-height:1;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      // Fixed-width column wrapper: label sits above the control; the column width
+      // is fixed so fields align across rows. The control (_vdd) is passed the same
+      // inner width so its button truncates with an ellipsis inside the column.
+      function _col(label, w, ctrl) {
+        return '<div style="flex:0 0 ' + w + 'px;width:' + w + 'px;max-width:' + w + 'px;min-width:0">'
+          + '<span style="' + _mlbl + '">' + esc(label) + '</span>'
+          + '<div style="min-width:0;overflow:hidden">' + ctrl + '</div></div>';
+      }
       // Product items — the full catalog; onclick bakes in the product name.
       var _prodItems = [];
       prods.forEach(function (p) {
@@ -951,11 +962,14 @@
       // Current values shown on each button (placeholder when unchosen). Method
       // shows its readable label to match the menu items.
       var _curMethodLabel = curPt ? (PRINT_LABELS[String(curPt).toUpperCase()] || curPt) : '';
-      pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
-        + _vdd(curProd, 'Product', 190, _prodItems) + _dot
-        + _vdd(_curColor, 'Color', 78, _colorItems) + _dot
-        + _vdd(_curSize, 'Size', 46, _sizeItems) + _dot
-        + _vdd(_curMethodLabel, 'Method', 98, _methodItems)
+      // Fixed-width labeled columns replace the old middot-separated inline row.
+      // The _vdd inner width is a touch under the column so the button + caret sit
+      // inside; long blank names truncate with ellipsis inside the fixed column.
+      pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:flex-start;flex-wrap:nowrap;gap:16px;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
+        + _col('Blank', 200, _vdd(curProd, 'Product', 192, _prodItems))
+        + _col('Color', 96, _vdd(_curColor, 'Color', 88, _colorItems))
+        + _col('Size', 58, _vdd(_curSize, 'Size', 50, _sizeItems))
+        + _col('Method', 90, _vdd(_curMethodLabel, 'Method', 82, _methodItems))
         + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
@@ -2414,7 +2428,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-08-exprow-cards';
+  window.EG_BUILD = '2026-07-08-varstrip-labeled-cols';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
