@@ -93,13 +93,13 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .drop-zone:hover,.drop-zone.over{border-color:#374151;background:#f6f5f4}
 .drop-zone.has-file{border-color:#16a34a;border-style:solid;background:#f0fdf4}
 .ds-type-emb{background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
-.ds-type-dtg{background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
+.ds-type-dtg{background:#eef1fe;color:#2f4bf0;border:1px solid #eef1fe;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
 .ds-type-sub{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
 .ds-type-oth{background:#f3f3f1;color:#374151;border:1px solid #e5e4e0;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
 .trello-chip{display:inline-flex;align-items:center;gap:5px;background:#0052cc;color:#fff;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:5px;text-decoration:none;cursor:pointer}
 .trello-chip:hover{opacity:.85}
 .b-draft,.b-submitted,.b-approved,.b-rejected{background:#e5e4e0;color:#191918}
-.b-review{background:transparent;padding:0;color:#7c3aed}
+.b-review{background:transparent;padding:0;color:#2f4bf0}
 .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f3f3f1}
 .toggle-row:last-child{border-bottom:none}
 .file-badge-ok{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:4px}
@@ -241,7 +241,7 @@ html[data-theme=dark] .tab-btn{color:#7a7874!important}
 html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
 html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
 /* "via API" source badge */
-html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+html[data-theme=dark] [style*="background:#eef1fe"]{background:rgba(47,75,240,0.2)!important;color:#6d8cff!important;border:none!important}
 /* Action buttons: Resolve / Escalate */
 html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
 html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
@@ -249,7 +249,7 @@ html[data-theme=dark] [style*="background:#fff5f5;color:#dc2626"]{background:rgb
 html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
 /* Start / action dark buttons — add visible border in dark mode */
 html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
-/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#9749d4/#2eeeca/#e63561 ── */
+/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#2f4bf0/#2eeeca/#e63561 ── */
 /* Blue family → incoming, transit, ready, queue, pendingpo */
 html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-queue{background:#6a99d6!important;color:#fff!important;border:none!important}
@@ -265,12 +265,12 @@ html[data-theme=dark] .b-qc{background:#2dcaf0!important;color:#fff!important;bo
 html[data-theme=dark] .b-wh-working{background:#2dcaf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-labelled{background:#4ed2f2!important;color:#fff!important;border:none!important}
 /* Purple family → design, pre-scan, outdeliv, prod */
-html[data-theme=dark] .b-prod{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-prod{background:#2f4bf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-outdeliv{background:#a866db!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-prescan{background:#9749d4!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-design{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-prescan{background:#2f4bf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-design{background:#2f4bf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-approved{background:#a866db!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-prescan.badge-wh-tag,html[data-theme=dark] .b-wh-labelled.badge-wh-tag{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-prescan.badge-wh-tag,html[data-theme=dark] .b-wh-labelled.badge-wh-tag{background:#2f4bf0!important;color:#fff!important;border:none!important}
 /* Mint family → shipped, finished, delivered, ok, packed */
 html[data-theme=dark] .b-packed{background:#41f1d3!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-shipped{background:#2eeeca!important;color:#fff!important;border:none!important}
@@ -282,7 +282,7 @@ html[data-theme=dark] .b-flagged{background:#e63561!important;color:#fff!importa
 html[data-theme=dark] .b-wh-exception{background:#e63561!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-backorder{background:#ec557a!important;color:#fff!important;border:none!important}
 /* Type badge classes (ds-type-*) */
-html[data-theme=dark] .ds-type-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-type-dtg{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
 html[data-theme=dark] .ds-type-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
 html[data-theme=dark] .ds-type-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
 html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!important;border-color:#4e65ce!important}
@@ -290,12 +290,12 @@ html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!impor
 html[data-theme=dark] [style*="color:#286038;background:#e4f4ea"]{color:#fff!important;background:#2eeeca!important;border-color:#1ab8a0!important}
 html[data-theme=dark] [style*="color:#7a5018;background:#f8f4e0"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important;cursor:pointer}
 html[data-theme=dark] [style*="color:#3a5a96;background:#edf2f8"]{color:#fff!important;background:#4e65ce!important;border-color:#3a52b8!important}
-html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#9749d4!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#2f4bf0!important;border-color:#2439c8!important}
 html[data-theme=dark] [style*="color:#904a18;background:#f8f0e4"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important}
 html[data-theme=dark] [style*="background:#f3f4f6;border:1px solid #e5e4e0"]{background:#2a2826!important;border-color:#3a3835!important}
 html[data-theme=dark] [style*="color:#6b7280;background:#f3f4f6"]{color:#9ca3af!important;background:#2a2826!important;border-color:#3a3835!important}
 /* Type badge inline pills (DTG/SUB/EMB/SCR) */
-html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
 html[data-theme=dark] [style*="background:#f8f0e4;color:#904a18"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
 html[data-theme=dark] [style*="background:#e4f4ea;color:#286038"]{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
 html[data-theme=dark] [style*="background:#edf2f8;color:#3a5a96"]{background:#4e65ce!important;color:#fff!important;border-color:#3a52b8!important}
@@ -908,7 +908,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
               <div style="font-size:14px;font-weight:600;color:#191918;margin-bottom:5px">Gildan Hoodie 18500</div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
                 <span style="font-size:13.5px;color:#374151">from <strong>$18.50</strong></span>
-                <span style="font-size:12px;color:#7c3aed;font-weight:600">+28% sales</span>
+                <span style="font-size:12px;color:#2f4bf0;font-weight:600">+28% sales</span>
               </div>
               <button onclick="window.location='products-dash.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:7px;padding:7px 0;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Add to store</button>
             </div>
@@ -1431,7 +1431,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <div style="display:flex;flex-direction:column;height:100%">
         <!-- Chat header -->
         <div style="padding:12px 18px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:10px;flex-shrink:0">
-          <div id="chat-hdr-avatar" style="width:34px;height:34px;background:#f0ede9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#7c3aed;flex-shrink:0">SA</div>
+          <div id="chat-hdr-avatar" style="width:34px;height:34px;background:#f0ede9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#2f4bf0;flex-shrink:0">SA</div>
           <div>
             <div id="chat-hdr-name" style="font-size:14.5px;font-weight:700;color:#191918">Seller A Store</div>
             <div id="chat-hdr-status">● Online</div>
@@ -1982,7 +1982,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
       <div style="display:flex;align-items:center;gap:6px;overflow-x:auto">
         <div id="pstep-1" class="pstep done" style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#16a34a;white-space:nowrap"><span style="width:18px;height:18px;background:#16a34a;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0">✓</span>Received</div>
         <div style="flex:1;height:1.5px;background:#e5e4e0;min-width:12px"></div>
-        <div id="pstep-2" class="pstep active" style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#7c3aed;white-space:nowrap"><span style="width:18px;height:18px;background:#191918;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0">●</span>In Production</div>
+        <div id="pstep-2" class="pstep active" style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#2f4bf0;white-space:nowrap"><span style="width:18px;height:18px;background:#191918;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;flex-shrink:0">●</span>In Production</div>
         <div style="flex:1;height:1.5px;background:#e5e4e0;min-width:12px"></div>
         <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:#9ca3af;white-space:nowrap"><span style="width:18px;height:18px;background:#f3f3f1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:10px;flex-shrink:0">3</span>QC</div>
         <div style="flex:1;height:1.5px;background:#e5e4e0;min-width:12px"></div>
@@ -3071,7 +3071,7 @@ setInterval(tickAlerts, 3500);
 
 // ---- Chat ----
 const CHAT_DATA = {
-  'seller-a': {name:'Seller A Store', avatar:'SA', avatarBg:'#ede9fe', avatarColor:'#7c3aed', status:'● Online', statusColor:'#22c55e'},
+  'seller-a': {name:'Seller A Store', avatar:'SA', avatarBg:'#eef1fe', avatarColor:'#2f4bf0', status:'● Online', statusColor:'#22c55e'},
   'seller-b': {name:'Seller B Store', avatar:'SB', avatarBg:'#dbeafe', avatarColor:'#1d4ed8', status:'● Away', statusColor:'#f59e0b'},
   'my-store': {name:'My Store', avatar:'MS', avatarBg:'#f0fdf4', avatarColor:'#16a34a', status:'● Online', statusColor:'#22c55e'},
   'prod-team': {name:'Production Team', avatar:'#P', avatarBg:'#fef3c7', avatarColor:'#b45309', status:'5 members', statusColor:'#9ca3af'},
@@ -3739,7 +3739,7 @@ function opStockState(sku) {
 // Unified no-background pipeline palette — text-only, no pill.
 // One color per stage so the dashboards don't clash.
 const OP_STATUS_STYLE = {
-  in_review:     'background:transparent;color:#7c3aed',
+  in_review:     'background:transparent;color:#2f4bf0',
   awaiting_scan: 'background:transparent;color:#c2410c',
   scanned:       'background:transparent;color:#0891b2',
   printing:      'background:transparent;color:#1d4ed8',
@@ -3751,7 +3751,7 @@ const OP_STATUS_STYLE = {
   refunded:      'background:transparent;color:#374151;font-weight:600',
   // legacy aliases
   new:           'background:transparent;color:#374151',
-  design_review: 'background:transparent;color:#7c3aed',
+  design_review: 'background:transparent;color:#2f4bf0',
   prescan:       'background:transparent;color:#c2410c',
   in_queue:      'background:transparent;color:#c2410c',
   ready_print:   'background:transparent;color:#0891b2',
@@ -3795,8 +3795,8 @@ function opUpdateTabCounts() {
   });
 }
 
-var OP_PT_BG  = {dtg:'#ede9fe', sub:'#fff7ed', emb:'#f0fdf4', scr:'#edf2f8'};
-var OP_PT_FG  = {dtg:'#7c3aed', sub:'#c2410c', emb:'#15803d', scr:'#3a5a96'};
+var OP_PT_BG  = {dtg:'#eef1fe', sub:'#fff7ed', emb:'#f0fdf4', scr:'#edf2f8'};
+var OP_PT_FG  = {dtg:'#2f4bf0', sub:'#c2410c', emb:'#15803d', scr:'#3a5a96'};
 var OP_PT_LBL = {dtg:'DTG', sub:'SUB', emb:'EMB', scr:'SCR'};
 
 function renderOpOrders() {
@@ -3928,7 +3928,7 @@ function renderOpOrders() {
           const _hasDesign = !!(it.file || it.thumb || _custFile);
           const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
           const fileLink = _custFile
-            ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, _dk, _custFile) : '<a href="'+_custFile+'" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>')
+            ? ((window.EGDesignTools && EGDesignTools.customerFileControls) ? EGDesignTools.customerFileControls(o.num, _dk, _custFile) : '<a href="'+_custFile+'" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#2f4bf0;font-weight:600;text-decoration:underline;text-decoration-color:#b9c7fb">Customer file ↗</a>')
             : (_hasDesign
                 ? (_fileIsFilename
                     ? '<a href="#" onclick="event.preventDefault();event.stopPropagation();opPreviewFile(\''+o.num+'\','+ei+')" style="color:#374151;text-decoration:underline;text-decoration-color:#c4c2be">'+it.file+'</a>'
@@ -4685,7 +4685,7 @@ function opZoomProduct(orderNum, itemIdx) {
   // up the exact file the customer sent (separate from the deliverable download).
   var _custUrl = it.customerFile || (it.designSrc && /^https?:\/\//i.test(String(it.designSrc)) ? String(it.designSrc) : '');
   var custFileLink = _custUrl
-    ? '<a href="' + _custUrl + '" target="_blank" onclick="event.stopPropagation()" style="margin-top:10px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #c4b5fd;background:#faf5ff;font-size:13.5px;font-weight:600;color:#7c3aed;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;box-sizing:border-box">Customer-uploaded file ↗</a>'
+    ? '<a href="' + _custUrl + '" target="_blank" onclick="event.stopPropagation()" style="margin-top:10px;width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid #b9c7fb;background:#eef1fe;font-size:13.5px;font-weight:600;color:#2f4bf0;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;box-sizing:border-box">Customer-uploaded file ↗</a>'
     : '';
   overlay.innerHTML = '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;padding:20px;max-width:480px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.35)">'
     + '<div style="position:relative;width:100%;aspect-ratio:1;border-radius:9px;border:1px solid #e5e4e0;background:#fff;overflow:hidden">'
@@ -5116,7 +5116,7 @@ function opPopulateSingle(num) {
     actionBtn.onclick = () => opApproveFromPanel();
   } else if (st === 'printing') {
     actionBtn.textContent = '▶ Done Printing'; actionBtn.style.display = '';
-    actionBtn.className = 'btn'; actionBtn.style.background = '#7c3aed'; actionBtn.style.color = '#fff'; actionBtn.style.border = 'none';
+    actionBtn.className = 'btn'; actionBtn.style.background = '#2f4bf0'; actionBtn.style.color = '#fff'; actionBtn.style.border = 'none';
     actionBtn.style.flex = '1'; actionBtn.style.justifyContent = 'center'; actionBtn.style.fontSize = '12px';
     actionBtn.onclick = () => { opMarkPacking(o.num); };
   } else {
@@ -5188,7 +5188,7 @@ function opRenderMulti() {
       : (st === 'design_review')
       ? `<button class="btn btn-green" style="font-size:11.5px;padding:3px 8px" onclick="event.stopPropagation();opApproveOrder('${num}')">✓ Approve</button>`
       : (st === 'in_queue')
-      ? `<button class="btn" style="background:#7c3aed;color:#fff;border:none;font-size:11.5px;padding:3px 8px" onclick="event.stopPropagation();opStartPrinting('${num}')">▶ Print</button>`
+      ? `<button class="btn" style="background:#2f4bf0;color:#fff;border:none;font-size:11.5px;padding:3px 8px" onclick="event.stopPropagation();opStartPrinting('${num}')">▶ Print</button>`
       : '';
     return `<div id="op-mc-${num}" style="border:1.5px solid ${isOpen?'#111827':'#e5e4e0'};border-radius:10px;overflow:hidden;transition:border-color .15s">
       <div style="background:${isOpen?'#111827':'#fff'};padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="opToggleCard('${num}')">
@@ -5607,7 +5607,7 @@ let shiftFilter = 'all';
 
 // Title accent — keeps the type cue without a leading icon. Flag stays red for urgency.
 const SHIFT_TITLE_COLOR = {
-  receive:'#1d4ed8', print:'#7c3aed', qc:'#b45309',
+  receive:'#1d4ed8', print:'#2f4bf0', qc:'#b45309',
   approve:'#15803d', note:'#374151', flag:'#dc2626',
 };
 
@@ -7513,7 +7513,7 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     'new':    {cls:'b-s-new',   label:'New',            dot:'#1d4ed8'},
     'review': {cls:'b-s-review',label:'In Review',      dot:'#374151'},
     'action': {cls:'b-s-action',label:'Action Needed',  dot:'#dc2626'},
-    'prod':   {cls:'b-s-prod',  label:'In Production',  dot:'#6d28d9'},
+    'prod':   {cls:'b-s-prod',  label:'In Production',  dot:'#2f4bf0'},
     'shipped':{cls:'b-s-ship',  label:'Shipped',         dot:'#15803d'}
   };
   const STATUS_PRIORITY = ['action','review','new','prod','shipped'];

@@ -448,7 +448,7 @@
     if (st === 'refund_pending') return _pill('#fef3c7', '#92400e', 'Refund pending');
     if (st === 'delivered') return _pill('#f0fdf4', '#15803d', 'Delivered');
     if (st === 'in_transit' || st === 'transit') return _pill('#eff6ff', '#1d4ed8', 'In transit');
-    if (isReturn) return _pill('#f5f3ff', '#6d28d9', 'Return');
+    if (isReturn) return _pill('#eef1fe', '#2f4bf0', 'Return');
     return _pill('#eff6ff', '#1d4ed8', 'Shipped');
   }
   function _actBtn(color) { return 'font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;border:1px solid #e5e4e0;background:#fff;color:' + color + ';cursor:pointer;font-family:inherit;white-space:nowrap'; }

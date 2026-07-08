@@ -36,7 +36,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
 .stat-card{background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:16px 18px;position:relative;overflow:hidden}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0}
-.s-blue::before{background:#3b82f6}.s-green::before{background:#22c55e}.s-amber::before{background:#7a92c4}.s-purple::before{background:#8b5cf6}
+.s-blue::before{background:#3b82f6}.s-green::before{background:#22c55e}.s-amber::before{background:#7a92c4}.s-purple::before{background:#2f4bf0}
 
 /* ── Mobile Responsive ── */
 #mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
@@ -120,7 +120,7 @@ html[data-theme=dark] .tab-btn{color:#7a7874!important}
 html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
 html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
 /* "via API" source badge */
-html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+html[data-theme=dark] [style*="background:#eef1fe"]{background:rgba(47,75,240,0.2)!important;color:#6d8cff!important;border:none!important}
 /* Action buttons: Resolve / Escalate */
 html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
 html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
@@ -128,7 +128,7 @@ html[data-theme=dark] [style*="background:#fff5f5;color:#dc2626"]{background:rgb
 html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
 /* Start / action dark buttons — add visible border in dark mode */
 html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
-/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#9749d4/#2eeeca/#e63561 ── */
+/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#2f4bf0/#2eeeca/#e63561 ── */
 /* Blue family → incoming, transit, ready, queue */
 html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-queue{background:#6a99d6!important;color:#fff!important;border:none!important}
@@ -144,10 +144,10 @@ html[data-theme=dark] .b-qc{background:#2dcaf0!important;color:#fff!important;bo
 html[data-theme=dark] .b-wh-working{background:#2dcaf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-labelled{background:#4ed2f2!important;color:#fff!important;border:none!important}
 /* Purple family → design, pre-scan, outdeliv, prod */
-html[data-theme=dark] .b-prod{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-prod{background:#2f4bf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-outdeliv{background:#a866db!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-prescan{background:#9749d4!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-design{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-prescan{background:#2f4bf0!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-wh-design{background:#2f4bf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-approved{background:#a866db!important;color:#fff!important;border:none!important}
 /* Mint family → shipped, finished, delivered, ok, packed */
 html[data-theme=dark] .b-packed{background:#41f1d3!important;color:#fff!important;border:none!important}
@@ -160,7 +160,7 @@ html[data-theme=dark] .b-flagged{background:#e63561!important;color:#fff!importa
 html[data-theme=dark] .b-wh-exception{background:#e63561!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-wh-backorder{background:#ec557a!important;color:#fff!important;border:none!important}
 /* Type badge classes (ds-type-*) */
-html[data-theme=dark] .ds-type-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-type-dtg{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
 html[data-theme=dark] .ds-type-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
 html[data-theme=dark] .ds-type-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
 html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!important;border-color:#4e65ce!important}
@@ -168,11 +168,11 @@ html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!impor
 html[data-theme=dark] [style*="color:#286038;background:#e4f4ea"]{color:#fff!important;background:#2eeeca!important;border-color:#1ab8a0!important}
 html[data-theme=dark] [style*="color:#7a5018;background:#f8f4e0"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important;cursor:pointer}
 html[data-theme=dark] [style*="color:#3a5a96;background:#edf2f8"]{color:#fff!important;background:#4e65ce!important;border-color:#3a52b8!important}
-html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#9749d4!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#2f4bf0!important;border-color:#2439c8!important}
 html[data-theme=dark] [style*="color:#904a18;background:#f8f0e4"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important}
 html[data-theme=dark] [style*="background:#f3f4f6;border:1px solid #e5e4e0"]{background:#2a2826!important;border-color:#3a3835!important}
 html[data-theme=dark] [style*="color:#6b7280;background:#f3f4f6"]{color:#9ca3af!important;background:#2a2826!important;border-color:#3a3835!important}
-html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
 html[data-theme=dark] [style*="background:#f8f0e4;color:#904a18"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
 html[data-theme=dark] [style*="background:#e4f4ea;color:#286038"]{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
 html[data-theme=dark] [style*="background:#edf2f8;color:#3a5a96"]{background:#4e65ce!important;color:#fff!important;border-color:#3a52b8!important}
@@ -484,7 +484,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 const PRODUCTS=[
   {id:1,img:'images/tshirt-red.jpg',name:'Gildan Ultra Cotton Tee',sku:'G2000',cat:'apparel',price:'$5.20',margin:'~$15–28',sales:312,tag:'Bestseller',tagCls:'background:#dcfce7;color:#15803d',published:true},
   {id:2,img:'images/395_fm.jpg',name:'Gildan Hoodie 18500',sku:'G18500',cat:'apparel',price:'$18.50',margin:'~$30–50',sales:198,tag:'Top seller',tagCls:'background:#fef9c3;color:#374151',published:true},
-  {id:3,img:'images/372_fm.jpg',name:'Gildan Crewneck 18000',sku:'G18000',cat:'apparel',price:'$14.00',margin:'~$22–38',sales:145,tag:'Popular',tagCls:'background:#ede9fe;color:#7c3aed',published:true},
+  {id:3,img:'images/372_fm.jpg',name:'Gildan Crewneck 18000',sku:'G18000',cat:'apparel',price:'$14.00',margin:'~$22–38',sales:145,tag:'Popular',tagCls:'background:#eef1fe;color:#2f4bf0',published:true},
   {id:4,img:'images/1610_fm.jpg',name:'Comfort Colors Crewneck 1566',sku:'CC1566',cat:'apparel',price:'$19.50',margin:'~$28–45',sales:87,tag:'Premium',tagCls:'background:#fdf4ff;color:#9333ea',published:true},
   {id:5,img:'images/1822_fm.jpg',name:'Comfort Colors Tee 1717',sku:'CC1717',cat:'apparel',price:'$14.00',margin:'~$20–35',sales:224,tag:'Trending',tagCls:'background:#fff;border:1px solid #191918;color:#191918',published:true},
   {id:6,img:'images/29_fm.jpg',name:'Next Level Tee 3600',sku:'NL3600',cat:'apparel',price:'$11.00',margin:'~$18–32',sales:176,tag:'Soft feel',tagCls:'background:#f0fdf4;color:#16a34a',published:true},

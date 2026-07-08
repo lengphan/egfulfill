@@ -41,7 +41,7 @@
   // the canonical factoryStatus values that EGStore.update accepts.
   var STATUS_OPTIONS = [
     { value:'new',           label:'New',           color:'#374151' },
-    { value:'in_review',     label:'In Review',     color:'#7c3aed' },
+    { value:'in_review',     label:'In Review',     color:'#2f4bf0' },
     { value:'awaiting_scan', label:'Awaiting Scan', color:'#c2410c' },
     { value:'printing',      label:'Printing',      color:'#1d4ed8' },
     { value:'packing',       label:'Packing',       color:'#0e7490' },

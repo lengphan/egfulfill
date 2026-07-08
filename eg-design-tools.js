@@ -203,12 +203,12 @@
   function designLab() {
     // Dithered header (eg-dither, muted grey/beige/black 'noir' palette) replaces the icon tile.
     var card = function (icon, title, desc, cta, action, seed) {
-      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e6e4df;border-radius:14px;overflow:hidden;padding:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease" onmouseover="this.style.borderColor=\'#8b5cf6\';this.style.boxShadow=\'0 8px 22px rgba(139,92,246,.15)\';this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.borderColor=\'#e6e4df\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,.05)\';this.style.transform=\'\'">'
+      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e6e4df;border-radius:14px;overflow:hidden;padding:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease" onmouseover="this.style.borderColor=\'#2f4bf0\';this.style.boxShadow=\'0 8px 22px rgba(47,75,240,.15)\';this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.borderColor=\'#e6e4df\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,.05)\';this.style.transform=\'\'">'
         + '<div class="egdl-art" data-dither="art" data-pop="noir" data-seed="' + seed + '" data-pixel="4" style="height:118px;position:relative;background:#e9e6e0"></div>'
         + '<div style="padding:18px 20px 20px">'
         +   '<div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">' + title + '</div>'
         +   '<div style="font-size:13.5px;color:#6b7280;line-height:1.55;margin-bottom:16px">' + desc + '</div>'
-        +   '<div style="font-size:12px;font-weight:700;color:#7c3aed;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em">' + cta + '</div>'
+        +   '<div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em">' + cta + '</div>'
         + '</div></button>';
     };
     var PEN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L19 9l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
@@ -701,7 +701,7 @@
   function customerFileControls(orderNum, sku, url) {
     if (!url || isCustomerFileDismissed(orderNum, sku)) return '';
     var on = jsAttr(orderNum), sk = jsAttr(sku), u = jsAttr(url);
-    var link = '<a href="' + esc(url) + '" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#7c3aed;font-weight:600;text-decoration:underline;text-decoration-color:#c4b5fd">Customer file ↗</a>';
+    var link = '<a href="' + esc(url) + '" target="_blank" onclick="event.stopPropagation()" title="Customer-uploaded file from the marketplace" style="color:#2f4bf0;font-weight:600;text-decoration:underline;text-decoration-color:#b9c7fb">Customer file ↗</a>';
     var mini = 'font-size:10.5px;font-weight:700;line-height:1;padding:2px 6px;border-radius:5px;cursor:pointer;font-family:inherit;white-space:nowrap';
     if (isCustomerFileAdopted(orderNum, sku, url)) {
       return '<span style="display:inline-flex;align-items:center;gap:6px">' + link
@@ -1183,8 +1183,8 @@
     if (!results.length) { list.innerHTML = '<div style="padding:18px;text-align:center;font-size:13px;color:#9ca3af">No templates match “' + esc(q) + '”</div>'; return; }
     list.innerHTML = results.map(function (t) {
       var tech = _tplTechOf(t);
-      var techBg = tech === 'DTG' ? '#ede9fe' : tech === 'EMB' ? '#dcfce7' : tech === 'SUB' ? '#dbeafe' : '#f0ede9';
-      var techFg = tech === 'DTG' ? '#7c3aed' : tech === 'EMB' ? '#15803d' : tech === 'SUB' ? '#1d4ed8' : '#374151';
+      var techBg = tech === 'DTG' ? '#eef1fe' : tech === 'EMB' ? '#dcfce7' : tech === 'SUB' ? '#dbeafe' : '#f0ede9';
+      var techFg = tech === 'DTG' ? '#2f4bf0' : tech === 'EMB' ? '#15803d' : tech === 'SUB' ? '#1d4ed8' : '#374151';
       var thumbSrc = t.designOnlyImg || t.compositeImg || t.productImg || '';
       var thumb = thumbSrc ? '<img src="' + esc(thumbSrc) + '" style="width:34px;height:34px;object-fit:cover;border-radius:8px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:34px;height:34px;background:#f0ede9;border-radius:8px;flex-shrink:0"></div>';
       return '<div onclick="EGDesignTools._applyTemplate(\'' + jsAttr(String(t.id)) + '\')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;cursor:pointer;border-radius:8px" onmouseover="this.style.background=\'#fafaf9\'" onmouseout="this.style.background=\'transparent\'">'
@@ -1267,7 +1267,7 @@
           + '<div style="font-size:11px;color:#9ca3af;margin-top:6px;text-align:center">Hover to magnify · click the artwork to sample a thread colour</div>')
       : '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border:1.5px dashed #c4c3be;border-radius:10px;cursor:pointer;color:#9ca3af;font-size:13px;gap:8px;text-align:center"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 16V4M7 9l5-5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Click to choose a file</label>';
     return '<div style="padding:18px">'
-      + (s.fromCustomer && hasImg ? '<div style="font-size:12px;font-weight:600;color:#7c3aed;background:#faf5ff;border:1px solid #e9d5ff;border-radius:7px;padding:7px 10px;margin-bottom:12px">Customer-uploaded file — review &amp; use, or replace it below.</div>' : '')
+      + (s.fromCustomer && hasImg ? '<div style="font-size:12px;font-weight:600;color:#2f4bf0;background:#eef1fe;border:1px solid #b9c7fb;border-radius:7px;padding:7px 10px;margin-bottom:12px">Customer-uploaded file — review &amp; use, or replace it below.</div>' : '')
       + preview
       + '<div style="display:flex;gap:8px;margin-top:12px"><label style="flex:1;text-align:center;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff"><input type="file" accept="image/*,.png,.jpg,.jpeg,.svg,.webp,.pdf,.emb,.dst" style="display:none" onchange="EGDesignTools._upFile(this.files&&this.files[0])"/>' + (hasImg ? 'Replace file' : 'Choose file') + '</label>' + (hasImg ? '<button onclick="EGDesignTools._upRemoveBg()" style="border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;background:#fff;font-family:inherit">Remove BG</button>' : '')
       + '</div><div id="egup-threads"></div></div>'

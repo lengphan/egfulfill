@@ -3492,8 +3492,8 @@
       }
       var boards   = opts.boards   || ['dtg','emb','sub','scr'];
       var labels   = opts.boardLabels || {dtg:'DTG',emb:'EMB',sub:'SUB',scr:'SCR'};
-      var bgMap    = opts.boardBg     || {dtg:'#ede9fe',emb:'#f0fdf4',sub:'#fff7ed',scr:'#edf2f8'};
-      var fgMap    = opts.boardFg     || {dtg:'#7c3aed',emb:'#15803d',sub:'#c2410c',scr:'#3a5a96'};
+      var bgMap    = opts.boardBg     || {dtg:'#eef1fe',emb:'#f0fdf4',sub:'#fff7ed',scr:'#edf2f8'};
+      var fgMap    = opts.boardFg     || {dtg:'#2f4bf0',emb:'#15803d',sub:'#c2410c',scr:'#3a5a96'};
       var onPick   = opts.onPick      || function(){};
       menu.innerHTML = '<div style="font-size:11.25px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:7px 11px 4px">Select board</div>' +
         boards.map(function(t){

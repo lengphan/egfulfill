@@ -1,7 +1,7 @@
 // eg-theme.js — universal neon-purple ACCENT + monospace-label layer for the boards.
 // One source of truth: injected as a single <style> over the shared board classes so the accent is
 // identical on every board and future tweaks are a one-file edit. Loaded via <script src> on each board.
-// Palette locked with the login: --accent #2f4bf0 / --accent-dk #2439c8 / dark-mode --accent-lt #a78bfa.
+// Palette locked with the login: --accent #2f4bf0 / --accent-dk #2439c8 / dark-mode --accent-lt #6d8cff.
 // Fonts (mono nav, Fraunces h1, mono badges) apply in BOTH themes; accent COLOURS have a light + a dark
 // variant. Base stays monotone — accent is SPARING (active nav, focus, toggles, emphasis button, links).
 (function () {
@@ -181,7 +181,7 @@
   // ── Tavus card header: inject [colored dot] before each stat card's TITLE + a separator line under that
   //    title row. Pure CSS can't target the (inline-styled, structurally varied) title, so we do it here.
   //    title = the first UPPERCASE text element in the card (the eyebrow); dot colour cycles per card. ──
-  var EG_CARD_DOTS = ['#34d399', '#f472b6', '#fbbf24', '#818cf8', '#fb7185', '#a78bfa'];
+  var EG_CARD_DOTS = ['#34d399', '#f472b6', '#fbbf24', '#818cf8', '#fb7185', '#6d8cff'];
   function egEnhanceCards() {
     var cards = document.querySelectorAll('.wcard,.stat-card');
     for (var i = 0; i < cards.length; i++) {

@@ -70,7 +70,7 @@ html[data-theme=dark] .wcard{background:#252220!important;border-color:#302e2c!i
 .b-incoming,.b-inprog,.b-review,.b-approved,.b-paid{background:#e5e4e0;color:#191918}
 .pay-pending{background:#fffbeb;color:#92400e;border:1px solid #fcd34d}
 .pay-approved{background:#e4f4ea;color:#286038;border:1px solid #86efac}
-.pay-released{background:#eeecf8;color:#5f52b0;border:1px solid #c4b5fd}
+.pay-released{background:#eeecf8;color:#5f52b0;border:1px solid #b9c7fb}
 .pri-high{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
 #db-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 18px;border-radius:8px;font-size:14px;font-weight:600;z-index:999;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap}
 /* DARK MODE */
@@ -121,20 +121,20 @@ html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0
 html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
 html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
 html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
-html[data-theme=dark] [style*="background:#ede9fe"]{background:rgba(151,73,212,0.2)!important;color:#c084fc!important;border:none!important}
+html[data-theme=dark] [style*="background:#eef1fe"]{background:rgba(47,75,240,0.2)!important;color:#6d8cff!important;border:none!important}
 html[data-theme=dark] [style*="background:linear-gradient(135deg,#0f172a"]{background:linear-gradient(135deg,#0a0e18,#141c2e)!important}
 html[data-theme=dark] .b-incoming{background:#4e65ce!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-inprog{background:#2dcaf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-review{background:#9749d4!important;color:#fff!important;border:none!important}
+html[data-theme=dark] .b-review{background:#2f4bf0!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-approved{background:#2eeeca!important;color:#fff!important;border:none!important}
 html[data-theme=dark] .b-paid{background:#6a99d6!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .ds-dtg{background:#9749d4!important;color:#fff!important;border-color:#7e30b8!important}
+html[data-theme=dark] .ds-dtg{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
 html[data-theme=dark] .ds-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
 html[data-theme=dark] .ds-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
 html[data-theme=dark] .ds-scr{background:#2dcaf0!important;color:#fff!important;border-color:#18a8cc!important}
 html[data-theme=dark] .pay-pending{background:rgba(212,160,23,0.15)!important;color:#fbbf24!important;border-color:rgba(212,160,23,0.3)!important}
 html[data-theme=dark] .pay-approved{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
-html[data-theme=dark] .pay-released{background:rgba(151,73,212,0.15)!important;color:#c084fc!important;border-color:rgba(151,73,212,0.3)!important}
+html[data-theme=dark] .pay-released{background:rgba(47,75,240,0.15)!important;color:#6d8cff!important;border-color:rgba(47,75,240,0.3)!important}
 html[data-theme=dark] .pri-high{background:rgba(230,53,97,0.15)!important;color:#e63561!important;border-color:rgba(230,53,97,0.3)!important}
 html[data-theme=dark] #db-toast{background:#252220!important;border:1px solid #302e2c!important}
 html[data-theme=dark] #pref-panel{background:#252220!important;border-color:#302e2c!important;box-shadow:0 8px 28px rgba(0,0,0,.5)!important}
@@ -654,7 +654,7 @@ function dsnSettingsTab(id, el){
             <button onclick="dbApprovePayment()" style="width:100%;padding:7px;border-radius:8px;background:#ecfdf5;color:#15803d;border:1px solid #bbf7d0;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✓ Approve & Add to Balance</button>
           </div>
           <div id="admin-release" style="display:none">
-            <button onclick="dbReleasePayment()" style="width:100%;padding:7px;border-radius:8px;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">↑ Release via PayPal</button>
+            <button onclick="dbReleasePayment()" style="width:100%;padding:7px;border-radius:8px;background:#eef1fe;color:#2f4bf0;border:1px solid #b9c7fb;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">↑ Release via PayPal</button>
           </div>
           <div id="modal-pay-hist" style="margin-top:9px"></div>
         </div>
@@ -900,7 +900,7 @@ function showSec(id) {
 function renderWalletSparks() {
   dsnSpark('sp-wal-available', [240,260,280,300,310,320,340],         '#0d9488');
   dsnSpark('sp-wal-pending',   [80,90,100,110,115,120,125],            '#191918');
-  dsnSpark('sp-wal-earned',    [800,900,1000,1100,1180,1220,1248],     '#9749d4');
+  dsnSpark('sp-wal-earned',    [800,900,1000,1100,1180,1220,1248],     '#2f4bf0');
 }
 
 // Lightweight inline-SVG sparkline (no Chart.js dependency) — mirrors the admin KPI card look.
@@ -952,7 +952,7 @@ function renderOverview() {
   document.getElementById('ov-earned').textContent = '$' + earned;
   // KPI sparklines — 7-point weekly trend, accent-colored per card
   dsnSpark('sp-dsn-active',   [1,2,1,3,2,2,2],               '#111827');
-  dsnSpark('sp-dsn-review',   [0,1,1,0,1,2,1],               '#9749d4');
+  dsnSpark('sp-dsn-review',   [0,1,1,0,1,2,1],               '#2f4bf0');
   dsnSpark('sp-dsn-approved', [2,3,3,4,4,5,6],               '#0d9488');
   dsnSpark('sp-dsn-earned',   [120,180,160,240,300,330,364], '#191918');
   const el = document.getElementById('ov-cards');
@@ -1139,7 +1139,7 @@ function cardHTML(c) {
           ${c.notes.length?`<span style="font-size:11.5px;color:#6b7280">💬 ${c.notes.length}</span>`:''}
         </div>
         <div style="display:flex;align-items:center;gap:4px">
-          ${c.payment>0?`<span style="font-size:12px;font-weight:700;color:${c.payStatus==='released'?'#15803d':c.payStatus==='approved'?'#7c3aed':'#374151'}">$${c.payment}</span>`:''}
+          ${c.payment>0?`<span style="font-size:12px;font-weight:700;color:${c.payStatus==='released'?'#15803d':c.payStatus==='approved'?'#2f4bf0':'#374151'}">$${c.payment}</span>`:''}
           ${c.assignee?`<div style="width:20px;height:20px;border-radius:50%;background:#191918;color:#e8e4dd;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">${c.assignee[0]}</div>`:`<div style="width:20px;height:20px;border-radius:50%;border:1.5px dashed #d1d5db;display:flex;align-items:center;justify-content:center"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><circle cx="4.5" cy="3" r="1.6" stroke="#9ca3af" stroke-width="1"/><path d="M1 8.5c0-1.9 1.6-3 3.5-3s3.5 1.1 3.5 3" stroke="#9ca3af" stroke-width="1" stroke-linecap="round"/></svg></div>`}
         </div>
       </div>
@@ -1241,10 +1241,10 @@ function renderAction(c) {
   const el = document.getElementById('modal-action-area');
   if (DB_ROLE==='designer') {
     if (c.col==='incoming'&&!c.assignee) el.innerHTML = `<button onclick="dbClaim()" class="btn btn-dk" style="width:100%;justify-content:center">Claim Card →</button>`;
-    else if (c.col==='inprogress') el.innerHTML = `<button onclick="dbSubmit()" class="btn" style="width:100%;justify-content:center;background:#9749d4;color:#fff">Submit for Review →</button>`;
+    else if (c.col==='inprogress') el.innerHTML = `<button onclick="dbSubmit()" class="btn" style="width:100%;justify-content:center;background:#2f4bf0;color:#fff">Submit for Review →</button>`;
     else if (c.col==='review') el.innerHTML = `<div style="font-size:13px;color:#9ca3af;text-align:center;padding:8px;background:#f9f8f7;border-radius:8px">Awaiting admin review…</div>`;
     else if (c.col==='approved') el.innerHTML = `<div style="font-size:13px;color:#15803d;text-align:center;padding:8px;background:#f0fdf4;border-radius:8px;font-weight:600">✓ $${c.payment} added to balance</div>`;
-    else if (c.col==='paid') el.innerHTML = `<div style="font-size:13px;color:#7c3aed;text-align:center;padding:8px;background:#f5f3ff;border-radius:8px;font-weight:600">💸 Payment released</div>`;
+    else if (c.col==='paid') el.innerHTML = `<div style="font-size:13px;color:#2f4bf0;text-align:center;padding:8px;background:#f5f3ff;border-radius:8px;font-weight:600">💸 Payment released</div>`;
     else el.innerHTML = '';
   } else {
     if (c.col==='review') el.innerHTML = `<button onclick="dbMoveBack()" class="btn btn-out" style="width:100%;justify-content:center;font-size:13px">← Request Changes</button>`;

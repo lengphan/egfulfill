@@ -1,16 +1,16 @@
 /* eg-dither.js — brand dithering engine (dependency-free, offline, no external image service).
  *
  * Ordered (Bayer 8×8) dithering that maps a light-field OR a real image through the EGFULFILL palette
- * (ink → violet-dk → violet → POP → paper), giving the modern-retro digital look with a swappable pop.
+ * (ink → accent-dk → accent → POP → paper), giving the modern-retro digital look with a swappable pop.
  *
  * USE — declarative (auto-initialised on DOMContentLoaded, re-rendered on resize):
  *   <div data-dither="art"   data-pop="#ff5c39"></div>                 // procedural art
- *   <div data-dither="image" data-src="hero.jpg" data-pop="#9f52e0"></div>  // dither a photo
+ *   <div data-dither="image" data-src="hero.jpg" data-pop="#2f4bf0"></div>  // dither a photo
  *   optional: data-pixel="4" (cell size) · data-seed="7" · data-fit="cover|contain"
  *
  * USE — programmatic:
  *   EGDither.art(canvasOrEl, { pop:'#12b886', pixel:4, seed:7 });
- *   EGDither.image(canvasOrEl, 'photo.jpg', { pop:'#9f52e0', pixel:3, fit:'cover', contrast:1.1 });
+ *   EGDither.image(canvasOrEl, 'photo.jpg', { pop:'#2f4bf0', pixel:3, fit:'cover', contrast:1.1 });
  *   EGDither.mount(el, { mode:'art', pop:'#ff5c39' });   // makes+sizes a canvas, re-renders on resize
  *   EGDither.paletteFor('#ff5c39');                       // → [[r,g,b]×5] dark→light
  */
@@ -26,9 +26,9 @@
   ].map(function (r) { return r.map(function (v) { return (v + 0.5) / 64; }); });
 
   // Brand ramp (dark → light). The middle slot is the swappable "pop"; the rest is locked to the theme.
-  var INK = [25, 25, 24], VIO_DK = [138, 61, 208], VIO = [159, 82, 224], PAPER = [240, 237, 230];
+  var INK = [25, 25, 24], VIO_DK = [36, 57, 200], VIO = [47, 75, 240], PAPER = [240, 237, 230];
 
-  var POPS = { violet: '#9f52e0', coral: '#ff5c39', teal: '#12b886', amber: '#ffd43b', blue: '#4c6ef5', pink: '#f06595' };
+  var POPS = { violet: '#2f4bf0', coral: '#ff5c39', teal: '#12b886', amber: '#ffd43b', blue: '#4c6ef5', pink: '#f06595' };
 
   // Named FULL palettes (dark→light). The muted grey/beige/black ramps read like the Tavus starter-kit
   // photos — desaturated, no colour dominance. Use these for card imagery; use `pop` names for accent art.
