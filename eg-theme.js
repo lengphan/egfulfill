@@ -8,7 +8,7 @@
   if (document.getElementById('eg-theme-accent')) return;
   var MONO = "ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace";
   var css = [
-    ':root{--eg-accent:#2f4bf0;--eg-accent-dk:#2439c8;--eg-accent-lt:#a78bfa;--eg-accent-tint:#f3efff;--eg-sep:#e8e6e1}',
+    ':root{--eg-accent:#2f4bf0;--eg-accent-dk:#2439c8;--eg-accent-lt:#6d8cff;--eg-accent-tint:#e7ecfe;--eg-sep:#e8e6e1}',
     'html[data-theme=dark]{--eg-sep:rgba(201,195,186,.22)}',
 
     /* ── SHARP CORNERS everywhere (retro/pixelated sticky-note vibe) ─── */
