@@ -20,6 +20,10 @@ const SS_BASE    = (process.env.SS_API_BASE || 'https://api.ssactivewear.com/v2'
 // Field list we ask S&S for — keeps payloads small (product feed is huge).
 const PRODUCT_FIELDS = 'sku,gtin,styleID,brandName,styleName,colorName,colorCode,sizeName,piecePrice,dozenPrice,casePrice,salePrice,customerPrice,mapPrice,qty,warehouses,colorFrontImage,colorSwatchImage,baseCategory';
 
+// S&S returns RELATIVE image paths (e.g. "Images/Color/19561_f_fm.jpg") → prefix their CDN.
+const SS_CDN = 'https://cdn.ssactivewear.com/';
+function ssImg(u) { if (!u) return null; return /^https?:/i.test(u) ? u : SS_CDN + String(u).replace(/^\//, ''); }
+
 function num(v) { const n = Number(v); return isFinite(n) ? n : null; }
 function int(v) { const n = parseInt(v, 10); return isFinite(n) ? n : 0; }
 function creds() { return !!(SS_ACCOUNT && SS_KEY); }
@@ -33,13 +37,15 @@ async function ssGet(path) {
   return { ok: r.ok, status: r.status, data };
 }
 
-// Map one S&S product row → our ss_products columns.
-function mapProduct(p) {
+// Map one S&S product row → our ss_products columns. `meta` = the style's metadata
+// (brand + descriptive title + category), since the PRODUCT feed omits brand and only
+// carries the style NUMBER in styleName — so New In can show "Gildan Ultra Cotton…".
+function mapProduct(p, meta) {
   return {
     sku: String(p.sku || p.skuID || p.gtin || ''),
-    style_id: p.styleID != null ? String(p.styleID) : null,
-    brand: p.brandName || null,
-    style_name: p.styleName || null,
+    style_id: p.styleID != null ? String(p.styleID) : (meta && meta.styleID != null ? String(meta.styleID) : null),
+    brand: (meta && meta.brand) || p.brandName || null,
+    style_name: (meta && meta.title) || p.styleName || null,
     color: p.colorName || null,
     color_code: p.colorCode || null,
     size: p.sizeName || null,
@@ -48,8 +54,8 @@ function mapProduct(p) {
     map_price: num(p.mapPrice),
     qty: int(p.qty),
     warehouses: JSON.stringify(Array.isArray(p.warehouses) ? p.warehouses : []),
-    image: p.colorFrontImage || p.colorSwatchImage || null,
-    category: p.baseCategory || null,
+    image: ssImg(p.colorFrontImage || p.colorSwatchImage),   // relative path → CDN-prefixed
+    category: (meta && meta.category) || p.baseCategory || null,
     data: p,
   };
 }
@@ -106,6 +112,18 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       reply.code(400);
       return { error: 'Specify styleIds[] or brands[] to sync — the full S&S catalog is too large to pull at once.' };
     }
+    // Style metadata (brand, descriptive title, category) — the product feed omits these,
+    // so fetch the (far smaller) style list once and index it by styleID.
+    let styleMap = {};
+    try {
+      const sr = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory');
+      if (sr.ok && Array.isArray(sr.data)) sr.data.forEach((s) => {
+        const brand = s.brandName || '';
+        const title = ((brand ? brand + ' ' : '') + (s.title || '')).trim();
+        styleMap[String(s.styleID)] = { styleID: s.styleID, brand: brand || null, title: title || null, category: s.baseCategory || null };
+      });
+    } catch (e) {}
+
     let products = [];
     try {
       if (styleIds.length) {
@@ -114,17 +132,21 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
           if (r.ok && Array.isArray(r.data)) products = products.concat(r.data);
         }
       } else {
-        // brand path: pull the feed once, filter by brand client-side (still bounded to the chosen brands).
+        // brand path: pull the feed once, filter by the STYLE's brand (product rows omit brandName).
         const r = await ssGet('/products/?fields=' + PRODUCT_FIELDS);
         if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S products fetch failed', status: r.status, body: r.data }; }
         const set = new Set(brands.map((b) => b.toLowerCase()));
-        products = (Array.isArray(r.data) ? r.data : []).filter((p) => set.has(String(p.brandName || '').toLowerCase()));
+        products = (Array.isArray(r.data) ? r.data : []).filter((p) => {
+          const m = styleMap[String(p.styleID)];
+          const brand = (m && m.brand) || p.brandName || '';
+          return set.has(String(brand).toLowerCase());
+        });
       }
     } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
 
     let n = 0;
     for (const raw of products) {
-      const p = mapProduct(raw);
+      const p = mapProduct(raw, styleMap[String(raw.styleID)]);
       if (!p.sku) continue;
       try {
         await q(
