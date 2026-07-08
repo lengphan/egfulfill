@@ -398,8 +398,13 @@
     try {
       if (it && it.img && /^(https?:|data:)/.test(String(it.img))) return it.img;
       if (it && it.sellerImg && /^(https?:|data:)/.test(String(it.sellerImg))) return it.sellerImg;
+      if (it && it.listingImg && /^(https?:|data:)/.test(String(it.listingImg))) return it.listingImg;
       if (it && window.EGStore && EGStore.imageForSku) { var s = EGStore.imageForSku(it.sku, it.name); if (s) return s; }
       if (it && it.thumb && /^(https?:|data:)/.test(String(it.thumb))) return it.thumb;
+      // Item carries no own image (common on the factory boards, whose item objects don't get the
+      // seller's uploaded listing photo) → fall back to the ORDER's listing image so the row still
+      // shows a picture on first render instead of a blank square.
+      if (o) { var ol = orderListingImg(o); if (ol) return ol; }
     } catch (e) {}
     return '';
   }
@@ -2409,7 +2414,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-07-vdd-nochevron-fulllabels';
+  window.EG_BUILD = '2026-07-08-itemimg-firstrender';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
@@ -2452,11 +2457,15 @@
       var listing = itemListingURL(o, it);
       if (!listing) return { html: comp, hasArt: !!(design || extra.length) };   // no listing → plain composite
       var listCard = '<img src="' + listing + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=\'none\'"/>';
-      // One image at a time (composite default) + corner swap arrow. No onclick on the
-      // wrapper, so the board's own avatar click (zoom / mini designer) still fires.
-      var html = '<div class="egdt-swap" data-front="a" style="position:relative;width:100%;height:100%">'
-        + '<div data-layer="a" style="position:absolute;inset:0">' + comp + '</div>'
-        + '<div data-layer="b" style="position:absolute;inset:0;display:none">' + listCard + '</div>'
+      // Which layer shows first: the production composite by default — BUT when no blank is
+      // picked and there's no design yet (the composite is an empty "—"), default to the
+      // LISTING so the row shows a picture on first render instead of a blank square. The swap
+      // arrow still toggles between the two, so the swap behaviour itself is unchanged.
+      var compEmpty = !blank && !showDesign;
+      var front = compEmpty ? 'b' : 'a';
+      var html = '<div class="egdt-swap" data-front="' + front + '" style="position:relative;width:100%;height:100%">'
+        + '<div data-layer="a" style="position:absolute;inset:0;display:' + (front === 'a' ? 'block' : 'none') + '">' + comp + '</div>'
+        + '<div data-layer="b" style="position:absolute;inset:0;display:' + (front === 'b' ? 'block' : 'none') + '">' + listCard + '</div>'
         + _SWAP_ARROW
         + '</div>';
       return { html: html, hasArt: !!(design || extra.length) };
