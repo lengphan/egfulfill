@@ -28,6 +28,19 @@ function num(v) { const n = Number(v); return isFinite(n) ? n : null; }
 function int(v) { const n = parseInt(v, 10); return isFinite(n) ? n : 0; }
 function creds() { return !!(SS_ACCOUNT && SS_KEY); }
 
+// S&S distribution centers (fixed) — approx lat/long for "closest warehouse" ranking.
+// Verified against the /warehouses response on first use; extend if S&S adds a DC.
+const SS_WH_COORDS = {
+  NJ: [40.21, -74.62], KS: [38.88, -94.82], TX: [32.73, -96.61], NV: [39.51, -119.79],
+  GA: [33.45, -84.15], IL: [41.44, -87.69], FL: [28.55, -81.78], OH: [39.96, -82.79],
+};
+function haversineMi(lat1, lon1, lat2, lon2) {
+  const R = 3959, toR = (d) => d * Math.PI / 180;
+  const dLat = toR(lat2 - lat1), dLon = toR(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // One authenticated GET to S&S. Returns { ok, status, data } (data parsed JSON or raw text).
 async function ssGet(path) {
   const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
@@ -124,47 +137,43 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       });
     } catch (e) {}
 
-    let products = [];
-    try {
-      if (styleIds.length) {
-        for (const sid of styleIds.slice(0, 100)) {
-          const r = await ssGet('/products/?style=' + encodeURIComponent(sid) + '&fields=' + PRODUCT_FIELDS);
-          if (r.ok && Array.isArray(r.data)) products = products.concat(r.data);
-        }
-      } else {
-        // brand path: pull the feed once, filter by the STYLE's brand (product rows omit brandName).
-        const r = await ssGet('/products/?fields=' + PRODUCT_FIELDS);
-        if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S products fetch failed', status: r.status, body: r.data }; }
-        const set = new Set(brands.map((b) => b.toLowerCase()));
-        products = (Array.isArray(r.data) ? r.data : []).filter((p) => {
-          const m = styleMap[String(p.styleID)];
-          const brand = (m && m.brand) || p.brandName || '';
-          return set.has(String(brand).toLowerCase());
-        });
-      }
-    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
-
-    let n = 0;
-    for (const raw of products) {
-      const p = mapProduct(raw, styleMap[String(raw.styleID)]);
-      if (!p.sku) continue;
-      try {
-        await q(
-          `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, data, synced_at)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
-           on conflict (sku) do update set
-             style_id=excluded.style_id, brand=excluded.brand, style_name=excluded.style_name,
-             color=excluded.color, color_code=excluded.color_code, size=excluded.size,
-             price=excluded.price, map_price=excluded.map_price, qty=excluded.qty,
-             warehouses=excluded.warehouses, image=excluded.image, category=excluded.category,
-             data=excluded.data, synced_at=now()`,
-          [p.sku, p.style_id, p.brand, p.style_name, p.color, p.color_code, p.size,
-           p.price, p.map_price, p.qty, p.warehouses, p.image, p.category, p.data]
-        );
-        n++;
-      } catch (e) {}
+    // Resolve which styles to sync WITHOUT ever pulling the full product feed (that OOMs a 1GB VPS):
+    // the brand path picks styleIds from the small styles list, then we fetch products PER STYLE.
+    let toSync = styleIds.slice();
+    if (!toSync.length && brands.length) {
+      const set = new Set(brands.map((b) => b.toLowerCase()));
+      toSync = Object.values(styleMap).filter((m) => set.has(String(m.brand || '').toLowerCase())).map((m) => String(m.styleID));
     }
-    return { ok: true, synced: n, fetched: products.length };
+    toSync = toSync.slice(0, 300);   // hard cap so a big brand can't run away on memory/time
+
+    let n = 0, fetched = 0;
+    for (const sid of toSync) {
+      let prods = [];
+      try { const r = await ssGet('/products/?style=' + encodeURIComponent(sid) + '&fields=' + PRODUCT_FIELDS); if (r.ok && Array.isArray(r.data)) prods = r.data; } catch (e) {}
+      fetched += prods.length;
+      const meta = styleMap[String(sid)];
+      for (const raw of prods) {
+        const p = mapProduct(raw, styleMap[String(raw.styleID)] || meta);
+        if (!p.sku) continue;
+        try {
+          await q(
+            `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, data, synced_at)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+             on conflict (sku) do update set
+               style_id=excluded.style_id, brand=excluded.brand, style_name=excluded.style_name,
+               color=excluded.color, color_code=excluded.color_code, size=excluded.size,
+               price=excluded.price, map_price=excluded.map_price, qty=excluded.qty,
+               warehouses=excluded.warehouses, image=excluded.image, category=excluded.category,
+               data=excluded.data, synced_at=now()`,
+            [p.sku, p.style_id, p.brand, p.style_name, p.color, p.color_code, p.size,
+             p.price, p.map_price, p.qty, p.warehouses, p.image, p.category, p.data]
+          );
+          n++;
+        } catch (e) {}
+      }
+      prods = null;   // let each style's payload GC before the next
+    }
+    return { ok: true, synced: n, fetched, styles: toSync.length };
   });
 
   // ── List synced S&S products (the "New In" tab feed) — search/filter/paged ───
@@ -195,6 +204,26 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S live lookup failed', status: r.status }; }
       const p = Array.isArray(r.data) ? r.data[0] : r.data;
       return { sku: req.params.sku, qty: int(p?.qty), warehouses: p?.warehouses || [], price: num(p?.customerPrice), map_price: num(p?.mapPrice) };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  // ── S&S distribution centers, optionally ranked CLOSEST-FIRST to ?near=lat,lng ─
+  // (your warehouse). The PO flow defaults the pickup DC to the nearest one WITH stock
+  // while still listing every DC to choose from.
+  app.get('/api/ss/warehouses', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
+    try {
+      const r = await ssGet('/warehouses/');
+      let list = (r.ok && Array.isArray(r.data)) ? r.data : [];
+      const near = String(req.query?.near || '').split(',').map(Number);
+      if (near.length === 2 && isFinite(near[0]) && isFinite(near[1])) {
+        list = list.map((w) => {
+          const abbr = String(w.warehouseAbbr || w.abbr || w.warehouseCode || w.code || '').toUpperCase().slice(0, 2);
+          const c = SS_WH_COORDS[abbr];
+          return { ...w, _abbr: abbr, distance_mi: c ? Math.round(haversineMi(near[0], near[1], c[0], c[1])) : null };
+        }).sort((a, b) => (a.distance_mi ?? 1e9) - (b.distance_mi ?? 1e9));
+      }
+      return list;
     } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
   });
 }
