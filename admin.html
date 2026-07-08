@@ -2038,41 +2038,50 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 
   <!-- ===== SELLERS ===== -->
+  <style>
+    /* Dark-mode: the structural ink dividers I set inline (1.5px #191918) would
+       vanish on the dark card ground — remap them to the eg-board dark line tone
+       so the list header, tab strip and tx-table top rule stay legible. Light
+       mode keeps the sharp ink rule. Scoped to the sellers detail only. */
+    html.eg-board-on[data-theme=dark] #section-sellers .sd-listhead,
+    html.eg-board-on[data-theme=dark] #section-sellers .sd-tabstrip{border-bottom-color:#5a5660!important}
+    html.eg-board-on[data-theme=dark] #section-sellers .sd-txtable{border-top-color:#5a5660!important}
+  </style>
   <div id="section-sellers" class="section fi">
 
-    <div style="display:grid;grid-template-columns:240px 1fr;gap:28px">
-      <!-- Left: flat sidebar — section header, list of rows, tiny stats block.
-           No nested cards, no card chrome. Just labels + content + a single
-           subtle divider where it matters. -->
-      <div>
-        <div style="margin-bottom:10px">
-          <div id="seller-count" style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em">Sellers · 3</div>
+    <div style="display:grid;grid-template-columns:248px minmax(0,1fr);gap:22px;max-width:1180px;align-items:start">
+      <!-- Left: sellers list as ONE bordered Board-OS unit — mono eyebrow
+           header on an ink rule, then the rows. Sharp, ink-framed, hard
+           offset shadow so it reads as a tidy panel next to the detail. -->
+      <div class="card" style="box-shadow:4px 4px 0 var(--bos-ink,#191918)!important;border-radius:0!important;overflow:hidden;position:sticky;top:14px">
+        <div class="sd-listhead" style="padding:12px 14px;border-bottom:1.5px solid #191918">
+          <div id="seller-count" style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.08em">Sellers · 3</div>
         </div>
-        <div id="seller-list" style="display:flex;flex-direction:column">
-          <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid #191918;background:transparent" onclick="selectSeller('seller-a',this)">
+        <div id="seller-list" style="display:flex;flex-direction:column;padding:6px">
+          <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid #191918;background:transparent" onclick="selectSeller('seller-a',this)">
             <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#eef1fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#2f4bf0;flex-shrink:0">SA</div>
+              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">SA</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller A Store <span style="width:6px;height:6px;border-radius:50%;background:#191918" title="Active"></span></div>
-                <div style="font-size:11.5px;color:#9ca3af">3 users · 2m ago</div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller A Store <span style="width:6px;height:6px;border-radius:0;background:var(--bos-mint,#12b886)" title="Active"></span></div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">3 users · 2m ago</div>
               </div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-seller-b" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('seller-b',this)">
+          <div class="seller-card-item" id="sc-seller-b" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('seller-b',this)">
             <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#dbeafe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#1d4ed8;flex-shrink:0">SB</div>
+              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">SB</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller B Store <span style="width:6px;height:6px;border-radius:50%;background:#c9c3ba" title="Suspended"></span></div>
-                <div style="font-size:11.5px;color:#9ca3af">1 user · 6d ago</div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller B Store <span style="width:6px;height:6px;border-radius:0;background:#c9c3ba" title="Suspended"></span></div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">1 user · 6d ago</div>
               </div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-my-store" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('my-store',this)">
+          <div class="seller-card-item" id="sc-my-store" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('my-store',this)">
             <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#f0fdf4;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#16a34a;flex-shrink:0">MS</div>
+              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">MS</div>
               <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">My Store <span style="width:6px;height:6px;border-radius:50%;background:#191918" title="Active"></span></div>
-                <div style="font-size:11.5px;color:#9ca3af">1 user · 12h ago</div>
+                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">My Store <span style="width:6px;height:6px;border-radius:0;background:var(--bos-mint,#12b886)" title="Active"></span></div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">1 user · 12h ago</div>
               </div>
             </div>
           </div>
@@ -2083,32 +2092,32 @@ document.addEventListener('DOMContentLoaded', function(){
            card; the dark #191918 header sits flush against the tabs strip
            so the whole header reads as one unit. -->
       <div>
-        <div class="card" style="overflow:hidden;background:#fdfcfa;margin-bottom:18px">
+        <div class="card" style="overflow:hidden;margin-bottom:18px;box-shadow:4px 4px 0 var(--bos-ink,#191918)!important;border-radius:0!important">
           <!-- Dark identity band -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
             <div style="display:flex;align-items:center;gap:13px;min-width:0">
-              <div id="seller-detail-avatar" style="width:46px;height:46px;background:#eef1fe;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#2f4bf0;flex-shrink:0">SA</div>
+              <div id="seller-detail-avatar" style="width:46px;height:46px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
               <div style="min-width:0">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <div id="seller-detail-name" style="font-size:18px;font-weight:700;color:#fdfcfa">Seller A Store</div>
-                  <span id="seller-detail-status" style="font-size:11px;font-weight:700;color:#191918;background:#f3eee2;padding:2px 7px;border-radius:4px;letter-spacing:.03em;text-transform:uppercase">Active</span>
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                  <div id="seller-detail-name" style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;color:#fdfcfa;letter-spacing:0">Seller A Store</div>
+                  <span id="seller-detail-status" class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#f3eee2;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
                 </div>
-                <div id="seller-detail-email" style="font-size:12.5px;color:#a8a39c;margin-top:2px">sellera@store.com · Joined Jan 2025</div>
+                <div id="seller-detail-email" style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;color:#a8a39c;margin-top:3px;letter-spacing:.02em">sellera@store.com · Joined Jan 2025</div>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-              <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#fdfcfa;color:#191918;border:none;font-size:13px;font-weight:600;padding:6px 16px;border-radius:6px;cursor:pointer;font-family:inherit;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
+              <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#fdfcfa;color:#191918;border:1.5px solid #fdfcfa;font-size:11px;font-weight:400;padding:6px 15px;border-radius:0;cursor:pointer;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
             </div>
           </div>
           <!-- Tabs row, attached directly under the dark band. Three zones:
                (1) tabs on the left, (2) Adjust button immediately after tabs,
                (3) Export CSV / Invite Member on the far right. Which action
                buttons show depends on the active tab — see setSellerTab. -->
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-top:1px solid #40403d;border-bottom:1px solid #40403d;background:#fdfcfa">
+          <div class="sd-tabstrip" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-bottom:1.5px solid #191918">
             <div style="display:flex;gap:0">
-              <button id="stab-balance" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
-              <button id="stab-team" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('team',this)">Team & Permissions</button>
-              <button id="stab-api" style="padding:11px 16px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s" onclick="setSellerTab('api',this)">API & Sync</button>
+              <button id="stab-balance" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid #111827;margin-bottom:-1.5px;background:none;cursor:pointer;color:#191918;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
+              <button id="stab-team" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('team',this)">Team &amp; Permissions</button>
+              <button id="stab-api" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('api',this)">API &amp; Sync</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
               <button id="seller-action-export" style="display:none;background:none;border:none;font-size:12.5px;font-weight:600;color:#6b7280;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.background='#f6f5f4';this.style.color='#191918'" onmouseout="this.style.background='transparent';this.style.color='#6b7280'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Export CSV</button>
@@ -2120,33 +2129,31 @@ document.addEventListener('DOMContentLoaded', function(){
         <!-- Balance tab — flows directly inside the unified seller card, no
              nested chrome. Internal dividers do the visual separation. -->
         <div id="seller-tab-balance">
-          <div style="background:#fafaf9">
-            <!-- Top: metric strip (3 inline stats with vertical dividers).
-                 Values wired to live EGStore.getOrders() via
-                 updateSellerBalanceStats() — refreshed on selectSeller AND on
-                 the eg-orders-changed CustomEvent. -->
-            <div style="display:flex;align-items:center;padding:18px 4px;border-bottom:1px solid #e5e4e0">
-              <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total paid</div>
-                <div id="seller-stat-paid" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$0</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
+          <div>
+            <!-- Top: three Board-OS stat cards (mono eyebrow title-bar +
+                 Fraunces number). Values wired to live EGStore.getOrders()
+                 via updateSellerBalanceStats() — refreshed on selectSeller
+                 AND on the eg-orders-changed CustomEvent. -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:20px 20px 22px">
+              <div class="stat-card" style="padding:15px 16px 16px">
+                <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total paid</div>
+                <div id="seller-stat-paid" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">$0</div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
-              <div style="width:1px;align-self:stretch;background:#e5e4e0"></div>
-              <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total refunded</div>
-                <div id="seller-stat-refunded" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">$0</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
+              <div class="stat-card" style="padding:15px 16px 16px">
+                <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total refunded</div>
+                <div id="seller-stat-refunded" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">$0</div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
-              <div style="width:1px;align-self:stretch;background:#e5e4e0"></div>
-              <div style="flex:1;padding:0 20px">
-                <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total orders</div>
-                <div id="seller-stat-orders" style="font-size:24px;font-weight:800;color:#191918;line-height:1.1">0</div>
-                <div style="font-size:11.5px;color:#9ca3af;margin-top:3px">All time</div>
+              <div class="stat-card" style="padding:15px 16px 16px">
+                <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total orders</div>
+                <div id="seller-stat-orders" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">0</div>
+                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
             </div>
-            <!-- Transactions table — flows directly under the header strip -->
-            <table class="dtable" style="border:none;margin:0;background:#fff">
-              <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px 8px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px">Order</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;text-align:right">Amount</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:8px 18px 8px 12px">Status</th></tr></thead>
+            <!-- Transactions table — sharp .dtable, framed by a top ink rule -->
+            <table class="dtable sd-txtable" style="border:none;margin:0;background:transparent;border-top:1.5px solid #191918">
+              <thead><tr><th style="padding:10px 12px 10px 20px">Date</th><th style="padding:10px 12px">Order</th><th style="padding:10px 12px">Description</th><th style="padding:10px 12px;text-align:right">Amount</th><th style="padding:10px 20px 10px 12px">Status</th></tr></thead>
               <tbody id="seller-tx-tbody">
                 <tr><td colspan="5" style="padding:26px 18px;text-align:center;color:#9ca3af;font-size:13px">Select a seller to see their transactions.</td></tr>
               </tbody>
@@ -2163,7 +2170,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <thead><tr><th>User</th><th>Role</th><th>Permissions</th><th>Last Active</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#eef1fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#191918">SA</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Seller A (Owner)</div><div style="font-size:12px;color:#9ca3af">sellera@store.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#e9eefe;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:var(--bos-violet,#2f4bf0)">SA</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Seller A (Owner)</div><div style="font-size:12px;color:#9ca3af">sellera@store.com</div></div></div></td>
                   <td><span class="badge b-new" style="font-size:11.5px">Owner</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px" disabled><option>Full Access</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">2m ago</td>
@@ -2171,7 +2178,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <td>—</td>
                 </tr>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f6f5f4;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#374151">MK</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Mike K.</div><div style="font-size:12px;color:#9ca3af">mike@sellera.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#374151">MK</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Mike K.</div><div style="font-size:12px;color:#9ca3af">mike@sellera.com</div></div></div></td>
                   <td><span class="badge b-queue" style="font-size:11.5px">Manager</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px"><option>Orders + Tracking</option><option>Full Access</option><option>View Only</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">1h ago</td>
@@ -2179,7 +2186,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <td><button class="btn-ghost" style="font-size:13px">Remove</button></td>
                 </tr>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f6f5f4;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#374151">JL</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Jess L.</div><div style="font-size:12px;color:#9ca3af">jess@sellera.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#374151">JL</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Jess L.</div><div style="font-size:12px;color:#9ca3af">jess@sellera.com</div></div></div></td>
                   <td><span class="badge b-prod" style="font-size:11.5px">Support</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px"><option>View Only</option><option>Orders + Tracking</option><option>Full Access</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">3h ago</td>
@@ -2210,7 +2217,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <div style="background:#fff">
               <!-- Shopify (connected) -->
               <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #f3f3f1">
-                <div style="width:32px;height:32px;border-radius:7px;background:#f0f9ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <div style="width:32px;height:32px;border-radius:0;border:1.5px solid var(--bos-ink,#191918);background:#f0f9ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#0d7c66" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#0d7c66" stroke-width="1.4" stroke-linecap="round"/></svg>
                 </div>
                 <div style="flex:1;min-width:0">
@@ -2222,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
               <!-- Etsy (not connected) -->
               <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #f3f3f1">
-                <div style="width:32px;height:32px;border-radius:7px;background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <div style="width:32px;height:32px;border-radius:0;border:1.5px solid var(--bos-ink,#191918);background:#fff7ed;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="#ea580c" stroke-width="1.4"/><path d="M6 5v6M6 8h3" stroke="#ea580c" stroke-width="1.4" stroke-linecap="round"/></svg>
                 </div>
                 <div style="flex:1;min-width:0">
@@ -2233,7 +2240,7 @@ document.addEventListener('DOMContentLoaded', function(){
               </div>
               <!-- TikTok Shop (not connected) -->
               <div style="display:flex;align-items:center;gap:12px;padding:13px 18px">
-                <div style="width:32px;height:32px;border-radius:7px;background:#fdf2f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <div style="width:32px;height:32px;border-radius:0;border:1.5px solid var(--bos-ink,#191918);background:#fdf2f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M9 2v8a2 2 0 11-2-2" stroke="#be185d" stroke-width="1.4" stroke-linecap="round"/><path d="M9 5a3 3 0 003 3" stroke="#be185d" stroke-width="1.4" stroke-linecap="round"/></svg>
                 </div>
                 <div style="flex:1;min-width:0">
