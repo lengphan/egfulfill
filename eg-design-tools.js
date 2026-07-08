@@ -997,7 +997,7 @@
     // the order is still in setup; locked orders just show the meta row.
     var center = p.setup ? '<div style="flex:1;display:flex;align-items:center;justify-content:flex-start;min-width:0">' + (p.selector || '') + '</div>' : '';
     var trash = p.trash ? '<span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center">' + p.trash + '</span>' : '';
-    return '<div style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 44px;position:relative;' + (p.sep || '') + '">'
+    return '<div class="egdt-item-row" style="display:flex;align-items:center;gap:0;padding:11px 14px 11px 44px;position:relative;' + (p.sep || '') + '">'
       + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
       + '</div>';
   }
@@ -2414,7 +2414,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-08-itemimg-firstrender';
+  window.EG_BUILD = '2026-07-08-exprow-cards';
   // Staff boards pull the factory's blank/variant/method picks from the server so they're shared
   // across devices + survive a cache clear (was per-browser eg_neworder_setup).
   try { var _egu = JSON.parse(localStorage.getItem('eg_user') || '{}'); if (_egu && _egu.role && _egu.role !== 'seller' && window.EGStore && EGStore.hydrateKV) EGStore.hydrateKV('neworder_setup', 'eg_neworder_setup'); } catch (e) {}
