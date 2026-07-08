@@ -356,31 +356,37 @@ html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px sol
 /* order-table expanded detail row: was stark #fff (td + inner div) — now transparent so it inherits
    the theme ground in BOTH light + dark, matching its parent row; just fix the beige border colour */
 html.eg-board-on .dtable tr.exp-row td{background:transparent!important;border-top-color:var(--bos-line)!important;border-bottom-color:var(--bos-line)!important}
-/* ── Expanded item rows → tidy framed cards (STYLING ONLY — no render/logic change) ──
-   Two surfaces share one look: the seller (orders.html) items carry [id^="item-wrap-"];
-   the factory boards' items carry .egdt-item-row (from EGDesignTools.itemRowLayout). Each
-   becomes a white card with a thin ink frame that lifts on hover, sitting on a soft band,
-   so the setup block reads as a tidy card instead of a flat strip. */
-html.eg-board-on [id^="item-wrap-"],
-html.eg-board-on .egdt-item-row{background:#fff!important;border:1.5px solid var(--bos-line)!important;border-radius:0!important;margin-bottom:9px!important;transition:border-color .14s ease,box-shadow .14s ease!important}
-html.eg-board-on [id^="item-wrap-"]{padding:12px 14px!important}
-/* factory cards sit directly in the detail <td> (no wrapper) — inset them so the band shows */
-html.eg-board-on .egdt-item-row{margin-left:12px!important;margin-right:12px!important}
-html.eg-board-on .egdt-item-row:first-child{margin-top:11px!important}
-html.eg-board-on [id^="item-wrap-"]:hover,
-html.eg-board-on .egdt-item-row:hover{border-color:var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important}
-/* soft band behind the cards — seller wrapper (scoped via :has so the factory's OTHER
-   expansion rows keep their own ground) + the factory main detail rows' <td> */
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){background:#f5f3ef!important;padding-top:12px!important;padding-bottom:12px!important}
+/* ── Expanded item rows → Indented Hairline + CONNECTED LADDER (STYLING ONLY) ──
+   Setup rows sit under the parent order, indented past a thin vertical guide; each row's
+   separator is a RUNG that runs from the guide all the way across — so the tree branch and
+   the row divider are ONE connected hairline (no floating ticks, no card frames, no band).
+   EVERY line here is a single 1px hairline (var(--bos-line)). Selected rows get only a
+   faint accent tint (the checkbox carries selection). Seller items = [id^="item-wrap-"];
+   factory items = .egdt-item-row (EGDesignTools.itemRowLayout). Consistent on all boards. */
+/* seller (orders.html): item-wrap grids live inside the exp-row wrapper div */
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 12px 44px!important}
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:22px;top:0;bottom:16px;width:1px;background:var(--bos-line)}
+html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:11px 6px!important}
+html.eg-board-on [id^="item-wrap-"]::after{content:"";position:absolute;left:-22px;right:0;bottom:0;height:1px;background:var(--bos-line)}
+html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
+html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
+/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> */
 html.eg-board-on tr[id^="op-detail-"] > td,
-html.eg-board-on tr[id^="wh-detail-"] > td{background:#f5f3ef!important}
-html[data-theme=dark].eg-board-on [id^="item-wrap-"],
-html[data-theme=dark].eg-board-on .egdt-item-row{background:#252220!important;border-color:#3a3631!important}
-html[data-theme=dark].eg-board-on [id^="item-wrap-"]:hover,
-html[data-theme=dark].eg-board-on .egdt-item-row:hover{border-color:#c9c3ba!important;box-shadow:3px 3px 0 #c9c3ba!important}
-html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]),
-html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td,
-html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td{background:#1e1b19!important}
+html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important}
+html.eg-board-on tr[id^="op-detail-"] > td::before,
+html.eg-board-on tr[id^="wh-detail-"] > td::before{content:"";position:absolute;left:22px;top:0;bottom:16px;width:1px;background:var(--bos-line)}
+html.eg-board-on .egdt-item-row{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
+html.eg-board-on .egdt-item-row::after{content:"";position:absolute;left:22px;right:14px;bottom:0;height:1px;background:var(--bos-line)}
+html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
+html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
+/* dark — same thin hairlines, faint light tint */
+html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before,
+html[data-theme=dark].eg-board-on [id^="item-wrap-"]::after,
+html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td::before,
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td::before,
+html[data-theme=dark].eg-board-on .egdt-item-row::after{background:#3a3631!important}
+html[data-theme=dark].eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked),
+html[data-theme=dark].eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(201,195,186,.06)!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
    inside fields were hard to read. Mono stays as the accent on labels/eyebrows/nav/chrome. */
 /* content-card headings (Order Pipeline, Recent Orders, Last 6 Months, etc.) -> mono to match the theme */

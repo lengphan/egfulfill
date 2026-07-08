@@ -36,7 +36,7 @@
       "#op-prod-search{background:#fff!important;border:1.5px solid #191918!important;border-radius:0!important;box-shadow:2px 2px 0 #191918;width:240px!important}" +
       "#op-prod-cat,#op-prod-status{border:1.5px solid #191918!important;border-radius:0!important;background:#fff!important;font-family:" + mono + "!important;text-transform:uppercase;font-size:11px!important;letter-spacing:.04em;padding:7px 26px 7px 11px!important}" +
       /* keep the Catalog grid from stretching: responsive columns, capped width */
-      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important}" +
+      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;align-items:start!important}" +
       /* New In / Favorites search row */
       ".epx-searchrow{display:flex;align-items:center;gap:13px;margin-bottom:15px;flex-wrap:wrap}" +
       "#epx-search{flex:1;min-width:220px;max-width:460px;background:#fff;border:1.5px solid #191918;border-radius:0;padding:9px 13px;font-size:13.5px;font-family:inherit;color:#191918;outline:none;box-shadow:2px 2px 0 #191918}" +
@@ -180,7 +180,10 @@
     _tabs.querySelectorAll('.epx-tab').forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
     var isCat = (t === 'catalog');
     if (_header) _header.style.display = isCat ? '' : 'none';
-    if (_grid) _grid.style.display = isCat ? '' : 'none';
+    // Restore display:grid (NOT '') — the grid's inline style is "display:grid;…", so
+    // setting it to '' would wipe display entirely and the grid falls back to block
+    // (this was the "catalog cards stretched full-width" bug).
+    if (_grid) _grid.style.display = isCat ? 'grid' : 'none';
     if (_newin) _newin.style.display = (t === 'newin') ? '' : 'none';
     if (_favs) _favs.style.display = (t === 'favorites') ? '' : 'none';
     if (t === 'newin' && !_newinLoaded) { _newinLoaded = true; loadNewIn(''); }
