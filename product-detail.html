@@ -7,6 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+/* Retro/Tavus product face (ported from product-detail-public.html) — uses Board OS
+   tokens (cobalt #2f4bf0, ink #191918, Fraunces display, DepartureMono micro-labels,
+   hard black offset shadows, square corners). Presentation-only; all ids/handlers kept. */
+@font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:block}
+:root{
+  --pd-ink:#191918; --pd-paper:#fff; --pd-panel:#efece7; --pd-line:#e5e4e0;
+  --pd-violet:#2f4bf0; --pd-amber:#f8d264; --pd-indigo:#e9eefe;
+  --pd-grey:#6b7280; --pd-grey2:#9ca3af;
+  --pd-disp:'Fraunces',Georgia,serif; --pd-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
 body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
 .sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
 .ni{display:flex;align-items:center;gap:9px;padding:8px 12px;border:1px solid transparent;border-radius:8px;font-size:14.5px;font-weight:500;color:#374151;cursor:pointer;transition:background-color .15s,color .15s;text-decoration:none;margin:0 8px}
@@ -20,24 +30,122 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
 /* Match dashboard cards: lighter bg + dark 2px borderline (offset shadow) */
 html:not([data-theme=dark]) .card{background:#fdfcfa!important;border:1px solid #40403d!important;box-shadow:2px 2px 0 #40403d!important}
-/* technique tabs */
-.tech-tab{flex:1;padding:8px 6px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center;white-space:nowrap}
-.tech-tab.on{background:#fff;border-color:#191918;color:#191918}
-.tech-tab:not(.on):hover{border-color:#9ca3af}
-/* size buttons */
-.sz-btn{min-width:44px;padding:7px 10px;border:1.5px solid #e5e4e0;border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
-.sz-btn.on{border-color:#191918;background:#191918;color:#fff}
-.sz-btn:not(.on):hover{border-color:#9ca3af}
-/* color swatches */
-.clr-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s;flex-shrink:0;position:relative}
-.clr-swatch.on{border-color:#191918 !important;box-shadow:0 0 0 2px #fff inset}
-.clr-swatch:hover{transform:scale(1.12)}
-/* thumbnail strip */
-.thumb{width:84px;height:84px;border-radius:9px;border:1.5px solid #e5e4e0;overflow:hidden;cursor:pointer;transition:border-color .15s;background:#f6f5f4;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.thumb.on{border-color:#191918}
-.thumb:hover:not(.on){border-color:#9ca3af}
+/* ── RETRO micro-labels (DepartureMono uppercase) ── */
+.pd-eyebrow{font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-grey2);display:block;margin-bottom:10px}
+.pd-label{font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-ink)}
+.pd-link{font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--pd-violet);cursor:pointer;text-decoration:none;border-bottom:1.5px solid var(--pd-violet)}
+.pd-meta{font-family:var(--pd-mono);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--pd-grey)}
+/* technique tabs — segmented, sharp, connected */
+.tech-tab{padding:9px 14px;border:1.5px solid var(--pd-ink);border-radius:0;font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;background:#eceae4;color:var(--pd-grey);transition:background .1s,color .1s,box-shadow .1s;text-align:center;white-space:nowrap;margin:0 -1.5px -1.5px 0}
+.tech-tab.on{background:var(--pd-paper);color:var(--pd-ink);box-shadow:2px 2px 0 var(--pd-ink)}
+.tech-tab:not(.on):hover{color:var(--pd-ink)}
+/* size buttons — segmented selector */
+.sz-btn{min-width:46px;padding:9px 12px;border:1.5px solid var(--pd-ink);border-radius:0;font-family:var(--pd-mono);font-size:12px;font-weight:400;cursor:pointer;background:var(--pd-paper);color:var(--pd-ink);transition:background .1s,color .1s,box-shadow .1s;text-align:center;margin:0 -1.5px -1.5px 0}
+.sz-btn.on{background:var(--pd-ink);color:var(--pd-paper)}
+.sz-btn:not(.on):hover{box-shadow:2px 2px 0 var(--pd-ink)}
+/* color swatches — square, hard-shadow selected */
+.clr-swatch{width:28px;height:28px;border-radius:0;cursor:pointer;border:1.5px solid var(--pd-ink);transition:box-shadow .1s,transform .1s;flex-shrink:0;position:relative}
+.clr-swatch.on{border-color:var(--pd-ink)!important;box-shadow:2px 2px 0 var(--pd-ink)}
+.clr-swatch:hover{transform:translate(-1px,-1px)}
+/* thumbnail strip — square, ink border, hard-shadow selected */
+.thumb{width:84px;height:84px;border-radius:0;border:1.5px solid var(--pd-ink);overflow:hidden;cursor:pointer;transition:box-shadow .1s,transform .1s;background:var(--pd-panel);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.thumb.on{box-shadow:3px 3px 0 var(--pd-ink)}
+.thumb:hover:not(.on){transform:translate(-1px,-1px);box-shadow:2px 2px 0 var(--pd-ink)}
+.thumb img{border-radius:0!important}
 /* star rating */
-.star{color:#f59e0b;font-size:17px;line-height:1}
+.star{color:var(--pd-ink);font-size:15px;line-height:1;letter-spacing:1px}
+.star.off{color:var(--pd-line)}
+/* price + delivery split card */
+.pd-facts{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:20px;border:1.5px solid var(--pd-ink);box-shadow:4px 4px 0 var(--pd-ink);background:var(--pd-paper)}
+.pd-fact{padding:16px 18px}
+.pd-fact+.pd-fact{border-left:1.5px solid var(--pd-ink)}
+.pd-fact .cap{font-family:var(--pd-mono);font-size:10px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-grey2);margin-bottom:8px}
+#pd-price{font-family:var(--pd-disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:32px;letter-spacing:-.03em;line-height:1;color:var(--pd-ink)}
+.pd-fact .note{font-size:11.5px;color:var(--pd-grey)}
+.pd-fact .ship-row{display:flex;align-items:center;gap:6px;font-family:var(--pd-mono);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--pd-ink);margin-bottom:4px}
+.pd-fact .days{font-family:var(--pd-disp);font-optical-sizing:none;font-variation-settings:'opsz' 30,'wght' 800;font-size:20px;letter-spacing:-.02em;color:var(--pd-ink);line-height:1.1}
+/* bulk pricing amber banner */
+.pd-bulk{background:var(--pd-amber);border:1.5px solid var(--pd-ink);box-shadow:3px 3px 0 var(--pd-ink);padding:11px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;border-radius:0}
+.pd-bulk .tag{background:var(--pd-ink);color:var(--pd-paper);font-family:var(--pd-mono);font-size:9px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;flex-shrink:0}
+.pd-bulk .txt{font-family:var(--pd-mono);font-size:11.5px;font-weight:400;text-transform:uppercase;letter-spacing:.02em;color:var(--pd-ink);line-height:1.4}
+/* CTAs — hard offset shadow, mono uppercase */
+.pd-cta{display:block;width:100%;text-align:center;font-family:var(--pd-mono);font-size:12px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;text-decoration:none;border:1.5px solid var(--pd-ink);box-shadow:3px 3px 0 var(--pd-ink);padding:14px;border-radius:0;transition:transform .09s,box-shadow .09s}
+.pd-cta:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--pd-ink)}
+.pd-cta:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--pd-ink)}
+.pd-cta.primary{background:var(--pd-violet);color:#fff}
+.pd-cta.ghost{background:var(--pd-paper);color:var(--pd-ink)}
+/* spec panels — title-bar hairline cards */
+.pd-panel{border:1.5px solid var(--pd-ink)!important;box-shadow:5px 5px 0 var(--pd-ink)!important;background:var(--pd-paper)!important;border-radius:0!important;padding:0!important;overflow:hidden}
+.pd-panel-hd{border-bottom:1.5px solid var(--pd-ink);padding:11px 18px;font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-ink);display:flex;align-items:center;gap:9px;background:var(--pd-indigo)}
+.pd-panel-hd .rl{flex:1;height:8px;background:repeating-linear-gradient(90deg,var(--pd-ink) 0,var(--pd-ink) 1.5px,transparent 1.5px,transparent 5px)}
+.pd-panel-bd{padding:18px 20px;display:flex;flex-direction:column;gap:11px}
+.pd-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.pd-row .k{font-size:13px;color:var(--pd-grey);white-space:nowrap}
+.pd-row .v{font-size:13px;color:var(--pd-ink);font-weight:600;text-align:right}
+.pd-row-note{border-top:1.5px solid var(--pd-line);padding-top:11px;margin-top:2px;font-size:12px;color:var(--pd-grey)}
+.pd-row-note strong{color:var(--pd-ink)}
+/* customization chips — square framed */
+.pd-chip{font-family:var(--pd-mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--pd-ink);background:var(--pd-paper);border:1.5px solid var(--pd-ink);border-radius:0;padding:5px 11px}
+/* sub-headings + bullet lists inside panels */
+.pd-subhd{font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--pd-ink);margin:0 0 9px}
+.pd-panel-bd .pd-subhd:not(:first-child){margin-top:16px}
+.pd-bullet{display:flex;align-items:flex-start;gap:9px}
+.pd-bullet .dot{width:6px;height:6px;border-radius:0;background:var(--pd-violet);flex-shrink:0;margin-top:5px}
+.pd-bullet span:last-child{font-size:13px;color:#374151;line-height:1.45}
+html[data-theme=dark] .pd-subhd{color:#e8e4dd}
+html[data-theme=dark] .pd-bullet span:last-child{color:#a8a39b}
+html[data-theme=dark] #pd-about{color:#a8a39b!important}
+/* ── BREADCRUMB (in-app header) — DepartureMono, muted ancestors + cobalt hover, solid-ink current, sharp ── */
+.pd-crumbs{display:flex;align-items:center;gap:8px;font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;flex-wrap:wrap}
+.pd-crumbs a{color:var(--pd-grey2);text-decoration:none;border-bottom:1.5px solid transparent;transition:color .12s,border-color .12s}
+.pd-crumbs a:hover{color:var(--pd-violet);border-bottom-color:var(--pd-violet)}
+.pd-crumbs .pd-crumb-sep{color:var(--pd-grey2);opacity:.7;display:inline-flex;align-items:center}
+.pd-crumbs #bc-name{color:var(--pd-ink)}
+html[data-theme=dark] .pd-crumbs a{color:#8b867d}
+html[data-theme=dark] .pd-crumbs a:hover{color:#6f8bff;border-bottom-color:#6f8bff}
+html[data-theme=dark] .pd-crumbs .pd-crumb-sep{color:#8b867d}
+html[data-theme=dark] .pd-crumbs #bc-name{color:#e8e4dd}
+/* big product name → Fraunces serif */
+#pd-name{font-family:var(--pd-disp)!important;font-optical-sizing:none;font-variation-settings:'opsz' 60,'wght' 560;font-size:clamp(28px,3.2vw,40px)!important;line-height:1.04!important;letter-spacing:-.015em!important;color:var(--pd-ink)}
+/* hero + thumb placeholder ground stays neutral paper */
+#pd-hero{border-radius:0!important;border:1.5px solid var(--pd-ink)!important;box-shadow:6px 6px 0 var(--pd-ink)!important;background:var(--pd-panel)!important}
+.pd-heronav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;background:var(--pd-paper);border:1.5px solid var(--pd-ink);box-shadow:2px 2px 0 var(--pd-ink);border-radius:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .09s,box-shadow .09s}
+.pd-heronav:hover{transform:translateY(-50%) translate(1px,1px);box-shadow:1px 1px 0 var(--pd-ink)}
+/* ── DARK MODE — retro face on the dark board ground ── */
+html[data-theme=dark] #pd-name{color:#e8e4dd}
+html[data-theme=dark] .pd-eyebrow,html[data-theme=dark] .pd-label{color:#e8e4dd}
+html[data-theme=dark] .pd-meta,html[data-theme=dark] .pd-fact .note,html[data-theme=dark] .pd-row .k,html[data-theme=dark] .pd-row-note{color:#a8a39b}
+html[data-theme=dark] .pd-link{color:#6f8bff;border-bottom-color:#6f8bff}
+html[data-theme=dark] .tech-tab{border-color:#5a5660;background:#26242b;color:#a8a39b}
+html[data-theme=dark] .tech-tab.on{background:#201e24;color:#e8e4dd;box-shadow:2px 2px 0 #5a5660}
+html[data-theme=dark] .sz-btn{border-color:#5a5660;background:#201e24;color:#e8e4dd}
+html[data-theme=dark] .sz-btn.on{background:#e8e4dd;color:#1a1917}
+html[data-theme=dark] .sz-btn:not(.on):hover{box-shadow:2px 2px 0 #5a5660}
+html[data-theme=dark] .clr-swatch{border-color:#5a5660}
+html[data-theme=dark] .clr-swatch.on{border-color:#e8e4dd!important;box-shadow:2px 2px 0 #5a5660}
+html[data-theme=dark] .thumb{border-color:#5a5660;background:#26242b}
+html[data-theme=dark] .thumb.on{box-shadow:3px 3px 0 #5a5660}
+html[data-theme=dark] .pd-facts{border-color:#5a5660;box-shadow:4px 4px 0 #5a5660;background:#201e24}
+html[data-theme=dark] .pd-fact+.pd-fact{border-left-color:#5a5660}
+html[data-theme=dark] #pd-price,html[data-theme=dark] .pd-fact .days,html[data-theme=dark] .pd-fact .ship-row{color:#e8e4dd}
+html[data-theme=dark] .pd-fact .cap{color:#8b867d}
+html[data-theme=dark] .pd-bulk{background:#3c3413;border-color:#5a5660;box-shadow:3px 3px 0 #5a5660}
+html[data-theme=dark] .pd-bulk .tag{background:#e8e4dd;color:#1a1917}
+html[data-theme=dark] .pd-bulk .txt{color:#f0e6c8}
+html[data-theme=dark] .pd-cta{border-color:#5a5660;box-shadow:3px 3px 0 #5a5660}
+html[data-theme=dark] .pd-cta:hover{box-shadow:2px 2px 0 #5a5660}
+html[data-theme=dark] .pd-cta.primary{background:var(--pd-violet);color:#fff}
+html[data-theme=dark] .pd-cta.ghost{background:#201e24;color:#e8e4dd}
+html[data-theme=dark] .pd-panel{border-color:#5a5660!important;box-shadow:5px 5px 0 #5a5660!important;background:#201e24!important}
+html[data-theme=dark] .pd-panel-hd{background:#232a4a;border-bottom-color:#5a5660;color:#e8e4dd}
+html[data-theme=dark] .pd-panel-hd .rl{background:repeating-linear-gradient(90deg,#8b867d 0,#8b867d 1.5px,transparent 1.5px,transparent 5px)}
+html[data-theme=dark] .pd-row .v{color:#e8e4dd}
+html[data-theme=dark] .pd-row-note strong{color:#e8e4dd}
+html[data-theme=dark] .pd-row-note{border-top-color:#403d48}
+html[data-theme=dark] .pd-chip{background:#201e24;border-color:#5a5660;color:#e8e4dd}
+html[data-theme=dark] #pd-hero{border-color:#5a5660!important;box-shadow:6px 6px 0 #5a5660!important;background:#201e24!important}
+html[data-theme=dark] .pd-heronav{background:#201e24;border-color:#5a5660;box-shadow:2px 2px 0 #5a5660}
+html[data-theme=dark] .pd-heronav svg path{stroke:#e8e4dd}
 #mob-ham{display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;flex-shrink:0;align-items:center}
 #mob-ham:hover{background:#f6f5f4}
 #mob-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:45;cursor:pointer}
@@ -182,12 +290,12 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 <div style="margin-left:220px;min-height:100vh">
   <header style="background:#f7f5f0;border-bottom:1px solid rgba(0,0,0,.14);height:54px;display:flex;align-items:center;padding:0 20px;position:sticky;top:0;z-index:30;gap:8px;flex-shrink:0">
     <button id="mob-ham" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;padding:5px 7px;border-radius:7px;color:#6b7280;line-height:0;align-items:center;flex-shrink:0"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-    <div style="display:flex;align-items:center;gap:6px;font-size:14px;flex-wrap:wrap">
-      <a href="design-lab.html" style="color:#6b7280;text-decoration:none;font-weight:500" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Design Lab</a>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <a href="products-dash.html" style="color:#6b7280;text-decoration:none;font-weight:500" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#6b7280'">Browse Catalog</a>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <span id="bc-name" style="color:#191918;font-weight:600">Product Detail</span>
+    <div class="pd-crumbs">
+      <a href="design-lab.html">Design Lab</a>
+      <span class="pd-crumb-sep"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+      <a href="products-dash.html">Browse Catalog</a>
+      <span class="pd-crumb-sep"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+      <span id="bc-name">Product Detail</span>
     </div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
       <div style="display:flex;align-items:center;gap:4px;position:relative">
@@ -243,9 +351,9 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
              right column's "Save to Product Templates" button. Image inside
              scales via object-fit so different aspect ratios still look
              centered. -->
-        <div style="flex:1;height:700px;border-radius:14px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center" id="pd-hero">
+        <div style="flex:1;height:700px;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center" id="pd-hero">
           <!-- Hero placeholder – updated by setHero() -->
-          <div id="hero-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ede9">
+          <div id="hero-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#efece7">
             <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
               <rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>
               <circle cx="40" cy="52" r="12" fill="#d1d0cb"/>
@@ -254,11 +362,11 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
             </svg>
           </div>
           <!-- Nav arrows -->
-          <button onclick="heroNav(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <button onclick="heroNav(-1)" class="pd-heronav" style="left:12px" aria-label="Previous image">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#191918" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button onclick="heroNav(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <button onclick="heroNav(1)" class="pd-heronav" style="right:12px" aria-label="Next image">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#191918" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
       </div>
@@ -267,77 +375,72 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <div style="flex:1;min-width:340px;max-width:480px">
 
         <!-- Product name -->
-        <h1 id="pd-name" style="font-size:1.4rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 6px;line-height:1.3">Unisex T-Shirt</h1>
-        <p id="pd-sub" style="font-size:14px;color:#6b7280;margin:0 0 10px">Soft cotton · DTG print · 180 GSM</p>
+        <span class="pd-eyebrow">Catalog · Print on demand</span>
+        <h1 id="pd-name" style="margin:0 0 8px">Unisex T-Shirt</h1>
+        <p id="pd-sub" style="font-size:14px;color:#6b7280;margin:0 0 14px;line-height:1.5">Soft cotton · DTG print · 180 GSM</p>
 
         <!-- Rating -->
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:20px;padding-bottom:20px;border-bottom:1.5px solid var(--pd-line)">
           <div>
-            <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span style="color:#d1d0cb;font-size:17px;line-height:1">★</span>
+            <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star off">★</span>
           </div>
-          <span style="font-size:13.5px;color:#3b82f6;font-weight:600;cursor:pointer">24 Reviews</span>
+          <span class="pd-meta" style="color:var(--pd-ink);cursor:pointer;border-bottom:1.5px solid var(--pd-ink)">24 Reviews</span>
         </div>
 
-        <div style="border-top:1px solid #f0ede9;padding-top:18px">
+        <div style="padding-top:2px">
 
           <!-- Technique -->
-          <div style="margin-bottom:18px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Technique</span>
-              <span onclick="if(window.EGGuides)EGGuides.openFile()" style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">File guidelines ↗</span>
+          <div style="margin-bottom:22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+              <span class="pd-label">Technique</span>
+              <span class="pd-link" onclick="if(window.EGGuides)EGGuides.openFile()">File guidelines ↗</span>
             </div>
-            <div id="pd-techs" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+            <div id="pd-techs" style="display:flex;flex-wrap:wrap"></div>
           </div>
 
           <!-- Color -->
-          <div style="margin-bottom:18px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Color</span>
-              <span id="pd-color-name" style="font-size:13px;color:#6b7280">Dark Gray</span>
+          <div style="margin-bottom:22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+              <span class="pd-label">Color</span>
+              <span id="pd-color-name" class="pd-meta">Dark Gray</span>
             </div>
-            <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:8px"></div>
           </div>
 
           <!-- Size -->
-          <div style="margin-bottom:20px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <span style="font-size:13.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Size</span>
-              <span onclick="if(window.EGGuides)EGGuides.openSize(_pid)" style="font-size:13px;color:#3b82f6;font-weight:500;cursor:pointer">Size guide ↗</span>
+          <div style="margin-bottom:22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+              <span class="pd-label">Size</span>
+              <span class="pd-link" onclick="if(window.EGGuides)EGGuides.openSize(_pid)">Size guide ↗</span>
             </div>
-            <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <div id="pd-sizes" style="display:flex;flex-wrap:wrap"></div>
           </div>
 
-          <!-- Price + delivery -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-            <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
-              <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Price <span style="color:#ef4444">*</span></div>
-              <div id="pd-price" style="font-size:1.5rem;font-weight:800;color:#191918;letter-spacing:-0.04em;line-height:1">$10.95</div>
-              <div style="font-size:12.5px;color:#6b7280;margin-top:4px">+ shipping from <strong>$4.99</strong></div>
+          <!-- Price + delivery (split card) -->
+          <div class="pd-facts">
+            <div class="pd-fact">
+              <div class="cap">From</div>
+              <div id="pd-price">$10.95</div>
+              <div class="note">+ shipping from <strong>$4.99</strong></div>
             </div>
-            <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
-              <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Estimated delivery</div>
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-                <span style="font-size:14px">🇻🇳</span>
-                <span style="font-size:14px;font-weight:600;color:#374151">Vietnam</span>
-              </div>
-              <div style="font-size:1.1rem;font-weight:800;color:#191918;letter-spacing:-0.03em;line-height:1.2">12–17 days</div>
+            <div class="pd-fact">
+              <div class="cap">Delivery</div>
+              <div class="ship-row"><span>🇻🇳</span><span>Vietnam</span></div>
+              <div class="days">12–17 days</div>
             </div>
           </div>
 
           <!-- Bulk price note -->
-          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="#d97706" stroke-width="1.3"/><path d="M7.5 5v3.5M7.5 10.5v.5" stroke="#d97706" stroke-width="1.3" stroke-linecap="round"/></svg>
-            <div>
-              <span style="font-size:13px;font-weight:600;color:#92400e">Bulk pricing available</span>
-              <span style="font-size:13px;color:#b45309"> · Save up to 20% on 50+ units</span>
-            </div>
+          <div class="pd-bulk">
+            <span class="tag">Bulk</span>
+            <span class="txt">Bulk pricing available · Save up to 20% on 50+ units</span>
           </div>
 
           <!-- CTA buttons -->
-          <button onclick="startDesigning()" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          <button onclick="startDesigning()" class="pd-cta primary" style="margin-bottom:11px">
             Start designing →
           </button>
-          <button onclick="addToProducts()" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+          <button onclick="addToProducts()" class="pd-cta ghost">
             <span>Save to Product Templates</span>
           </button>
 
@@ -346,39 +449,25 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     </div>
 
     <!-- About this product — operator-authored description -->
-    <div id="pd-about-wrap" class="card" style="display:none;margin-top:36px;padding:20px 22px">
-      <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">About this product</div>
-      <div id="pd-about" style="font-size:14px;color:#374151;line-height:1.6;white-space:pre-wrap"></div>
+    <div id="pd-about-wrap" class="pd-panel" style="display:none;margin-top:36px">
+      <div class="pd-panel-hd"><span>About this product</span><span class="rl"></span></div>
+      <div class="pd-panel-bd"><div id="pd-about" style="font-size:14px;color:#374151;line-height:1.6;white-space:pre-wrap"></div></div>
     </div>
 
     <!-- Product specs section -->
-    <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div class="card" style="padding:20px 22px">
-        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Product Details</div>
-        <div id="pd-specs" style="display:flex;flex-direction:column;gap:9px"></div>
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <div class="pd-panel">
+        <div class="pd-panel-hd"><span>Product Details</span><span class="rl"></span></div>
+        <div class="pd-panel-bd" id="pd-specs"></div>
       </div>
-      <div class="card" style="padding:20px 22px">
-        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Print Areas</div>
-        <div style="display:flex;flex-direction:column;gap:9px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:14px;color:#374151;font-weight:500">Front center</span>
-            <span style="font-size:13.5px;color:#6b7280">12" × 16" max</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:14px;color:#374151;font-weight:500">Back center</span>
-            <span style="font-size:13.5px;color:#6b7280">12" × 16" max</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:14px;color:#374151;font-weight:500">Left sleeve</span>
-            <span style="font-size:13.5px;color:#6b7280">3" × 3" max</span>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:14px;color:#374151;font-weight:500">Right sleeve</span>
-            <span style="font-size:13.5px;color:#6b7280">3" × 3" max</span>
-          </div>
-          <div style="border-top:1px solid #f0ede9;padding-top:9px;margin-top:3px">
-            <div style="font-size:13px;color:#9ca3af">Min resolution: <strong style="color:#374151">150 DPI</strong> · Preferred: <strong style="color:#374151">300 DPI</strong></div>
-          </div>
+      <div class="pd-panel">
+        <div class="pd-panel-hd"><span>Print Areas</span><span class="rl"></span></div>
+        <div class="pd-panel-bd">
+          <div class="pd-row"><span class="k">Front center</span><span class="v">12" × 16" max</span></div>
+          <div class="pd-row"><span class="k">Back center</span><span class="v">12" × 16" max</span></div>
+          <div class="pd-row"><span class="k">Left sleeve</span><span class="v">3" × 3" max</span></div>
+          <div class="pd-row"><span class="k">Right sleeve</span><span class="v">3" × 3" max</span></div>
+          <div class="pd-row-note">Min resolution: <strong>150 DPI</strong> · Preferred: <strong>300 DPI</strong></div>
         </div>
       </div>
     </div>
@@ -389,39 +478,41 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       <!-- Customizable positions + sizes + design tips. Mirrors the
            right-side "File Guidelines" card's two-subsection rhythm so the
            heights line up; chips on top, bullets on bottom. -->
-      <div class="card" style="padding:20px 22px">
-        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Customization</div>
+      <div class="pd-panel">
+        <div class="pd-panel-hd"><span>Customization</span><span class="rl"></span></div>
+        <div class="pd-panel-bd">
+          <div class="pd-subhd">Positions you can customize</div>
+          <div id="pd-positions" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px"></div>
 
-        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:9px">Positions you can customize</div>
-        <div id="pd-positions" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px"></div>
+          <div class="pd-subhd">Available sizes</div>
+          <div id="pd-cust-sizes" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px"></div>
 
-        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:9px">Available sizes</div>
-        <div id="pd-cust-sizes" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px"></div>
-
-        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Design tips</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Upload artwork or add custom text per side</span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Preview every side before you check out</span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Bulk-order ready — pricing scales with volume</span></div>
+          <div class="pd-subhd">Design tips</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="pd-bullet"><span class="dot"></span><span>Upload artwork or add custom text per side</span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Preview every side before you check out</span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Bulk-order ready — pricing scales with volume</span></div>
+          </div>
         </div>
       </div>
 
       <!-- File Guidelines — simple print + embroidery requirements -->
-      <div class="card" style="padding:20px 22px">
-        <div style="font-size:13px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">File Guidelines</div>
+      <div class="pd-panel">
+        <div class="pd-panel-hd"><span>File Guidelines</span><span class="rl"></span></div>
+        <div class="pd-panel-bd">
+          <div class="pd-subhd">Print · DTG / DTF</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px">
+            <div class="pd-bullet"><span class="dot"></span><span>PNG or PDF, <strong>150 DPI minimum</strong> (300 preferred)</span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Transparent background</span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Design true-to-size to the print area</span></div>
+          </div>
 
-        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Print · DTG / DTF</div>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">PNG or PDF, <strong>150 DPI minimum</strong> (300 preferred)</span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Transparent background</span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Design true-to-size to the print area</span></div>
-        </div>
-
-        <div style="font-size:12.5px;font-weight:700;color:#374151;margin-bottom:8px">Embroidery</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Vector PDF, or PNG at <strong>150 DPI+</strong></span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Solid shapes &amp; colors only — no gradients</span></div>
-          <div style="display:flex;align-items:flex-start;gap:9px"><span style="width:5px;height:5px;border-radius:50%;background:#191918;flex-shrink:0;margin-top:6px"></span><span style="font-size:13px;color:#374151;line-height:1.45">Max <strong>15K stitches</strong> (25K for large designs)</span></div>
+          <div class="pd-subhd">Embroidery</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div class="pd-bullet"><span class="dot"></span><span>Vector PDF, or PNG at <strong>150 DPI+</strong></span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Solid shapes &amp; colors only — no gradients</span></div>
+            <div class="pd-bullet"><span class="dot"></span><span>Max <strong>15K stitches</strong> (25K for large designs)</span></div>
+          </div>
         </div>
       </div>
 
@@ -529,7 +620,7 @@ var _selSize = 'M';
 var _tech = 'dtg';
 var _techs = [];
 
-var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
+var HERO_BKGS = ['#efece7','#e6e3dc','#eceae4','#e9e6df','#e4e1da','#efece7'];
 
 // All images available for this product (primary + any extras). Used by the hero
 // carousel and the thumbnail strip. Falls back to a single placeholder when the
@@ -581,7 +672,7 @@ function init() {
   // Specs
   var spEl = document.getElementById('pd-specs');
   spEl.innerHTML = _prod.specs.map(function(sp){
-    return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px"><span style="font-size:14px;color:#6b7280;white-space:nowrap">'+sp.k+'</span><span style="font-size:14px;color:#374151;font-weight:500;text-align:right">'+sp.v+'</span></div>';
+    return '<div class="pd-row"><span class="k">'+sp.k+'</span><span class="v">'+sp.v+'</span></div>';
   }).join('');
 
   // Customization: thread colors + positions
@@ -600,7 +691,7 @@ function pdCustomPositions() {
 }
 function pdRenderCustomization() {
   var chip = function(label){
-    return '<span style="font-size:12.5px;color:#374151;background:#f4f2ef;border:1px solid #e5e4e0;border-radius:7px;padding:5px 11px">'+label+'</span>';
+    return '<span class="pd-chip">'+label+'</span>';
   };
   var pos = document.getElementById('pd-positions');
   if (pos) pos.innerHTML = pdCustomPositions().map(chip).join('');
@@ -643,7 +734,7 @@ function selectColor(idx) {
   var ci = _prod.colorImages && _prod.colorImages[name];
   var heroEl = document.getElementById('hero-inner');
   if (ci) {
-    heroEl.style.background = '#f6f5f4';
+    heroEl.style.background = '#efece7';
     heroEl.innerHTML = '<img src="' + ci + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'\'"/>';
     document.querySelectorAll('.thumb').forEach(function(t){ t.classList.remove('on'); });
   } else if (heroEl) {
@@ -713,7 +804,7 @@ function setHero(idx) {
   if (src) {
     // Real image — replace the placeholder SVG with the product photo. Keep object-contain
     // so the full mockup is visible without cropping the model/garment.
-    heroEl.style.background = '#f6f5f4';
+    heroEl.style.background = '#efece7';
     heroEl.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'<div style=&quot;color:#9ca3af;font-size:13px&quot;>Image failed to load</div>\'"/>';
   } else {
     // Placeholder slot — pastel background + camera SVG so it still feels like a gallery
