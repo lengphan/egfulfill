@@ -70,7 +70,7 @@ html.eg-board-on header{background:transparent!important;border-bottom:none!impo
 /* out-specify the beige-neutraliser (which also matches the header's inline #f7f5f0) so the header stays clear */
 html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-board-on[data-theme=dark] header[style*="background"]{background:transparent!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
-  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
+  border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
