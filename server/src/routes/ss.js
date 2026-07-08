@@ -92,6 +92,16 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
        synced_at timestamptz default now()
      )`).catch(() => {});
 
+  // Favorited S&S styles — the factory's shortlist, shared across staff (like the
+  // backorder/PO queues). Keyed by S&S styleID so favoriting is idempotent.
+  q(`create table if not exists ss_favorites (
+       style_id text primary key,
+       brand text, style_name text, category text, image text,
+       data jsonb,
+       created_by integer,
+       created_at timestamptz default now()
+     )`).catch(() => {});
+
   // ── Status: is it configured, and what's synced? ────────────────────────────
   app.get('/api/ss/status', { preHandler: requireStaff }, async () => {
     let count = 0, last = null;
@@ -102,20 +112,70 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     return { configured: creds(), account: SS_ACCOUNT ? '…' + SS_ACCOUNT.slice(-4) : null, base: SS_BASE, synced_count: count, last_sync: last };
   });
 
-  // ── Browse S&S STYLES (lightweight) — for picking what to sync into "New In" ─
-  // Optional ?brand= and ?search= filter it down. Style-level = far fewer rows than products.
+  // ── Browse the LIVE S&S catalog (styles) — powers the "New In" tab ───────────
+  // Hits S&S directly (NOT our synced ss_products table), so it shows their full
+  // live catalog. The whole style list (~thousands of small rows) is cached in
+  // memory for 5 min so search/paging keystrokes don't refetch it every time.
+  let _stylesCache = { at: 0, data: null };
+  async function fetchStyles() {
+    const now = Date.now();
+    if (_stylesCache.data && (now - _stylesCache.at) < 5 * 60 * 1000) return _stylesCache.data;
+    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage');
+    if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
+    const mapped = r.data.map((s) => ({
+      styleID: String(s.styleID),
+      brand: s.brandName || '',
+      title: ((s.brandName ? s.brandName + ' ' : '') + (s.title || '')).trim() || (s.title || ''),
+      category: s.baseCategory || '',
+      image: ssImg(s.styleImage)
+    })).filter((s) => s.styleID);
+    _stylesCache = { at: now, data: mapped };
+    return mapped;
+  }
+
   app.get('/api/ss/styles', { preHandler: requireStaff }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
-    const brand = (req.query?.brand || '').trim();
+    const brand = (req.query?.brand || '').trim().toLowerCase();
     const search = (req.query?.search || '').trim().toLowerCase();
+    const limit = Math.min(120, Math.max(1, parseInt(req.query?.limit, 10) || 60));
+    const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
     try {
-      const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage');
-      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S styles fetch failed', status: r.status, body: r.data }; }
-      let list = Array.isArray(r.data) ? r.data : [];
-      if (brand) list = list.filter((s) => String(s.brandName || '').toLowerCase() === brand.toLowerCase());
-      if (search) list = list.filter((s) => (String(s.title || '') + ' ' + String(s.brandName || '')).toLowerCase().includes(search));
-      return list.slice(0, 500);
-    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+      let list = await fetchStyles();
+      if (brand) list = list.filter((s) => s.brand.toLowerCase() === brand);
+      if (search) list = list.filter((s) => (s.title + ' ' + s.brand + ' ' + s.category).toLowerCase().includes(search));
+      const total = list.length;
+      let favs = new Set();
+      try { const fr = await q('select style_id from ss_favorites'); favs = new Set(fr.rows.map((r) => String(r.style_id))); } catch (e) {}
+      const styles = list.slice(offset, offset + limit).map((s) => ({ ...s, favorited: favs.has(s.styleID) }));
+      return { total, styles, cached: (Date.now() - _stylesCache.at) > 500 };
+    } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────
+  app.get('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const r = await q('select style_id, brand, style_name, category, image from ss_favorites order by created_at desc');
+      return { favorites: r.rows.map((x) => ({ styleID: x.style_id, brand: x.brand, title: x.style_name, category: x.category, image: x.image, favorited: true })) };
+    } catch (e) { reply.code(500); return { error: e.message }; }
+  });
+  app.post('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const id = String(b.styleID || b.style_id || '').trim();
+    if (!id) { reply.code(400); return { error: 'styleID required' }; }
+    try {
+      await q(
+        `insert into ss_favorites (style_id, brand, style_name, category, image, created_by)
+         values ($1,$2,$3,$4,$5,$6)
+         on conflict (style_id) do update set brand=excluded.brand, style_name=excluded.style_name,
+           category=excluded.category, image=excluded.image`,
+        [id, b.brand || null, b.title || b.style_name || null, b.category || null, b.image || null, req.user?.id || null]
+      );
+      return { ok: true, styleID: id, favorited: true };
+    } catch (e) { reply.code(500); return { error: e.message }; }
+  });
+  app.delete('/api/ss/favorites/:styleId', { preHandler: requireStaff }, async (req, reply) => {
+    try { await q('delete from ss_favorites where style_id=$1', [String(req.params.styleId)]); return { ok: true, favorited: false }; }
+    catch (e) { reply.code(500); return { error: e.message }; }
   });
 
   // ── SYNC catalog + inventory into ss_products (BOUNDED) ──────────────────────
