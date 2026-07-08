@@ -81,9 +81,15 @@
   .qa-body{max-height:0;opacity:0;overflow:hidden;transition:max-height .42s ease,opacity .3s ease}
   .qa-a{padding:0 22px 22px 69px;font-size:14.5px;line-height:1.6;color:var(--ink2)}
   /* the .open row (set by mouseenter/focus in JS — stable, no :hover-resize flicker) grows to fill the box */
-  .qa-item.open{flex:1 1 0;background:#fdf4d9}
-  .qa-item.open .qa-body{max-height:360px;opacity:1}
-  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr;height:auto} .qa-img{height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} .qa-list{height:auto} .qa-item.open{flex:0 0 auto} }
+  .qa-item.open{background:#fdf4d9}
+  /* answer reveals as an OVERLAY over the image (master-detail): the question list never resizes,
+     so there is no hover reflow — the old flicker came from a row growing under the moving pointer */
+  .qa-img{position:relative;overflow:hidden}
+  .qa-answer{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;justify-content:center;padding:clamp(30px,3.6vw,58px);background:rgba(253,244,217,.97);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .32s cubic-bezier(.2,.7,.3,1),transform .32s cubic-bezier(.2,.7,.3,1)}
+  .qa-answer.on{opacity:1;transform:none}
+  .qa-answer-q{font-family:'Fraunces',Georgia,serif;font-weight:800;font-size:clamp(23px,2.5vw,32px);line-height:1.12;letter-spacing:-.01em;color:var(--ink);margin-bottom:16px;text-wrap:balance}
+  .qa-answer-a{font-size:clamp(15px,1.35vw,18px);line-height:1.62;color:#3a3a38;max-width:46ch}
+  @media(max-width:820px){ .qa-panel{grid-template-columns:1fr;height:auto} .qa-img{height:240px;border-right:none;border-bottom:1.5px solid var(--ink)} .qa-list{height:auto} .qa-item.open{flex:0 0 auto} .qa-item.open .qa-body{max-height:360px;opacity:1} .qa-answer{display:none} }
 </style>
 </head>
 <body>
@@ -175,7 +181,7 @@
       <p class="hiw-lead">Hover a question to open it — no clicking.</p>
     </div>
     <div class="qa-panel">
-      <div class="qa-img"><div data-dither="image" data-src="images/cloud-wallpaper.jpg" data-pop="dusk" data-fit="cover" data-pixel="3"></div></div>
+      <div class="qa-img"><div data-dither="image" data-src="images/cloud-wallpaper.jpg" data-pop="dusk" data-fit="cover" data-pixel="3"></div><div class="qa-answer" id="qa-answer"><div class="qa-answer-q"></div><div class="qa-answer-a"></div></div></div>
       <div class="qa-list">
         <div class="qa-item" tabindex="0">
           <div class="qa-hd"><span class="qa-ava"><span data-dither="art" data-pop="noir" data-seed="3" data-pixel="2"></span></span><span class="qa-q">Do I need to hold my own inventory?</span></div>
@@ -275,20 +281,24 @@
   (function(){
     var items=[].slice.call(document.querySelectorAll('.qa-item'));
     if(!items.length) return;
-    var INTENT=90;              // ms the pointer must settle on a header before it opens (< the .42s row anim)
-    var timer=null, pending=null;
-    function openRow(it){ if(!it||it.classList.contains('open')) return; items.forEach(function(x){ x.classList.toggle('open', x===it); }); }
-    function arm(it){ pending=it; if(timer) clearTimeout(timer); timer=setTimeout(function(){ timer=null; if(pending) openRow(pending); }, INTENT); }
+    var ans=document.getElementById('qa-answer');
+    var aq=ans&&ans.querySelector('.qa-answer-q'), aa=ans&&ans.querySelector('.qa-answer-a');
+    var INTENT=50, timer=null, pending=null;   // tiny settle only to collapse a fast transit; no reflow to fight now
+    function show(it){
+      items.forEach(function(x){ x.classList.toggle('open', x===it); });
+      if(ans&&aq&&aa){ var q=it.querySelector('.qa-q'), a=it.querySelector('.qa-a'); aq.textContent=q?q.textContent:''; aa.textContent=a?a.textContent:''; ans.classList.add('on'); }
+    }
+    function arm(it){ pending=it; if(timer) clearTimeout(timer); timer=setTimeout(function(){ timer=null; if(pending) show(pending); }, INTENT); }
     function disarm(){ if(timer){ clearTimeout(timer); timer=null; } pending=null; }
     items.forEach(function(it){
-      var hd=it.querySelector('.qa-hd')||it;   // bind to the FIXED-height header, not the resizing row
-      hd.addEventListener('mouseenter', function(){ arm(it); });     // settle-to-open: transit enters just re-arm to the newest header
-      hd.addEventListener('mouseleave', function(){ if(pending===it) disarm(); });   // pointer left before it settled → cancel this open
-      it.addEventListener('focus', function(){ disarm(); openRow(it); });   // keyboard: open immediately
+      var hd=it.querySelector('.qa-hd')||it;   // bind to the FIXED header (headers never move now)
+      hd.addEventListener('mouseenter', function(){ arm(it); });
+      hd.addEventListener('mouseleave', function(){ if(pending===it) disarm(); });
+      it.addEventListener('focus', function(){ disarm(); show(it); });   // keyboard: reveal immediately
     });
     var list=items[0].parentNode;
-    if(list) list.addEventListener('mouseleave', disarm);   // pointer off the whole list → drop any pending open (keep last opened)
-    openRow(items[0]);   // start with the first open so the panel is filled
+    if(list) list.addEventListener('mouseleave', disarm);   // keep the last answer shown (stable)
+    show(items[0]);   // start with the first answer in the panel
   })();
 </script>
 </body>
