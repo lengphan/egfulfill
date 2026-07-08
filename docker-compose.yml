@@ -40,6 +40,10 @@ services:
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:-}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:-}
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:-read_orders,write_orders,read_products}
+      # S&S Activewear (blanks supplier) — HTTP Basic: account number = user, API key = pass.
+      SS_ACCOUNT_NUMBER: ${SS_ACCOUNT_NUMBER:-}
+      SS_API_KEY: ${SS_API_KEY:-}
+      SS_API_BASE: ${SS_API_BASE:-https://api.ssactivewear.com/v2}
       # USPS Labels — values come from .env. Defaults to the TEM test environment
       # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
       # only when going live.
