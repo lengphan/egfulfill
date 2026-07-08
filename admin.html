@@ -14,6 +14,7 @@
 <script src="eg-design-tools.js"></script>
 <script src="eg-guides.js"></script>
 <script src="eg-withdraw.js" defer></script>
+<script src="eg-financials.js" defer></script>
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-chat-extras.js"></script>
@@ -2006,6 +2007,11 @@ document.addEventListener('DOMContentLoaded', function(){
         </button>
       </div>
     </div>
+
+    <!-- Profit & Costs — SHARED factory financials (eg-financials.js). Rendered
+         into this mount div by EGFinancials.render('fin-mount'). Same panel on
+         admin + warehouse (one 'factory' wallet). -->
+    <div id="fin-mount"></div>
 
     <!-- Pending seller top-ups (manual VietQR confirmation) — only shown when any exist -->
     <div id="adm-pending-topups" style="display:none;margin-bottom:20px"></div>
@@ -10780,6 +10786,8 @@ function walRefresh() {
   walRenderLedger();
   admRenderPendingTopups();
   if (typeof admRenderPendingWithdrawals === 'function') admRenderPendingWithdrawals();
+  // Shared Profit & Costs panel (eg-financials.js) — same on admin + warehouse.
+  try { if (window.EGFinancials) EGFinancials.render('fin-mount'); } catch (e) {}
 }
 
 // ── Pending seller top-ups (manual VietQR reconciliation) ────────────────────

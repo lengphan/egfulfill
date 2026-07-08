@@ -13,6 +13,7 @@
 <script src="eg-sidebar-badges.js"></script>
 <script src="eg-board-settings.js"></script>
 <script src="eg-withdraw.js" defer></script>
+<script src="eg-financials.js" defer></script>
 <script src="eg-chat-extras.js"></script>
 <script src="egfulfill-drag.js"></script>
 <script src="egfulfill-tracking.js"></script>
@@ -2242,6 +2243,11 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         </button>
       </div>
     </div>
+
+    <!-- Profit & Costs — SHARED factory financials (eg-financials.js). Rendered
+         into this mount div by EGFinancials.render('fin-mount'). Same panel on
+         admin + warehouse (one 'factory' wallet). -->
+    <div id="fin-mount"></div>
 
     <!-- Pending withdrawal requests (seller + factory payouts awaiting approval) — only shown when any exist -->
     <div id="adm-pending-withdrawals" style="display:none;margin-bottom:20px"></div>
@@ -12285,6 +12291,8 @@ function walRefresh() {
   }
   walRenderLedger();
   if (typeof admRenderPendingWithdrawals === 'function') admRenderPendingWithdrawals();
+  // Shared Profit & Costs panel (eg-financials.js) — same on admin + warehouse.
+  try { if (window.EGFinancials) EGFinancials.render('fin-mount'); } catch (e) {}
 }
 
 // ── Pending withdrawal requests (seller + factory payouts) ───────────────────
