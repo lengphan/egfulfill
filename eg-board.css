@@ -401,3 +401,13 @@ html.eg-board-on .egdt-varstrip select{border:none!important;background:transpar
 /* LEFT-ALIGN the content so it hugs the sidebar (centring left a big gap next to the nav on wide
    monitors) + a moderate cap so the right side doesn't stretch. Whitespace collects on the far right. */
 html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width:1400px"]{max-width:1520px!important;margin-left:0!important;margin-right:0!important}
+
+/* ── Dashboard stat cards → TAVUS PRESS (replaces the old top:-1px lift) ──
+   Each card rests on a dark offset shadow; hover sinks it toward the shadow; mousedown
+   presses it fully in. No lingering state. Overrides the per-file .wcard/.stat-card hovers. */
+html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:5px 5px 0 var(--bos-ink)!important;transition:transform .13s cubic-bezier(.3,.7,.4,1),box-shadow .13s ease!important}
+html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translate(3px,3px)!important;box-shadow:2px 2px 0 var(--bos-ink)!important}
+html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
+html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:5px 5px 0 #3a3631!important}
+html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:2px 2px 0 #3a3631!important}
+html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-on .stat-card:active{box-shadow:0 0 0 #3a3631!important}
