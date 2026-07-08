@@ -28,12 +28,17 @@ function num(v) { const n = Number(v); return isFinite(n) ? n : null; }
 function int(v) { const n = parseInt(v, 10); return isFinite(n) ? n : 0; }
 function creds() { return !!(SS_ACCOUNT && SS_KEY); }
 
-// S&S distribution centers (fixed) — approx lat/long for "closest warehouse" ranking.
-// Verified against the /warehouses response on first use; extend if S&S adds a DC.
-const SS_WH_COORDS = {
-  NJ: [40.21, -74.62], KS: [38.88, -94.82], TX: [32.73, -96.61], NV: [39.51, -119.79],
-  GA: [33.45, -84.15], IL: [41.44, -87.69], FL: [28.55, -81.78], OH: [39.96, -82.79],
-};
+// S&S distribution centers (fixed locations) — used both to rank by distance AND as the
+// fallback DC list, since S&S's /warehouses endpoint comes back empty for this account.
+const SS_DC = [
+  { abbr: 'NJ', name: 'Robbinsville, NJ', city: 'Robbinsville', state: 'NJ', lat: 40.21, lng: -74.62 },
+  { abbr: 'GA', name: 'McDonough, GA',    city: 'McDonough',    state: 'GA', lat: 33.45, lng: -84.15 },
+  { abbr: 'IL', name: 'University Park, IL', city: 'University Park', state: 'IL', lat: 41.44, lng: -87.69 },
+  { abbr: 'KS', name: 'Olathe, KS',       city: 'Olathe',       state: 'KS', lat: 38.88, lng: -94.82 },
+  { abbr: 'TX', name: 'Fort Worth, TX',   city: 'Fort Worth',   state: 'TX', lat: 32.75, lng: -97.33 },
+  { abbr: 'NV', name: 'Reno, NV',         city: 'Reno',         state: 'NV', lat: 39.53, lng: -119.75 },
+];
+const SS_WH_COORDS = SS_DC.reduce((m, d) => { m[d.abbr] = [d.lat, d.lng]; return m; }, {});
 function haversineMi(lat1, lon1, lat2, lon2) {
   const R = 3959, toR = (d) => d * Math.PI / 180;
   const dLat = toR(lat2 - lat1), dLon = toR(lon2 - lon1);
@@ -212,18 +217,18 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
   // while still listing every DC to choose from.
   app.get('/api/ss/warehouses', { preHandler: requireStaff }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
-    try {
-      const r = await ssGet('/warehouses/');
-      let list = (r.ok && Array.isArray(r.data)) ? r.data : [];
-      const near = String(req.query?.near || '').split(',').map(Number);
-      if (near.length === 2 && isFinite(near[0]) && isFinite(near[1])) {
-        list = list.map((w) => {
-          const abbr = String(w.warehouseAbbr || w.abbr || w.warehouseCode || w.code || '').toUpperCase().slice(0, 2);
-          const c = SS_WH_COORDS[abbr];
-          return { ...w, _abbr: abbr, distance_mi: c ? Math.round(haversineMi(near[0], near[1], c[0], c[1])) : null };
-        }).sort((a, b) => (a.distance_mi ?? 1e9) - (b.distance_mi ?? 1e9));
-      }
-      return list;
-    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+    // Prefer the live S&S list if it ever returns rows; otherwise use the fixed DC list.
+    let list = [];
+    try { const r = await ssGet('/warehouses/'); if (r.ok && Array.isArray(r.data) && r.data.length) list = r.data; } catch (e) {}
+    if (!list.length) list = SS_DC.map((d) => ({ ...d }));
+    const near = String(req.query?.near || '').split(',').map(Number);
+    if (near.length === 2 && isFinite(near[0]) && isFinite(near[1])) {
+      list = list.map((w) => {
+        const abbr = String(w.abbr || w.warehouseAbbr || w.warehouseCode || w.code || '').toUpperCase().slice(0, 2);
+        const c = SS_WH_COORDS[abbr] || (isFinite(w.lat) && isFinite(w.lng) ? [w.lat, w.lng] : null);
+        return { ...w, abbr, distance_mi: c ? Math.round(haversineMi(near[0], near[1], c[0], c[1])) : null };
+      }).sort((a, b) => (a.distance_mi ?? 1e9) - (b.distance_mi ?? 1e9));
+    }
+    return list;
   });
 }
