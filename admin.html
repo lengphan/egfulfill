@@ -2067,49 +2067,92 @@ document.addEventListener('DOMContentLoaded', function(){
     html.eg-board-on[data-theme=dark] #section-sellers .sd-listhead,
     html.eg-board-on[data-theme=dark] #section-sellers .sd-tabstrip{border-bottom-color:#5a5660!important}
     html.eg-board-on[data-theme=dark] #section-sellers .sd-txtable{border-top-color:#5a5660!important}
+
+    /* ── Seller CARD grid (replaces the old left list). Board-OS chip:
+         square corners, 1.5px ink border, 4px hard offset shadow, cream
+         ground. Hover presses in (translate toward the shadow) so the click
+         reads as tactile. Cursor pointer everywhere. ────────────────────── */
+    #section-sellers .seller-card-item{
+      background:var(--bos-paper,#fdfcfa);
+      border:1.5px solid var(--bos-ink,#191918);
+      border-radius:0;
+      box-shadow:4px 4px 0 var(--bos-ink,#191918);
+      cursor:pointer;
+      transition:transform .11s ease, box-shadow .11s ease;
+    }
+    #section-sellers .seller-card-item:hover{
+      transform:translate(2px,2px);
+      box-shadow:2px 2px 0 var(--bos-ink,#191918);
+    }
+    #section-sellers .seller-card-item:active{
+      transform:translate(4px,4px);
+      box-shadow:0 0 0 var(--bos-ink,#191918);
+    }
+    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item{
+      background:#2c2a31;border-color:#5a5660;box-shadow:4px 4px 0 #14131a;
+    }
+    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:hover{box-shadow:2px 2px 0 #14131a}
+    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:active{box-shadow:0 0 0 #14131a}
   </style>
   <div id="section-sellers" class="section fi">
 
-    <div style="display:grid;grid-template-columns:248px minmax(0,1fr);gap:22px;max-width:1180px;align-items:start">
-      <!-- Left: sellers list as ONE bordered Board-OS unit — mono eyebrow
-           header on an ink rule, then the rows. Sharp, ink-framed, hard
-           offset shadow so it reads as a tidy panel next to the detail. -->
-      <div class="card" style="box-shadow:4px 4px 0 var(--bos-ink,#191918)!important;border-radius:0!important;overflow:hidden;position:sticky;top:14px">
-        <div class="sd-listhead" style="padding:12px 14px;border-bottom:1.5px solid #191918">
-          <div id="seller-count" style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.08em">Sellers · 3</div>
+    <!-- ══ GRID VIEW — clickable seller cards. Clicking a card runs the SAME
+         selectSeller(id, el) the old list rows ran, then reveals the detail
+         panel below. ══════════════════════════════════════════════════════ -->
+    <div id="seller-grid-view">
+      <div class="sd-listhead" style="display:flex;align-items:center;gap:10px;padding:0 0 12px;margin-bottom:16px;border-bottom:1.5px solid #191918;max-width:1180px">
+        <div id="seller-count" style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.08em">Sellers · 3</div>
+      </div>
+      <div id="seller-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px;max-width:1180px;align-items:start">
+        <!-- Demo cards (replaced by loadRealSellers when the API responds). -->
+        <div class="seller-card-item" id="sc-seller-a" onclick="openSellerDetail('seller-a',this)" style="padding:16px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Seller A Store</div>
+              <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sellera@store.com</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
+            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
+            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">3 users</span>
+          </div>
         </div>
-        <div id="seller-list" style="display:flex;flex-direction:column;padding:6px">
-          <div class="seller-card-item" id="sc-seller-a" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid #191918;background:transparent" onclick="selectSeller('seller-a',this)">
-            <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">SA</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller A Store <span style="width:6px;height:6px;border-radius:0;background:var(--bos-mint,#12b886)" title="Active"></span></div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">3 users · 2m ago</div>
-              </div>
+        <div class="seller-card-item" id="sc-seller-b" onclick="openSellerDetail('seller-b',this)" style="padding:16px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SB</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Seller B Store</div>
+              <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sellerb@shop.com</div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-seller-b" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('seller-b',this)">
-            <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">SB</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">Seller B Store <span style="width:6px;height:6px;border-radius:0;background:#c9c3ba" title="Suspended"></span></div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">1 user · 6d ago</div>
-              </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
+            <span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Suspended</span>
+            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
+          </div>
+        </div>
+        <div class="seller-card-item" id="sc-my-store" onclick="openSellerDetail('my-store',this)" style="padding:16px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">MS</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">My Store</div>
+              <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">owner@egops.com</div>
             </div>
           </div>
-          <div class="seller-card-item" id="sc-my-store" style="padding:9px 10px;border-radius:0;cursor:pointer;border:1.5px solid transparent;background:transparent" onclick="selectSeller('my-store',this)">
-            <div style="display:flex;align-items:center;gap:9px">
-              <div style="width:30px;height:30px;background:#e9eefe;border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:var(--bos-violet,#2f4bf0);flex-shrink:0;border:1.5px solid var(--bos-ink,#191918)">MS</div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">My Store <span style="width:6px;height:6px;border-radius:0;background:var(--bos-mint,#12b886)" title="Active"></span></div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.03em">1 user · 12h ago</div>
-              </div>
-            </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
+            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
+            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Right: detail. Identity band + tabs share a single sticker-shadow
+    <!-- ══ DETAIL VIEW — hidden until a card is clicked; slides in full-width
+         to replace the grid. "← Back to sellers" returns to the grid. All
+         existing detail markup/ids/handlers are REUSED unchanged. ═════════ -->
+    <div id="seller-detail-view" style="display:none;max-width:1180px">
+      <button onclick="backToSellers()" style="display:inline-flex;align-items:center;gap:7px;margin-bottom:16px;background:none;border:none;padding:6px 2px;cursor:pointer;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em" onmouseover="this.style.opacity='.6'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Back to sellers</button>
+      <!-- Detail. Identity band + tabs share a single sticker-shadow
            card; the dark #191918 header sits flush against the tabs strip
            so the whole header reads as one unit. -->
       <div>
@@ -2302,7 +2345,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
         </div><!-- /unified seller card -->
       </div>
-    </div>
+    </div><!-- /#seller-detail-view -->
   </div>
 
 <!-- ===== ACTIVITY (audit log) ===== -->
@@ -6362,24 +6405,33 @@ function loadRealSellers() {
         if (count) count.textContent = 'Sellers · ' + sellers.length;
         if (!list) return;
         window.REAL_SELLERS = {};
+        var esc = function(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(c){return c==='<'?'&lt;':c==='>'?'&gt;':c==='&'?'&amp;':'&quot;';}); };
         var html = '';
         sellers.forEach(function(u, i){
           var nm = u.store_name || u.name || u.email;
           var active = u.active !== false;
           window.REAL_SELLERS[u.id] = { id: u.id, name: nm, email: u.email, active: active };
-          var dot = active ? '#191918' : '#c9c3ba';
-          html += '<div class="seller-card-item" id="sc-' + u.id + '" style="padding:9px 10px;border-radius:7px;cursor:pointer;border:1.5px solid ' + (i===0?'#191918':'transparent') + ';background:transparent" onclick="selectSeller(\'' + u.id + '\',this)">'
-            + '<div style="display:flex;align-items:center;gap:9px">'
-            + '<div style="width:30px;height:30px;background:#eef1fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#2f4bf0;flex-shrink:0">' + _sellerInitials(nm) + '</div>'
+          // Board-OS clickable card. Same template as the demo cards above:
+          // cobalt square avatar + bold name + mono muted email + status badge.
+          var badge = active
+            ? '<span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>'
+            : '<span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Suspended</span>';
+          html += '<div class="seller-card-item" id="sc-' + esc(u.id) + '" onclick="openSellerDetail(\'' + esc(u.id) + '\',this)" style="padding:16px">'
+            + '<div style="display:flex;align-items:flex-start;gap:12px">'
+            + '<div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">' + esc(_sellerInitials(nm)) + '</div>'
             + '<div style="flex:1;min-width:0">'
-            + '<div style="font-size:13.5px;font-weight:600;color:#191918;display:flex;align-items:center;gap:5px">' + nm.replace(/[<>]/g,'') + ' <span style="width:6px;height:6px;border-radius:50%;background:' + dot + '" title="' + (active?'Active':'Suspended') + '"></span></div>'
-            + '<div style="font-size:11.5px;color:#9ca3af">' + (u.email||'').replace(/[<>]/g,'') + '</div>'
-            + '</div></div></div>';
+            + '<div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(nm) + '</div>'
+            + '<div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(u.email||'') + '</div>'
+            + '</div></div>'
+            + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">'
+            + badge
+            + '<span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">' + (active?'Active':'Suspended') + '</span>'
+            + '</div></div>';
         });
         list.innerHTML = html;
-        // Auto-select the first real seller.
-        var first = list.querySelector('.seller-card-item');
-        if (first) selectSeller(sellers[0].id, first);
+        // Cards render into the grid; the detail stays hidden until a card is
+        // clicked (no auto-open). Keep the grid visible on (re)load.
+        try { backToSellers(); } catch(e){}
       })
       .catch(function(){});
   } catch(e){}
@@ -6406,6 +6458,45 @@ function renderSellerTx(ledger){
   }).join('');
 }
 window.renderSellerTx = renderSellerTx;
+
+// ── Grid ⇄ detail view switching ─────────────────────────────────────────
+// A card click opens the detail: run the SAME selectSeller(id, el) the old
+// list rows ran (populates #seller-detail-* + tabs), then swap the grid out
+// for the full-width detail panel. "Back to sellers" reverses it.
+function openSellerDetail(id, el) {
+  try { selectSeller(id, el); } catch(e){}
+  // Mark the clicked card so toggleSellerStatus can find "the selected one".
+  try {
+    document.querySelectorAll('#seller-list .seller-card-item').forEach(function(c){ delete c.dataset.sel; });
+    if (el) el.dataset.sel = '1';
+  } catch(e){}
+  var grid = document.getElementById('seller-grid-view');
+  var detail = document.getElementById('seller-detail-view');
+  if (grid) grid.style.display = 'none';
+  if (detail) { detail.style.display = ''; try { detail.classList.remove('fi'); void detail.offsetWidth; detail.classList.add('fi'); } catch(e){} }
+  // Detail always opens on the Balance tab.
+  try { setSellerTab('balance', document.getElementById('stab-balance')); } catch(e){}
+  try { window.scrollTo(0, 0); } catch(e){}
+}
+window.openSellerDetail = openSellerDetail;
+
+function backToSellers() {
+  var grid = document.getElementById('seller-grid-view');
+  var detail = document.getElementById('seller-detail-view');
+  if (detail) detail.style.display = 'none';
+  if (grid) grid.style.display = '';
+  // selectSeller writes inline border/background onto the cards to mark the
+  // active one — strip those so every card returns to its pristine
+  // CSS-driven Board-OS look (border + hard shadow) in the grid.
+  try {
+    document.querySelectorAll('#seller-list .seller-card-item').forEach(function(c){
+      c.style.removeProperty('border');
+      c.style.removeProperty('background');
+    });
+  } catch(e){}
+}
+window.backToSellers = backToSellers;
+
 function selectSeller(id, el) {
   // Reset every seller pill: transparent border + transparent background so
   // only the active one shows chrome, with no light-grey hover lingering on
