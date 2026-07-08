@@ -1,59 +1,52 @@
 /* eg-cursor.js — a crisp PIXEL-ARROW cursor for the app (Tavus/retro vibe).
-   Self-contained: adds its own class + element, hides the system pointer, and follows the
-   mouse with a hand-built pixel arrow (black fill + auto-generated white outline). It steps
-   ASIDE over text inputs so typing still shows a native caret, and no-ops on touch devices.
-   Load once per page:  <script src="eg-cursor.js" defer></script>  */
+   It renders a cobalt pixel arrow (auto white outline) to a canvas ONCE and sets it as the
+   real CSS cursor via `cursor:url(png) 0 0, auto`. Because it's the actual cursor:
+     • it can never "disappear" — if a browser can't use the image it falls back to the system arrow,
+     • there's no follower div to lag or fail,
+     • text fields keep a native caret.
+   No-ops on touch. Load once per page:  <script src="eg-cursor.js" defer></script>  */
 (function () {
   'use strict';
   if (window.__egCursor) return; window.__egCursor = 1;
   try { if (matchMedia('(pointer:coarse)').matches) return; } catch (e) {}   // touch → keep native
 
-  // Classic pointer bitmap (1 = fill). White outline is derived from the 8-neighbourhood.
+  // Classic pointer bitmap (1 = fill). White outline derived from the 8-neighbourhood.
   var A = [
-    [1,0,0,0,0,0,0,0,0,0,0],[1,1,0,0,0,0,0,0,0,0,0],[1,1,1,0,0,0,0,0,0,0,0],
-    [1,1,1,1,0,0,0,0,0,0,0],[1,1,1,1,1,0,0,0,0,0,0],[1,1,1,1,1,1,0,0,0,0,0],
-    [1,1,1,1,1,1,1,0,0,0,0],[1,1,1,1,1,1,1,1,0,0,0],[1,1,1,1,1,1,1,1,1,0,0],
-    [1,1,1,1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,0,0,0,0],[1,1,1,0,1,1,1,0,0,0,0],
-    [1,1,0,0,0,1,1,1,0,0,0],[1,0,0,0,0,1,1,1,0,0,0],[0,0,0,0,0,0,1,1,1,0,0],
-    [0,0,0,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,1,1,0,0]
+    [1,0,0,0,0,0,0,0,0],[1,1,0,0,0,0,0,0,0],[1,1,1,0,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0,0],[1,1,1,1,1,0,0,0,0],[1,1,1,1,1,1,0,0,0],
+    [1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,0],[1,1,1,1,1,0,0,0,0],
+    [1,1,0,1,1,1,0,0,0],[1,0,0,0,1,1,1,0,0],[0,0,0,0,0,1,1,1,0],
+    [0,0,0,0,0,0,1,1,0]
   ];
-  function arrowSVG() {
-    var H = A.length, W = A[0].length, r = '';
-    function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
+  var H = A.length, W = A[0].length, S = 2;   // compact 9×13 bitmap → ~18×26px, crisp
+  function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
+
+  var url;
+  try {
+    var cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff';                                   // white outline first
     for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
-      if (A[y][x]) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="#2f4bf0"/>';
-      else if (fa(x-1,y)||fa(x+1,y)||fa(x,y-1)||fa(x,y+1)||fa(x-1,y-1)||fa(x+1,y-1)||fa(x-1,y+1)||fa(x+1,y+1))
-        r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="#fff"/>';
+      if (!A[y][x] && (fa(x-1,y)||fa(x+1,y)||fa(x,y-1)||fa(x,y+1)||fa(x-1,y-1)||fa(x+1,y-1)||fa(x-1,y+1)||fa(x+1,y+1)))
+        ctx.fillRect(x*S, y*S, S, S);
     }
-    return '<svg width="' + (W * 1.95) + '" height="' + (H * 1.95) + '" viewBox="0 0 ' + W + ' ' + H +
-      '" shape-rendering="crispEdges" style="display:block;filter:drop-shadow(1px 1.5px 0 rgba(0,0,0,.3))">' + r + '</svg>';
-  }
+    ctx.fillStyle = '#2f4bf0';                                // cobalt fill on top
+    for (var y2 = 0; y2 < H; y2++) for (var x2 = 0; x2 < W; x2++) { if (A[y2][x2]) ctx.fillRect(x2*S, y2*S, S, S); }
+    url = cv.toDataURL('image/png');
+  } catch (e) { return; }   // canvas blocked → leave the native cursor
 
-  var st = document.createElement('style');
+  var st = document.createElement('style'); st.id = 'eg-cursor-css';
   st.textContent =
-    'html.eg-pixcur,html.eg-pixcur *{cursor:none!important}' +
-    'html.eg-pixcur input,html.eg-pixcur textarea,html.eg-pixcur select,html.eg-pixcur [contenteditable="true"]{cursor:auto!important}' +
-    '#eg-pixcur{position:fixed;top:0;left:0;pointer-events:none;z-index:2147483000;opacity:0;will-change:transform}';
+    'html.eg-pixcur,html.eg-pixcur *{cursor:url(' + url + ') 0 0, auto !important}' +
+    // text entry keeps a real caret; disabled/loading states keep their own cursor
+    'html.eg-pixcur input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]),' +
+    'html.eg-pixcur textarea,html.eg-pixcur [contenteditable="true"]{cursor:text !important}' +
+    'html.eg-pixcur [disabled],html.eg-pixcur .cursor-wait{cursor:default !important}';
   document.head.appendChild(st);
+  document.documentElement.classList.add('eg-pixcur');
 
-  var el = document.createElement('div'); el.id = 'eg-pixcur'; el.innerHTML = arrowSVG();
-  function mount() { document.documentElement.classList.add('eg-pixcur'); (document.body || document.documentElement).appendChild(el); }
-  if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
-
-  var shown = false;
-  window.addEventListener('mousemove', function (e) {
-    if (!shown) { shown = true; }
-    el.style.transform = 'translate(' + e.clientX + 'px,' + e.clientY + 'px)';
-    // over a text field → hide the arrow so the native caret shows
-    var t = e.target, inField = t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]');
-    el.style.opacity = inField ? '0' : '1';
-  }, { passive: true });
-  window.addEventListener('mouseleave', function () { el.style.opacity = '0'; });
-  window.addEventListener('mouseenter', function () { el.style.opacity = '1'; });
-
-  // let a page opt out at runtime: EGCursor.off() / EGCursor.on()
   window.EGCursor = {
-    on: function () { document.documentElement.classList.add('eg-pixcur'); el.style.display = ''; },
-    off: function () { document.documentElement.classList.remove('eg-pixcur'); el.style.display = 'none'; }
+    on: function () { document.documentElement.classList.add('eg-pixcur'); },
+    off: function () { document.documentElement.classList.remove('eg-pixcur'); }
   };
 })();
