@@ -203,6 +203,48 @@ img{max-width:100%}
 .fab svg{width:26px;height:26px}
 .fab:active{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink)}
 
+/* ---- in-app sub-pages (product detail, add funds, stores, settings, help) ---- */
+#subpage{position:absolute; inset:0; z-index:40; background:var(--ground); display:none; flex-direction:column; transform:translateX(100%); transition:transform .28s cubic-bezier(.3,.72,.32,1)}
+#subpage.on{display:flex; transform:none}
+.sub-head{flex-shrink:0; display:flex; align-items:center; gap:13px; padding:calc(16px + env(safe-area-inset-top)) 18px 12px; background:var(--ground)}
+.sub-back{width:40px; height:40px; flex-shrink:0; border:1.5px solid var(--ink); border-radius:4px; background:var(--paper); display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:2px 2px 0 var(--ink)}
+.sub-back:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--ink)}
+.sub-title{font-size:20px; font-weight:800; letter-spacing:-.02em}
+.sub-body{flex:1; overflow-y:auto; overflow-x:hidden; padding:6px 20px calc(34px + env(safe-area-inset-bottom)); overscroll-behavior:contain; scrollbar-width:none}
+.sub-body::-webkit-scrollbar{display:none}
+.fld{margin-bottom:16px}
+.fld label{display:block; font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--grey); margin:0 2px 6px}
+.fld input,.fld textarea{width:100%; border:1.5px solid var(--ink); border-radius:4px; padding:13px; font-family:var(--sans); font-size:15px; background:var(--paper); outline:none}
+.fld input:focus,.fld textarea:focus{box-shadow:2.5px 2.5px 0 var(--ink)}
+.amt-in{display:flex; align-items:center; border:1.5px solid var(--ink); border-radius:4px; background:var(--paper); padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+.amt-in b{font-size:26px; font-weight:800}
+.amt-in input{flex:1; border:none; outline:none; font-size:30px; font-weight:800; padding:14px 6px; background:transparent; font-variant-numeric:tabular-nums; width:100%}
+.chips{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px}
+.chip-amt{border:1.5px solid var(--ink); border-radius:4px; padding:11px 0; font-family:var(--mono); font-size:12px; background:var(--paper); cursor:pointer; text-align:center}
+.chip-amt.on{background:var(--cobalt); color:#fff}
+.sub-cta{width:100%; border:1.5px solid var(--ink); border-radius:4px; background:var(--cobalt); color:#fff; padding:16px; font-family:var(--mono); font-size:13px; letter-spacing:.08em; text-transform:uppercase; cursor:pointer; box-shadow:4px 4px 0 var(--ink); margin-top:22px}
+.sub-cta:active{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink)}
+.pd-hero{width:100%; height:230px; border:1.5px solid var(--ink); border-radius:4px; background:var(--soft); display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:16px}
+.pd-hero img{width:100%; height:100%; object-fit:cover} .pd-hero svg{width:72px; height:72px; opacity:.85}
+.pd-badges{display:flex; gap:7px; flex-wrap:wrap; margin:10px 0 4px}
+.meth{font-family:var(--mono); font-size:10px; letter-spacing:.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; border:1.5px solid var(--ink)}
+.kv-row{display:flex; justify-content:space-between; padding:12px 2px; border-bottom:1px solid var(--soft); font-size:14px}
+.kv-row b{font-family:var(--mono); font-weight:400}
+.store-row{display:flex; align-items:center; gap:13px; padding:14px; border:1.5px solid var(--ink); border-radius:4px; background:var(--paper); margin-bottom:12px}
+.store-ic{width:40px; height:40px; flex-shrink:0; border:1.5px solid var(--ink); border-radius:4px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:13px}
+.store-row .st-mid{flex:1; min-width:0} .store-row .st-mid b{font-size:14.5px; display:block} .store-row .st-mid span{font-size:12px; color:var(--grey)}
+.st-btn{font-family:var(--mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; padding:8px 12px; border:1.5px solid var(--ink); border-radius:3px; background:var(--paper); cursor:pointer; flex-shrink:0}
+.st-btn.conn{background:var(--mint)}
+.tgl-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 2px; border-bottom:1px solid var(--soft)}
+.tgl-row b{font-size:14.5px; font-weight:700; display:block} .tgl-row span{font-size:12px; color:var(--grey)}
+.tgl{width:46px; height:27px; border:1.5px solid var(--ink); border-radius:20px; background:var(--paper); position:relative; cursor:pointer; flex-shrink:0}
+.tgl i{position:absolute; top:2px; left:2px; width:19px; height:19px; background:var(--ink); border-radius:50%; transition:transform .18s}
+.tgl.on{background:var(--cobalt)} .tgl.on i{transform:translateX(19px); background:#fff}
+.faq{border:1.5px solid var(--ink); border-radius:4px; margin-bottom:11px; overflow:hidden; background:var(--paper)}
+.faq-q{padding:14px 15px; font-size:14px; font-weight:700; cursor:pointer; display:flex; justify-content:space-between; gap:10px}
+.faq-a{padding:0 15px; max-height:0; overflow:hidden; transition:max-height .25s,padding .25s; font-size:13.5px; color:var(--grey); line-height:1.55}
+.faq.on .faq-a{max-height:240px; padding:0 15px 14px}
+
 /* motion */
 .screen.active{animation:screenIn .28s var(--ease-out)}
 @keyframes screenIn{from{opacity:0}to{opacity:1}}
@@ -267,7 +309,7 @@ button:focus-visible,.mrow:focus-visible,.order:focus-visible,.todo-row:focus-vi
         <div class="bal" id="m-balance">$0.00</div>
         <div class="sub" id="m-balsub">Syncing…</div>
         <div class="hero-actions">
-          <button class="hbtn" onclick="location.href='wallet.html'">Add funds</button>
+          <button class="hbtn" onclick="openAddFunds()">Add funds</button>
           <button class="hbtn ghost" onclick="go('wallet')">Activity</button>
         </div>
       </div>
@@ -320,8 +362,8 @@ button:focus-visible,.mrow:focus-visible,.order:focus-visible,.todo-row:focus-vi
         <div class="bal" id="m-wbal">$0.00</div>
         <div class="sub" id="m-wsub">Syncing…</div>
         <div class="hero-actions">
-          <button class="hbtn" onclick="location.href='wallet.html'">Add funds</button>
-          <button class="hbtn ghost" onclick="location.href='wallet.html'">Withdraw</button>
+          <button class="hbtn" onclick="openAddFunds()">Add funds</button>
+          <button class="hbtn ghost" onclick="openWithdraw()">Withdraw</button>
         </div>
       </div>
       <div class="sec-head fu"><div class="sec-title">Recent activity</div></div>
@@ -336,7 +378,15 @@ button:focus-visible,.mrow:focus-visible,.order:focus-visible,.todo-row:focus-vi
 
   </div>
 
-  <button class="fab" id="fab" aria-label="New order" onclick="location.href='orders.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+  <div id="subpage">
+    <div class="sub-head">
+      <button class="sub-back" onclick="closeSub()" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="sub-title" id="sub-title"></div>
+    </div>
+    <div class="sub-body" id="sub-body"></div>
+  </div>
+
+  <button class="fab" id="fab" aria-label="New order" onclick="go('orders')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
 
   <nav class="nav">
     <button class="tab on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11l8-7 8 7M6 10v9h12v-9"/></svg><span>Home</span></button>
@@ -470,6 +520,11 @@ $('lg-go').onclick = function(){
   api('/auth/login',{ method:'POST', body:{ email:em, password:pw } }).then(function(r){
     b.innerHTML='Sign in'; b.disabled=false;
     if(!r.ok||!r.data||!r.data.token){ $('lg-err').textContent=(r.data&&r.data.error)||'Login failed.'; return; }
+    // Gate: this is the SELLER app — only an existing (already-registered) seller account may sign in.
+    // There is no sign-up here; register on egful.store. Staff have their own app.
+    var role = r.data.user && r.data.user.role;
+    if(role && STAFF.indexOf(role)>=0){ $('lg-err').textContent='Staff account — please use the Staff app.'; return; }
+    if(role && role!=='seller'){ $('lg-err').textContent='Registered sellers only. Sign up on egful.store first.'; return; }
     localStorage.setItem(TOKEN_KEY, r.data.token);
     localStorage.setItem(USER_KEY, JSON.stringify(r.data.user||{}));
     showApp();
@@ -579,6 +634,84 @@ function trackPkg(){
 }
 window.trackPkg=trackPkg;
 
+/* ══════════ in-app sub-pages (nothing links out to the desktop site) ══════════ */
+function openSub(title, html){ var b=$('sub-body'); if(b){ b.innerHTML=html; b.scrollTop=0; } var t=$('sub-title'); if(t) t.textContent=title; var s=$('subpage'); if(s) s.classList.add('on'); }
+function closeSub(){ var s=$('subpage'); if(s) s.classList.remove('on'); }
+window.openSub=openSub; window.closeSub=closeSub;
+
+function openProduct(i){
+  var p=CAT[i]||{}, img=p.img||p.image||'', price=Number(p.price||p.base_price||p.basePrice||0);
+  var meths=String(p.method||p.type||'').split(/[\/,]/).map(function(x){return x.trim();}).filter(Boolean);
+  var hero=isImg(img)?'<div class="pd-hero"><img src="'+esc(img)+'"></div>':'<div class="pd-hero">'+GARMENT+'</div>';
+  openSub(p.name||'Product', hero
+    +'<div style="font-size:22px;font-weight:800;letter-spacing:-.02em">'+esc(p.name||'Product')+'</div>'
+    +'<div class="pd-badges">'+meths.map(function(m){return '<span class="meth">'+esc(m)+'</span>';}).join('')+'<span class="meth" style="background:var(--mint)">'+esc(p.status||'Active')+'</span></div>'
+    +'<div style="font-size:26px;font-weight:800;margin:10px 0 6px">'+(price?money(price,2):'—')+'</div>'
+    +'<div class="kv-row"><span>SKU</span><b>'+esc(p.sku||'—')+'</b></div>'
+    +'<div class="kv-row"><span>Method</span><b>'+esc(p.method||p.type||'—')+'</b></div>'
+    +'<div class="kv-row"><span>Base cost</span><b>'+((p.base_price||p.basePrice)?money(p.base_price||p.basePrice,2):'—')+'</b></div>'
+    +'<div class="kv-row"><span>Status</span><b>'+esc(p.status||'Active')+'</b></div>'
+    +'<button class="sub-cta" onclick="closeSub();go(\'orders\')">Create an order</button>');
+}
+window.openProduct=openProduct;
+
+var _afAmt=0;
+function openAddFunds(){
+  _afAmt=0;
+  openSub('Add funds',
+    '<div class="fld"><label>Amount</label><div class="amt-in"><b>$</b><input id="af-amt" type="number" inputmode="decimal" placeholder="0" oninput="afType(this.value)"></div>'
+    +'<div class="chips" id="af-chips">'+[50,100,200,500].map(function(a){return '<button class="chip-amt" onclick="afPick('+a+')">$'+a+'</button>';}).join('')+'</div></div>'
+    +'<div class="fld"><label>Pay with</label>'
+    +'<div class="store-row" style="margin-bottom:10px"><div class="store-ic" style="background:var(--sky)">QR</div><div class="st-mid"><b>VietQR</b><span>Bank transfer · instant</span></div><div class="tgl on afm" onclick="afMethod(this)"><i></i></div></div>'
+    +'<div class="store-row" style="margin:0"><div class="store-ic" style="background:var(--butter)">CC</div><div class="st-mid"><b>Card</b><span>Visa · Mastercard</span></div><div class="tgl afm" onclick="afMethod(this)"><i></i></div></div></div>'
+    +'<div style="display:flex;justify-content:space-between;padding:12px 2px;border-top:1px solid var(--soft)"><span style="color:var(--grey)">Current balance</span><b style="font-family:var(--mono)">'+money(WALLET.balance)+'</b></div>'
+    +'<button class="sub-cta" onclick="doAddFunds()">Add funds</button>');
+}
+function afPick(a){ _afAmt=a; var el=$('af-amt'); if(el)el.value=a; document.querySelectorAll('#af-chips .chip-amt').forEach(function(c){c.classList.toggle('on', c.textContent==='$'+a);}); }
+function afType(v){ _afAmt=parseFloat(v)||0; document.querySelectorAll('#af-chips .chip-amt').forEach(function(c){c.classList.remove('on');}); }
+function afMethod(el){ document.querySelectorAll('.afm').forEach(function(t){t.classList.remove('on');}); el.classList.add('on'); }
+function doAddFunds(){ if(_afAmt<=0){ toast('Enter an amount.'); return; } WALLET.balance=Number(WALLET.balance||0)+_afAmt; (WALLET.ledger=WALLET.ledger||[]).unshift({delta:_afAmt,note:'Top-up',created_at:new Date().toISOString()}); renderWallet(); renderHome(); toast('Added '+money(_afAmt)); closeSub(); }
+window.openAddFunds=openAddFunds; window.afPick=afPick; window.afType=afType; window.afMethod=afMethod; window.doAddFunds=doAddFunds;
+
+var _wdAmt=0;
+function openWithdraw(){
+  _wdAmt=0;
+  openSub('Withdraw',
+    '<div class="fld"><label>Amount</label><div class="amt-in"><b>$</b><input id="wd-amt" type="number" inputmode="decimal" placeholder="0" oninput="wdType(this.value)"></div>'
+    +'<div class="chips" id="wd-chips" style="grid-template-columns:1fr"><button class="chip-amt" onclick="wdAll()">Withdraw all · '+money(WALLET.balance)+'</button></div></div>'
+    +'<div class="fld"><label>To</label><div class="store-row" style="margin:0"><div class="store-ic" style="background:var(--mint)">BK</div><div class="st-mid"><b>Bank ····4291</b><span>1–2 business days</span></div></div></div>'
+    +'<button class="sub-cta" onclick="doWithdraw()">Withdraw</button>');
+}
+function wdType(v){ _wdAmt=parseFloat(v)||0; }
+function wdAll(){ _wdAmt=Number(WALLET.balance||0); var el=$('wd-amt'); if(el)el.value=_wdAmt.toFixed(2); }
+function doWithdraw(){ if(_wdAmt<=0){ toast('Enter an amount.'); return; } if(_wdAmt>Number(WALLET.balance||0)){ toast('Exceeds balance.'); return; } WALLET.balance=Number(WALLET.balance||0)-_wdAmt; (WALLET.ledger=WALLET.ledger||[]).unshift({delta:-_wdAmt,note:'Withdrawal',created_at:new Date().toISOString()}); renderWallet(); renderHome(); toast('Withdrew '+money(_wdAmt)); closeSub(); }
+window.openWithdraw=openWithdraw; window.wdType=wdType; window.wdAll=wdAll; window.doWithdraw=doWithdraw;
+
+function openStores(){
+  var chans=[['Etsy','Connected · syncing','var(--coral)','ET',1],['Shopify','Not connected','var(--mint)','SH',0],['TikTok Shop','Not connected','var(--blush)','TT',0],['WooCommerce','Not connected','var(--sky)','WC',0]];
+  openSub('Connected stores', chans.map(function(c){ return '<div class="store-row"><div class="store-ic" style="background:'+c[2]+'">'+c[3]+'</div><div class="st-mid"><b>'+c[0]+'</b><span>'+c[1]+'</span></div><button class="st-btn'+(c[4]?' conn':'')+'" onclick="toast(\''+(c[4]?'Manage ':'Connect ')+c[0]+'\')">'+(c[4]?'Manage':'Connect')+'</button></div>'; }).join(''));
+}
+window.openStores=openStores;
+
+function openSettings(){
+  var u=user()||{};
+  openSub('Settings',
+    '<div class="fld"><label>Store name</label><input value="'+esc(u.name||'')+'"></div>'
+    +'<div class="fld"><label>Email</label><input value="'+esc(u.email||'')+'" readonly style="color:var(--grey)"></div>'
+    +'<div style="font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin:22px 2px 4px">Preferences</div>'
+    +'<div class="tgl-row"><div><b>Order notifications</b><span>New orders &amp; status changes</span></div><div class="tgl on" onclick="this.classList.toggle(\'on\')"><i></i></div></div>'
+    +'<div class="tgl-row"><div><b>Payout alerts</b><span>When funds land</span></div><div class="tgl on" onclick="this.classList.toggle(\'on\')"><i></i></div></div>'
+    +'<div class="tgl-row"><div><b>Dark mode</b><span>Easier on the eyes</span></div><div class="tgl" onclick="this.classList.toggle(\'on\')"><i></i></div></div>'
+    +'<button class="sub-cta" onclick="toast(\'Settings saved\');closeSub()">Save changes</button>');
+}
+window.openSettings=openSettings;
+
+function openHelp(){
+  var qs=[['How do I connect my Etsy shop?','Connected stores → Connect next to Etsy, then authorise. Orders sync within a minute.'],['When do I get paid?','Payouts land in your wallet as orders ship — withdraw anytime from the Wallet tab.'],['How is shipping calculated?','We rate-shop USPS/UPS live and buy the cheapest label per order.'],['Where do I edit designs?','Design Lab on desktop has the full editor; on mobile you review and approve.']];
+  openSub('Help &amp; support', qs.map(function(q,i){ return '<div class="faq" id="faq-'+i+'"><div class="faq-q" onclick="document.getElementById(\'faq-'+i+'\').classList.toggle(\'on\')">'+q[0]+'<span>+</span></div><div class="faq-a">'+q[1]+'</div></div>'; }).join('')+'<button class="sub-cta" onclick="toast(\'Opening support chat…\')">Contact support</button>');
+}
+window.openHelp=openHelp;
+
 /* ════════ PRODUCTS ════════ */
 function renderProducts(){
   $('m-prodcount').textContent = CAT.length+' live';
@@ -586,7 +719,7 @@ function renderProducts(){
   $('m-prodgrid').innerHTML = CAT.map(function(p,i){
     var img=p.img||p.image||''; var price=Number(p.price||p.base_price||p.basePrice||0);
     var inner = isImg(img) ? '<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">' : GARMENT;
-    return '<div class="prod" onclick="location.href=\'products-dash.html\'"><div class="prod-img" style="background:var(--'+PAS[i%PAS.length]+')"><span class="prod-sku">'+esc(p.sku||('EG-'+(i+1)))+'</span>'+inner+'</div>'+
+    return '<div class="prod" onclick="openProduct('+i+')"><div class="prod-img" style="background:var(--'+PAS[i%PAS.length]+')"><span class="prod-sku">'+esc(p.sku||('EG-'+(i+1)))+'</span>'+inner+'</div>'+
       '<div class="prod-body"><div class="prod-name">'+esc(p.name||'Product')+'</div><div class="prod-meta"><span class="prod-price">'+(price?money(price,0):'—')+'</span><span class="prod-sold">'+esc(p.status||'Active')+'</span></div></div></div>';
   }).join('');
 }
@@ -610,14 +743,14 @@ function fmtWhen(t){ try{ var d=new Date(t); return d.toLocaleDateString('en-US'
 function renderMenu(){
   var u=user(), staff=u&&STAFF.indexOf(u.role)>=0;
   var links=[
-    ['Connected stores','stores.html','var(--mint)','<path d="M4 7h16v13H4zM4 7l2-3h12l2 3M9 11h6"/>'],
-    ['Settings','settings.html','var(--butter)','<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>'],
-    ['Help &amp; support','help.html','var(--coral)','<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.7-2.5 2-2.5 3.5M12 17h.01"/>']
+    ['Connected stores','openStores()','var(--mint)','<path d="M4 7h16v13H4zM4 7l2-3h12l2 3M9 11h6"/>'],
+    ['Settings','openSettings()','var(--butter)','<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>'],
+    ['Help &amp; support','openHelp()','var(--coral)','<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.5 1.5c0 1.7-2.5 2-2.5 3.5M12 17h.01"/>']
   ];
-  if(staff) links.push(['Staff app','floor.html','var(--sky)','<path d="M4 7V5h3M20 7V5h-3M4 17v2h3M20 17v2h-3M7 12h10"/>']);
+  if(staff) links.push(['Staff app',"location.href='floor.html'",'var(--sky)','<path d="M4 7V5h3M20 7V5h-3M4 17v2h3M20 17v2h-3M7 12h10"/>']);
   var chev='<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>';
   $('m-menu').innerHTML = links.map(function(l){
-    return '<a class="mrow" href="'+l[1]+'"><div class="m-ic" style="background:'+l[2]+'"><svg viewBox="0 0 24 24" fill="none" stroke="#191918" stroke-width="1.7">'+l[3]+'</svg></div><b>'+l[0]+'</b>'+chev+'</a>';
+    return '<div class="mrow" onclick="'+l[1]+'"><div class="m-ic" style="background:'+l[2]+'"><svg viewBox="0 0 24 24" fill="none" stroke="#191918" stroke-width="1.7">'+l[3]+'</svg></div><b>'+l[0]+'</b>'+chev+'</div>';
   }).join('') + '<div class="mrow danger" onclick="logout()"><div class="m-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M15 4h4v16h-4M11 8l-4 4 4 4M7 12h9"/></svg></div><b>Log out</b></div>';
 }
 
