@@ -3,341 +3,351 @@
 <head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Product Detail – EGFULFILL</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..900;1,9..144,400..900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="eg-mkt.css"><!-- shared marketing header/footer + tokens + Departure Mono pixel nav -->
 <style>
-body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f4f2ef;margin:0}
-.nav-link{color:#555550;font-size:14px;font-weight:500;cursor:pointer;transition:color .15s;text-decoration:none}
-.nav-link:hover{color:#111827}
-.nav-link.active{color:#111827;font-weight:600}
-/* technique tabs */
-.tech-tab{flex:1;padding:8px 6px;border:1.5px solid #e5e4e0;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center;white-space:nowrap}
-.tech-tab.on{background:#fff;border-color:#191918;color:#191918}
-.tech-tab:not(.on):hover{border-color:#9ca3af}
-/* size buttons */
-.sz-btn{min-width:44px;padding:7px 10px;border:1.5px solid #e5e4e0;border-radius:7px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;background:#fff;color:#374151;transition:all .15s;text-align:center}
-.sz-btn.on{border-color:#191918;background:#191918;color:#fff}
-.sz-btn:not(.on):hover{border-color:#9ca3af}
-/* color swatches */
-.clr-swatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:all .15s;flex-shrink:0;position:relative}
-.clr-swatch.on{border-color:#191918 !important;box-shadow:0 0 0 2px #fff inset}
-.clr-swatch:hover{transform:scale(1.12)}
-/* thumbnail strip */
-.thumb{width:72px;height:72px;border-radius:8px;border:1.5px solid #e5e4e0;overflow:hidden;cursor:pointer;transition:border-color .15s;background:#f6f5f4;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.thumb.on{border-color:#191918}
-.thumb:hover:not(.on){border-color:#9ca3af}
-/* star rating */
-.star{color:#f59e0b;font-size:16px;line-height:1}
-.pd-layout{display:flex;gap:32px;align-items:flex-start}
-@media(max-width:900px){
-  .pd-layout{flex-direction:column!important}
-  .pd-thumbs{flex-direction:row!important;width:auto!important;gap:8px!important}
-  .pd-hero{width:100%!important}
-}
-::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-thumb{background:#e5e4e0;border-radius:4px}
-/* breadcrumb back link hover */
-.bc-link{color:#6b7280;text-decoration:none;font-weight:500;transition:color .15s}
-.bc-link:hover{color:#191918}
+  /* ===== Product detail (public) — neo-brutalism, on the marketing theme ===== */
+  .pd-shell{max-width:1180px;margin:0 auto;padding:clamp(22px,3vw,40px) clamp(18px,4vw,52px) clamp(56px,7vw,96px)}
+
+  /* breadcrumb */
+  .pd-bc{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:26px;flex-wrap:wrap;color:var(--grey2)}
+  .pd-bc a{color:var(--grey2);text-decoration:none;border-bottom:1.5px solid transparent;transition:color .12s,border-color .12s}
+  .pd-bc a:hover{color:var(--ink);border-bottom-color:var(--ink)}
+  .pd-bc #bc-name{color:var(--ink)}
+
+  /* layout */
+  .pd-layout{display:flex;gap:clamp(22px,3vw,40px);align-items:flex-start}
+  .pd-media{display:flex;gap:12px;flex-shrink:0}
+
+  /* thumbnail strip */
+  .pd-thumbs{display:flex;flex-direction:column;gap:10px;width:74px}
+  .thumb{width:74px;height:74px;border:1.5px solid var(--ink);overflow:hidden;cursor:pointer;background:#efece7;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:box-shadow .1s,transform .1s}
+  .thumb.on{box-shadow:3px 3px 0 var(--ink)}
+  .thumb:hover:not(.on){transform:translate(-1px,-1px);box-shadow:2px 2px 0 var(--ink)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* hero image */
+  .pd-hero{width:clamp(320px,42vw,460px);height:clamp(400px,52vw,540px);background:#efece7;border:1.5px solid var(--ink);box-shadow:6px 6px 0 var(--ink);overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center}
+  #hero-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#efece7}
+  .pd-hero .heronav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;background:var(--paper);border:1.5px solid var(--ink);box-shadow:2px 2px 0 var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .09s,box-shadow .09s}
+  .pd-hero .heronav:hover{transform:translateY(-50%) translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+  .pd-hero .heronav.l{left:12px}
+  .pd-hero .heronav.r{right:12px}
+
+  /* info panel */
+  .pd-info{flex:1;min-width:0;max-width:420px}
+  .pd-eyebrow{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey2);display:block;margin-bottom:10px}
+  #pd-name{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 60,'wght' 560;font-size:clamp(28px,3.4vw,40px);line-height:1.04;letter-spacing:-.015em;color:var(--ink);margin:0 0 8px}
+  #pd-sub{font-size:14px;color:var(--ink2);margin:0 0 14px;line-height:1.5}
+
+  .pd-rating{display:flex;align-items:center;gap:9px;margin-bottom:20px;padding-bottom:20px;border-bottom:1.5px solid var(--line)}
+  .star{color:var(--ink);font-size:15px;line-height:1;letter-spacing:1px}
+  .star.off{color:var(--line)}
+  #pd-reviews{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink);cursor:pointer;border-bottom:1.5px solid var(--ink)}
+
+  .pd-block{margin-bottom:22px}
+  .pd-block-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+  .pd-label{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink)}
+  .pd-link{font-family:var(--mono);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--violet);cursor:pointer;text-decoration:none;border-bottom:1.5px solid var(--violet)}
+  .pd-meta{font-size:13px;color:var(--ink2)}
+
+  /* technique tabs */
+  .tech-tab{padding:9px 14px;border:1.5px solid var(--ink);font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;background:#eceae4;color:var(--grey2);transition:background .1s,color .1s;margin:0 -1.5px -1.5px 0}
+  .tech-tab.on{background:var(--paper);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+  .tech-tab:not(.on):hover{color:var(--ink)}
+
+  /* size buttons */
+  .sz-btn{min-width:46px;padding:9px 12px;border:1.5px solid var(--ink);font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;background:var(--paper);color:var(--ink);transition:background .1s,color .1s,box-shadow .1s;text-align:center;margin:0 -1.5px -1.5px 0}
+  .sz-btn.on{background:var(--ink);color:var(--paper)}
+  .sz-btn:not(.on):hover{box-shadow:2px 2px 0 var(--ink)}
+
+  /* color swatches */
+  .clr-swatch{width:28px;height:28px;cursor:pointer;border:1.5px solid var(--ink);transition:box-shadow .1s,transform .1s;flex-shrink:0}
+  .clr-swatch.on{box-shadow:2px 2px 0 var(--ink)}
+  .clr-swatch:hover{transform:translate(-1px,-1px)}
+
+  /* price + delivery cards */
+  .pd-facts{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:20px;border:1.5px solid var(--ink);box-shadow:4px 4px 0 var(--ink);background:var(--paper)}
+  .pd-fact{padding:16px 18px}
+  .pd-fact+.pd-fact{border-left:1.5px solid var(--ink)}
+  .pd-fact .cap{font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--grey2);margin-bottom:8px}
+  #pd-price{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:32px;letter-spacing:-.03em;line-height:1;color:var(--ink)}
+  .pd-fact .note{font-size:11.5px;color:var(--ink2);margin-top:6px}
+  .pd-fact .ship-row{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px}
+  .pd-fact .days{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 30,'wght' 800;font-size:20px;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+
+  /* bulk note */
+  .pd-bulk{background:var(--amber);border:1.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:11px 14px;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .pd-bulk .tag{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 7px;flex-shrink:0}
+  .pd-bulk .txt{font-family:var(--mono);font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--ink);line-height:1.4}
+
+  /* CTAs */
+  .pd-cta{display:block;width:100%;text-align:center;font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;text-decoration:none;border:1.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink);padding:14px;transition:transform .09s,box-shadow .09s;font-family:var(--mono)}
+  .pd-cta:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--ink)}
+  .pd-cta.primary{background:var(--violet);color:#fff;margin-bottom:11px}
+  .pd-cta.ghost{background:var(--paper);color:var(--ink)}
+
+  /* trust row */
+  .pd-trust{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap}
+  .pd-trust span{font-family:var(--mono);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--grey2);display:flex;align-items:center;gap:5px}
+
+  /* spec panels */
+  .pd-specs-grid{margin-top:clamp(34px,4vw,52px);display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .pd-panel{border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper)}
+  .pd-panel-hd{border-bottom:1.5px solid var(--ink);padding:11px 18px;font-family:var(--mono);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink);display:flex;align-items:center;gap:9px;background:var(--indigo)}
+  .pd-panel-hd .rl{flex:1;height:8px;background:repeating-linear-gradient(90deg,var(--ink) 0,var(--ink) 1.5px,transparent 1.5px,transparent 5px)}
+  .pd-panel-bd{padding:18px 20px;display:flex;flex-direction:column;gap:11px}
+  .pd-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+  .pd-row .k{font-size:13px;color:var(--grey2);white-space:nowrap}
+  .pd-row .v{font-size:13px;color:var(--ink);font-weight:600;text-align:right}
+  .pd-row-note{border-top:1.5px solid var(--line);padding-top:11px;margin-top:2px;font-size:12px;color:var(--grey2)}
+  .pd-row-note strong{color:var(--ink)}
+
+  /* CTA band */
+  .pd-band{margin-top:clamp(40px,5vw,68px);background:var(--ink);border:1.5px solid var(--ink);box-shadow:7px 7px 0 var(--violet);padding:clamp(34px,5vw,56px) clamp(24px,4vw,48px);text-align:center;color:var(--paper)}
+  .pd-band .flag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#fff;border:1.5px solid #4a4844;padding:5px 12px;margin-bottom:20px}
+  .pd-band h2{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 70,'wght' 480;font-size:clamp(28px,4vw,46px);line-height:1.04;letter-spacing:-.015em;margin:0 0 12px;color:var(--paper)}
+  .pd-band p{color:#b7b2aa;font-size:15px;line-height:1.55;margin:0 auto 26px;max-width:44ch}
+  .pd-band-cta{display:flex;align-items:center;justify-content:center;gap:13px;flex-wrap:wrap}
+  .pd-band-cta a{font-family:var(--mono);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-decoration:none;padding:13px 26px;border:1.5px solid var(--paper);box-shadow:3px 3px 0 var(--paper);transition:transform .09s,box-shadow .09s}
+  .pd-band-cta a:hover{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--paper)}
+  .pd-band-cta .go{background:var(--violet);color:#fff}
+  .pd-band-cta .ghost{background:transparent;color:var(--paper)}
+
+  @media(max-width:900px){
+    .pd-layout{flex-direction:column}
+    .pd-media{flex-direction:column-reverse;width:100%}
+    .pd-thumbs{flex-direction:row;width:auto;flex-wrap:wrap}
+    .pd-hero{width:100%}
+    .pd-info{max-width:none;width:100%}
+    .pd-specs-grid{grid-template-columns:1fr}
+  }
 </style>
-<style id="eg-outline-btns">
-.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
-.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
-.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
-.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
-.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
-.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
-.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
-html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
-html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
-html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
-</style>
-<style id="eg-input-focus">
-input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
-.btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
-.ni:focus{outline:none!important;box-shadow:none!important}
-</style>
-<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
 <script src="egfulfill-store.js"></script>
-<script src="eg-theme.js"></script>
 </head>
 <body>
 
-
-<!-- NAV -->
-<nav style="background:#f4f2ef;border-bottom:1px solid #e5e4e0;position:sticky;top:0;z-index:50">
-  <div style="max-width:1280px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:32px">
-      <a href="index.html" style="text-decoration:none">
-        <span style="font-family:'Fraunces',serif;font-weight:900;font-optical-sizing:auto;font-weight:800;font-size:15px;letter-spacing:-0.02em;color:#191918;font-size:28px;letter-spacing:0">egfulfill</span>
-      </a>
-      <div style="display:flex;align-items:center;gap:24px">
-        <a href="products.html" class="nav-link active">Products</a>
-        <a href="howitworks.html" class="nav-link">How It Works</a>
-        <a href="about.html" class="nav-link">About</a>
-        <a href="apidocs.html" class="nav-link">Resources</a>
+<!-- STICKY TOP: full-width promo bar + floating split header (copied from index.html) -->
+<div class="topstick">
+  <div class="promo"><div class="page"><div class="promo-in"><span class="b-tag">New</span> TikTok Shop sync is live — connect your shop in two minutes. <a href="howitworks.html">See how it works →</a></div></div></div>
+  <div class="hdr-wrap">
+    <div class="page">
+      <header class="mkhead">
+        <div class="mkhead-l">
+          <span class="mklogo-cell"><a class="mklogo" href="index.html">egfulfill</a></span>
+          <nav class="mknav">
+            <a href="products.html"><span class="sq"></span>Products</a>
+            <a href="howitworks.html"><span class="sq"></span>How it works</a>
+            <a href="pricing.html"><span class="sq"></span>Pricing</a>
+            <a href="apidocs.html"><span class="sq"></span>API docs</a>
+          </nav>
+        </div>
+        <div class="mkright"><a class="mklogin" href="seller-login.html">Log in</a><a class="mkstart" href="seller-signup.html">Start for free</a></div>
+        <button class="burger" onclick="var m=document.getElementById('mobnav');m.style.display=m.style.display==='flex'?'none':'flex'" aria-label="Menu"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 5h14M2 9h14M2 13h14" stroke="#191918" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+      </header>
+      <div id="mobnav">
+        <a href="products.html">Products</a>
+        <a href="howitworks.html">How it works</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="apidocs.html">API docs</a>
+        <a href="seller-login.html">Log in</a>
+        <a href="seller-signup.html" style="color:var(--violet)">Start for free →</a>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <a href="seller-login.html" class="nav-link">Log in</a>
-      <button style="background:#111827;color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Start for free</button>
-    </div>
   </div>
-</nav>
+</div>
 
 <!-- Main content -->
-<div style="max-width:1100px;margin:0 auto;padding:28px 24px 60px">
+<div class="pd-shell">
 
   <!-- Breadcrumb -->
-  <div style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:28px;flex-wrap:wrap">
-    <a href="products.html" class="bc-link">Products</a>
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 3l3 3-3 3" stroke="#9ca3af" stroke-width="1.3" stroke-linecap="round"/></svg>
-    <span id="bc-name" style="color:#191918;font-weight:600">Product Detail</span>
+  <div class="pd-bc">
+    <a href="products.html">Products</a>
+    <span>›</span>
+    <span id="bc-name">Product Detail</span>
   </div>
 
   <!-- Product layout -->
   <div class="pd-layout">
 
     <!-- Left: thumbnail strip + hero image -->
-    <div style="display:flex;gap:12px;flex-shrink:0">
+    <div class="pd-media">
       <!-- Thumbnail strip -->
-      <div class="pd-thumbs" style="display:flex;flex-direction:column;gap:8px;width:72px">
+      <div class="pd-thumbs">
         <div class="thumb on" id="thumb-0" onclick="setHero(0)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><circle cx="10" cy="12" r="3" fill="#c9c5bd"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#bfbbb2"/></svg>
         </div>
         <div class="thumb" id="thumb-1" onclick="setHero(1)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dbeafe"/><circle cx="14" cy="15" r="5" fill="#93c5fd"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><circle cx="14" cy="15" r="5" fill="#c9c5bd"/></svg>
         </div>
         <div class="thumb" id="thumb-2" onclick="setHero(2)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#dcfce7"/><path d="M8 20l4-8 4 6 3-4 4 6" stroke="#86efac" stroke-width="1.5" fill="none"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><path d="M8 20l4-8 4 6 3-4 4 6" stroke="#c9c5bd" stroke-width="1.5" fill="none"/></svg>
         </div>
         <div class="thumb" id="thumb-3" onclick="setHero(3)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#fef9c3"/><circle cx="9" cy="13" r="3" fill="#fde047"/><circle cx="18" cy="16" r="4" fill="#facc15"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><circle cx="9" cy="13" r="3" fill="#c9c5bd"/><circle cx="18" cy="16" r="4" fill="#bfbbb2"/></svg>
         </div>
         <div class="thumb" id="thumb-4" onclick="setHero(4)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f3e8ff"/><rect x="8" y="10" width="12" height="10" rx="2" fill="#d8b4fe"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><rect x="8" y="10" width="12" height="10" fill="#c9c5bd"/></svg>
         </div>
         <div class="thumb" id="thumb-5" onclick="setHero(5)">
-          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#f0fdf4"/><path d="M7 20c0-4 3-7 7-7s7 3 7 7" fill="#bbf7d0"/></svg>
+          <svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><path d="M7 20c0-4 3-7 7-7s7 3 7 7" fill="#c9c5bd"/></svg>
         </div>
       </div>
 
       <!-- Hero image -->
-      <div class="pd-hero" style="width:420px;height:500px;border-radius:14px;background:#f6f5f4;border:1px solid #e5e4e0;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center">
-        <div id="hero-inner" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f0ede9">
-          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
-            <rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>
-            <circle cx="40" cy="52" r="12" fill="#d1d0cb"/>
-            <path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>
-            <text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">Front view</text>
+      <div class="pd-hero">
+        <div id="hero-inner">
+          <svg width="130" height="130" viewBox="0 0 120 120" fill="none">
+            <rect x="10" y="30" width="100" height="75" fill="#e0ddd6"/>
+            <circle cx="40" cy="52" r="12" fill="#c9c5bd"/>
+            <path d="M10 85l28-25 22 22 17-14 33 27" fill="#bfbbb2"/>
           </svg>
         </div>
         <!-- Nav arrows -->
-        <button onclick="heroNav(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <button onclick="heroNav(-1)" class="heronav l" aria-label="Previous image">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L5 7l3.5 4" stroke="#191918" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button onclick="heroNav(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid #e5e4e0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.12)'" onmouseout="this.style.boxShadow=''">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#374151" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <button onclick="heroNav(1)" class="heronav r" aria-label="Next image">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5.5 3L9 7l-3.5 4" stroke="#191918" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </div>
     </div>
 
     <!-- Right: product info panel -->
-    <div style="flex:1;min-width:0;max-width:380px">
+    <div class="pd-info">
 
-      <!-- Product name -->
-      <h1 id="pd-name" style="font-size:1.4rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0 0 6px;line-height:1.3">Product</h1>
-      <p id="pd-sub" style="font-size:13px;color:#6b7280;margin:0 0 10px">Print on demand · multiple techniques</p>
+      <span class="pd-eyebrow">Catalog · Print on demand</span>
+      <h1 id="pd-name">Product</h1>
+      <p id="pd-sub">Print on demand · multiple techniques</p>
 
       <!-- Rating -->
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:18px">
+      <div class="pd-rating">
         <div>
-          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span style="color:#d1d0cb;font-size:16px;line-height:1">★</span>
+          <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star off">★</span>
         </div>
-        <span id="pd-reviews" style="font-size:12.5px;color:#3b82f6;font-weight:600;cursor:pointer">Reviews</span>
+        <span id="pd-reviews">Reviews</span>
       </div>
 
-      <div style="border-top:1px solid #f0ede9;padding-top:18px">
-
-        <!-- Technique -->
-        <div style="margin-bottom:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Technique</span>
-            <span style="font-size:12px;color:#3b82f6;font-weight:500;cursor:pointer">File guidelines ↗</span>
-          </div>
-          <div id="pd-techs" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <!-- Technique -->
+      <div class="pd-block">
+        <div class="pd-block-hd">
+          <span class="pd-label">Technique</span>
+          <span class="pd-link">File guidelines ↗</span>
         </div>
-
-        <!-- Color -->
-        <div style="margin-bottom:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Color</span>
-            <span id="pd-color-name" style="font-size:12px;color:#6b7280">Black</span>
-          </div>
-          <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-
-        <!-- Size -->
-        <div style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <span style="font-size:12.5px;font-weight:700;color:#191918;text-transform:uppercase;letter-spacing:.04em">Size</span>
-            <span style="font-size:12px;color:#3b82f6;font-weight:500;cursor:pointer">Size guide</span>
-          </div>
-          <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-
-        <!-- Price + delivery -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
-          <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
-            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">From</div>
-            <div id="pd-price" style="font-size:1.5rem;font-weight:800;color:#191918;letter-spacing:-0.04em;line-height:1">$10.95</div>
-            <div style="font-size:11.5px;color:#6b7280;margin-top:4px">+ shipping from <strong>$4.99</strong></div>
-          </div>
-          <div style="background:#fff;border:1px solid #e5e4e0;border-radius:10px;padding:14px">
-            <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Delivery</div>
-            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
-              <span style="font-size:13px">🌍</span>
-              <span style="font-size:13px;font-weight:600;color:#374151">Worldwide</span>
-            </div>
-            <div style="font-size:1.1rem;font-weight:800;color:#191918;letter-spacing:-0.03em;line-height:1.2">7–17 days</div>
-          </div>
-        </div>
-
-        <!-- Bulk price note -->
-        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:20px;display:flex;align-items:center;gap:8px">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="#d97706" stroke-width="1.3"/><path d="M7.5 5v3.5M7.5 10.5v.5" stroke="#d97706" stroke-width="1.3" stroke-linecap="round"/></svg>
-          <div>
-            <span style="font-size:12px;font-weight:600;color:#92400e">Bulk pricing available</span>
-            <span style="font-size:12px;color:#b45309"> · Save up to 20% on 50+ units</span>
-          </div>
-        </div>
-
-        <!-- Public CTAs -->
-        <button onclick="window.location='seller-login.html'" style="width:100%;background:#111827;color:#fff;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;margin-bottom:10px;letter-spacing:.01em" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-          Log in to start designing →
-        </button>
-        <button onclick="window.location='seller-signup.html'" style="width:100%;background:#fff;color:#191918;border:1.5px solid #e5e4e0;border-radius:10px;padding:12px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
-          Create free account
-        </button>
-
-        <!-- Trust badge -->
-        <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:16px">
-          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5H11l-2.8 2 1 3.5L6 8.5l-3.2 2.5 1-3.5L1 4.5h3.5L6 1z" fill="#191918"/></svg>
-            No minimums
-          </span>
-          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Free to start
-          </span>
-          <span style="font-size:11.5px;color:#9ca3af;display:flex;align-items:center;gap:4px">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" rx="1.5" stroke="#9ca3af" stroke-width="1.2"/><path d="M4 4V3a2 2 0 014 0v1" stroke="#9ca3af" stroke-width="1.2"/></svg>
-            Secure checkout
-          </span>
-        </div>
-
+        <div id="pd-techs" style="display:flex;flex-wrap:wrap"></div>
       </div>
+
+      <!-- Color -->
+      <div class="pd-block">
+        <div class="pd-block-hd">
+          <span class="pd-label">Color</span>
+          <span id="pd-color-name" class="pd-meta">Black</span>
+        </div>
+        <div id="pd-colors" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
+      <!-- Size -->
+      <div class="pd-block">
+        <div class="pd-block-hd">
+          <span class="pd-label">Size</span>
+          <span class="pd-link">Size guide</span>
+        </div>
+        <div id="pd-sizes" style="display:flex;flex-wrap:wrap"></div>
+      </div>
+
+      <!-- Price + delivery -->
+      <div class="pd-facts">
+        <div class="pd-fact">
+          <div class="cap">From</div>
+          <div id="pd-price">$10.95</div>
+          <div class="note">+ shipping from <strong>$4.99</strong></div>
+        </div>
+        <div class="pd-fact">
+          <div class="cap">Delivery</div>
+          <div class="ship-row"><span>🌍</span><span>Worldwide</span></div>
+          <div class="days">7–17 days</div>
+        </div>
+      </div>
+
+      <!-- Bulk price note -->
+      <div class="pd-bulk">
+        <span class="tag">Bulk</span>
+        <span class="txt">Bulk pricing available · Save up to 20% on 50+ units</span>
+      </div>
+
+      <!-- Public CTAs -->
+      <a class="pd-cta primary" href="seller-login.html">Log in to start designing →</a>
+      <a class="pd-cta ghost" href="seller-signup.html">Create free account</a>
+
+      <!-- Trust badge -->
+      <div class="pd-trust">
+        <span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5H11l-2.8 2 1 3.5L6 8.5l-3.2 2.5 1-3.5L1 4.5h3.5L6 1z" fill="#191918"/></svg>
+          No minimums
+        </span>
+        <span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 6.5l2.5 2.5 5.5-5.5" stroke="#191918" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Free to start
+        </span>
+        <span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="4" width="10" height="7" stroke="#191918" stroke-width="1.2"/><path d="M4 4V3a2 2 0 014 0v1" stroke="#191918" stroke-width="1.2"/></svg>
+          Secure checkout
+        </span>
+      </div>
+
     </div>
   </div>
 
   <!-- Product specs section -->
-  <div style="margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
-    <div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:20px 22px">
-      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Product Details</div>
-      <div id="pd-specs" style="display:flex;flex-direction:column;gap:9px"></div>
+  <div class="pd-specs-grid">
+    <div class="pd-panel">
+      <div class="pd-panel-hd"><span>Product Details</span><span class="rl"></span></div>
+      <div class="pd-panel-bd" id="pd-specs"></div>
     </div>
-    <div style="background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:20px 22px">
-      <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Print Areas</div>
-      <div style="display:flex;flex-direction:column;gap:9px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;color:#374151;font-weight:500">Front center</span>
-          <span style="font-size:12.5px;color:#6b7280">12" × 16" max</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;color:#374151;font-weight:500">Back center</span>
-          <span style="font-size:12.5px;color:#6b7280">12" × 16" max</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;color:#374151;font-weight:500">Left sleeve</span>
-          <span style="font-size:12.5px;color:#6b7280">3" × 3" max</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:13px;color:#374151;font-weight:500">Right sleeve</span>
-          <span style="font-size:12.5px;color:#6b7280">3" × 3" max</span>
-        </div>
-        <div style="border-top:1px solid #f0ede9;padding-top:9px;margin-top:3px">
-          <div style="font-size:12px;color:#9ca3af">Min resolution: <strong style="color:#374151">150 DPI</strong> · Preferred: <strong style="color:#374151">300 DPI</strong></div>
-        </div>
+    <div class="pd-panel">
+      <div class="pd-panel-hd"><span>Print Areas</span><span class="rl"></span></div>
+      <div class="pd-panel-bd">
+        <div class="pd-row"><span class="k">Front center</span><span class="v">12" × 16" max</span></div>
+        <div class="pd-row"><span class="k">Back center</span><span class="v">12" × 16" max</span></div>
+        <div class="pd-row"><span class="k">Left sleeve</span><span class="v">3" × 3" max</span></div>
+        <div class="pd-row"><span class="k">Right sleeve</span><span class="v">3" × 3" max</span></div>
+        <div class="pd-row-note">Min resolution: <strong>150 DPI</strong> · Preferred: <strong>300 DPI</strong></div>
       </div>
     </div>
   </div>
 
   <!-- Sign up CTA banner -->
-  <div style="margin-top:48px;background:#111827;border-radius:20px;padding:40px;text-align:center">
-    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:999px;padding:4px 14px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.7);margin-bottom:20px">
-      ✦ No minimums · No upfront cost
-    </div>
-    <h2 style="font-size:1.8rem;font-weight:700;color:#fff;letter-spacing:-0.04em;margin:0 0 10px;line-height:1.2">Ready to sell this product?</h2>
-    <p style="color:rgba(255,255,255,.5);font-size:13.5px;margin:0 0 24px;max-width:380px;margin-left:auto;margin-right:auto;line-height:1.6">Create a free account, upload your design, and start selling in minutes. We handle printing, packing, and shipping.</p>
-    <div style="display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
-      <button onclick="window.location='seller-signup.html'" style="background:#fff;color:#111827;font-size:14px;font-weight:700;padding:12px 28px;border-radius:10px;border:none;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
-        Create free account →
-      </button>
-      <button onclick="window.location='seller-login.html'" style="background:transparent;color:rgba(255,255,255,0.7);font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">
-        Log in
-      </button>
+  <div class="pd-band">
+    <div class="flag">✦ No minimums · No upfront cost</div>
+    <h2>Ready to sell this product?</h2>
+    <p>Create a free account, upload your design, and start selling in minutes. We handle printing, packing, and shipping.</p>
+    <div class="pd-band-cta">
+      <a class="go" href="seller-signup.html">Create free account →</a>
+      <a class="ghost" href="seller-login.html">Log in</a>
     </div>
   </div>
 
 </div>
 
-<!-- FOOTER -->
-<footer style="background:#f4f2ef;border-top:1px solid #e5e4e0;padding:48px 0 32px">
-  <div style="max-width:1280px;margin:0 auto;padding:0 24px">
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:32px;margin-bottom:40px">
-      <div style="grid-column:span 1">
-        <div style="font-weight:800;font-size:15px;letter-spacing:-0.02em;color:#191918;margin-bottom:10px"><span style="color:#191918">EG</span>FULFILL</div>
-        <p style="font-size:12px;color:#9ca3af;line-height:1.6">Print-on-demand fulfillment built for scale. Zero minimums.</p>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Products</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <a href="products.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Apparel</a>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Accessories</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Home & Living</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">New arrivals</span>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Platform</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <a href="howitworks.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">How It Works</a>
-          <a href="apidocs.html" style="font-size:13px;color:#555550;text-decoration:none" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">API Docs</a>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Company</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">About</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Blog</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Careers</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Contact</span>
-        </div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">Legal</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Privacy</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Terms</span>
-          <span style="font-size:13px;color:#555550;cursor:pointer" onmouseover="this.style.color='#191918'" onmouseout="this.style.color='#555550'">Cookies</span>
-        </div>
+<!-- FOOTER (full-width, copied from index.html) -->
+<div class="mkfoot">
+  <div class="page">
+    <div class="mkfoot-cta">
+      <div class="mkfoot-word">egfulfill</div>
+      <div class="r">
+        <div class="tagline">Print-on-demand fulfilment for every order, from every channel — in one place.</div>
       </div>
     </div>
-    <div style="border-top:1px solid #e5e4e0;padding-top:20px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:12px;color:#9ca3af">© 2026 EGFULFILL. All rights reserved.</span>
-      <span style="font-size:12px;color:#9ca3af">Made with care for sellers worldwide 🌍</span>
+    <div class="mkfoot-cols">
+      <div class="mkfoot-col"><h5>Product</h5><a href="products.html">Browse catalog</a><a href="howitworks.html">How it works</a><a href="pricing.html">Pricing</a><a href="apidocs.html">API docs</a></div>
+      <div class="mkfoot-col"><h5>Company</h5><a href="about.html">About</a><a href="security.html">Security</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
+      <div class="mkfoot-col"><h5>Channels</h5><a href="products.html">Etsy</a><a href="products.html">Shopify</a><a href="products.html">TikTok Shop</a><a href="products.html">Amazon</a></div>
+      <div class="mkfoot-col"><h5>Get started</h5><a href="seller-signup.html">Create account</a><a href="seller-login.html">Seller log in</a><a href="login.html">Staff log in</a><a href="help.html">Help centre</a></div>
     </div>
+    <div class="mkfoot-bar"><span>© 2026 EGFULFILL · Made for makers</span><span class="dots"><span></span><span></span><span></span></span></div>
   </div>
-</footer>
+</div>
 
 <script>
 var PRODUCT_DATA = {
@@ -424,7 +434,7 @@ var _tech = 'dtg';
 var _techs = [];
 var _images = [];
 
-var HERO_BKGS = ['#f0ede9','#dbeafe','#dcfce7','#fef9c3','#f3e8ff','#f0fdf4'];
+var HERO_BKGS = ['#efece7','#e6e3dc','#eceae4','#e9e6df','#e4e1da','#efece7'];
 
 function init() {
   document.getElementById('pd-name').textContent = _prod.name;
@@ -447,7 +457,7 @@ function init() {
   // Colors
   var cEl = document.getElementById('pd-colors');
   cEl.innerHTML = _prod.colors.map(function(c,i){
-    return '<div class="clr-swatch'+(i===0?' on':'')+'" style="background:'+c+';border-color:'+(i===0?'#191918':'#e5e4e0')+'" title="'+_prod.colorNames[i]+'" onclick="selectColor('+i+')"></div>';
+    return '<div class="clr-swatch'+(i===0?' on':'')+'" style="background:'+c+'" title="'+_prod.colorNames[i]+'" onclick="selectColor('+i+')"></div>';
   }).join('');
   document.getElementById('pd-color-name').textContent = _prod.colorNames[0];
 
@@ -464,7 +474,7 @@ function init() {
   // Specs
   var spEl = document.getElementById('pd-specs');
   spEl.innerHTML = _prod.specs.map(function(sp){
-    return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px"><span style="font-size:13px;color:#6b7280;white-space:nowrap">'+sp.k+'</span><span style="font-size:13px;color:#374151;font-weight:500;text-align:right">'+sp.v+'</span></div>';
+    return '<div class="pd-row"><span class="k">'+sp.k+'</span><span class="v">'+sp.v+'</span></div>';
   }).join('');
 }
 
@@ -477,11 +487,11 @@ function pdRenderThumbs() {
     var src = _images[i];
     if (src) {
       html += '<div class="thumb' + (i === 0 ? ' on' : '') + '" id="thumb-' + i + '" onclick="setHero(' + i + ')" style="cursor:pointer">'
-        + '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'"/>'
+        + '<img src="' + src + '" onerror="this.style.display=\'none\'"/>'
       + '</div>';
     } else {
       html += '<div class="thumb" id="thumb-' + i + '" style="cursor:default;opacity:.5">'
-        + '<svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" rx="2" fill="#e5e4e0"/><circle cx="10" cy="12" r="3" fill="#d1d0cb"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#c8c7c2"/></svg>'
+        + '<svg width="30" height="30" viewBox="0 0 28 28" fill="none"><rect x="2" y="6" width="24" height="18" fill="#e0ddd6"/><circle cx="10" cy="12" r="3" fill="#c9c5bd"/><path d="M2 20l7-6 5 5 4-3 8 6" fill="#bfbbb2"/></svg>'
       + '</div>';
     }
   }
@@ -492,7 +502,6 @@ function selectColor(idx) {
   _selColor = idx;
   document.querySelectorAll('.clr-swatch').forEach(function(el,i){
     el.classList.toggle('on', i===idx);
-    el.style.borderColor = i===idx ? '#191918' : '#e5e4e0';
   });
   var name = _prod.colorNames[idx];
   document.getElementById('pd-color-name').textContent = name;
@@ -500,7 +509,7 @@ function selectColor(idx) {
   var ci = _prod.colorImages && _prod.colorImages[name];
   var heroEl = document.getElementById('hero-inner');
   if (ci) {
-    heroEl.style.background = '#f6f5f4';
+    heroEl.style.background = '#efece7';
     heroEl.innerHTML = '<img src="' + ci + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'\'"/>';
     document.querySelectorAll('.thumb').forEach(function(t){ t.classList.remove('on'); });
   } else if (heroEl) {
@@ -560,15 +569,15 @@ function setHero(idx) {
   if (!heroEl) return;
   var src = _images[idx];
   if (src) {
-    heroEl.style.background = '#f6f5f4';
+    heroEl.style.background = '#efece7';
     heroEl.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block" onerror="this.parentNode.innerHTML=\'<div style=&quot;color:#9ca3af;font-size:13px&quot;>Image failed to load</div>\'"/>';
   } else {
     heroEl.style.background = HERO_BKGS[idx % HERO_BKGS.length];
-    heroEl.innerHTML = '<svg width="120" height="120" viewBox="0 0 120 120" fill="none">'
-      + '<rect x="10" y="30" width="100" height="75" rx="8" fill="#e5e4e0"/>'
-      + '<circle cx="40" cy="52" r="12" fill="#d1d0cb"/>'
-      + '<path d="M10 85l28-25 22 22 17-14 33 27" fill="#c8c7c2"/>'
-      + '<text x="60" y="18" text-anchor="middle" font-size="10" fill="#9ca3af" font-family="Inter,sans-serif">View ' + (idx + 1) + '</text>'
+    heroEl.innerHTML = '<svg width="130" height="130" viewBox="0 0 120 120" fill="none">'
+      + '<rect x="10" y="30" width="100" height="75" fill="#e0ddd6"/>'
+      + '<circle cx="40" cy="52" r="12" fill="#c9c5bd"/>'
+      + '<path d="M10 85l28-25 22 22 17-14 33 27" fill="#bfbbb2"/>'
+      + '<text x="60" y="18" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="ui-monospace,monospace">VIEW ' + (idx + 1) + '</text>'
     + '</svg>';
   }
 }
@@ -581,5 +590,6 @@ function heroNav(dir) {
 
 init();
 </script>
+<script src="eg-mkt.js"></script>
 </body>
 </html>

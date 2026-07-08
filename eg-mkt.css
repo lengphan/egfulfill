@@ -4,8 +4,9 @@
     --ground:#faf9f7; --paper:#fdfcfa; --ink:#191918; --ink2:#40403d;
     --grey:#9ca3af; --grey2:#6b7280; --line:#e5e4e0;
     --violet:#2f4bf0; --hot:#f76f9b;  /* accent -> cobalt (was #9f52e0) */
-    --mint:#9be8bf; --pink:#f7bcd8; --amber:#f8d264; --indigo:#a9b6f2;
-    --coral:#f6b48c; --lilac:#cdbcf5; --sky:#b0d4f7;
+    --mint:#9be8bf; --pink:#f7bcd8; --amber:#f8d264; --indigo:#6d8cff;  /* was periwinkle #a9b6f2 -> light cobalt (no violet in UI) */
+    --coral:#f6b48c; --lilac:#c3cffb; --sky:#b0d4f7;  /* --lilac was violet #cdbcf5 -> pale cobalt tint */
+    --cobalt-tint:#e4eafe;  /* soft cobalt fill for the highlighted/"Popular" plan card */
     --disp:'Fraunces',Georgia,serif;
     --mono:'Departure Mono',ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace;
     --body:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;
@@ -165,7 +166,7 @@
   /* pricing */
   .prgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
   .prcard{border:1.5px solid var(--ink);box-shadow:5px 5px 0 var(--ink);background:var(--paper);padding:26px 24px;display:flex;flex-direction:column}
-  .prcard.pop{background:var(--lilac)}
+  .prcard.pop{background:var(--cobalt-tint)}
   .prcard .pn{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--grey2);display:flex;align-items:center;gap:8px}
   .prcard .pn .sq{width:9px;height:9px;background:var(--ink)}
   .prcard .price{font-family:var(--disp);font-optical-sizing:none;font-variation-settings:'opsz' 40,'wght' 900;font-size:44px;letter-spacing:-.03em;margin:14px 0 2px;line-height:1}
