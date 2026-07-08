@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EG Floor">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<title>EG Floor — Warehouse</title>
+<style>
+  :root{
+    --bg:#f4f2ef; --card:#ffffff; --bd:#e5e4e0; --dk:#1a1917;
+    --tx:#191918; --mut:#6b6b68; --red:#c0392b; --warn:#6b7280; --green:#1e7a46;
+    --cream:#f3eee2;                 /* wordmark / accents on the dark bar */
+    --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 14px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;overflow:hidden;
+  }
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input{font-family:inherit}
+
+  /* ── App shell ───────────────────────────────────────────── */
+  #app{display:flex;flex-direction:column;height:100dvh}
+  header.bar{
+    flex:0 0 auto;background:var(--dk);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    display:flex;align-items:center;gap:10px;
+  }
+  header.bar .logo{font-family:'Fraunces',Georgia,serif;font-weight:900;font-optical-sizing:auto;font-size:21px;letter-spacing:-.2px;color:var(--cream)}
+  header.bar .logo .app-tag{font-family:-apple-system,'Segoe UI',sans-serif;font-weight:800;font-size:9px;letter-spacing:.12em;color:var(--cream);border:1px solid rgba(243,238,226,.45);border-radius:5px;padding:2px 5px;margin-left:8px;vertical-align:middle;position:relative;top:-3px}
+  header.bar .who{margin-left:auto;font-size:13px;font-weight:600;text-align:right;line-height:1.3;opacity:.9}
+  header.bar .out{font-size:11px;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:5px 9px;color:#fff}
+
+  main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .view{display:none;padding:16px 14px calc(env(safe-area-inset-bottom) + 90px)}
+  .view.on{display:block}
+  .vtitle{font-size:13px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--mut);margin:2px 2px 12px}
+
+  /* ── Bottom tab bar ──────────────────────────────────────── */
+  nav.tabs{
+    flex:0 0 auto;background:var(--card);border-top:1px solid var(--bd);
+    display:flex;padding-bottom:env(safe-area-inset-bottom);
+    box-shadow:0 -2px 14px rgba(0,0,0,.04);
+    position:relative;z-index:90;   /* stays ABOVE the scan overlay (z-index 80) so the 3 tabs are usable while scanning */
+  }
+  nav.tabs button{
+    flex:1;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--mut);font-size:10px;font-weight:600;letter-spacing:.2px;position:relative;
+  }
+  nav.tabs button svg{width:23px;height:23px;fill:currentColor}
+  nav.tabs button.on{color:var(--dk)}
+  nav.tabs button.on::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:26px;height:2.5px;background:var(--dk);border-radius:0 0 3px 3px}
+  nav.tabs button .dot{position:absolute;top:6px;right:calc(50% - 18px);min-width:15px;height:15px;border-radius:8px;background:var(--red);color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 3px}
+  nav.tabs button .dot.show{display:flex}
+
+  /* ── Cards / lists ───────────────────────────────────────── */
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--shadow)}
+  .row{
+    background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 13px;
+    margin-bottom:9px;box-shadow:var(--shadow);display:flex;align-items:center;gap:12px;
+  }
+  .row:active{transform:scale(.99)}
+  .row .body{flex:1;min-width:0}
+  .row .ttl{font-weight:700;font-size:14.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .sub{font-size:11.5px;color:var(--mut);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .sku{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:var(--mut)}
+  .stocknum{text-align:right;flex:0 0 auto}
+  .stocknum .n{font-size:21px;font-weight:800;line-height:1}
+  .stocknum .lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-top:2px}
+  .stocknum.low .n{color:var(--red)}
+  .stocknum.warn .n{color:var(--warn)}
+
+  .badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:.3px;
+    text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid transparent}
+  .b-new{background:#eef2ff;color:#3949ab;border-color:#dfe4ff}
+  .b-queue{background:#eef0f2;color:#4b5563;border-color:#dde1e6}
+  .b-prod{background:#e8f0fe;color:#1a56c4;border-color:#d3e2fd}
+  .b-qc{background:#e6f6fb;color:#0e7490;border-color:#c9eaf3}
+  .b-packed{background:#e6f7ee;color:#1e7a46;border-color:#c8ecd6}
+  .b-shipped{background:#eef0f2;color:#374151;border-color:#dde1e6}
+  .b-low{background:#fdecea;color:#c0392b;border-color:#f7c9c4}
+  .b-warn{background:#f1f1ef;color:#6b7280;border-color:#e2e1dc}
+
+  /* ── Search box ──────────────────────────────────────────── */
+  .search{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--bd);
+    border-radius:12px;padding:11px 13px;margin-bottom:13px;box-shadow:var(--shadow)}
+  .search svg{width:18px;height:18px;stroke:var(--mut);stroke-width:2;fill:none;flex:0 0 auto}
+  .search input{flex:1;border:none;outline:none;font-size:16px;background:none;color:var(--tx);min-width:0}
+  .search .clr{font-size:18px;color:var(--mut);padding:0 2px;display:none}
+  .search .clr.show{display:block}
+
+  .empty{text-align:center;color:var(--mut);font-size:13px;padding:46px 20px;line-height:1.6}
+  .empty svg{width:38px;height:38px;stroke:var(--bd);stroke-width:1.6;fill:none;display:block;margin:0 auto 10px}
+
+  /* ── Scan overlay (full-screen camera, square reticle) ───── */
+  #scan-ov{position:fixed;inset:0;z-index:80;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+  #scan-ov.on{display:flex}
+  #scan-ov video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .reticle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .reticle .box{width:78%;max-width:330px;aspect-ratio:1;border-radius:22px;
+    box-shadow:0 0 0 100vmax rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.32);position:relative}
+  .reticle .box .corner{position:absolute;width:30px;height:30px;border:3px solid var(--cream)}
+  .reticle .box .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
+  .reticle .box .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 14px 0 0}
+  .reticle .box .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 14px}
+  .reticle .box .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
+  /* smooth one-way sweep with fade — no bounce */
+  .reticle .box .laser{position:absolute;left:7%;right:7%;height:2.5px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--cream),transparent);box-shadow:0 0 12px rgba(243,238,226,.8);top:8%;animation:sweep 2.6s cubic-bezier(.45,0,.55,1) infinite}
+  @keyframes sweep{0%{top:8%;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:92%;opacity:0}}
+  .scan-close{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:92;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:20px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .scanhint{position:absolute;left:0;right:0;text-align:center;color:#fff;font-size:13.5px;text-shadow:0 1px 4px #000;font-weight:600;top:calc(env(safe-area-inset-top) + 20px);padding:0 60px}
+  .scan-bottom{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 56px);padding:14px 14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.75) 42%);z-index:81}
+  .scan-manual{display:flex;gap:8px}
+  .scan-manual input{flex:1;border:none;border-radius:11px;padding:13px;font-size:15px;outline:none;background:rgba(255,255,255,.96)}
+  .scan-manual button{background:var(--cream);color:var(--dk);border:none;border-radius:11px;padding:0 18px;font-weight:800;font-size:14px}
+  .scanlog{max-height:30vh;overflow-y:auto;margin-bottom:10px}
+  .scanlog .row{margin-bottom:8px}
+  /* Scan CTA (top of Inventory / Orders) */
+  .scan-cta{width:100%;background:var(--dk);color:var(--cream);padding:15px;border-radius:14px;font-size:15.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px;border:none;font-family:inherit;cursor:pointer;margin-bottom:12px;-webkit-tap-highlight-color:transparent}
+  .scan-cta svg{width:20px;height:20px;fill:currentColor}
+  /* Stock In / Out mode toggles */
+  .scanmode{display:flex;gap:10px;margin-bottom:12px}
+  .sm{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:15px 8px;border-radius:14px;border:2px solid var(--bd);background:#fff;font-weight:800;font-size:15px;color:var(--mut);font-family:inherit;cursor:pointer;transition:all .12s;-webkit-tap-highlight-color:transparent}
+  .sm .sg{font-size:21px;line-height:1;font-weight:700}
+  /* Always colour-coded — green = In, red = Out. Idle = light tint, active = filled. */
+  .sm-in{background:#e6f7ee;border-color:var(--green);color:var(--green)}
+  .sm-out{background:#fdecea;border-color:var(--red);color:var(--red)}
+  .sm.on.sm-in{background:var(--green);border-color:var(--green);color:#fff}
+  .sm.on.sm-out{background:var(--red);border-color:var(--red);color:#fff}
+  .modebar{font-size:13px;font-weight:700;text-align:center;padding:10px;border-radius:11px;margin-bottom:12px;display:none}
+  .modebar.in{display:block;background:#e6f7ee;color:var(--green)}
+  .modebar.out{display:block;background:#fdecea;color:var(--red)}
+  .scanmode-ov{margin-bottom:10px}
+  .scanmode-ov .sm{padding:11px 8px;font-size:14px;border-radius:12px}
+  /* Order-sheet item card + per-item Start button */
+  .oitem{background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:11px 12px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .oitem .item{background:none;border:none;border-radius:0;padding:0;margin:0;box-shadow:none}
+  .item-start{display:block;width:100%;margin-top:11px;padding:13px;border-radius:11px;font-size:15px;font-weight:800;border:none;font-family:inherit;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+  .item-start.go{background:var(--dk);color:var(--cream)}
+  .item-start.go:active{opacity:.85}
+  .item-start.state{background:#eef0f2;color:#4b5563;cursor:default;font-weight:700;font-size:13.5px}
+  /* Photo lightbox (composite mockup) */
+  #photo-lb{position:fixed;inset:0;z-index:95;background:rgba(10,10,9,.93);display:none;align-items:center;justify-content:center;padding:22px}
+  #photo-lb.on{display:flex}
+  .comp-lg{position:relative;width:min(86vw,420px);aspect-ratio:1;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .comp-lg .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .comp-lg .ov{position:absolute;left:17%;top:17%;width:66%;height:66%;object-fit:contain}
+  /* Item composite is tappable */
+  .item .comp{cursor:zoom-in}
+
+  /* ── Detail sheet ────────────────────────────────────────── */
+  .sheet-bg{position:fixed;inset:0;background:rgba(20,20,18,.42);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+  .sheet-bg.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--bg);
+    border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+    max-height:90dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  .sheet.on{transform:translateY(0)}
+  .sheet .grip{width:38px;height:4px;background:#d6d4cf;border-radius:3px;margin:9px auto 4px;flex:0 0 auto}
+  .sheet .shead{padding:10px 16px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bd)}
+  .sheet .shead .h{flex:1;min-width:0}
+  .sheet .shead .h .t{font-size:18px;font-weight:800;line-height:1.2}
+  .sheet .shead .h .s{font-size:12px;color:var(--mut);margin-top:3px;font-family:ui-monospace,Menlo,monospace}
+  .sheet .shead .h .s:empty{display:none}
+  .sheet .shead #sh-status{flex:0 0 auto}
+  .sheet .shead .x{font-size:22px;color:var(--mut);flex:0 0 auto;padding:0 4px 0 6px;line-height:1;cursor:pointer}
+  .item .comp{position:relative;width:46px;height:46px;border-radius:8px;overflow:hidden;background:#f0efec;flex:0 0 auto;border:1px solid var(--bd)}
+  .item .comp .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .item .comp .ov{position:absolute;left:17%;top:17%;width:66%;height:66%;object-fit:contain}
+  .sheet .sbody{overflow-y:auto;padding:16px 18px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;font-size:14px;margin-bottom:4px}
+  .kv .k{color:var(--mut);font-size:12.5px;padding-top:1px}
+  .kv .v{text-align:right;font-weight:600;word-break:break-word}
+  .statgrid{display:flex;gap:9px;margin-bottom:16px}
+  .statgrid .s{flex:1;background:var(--card);border:1px solid var(--bd);border-radius:13px;padding:13px 8px;text-align:center}
+  .statgrid .s .n{font-size:26px;font-weight:800;line-height:1}
+  .statgrid .s .l{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin-top:5px}
+  .statgrid .s.red .n{color:var(--red)}
+  .statgrid .s.green .n{color:var(--green)}
+  .seclabel{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);margin:18px 2px 9px}
+  .item{display:flex;gap:11px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:11px;padding:9px 11px;margin-bottom:8px}
+  .item img{width:42px;height:42px;border-radius:8px;object-fit:cover;background:#eee;flex:0 0 auto}
+  .item .ph{width:42px;height:42px;border-radius:8px;background:#f0efec;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:9px}
+  .item .ib{flex:1;min-width:0}
+  .item .ib .n{font-weight:700;font-size:13.5px;line-height:1.25}
+  .item .ib .m{font-size:11px;color:var(--mut);margin-top:2px}
+  .item .q{font-weight:800;font-size:15px;flex:0 0 auto}
+
+  /* ── Login ───────────────────────────────────────────────── */
+  #login{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;
+    justify-content:center;padding:30px 26px calc(env(safe-area-inset-bottom) + 30px)}
+  #login .brand{font-family:'Fraunces',Georgia,serif;font-weight:900;font-optical-sizing:auto;font-size:38px;text-align:center;margin-bottom:6px;letter-spacing:-.5px;color:var(--tx)}
+  #login .brand .app-tag{font-family:-apple-system,'Segoe UI',sans-serif;font-weight:800;font-size:11px;letter-spacing:.12em;color:var(--mut);border:1px solid var(--bd);border-radius:6px;padding:3px 6px;margin-left:9px;vertical-align:middle;position:relative;top:-9px}
+  #login .tag{text-align:center;color:var(--mut);font-size:12.5px;margin-bottom:30px;letter-spacing:.3px}
+  #login label{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;display:block;margin:0 2px 6px}
+  #login input{width:100%;border:1px solid var(--bd);border-radius:12px;padding:14px;font-size:16px;outline:none;background:var(--card);margin-bottom:15px}
+  #login input:focus{border-color:var(--dk)}
+  #login button{width:100%;background:var(--dk);color:#fff;border-radius:12px;padding:15px;font-size:15.5px;font-weight:700;margin-top:6px}
+  #login .err{color:var(--red);font-size:13px;text-align:center;min-height:18px;margin-top:12px;font-weight:600}
+  #login .note{text-align:center;color:var(--mut);font-size:11px;margin-top:18px;line-height:1.5}
+
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 78px);transform:translateX(-50%) translateY(20px);
+    background:var(--dk);color:#fff;padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:600;z-index:70;
+    opacity:0;pointer-events:none;transition:all .25s;box-shadow:0 6px 22px rgba(0,0,0,.25);max-width:88%;text-align:center}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block;vertical-align:middle}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .pull{text-align:center;font-size:11px;color:var(--mut);padding:4px 0 10px}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="login">
+  <div class="brand">egfulfill<span class="app-tag">APP</span></div>
+  <label>Email</label>
+  <input id="lg-email" type="email" autocomplete="username" inputmode="email" placeholder="you@warehouse.com">
+  <label>Password</label>
+  <input id="lg-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+  <button id="lg-go">Sign in</button>
+  <div class="err" id="lg-err"></div>
+  <div class="note">Staff access only. Use your EGFULFILL operator / warehouse / admin login.</div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app" style="display:none">
+  <header class="bar">
+    <div class="logo">egfulfill<span class="app-tag">APP</span></div>
+    <div class="who"><span id="hd-name">—</span></div>
+    <button class="out" id="hd-out">Sign out</button>
+  </header>
+
+  <main>
+    <!-- INVENTORY -->
+    <section class="view on" id="v-inv">
+      <div class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="inv-q" placeholder="Search SKU or name" autocomplete="off" enterkeyhint="search">
+        <button class="clr" id="inv-clr">✕</button>
+      </div>
+      <div class="pull" id="inv-meta"></div>
+      <div id="inv-list"></div>
+    </section>
+
+    <!-- ORDERS -->
+    <section class="view" id="v-ord">
+      <div class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="ord-q" placeholder="Search order #, customer, tracking" autocomplete="off" enterkeyhint="search">
+        <button class="clr" id="ord-clr">✕</button>
+      </div>
+      <div class="pull" id="ord-meta"></div>
+      <div id="ord-list"></div>
+    </section>
+
+  </main>
+
+  <nav class="tabs">
+    <button data-tab="scan">
+      <svg viewBox="0 0 16 16"><path d="M1.4 3.2A1.8 1.8 0 013.2 1.4H5a.7.7 0 010 1.4H3.2a.4.4 0 00-.4.4V5a.7.7 0 01-1.4 0V3.2zM11 1.4h1.8A1.8 1.8 0 0114.6 3.2V5a.7.7 0 01-1.4 0V3.2a.4.4 0 00-.4-.4H11a.7.7 0 010-1.4zM2.1 10.3a.7.7 0 01.7.7v1.8a.4.4 0 00.4.4H5a.7.7 0 010 1.4H3.2a1.8 1.8 0 01-1.8-1.8V11a.7.7 0 01.7-.7zM13.9 10.3a.7.7 0 01.7.7v1.8a1.8 1.8 0 01-1.8 1.8H11a.7.7 0 010-1.4h1.8a.4.4 0 00.4-.4V11a.7.7 0 01.7-.7z"/><rect x="1.3" y="7.3" width="13.4" height="1.4" rx=".7"/></svg>
+      Scan
+    </button>
+    <button data-tab="inv" class="on">
+      <svg viewBox="0 0 16 16"><path d="M7.32 1.6a1.5 1.5 0 011.36 0l4.5 2.25L8 6.55 2.82 3.85l4.5-2.25z"/><path d="M1.7 5.1L7.3 8v6.2l-5.04-2.52a1 1 0 01-.56-.9V5.1z"/><path d="M14.3 5.1v5.68a1 1 0 01-.56.9L8.7 14.2V8L14.3 5.1z"/></svg>
+      Inventory
+    </button>
+    <button data-tab="ord">
+      <svg viewBox="0 0 16 16" fill-rule="evenodd"><path d="M3 1.6h10a1 1 0 011 1v11.4a.45.45 0 01-.7.38L12 13.6l-1.65 1.05a.5.5 0 01-.54 0L8.2 13.6l-1.6 1.05a.5.5 0 01-.55 0L4.45 13.6l-1.75 1.12A.45.45 0 012 14V2.6a1 1 0 011-1zM5 5.2a.7.7 0 000 1.4h6a.7.7 0 000-1.4H5zm0 3a.7.7 0 000 1.4h4a.7.7 0 000-1.4H5z"/></svg>
+      Orders
+    </button>
+  </nav>
+</div>
+
+<!-- SCAN OVERLAY (full-screen camera, square reticle) -->
+<div id="scan-ov">
+  <video id="cam" playsinline muted></video>
+  <div class="reticle"><div class="box"><div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div><div class="laser"></div></div></div>
+  <button class="scan-close" onclick="closeScan()" aria-label="Close scanner">✕</button>
+  <div class="scanhint" id="scanhint">Point at the QR / barcode</div>
+  <div class="scan-bottom">
+    <div class="scanmode scanmode-ov">
+      <button class="sm sm-in" id="sm-in" onclick="setScanMode('in')"><span class="sg">+</span> In</button>
+      <button class="sm sm-out" id="sm-out" onclick="setScanMode('out')"><span class="sg">−</span> Out</button>
+    </div>
+    <div class="modebar" id="modebar"></div>
+    <div class="scanlog" id="scanlog"></div>
+    <div class="scan-manual">
+      <input id="scaninput" placeholder="…or type SKU / order #" autocomplete="off" autocapitalize="characters" enterkeyhint="search">
+      <button id="scango">Find</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO LIGHTBOX (composite mockup) -->
+<div id="photo-lb" onclick="closePhoto()">
+  <div id="photo-lb-stage"></div>
+  <button class="scan-close" onclick="event.stopPropagation();closePhoto()" aria-label="Close">✕</button>
+</div>
+
+<!-- DETAIL SHEET -->
+<div class="sheet-bg" id="sheetbg"></div>
+<div class="sheet" id="sheet">
+  <div class="grip"></div>
+  <div class="shead"><div class="h"><div class="t" id="sh-t">—</div><div class="s" id="sh-s"></div></div><span id="sh-status"></span><button class="x" id="sh-x">✕</button></div>
+  <div class="sbody" id="sh-body"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════════
+   EG Floor — mobile PWA for warehouse + admin.
+   Shares the same session keys as the desktop app (eg_token / eg_user),
+   so a sign-in here = signed in everywhere on this device, and vice-versa.
+   Read-mostly: inventory lookup, order quick-check, scan-first lookup,
+   low-stock dashboard. All data via the staff-gated /api/* endpoints.
+   ════════════════════════════════════════════════════════════════════ */
+var API_BASE = '';                 // same-origin in prod (Caddy proxies /api)
+var TOKEN_KEY = 'eg_token', USER_KEY = 'eg_user';
+var STAFF = ['operator','warehouse','admin','designer'];
+
+var INV = [];      // inventory rows
+var ORD = [];      // orders
+var DATA_AT = 0;   // last fetch ms
+
+/* ── tiny helpers ───────────────────────────────────────────── */
+function $(id){ return document.getElementById(id); }
+function tok(){ return localStorage.getItem(TOKEN_KEY) || ''; }
+function user(){ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch(e){ return null; } }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function api(path, opts){
+  opts = opts || {};
+  var h = { 'Content-Type':'application/json' };
+  if (tok()) h['Authorization'] = 'Bearer ' + tok();
+  return fetch(API_BASE + '/api' + path, { method: opts.method||'GET', headers: h, body: opts.body?JSON.stringify(opts.body):undefined })
+    .then(function(r){ return r.json().catch(function(){return{};}).then(function(d){ return { ok:r.ok, status:r.status, data:d }; }); });
+}
+var _tt;
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(_tt); _tt=setTimeout(function(){t.classList.remove('on');},2200); }
+
+/* ── available / low-stock math ─────────────────────────────── */
+function avail(r){ return (Number(r.in_stock)||0) - (Number(r.reserved)||0); }
+function reorderAt(r){ return r.reorder_at==null ? 25 : Number(r.reorder_at); }
+function stockState(r){            // 'low' (<=reorder), 'warn' (<=reorder*1.5), 'ok'
+  var a=avail(r), t=reorderAt(r);
+  if (a<=t) return 'low';
+  if (a<=Math.ceil(t*1.5)) return 'warn';
+  return 'ok';
+}
+
+/* ════════ AUTH ════════ */
+function showApp(){
+  var u = user();
+  $('login').style.display='none';
+  $('app').style.display='flex';
+  $('hd-name').textContent = (u && (u.name||u.email)) || 'Staff';
+  loadAll();
+}
+function showLogin(){ $('app').style.display='none'; $('login').style.display='flex'; }
+function logout(){ stopScan(); localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); showLogin(); }
+
+$('lg-go').onclick = function(){
+  var em = $('lg-email').value.trim(), pw = $('lg-pass').value;
+  if (!em || !pw){ $('lg-err').textContent='Enter email and password.'; return; }
+  $('lg-err').textContent=''; var btn=this; btn.innerHTML='<span class="spin"></span>'; btn.disabled=true;
+  api('/auth/login', { method:'POST', body:{ email:em, password:pw } }).then(function(r){
+    btn.innerHTML='Sign in'; btn.disabled=false;
+    if (!r.ok || !r.data || !r.data.token){ $('lg-err').textContent=(r.data&&r.data.error)||'Login failed.'; return; }
+    var role = r.data.user && r.data.user.role;
+    if (STAFF.indexOf(role)===-1){ $('lg-err').textContent='This app is for warehouse & admin staff only.'; return; }
+    localStorage.setItem(TOKEN_KEY, r.data.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(r.data.user));
+    showApp();
+  }).catch(function(){ btn.innerHTML='Sign in'; btn.disabled=false; $('lg-err').textContent='Network error.'; });
+};
+$('lg-pass').addEventListener('keydown', function(e){ if(e.key==='Enter') $('lg-go').click(); });
+$('hd-out').onclick = logout;
+
+/* ════════ DATA ════════ */
+function loadAll(quiet){
+  if (!quiet){ $('inv-meta').textContent='Loading…'; $('ord-meta').textContent='Loading…'; }
+  return Promise.all([ api('/inventory'), api('/orders') ]).then(function(res){
+    var iv=res[0], od=res[1];
+    if (iv.status===401 || od.status===401){ logout(); return; }
+    if (iv.ok && Array.isArray(iv.data)) INV = iv.data;
+    if (od.ok && Array.isArray(od.data)) ORD = od.data;
+    DATA_AT = Date.now();
+    renderInv(); renderOrders(); renderLow();
+  }).catch(function(){ $('inv-meta').textContent='Offline — showing last loaded.'; });
+}
+
+/* ════════ TABS ════════ */
+var lastTab = 'inv';   // remembers the real view to return to when the scanner closes
+function navHighlight(tab){ document.querySelectorAll('nav.tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===tab); }); }
+function go(tab){
+  // The Scan tab has no page — tapping it opens the live camera straight away.
+  if (tab === 'scan'){ navHighlight('scan'); startScan(); return; }
+  if (typeof stopScan === 'function') stopScan();   // leaving Scan closes the camera so the chosen tab shows
+  lastTab = tab;
+  navHighlight(tab);
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('on'); });
+  var v=$('v-'+tab); if(v) v.classList.add('on');
+  $('app').querySelector('main').scrollTop=0;
+}
+document.querySelectorAll('nav.tabs button').forEach(function(b){ b.onclick=function(){ go(b.dataset.tab); }; });
+
+/* ════════ INVENTORY VIEW ════════ */
+function invRow(r){
+  var a=avail(r), st=stockState(r);
+  var cls = st==='low'?'low':(st==='warn'?'warn':'');
+  return '<div class="row" data-sku="'+esc(r.sku)+'" onclick="openSku(\''+esc(r.sku).replace(/'/g,"\\'")+'\')">'+
+    '<div class="body"><div class="ttl">'+esc(r.name||r.sku)+'</div>'+
+    '<div class="sub"><span class="sku">'+esc(r.sku)+'</span>'+(r.variant?' · '+esc(r.variant):'')+'</div></div>'+
+    '<div class="stocknum '+cls+'"><div class="n">'+a+'</div><div class="lbl">avail</div></div></div>';
+}
+function renderInv(){
+  var q=($('inv-q').value||'').trim().toLowerCase();
+  $('inv-clr').classList.toggle('show', !!q);
+  var list = INV.filter(function(r){
+    if(!q) return true;
+    return (r.sku||'').toLowerCase().indexOf(q)>=0 || (r.name||'').toLowerCase().indexOf(q)>=0 || (r.variant||'').toLowerCase().indexOf(q)>=0 || (r.category||'').toLowerCase().indexOf(q)>=0;
+  });
+  $('inv-meta').textContent = list.length+' of '+INV.length+' SKUs'+(DATA_AT?' · synced '+ago(DATA_AT):'');
+  if(!list.length){ $('inv-list').innerHTML = emptyHtml('No SKUs match','box'); return; }
+  list.sort(function(a,b){ return (a.name||a.sku).localeCompare(b.name||b.sku); });
+  $('inv-list').innerHTML = list.map(invRow).join('');
+}
+$('inv-q').addEventListener('input', renderInv);
+$('inv-clr').onclick=function(){ $('inv-q').value=''; renderInv(); $('inv-q').focus(); };
+
+/* ════════ ORDERS VIEW ════════ */
+function statusBadge(s){
+  s=(s||'new').toLowerCase();
+  var map={new:'b-new',queued:'b-queue',queue:'b-queue',working:'b-prod',printing:'b-prod',production:'b-prod',printed:'b-prod',qc:'b-qc',packed:'b-packed',shipped:'b-shipped',delivered:'b-shipped',fulfilled:'b-shipped'};
+  return '<span class="badge '+(map[s]||'b-new')+'">'+esc(s)+'</span>';
+}
+function ordName(o){
+  var c=o.customer||{};
+  return c.name || (c.shipTo&&c.shipTo.name) || o.customer_name || '—';
+}
+function ordNumber(o){
+  if (o.seq) return '#'+o.seq;
+  return esc(o.id||'');
+}
+function ordItemsCount(o){ var it=o.items||o.itemsList||[]; return it.reduce(function(n,i){return n+(Number(i.qty)||1);},0); }
+function ordRow(o){
+  var st = o.factory_status || o.status || 'new';
+  return '<div class="row" onclick="openOrder(\''+esc(String(o.id)).replace(/'/g,"\\'")+'\')">'+
+    '<div class="body"><div class="ttl">'+ordNumber(o)+' · '+esc(ordName(o))+'</div>'+
+    '<div class="sub">'+ordItemsCount(o)+' item'+(ordItemsCount(o)===1?'':'s')+(o.tracking?' · '+esc(o.tracking):'')+(o.store?' · '+esc(o.store):'')+'</div></div>'+
+    statusBadge(st)+'</div>';
+}
+function renderOrders(){
+  var q=($('ord-q').value||'').trim().toLowerCase();
+  $('ord-clr').classList.toggle('show', !!q);
+  var list = ORD.filter(function(o){
+    if(!q) return true;
+    return String(o.id||'').toLowerCase().indexOf(q)>=0 || String(o.seq||'').indexOf(q)>=0 || ordName(o).toLowerCase().indexOf(q)>=0 || (o.tracking||'').toLowerCase().indexOf(q)>=0 || (o.store||'').toLowerCase().indexOf(q)>=0;
+  });
+  $('ord-meta').textContent = list.length+' of '+ORD.length+' orders'+(DATA_AT?' · synced '+ago(DATA_AT):'');
+  if(!list.length){ $('ord-list').innerHTML = emptyHtml(q?'No orders match':'No orders yet','doc'); return; }
+  $('ord-list').innerHTML = list.slice(0,200).map(ordRow).join('');
+}
+$('ord-q').addEventListener('input', renderOrders);
+$('ord-clr').onclick=function(){ $('ord-q').value=''; renderOrders(); $('ord-q').focus(); };
+
+/* ════════ LOW STOCK VIEW ════════ */
+function renderLow(){
+  if(!$('low-list')) return;   // Low-stock tab was removed — nothing to render
+  var low = INV.filter(function(r){ return stockState(r)!=='ok'; });
+  low.sort(function(a,b){ return (avail(a)-reorderAt(a)) - (avail(b)-reorderAt(b)); }); // most-deficit first
+  var dot=$('low-dot'); var crit=low.filter(function(r){return stockState(r)==='low';}).length;
+  if(dot){ dot.textContent=crit; dot.classList.toggle('show', crit>0); }
+  $('low-meta').textContent = low.length+' item'+(low.length===1?'':'s')+' at or near reorder';
+  if(!low.length){ $('low-list').innerHTML = emptyHtml('Everything is above reorder level 🎉','check'); return; }
+  $('low-list').innerHTML = low.map(function(r){
+    var a=avail(r), st=stockState(r), t=reorderAt(r);
+    var badge = st==='low'?'<span class="badge b-low">Reorder</span>':'<span class="badge b-warn">Low</span>';
+    return '<div class="row" onclick="openSku(\''+esc(r.sku).replace(/'/g,"\\'")+'\')">'+
+      '<div class="body"><div class="ttl">'+esc(r.name||r.sku)+'</div>'+
+      '<div class="sub"><span class="sku">'+esc(r.sku)+'</span> · reorder at '+t+'</div></div>'+
+      '<div style="text-align:right"><div class="stocknum '+(st==='low'?'low':'warn')+'"><div class="n">'+a+'</div><div class="lbl">avail</div></div></div>'+
+      '<div style="flex:0 0 auto">'+badge+'</div></div>';
+  }).join('');
+}
+
+/* ════════ DETAIL SHEET ════════ */
+function openSheet(){ $('sheetbg').classList.add('on'); $('sheet').classList.add('on'); }
+function closeSheet(){ $('sheetbg').classList.remove('on'); $('sheet').classList.remove('on'); }
+$('sheetbg').onclick = closeSheet; $('sh-x').onclick = closeSheet;
+
+function openSku(sku){
+  var r = INV.find(function(x){ return String(x.sku)===String(sku); });
+  if(!r){ toast('SKU not in inventory'); return; }
+  var a=avail(r), st=stockState(r), t=reorderAt(r);
+  $('sh-t').textContent = r.name || r.sku;
+  $('sh-s').textContent = r.sku + (r.variant?' · '+r.variant:'');
+  $('sh-status').innerHTML = '';
+  var stCls = st==='low'?'red':(st==='ok'?'green':'');
+  $('sh-body').innerHTML =
+    '<div class="statgrid">'+
+      '<div class="s '+stCls+'"><div class="n">'+a+'</div><div class="l">Available</div></div>'+
+      '<div class="s"><div class="n">'+(Number(r.in_stock)||0)+'</div><div class="l">On hand</div></div>'+
+      '<div class="s"><div class="n">'+(Number(r.reserved)||0)+'</div><div class="l">Reserved</div></div>'+
+    '</div>'+
+    (st!=='ok' ? '<div style="margin-bottom:14px">'+(st==='low'?'<span class="badge b-low">At / below reorder ('+t+')</span>':'<span class="badge b-warn">Approaching reorder ('+t+')</span>')+'</div>' : '')+
+    '<div class="kv">'+
+      kv('Category', r.category||'—')+
+      kv('Variant', r.variant||'—')+
+      kv('Reorder at', String(t))+
+      kv('Open orders needing it', String(ordersUsingSku(r.sku)))+
+    '</div>'+
+    '<div style="margin-top:20px;padding:14px;background:var(--card);border:1px solid var(--bd);border-radius:13px;text-align:center">'+
+      '<svg id="sku-barcode" style="max-width:100%;height:62px"></svg>'+
+      '<div style="font-size:10px;color:var(--mut);margin-top:2px;letter-spacing:.5px;font-family:ui-monospace,Menlo,monospace">'+esc(r.sku)+'</div>'+
+      '<div style="font-size:10.5px;color:var(--mut);margin-top:4px">Scannable barcode · print &amp; stick on the stock</div>'+
+    '</div>';
+  openSheet();
+  // Render the SKU as a CODE128 barcode (what the camera scans to add/remove stock).
+  try { if (window.JsBarcode) JsBarcode('#sku-barcode', String(r.sku), { format:'CODE128', displayValue:false, height:54, margin:0, width:2 }); } catch(e){}
+}
+function ordersUsingSku(sku){
+  var n=0;
+  ORD.forEach(function(o){
+    var done = ['shipped','delivered','fulfilled','cancelled'].indexOf((o.factory_status||o.status||'').toLowerCase())>=0;
+    if (done) return;
+    (o.items||[]).forEach(function(i){ if(String(i.sku)===String(sku)) n++; });
+  });
+  return n;
+}
+
+function openOrder(id){
+  var o = ORD.find(function(x){ return String(x.id)===String(id); });
+  if(!o){ toast('Order not found'); return; }
+  var st = o.factory_status || o.status || 'new';
+  // Header: "Order #id" only; the status badge moves up next to the close X.
+  $('sh-t').textContent = 'Order ' + (o.seq ? ('#'+o.seq) : ('#'+String(o.id||'')));
+  $('sh-s').textContent = '';
+  $('sh-status').innerHTML = statusBadge(st);
+  var addr = fmtAddr(o);
+  var oShipped = ['shipped','delivered','fulfilled'].indexOf(st)>=0;
+  var items = (o.items||[]).map(function(i){
+    // Composite = the design overlaid on the blank product (same idea as the boards).
+    var blank = (i.img && /^(https?:|data:)/.test(String(i.img))) ? i.img : '';
+    var design = (i.design_src && /^(https?:|data:)/.test(String(i.design_src))) ? i.design_src : '';
+    var thumb;
+    if (blank || design) {
+      thumb = '<div class="comp" data-blank="'+esc(blank)+'" data-design="'+esc(design)+'" onclick="openPhoto(this.dataset.blank,this.dataset.design)">'+
+        (blank?'<img class="bg" src="'+esc(blank)+'" onerror="this.style.display=\'none\'">':'')+
+        (design?'<img class="ov" src="'+esc(design)+'" onerror="this.style.display=\'none\'">':(blank?'':'<img class="bg" src="'+esc(design)+'">'))+
+      '</div>';
+    } else { thumb = '<div class="ph">no img</div>'; }
+    var meta = [i.color,i.size,i.variant,i.print_type||i.tech].filter(Boolean).map(esc).join(' · ');
+    // Per-item production control: Working flag lives on each item, not the order.
+    var ifs = String(i.factory_status||i.factoryStatus||'').toLowerCase();
+    var perItem = oShipped
+      ? '<div class="item-start state">✓ Shipped</div>'
+      : (ifs==='working'
+          ? '<div class="item-start state">● Working</div>'
+          : '<button class="item-start go" data-oid="'+esc(String(o.id))+'" data-sku="'+esc(String(i.sku||''))+'" onclick="startItem(this.dataset.oid,this.dataset.sku)">▶ Start</button>');
+    return '<div class="oitem"><div class="item">'+thumb+'<div class="ib"><div class="n">'+esc(i.name||i.sku||'Item')+'</div>'+
+      '<div class="m">'+(i.sku?'<span class="sku">'+esc(i.sku)+'</span>':'')+(meta?(i.sku?' · ':'')+meta:'')+'</div></div>'+
+      '<div class="q">×'+(Number(i.qty)||1)+'</div></div>'+perItem+'</div>';
+  }).join('');
+  // Once EVERY item is working, the whole order can ship.
+  var allWorking = (o.items||[]).length>0 && (o.items||[]).every(function(i){ return String(i.factory_status||i.factoryStatus||'').toLowerCase()==='working'; });
+  var shipBtn = (allWorking && !oShipped)
+    ? '<button class="item-start go" data-oid="'+esc(String(o.id))+'" style="margin-top:16px;background:var(--green)" onclick="markShipped(this.dataset.oid)">✓ Mark order shipped</button>'
+    : '';
+  $('sh-body').innerHTML =
+    '<div class="seclabel" style="margin-top:0">Name &amp; address</div>'+
+    '<div class="card" style="padding:13px;font-size:14px;line-height:1.55">'+(addr || '<span style="color:var(--mut)">No address on file</span>')+'</div>'+
+    '<div class="kv" style="margin-top:14px">'+
+      kv('Store', esc(o.store||'—'))+
+      kv('Source', esc(o.source||'manual'))+
+      (o.tracking?kv('Tracking', esc(o.tracking)):'')+
+      (o.delivery?kv('Delivery', esc(o.delivery)):'')+
+    '</div>'+
+    '<div class="seclabel">Items ('+ordItemsCount(o)+')</div>'+ (items||'<div class="empty" style="padding:20px">No line items</div>') + shipBtn;
+  openSheet();
+}
+// Mark ONE item as being worked. The order itself stays on the real pipeline
+// (advances to Printing on the first item), never "working". Persisted per item
+// so every board sees it.
+function startItem(orderId, sku){
+  var o = ORD.find(function(x){ return String(x.id)===String(orderId); }); if(!o) return;
+  (o.items||[]).forEach(function(i){ if(String(i.sku)===String(sku)){ i.factory_status='working'; } });
+  var st = String(o.factory_status||o.status||'').toLowerCase();
+  if (['shipped','delivered','fulfilled','cancelled','refunded','printing'].indexOf(st)<0){ o.factory_status='printing'; o.status='printing'; }
+  if (navigator.vibrate) navigator.vibrate(40);
+  api('/orders/'+encodeURIComponent(orderId)+'/item-status', { method:'POST', body:{ sku:sku, status:'working' } }).catch(function(){});
+  api('/orders/'+encodeURIComponent(orderId), { method:'PATCH', body:{ factoryStatus:o.factory_status, status:o.status } }).catch(function(){});
+  openOrder(orderId); renderOrders();
+}
+// All items worked → ship the whole order.
+function markShipped(orderId){
+  var o = ORD.find(function(x){ return String(x.id)===String(orderId); }); if(!o) return;
+  o.factory_status='shipped'; o.status='shipped';
+  if (navigator.vibrate) navigator.vibrate([40,40,40]);
+  toast('Order marked shipped');
+  api('/orders/'+encodeURIComponent(orderId), { method:'PATCH', body:{ factoryStatus:'shipped', status:'shipped' } }).catch(function(){});
+  openOrder(orderId); renderOrders();
+}
+// Production status helpers for the order sheet's per-item Start button.
+function isStartable(s){ s=String(s||'').toLowerCase(); return ['new','queued','queue','action','in_review','awaiting','awaiting_scan','received',''].indexOf(s)>=0; }
+function statusLabel(s){ s=String(s||'').toLowerCase();
+  if (['printing','working','production','in_production','printed'].indexOf(s)>=0) return '● Working';
+  if (s==='qc') return '● In QC';
+  if (s==='packed') return '● Packed — ready to ship';
+  if (['shipped','delivered','fulfilled'].indexOf(s)>=0) return '✓ Shipped';
+  if (s==='cancelled') return 'Cancelled';
+  return '● ' + (s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '));
+}
+// Start the order → move it into production (PATCH), optimistic + re-render.
+function startOrder(id){
+  var o = ORD.find(function(x){ return String(x.id)===String(id); }); if(!o) return;
+  o.factory_status='working'; o.status='working';
+  // Mirror onto every line item too, so the order reads "Working" everywhere.
+  (o.items||[]).forEach(function(i){ i.status='working'; });
+  if (navigator.vibrate) navigator.vibrate(50);
+  toast('Started — now working');
+  api('/orders/'+encodeURIComponent(id), { method:'PATCH', body:{ factoryStatus:'working', status:'working' } })
+    .then(function(res){ if(!res||!res.ok) toast('Couldn’t sync — will retry on refresh'); })
+    .catch(function(){ toast('Offline — not synced yet'); });
+  openOrder(id);     // re-render the sheet — Start is gone, shows "● Working"
+  renderOrders();    // refresh the orders list
+}
+// Tap an item photo → full composite (design overlaid on the blank) lightbox.
+function openPhoto(blank, design){
+  if(!blank && !design){ toast('No mockup for this item yet'); return; }
+  $('photo-lb-stage').innerHTML = '<div class="comp-lg">'+
+    (blank?'<img class="bg" src="'+esc(blank)+'">':'')+
+    (design?'<img class="ov" src="'+esc(design)+'">':(blank?'':'<img class="bg" src="'+esc(design)+'">'))+
+  '</div>';
+  $('photo-lb').classList.add('on');
+}
+function closePhoto(){ $('photo-lb').classList.remove('on'); }
+function kv(k,v){ return '<div class="k">'+esc(k)+'</div><div class="v">'+v+'</div>'; }
+function fmtAddr(o){
+  var c=o.customer||{}, a=o.address||c.shipTo||{};
+  if (typeof a==='string'){ return esc(a); }
+  var name = c.name || a.name || '';
+  var line = [a.line1||a.address1||a.street, a.line2||a.address2].filter(Boolean).join(', ');
+  var city = [a.city, a.state||a.province, a.zip||a.postal_code||a.postalCode].filter(Boolean).join(' ');
+  var parts = [name, line, city, a.country].filter(Boolean).map(esc);
+  return parts.length ? parts.join('<br>') : '';
+}
+
+/* ════════ SCAN ════════
+   Real camera barcode/QR scanning on every phone:
+   • Android Chrome → the fast native BarcodeDetector path.
+   • iOS Safari (no BarcodeDetector) → lazy-load ZXing and decode the camera
+     stream in-page. Both call onScan() with the decoded value.
+   Manual typing stays as a last-resort fallback (camera denied / no network). */
+var scanStream=null, scanRAF=null, detector=null, scanning=false, lastHit='', lastHitAt=0;
+var zxingReader=null, zxingControls=null, _zxingP=null;
+function supportsBarcode(){ return ('BarcodeDetector' in window); }
+
+// ONE camera stream for the whole session: the permission prompt appears only the
+// FIRST time the scanner opens; every re-open reuses this stream (no re-ask). It's
+// fully released when the app is backgrounded/closed so the camera doesn't stay on.
+var _camP=null;
+function getCamera(){
+  if(scanStream && scanStream.active) return Promise.resolve(scanStream);
+  if(_camP) return _camP;
+  _camP = navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } } })
+    .then(function(s){ scanStream=s; _camP=null; return s; })
+    .catch(function(e){ _camP=null; throw e; });
+  return _camP;
+}
+function releaseCam(){
+  if(scanStream){ try{ scanStream.getTracks().forEach(function(t){ t.stop(); }); }catch(e){} scanStream=null; }
+  var v=$('cam'); if(v){ try{ v.srcObject=null; }catch(e){} }
+}
+window.addEventListener('pagehide', releaseCam);
+document.addEventListener('visibilitychange', function(){ if(document.hidden){ if(scanning) stopScan(); releaseCam(); } });
+
+// One unified scanner for everything — matchCode() figures out SKU vs order vs
+// tracking. The In/Out mode only affects what a SKU scan does (adjust vs look-up).
+function startScan(){
+  $('scanlog').innerHTML = '';
+  $('scan-ov').classList.add('on');
+  _setScanHint();
+  if (scanning) return;
+  if (supportsBarcode()) startNativeScan();
+  else startZxingScan();
+}
+function startScanFor(){ startScan(); }   // back-compat shim
+function _setScanHint(){
+  $('scanhint').textContent = scanMode==='in' ? 'Scan a barcode to add stock (+1)'
+    : scanMode==='out' ? 'Scan a barcode to remove stock (−1)'
+    : 'Point at any barcode or order QR';
+}
+
+// Android / Chromium — native BarcodeDetector over our own camera stream.
+function startNativeScan(){
+  getCamera().then(function(stream){
+    var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
+    try{ detector=new window.BarcodeDetector({ formats:['qr_code','code_128','ean_13','ean_8','code_39','code_93','upc_a','upc_e','itf','codabar','data_matrix','aztec','pdf417'] }); }
+    catch(e){ try{ detector=new window.BarcodeDetector(); }catch(e2){ detector=null; } }
+    if(!detector){ startZxingScan(); return; }   // keep the stream; ZXing reuses it
+    scanning=true; _setScanHint(); tick();
+  }).catch(function(){ scanning=false; toast('Camera blocked — allow camera access, or type the code'); $('scaninput').focus(); });
+}
+function tick(){
+  if(!scanning) return;
+  var v=$('cam');
+  if (v.readyState>=2 && detector){
+    detector.detect(v).then(function(codes){ if (codes && codes.length) onScan(codes[0].rawValue); }).catch(function(){});
+  }
+  scanRAF = requestAnimationFrame(tick);
+}
+
+// iOS Safari & anything without BarcodeDetector — ZXing decodes the live camera.
+function loadZxing(){
+  if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) return Promise.resolve();
+  if (_zxingP) return _zxingP;
+  _zxingP = new Promise(function(res,rej){
+    var s=document.createElement('script');
+    s.src='https://unpkg.com/@zxing/browser@0.1.5/umd/zxing-browser.min.js';
+    s.async=true; s.onload=res; s.onerror=function(){ _zxingP=null; rej(new Error('load failed')); };
+    document.head.appendChild(s);
+  });
+  return _zxingP;
+}
+function startZxingScan(){
+  scanning=true; $('scanhint').textContent='Loading scanner…';
+  loadZxing().then(function(){
+    if(!scanning) return;                          // user hit Stop while loading
+    zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+    var onResult=function(result){ if(result) onScan(result.getText ? result.getText() : (result.text || '')); };
+    // Reuse the one warm stream when ZXing supports it (no re-prompt); else let ZXing
+    // open the camera itself.
+    if(typeof zxingReader.decodeFromStream==='function'){
+      return getCamera().then(function(stream){
+        var v=$('cam'); v.srcObject=stream; v.setAttribute('playsinline','true'); v.muted=true; v.play();
+        return zxingReader.decodeFromStream(stream, $('cam'), onResult);
+      });
+    }
+    return zxingReader.decodeFromConstraints({ video:{ facingMode:{ ideal:'environment' } } }, $('cam'), onResult);
+  }).then(function(controls){
+    if(!scanning){ if(controls&&controls.stop) controls.stop(); return; }
+    zxingControls = controls; _setScanHint();
+  }).catch(function(){
+    stopScan(); toast('Could not start the camera scanner — type the code'); $('scaninput').focus();
+  });
+}
+
+function stopScan(){
+  scanning=false;
+  if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF=null; }
+  if(zxingControls){ try{ zxingControls.stop(); }catch(e){} zxingControls=null; }
+  if(zxingReader){ try{ zxingReader.reset && zxingReader.reset(); }catch(e){} zxingReader=null; }
+  detector=null;
+  // Keep the camera stream WARM so re-opening the scanner never re-prompts — just stop
+  // rendering. The stream is fully released on pagehide / when the app is hidden.
+  var v=$('cam'); if(v){ try{ v.pause(); }catch(e){} }
+  if(scanStream && !scanStream.active) scanStream=null;
+  $('scan-ov').classList.remove('on');
+  // NB: does NOT navigate. go() calls stopScan(), so calling go() here recursed
+  // infinitely — that bug made every non-Scan tab tap dead. Use closeScan() to return
+  // to the last view when the user dismisses the scanner.
+}
+function closeScan(){ stopScan(); go(lastTab || 'inv'); }
+$('scango').onclick=function(){ var v=$('scaninput').value.trim(); if(v){ resolveCode(v); $('scaninput').value=''; } };
+$('scaninput').addEventListener('keydown', function(e){ if(e.key==='Enter') $('scango').click(); });
+
+/* ── Stock In / Out mode — scanning a product barcode adjusts its on-hand ──── */
+var scanMode = 'lookup';   // 'lookup' | 'in' | 'out'
+function setScanMode(m){
+  scanMode = (scanMode === m) ? 'lookup' : m;   // tapping the active toggle returns to look-up
+  $('sm-in').classList.toggle('on', scanMode==='in');
+  $('sm-out').classList.toggle('on', scanMode==='out');
+  var bar=$('modebar'); bar.className = 'modebar' + (scanMode!=='lookup' ? ' '+scanMode : '');
+  bar.textContent = scanMode==='in' ? 'Scan a product barcode to ADD 1 to stock'
+                  : scanMode==='out' ? 'Scan a product barcode to REMOVE 1 from stock' : '';
+  if (scanning) _setScanHint();
+}
+function adjustStock(sku, delta){
+  var r = INV.find(function(x){ return String(x.sku)===String(sku); });
+  if(!r){
+    if(delta<0){ toast('“'+sku+'” isn’t in inventory yet'); return; }
+    // Stock In on an unknown SKU → receive it as a brand-new inventory item.
+    r = { sku: sku, name: sku, variant:'', in_stock:0, reserved:0, reorder_at:25, category:null };
+    INV.push(r);
+    toast('New item received: '+sku);
+  }
+  var cur=Number(r.in_stock)||0;
+  if (delta<0 && cur===0){ toast(r.sku+' is already at 0'); return; }
+  var next=Math.max(0, cur+delta);
+  r.in_stock = next;                       // optimistic local update
+  renderInv(); renderLow();
+  if (navigator.vibrate) navigator.vibrate(delta>0?60:[40,40]);
+  toast((delta>0?'+1 · ':'−1 · ')+(r.name||r.sku)+' → '+next+' on hand');
+  var html='<div class="row"><div class="body"><div class="ttl">'+(delta>0?'+1  ':'−1  ')+esc(r.name||r.sku)+'</div>'+
+    '<div class="sub"><span class="sku">'+esc(r.sku)+'</span> · now '+next+' on hand</div></div>'+
+    '<span class="badge '+(delta>0?'b-packed':'b-low')+'">'+(delta>0?'IN':'OUT')+'</span></div>';
+  var log=$('scanlog'); log.innerHTML = html + log.innerHTML;
+  api('/inventory', { method:'POST', body: INV }).then(function(res){
+    if(!res || !res.ok){ toast('Couldn’t save — will sync on refresh'); }
+  }).catch(function(){ toast('Offline — change not saved yet'); });
+}
+
+function onScan(val){
+  var now=Date.now();
+  if (val===lastHit && now-lastHitAt<2500) return;   // debounce same code
+  lastHit=val; lastHitAt=now;
+  if (navigator.vibrate) navigator.vibrate(60);
+  $('scanhint').textContent='✓ '+val;
+  resolveCode(val);
+}
+function logScan(val){
+  var r = matchCode(val);
+  var label = r ? (r.kind==='sku' ? (r.row.name||r.row.sku) : (ordNumber(r.row)+' · '+ordName(r.row))) : 'No match';
+  var sub = r ? (r.kind==='sku' ? ('SKU '+esc(val)+' · '+avail(r.row)+' avail') : ('Order '+esc(val))) : esc(val);
+  var html = '<div class="row" '+(r?'onclick="reopenScan(\''+esc(val).replace(/\'/g,"\\\\'")+'\')"':'')+'>'+
+    '<div class="body"><div class="ttl">'+esc(label)+'</div><div class="sub">'+sub+'</div></div>'+
+    (r?'<span class="badge '+(r.kind==='sku'?'b-prod':'b-packed')+'">'+(r.kind==='sku'?'SKU':'Order')+'</span>':'<span class="badge b-low">?</span>')+'</div>';
+  var log=$('scanlog'); log.innerHTML = html + log.innerHTML;
+}
+function reopenScan(val){ resolveCode(val); }
+function matchCode(val){
+  var v=String(val).trim();
+  var s = INV.find(function(r){ return String(r.sku).toLowerCase()===v.toLowerCase(); });
+  if (s) return { kind:'sku', row:s };
+  var o = ORD.find(function(r){ return String(r.id).toLowerCase()===v.toLowerCase() || ('ff-'+String(r.seq))===v.toLowerCase() || String(r.seq)===v || ('#'+r.seq)===v; });
+  if (o) return { kind:'order', row:o };
+  // tracking-number fallback
+  var ot = ORD.find(function(r){ return r.tracking && String(r.tracking).toLowerCase()===v.toLowerCase(); });
+  if (ot) return { kind:'order', row:ot };
+  return null;
+}
+function resolveCode(val){
+  var r = matchCode(val);
+  if (!r){ toast('No SKU or order matches "'+val+'"'); return; }
+  if (r.kind==='sku'){
+    // In/Out mode adjusts stock and KEEPS scanning (rapid stock counts);
+    // Lookup mode opens the item sheet.
+    if (scanMode==='in')  { adjustStock(r.row.sku, +1); return; }
+    if (scanMode==='out') { adjustStock(r.row.sku, -1); return; }
+    stopScan(); openSku(r.row.sku);   // look-up → close camera, open the sheet
+  } else {
+    stopScan(); openOrder(r.row.id);
+  }
+}
+
+/* ════════ shared bits ════════ */
+function ago(ms){ var s=Math.floor((Date.now()-ms)/1000); if(s<60) return 'just now'; var m=Math.floor(s/60); if(m<60) return m+'m ago'; return Math.floor(m/60)+'h ago'; }
+function emptyHtml(msg, icon){
+  var ic = { box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/>', doc:'<path d="M5 4h14v16l-3-2-4 2-4-2-3 2z"/>', check:'<path d="M20 6 9 17l-5-5"/>' }[icon]||'';
+  return '<div class="empty"><svg viewBox="0 0 24 24">'+ic+'</svg>'+esc(msg)+'</div>';
+}
+
+/* ── pull-to-refresh (lightweight) + periodic sync ──────────── */
+var pullStart=0;
+$('app') && document.querySelector('main') && document.querySelector('main').addEventListener('touchstart', function(e){ if(this.scrollTop<=0) pullStart=e.touches[0].clientY; else pullStart=0; }, {passive:true});
+document.querySelector('main') && document.querySelector('main').addEventListener('touchend', function(e){
+  if(pullStart && e.changedTouches[0].clientY-pullStart>90){ toast('Refreshing…'); loadAll(true); }
+  pullStart=0;
+}, {passive:true});
+setInterval(function(){ if($('app').style.display!=='none' && document.visibilityState==='visible') loadAll(true); }, 60000);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && $('app').style.display!=='none' && Date.now()-DATA_AT>20000) loadAll(true); });
+
+/* ── boot ───────────────────────────────────────────────────── */
+(function init(){
+  var u=user();
+  if (tok() && u && STAFF.indexOf(u.role)>=0) showApp();
+  else { if(tok()&&u) { /* seller token on device */ $('lg-err'); } showLogin(); }
+  if ('serviceWorker' in navigator){ navigator.serviceWorker.register('sw-mobile.js').catch(function(){}); }
+})();
+</script>
+</body>
+</html>
