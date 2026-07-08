@@ -181,7 +181,7 @@
     'wedding gift', 'birthday gift idea', 'custom door mat', 'trending home decor'];
 
   var _injected = false, _role = 'seller', _last = [], _view = 'search';
-  var _query = '', _feedQuery = '', _feed = false, _page = 1, _count = 0, _perPage = 24, _loading = false;
+  var _query = '', _feedQuery = '', _feed = false, _page = 1, _count = 0, _perPage = 25, _loading = false;
 
   function _wireCommon(root) {
     (root || document).querySelector('#eg-scout-form').addEventListener('submit', function (e) { e.preventDefault(); doSearch(1); });
@@ -421,11 +421,11 @@
       '<span class="eg-scout-pgtxt">Page ' + _page + ' / ' + total + '</span>' +
       '<button class="eg-scout-pg-btn" id="eg-scout-next" ' + (_page >= total ? 'disabled' : '') + ' aria-label="Next page">&#8250;</button>' +
       '<select class="eg-scout-perpage" id="eg-scout-perpage" title="Products per page">' +
-        [12, 24, 36, 48].map(function (n) { return '<option value="' + n + '"' + (n === _perPage ? ' selected' : '') + '>' + n + ' / page</option>'; }).join('') +
+        [25, 50, 75, 100].map(function (n) { return '<option value="' + n + '"' + (n === _perPage ? ' selected' : '') + '>' + n + ' / page</option>'; }).join('') +
       '</select>';
     var prev = document.getElementById('eg-scout-prev'); if (prev) prev.onclick = function () { if (_page > 1) _go(_page - 1); };
     var next = document.getElementById('eg-scout-next'); if (next) next.onclick = function () { if (_page < total) _go(_page + 1); };
-    var pp = document.getElementById('eg-scout-perpage'); if (pp) pp.onchange = function () { _perPage = parseInt(pp.value, 10) || 24; _go(1); };
+    var pp = document.getElementById('eg-scout-perpage'); if (pp) pp.onchange = function () { _perPage = parseInt(pp.value, 10) || 25; _go(1); };
   }
   function _go(page) {
     var grid = document.getElementById('eg-scout-grid'); if (grid) grid.scrollTop = 0;
