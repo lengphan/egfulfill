@@ -97,11 +97,11 @@ nav.tabs button .dot.show{display:flex}
 .k-dot{width:8px;height:8px;border-radius:2px;border:1px solid var(--dk)}
 
 /* scan overlay (dark; cobalt accents) */
-#scan-ov{position:absolute;inset:0;z-index:80;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
+#scan-ov{position:absolute;inset:0;z-index:100;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center}
 #scan-ov.on{display:flex}
 #scan-ov video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.reticle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.reticle .box{width:78%;max-width:330px;aspect-ratio:1;border-radius:4px;box-shadow:0 0 0 100vmax rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.3);position:relative}
+.reticle{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding-bottom:150px}
+.reticle .box{width:70%;max-width:266px;aspect-ratio:1;border-radius:4px;box-shadow:0 0 0 100vmax rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.3);position:relative}
 .reticle .box .corner{position:absolute;width:30px;height:30px;border:3px solid var(--cobalt)}
 .reticle .box .tl{top:-2px;left:-2px;border-right:none;border-bottom:none}
 .reticle .box .tr{top:-2px;right:-2px;border-left:none;border-bottom:none}
@@ -109,13 +109,13 @@ nav.tabs button .dot.show{display:flex}
 .reticle .box .br{bottom:-2px;right:-2px;border-left:none;border-top:none}
 .reticle .box .laser{position:absolute;left:7%;right:7%;height:2.5px;border-radius:2px;background:linear-gradient(90deg,transparent,#6d8cff,transparent);box-shadow:0 0 12px rgba(109,140,255,.9);top:8%;animation:sweep 2.6s cubic-bezier(.45,0,.55,1) infinite}
 @keyframes sweep{0%{top:8%;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:92%;opacity:0}}
-.scan-close{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:92;width:40px;height:40px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:20px;border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;cursor:pointer}
-.scanhint{position:absolute;left:0;right:0;text-align:center;color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-shadow:0 1px 4px #000;top:calc(env(safe-area-inset-top) + 20px);padding:0 60px}
-.scan-bottom{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 56px);padding:14px 14px 16px;background:linear-gradient(transparent,rgba(0,0,0,.75) 42%);z-index:81}
+.scan-close{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;z-index:103;width:40px;height:40px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:20px;border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.scanhint{position:absolute;left:0;right:0;text-align:center;color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-shadow:0 1px 4px #000;top:calc(env(safe-area-inset-top) + 26px);padding:0 64px;z-index:102}
+.scan-bottom{position:absolute;left:0;right:0;bottom:0;padding:22px 16px calc(env(safe-area-inset-bottom) + 20px);background:linear-gradient(transparent,rgba(0,0,0,.55) 10%,rgba(0,0,0,.9) 42%);z-index:101}
 .scan-manual{display:flex;gap:8px}
 .scan-manual input{flex:1;border:1.5px solid #000;border-radius:4px;padding:13px;font-size:15px;outline:none;background:rgba(255,255,255,.97)}
 .scan-manual button{background:var(--cobalt);color:#fff;border:1.5px solid #000;border-radius:4px;padding:0 18px;font-family:var(--mono);font-size:12px;text-transform:uppercase}
-.scanlog{max-height:30vh;overflow-y:auto;margin-bottom:10px}
+.scanlog{max-height:16vh;overflow-y:auto;margin-bottom:12px}
 .scanlog .row{margin-bottom:8px}
 .scan-cta{width:100%;background:var(--cobalt);color:#fff;padding:16px;border:1.5px solid var(--dk);border-radius:4px;box-shadow:4px 4px 0 var(--dk);font-family:var(--mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;margin-bottom:16px}
 .scan-cta svg{width:20px;height:20px;fill:currentColor}
@@ -178,8 +178,10 @@ nav.tabs button .dot.show{display:flex}
 .item .q{font-family:var(--mono);font-size:15px;flex:0 0 auto}
 
 /* login (Staff) */
-#login{position:absolute;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;justify-content:center;padding:34px 26px calc(env(safe-area-inset-bottom) + 34px)}
-#login .brand{font-family:var(--mono);font-weight:400;font-size:26px;letter-spacing:.02em;text-transform:uppercase;margin-bottom:14px;color:var(--tx)}
+#login{position:absolute;inset:0;z-index:60;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden}
+#lg-halftone{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.lg-inner{position:relative;z-index:1;width:100%;padding:0 30px calc(env(safe-area-inset-bottom) + 16px);display:flex;flex-direction:column}
+#login .brand{font-family:var(--mono);font-weight:400;font-size:26px;letter-spacing:.02em;text-transform:uppercase;margin-bottom:30px;color:var(--tx)}
 #login .brand .app-tag{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:#fff;background:var(--cobalt);border-radius:3px;padding:3px 7px;margin-left:9px;vertical-align:middle;position:relative;top:-4px}
 #login .lg-h{font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin-bottom:6px}
 #login .tag{color:var(--mut);font-size:13px;margin-bottom:26px}
@@ -203,16 +205,14 @@ nav.tabs button .dot.show{display:flex}
 
 <!-- ═══ LOGIN ═══ -->
 <div id="login">
-  <div class="brand">EGFULFILL<span class="app-tag">STAFF</span></div>
-  <div class="lg-h">Floor &amp; ops,<br>in your hand.</div>
-  <div class="tag">Sign in to scan stock, run the queue &amp; manage the wallet.</div>
-  <label>Email</label>
-  <input id="lg-email" type="email" autocomplete="username" inputmode="email" placeholder="you@warehouse.com">
-  <label>Password</label>
-  <input id="lg-pass" type="password" autocomplete="current-password" placeholder="••••••••">
-  <button id="lg-go">Sign in</button>
-  <div class="err" id="lg-err"></div>
-  <div class="note">Staff access only — operator, warehouse, designer or admin login.</div>
+  <canvas id="lg-halftone"></canvas>
+  <div class="lg-inner">
+    <div class="brand">EGFULFILL<span class="app-tag">STAFF</span></div>
+    <input id="lg-email" type="email" autocomplete="username" inputmode="email" placeholder="Email">
+    <input id="lg-pass" type="password" autocomplete="current-password" placeholder="Password">
+    <div class="err" id="lg-err"></div>
+    <button id="lg-go">Sign in</button>
+  </div>
 </div>
 
 <!-- ═══ APP ═══ -->
@@ -374,7 +374,23 @@ function showApp(){
   WACCT = (u && u.role==='designer') ? 'designer' : 'factory';
   loadAll();
 }
-function showLogin(){ $('app').style.display='none'; $('login').style.display='flex'; }
+function egHalftone(){
+  var c=document.getElementById('lg-halftone'); if(!c) return; var ctx=c.getContext('2d'); if(!ctx) return;
+  if(c._raf) cancelAnimationFrame(c._raf);
+  var dpr=Math.min(2,window.devicePixelRatio||1), W=0,H=0;
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function size(){ W=c.offsetWidth; H=c.offsetHeight; c.width=W*dpr; c.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); }
+  var GAP=26, t=0;
+  function draw(){ if(!W||!H) size(); ctx.clearRect(0,0,W,H);
+    for(var y=GAP/2;y<H+GAP;y+=GAP){ for(var x=GAP/2;x<W+GAP;x+=GAP){
+      var d=(Math.sin(x*0.031+t)+Math.cos(y*0.041-t*0.8)+Math.sin((x+y)*0.022+t*0.6))*0.1667+0.5, r=0.5+d*3.2;
+      ctx.beginPath(); ctx.arc(x,y,r,0,6.2832);
+      ctx.fillStyle=d>0.62?'rgba(47,75,240,'+(0.05+d*0.24)+')':'rgba(22,22,24,'+(0.03+d*0.06)+')'; ctx.fill(); } }
+    t+=0.02; if(!reduce) c._raf=requestAnimationFrame(draw); }
+  size(); draw();
+  if(!c._rz){ c._rz=1; window.addEventListener('resize', function(){ size(); if(reduce) draw(); }); }
+}
+function showLogin(){ $('app').style.display='none'; $('login').style.display='flex'; setTimeout(egHalftone,0); }
 function logout(){ stopScan(); localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); showLogin(); }
 
 $('lg-go').onclick = function(){
