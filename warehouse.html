@@ -2221,52 +2221,76 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
   <!-- Shared between admin + warehouse. Reads EGStore.getFactoryBalance +
        getFactoryLedger so both boards see the exact same money state. -->
   <div id="section-balance" class="section fi">
-    <!-- Top: balance summary + actions, single outline card with subtle shade -->
-    <div style="border:1px solid #e5e4e0;border-radius:10px;background:#fafaf9;padding:22px 26px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap">
-      <div>
-        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Factory wallet balance</div>
-        <div id="wallet-bal-big" style="font-size:34px;font-weight:800;color:#191918;letter-spacing:-.02em;line-height:1">$0.00</div>
-        <div style="font-size:12.5px;color:#6b7280;margin-top:6px">Shared between admin + warehouse · auto-credited on every seller push, debited on refunds / payouts</div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
-        <button onclick="walExportLedger()" style="background:#fff;border:1px solid #e5e4e0;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+    <!-- ── Section-level tabs (mirrors Purchases' "Back Order Queue / Purchase
+         History" ink-underline strip). Left: Overview / Transactions /
+         Withdrawals. Right: the slim action row (Export CSV / Withdraw /
+         Refresh) preserved from the old header card. The big balance number
+         lives ONCE — inside the Overview panel's headline (eg-financials.js).
+         The persistent header chip (#wallet-bal-big in .bos-controls) stays. -->
+    <div style="display:flex;align-items:center;border-bottom:2px solid #e5e4e0;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <button id="bal-sec-tab-overview" onclick="setBalanceTab('overview')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-2px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">Overview</button>
+      <button id="bal-sec-tab-transactions" onclick="setBalanceTab('transactions')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Transactions</button>
+      <button id="bal-sec-tab-withdrawals" onclick="setBalanceTab('withdrawals')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Withdrawals</button>
+      <div style="flex:1;min-width:12px"></div>
+      <!-- Slim action row (moved out of the old header card) -->
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;padding-bottom:6px">
+        <button onclick="walExportLedger()" style="background:#fff;border:1px solid #e5e4e0;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:border-color .12s" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Export CSV
         </button>
-        <button onclick="openWithdrawModal({account:'factory'})" style="background:#fff;border:1px solid #40403d;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
+        <button onclick="openWithdrawModal({account:'factory'})" style="background:#fff;border:1px solid #40403d;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><path d="M6.5 12V1M2 8l4.5 4.5L11 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Withdraw
         </button>
-        <button onclick="walRefresh()" style="background:#191918;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        <button onclick="walRefresh()" style="background:#191918;color:#fff;border:none;border-radius:8px;padding:7px 15px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6a4 4 0 014-4M10 6a4 4 0 01-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M5 1l1 1-1 1M7 11l-1-1 1-1" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Refresh
         </button>
       </div>
     </div>
 
-    <!-- Profit & Costs — SHARED factory financials (eg-financials.js). Rendered
-         into this mount div by EGFinancials.render('fin-mount'). Same panel on
-         admin + warehouse (one 'factory' wallet). -->
-    <div id="fin-mount"></div>
-
-    <!-- Pending withdrawal requests (seller + factory payouts awaiting approval) — only shown when any exist -->
-    <div id="adm-pending-withdrawals" style="display:none;margin-bottom:20px"></div>
-
-    <!-- Tab strip — dark-underline active, no faded gray line under the row -->
-    <div style="display:flex;gap:0;margin-bottom:18px">
-      <button class="bal-tab on" onclick="setBalTab('all',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">All transactions <span id="wal-cnt-all" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
-      <button class="bal-tab" onclick="setBalTab('charge',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Charges <span id="wal-cnt-charge" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
-      <button class="bal-tab" onclick="setBalTab('refund',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Refunds <span id="wal-cnt-refund" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
-      <button class="bal-tab" onclick="setBalTab('payout',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Designer payouts <span id="wal-cnt-payout" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
+    <!-- ══════════════════════════════════════════
+         TAB 1 — OVERVIEW · the SHARED factory financials panel (eg-financials.js).
+         Its Fraunces headline is the SINGLE source of truth for the balance.
+    ══════════════════════════════════════════ -->
+    <div id="bal-sec-pnl-overview">
+      <!-- Profit & Costs — rendered into this mount div by EGFinancials.render('fin-mount').
+           Same panel on admin + warehouse (one 'factory' wallet). -->
+      <div id="fin-mount"></div>
     </div>
 
-    <!-- Ledger table — outline card matching the sellers page transactions -->
-    <div id="bal-pane-all" class="bal-pane" style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#fff">
-      <table class="dtable" style="border:none;margin:0">
-        <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Reference</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Transaction ID</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
-        <tbody id="wal-ledger-rows"></tbody>
-      </table>
-      <div id="wal-empty" style="display:none;padding:48px 24px;text-align:center;color:#9ca3af;font-size:13.5px;line-height:1.6">No transactions yet.<br><span style="font-size:12.5px">Charges appear when sellers push orders to production. Refunds + payouts appear when admin approves them.</span></div>
+    <!-- ══════════════════════════════════════════
+         TAB 2 — TRANSACTIONS · the full itemized ledger table (type sub-filter).
+    ══════════════════════════════════════════ -->
+    <div id="bal-sec-pnl-transactions" style="display:none">
+      <!-- Type sub-filter strip — dark-underline active, no faded gray line under the row -->
+      <div style="display:flex;gap:0;margin-bottom:18px">
+        <button class="bal-tab on" onclick="setBalTab('all',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">All transactions <span id="wal-cnt-all" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
+        <button class="bal-tab" onclick="setBalTab('charge',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Charges <span id="wal-cnt-charge" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
+        <button class="bal-tab" onclick="setBalTab('refund',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Refunds <span id="wal-cnt-refund" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
+        <button class="bal-tab" onclick="setBalTab('payout',this)" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Designer payouts <span id="wal-cnt-payout" style="font-size:12px;font-weight:700;opacity:.5;margin-left:3px">0</span></button>
+      </div>
+
+      <!-- Ledger table — outline card matching the sellers page transactions -->
+      <div id="bal-pane-all" class="bal-pane" style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden;background:#fff">
+        <table class="dtable" style="border:none;margin:0">
+          <thead><tr style="background:#fafaf9"><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px 9px 18px">Date</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Type</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Reference</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Transaction ID</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px">Description</th><th style="background:none;font-size:10.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;padding:9px 18px 9px 12px;text-align:right">Amount</th></tr></thead>
+          <tbody id="wal-ledger-rows"></tbody>
+        </table>
+        <div id="wal-empty" style="display:none;padding:48px 24px;text-align:center;color:#9ca3af;font-size:13.5px;line-height:1.6">No transactions yet.<br><span style="font-size:12.5px">Charges appear when sellers push orders to production. Refunds + payouts appear when admin approves them.</span></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB 3 — WITHDRAWALS · pending seller top-ups + payout approvals.
+    ══════════════════════════════════════════ -->
+    <div id="bal-sec-pnl-withdrawals" style="display:none">
+      <!-- Pending seller top-ups (manual VietQR confirmation) — only shown when any exist -->
+      <div id="adm-pending-topups" style="display:none;margin-bottom:20px"></div>
+      <!-- Pending withdrawal requests (seller + factory payouts awaiting approval) — only shown when any exist -->
+      <div id="adm-pending-withdrawals" style="display:none;margin-bottom:20px"></div>
+      <!-- Empty state — shown when nothing is pending -->
+      <div id="bal-withdrawals-empty" style="border:1px solid #e5e4e0;border-radius:10px;background:#fff;padding:48px 24px;text-align:center;color:#9ca3af;font-size:13.5px;line-height:1.6">No pending withdrawals or top-ups.<br><span style="font-size:12.5px">Seller top-ups and payout requests awaiting approval show up here. Use <b>Withdraw</b> above to request a factory payout.</span></div>
     </div>
   </div>
 
@@ -12282,6 +12306,32 @@ function setBalTab(id, btn) {
   }
   walRenderLedger();
 }
+// Section-level tabs: Overview (financials panel) / Transactions (ledger table) /
+// Withdrawals (pending approvals). Mirrors setPurchaseTab's ink-underline pattern.
+var _balSecTab = 'overview';
+function setBalanceTab(tab) {
+  _balSecTab = tab;
+  ['overview','transactions','withdrawals'].forEach(function (t) {
+    var pnl = document.getElementById('bal-sec-pnl-' + t);
+    if (pnl) pnl.style.display = t === tab ? '' : 'none';
+    var b = document.getElementById('bal-sec-tab-' + t);
+    if (b) { b.style.borderBottomColor = t === tab ? '#111827' : 'transparent'; b.style.color = t === tab ? '#191918' : '#6b7280'; }
+  });
+  if (tab === 'overview') { try { if (window.EGFinancials) EGFinancials.render('fin-mount'); } catch (e) {} }
+  if (tab === 'transactions') { walRenderLedger(); }
+  if (tab === 'withdrawals') { if (typeof admRenderPendingTopups === 'function') admRenderPendingTopups(); if (typeof whReconcileTopups === 'function') whReconcileTopups(); if (typeof admRenderPendingWithdrawals === 'function') admRenderPendingWithdrawals(); _balSyncWithdrawalsEmpty(); }
+}
+window.setBalanceTab = setBalanceTab;
+// Toggle the Withdrawals-tab empty state when neither pending box is showing.
+function _balSyncWithdrawalsEmpty() {
+  var empty = document.getElementById('bal-withdrawals-empty'); if (!empty) return;
+  var tu = document.getElementById('adm-pending-topups');
+  var wd = document.getElementById('adm-pending-withdrawals');
+  var anyTopup = tu && tu.style.display !== 'none';
+  var anyWd = wd && wd.style.display !== 'none';
+  empty.style.display = (anyTopup || anyWd) ? 'none' : 'block';
+}
+window._balSyncWithdrawalsEmpty = _balSyncWithdrawalsEmpty;
 function walRefresh() {
   if (typeof EGStore !== 'undefined' && EGStore.getFactoryBalance) {
     var v = EGStore.getFactoryBalance();
@@ -12304,7 +12354,7 @@ function admRenderPendingWithdrawals() {
   fetch('/api/wallet/withdrawals?status=pending', { headers: { Authorization: 'Bearer ' + tok } })
     .then(function (r) { return r.ok ? r.json() : []; })
     .then(function (list) {
-      if (!Array.isArray(list) || !list.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      if (!Array.isArray(list) || !list.length) { box.style.display = 'none'; box.innerHTML = ''; _balSyncWithdrawalsEmpty(); return; }
       var rows = list.map(function (t) {
         var d = new Date(t.created_at || Date.now());
         var when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -12326,8 +12376,9 @@ function admRenderPendingWithdrawals() {
           + '<span style="background:#b45309;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px">' + list.length + '</span>'
           + '<span style="font-size:12.5px;color:#9ca3af;margin-left:4px">Approve to debit the wallet and send the payout — or reject to cancel.</span></div>'
         + '<table style="width:100%;border-collapse:collapse"><tbody>' + rows + '</tbody></table></div>';
+      _balSyncWithdrawalsEmpty();
     })
-    .catch(function () { box.style.display = 'none'; });
+    .catch(function () { box.style.display = 'none'; _balSyncWithdrawalsEmpty(); });
 }
 function admApproveWithdrawal(id) {
   var tok = localStorage.getItem('eg_token');

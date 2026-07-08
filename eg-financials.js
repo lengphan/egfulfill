@@ -14,9 +14,13 @@
      • COSTS   — itemized cards: Purchase Orders (open + received), Refunds,
                  Returns, Designer Payouts, Withdrawals (approved) — each a card
                  with its (negative) total + a count
-     • NET / PROJECTED — current balance minus committed/pending spend
-                 (open POs + pending withdrawals) = "projected after commitments"
-     • an itemized RECENT ACTIVITY list (date · type · note · amount), newest first
+     • NET / PROJECTED — committed/pending spend (open POs + pending withdrawals)
+                 + "projected balance after commitments". The current balance is
+                 shown ONCE, in the headline above — not repeated here.
+
+   The itemized transaction list is NOT part of this panel: it lives in the
+   board's own "Transactions" tab (the full ledger table) so the balance and its
+   activity each appear exactly once. This panel is the "Overview" tab.
 
    DATA SOURCES (aggregated ENTIRELY on the frontend — NO backend route changes):
      • GET /api/wallet?account=factory  → { balance, ledger:[{delta,type,note,ref,created_at}] }
@@ -55,16 +59,6 @@
     var s = '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return neg ? '−' + s : s;
   }
-  function _when(ts) {
-    if (!ts) return '—';
-    try {
-      var d = new Date(ts);
-      if (isNaN(d.getTime())) return String(ts);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
-        ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } catch (e) { return String(ts); }
-  }
-
   /* ── PO aggregation from EGStore (POs are NOT in the wallet ledger) ── */
   function _poLineTotal(po) {
     if (!po) return 0;
@@ -325,80 +319,22 @@
     }
     html += '</div>';
 
-    /* ── net / projected ── */
+    /* ── net / projected ──
+       The big headline above is the SINGLE source of truth for the current
+       balance, so we DON'T repeat it here. This strip is only about what's
+       still COMMITTED (open POs + pending payouts) and what's left once those
+       clear. The full itemized activity lives in the board's Transactions tab. */
     html += '<div class="egfin-secttl">Net &amp; projected</div>';
     html += '<div class="egfin-net">' +
-      '<div class="egfin-netcell"><div class="egfin-netlbl">Current balance</div>' +
-      '<div class="egfin-netval">' + _money(balance) + '</div>' +
-      '<div class="egfin-netmeta">on the factory wallet now</div></div>' +
       '<div class="egfin-netcell"><div class="egfin-netlbl">Committed spend</div>' +
       '<div class="egfin-netval neg">' + _money(-committed) + '</div>' +
       '<div class="egfin-netmeta">' + _money(-poOpen.sum) + ' open POs · ' + _money(-pendWd.sum) + ' pending payouts</div></div>' +
-      '<div class="egfin-netcell hi"><div class="egfin-netlbl">Projected after commitments</div>' +
+      '<div class="egfin-netcell hi"><div class="egfin-netlbl">Projected balance after commitments</div>' +
       '<div class="egfin-netval' + (projected < 0 ? ' neg' : '') + '">' + _money(projected) + '</div>' +
-      '<div class="egfin-netmeta">what you keep once open POs &amp; payouts clear</div></div>' +
+      '<div class="egfin-netmeta">current balance minus open POs &amp; pending payouts</div></div>' +
       '</div>';
 
-    /* ── recent activity (ledger + PO commitments), newest first ── */
-    var activity = [];
-    ledger.forEach(function (row) {
-      var b = _bucket(row);
-      var income = _isIncome(b);
-      activity.push({
-        ts: row.created_at, income: income,
-        tag: _tagLabel(b),
-        note: row.note || _defaultNote(b, row.ref),
-        amt: income ? Math.abs(_num(row.delta)) : -Math.abs(_num(row.delta)),
-        sort: _sortTs(row.created_at)
-      });
-    });
-    pos.forEach(function (po) {
-      var t = _poLineTotal(po);
-      activity.push({
-        ts: po.created || po.date || po.ts, income: false,
-        tag: 'PO',
-        note: 'Purchase order ' + (po.num || po.id || '') + (po.supplier ? ' · ' + po.supplier : '') +
-          ' (' + (_poReceived(po) ? 'received' : 'open') + ')',
-        amt: -t,
-        sort: _sortTs(po.ts || po.created || po.date)
-      });
-    });
-    activity.sort(function (a, b) { return b.sort - a.sort; });
-    activity = activity.slice(0, 40);
-
-    html += '<div class="egfin-secttl">Recent activity</div><div class="egfin-act">';
-    if (!activity.length) {
-      html += '<div class="egfin-empty">No factory transactions yet.<br>' +
-        'Income appears when sellers pay / push orders; costs appear on refunds, payouts, withdrawals &amp; purchase orders.</div>';
-    } else {
-      html += activity.map(function (a) {
-        return '<div class="egfin-row">' +
-          '<span class="egfin-tag ' + (a.income ? 'inc' : 'cost') + '">' + _esc(a.tag) + '</span>' +
-          '<span class="egfin-rwhen">' + _esc(_when(a.ts)) + '</span>' +
-          '<span class="egfin-rnote" title="' + _esc(a.note) + '">' + _esc(a.note) + '</span>' +
-          '<span class="egfin-ramt' + (a.amt < 0 ? ' neg' : '') + '">' + (a.amt >= 0 ? '+' : '') + _money(a.amt) + '</span>' +
-          '</div>';
-      }).join('');
-    }
-    html += '</div>';
-
     el.innerHTML = html;
-  }
-
-  function _tagLabel(b) {
-    return b === 'topup' ? 'Payment' : b === 'earning' ? 'Earning' :
-      b === 'refund' ? 'Refund' : b === 'payout' ? 'Payout' :
-        b === 'withdrawal' ? 'Withdraw' : 'Adjust';
-  }
-  function _defaultNote(b, ref) {
-    var base = b === 'topup' ? 'Seller wallet top-up' : b === 'earning' ? 'Order earning' :
-      b === 'refund' ? 'Refund to seller' : b === 'payout' ? 'Designer payout' :
-        b === 'withdrawal' ? 'Factory withdrawal' : 'Manual adjustment';
-    return ref ? base + ' · ' + ref : base;
-  }
-  function _sortTs(ts) {
-    if (!ts) return 0;
-    try { var n = new Date(ts).getTime(); return isNaN(n) ? 0 : n; } catch (e) { return 0; }
   }
 
   /* ── public API ── */
