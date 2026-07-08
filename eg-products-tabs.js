@@ -36,8 +36,13 @@
       /* re-theme the board's own Catalog search + selects (they carry inline soft styles) */
       "#op-prod-search{background:#fff!important;border:1.5px solid #191918!important;border-radius:0!important;box-shadow:2px 2px 0 #191918;width:240px!important}" +
       "#op-prod-cat,#op-prod-status{border:1.5px solid #191918!important;border-radius:0!important;background:#fff!important;font-family:" + mono + "!important;text-transform:uppercase;font-size:11px!important;letter-spacing:.04em;padding:7px 26px 7px 11px!important}" +
-      /* keep the Catalog grid from stretching: responsive columns, capped width */
-      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;align-items:start!important}" +
+      /* keep the Catalog grid from stretching: responsive columns, capped width.
+         align-items:stretch so every card in a row fills to the tallest — the card
+         markup is a flex row with min-height, so rows stay uniform. */
+      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;align-items:stretch!important}" +
+      /* uniform catalog cards: fixed name clamp + full-height image column */
+      "#op-prod-grid>.card{height:100%}" +
+      "#op-prod-grid .op-prod-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}" +
       /* New In / Favorites search row */
       ".epx-searchrow{display:flex;align-items:center;gap:13px;margin-bottom:15px;flex-wrap:wrap}" +
       "#epx-search{flex:1;min-width:220px;max-width:460px;background:#fff;border:1.5px solid #191918;border-radius:0;padding:9px 13px;font-size:13.5px;font-family:inherit;color:#191918;outline:none;box-shadow:2px 2px 0 #191918}" +
@@ -79,12 +84,101 @@
 
   var _tabs, _newin, _favs, _grid, _header, _searchTimer, _newinLoaded = false, _io;
 
+  // ── S&S New-In image resolution ────────────────────────────────────────────
+  // The styles feed's `styleImage` is frequently null/unusable, so many New In
+  // cards would render blank. The PRODUCT image (`colorFrontImage`) DOES work and
+  // is returned by GET /api/ss/style/:id as { image }. So: keep styleImage as the
+  // fast path when present; otherwise (or if the <img> errors) LAZY-load the real
+  // image only when the card scrolls into view, via an IntersectionObserver, with
+  // the fetches THROTTLED to a few at a time and results cached by styleID so
+  // re-renders / re-scrolls never refetch.
+  var _imgCache = {};        // styleID -> resolved URL ('' = tried, no image found)
+  var _imgIO = null;         // IntersectionObserver watching the .img containers
+  var _imgQueue = [];        // pending styleIDs to resolve (each with its DOM node)
+  var _imgActive = 0;        // in-flight fetch count
+  var IMG_MAX = 3;           // concurrent /api/ss/style/:id requests
+
+  function _applyResolvedImg(imgWrap, url) {
+    if (!imgWrap || !url) return;
+    var existing = imgWrap.querySelector('img');
+    if (existing) { existing.src = url; existing.style.display = ''; }
+    else {
+      var im = document.createElement('img');
+      im.alt = ''; im.loading = 'lazy'; im.src = url;
+      // Insert before the placeholder so object-fit styling applies.
+      var ph = imgWrap.querySelector('.ph');
+      imgWrap.insertBefore(im, ph || null);
+    }
+    var ph = imgWrap.querySelector('.ph');
+    if (ph) ph.style.display = 'none';
+  }
+
+  function _imgPump() {
+    while (_imgActive < IMG_MAX && _imgQueue.length) {
+      var job = _imgQueue.shift();
+      var sid = job.id, wrap = job.wrap;
+      // Skip if this node was already resolved by a cached hit.
+      if (_imgCache[sid]) { _applyResolvedImg(wrap, _imgCache[sid]); continue; }
+      if (_imgCache[sid] === '') continue;   // known-empty, don't refetch
+      _imgActive++;
+      (function (sid, wrap) {
+        fetch('/api/ss/style/' + encodeURIComponent(sid), { headers: hdr() })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            var url = (d && d.image) || '';
+            _imgCache[sid] = url;                       // cache result (even '' = tried)
+            if (url) _applyResolvedImg(wrap, url);
+          })
+          .catch(function () { /* leave placeholder; don't cache so a later scroll can retry */ })
+          .then(function () { _imgActive--; _imgPump(); });
+      })(sid, wrap);
+    }
+  }
+
+  function _ensureImgIO() {
+    if (_imgIO || !('IntersectionObserver' in window)) return _imgIO;
+    _imgIO = new IntersectionObserver(function (ents) {
+      ents.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var wrap = en.target;
+        _imgIO.unobserve(wrap);                         // resolve each card at most once
+        var sid = wrap.getAttribute('data-sid');
+        if (!sid) return;
+        var cached = _imgCache[sid];
+        if (cached) { _applyResolvedImg(wrap, cached); return; }   // instant on re-render
+        if (cached === '') return;                       // known no-image
+        _imgQueue.push({ id: sid, wrap: wrap });
+        _imgPump();
+      });
+    }, { rootMargin: '200px 0px', threshold: 0.01 });
+    return _imgIO;
+  }
+
+  // Wire lazy image resolution for every card in `container` that lacks a usable
+  // styleImage (or already has one cached). Called after each renderList().
+  function _observeCardImages(container) {
+    var io = _ensureImgIO();
+    container.querySelectorAll('.epx-card .img[data-needs-img="1"]').forEach(function (wrap) {
+      var sid = wrap.getAttribute('data-sid');
+      if (sid && _imgCache[sid]) { _applyResolvedImg(wrap, _imgCache[sid]); return; }  // cache hit — no observe
+      if (sid && _imgCache[sid] === '') return;
+      if (io) io.observe(wrap);
+      else if (sid) { _imgQueue.push({ id: sid, wrap: wrap }); _imgPump(); }  // no IO support → resolve eagerly
+    });
+  }
+
   function cardHTML(s) {
-    // Use the style's image; on load-error (or missing) fall back to the garment placeholder.
-    var img = s.image
-      ? '<img src="' + esc(s.image) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';var p=this.parentNode.querySelector(\'.ph\');if(p)p.style.display=\'flex\'">'
+    // Fast path: use styleImage when present. On load-error (or when it's missing),
+    // fall through to lazy-loading the real colorFrontImage via /api/ss/style/:id;
+    // the placeholder shows meanwhile. onerror flips the container to needs-img so
+    // the IntersectionObserver picks it up on the next _observeCardImages pass.
+    var hasImg = !!s.image;
+    var img = hasImg
+      ? '<img src="' + esc(s.image) + '" alt="" loading="lazy" onerror="this.onerror=null;this.style.display=\'none\';var im=this.parentNode;im.setAttribute(\'data-needs-img\',\'1\');var p=im.querySelector(\'.ph\');if(p)p.style.display=\'flex\';if(window.EGProdTabs&&window.EGProdTabs._reresolve)window.EGProdTabs._reresolve(im)">'
       : '';
-    var phStyle = s.image ? 'display:none' : 'display:flex';
+    var phStyle = hasImg ? 'display:none' : 'display:flex';
+    // Mark cards WITHOUT a fast-path image so the observer lazy-loads them.
+    var needsAttr = hasImg ? '' : ' data-needs-img="1"';
     var meta = [esc(s.brand || ''), s.category ? esc(s.category) : ''].filter(Boolean).join(' · ');
     return '<div class="epx-card' + (s.favorited ? ' is-fav' : '') + '" data-id="' + esc(s.styleID) + '">' +
       '<div class="b">' +
@@ -93,7 +187,7 @@
         '<div class="mt">Style ' + esc(s.styleID) + '</div>' +
         '<div class="cardfoot"><button class="epx-add" type="button">+ Add to catalog</button></div>' +
       '</div>' +
-      '<div class="img">' +
+      '<div class="img" data-sid="' + esc(s.styleID) + '"' + needsAttr + '>' +
         '<button class="epx-heart" type="button" title="Favorite / unfavorite">' + HEART + '</button>' +
         img +
         '<span class="ph" style="align-items:center;justify-content:center;width:100%;height:100%;' + phStyle + '">' + GARMENT + '</span>' +
@@ -110,6 +204,21 @@
       card.querySelector('.epx-heart').addEventListener('click', function (e) { e.stopPropagation(); toggleFav(card, s); });
       card.querySelector('.epx-add').addEventListener('click', function (e) { e.stopPropagation(); addToCatalog(s); });
     });
+    // Lazy-load real product images for cards without a usable styleImage.
+    _observeCardImages(container);
+  }
+
+  // Called from an <img> onerror (styleImage 404'd): the container was just flagged
+  // needs-img, so hand it to the observer to lazy-load the real colorFrontImage.
+  function _reresolve(imgWrap) {
+    if (!imgWrap) return;
+    var sid = imgWrap.getAttribute('data-sid');
+    if (!sid) return;
+    if (_imgCache[sid]) { _applyResolvedImg(imgWrap, _imgCache[sid]); return; }
+    if (_imgCache[sid] === '') return;
+    var io = _ensureImgIO();
+    if (io) io.observe(imgWrap);
+    else { _imgQueue.push({ id: sid, wrap: imgWrap }); _imgPump(); }
   }
 
   function loadNewIn(search) {
@@ -282,7 +391,7 @@
     show('newin');
   }
 
-  window.EGProdTabs = { init: init, loadNewIn: loadNewIn, loadFavs: loadFavs };
+  window.EGProdTabs = { init: init, loadNewIn: loadNewIn, loadFavs: loadFavs, _reresolve: _reresolve };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 350); });
   else setTimeout(init, 350);
 })();

@@ -127,6 +127,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       brand: s.brandName || '',
       title: ((s.brandName ? s.brandName + ' ' : '') + (s.title || '')).trim() || (s.title || ''),
       category: s.baseCategory || '',
+      // styleImage is frequently null/unusable on this account. ssImg CDN-prefixes any
+      // relative path (incl. a bare filename with no leading slash), so the client's fast
+      // path works when it IS present; when it's null the client lazy-loads the reliable
+      // colorFrontImage via GET /api/ss/style/:id (see eg-products-tabs.js).
       image: ssImg(s.styleImage)
     })).filter((s) => s.styleID);
     _stylesCache = { at: now, data: mapped };
