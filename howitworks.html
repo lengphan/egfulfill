@@ -73,7 +73,9 @@
   .qa-item{flex:0 0 auto;display:flex;flex-direction:column;overflow:hidden;border-bottom:1.5px solid var(--ink);background:var(--amber);transition:flex-grow .42s ease,background .3s ease}
   .qa-item:last-child{border-bottom:none}
   .qa-item:focus{outline:none}
-  .qa-hd{display:flex;align-items:center;gap:13px;padding:0 22px;min-height:66px;flex-shrink:0}
+  .qa-hd{display:flex;align-items:center;gap:13px;padding:0 22px;min-height:66px;flex-shrink:0;cursor:pointer;position:relative;z-index:1}
+  /* the decorative dither avatar/canvas must never intercept the header's hover/click */
+  .qa-hd [data-dither],.qa-hd canvas{pointer-events:none}
   .qa-ava{width:34px;height:34px;border:1.5px solid var(--ink);flex-shrink:0;overflow:hidden;background:#0c0c0b;position:relative}
   .qa-ava [data-dither]{position:absolute;inset:0}
   .qa-ava canvas{width:100%;height:100%;display:block}
@@ -295,6 +297,8 @@
       hd.addEventListener('mouseenter', function(){ arm(it); });
       hd.addEventListener('mouseleave', function(){ if(pending===it) disarm(); });
       it.addEventListener('focus', function(){ disarm(); show(it); });   // keyboard: reveal immediately
+      // CLICK/TAP fallback — always opens instantly, even if hover-intent is flaky or on touch.
+      hd.addEventListener('click', function(){ disarm(); show(it); });
     });
     var list=items[0].parentNode;
     if(list) list.addEventListener('mouseleave', disarm);   // keep the last answer shown (stable)
