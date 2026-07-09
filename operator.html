@@ -3850,7 +3850,7 @@ function renderOpOrders() {
       </td>
     </tr>`;
     const detailRow = `<tr id="op-detail-${o.num}" style="display:${isExp?'table-row':'none'}">
-      <td colspan="10" style="padding:0;border-bottom:1px solid #f0ede9;background:#fafaf9">
+      <td colspan="10" style="padding:0;border-bottom:1px solid #f0ede9;background:transparent">
         ${o.itemList.map((it, ei) => {
           const sep = ei < o.itemList.length - 1 ? 'border-bottom:1px solid #e8e7e4' : '';
           const tBg  = OP_PT_BG[it.printType]  || '#f3f4f6';

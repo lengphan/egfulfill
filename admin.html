@@ -4976,8 +4976,8 @@ function whRenderOrders() {
     </tr>`;
 
     const detailRow = hasDetail ? `<tr id="wh-detail-${o.num}" style="display:none">
-      <td colspan="10" style="padding:0;background:#fafaf9;border-bottom:1px solid #eeede9">
-        <div style="padding:6px 16px 10px 52px">
+      <td colspan="10" style="padding:0;background:transparent;border-bottom:1px solid #eeede9">
+        <div style="padding:6px 16px 10px 0">
           ${expandItems.map((it, idx) => {
             const bg   = ITEM_STATUS_BG[it.status]   || '#f3f3f1';
             const col  = ITEM_STATUS_COLORS[it.status]|| '#6b7280';

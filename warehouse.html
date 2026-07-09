@@ -6106,7 +6106,7 @@ function whRenderOrders() {
 
     const batchCnt = whItemChecks[o.num] ? Object.values(whItemChecks[o.num]).filter(Boolean).length : 0;
     const detailRow = hasDetail ? `<tr id="wh-detail-${o.num}" style="display:none">
-      <td colspan="10" style="padding:0;border-bottom:none;background:#fafaf9">
+      <td colspan="10" style="padding:0;border-bottom:none;background:transparent">
         <div id="wh-batch-${o.num}" style="display:${batchCnt>0?'flex':'none'};padding:7px 16px;background:#1f2937;align-items:center;gap:10px">
           <span id="wh-batch-cnt-${o.num}" style="color:#fff;font-size:13.25px;font-weight:600">${batchCnt} item${batchCnt!==1?'s':''} selected</span>
           <button onclick="event.stopPropagation();whBatchStartWorking('${o.num}')" style="font-size:12.25px;padding:3px 14px;border-radius:6px;background:#191918;color:#fff;border:none;cursor:pointer;font-weight:700">Start Working</button>

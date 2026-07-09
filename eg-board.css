@@ -396,12 +396,17 @@ html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){backgrou
    the line runs dead-straight through the dots. td padding-left forced to 0 so the geometry matches. */
 html.eg-board-on tr[id^="op-detail-"] > td,
 html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important;padding-left:0!important}
-/* Only when the row is a DIRECT child of the td (operator/warehouse) does x=17.5 line up with the
-   dots. Admin nests its rows in a padded div (its own status view), so it's excluded via :has(). */
+/* Spine at x=17.5 through the dots. Operator puts the rows DIRECTLY in the td; warehouse + admin
+   wrap them in a div (with the wrapper's own left padding zeroed so the dot still centres at 17.5),
+   so match both the direct-child and the div-wrapped cases. */
 html.eg-board-on tr[id^="op-detail-"] > td:has(> .egdt-item-row)::before,
-html.eg-board-on tr[id^="wh-detail-"] > td:has(> .egdt-item-row)::before{content:"";position:absolute;left:17.5px;top:-1px;bottom:16px;width:1px;background:var(--bos-line);z-index:0}
+html.eg-board-on tr[id^="op-detail-"] > td:has(> div > .egdt-item-row)::before,
+html.eg-board-on tr[id^="wh-detail-"] > td:has(> .egdt-item-row)::before,
+html.eg-board-on tr[id^="wh-detail-"] > td:has(> div > .egdt-item-row)::before{content:"";position:absolute;left:17.5px;top:-1px;bottom:16px;width:1px;background:var(--bos-line);z-index:0}
 html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td:has(> .egdt-item-row)::before,
-html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td:has(> .egdt-item-row)::before{background:#3a3631}
+html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td:has(> div > .egdt-item-row)::before,
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td:has(> .egdt-item-row)::before,
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td:has(> div > .egdt-item-row)::before{background:#3a3631}
 html.eg-board-on .egdt-item-row{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
 html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
 html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
