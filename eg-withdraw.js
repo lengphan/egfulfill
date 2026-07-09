@@ -24,9 +24,31 @@
   var WD_MAX_REQ = 500;     // maximum per single request
   var _wdAccount = 'own';   // resolved on open: 'own' (seller) | 'factory' | 'designer'
   var _wdBal = 0;           // available balance shown in the modal
+  var _wdForceFields = false; // "Use a different bank" was clicked → show entry fields even if one is saved
+  var _wdQrData = '';       // data-URL of the QR image staged in the entry form (before Save)
 
   function _tok() { try { return localStorage.getItem('eg_token') || ''; } catch (e) { return ''; } }
   function _base() { return window.EG_API_BASE || ''; }
+
+  /* ── Local-bank store — the SINGLE source of truth shared with eg-addfunds.js's
+        Linked Accounts window. Both modules read/write localStorage['eg_local_banks']
+        (a JSON array of { name, number, bank, qr, ts }); we also expose it on window
+        as EGLocalBanks so either side can call the same guarded parse/save. ── */
+  function _banksGet() {
+    try { var v = JSON.parse(localStorage.getItem('eg_local_banks') || 'null'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function _banksSave(a) {
+    try { localStorage.setItem('eg_local_banks', JSON.stringify(Array.isArray(a) ? a : [])); } catch (e) {}
+    try { window.dispatchEvent(new Event('eg-local-banks-changed')); } catch (e) {}
+  }
+  function _banksAdd(b) { var a = _banksGet(); a.unshift(b); _banksSave(a); return a; }
+  function _banksRemove(i) { var a = _banksGet(); if (i >= 0 && i < a.length) { a.splice(i, 1); _banksSave(a); } return a; }
+  // The currently SELECTED bank = the first one saved (newest, since we unshift on Save).
+  function _selectedBank() { var a = _banksGet(); return a.length ? a[0] : null; }
+  function _mask(num) { var s = String(num || '').replace(/\s+/g, ''); return s.length > 4 ? ('•••• ' + s.slice(-4)) : (s || '••••'); }
+  function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  window.EGLocalBanks = { get: _banksGet, save: _banksSave, add: _banksAdd, remove: _banksRemove, mask: _mask };
 
   // Read the CURRENT available balance for whichever wallet we're withdrawing from.
   // Factory pages keep it in EGStore.getFactoryBalance(); the seller keeps eg_balance.
@@ -44,7 +66,7 @@
     wrap.innerHTML =
       '<div id="withdraw-modal" style="display:none;position:fixed;inset:0;z-index:400;align-items:center;justify-content:center;font-family:inherit">'
       + '<div onclick="closeWithdrawModal()" style="position:fixed;inset:0;background:rgba(25,25,24,.42)"></div>'
-      + '<div style="background:#fdfcfa;border:1px solid #40403d;border-radius:12px;width:420px;max-width:calc(100vw - 32px);box-shadow:5px 5px 0 #40403d,0 24px 64px rgba(0,0,0,.22);padding:24px;position:relative">'
+      + '<div style="background:#fdfcfa;border:1px solid #d7d4cc;border-radius:12px;width:420px;max-width:calc(100vw - 32px);box-shadow:5px 5px 0 #d7d4cc,0 24px 64px rgba(0,0,0,.22);padding:24px;position:relative">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'
           + '<div style="font-size:16px;font-weight:700;color:#191918">Withdraw Funds</div>'
           + '<button onclick="closeWithdrawModal()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:4px;border-radius:6px;display:flex" onmouseover="this.style.background=\'#f3eee2\'" onmouseout="this.style.background=\'\'"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>'
@@ -54,13 +76,8 @@
           + '<div id="wd-avail" style="font-size:18px;font-weight:800;color:#191918;font-variant-numeric:tabular-nums">$0.00</div>'
         + '</div>'
         + '<div style="margin-bottom:14px">'
-          + '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to</label>'
-          + '<select id="wd-method" style="width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#191918" onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'">'
-            + '<option value="vietqr">BIDV</option>'
-            + '<option value="paypal">PayPal — card or balance</option>'
-            + '<option value="pingpong">PingPong (Connected)</option>'
-            + '<option value="bank">Bank Transfer (manual)</option>'
-          + '</select>'
+          + '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Withdraw to your bank</label>'
+          + '<div id="wd-bank-box"></div>'
         + '</div>'
         + '<div style="margin-bottom:6px">'
           + '<label style="font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:5px">Amount (USD)</label>'
@@ -93,13 +110,85 @@
             : (window.EG_WITHDRAW_ACCOUNT ? String(window.EG_WITHDRAW_ACCOUNT) : 'own');
     _wdAccount = acc;
     _wdBal = _liveBalance();
+    _wdForceFields = false; _wdQrData = '';
     var avail = document.getElementById('wd-avail');
     if (avail) avail.textContent = '$' + _wdBal.toFixed(2);
     var amt = document.getElementById('wd-amount'); if (amt) amt.value = '';
+    _wdRenderBank();
     _wdValidate();
     var m = document.getElementById('withdraw-modal');
     if (m) m.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+  }
+  /* ── Bank-destination block: SUMMARY of the saved local bank, or entry FIELDS
+        when none is saved (or "Use a different bank" was clicked). ── */
+  function _wdRenderBank() {
+    var box = document.getElementById('wd-bank-box'); if (!box) return;
+    var b = _selectedBank();
+    if (b && !_wdForceFields) { box.innerHTML = _wdSummaryHtml(b); }
+    else { box.innerHTML = _wdFieldsHtml(); }
+  }
+  function _wdSummaryHtml(b) {
+    var qr = b.qr
+      ? '<img src="' + _esc(b.qr) + '" alt="QR" style="width:44px;height:44px;border-radius:6px;object-fit:cover;border:1px solid #e5e4e0;flex-shrink:0">'
+      : '';
+    return '<div style="display:flex;align-items:center;gap:11px;border:1.5px solid #e5e4e0;border-radius:8px;padding:11px 13px;background:#fff">'
+      + qr
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:14px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(b.bank || 'Bank') + '</div>'
+        + '<div style="font-size:12.5px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _esc(b.name || '') + ' · <span style="font-family:monospace">' + _esc(_mask(b.number)) + '</span></div>'
+      + '</div>'
+      + '<span style="font-size:11px;font-weight:700;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:2px 9px;flex-shrink:0">Selected</span>'
+      + '</div>'
+      + '<button type="button" onclick="_wdUseDifferentBank()" style="background:none;border:none;padding:6px 0 0;margin:0;font-size:12px;font-weight:600;color:#6b7280;cursor:pointer;font-family:inherit;text-decoration:underline;text-decoration-color:#c4c3be;text-underline-offset:3px">Use a different bank</button>';
+  }
+  function _wdFieldsHtml() {
+    var _is = 'width:100%;border:1.5px solid #e5e4e0;border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;color:#191918';
+    var _foc = 'onfocus="this.style.borderColor=\'#191918\'" onblur="this.style.borderColor=\'#e5e4e0\'"';
+    var _lbl = 'font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px';
+    var has = _banksGet().length;
+    return (has ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><button type="button" onclick="_wdCancelDifferentBank()" style="background:none;border:none;cursor:pointer;color:#6b7280;font-size:12.5px;font-weight:600;font-family:inherit;display:inline-flex;align-items:center;gap:3px;padding:0"><span style="font-size:16px;line-height:1">‹</span>Use saved bank</button></div>' : '')
+      + '<div style="display:flex;flex-direction:column;gap:10px">'
+        + '<div><label style="' + _lbl + '">Account Name</label><input id="wd-bank-name" type="text" placeholder="Nguyen Van A" style="' + _is + '" ' + _foc + '></div>'
+        + '<div><label style="' + _lbl + '">Account Number</label><input id="wd-bank-number" type="text" inputmode="numeric" placeholder="0123456789" style="' + _is + '" ' + _foc + '></div>'
+        + '<div><label style="' + _lbl + '">Bank Name</label><input id="wd-bank-bank" type="text" placeholder="BIDV / Vietcombank / …" style="' + _is + '" ' + _foc + '></div>'
+        + '<div><label style="' + _lbl + '">QR code image <span style="color:#9ca3af;font-weight:500">(optional)</span></label>'
+          + '<input id="wd-bank-qr" type="file" accept="image/*" onchange="_wdOnQrFile(this)" style="display:none">'
+          + '<div style="display:flex;align-items:center;gap:10px">'
+            + '<button type="button" onclick="document.getElementById(\'wd-bank-qr\').click()" style="display:inline-flex;align-items:center;gap:6px;border:1.5px dashed #d7d4cc;background:#faf9f7;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;color:#191918;cursor:pointer;font-family:inherit" onmouseover="this.style.borderColor=\'#191918\'" onmouseout="this.style.borderColor=\'#d7d4cc\'"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 9.5V2M4 4.5L7 1.5l3 3M2.5 9.5v2a1 1 0 001 1h7a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Upload QR</button>'
+            + '<img id="wd-bank-qr-preview" alt="" style="display:none;width:44px;height:44px;border-radius:6px;object-fit:cover;border:1px solid #e5e4e0">'
+          + '</div>'
+        + '</div>'
+        + '<div id="wd-bank-err" style="display:none;font-size:12px;color:#dc2626;font-weight:600"></div>'
+        + '<button type="button" onclick="_wdSaveBank()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">Save bank</button>'
+      + '</div>';
+  }
+  function _wdUseDifferentBank() { _wdForceFields = true; _wdQrData = ''; _wdRenderBank(); _wdValidate(); }
+  function _wdCancelDifferentBank() { _wdForceFields = false; _wdQrData = ''; _wdRenderBank(); _wdValidate(); }
+  function _wdOnQrFile(input) {
+    var f = input && input.files && input.files[0];
+    var prev = document.getElementById('wd-bank-qr-preview');
+    if (!f) { _wdQrData = ''; if (prev) prev.style.display = 'none'; return; }
+    if (f.size > 8 * 1024 * 1024) { var er = document.getElementById('wd-bank-err'); if (er) { er.textContent = 'QR image too large (max 8MB).'; er.style.display = 'block'; } input.value = ''; return; }
+    var rd = new FileReader();
+    rd.onload = function () { _wdQrData = rd.result; if (prev) { prev.src = rd.result; prev.style.display = 'block'; } };
+    rd.readAsDataURL(f);
+  }
+  function _wdSaveBank() {
+    var name = ((document.getElementById('wd-bank-name') || {}).value || '').trim();
+    var number = ((document.getElementById('wd-bank-number') || {}).value || '').trim();
+    var bank = ((document.getElementById('wd-bank-bank') || {}).value || '').trim();
+    var er = document.getElementById('wd-bank-err');
+    if (!name || !number || !bank) {
+      if (er) { er.textContent = 'Account name, account number and bank name are all required.'; er.style.display = 'block'; }
+      return;
+    }
+    // Save + make it the SELECTED bank (unshift → first == selected), then show the summary.
+    _banksAdd({ name: name, number: number, bank: bank, qr: _wdQrData || '', ts: Date.now() });
+    _wdForceFields = false; _wdQrData = '';
+    _wdRenderBank();
+    _wdValidate();
+    _toast('Saved to Linked Accounts');
   }
   function closeWithdrawModal() {
     var m = document.getElementById('withdraw-modal');
@@ -119,11 +208,16 @@
     if (!input || !helper || !btn) return;
     var amt = parseFloat(input.value || '0') || 0;
     var bal = _wdBal;
+    var hasBank = !!_selectedBank();
     var msg, color, disabled;
     if (bal < WD_MIN_BAL) {
       // Whole feature is gated until the balance clears the floor.
       msg = 'A minimum balance of $' + WD_MIN_BAL.toFixed(2) + ' is required to withdraw (you have $' + bal.toFixed(2) + ')';
       color = '#dc2626'; disabled = true;
+    } else if (!hasBank) {
+      // No payout destination yet — must save a bank before requesting.
+      msg = 'Add your bank details above to receive the payout.';
+      color = '#9ca3af'; disabled = true;
     } else if (!amt) {
       msg = 'Minimum withdrawal: $' + WD_MIN_BAL.toFixed(2) + ' · maximum $' + WD_MAX_REQ.toFixed(2) + ' per request';
       color = '#9ca3af'; disabled = true;
@@ -152,11 +246,11 @@
   }
   function submitWithdraw() {
     var input = document.getElementById('wd-amount');
-    var methodEl = document.getElementById('wd-method');
     var amount = input ? (parseFloat(input.value || '0') || 0) : 0;
-    var method = methodEl ? methodEl.value : '';
+    var bank = _selectedBank();
     var bal = _liveBalance();
     // Re-check every gate before hitting the network — never trust the form alone.
+    if (!bank) { _toast('Add your bank details before requesting a withdrawal.'); return; }
     if (bal < WD_MIN_BAL) { _toast('A minimum balance of $' + WD_MIN_BAL.toFixed(2) + ' is required to withdraw.'); return; }
     if (amount < WD_MIN_BAL) { _toast('Minimum withdrawal is $' + WD_MIN_BAL.toFixed(2) + '.'); return; }
     if (amount > WD_MAX_REQ) { _toast('The maximum per request is $' + WD_MAX_REQ.toFixed(2) + '.'); return; }
@@ -165,7 +259,10 @@
     if (!tok) { _toast('You need to be signed in to withdraw.'); return; }
     var btn = document.getElementById('wd-submit');
     if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-    var body = { amount: amount, method: method, dest: (methodEl ? methodEl.options[methodEl.selectedIndex].text : method) };
+    // Withdrawals are ALWAYS a manual bank transfer — put the saved bank details into
+    // `dest` so the admin knows exactly where to pay.
+    var dest = 'Bank Transfer · ' + (bank.bank || '') + ' · ' + (bank.name || '') + ' · ' + (bank.number || '');
+    var body = { amount: amount, method: 'bank', dest: dest };
     if (_wdAccount !== 'own') body.account = _wdAccount;
     fetch(_base() + '/api/wallet/withdraw', {
       method: 'POST',
@@ -198,4 +295,8 @@
   window._wdSet = _wdSet;
   window._wdSetMax = _wdSetMax;
   window._wdValidate = _wdValidate;
+  window._wdUseDifferentBank = _wdUseDifferentBank;
+  window._wdCancelDifferentBank = _wdCancelDifferentBank;
+  window._wdOnQrFile = _wdOnQrFile;
+  window._wdSaveBank = _wdSaveBank;
 })();

@@ -287,14 +287,54 @@ function _laRender() {
     + '<div style="position:relative;background:#fdfcfa;border:1px solid #40403d;border-radius:18px;box-shadow:5px 5px 0 #40403d,0 28px 70px rgba(0,0,0,.3);width:880px;max-width:calc(100vw - 28px);height:600px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #ece8e0"><div><div style="font-size:17px;font-weight:800;color:#191918">Linked Accounts</div><div style="font-size:12.5px;color:#9ca3af;margin-top:1px">Manage your cards and payout accounts</div></div><button onclick="closeLinkedAccounts()" style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:5px;border-radius:7px" onmouseover="this.style.background=\'#f0ede9\'" onmouseout="this.style.background=\'transparent\'"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></div>'
     + '<div style="display:flex;flex:1;min-height:0">'
-    + '<div style="width:210px;flex-shrink:0;border-right:1px solid #ece8e0;padding:14px;display:flex;flex-direction:column;gap:4px">' + nav('cards', 'Cards', icCard) + nav('paypal', 'PayPal', icPay) + '</div>'
+    + '<div style="width:210px;flex-shrink:0;border-right:1px solid #ece8e0;padding:14px;display:flex;flex-direction:column;gap:4px">' + nav('cards', 'Cards', icCard) + nav('localbank', 'Local Bank', icBank) + nav('paypal', 'PayPal', icPay) + '</div>'
     + '<div style="flex:1;overflow:auto;padding:24px">' + _laPanelHtml() + '</div>'
     + '</div></div>';
   if (_laTab === 'cards' && _laAdding && typeof ccUpdatePreview === 'function') ccUpdatePreview();
 }
 // BIDV removed from Linked Accounts: it's the PLATFORM's receiving account (admin's
 // wallet), not a seller connection. This window only shows the seller's own cards + PayPal.
-function _laPanelHtml() { if (_laTab === 'paypal') return _laPaypalHtml(); return _laCardsHtml(); }
+function _laPanelHtml() { if (_laTab === 'paypal') return _laPaypalHtml(); if (_laTab === 'localbank') return _laLocalBankHtml(); return _laCardsHtml(); }
+// ── Local Bank — the seller's own bank(s) saved from the Withdraw window. Shares the
+// SINGLE source of truth (localStorage['eg_local_banks'] via window.EGLocalBanks, set up
+// by eg-withdraw.js). Read-only list here + remove; new banks are added on withdrawal.
+function _laLocalBanks() {
+  try { if (window.EGLocalBanks && EGLocalBanks.get) return EGLocalBanks.get(); } catch (e) {}
+  try { var v = JSON.parse(localStorage.getItem('eg_local_banks') || 'null'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function _laMaskAcct(num) {
+  try { if (window.EGLocalBanks && EGLocalBanks.mask) return EGLocalBanks.mask(num); } catch (e) {}
+  var s = String(num || '').replace(/\s+/g, ''); return s.length > 4 ? ('•••• ' + s.slice(-4)) : (s || '••••');
+}
+function _laEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function _laLocalBankHtml() {
+  var banks = _laLocalBanks();
+  var head = '<div style="font-size:13px;font-weight:700;color:#6b7280;letter-spacing:.03em;margin-bottom:12px">LOCAL BANK</div>';
+  if (!banks.length) {
+    return head + '<div style="border:1.5px dashed #d7d4cc;border-radius:12px;padding:22px 18px;background:#faf9f7;text-align:center">'
+      + '<div style="font-size:13.5px;color:#6b7280;line-height:1.6">No bank saved yet — add one when you withdraw.</div>'
+      + '</div>';
+  }
+  var rows = banks.map(function (b, i) {
+    var qr = b.qr
+      ? '<img src="' + _laEsc(b.qr) + '" alt="QR" style="width:42px;height:42px;border-radius:6px;object-fit:cover;border:1px solid #ece8e0;flex-shrink:0">'
+      : '<span style="width:42px;height:42px;border-radius:6px;background:#f4f2ef;border:1px solid #ece8e0;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l6 3v1H2v-1l6-3z" stroke="#9ca3af" stroke-width="1.2" stroke-linejoin="round"/><path d="M3 6.5v5M6 6.5v5M10 6.5v5M13 6.5v5M2 13.5h12" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round"/></svg></span>';
+    return '<div style="display:flex;align-items:center;gap:13px;border:1px solid #ece8e0;border-radius:12px;padding:13px 15px;margin-bottom:10px;background:#fff">'
+      + qr
+      + '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _laEsc(b.bank || 'Bank') + '</div>'
+        + '<div style="font-size:12px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + _laEsc(b.name || '') + ' · <span style="font-family:monospace">' + _laEsc(_laMaskAcct(b.number)) + '</span></div></div>'
+      + '<button onclick="laRemoveLocalBank(' + i + ')" title="Remove" style="background:none;border:none;cursor:pointer;color:#c4c3be;padding:5px;flex-shrink:0" onmouseover="this.style.color=\'#dc2626\'" onmouseout="this.style.color=\'#c4c3be\'"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>'
+      + '</div>';
+  }).join('');
+  return head + rows
+    + '<div style="font-size:12.5px;color:#9ca3af;margin-top:4px">Withdrawals are paid to your saved bank. Add or change one from the Withdraw window.</div>';
+}
+function laRemoveLocalBank(i) {
+  try { if (window.EGLocalBanks && EGLocalBanks.remove) { EGLocalBanks.remove(i); }
+    else { var a = _laLocalBanks(); a.splice(i, 1); localStorage.setItem('eg_local_banks', JSON.stringify(a)); } } catch (e) {}
+  _laRender();
+}
+window.laRemoveLocalBank = laRemoveLocalBank;
 // Real network logos (images/) for Visa + Mastercard; dark monogram chip fallback
 // for anything else (Amex, etc.).
 function _cardBrandMark(brand){
