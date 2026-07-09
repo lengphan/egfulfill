@@ -858,15 +858,25 @@
   function _vddOpen(ev, btn) {
     ev.stopPropagation();
     EGDesignTools._vddClose();
-    var m = btn.nextElementSibling, r = btn.getBoundingClientRect();
-    m.style.left = r.left + 'px';
+    var m = btn.nextElementSibling; if (!m) return;
+    var r = btn.getBoundingClientRect();
+    // Re-parent the menu to <body> so its position:fixed is VIEWPORT-relative — otherwise any
+    // ancestor with a transform (row/section animations) becomes its containing block and the menu
+    // lands far from its trigger. Restored to its .egdt-vdd on close.
+    m._vddHome = btn.parentNode;
+    document.body.appendChild(m);
+    var mw = Math.max(130, r.width);
+    m.style.left = Math.min(r.left, window.innerWidth - mw - 8) + 'px';
     m.style.top = (r.bottom + 3) + 'px';
-    m.style.minWidth = Math.max(130, r.width) + 'px';
+    m.style.minWidth = mw + 'px';
     m.classList.add('open');
     setTimeout(function () { document.addEventListener('click', EGDesignTools._vddClose, { once: true }); }, 0);
   }
   function _vddClose() {
-    [].forEach.call(document.querySelectorAll('.egdt-vdd-menu.open'), function (m) { m.classList.remove('open'); });
+    [].forEach.call(document.querySelectorAll('.egdt-vdd-menu.open'), function (m) {
+      m.classList.remove('open');
+      if (m._vddHome) { try { m._vddHome.appendChild(m); } catch (e) {} m._vddHome = null; }  // restore under its button
+    });
   }
 
   // Full right-side action cluster for an item row. Drop-in replacement for the
@@ -2538,7 +2548,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-dmfull';
+  window.EG_BUILD = '2026-07-09-vddbody';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
