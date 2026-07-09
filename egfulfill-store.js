@@ -1382,6 +1382,22 @@
           return String(c.dk||'') === String(sku||'') || String(c.sku||'') === String(sku||'');
         });
         if (exact) return exact;
+        // id↔num tolerance: a card is written under ONE order key (the board number), but callers
+        // look it up by either o.id or o.num — and for etsy orders id !== num. Only pay the
+        // getOrders() cost when the fast exact match above missed.
+        try {
+          var _oNum = String(orderNum), _alt = '';
+          var _all = this.getOrders ? (this.getOrders() || []) : [];
+          var _o = _all.find(function(x){ return String(x.id) === _oNum || String(x.num) === _oNum; });
+          if (_o) _alt = (String(_o.id) === _oNum) ? String(_o.num) : String(_o.id);
+          if (_alt && _alt !== _oNum) {
+            var aliased = cards.find(function(c){
+              if (String(c.order) !== _alt) return false;
+              return String(c.dk||'') === String(sku||'') || String(c.sku||'') === String(sku||'');
+            });
+            if (aliased) return aliased;
+          }
+        } catch(_e){}
         // Pass 2: same order, sku-less card.
         var orderOnly = cards.find(function(c){
           return String(c.order) === String(orderNum) && !c.sku;
@@ -3307,6 +3323,15 @@
         pushed[opts.orderNum + '|' + opts.sku] = { board: opts.board, ts: Date.now() };
         localStorage.setItem('eg_pushed_to_board', JSON.stringify(pushed));
       } catch(e) {}
+      // Persist any swatched thread colours under BOTH the board-number key (orderNum) and the
+      // stable order-id key (orderId), keyed by the BARE sku — matching every board read (rows
+      // read by o.num, the operator xfom by o.id; etsy orders have id !== num).
+      try {
+        if (Array.isArray(opts.threads) && opts.threads.length && this.setItemThreadColors) {
+          this.setItemThreadColors(opts.orderNum, opts.sku, opts.threads);
+          if (opts.orderId != null && String(opts.orderId) !== String(opts.orderNum)) this.setItemThreadColors(opts.orderId, opts.sku, opts.threads);
+        }
+      } catch(e) {}
       try {
         var cards = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
         if (!Array.isArray(cards)) cards = [];
@@ -3346,8 +3371,13 @@
         // Identity is the LINE key (dk = lineId) when provided, so two same-SKU lines
         // get their OWN card + design ID (Edit Items). Falls back to sku for legacy callers.
         var _lineKey = opts.dk || opts.sku || '';
+        // Dedup by order + line, but tolerate the id↔num axis: the same card may have been
+        // written under o.id by one caller and o.num by another (etsy: id !== num). Match c.order
+        // against BOTH keys so a later push updates the SAME card instead of forking a duplicate.
+        var _okeys = [String(opts.orderNum)];
+        if (opts.orderId != null && String(opts.orderId) !== String(opts.orderNum)) _okeys.push(String(opts.orderId));
         var existing = cards.find(function(c){
-          if (String(c.order) !== String(opts.orderNum)) return false;
+          if (_okeys.indexOf(String(c.order)) < 0) return false;
           return String(c.dk || c.sku || '') === String(_lineKey);
         });
         var card;
@@ -3363,6 +3393,7 @@
             if (!existing.notes) existing.notes = [];
             existing.notes.unshift({ author: opts.byRole || 'Factory', avatar: (opts.byRole||'F').charAt(0).toUpperCase(), text: noteText, ts: historyEntry.ts });
           }
+          if (Array.isArray(opts.threads) && opts.threads.length) existing.threads = opts.threads;
           card = existing;
         } else {
           // New card — assign a Design ID. Edit All passes a shared id (opts.sharedDesignId)
@@ -3382,7 +3413,8 @@
             specs: specs, files: [],
             notes: noteText ? [{ author: opts.byRole || 'Factory', avatar: (opts.byRole||'F').charAt(0).toUpperCase(), text: noteText, ts: historyEntry.ts }] : [],
             history: [historyEntry],
-            checklist: [], payment: 0, payStatus: 'pending'
+            checklist: [], payment: 0, payStatus: 'pending',
+            threads: Array.isArray(opts.threads) ? opts.threads : []
           };
           cards.push(card);
         }

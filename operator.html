@@ -3898,7 +3898,7 @@ function renderOpOrders() {
           let _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
           if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, _dk)) _custFile = '';
           // EMB item with the buyer's artwork → auto-match thread colours (once).
-          if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, _dk, it.printType, it.customerFile || it.designSrc);
+          if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, it.sku, it.printType, it.customerFile || it.designSrc);
           const _hasDesign = !!(it.file || it.thumb || _custFile);
           const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
           const fileLink = _custFile
@@ -4928,13 +4928,15 @@ function opSendToDesignStudio(type, name, sku, orderNum) {
     const order = OP_ORDERS.find(function(x){ return x.num === orderNum; });
     const it = order?.itemList?.find(function(x){ return x.sku === sku; });
     const card = EGStore.pushToDesignBoard({
-      orderNum: orderNum, sku: sku, dk: (it && (it.lineId || it._dk)) || sku, board: type,
+      orderNum: orderNum, orderId: (order && order.id) || orderNum,
+      sku: sku, dk: (it && (it.lineId || it._dk)) || sku, board: type,
       name: name || it?.name || 'Design',
       // Prefer raw design (clean file for designer). Fall back to the composite so the card
       // always has a thumbnail — without this, raw-less orders push as empty placeholder cards.
       thumb: (it?.file && String(it.file).startsWith('data:')) ? it.file
            : (it?.thumb && String(it.thumb).startsWith('data:')) ? it.thumb
            : null,
+      threads: (EGStore.getItemThreadColors && (EGStore.getItemThreadColors(orderNum, sku) || (order && EGStore.getItemThreadColors(order.id, sku)))) || [],
       byRole: 'Operator'
     });
     // Reload the in-memory board from localStorage (the deduped source of truth) so a

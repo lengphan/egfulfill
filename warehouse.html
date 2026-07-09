@@ -5378,8 +5378,10 @@ function whPreviewFile2(orderNum, itemIdx) {
       // pushToDesignBoard auto-assigns the DSN id as title; we still pass it.name so the
       // card's `product` field carries the item context for designers.
       EGStore.pushToDesignBoard({
-        orderNum: orderNum, sku: it.sku, board: boardId,
+        orderNum: orderNum, orderId: (order && order.id) || orderNum,
+        sku: it.sku, dk: (it.lineId || it._dk || it.sku), board: boardId,
         name: it.name, thumb: (it.file && String(it.file).startsWith('data:')) ? it.file : null,
+        threads: (EGStore.getItemThreadColors && (EGStore.getItemThreadColors(orderNum, it.sku) || (order && EGStore.getItemThreadColors(order.id, it.sku)))) || [],
         byRole: 'Warehouse'
       });
       if (typeof UDB_CARDS !== 'undefined' && Array.isArray(UDB_CARDS)) {
@@ -5695,9 +5697,11 @@ function whShowPushMenu(orderNum, sku, name, buttonEl) {
       const order = WH_ORDERS.find(x => x.num === orderNum);
       const it = order?.itemList?.find(x => x.sku === sku);
       EGStore.pushToDesignBoard({
-        orderNum: orderNum, sku: sku, board: boardId,
+        orderNum: orderNum, orderId: (order && order.id) || orderNum,
+        sku: sku, dk: (it && (it.lineId || it._dk || it.sku)) || sku, board: boardId,
         name: name || it?.name || 'Design',
         thumb: (it?.file && String(it.file).startsWith('data:')) ? it.file : null,
+        threads: (EGStore.getItemThreadColors && (EGStore.getItemThreadColors(orderNum, sku) || (order && EGStore.getItemThreadColors(order.id, sku)))) || [],
         byRole: 'Warehouse'
       });
       if (typeof UDB_CARDS !== 'undefined' && Array.isArray(UDB_CARDS)) {
@@ -6126,7 +6130,7 @@ function whRenderOrders() {
             let _custFile = (it.designSrc && /^https?:\/\//i.test(String(it.designSrc))) ? String(it.designSrc) : '';
             if (_custFile && window.EGDesignTools && EGDesignTools.isCustomerFileDismissed && EGDesignTools.isCustomerFileDismissed(o.num, (it._dk||it.sku))) _custFile = '';
             // EMB item with the buyer's artwork → auto-match thread colours (once).
-            if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, (it._dk||it.sku), it.printType, it.customerFile || it.designSrc);
+            if (window.EGDesignTools && EGDesignTools.autoThreadMatch) EGDesignTools.autoThreadMatch(o.num, it.sku, it.printType, it.customerFile || it.designSrc);
             const _hasDesign = !!(it.file || it.thumb || _custFile);
             const _fileIsFilename = it.file && !String(it.file).startsWith('data:');
             const fileLink = _custFile

@@ -314,6 +314,61 @@
   };
   function isNewOrder(o) { var s = orderStatusOf(o); return !EGDT_LOCKED_STATUS[s]; }
 
+  /* ── Per-board capability gating ───────────────────────────────────────────────
+     ONE map + ONE can() per seam. Board identity is AUTO-DETECTED from eg_user.role
+     (the same signal the hydration branch below + egstore-api.js isStaff() use), so
+     there is ZERO per-page boilerplate. Absence is NON-BREAKING: an unset capability
+     resolves to defaultWhenUnset(ctx) = today's exact behavior, so nothing is re-gated
+     until a cell in EG_BOARD_CAPS is deliberately changed. The map ships EMPTY on
+     purpose — every can() falls through to _EG_CAP_DEFAULTS and this whole block is a
+     provable no-op until you flip one cell. Turn a feature off for a board with e.g.
+     `EG_BOARD_CAPS.warehouse['design.edit'] = false;`  ── one dial, one place. */
+  var _egBoardMemo;
+  function egBoard() {
+    if (_egBoardMemo) return _egBoardMemo;
+    var r = 'seller';
+    try { r = (JSON.parse(localStorage.getItem('eg_user') || '{}').role) || 'seller'; } catch (e) {}
+    _egBoardMemo = (r === 'operator' || r === 'warehouse' || r === 'admin') ? r
+                 : (r === 'designer') ? 'operator'   // staff-like, no board of its own today
+                 : 'seller';
+    return _egBoardMemo;
+  }
+  // synced/Etsy predicate — the inline regex that was duplicated 5× below, in one place.
+  function _capIsSynced(o) {
+    return !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
+  }
+  // defaultWhenUnset(ctx) per key — the ONLY source of "today's behavior". Every real
+  // key has a default; each mirrors the exact predicate that gates that seam right now.
+  var _EG_CAP_DEFAULTS = {
+    'design.edit':             function (o) { return isNewOrder(o); },  // pickers / completeness / upload pulse
+    'design.edit.interactive': function (o) { return isNewOrder(o); },  // drag/resize/save inside the mini designer
+    'item.add':                function (o) { return isNewOrder(o); },  // inline "+ Add item"
+    'item.delete':             function (o) { return isNewOrder(o); },  // per-line trash ×
+    'push.approve':            function (o) { return isNewOrder(o); },  // "Push to production" buttons
+    'variant.prefill':         function (o) { return !_capIsSynced(o); }, // manual prefills; synced starts unset
+    'row.status.write':        function ( ) { return egBoard() === 'warehouse'; } // interactive Start vs read-only chip
+  };
+  // The ONE override map. Per board, per key: true | false | 'inherit' | function(ctx).
+  // Omit a cell (or use 'inherit') to keep that key's default. Ships all-empty ⇒ no-op.
+  var EG_BOARD_CAPS = {
+    seller:    {},
+    operator:  {},
+    warehouse: {},
+    admin:     {}
+  };
+  // The single gate. can('some.cap', order-or-{method}) -> boolean.
+  // Resolution: explicit board cell → its value/fn → else defaultWhenUnset(ctx).
+  // Unknown/typo'd key ⇒ permissive (true) so a mistake can never newly HIDE working UI.
+  function can(key, ctx) {
+    var board = EG_BOARD_CAPS[egBoard()];
+    var v = board ? board[key] : undefined;
+    if (v === undefined || v === 'inherit') {
+      var d = _EG_CAP_DEFAULTS[key];
+      return d ? !!d(ctx) : true;
+    }
+    return (typeof v === 'function') ? !!v(ctx) : !!v;
+  }
+
   function findOrder(orderNum) {
     var orders = (window.EGStore && EGStore.getOrders) ? (EGStore.getOrders() || []) : [];
     for (var i = 0; i < orders.length; i++) {
@@ -544,7 +599,13 @@
     var src = /(^|\.)etsystatic\.com/i.test(String(designUrl)) ? etsyImgProxy(designUrl) : designUrl;
     try {
       EGStore.matchThreadColors(src, function (threads) {
-        if (threads && threads.length) { try { EGStore.setItemThreadColors(orderNum, sku, threads); } catch (e) {} refreshBoard(); }
+        if (threads && threads.length) {
+          try { EGStore.setItemThreadColors(orderNum, sku, threads); } catch (e) {}
+          // Server-persist board-auto-matched threads (order_threads) so they survive a refresh
+          // + reach other devices — keyed by the STABLE order id, bare sku.
+          try { var _mo = findOrder(orderNum); if (_mo && EGStore.pushItemThreads) EGStore.pushItemThreads(_mo.id, sku, threads); } catch (e) {}
+          refreshBoard();
+        }
       });
     } catch (e) {}
   }
@@ -1227,6 +1288,36 @@
   }
   function itemNeedsDesign(orderNum, o, it) { return !itemSetupComplete(orderNum, o, it).ok; }
 
+  // Push every line of an order to its correct method board (DTG/DTF/EMB by it.printType,
+  // or a single boardOverride). Each line carries its raw artwork (thumb) AND its matched
+  // thread colours. Cards key by the board NUMBER (o.num) + line (dk); the stable order id
+  // rides along (orderId) so the card dedups and threads dual-key (id + num) — resolving on
+  // every board and for etsy orders where id !== num. Returns count pushed, or -1 if nothing
+  // to push. Idempotent — pushToDesignBoard dedups by order + line.
+  function _pushOrderToBoard(orderNum, boardOverride) {
+    var o = findOrder(orderNum);
+    if (!o || !Array.isArray(o.items) || !o.items.length) return -1;
+    if (!(window.EGStore && EGStore.pushToDesignBoard)) return -1;
+    var all = (window._xfomDesignMode === 'all');
+    var sharedId = (all && EGStore.nextDesignId) ? EGStore.nextDesignId() : null;
+    var n = 0;
+    o.items.forEach(function (it) {
+      var dk = itemDK(it);
+      var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || 'dtg').toLowerCase();
+      var thumb = '';
+      try {
+        thumb = (EGStore.getRawDesign && (
+          EGStore.getRawDesign(o.id, dk) || EGStore.getRawDesign(o.num, dk) ||
+          EGStore.getRawDesign(o.id, it.sku) || EGStore.getRawDesign(o.num, it.sku))) ||
+          it.designUrl || it.designSrc || it.img || '';
+      } catch (e) {}
+      var threads = [];
+      try { threads = (EGStore.getItemThreadColors && (EGStore.getItemThreadColors(o.num, it.sku) || EGStore.getItemThreadColors(o.id, it.sku))) || []; } catch (e) {}
+      EGStore.pushToDesignBoard({ orderNum: (o.num != null ? o.num : o.id), orderId: o.id, sku: it.sku, dk: dk, board: board, name: it.name || it.product || 'Design', thumb: thumb || null, byRole: 'Factory', sharedDesignId: sharedId, threads: threads });
+      n++;
+    });
+    return n;
+  }
   function pushToProduction(orderNum) {
     var o = findOrder(orderNum);
     var id = o ? o.id : orderNum;
@@ -1252,6 +1343,11 @@
     // already done the review, so it goes straight to Awaiting Scan — matching
     // the canonical flow (push → awaiting_scan, no manual release). The SELLER's
     // push (orders.html) is the one that lands at In Review for operator review.
+    // Auto-push every line to its correct method board NOW — mints the design card + DSN id,
+    // puts the artwork on the card, and carries the matched thread colours. No manual "Send to
+    // board", no waiting for the warehouse QR scan. The itemSetupComplete gate above already
+    // guarantees each line has product + method + design, so every line is board-ready.
+    try { _pushOrderToBoard(orderNum, ''); } catch (e) {}
     if (window.EGStore && EGStore.update) EGStore.update(id, { factoryStatus: 'awaiting_scan', status: 'awaiting_scan' });
     _egdtToast('Pushed → Awaiting Scan');
   }
@@ -2548,7 +2644,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-vddbody';
+  window.EG_BUILD = '2026-07-09-pushboard';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
@@ -2682,20 +2778,8 @@
     // → each line gets its own (cards key by dk). Realtime: design_cards write fires the
     // storage event the boards already listen to.
     sendUploadsToBoard: function (orderNum, boardOverride) {
-      var o = findOrder(orderNum); if (!o || !Array.isArray(o.items) || !o.items.length) return;
-      if (!(window.EGStore && EGStore.pushToDesignBoard)) return;
-      var all = (window._xfomDesignMode === 'all');
-      var sharedId = (all && EGStore.nextDesignId) ? EGStore.nextDesignId() : null;
-      var n = 0;
-      o.items.forEach(function (it) {
-        var dk = itemDK(it);
-        // A picked board overrides the per-item method route (Auto).
-        var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || 'dtg').toLowerCase();
-        var thumb = '';
-        try { thumb = (EGStore.getRawDesign && (EGStore.getRawDesign(o.id, dk) || EGStore.getRawDesign(orderNum, dk))) || ''; } catch (e) {}
-        EGStore.pushToDesignBoard({ orderNum: o.id, sku: it.sku, dk: dk, board: board, name: it.name || it.product || 'Design', thumb: thumb || null, byRole: 'Factory', sharedDesignId: sharedId });
-        n++;
-      });
+      var n = _pushOrderToBoard(orderNum, boardOverride);
+      if (n < 0) return;
       try { refreshBoard(); } catch (e) {}
       _refreshOpenXfom(orderNum);   // re-render so the new design IDs show in the captions
       if (typeof window.toast === 'function') { try { window.toast('Sent ' + n + ' design' + (n === 1 ? '' : 's') + ' to board'); } catch (e) {} }
