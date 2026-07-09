@@ -205,6 +205,33 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
   });
 
+  // ── New In from the SYNCED catalog (ss_products) — INSTANT: one grouped query, images included,
+  // ZERO per-style live calls. The client prefers this and falls back to live /api/ss/styles when
+  // the catalog hasn't been synced yet (returns {synced:false}). Run POST /api/ss/sync to populate.
+  app.get('/api/ss/styles-synced', { preHandler: requireStaff }, async (req, reply) => {
+    const search = (req.query?.search || '').trim().toLowerCase();
+    const limit = Math.min(120, Math.max(1, parseInt(req.query?.limit, 10) || 60));
+    const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
+    const proxify = (u) => (!u ? null : (/^https:\/\/cdn\.ssactivewear\.com\//i.test(u) ? '/api/ss/img?u=' + encodeURIComponent(u) : u));
+    try {
+      const g = await q(`select style_id, min(brand) as brand, min(style_name) as title, min(category) as category,
+                                (array_agg(image) filter (where image is not null))[1] as image,
+                                min(price) as price, count(*)::int as variants
+                         from ss_products group by style_id`);
+      if (!g.rows.length) return { synced: false, total: 0, styles: [] };
+      let favs = new Set();
+      try { const fr = await q('select style_id from ss_favorites'); favs = new Set(fr.rows.map((r) => String(r.style_id))); } catch (e) {}
+      let list = g.rows.map((r) => ({
+        styleID: String(r.style_id), brand: r.brand || '', title: r.title || ('Style ' + r.style_id),
+        category: r.category || '', image: proxify(r.image), price: r.price != null ? Number(r.price) : null,
+        favorited: favs.has(String(r.style_id)),
+      }));
+      if (search) list = list.filter((s) => (s.title + ' ' + s.brand + ' ' + s.category).toLowerCase().includes(search));
+      list.sort((a, b) => (a.brand + a.title).localeCompare(b.brand + b.title));
+      return { synced: true, total: list.length, styles: list.slice(offset, offset + limit) };
+    } catch (e) { reply.code(500); return { error: 'synced styles error: ' + e.message }; }
+  });
+
   // ── ONE style's detail — colors, sizes, price + description (powers "Add to catalog") ─
   // Hits S&S directly (per-style product feed is small). Returns everything the
   // create-product modal needs to prefill: distinct colors/sizes, a min price, an image
