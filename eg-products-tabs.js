@@ -30,37 +30,45 @@
       ".epx-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}" +
       ".epx-tab{font-family:" + mono + ";font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding:9px 15px;border:1.5px solid #191918;background:#fff;color:#191918;cursor:pointer;border-radius:0;display:flex;align-items:center;gap:7px;transition:background .12s,color .12s}" +
       ".epx-tab.on{background:#191918;color:#fff}" +
-      ".epx-tab.epx-tab-create{margin-left:auto}" +   /* push +Create to the far right, away from the view tabs */
+      /* right-hand action cluster: Export · Import · +Create, pushed to the far edge */
+      ".epx-tabspacer{margin-left:auto}" +
       ".epx-tab .n{font-size:10px;min-width:16px;height:16px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;background:#2f4bf0;color:#fff;border-radius:9px;font-variant-numeric:tabular-nums}" +
       ".epx-tab.on .n{background:#fff;color:#191918}" +
+      /* Export / Import buttons that live in the tabs row (lighter than the tabs) */
+      ".epx-io{font-family:" + mono + ";font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding:9px 13px;border:1.5px solid #191918;background:#fff;color:#191918;cursor:pointer;border-radius:0;display:inline-flex;align-items:center;gap:6px;transition:background .12s,color .12s}" +
+      ".epx-io:hover{background:#191918;color:#fff}" +
       /* re-theme the board's own Catalog search + selects (they carry inline soft styles) */
       "#op-prod-search{background:#fff!important;border:1.5px solid #191918!important;border-radius:0!important;box-shadow:2px 2px 0 #191918;width:240px!important}" +
       "#op-prod-cat,#op-prod-status{border:1.5px solid #191918!important;border-radius:0!important;background:#fff!important;font-family:" + mono + "!important;text-transform:uppercase;font-size:11px!important;letter-spacing:.04em;padding:7px 26px 7px 11px!important}" +
-      /* keep the Catalog grid from stretching: responsive columns, capped width.
-         align-items:stretch so every card in a row fills to the tallest — the card
-         markup is a flex row with min-height, so rows stay uniform. */
-      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))!important;align-items:stretch!important}" +
-      /* uniform catalog cards: fixed name clamp + full-height image column */
+      /* Catalog grid: big image-on-top cards, 4 per row (3 / 2 on narrower).
+         align-items:stretch so every card in a row fills to the tallest. */
+      "#op-prod-grid{grid-template-columns:repeat(4,1fr)!important;gap:18px!important;align-items:stretch!important}" +
+      "@media (max-width:1100px){#op-prod-grid{grid-template-columns:repeat(3,1fr)!important}}" +
+      "@media (max-width:760px){#op-prod-grid{grid-template-columns:repeat(2,1fr)!important}}" +
       "#op-prod-grid>.card{height:100%}" +
-      "#op-prod-grid .op-prod-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}" +
+      "#op-prod-grid .op-prod-name{min-height:2.5em}" +
       /* New In / Favorites search row */
       ".epx-searchrow{display:flex;align-items:center;gap:13px;margin-bottom:15px;flex-wrap:wrap}" +
       "#epx-search{flex:1;min-width:220px;max-width:460px;background:#fff;border:1.5px solid #191918;border-radius:0;padding:9px 13px;font-size:13.5px;font-family:inherit;color:#191918;outline:none;box-shadow:2px 2px 0 #191918}" +
       "#epx-search:focus{border-color:#2f4bf0;box-shadow:2px 2px 0 #2f4bf0}" +
       ".epx-status{font-family:" + mono + ";font-size:11px;color:#6b7280;white-space:nowrap}" +
-      /* card grid — horizontal cards, image on the RIGHT */
-      ".epx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}" +
-      ".epx-card{display:flex;align-items:stretch;border:1.5px solid #191918;background:#fff;border-radius:0;overflow:hidden;min-height:120px;transition:box-shadow .14s ease,transform .14s ease}" +
+      /* card grid — BIG cards, image on TOP (4 per row, ~18px gap) */
+      ".epx-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}" +
+      "@media (max-width:1100px){.epx-grid{grid-template-columns:repeat(3,1fr)}}" +
+      "@media (max-width:760px){.epx-grid{grid-template-columns:repeat(2,1fr)}}" +
+      ".epx-card{display:flex;flex-direction:column;border:1.5px solid #191918;background:#fff;border-radius:0;overflow:hidden;transition:box-shadow .14s ease,transform .14s ease}" +
       ".epx-card:hover{box-shadow:5px 5px 0 #191918;transform:translate(-1px,-1px)}" +
-      ".epx-card .b{flex:1;min-width:0;padding:13px 14px;display:flex;flex-direction:column;gap:4px}" +
+      ".epx-card .b{flex:1;min-width:0;padding:12px 13px 13px;display:flex;flex-direction:column;gap:4px}" +
       ".epx-card .nm{font-size:13.5px;font-weight:700;line-height:1.25;color:#191918;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}" +
       ".epx-card .mt{font-family:" + mono + ";font-size:10.5px;color:#6b7280;line-height:1.4}" +
-      ".epx-card .cardfoot{margin-top:auto;padding-top:9px}" +
-      ".epx-add{border:1.5px solid #191918;background:#fff;color:#191918;font-family:" + mono + ";font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:7px 11px;cursor:pointer;border-radius:0;transition:background .12s,color .12s}" +
+      ".epx-swatches{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px}" +
+      ".epx-swatches .sw{width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);flex:0 0 auto}" +
+      ".epx-card .cardfoot{margin-top:auto;padding-top:10px}" +
+      ".epx-add{border:1.5px solid #191918;background:#fff;color:#191918;font-family:" + mono + ";font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:8px 11px;cursor:pointer;border-radius:0;transition:background .12s,color .12s;width:100%}" +
       ".epx-add:hover{background:#2f4bf0;color:#fff;border-color:#2f4bf0}" +
-      ".epx-card .img{position:relative;flex:0 0 116px;width:116px;background:#f4f2ef;border-left:1.5px solid #191918;display:flex;align-items:center;justify-content:center;overflow:hidden}" +
-      ".epx-card .img>img{width:100%;height:100%;object-fit:contain}" +
-      ".epx-card .img .ph svg{width:54px;height:54px;opacity:.6}" +
+      ".epx-card .img{position:relative;height:166px;background:#f4f2ef;border-bottom:1.5px solid #191918;display:flex;align-items:center;justify-content:center;overflow:hidden}" +
+      ".epx-card .img>img{width:100%;height:100%;object-fit:cover}" +
+      ".epx-card .img .ph svg{width:56px;height:56px;opacity:.6}" +
       /* heart */
       ".epx-heart{position:absolute;top:7px;right:7px;z-index:2;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.92);border:1.5px solid #e5e4e0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:transform .12s,border-color .12s;backdrop-filter:blur(2px)}" +
       ".epx-heart:hover{transform:scale(1.12);border-color:#191918}" +
@@ -75,8 +83,10 @@
       "html[data-theme=dark] .epx-card{background:transparent;border-color:#c9c3ba}" +
       "html[data-theme=dark] .epx-card:hover{box-shadow:5px 5px 0 #c9c3ba}" +
       "html[data-theme=dark] .epx-card .nm{color:#ece8e1}" +
-      "html[data-theme=dark] .epx-card .img{background:#252220;border-left-color:#c9c3ba}" +
+      "html[data-theme=dark] .epx-card .img{background:#252220;border-bottom-color:#c9c3ba}" +
       "html[data-theme=dark] .epx-add{background:transparent;border-color:#c9c3ba;color:#c9c3ba}" +
+      "html[data-theme=dark] .epx-io{background:transparent;border-color:#c9c3ba;color:#c9c3ba}" +
+      "html[data-theme=dark] .epx-io:hover{background:#c9c3ba;color:#191918}" +
       "html[data-theme=dark] #epx-search{background:transparent;border-color:#c9c3ba;color:#ece8e1;box-shadow:2px 2px 0 #c9c3ba}" +
       "html[data-theme=dark] .epx-heart{background:rgba(37,34,32,.9);border-color:#3a3631}";
     document.head.appendChild(st);
@@ -182,6 +192,41 @@
     });
   }
 
+  // Colour-name → hex for New In swatches (mirrors eg-products.js OP_COLOR_HEX).
+  var _COLOR_HEX = {
+    white:'#ffffff','off white':'#f6f5f2',natural:'#efe9dc',ivory:'#f4efe3',cream:'#f2ebd8',bone:'#eae4d6',
+    black:'#191918','jet black':'#191918',navy:'#1e293b','navy blue':'#1e293b',midnight:'#111827',
+    'heather gray':'#9ca3af','heather grey':'#9ca3af',gray:'#9ca3af',grey:'#9ca3af','sport grey':'#a8a8a3',silver:'#c8c8c4',ash:'#d7d4cc',
+    charcoal:'#40403d','dark heather':'#4b4b48',graphite:'#3a3a37',slate:'#475569',
+    red:'#dc2626',cardinal:'#b91c1c',cherry:'#c81e1e',maroon:'#7f1d1d',burgundy:'#6d1f2b',
+    'royal blue':'#2f4bf0',royal:'#2f4bf0',blue:'#2563eb','light blue':'#93c5fd','carolina blue':'#93c5fd',sky:'#7dd3fc',teal:'#0d9488',turquoise:'#14b8a6',
+    green:'#166534','forest green':'#166534','kelly green':'#15803d','military green':'#4b5320',olive:'#556b2f',mint:'#a7f3d0',sage:'#9caf88',
+    purple:'#7c3aed',violet:'#8b5cf6',lavender:'#c4b5fd',
+    pink:'#ec4899','light pink':'#f9a8d4','hot pink':'#db2777',rose:'#f43f5e',coral:'#fb7185',
+    orange:'#ea580c','burnt orange':'#c2410c',rust:'#b45309',
+    yellow:'#eab308',gold:'#d4a017',mustard:'#ca8a04',
+    brown:'#78350f',chocolate:'#5b3a1e',tan:'#c8a97e',khaki:'#b8a271',sand:'#d8c7a3',beige:'#e0d5bf',
+    denim:'#4a6a8a',indigo:'#3730a3',cobalt:'#1d4ed8'
+  };
+  function _colorHex(name) {
+    var k = String(name || '').trim().toLowerCase(); if (!k) return null;
+    if (_COLOR_HEX[k]) return _COLOR_HEX[k];
+    for (var key in _COLOR_HEX) { if (k.indexOf(key) !== -1) return _COLOR_HEX[key]; }
+    return '#c4c0b8';
+  }
+  // New In styles sometimes carry a `colors` array; render up to 6 swatches when present.
+  function _swatchRow(s) {
+    var list = Array.isArray(s.colors) ? s.colors : [];
+    if (!list.length) return '';
+    var seen = {}, out = [];
+    for (var i = 0; i < list.length && out.length < 6; i++) {
+      var nm = String(list[i] || '').trim(); if (!nm) continue;
+      var lk = nm.toLowerCase(); if (seen[lk]) continue; seen[lk] = 1;
+      out.push('<span class="sw" title="' + esc(nm) + '" style="background:' + _colorHex(nm) + '"></span>');
+    }
+    return out.length ? '<div class="epx-swatches">' + out.join('') + '</div>' : '';
+  }
+
   function cardHTML(s) {
     // Fast path: use styleImage when present. On load-error (or when it's missing),
     // fall through to lazy-loading the real colorFrontImage via /api/ss/style/:id;
@@ -196,16 +241,17 @@
     var needsAttr = hasImg ? '' : ' data-needs-img="1"';
     var meta = [esc(s.brand || ''), s.category ? esc(s.category) : ''].filter(Boolean).join(' · ');
     return '<div class="epx-card' + (s.favorited ? ' is-fav' : '') + '" data-id="' + esc(s.styleID) + '">' +
-      '<div class="b">' +
-        '<div class="nm">' + esc(s.title || ('Style ' + s.styleID)) + '</div>' +
-        '<div class="mt">' + meta + '</div>' +
-        '<div class="mt">Style ' + esc(s.styleID) + '</div>' +
-        '<div class="cardfoot"><button class="epx-add" type="button">+ Add to catalog</button></div>' +
-      '</div>' +
       '<div class="img" data-sid="' + esc(s.styleID) + '"' + needsAttr + '>' +
         '<button class="epx-heart" type="button" title="Favorite / unfavorite">' + HEART + '</button>' +
         img +
         '<span class="ph" style="align-items:center;justify-content:center;width:100%;height:100%;' + phStyle + '">' + GARMENT + '</span>' +
+      '</div>' +
+      '<div class="b">' +
+        '<div class="nm">' + esc(s.title || ('Style ' + s.styleID)) + '</div>' +
+        '<div class="mt">' + (meta || ('Style ' + esc(s.styleID))) + '</div>' +
+        (meta ? '<div class="mt">Style ' + esc(s.styleID) + '</div>' : '') +
+        _swatchRow(s) +
+        '<div class="cardfoot"><button class="epx-add" type="button">+ Add to catalog</button></div>' +
       '</div>' +
     '</div>';
   }
@@ -354,14 +400,30 @@
 
     _header = _grid.previousElementSibling;      // the board's search/filter + buttons row (capture BEFORE inserting)
 
+    // Export / Import were previously a separate toolbar button-group below the
+    // search box; they now live in the tabs row, to the LEFT of "+ Create
+    // Product" (grouped on the right via .epx-tabspacer on the Catalog tab).
     _tabs = document.createElement('div'); _tabs.className = 'epx-tabs';
     _tabs.innerHTML =
       '<button class="epx-tab on" data-t="newin">New In</button>' +
       '<button class="epx-tab" data-t="favorites">Favorites <span class="n" id="epx-fav-n" style="display:none"></span></button>' +
       '<button class="epx-tab" data-t="catalog">Catalog</button>' +
-      '<button class="epx-tab epx-tab-create" data-t="create">+ Create Product</button>';
+      '<button class="epx-io epx-tabspacer" type="button" id="epx-export" title="Export catalog CSV">↑ Export</button>' +
+      '<button class="epx-io" type="button" id="epx-import" title="Import catalog CSV">↓ Import</button>' +
+      '<input type="file" id="epx-import-file" accept=".csv" style="display:none">' +
+      '<button class="epx-tab" data-t="create">+ Create Product</button>';
     sec.insertBefore(_tabs, sec.firstChild);
     _tabs.addEventListener('click', function (e) { var b = e.target.closest('.epx-tab'); if (b) show(b.dataset.t); });
+    // Wire Export / Import to the same handlers the old toolbar buttons used.
+    var _exp = $('epx-export');
+    if (_exp) _exp.addEventListener('click', function () { try { window.EGCatalogIO && window.EGCatalogIO.exportProducts(); } catch (e) {} });
+    var _imp = $('epx-import'), _impFile = $('epx-import-file');
+    if (_imp && _impFile) {
+      _imp.addEventListener('click', function () { _impFile.click(); });
+      _impFile.addEventListener('change', function () {
+        if (this.files && this.files[0]) { try { window.EGCatalogIO && window.EGCatalogIO.importProducts(this.files[0]); } catch (e) {} this.value = ''; }
+      });
+    }
 
     // New In container (search + live S&S grid)
     _newin = document.createElement('div'); _newin.id = 'epx-newin';

@@ -1172,13 +1172,8 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <select id="op-prod-cat" class="select" onchange="renderOpProducts()"></select>
         <select id="op-prod-status" class="select" onchange="renderOpProducts()"><option value="">All Status</option><option>Active</option><option>Draft</option></select>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-out" onclick="EGCatalogIO.exportProducts()">↑ Export</button>
-        <button class="btn btn-out" onclick="document.getElementById('prod-import-file').click()">↓ Import</button>
-        <input type="file" id="prod-import-file" accept=".csv" style="display:none" onchange="if(this.files[0]){EGCatalogIO.importProducts(this.files[0]);this.value='';}">
-      </div>
     </div>
-    <div id="op-prod-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px"></div>
+    <div id="op-prod-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px"></div>
   </div>
 
   <!-- ===== SHIPPING ===== -->

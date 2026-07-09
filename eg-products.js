@@ -40,6 +40,60 @@ if (typeof window.downloadProductCSVTemplate !== 'function') {
 // import / manual-order flow can be exercised against products the user creates by hand.
 const OP_PRODUCTS = [];
 
+// Colour-name → hex, for the catalog card swatch row. Monotone-friendly values
+// that match the board palette; unknown names fall back to a neutral grey.
+const OP_COLOR_HEX = {
+  white:'#ffffff', 'off white':'#f6f5f2', 'off-white':'#f6f5f2', natural:'#efe9dc', ivory:'#f4efe3', cream:'#f2ebd8', bone:'#eae4d6', ecru:'#e6dcc6',
+  black:'#191918', jet:'#191918', 'jet black':'#191918',
+  navy:'#1e293b', 'navy blue':'#1e293b', midnight:'#111827',
+  'heather gray':'#9ca3af', 'heather grey':'#9ca3af', gray:'#9ca3af', grey:'#9ca3af', 'sport grey':'#a8a8a3', 'sport gray':'#a8a8a3', silver:'#c8c8c4', ash:'#d7d4cc',
+  charcoal:'#40403d', 'dark heather':'#4b4b48', graphite:'#3a3a37', slate:'#475569',
+  red:'#dc2626', cardinal:'#b91c1c', cherry:'#c81e1e', maroon:'#7f1d1d', burgundy:'#6d1f2b', wine:'#5b1a26',
+  'royal blue':'#2f4bf0', royal:'#2f4bf0', blue:'#2563eb', 'light blue':'#93c5fd', 'carolina blue':'#93c5fd', sky:'#7dd3fc', 'baby blue':'#bfdbfe', teal:'#0d9488', turquoise:'#14b8a6', aqua:'#22d3ee',
+  green:'#166534', 'forest green':'#166534', forest:'#166534', 'kelly green':'#15803d', kelly:'#15803d', 'military green':'#4b5320', olive:'#556b2f', 'army green':'#4b5320', mint:'#a7f3d0', sage:'#9caf88', lime:'#84cc16',
+  purple:'#7c3aed', violet:'#8b5cf6', lavender:'#c4b5fd', plum:'#6b21a8',
+  pink:'#ec4899', 'light pink':'#f9a8d4', 'hot pink':'#db2777', rose:'#f43f5e', fuchsia:'#d946ef', coral:'#fb7185', salmon:'#fca5a5',
+  orange:'#ea580c', 'burnt orange':'#c2410c', rust:'#b45309', 'texas orange':'#c2410c',
+  yellow:'#eab308', gold:'#d4a017', mustard:'#ca8a04', 'daisy':'#facc15',
+  brown:'#78350f', chocolate:'#5b3a1e', chestnut:'#6b3f22', tan:'#c8a97e', khaki:'#b8a271', sand:'#d8c7a3', beige:'#e0d5bf', camel:'#c19a6b',
+  denim:'#4a6a8a', indigo:'#3730a3', cobalt:'#1d4ed8'
+};
+function opColorHex(name) {
+  const k = String(name || '').trim().toLowerCase();
+  if (!k) return null;
+  if (OP_COLOR_HEX[k]) return OP_COLOR_HEX[k];
+  // Loose fallbacks: match on a contained keyword (e.g. "Antique Cherry Red").
+  for (const key in OP_COLOR_HEX) { if (k.indexOf(key) !== -1) return OP_COLOR_HEX[key]; }
+  return '#c4c0b8'; // unknown colour → neutral placeholder swatch
+}
+// Derive up to `max` distinct { name, hex } swatches from a product's variant
+// colours (variantSkus[].color / variants[].color / colorImages keys / mainColor).
+function opProductColors(p, max) {
+  max = max || 6;
+  const seen = new Set(), out = [];
+  const push = (name) => {
+    const n = String(name || '').trim();
+    if (!n) return;
+    const key = n.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key); out.push({ name: n, hex: opColorHex(n) });
+  };
+  if (p.mainColor) push(p.mainColor);
+  const vs = Array.isArray(p.variantSkus) ? p.variantSkus : (Array.isArray(p.variants) ? p.variants : []);
+  vs.forEach(v => v && push(v.color));
+  if (p.colorImages && typeof p.colorImages === 'object') Object.keys(p.colorImages).forEach(push);
+  if (Array.isArray(p.colors)) p.colors.forEach(push);
+  return out.slice(0, max);
+}
+function opSwatchRow(p) {
+  const cols = opProductColors(p, 6);
+  if (!cols.length) return '';
+  const dots = cols.map(c =>
+    `<span title="${String(c.name).replace(/"/g,'&quot;')}" style="width:15px;height:15px;border-radius:4px;background:${c.hex};border:1px solid rgba(0,0,0,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);flex:0 0 auto"></span>`
+  ).join('');
+  return `<div style="display:flex;align-items:center;gap:5px;margin-top:8px;flex-wrap:wrap">${dots}</div>`;
+}
+
 function renderOpProducts() {
   const grid = document.getElementById('op-prod-grid'); if (!grid) return;
   const q = (document.getElementById('op-prod-search')?.value || '').toLowerCase();
@@ -51,28 +105,31 @@ function renderOpProducts() {
     if (status && p.status !== status) return false;
     return true;
   });
-  // "Add New Product" tile lives at the FRONT of the grid so newly-saved
-  // products land immediately to its right instead of crowding the left edge.
-  let html = `<div class="card" onclick="openNewProductModal()" style="overflow:hidden;cursor:pointer;border-style:dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:104px;height:100%;gap:6px;transition:border-color .15s" onmouseover="this.style.borderColor='#111827'" onmouseout="this.style.borderColor='#e5e4e0'">
-    <div style="width:44px;height:44px;background:#f6f5f4;border-radius:12px;display:flex;align-items:center;justify-content:center">
-      <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3" stroke="#6b7280" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h12" stroke="#6b7280" stroke-width="1.4" stroke-linecap="round"/></svg>
-    </div>
-    <span style="font-size:14px;font-weight:600;color:#374151">Add New Product</span>
-    <span style="font-size:12.5px;color:#9ca3af">Mockup + print specs</span>
-  </div>`;
-  html += filtered.map(p => `
-    <div class="card" style="overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative;display:flex;align-items:stretch;min-height:104px;height:100%" onclick="openProductCard(${p.id})" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
-      <button type="button" title="Duplicate product" onclick="event.stopPropagation();opCloneProduct(${p.id})" style="position:absolute;top:8px;right:8px;z-index:2;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.92);border:1px solid #e5e4e0;border-radius:7px;padding:4px 8px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;backdrop-filter:blur(3px);transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v5A1.5 1.5 0 0 0 3 9.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>Copy</button>
-      <div style="background:#f0ede9;flex:0 0 104px;width:104px;overflow:hidden;order:2;border-left:1px solid #e5e4e0">
-        <img src="${p.img}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.src='https://placehold.co/400x400/f0ede9/6b7280?text=${p.fallback}'"/>
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:44px;text-align:center;color:#9ca3af;font-size:13.5px;border:1px dashed #d7d4cc;border-radius:10px">No products yet — use <b style="color:#374151">+ Create Product</b> to add one.</div>';
+    return;
+  }
+  // Big image-on-top cards: image (fixed aspect, object-fit:cover) above the
+  // name, brand · category, colour swatches, then status pill + price.
+  grid.innerHTML = filtered.map(p => {
+    const cat = p.type || 'Product';
+    const method = (typeof EGStore !== 'undefined' && EGStore.formatMethod) ? EGStore.formatMethod(p.method) : (p.method || '');
+    const sub = [cat, method].filter(Boolean).join(' · ');
+    const price = (typeof p.price === 'number') ? p.price.toFixed(2) : (parseFloat(p.price) || 0).toFixed(2);
+    return `
+    <div class="card" style="overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative;display:flex;flex-direction:column;padding:0" onclick="openProductCard(${p.id})" onmouseover="this.style.borderColor='#9ca3af'" onmouseout="this.style.borderColor='#e5e4e0'">
+      <button type="button" title="Duplicate product" onclick="event.stopPropagation();opCloneProduct(${p.id})" style="position:absolute;top:9px;right:9px;z-index:2;display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.92);border:1px solid #e5e4e0;border-radius:7px;padding:4px 8px;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;backdrop-filter:blur(3px);transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='#9ca3af';this.style.color='#191918'" onmouseout="this.style.borderColor='#e5e4e0';this.style.color='#374151'"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 4.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v5A1.5 1.5 0 0 0 3 9.5h1.5" stroke="currentColor" stroke-width="1.3"/></svg>Copy</button>
+      <div style="background:#f4f2ef;height:164px;overflow:hidden;border-bottom:1px solid #e5e4e0">
+        <img src="${p.img}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.onerror=null;this.src='https://placehold.co/400x400/f0ede9/6b7280?text=${p.fallback}'"/>
       </div>
-      <div style="padding:12px 14px;flex:1;min-width:0;order:1;display:flex;flex-direction:column">
-        <div class="op-prod-name" title="Click to rename" onclick="event.stopPropagation();egRenameProductCard(${p.id}, this)" style="font-size:14px;font-weight:600;color:#191918;margin-bottom:2px;cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;outline:none;transition:background .15s" onmouseover="this.style.background='#f0ede9'" onmouseout="if(this.contentEditable!=='true')this.style.background='transparent'">${p.name}</div>
-        <div style="font-size:12.5px;color:#9ca3af;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.variants} · ${(typeof EGStore !== 'undefined' && EGStore.formatMethod) ? EGStore.formatMethod(p.method) : p.method}</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto"><span class="badge ${p.status==='Active'?'b-ok':'b-queue'}">${p.status}</span><span style="font-size:13px;font-weight:600;color:#374151">$${p.price.toFixed(2)}</span></div>
+      <div style="padding:12px 14px 13px;flex:1;min-width:0;display:flex;flex-direction:column">
+        <div class="op-prod-name" title="Click to rename" onclick="event.stopPropagation();egRenameProductCard(${p.id}, this)" style="font-size:14px;font-weight:600;color:#191918;line-height:1.3;margin-bottom:2px;cursor:text;border-radius:5px;padding:1px 3px;margin-left:-3px;outline:none;transition:background .15s;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" onmouseover="this.style.background='#f0ede9'" onmouseout="if(this.contentEditable!=='true')this.style.background='transparent'">${p.name}</div>
+        <div style="font-size:12px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</div>
+        ${opSwatchRow(p)}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:11px"><span class="badge ${p.status==='Active'?'b-ok':'b-queue'}">${p.status}</span><span style="font-size:14px;font-weight:700;color:#191918">$${price}</span></div>
       </div>
-    </div>`).join('');
-  grid.innerHTML = html;
+    </div>`;
+  }).join('');
 }
 
 // Duplicate a saved product — deep-clones it, names the copy "<name> (copy)",
