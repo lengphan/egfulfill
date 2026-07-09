@@ -150,16 +150,23 @@
       + '<div style="display:flex;align-items:center;gap:9px">' + root + leaf + '</div>'
       + '<button id="egdt-x" title="Back to board" style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0 4px">&times;</button></div>';
   }
-  function openSellerPage(src, title, onBack) {
+  function openSellerPage(src, title, onBack, full) {
     var ov = overlayEl();
-    // No breadcrumb strip — the embedded page's OWN header sits flush at the top so
-    // its separator lines up with the board sidebar (no double header). Dismiss via
-    // a sidebar nav click (wired by mount) or Escape; the sidebar's "Design Lab"
-    // item reopens the hub.
+    // The DESIGN MAKER (editor) has no nav sidebar of its own — open it FULL-SCREEN so it
+    // covers the factory sidebar too (a maximised canvas), instead of sitting beside it.
+    ov.style.left = full ? '0px' : SIDEBAR_W + 'px';
     // Cache-bust: iframes cache HTML very stubbornly, so the factory kept loading an
     // OLD design-maker/templates page. A unique param forces a fresh fetch each open.
     var _bust = src + (src.indexOf('?') >= 0 ? '&' : '?') + '_v=' + Date.now();
     ov.innerHTML = '<iframe id="egdt-frame" title="' + esc(title || '') + '" src="' + esc(_bust) + '" style="flex:1;border:0;width:100%"></iframe>';
+    // Full-screen has no sidebar to click for exit, so add a floating Close (Escape also works).
+    if (full) {
+      var xb = document.createElement('button');
+      xb.type = 'button'; xb.innerHTML = '&#10005; Close';
+      xb.style.cssText = 'position:absolute;top:11px;right:14px;z-index:6;background:#191918;color:#fff;border:1.5px solid #191918;font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em;text-transform:uppercase;padding:8px 12px;cursor:pointer;box-shadow:3px 3px 0 rgba(0,0,0,.22)';
+      xb.onclick = function () { unmount(); if (typeof onBack === 'function') onBack(); };
+      ov.appendChild(xb);
+    }
     mount(ov);
     // The iframed seller BOARD pages carry their own sidebar + dashboard top bar —
     // strip that chrome so we don't show a second side panel / seller header. The
@@ -168,6 +175,11 @@
     var ifr = ov.querySelector('#egdt-frame');
     ifr.addEventListener('load', function () {
       try {
+        var _p = ''; try { _p = ifr.contentWindow.location.pathname || ''; } catch (e) {}
+        // The editor's OWN "Design Lab" breadcrumb navigates to the SELLER design-lab.html
+        // (a 2-col page that renders oddly embedded here). Intercept it → close + reopen the
+        // FACTORY hub instead, so the factory never shows the seller Design Lab.
+        if (/design-lab\.html/i.test(_p)) { unmount(); designLab(); return; }
         var d = ifr.contentDocument || ifr.contentWindow.document;
         if (d && d.querySelector('.sidebar')) {
           var st = d.createElement('style');
@@ -194,7 +206,7 @@
     }
   }
   function templates(orderNum, sku, name) { openSellerPage('product-templates.html' + ctxQS(orderNum, sku), 'Templates' + (name ? (' · ' + name) : '')); }
-  function designMaker(orderNum, sku, name) { openSellerPage('design-maker.html' + ctxQS(orderNum, sku), 'Design Maker' + (name ? (' · ' + name) : '')); }
+  function designMaker(orderNum, sku, name) { openSellerPage('design-maker.html' + ctxQS(orderNum, sku), 'Design Maker' + (name ? (' · ' + name) : ''), null, true); }
 
   // Design Lab hub — mirrors the SELLER's design-lab.html layout (the SAME 4 cards:
   // Upload & Design · Use a Template · Image Library · Browse Catalog) but rendered
@@ -239,7 +251,7 @@
         // so it stays inside the factory shell. Falls back to the seller page if not on a board.
         else if (act === 'catalog') { close(); if (typeof window.showSection === 'function') showSection('products'); else openSellerPage('products-dash.html', 'Catalog', designLab); }
         else if (act === 'library') openSellerPage('image-library.html', 'Image Library', designLab);
-        else openSellerPage('design-maker.html', 'Design Maker', designLab);                      // Upload & Design (shared editor)
+        else openSellerPage('design-maker.html', 'Design Maker', designLab, true);                 // Upload & Design (shared editor, full-screen)
       });
     });
   }
@@ -2526,7 +2538,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-dot2';
+  window.EG_BUILD = '2026-07-09-dmfull';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
