@@ -22,7 +22,15 @@ const PRODUCT_FIELDS = 'sku,gtin,styleID,brandName,styleName,colorName,colorCode
 
 // S&S returns RELATIVE image paths (e.g. "Images/Color/19561_f_fm.jpg") → prefix their CDN.
 const SS_CDN = 'https://cdn.ssactivewear.com/';
-function ssImg(u) { if (!u) return null; return /^https?:/i.test(u) ? u : SS_CDN + String(u).replace(/^\//, ''); }
+// S&S's CDN 403s + Cross-Origin-Resource-Policy-blocks cross-origin BROWSER loads, so
+// <img src="https://cdn.ssactivewear.com/…"> fails from our origin. Route every image URL
+// through our same-origin proxy (GET /api/ss/img) — the server fetches it (no browser
+// Origin / CORP restriction) and re-serves it. Returns a RELATIVE url so it works in dev + prod.
+function ssImg(u) {
+  if (!u) return null;
+  const abs = /^https?:/i.test(u) ? u : SS_CDN + String(u).replace(/^\//, '');
+  return '/api/ss/img?u=' + encodeURIComponent(abs);
+}
 
 function num(v) { const n = Number(v); return isFinite(n) ? n : null; }
 function int(v) { const n = parseInt(v, 10); return isFinite(n) ? n : 0; }
@@ -79,6 +87,31 @@ function mapProduct(p, meta) {
 }
 
 export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
+  // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
+  // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),
+  // so the browser can't hot-link cdn.ssactivewear.com from our site. Fetch the image
+  // server-side and re-serve it same-origin. No auth (an <img> can't send one), but locked
+  // to the S&S CDN host + image paths only, with a timeout + content-type check, so it can't
+  // be used as an open/SSRF proxy.
+  app.get('/api/ss/img', async (req, reply) => {
+    const u = String((req.query && req.query.u) || '');
+    if (!/^https:\/\/cdn\.ssactivewear\.com\/[\w./%-]+$/i.test(u)) { reply.code(400); return { error: 'only S&S CDN images may be proxied' }; }
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'egfulfill/1.0', Accept: 'image/*' } });
+      clearTimeout(timer);
+      if (!r.ok) { reply.code(r.status); return { error: 'upstream ' + r.status }; }
+      const ct = r.headers.get('content-type') || 'image/jpeg';
+      if (!/^image\//i.test(ct)) { reply.code(415); return { error: 'not an image' }; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      reply.header('Content-Type', ct);
+      reply.header('Cache-Control', 'public, max-age=86400, immutable');
+      reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      return reply.send(buf);
+    } catch (e) { reply.code(502); return { error: 'proxy failed: ' + (e && e.message ? e.message : 'error') }; }
+  });
+
   // Synced blanks live in their own table (created idempotently at load, like the other integrations).
   q(`create table if not exists ss_products (
        sku text primary key,
