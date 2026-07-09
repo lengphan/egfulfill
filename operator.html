@@ -1173,7 +1173,9 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         <select id="op-prod-status" class="select" onchange="renderOpProducts()"><option value="">All Status</option><option>Active</option><option>Draft</option></select>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-out" onclick="downloadProductCSVTemplate()">↓ CSV Template</button>
+        <button class="btn btn-out" onclick="EGCatalogIO.exportProducts()">↑ Export</button>
+        <button class="btn btn-out" onclick="document.getElementById('prod-import-file').click()">↓ Import</button>
+        <input type="file" id="prod-import-file" accept=".csv" style="display:none" onchange="if(this.files[0]){EGCatalogIO.importProducts(this.files[0]);this.value='';}">
       </div>
     </div>
     <div id="op-prod-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px"></div>
@@ -9619,6 +9621,7 @@ udbInit();
 </script>
 <!-- Shared Products section + Add Product modal logic (operator/admin/warehouse all load this). -->
 <script src="eg-products.js"></script>
+<script src="eg-catalog-io.js" defer></script>
 
 <script>
 /* Align per-item factory-status chips directly under the order STATUS column.

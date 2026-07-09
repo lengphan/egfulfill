@@ -1201,7 +1201,9 @@ document.addEventListener('DOMContentLoaded', function(){
         <select class="select"><option>All Categories</option><option>Apparel</option><option>Mugs</option><option>Posters</option></select>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-out" style="font-size:13.5px" onclick="alert('Exported inventory CSV')">Export CSV</button>
+        <button class="btn btn-out" style="font-size:13.5px" onclick="EGCatalogIO.exportInventory()">Export CSV</button>
+        <button class="btn btn-out" style="font-size:13.5px" onclick="document.getElementById('inv-import-file').click()">Import</button>
+        <input type="file" id="inv-import-file" accept=".csv" style="display:none" onchange="if(this.files[0]){EGCatalogIO.importInventory(this.files[0]);this.value='';}">
         <button class="btn btn-out" style="font-size:13.5px" onclick="openSkuLabelModal()">Print SKU Labels</button>
         <button class="btn btn-dk" style="font-size:13.5px" onclick="EGInventory.openAddFromCatalog()">+ Add from catalog</button>
       </div>
@@ -1409,7 +1411,9 @@ document.addEventListener('DOMContentLoaded', function(){
         <select id="op-prod-status" class="select" onchange="renderOpProducts()"><option value="">All Status</option><option>Active</option><option>Draft</option></select>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-out" onclick="downloadProductCSVTemplate()">↓ CSV Template</button>
+        <button class="btn btn-out" onclick="EGCatalogIO.exportProducts()">↑ Export</button>
+        <button class="btn btn-out" onclick="document.getElementById('prod-import-file').click()">↓ Import</button>
+        <input type="file" id="prod-import-file" accept=".csv" style="display:none" onchange="if(this.files[0]){EGCatalogIO.importProducts(this.files[0]);this.value='';}">
       </div>
     </div>
     <div id="op-prod-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px"></div>
@@ -11656,6 +11660,7 @@ window.admDateClear = function() {
 </script>
 <!-- Shared Products section + Add Product modal (same as operator/warehouse). -->
 <script src="eg-products.js"></script>
+<script src="eg-catalog-io.js" defer></script>
 <script src="eg-scout.js"></script>
 <script>
 /* Compat shim: the page's showSection() still calls renderProducts(); route it
