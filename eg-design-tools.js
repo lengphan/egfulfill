@@ -893,23 +893,18 @@
     // rule forces 14px padding, overriding the inline padding:0). So the dot's left
     // WITHIN its row = spine-x − row-inset, landing it on the spine x on screen for
     // both contexts. The one shared spine x is the only geometry that matters.
-    var DOTX = 'calc(var(--egdt-spine-x,22px) - var(--egdt-row-inset,14px))';
     st.textContent =
-      // Base node — round, grey by default, background-coloured ring, on top of the spine.
-      '.egdt-dot{position:absolute;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#c4c3be;z-index:2;box-shadow:0 0 0 3px var(--egdt-node-ring,#fbfaf8);transition:background .15s}' +
-      // Factory board rows (itemRowLayout emits .egdt-item-row; row is position:relative).
-      '.egdt-item-row .egdt-dot{left:' + DOTX + '}' +
-      '.egdt-item-row.egdt-complete .egdt-dot{background:#2f4bf0}' +
-      '.egdt-item-row:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
-      // Seller item rows (orders.html item-wrap grid; wrapper adds 44px left pad → inset).
-      '[id^="item-wrap-"]{position:relative}' +
-      '[id^="item-wrap-"] .egdt-dot{left:' + DOTX + '}' +
-      '[id^="item-wrap-"].egdt-complete .egdt-dot{background:#2f4bf0}' +
-      '[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
-      // "Add item" node — the final grey node on the spine. Its container also sits at
-      // the spine container's content edge, so it carries the same row-inset as the
-      // rows. ALWAYS grey — it's an action, not a status.
-      '.egdt-additem-node .egdt-dot-add{left:' + DOTX + ';background:#c4c3be}';
+      // Clean STANDALONE status pip — flows as the row's first cell (NO spine, no
+      // absolute positioning). Grey by default; cobalt when the line is complete or
+      // its checkbox is checked. Same 8px pip in both seller + factory rows.
+      '.egdt-dot{display:inline-block;width:8px;height:8px;border-radius:50%!important;background:#cbc9c3;flex:0 0 auto;vertical-align:middle;transition:background .15s}' +
+      '.egdt-item-row.egdt-complete .egdt-dot,[id^="item-wrap-"].egdt-complete .egdt-dot{background:#2f4bf0}' +
+      '.egdt-item-row:has(input[type=checkbox]:checked) .egdt-dot,[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
+      // "Add item" affordance node — always grey (it's an action, not a status).
+      '.egdt-dot-add{display:inline-block;width:8px;height:8px;border-radius:50%!important;background:#cbc9c3;flex:0 0 auto;vertical-align:middle}' +
+      // Factory rows are display:flex with gap:0 — give the pip breathing room (seller
+      // rows are a grid whose column-gap already spaces it).
+      '.egdt-item-row .egdt-dot{margin-right:11px}';
     document.head.appendChild(st);
   }
   // Completeness of a line item — TRUE only when it is a real, fully-configured
@@ -1099,7 +1094,7 @@
     var dot = '<span class="egdt-dot" aria-hidden="true"></span>';
     // NB: p.sep (the board's inter-row border-bottom) is intentionally NOT applied
     // here — the timeline has no horizontal separators between item rows.
-    return '<div class="egdt-item-row' + (complete ? ' egdt-complete' : '') + '" style="display:flex;align-items:center;gap:0;padding:16px 14px 16px 40px;position:relative;">'
+    return '<div class="egdt-item-row' + (complete ? ' egdt-complete' : '') + '" style="display:flex;align-items:center;gap:0;padding:14px 14px 14px 14px;position:relative;">'
       + dot + (p.checkbox || '') + (p.thumb || '') + nameBlock + center + (p.status || '') + trash
       + '</div>';
   }
@@ -1152,7 +1147,7 @@
     if (!isNewOrder(o)) return '';
     var num = (o && (o.num || o.id)) || '';
     return '<div class="egdt-additem-node" onclick="event.stopPropagation()" '
-      + 'style="position:relative;padding:8px 14px 12px 40px">'
+      + 'style="display:flex;align-items:center;gap:11px;padding:10px 14px 12px 14px">'
       + '<span class="egdt-dot egdt-dot-add" aria-hidden="true"></span>'
       + '<button onclick="EGDesignTools.addItem(\'' + jsAttr(num) + '\')" title="Add another line item to this order" '
       + 'style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#6b7280;background:transparent;border:none;padding:0;cursor:pointer;font-family:inherit;transition:color .15s" '
@@ -2524,7 +2519,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-rowtimeline';
+  window.EG_BUILD = '2026-07-09-rowclean';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}

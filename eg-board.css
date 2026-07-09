@@ -380,26 +380,19 @@ html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){--egdt-ro
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]),
 html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td,
 html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td{--egdt-node-ring:var(--bos-ground,#191817)}
-/* seller (orders.html): item-wrap grids live inside the exp-row wrapper div */
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 12px 44px!important}
-/* ONE continuous spine: starts above the first row (top:-1px, tucked under the parent
-   row's bottom border so it reads as hanging off it) and stops at the last dot's centre. */
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:var(--egdt-spine-x);top:-1px;bottom:26px;height:auto;width:1.5px;background:var(--bos-line);z-index:0}
+/* seller (orders.html): item-wrap grids live inside the exp-row wrapper div. NO spine
+   line (removed) — item rows read as a clean, lightly-indented group under the parent. */
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 10px 22px!important}
 html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
 html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
 html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
-/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> (padding:0) */
+/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> (padding:0). NO spine line. */
 html.eg-board-on tr[id^="op-detail-"] > td,
 html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important}
-html.eg-board-on tr[id^="op-detail-"] > td::before,
-html.eg-board-on tr[id^="wh-detail-"] > td::before{content:"";position:absolute;left:var(--egdt-spine-x);top:-1px;bottom:32px;height:auto;width:1.5px;background:var(--bos-line);z-index:0}
 html.eg-board-on .egdt-item-row{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
 html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
 html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
-/* dark — same spine hairline, faint light tint */
-html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before,
-html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td::before,
-html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td::before{background:#3a3631!important}
+/* dark — checked-row faint light tint (spine removed) */
 html[data-theme=dark].eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked),
 html[data-theme=dark].eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(201,195,186,.06)!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
