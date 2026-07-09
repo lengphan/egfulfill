@@ -813,6 +813,67 @@
     if (curS && sizes.indexOf(curS) < 0) sizes.unshift(curS);
     return { colors: colors, sizes: sizes, curColor: curC, curSize: curS };
   }
+  // Map a product's method string ("DTG Print / Embroidery") to its FIRST method code.
+  function _firstMethodCode(methodStr) {
+    if (!methodStr) return '';
+    var t = String(methodStr).split(/\s*\/\s*/)[0].trim().toUpperCase();
+    if (/EMB/.test(t)) return 'EMB';
+    if (/APL|APPLIQ/.test(t)) return 'APL';
+    if (/LSR|LASER/.test(t)) return 'LSR';
+    if (/SUB/.test(t)) return 'SUB';
+    if (/DTF/.test(t)) return 'DTF';
+    if (/DTG|DIRECT/.test(t)) return 'DTG';
+    return '';
+  }
+  // Resolve a SYNCED (Etsy) buyer variant back to our STRUCTURED {blank,color,size,method}.
+  // Every field is '' when it can't be confidently mapped — the caller then shows "Select"
+  // (never a guess / DTG default). Most-authoritative first: exact variant-SKU match → text
+  // match against the catalog's known colours/sizes → SKU parse validated against the catalog.
+  function resolveSyncedVariant(o, it) {
+    var empty = { blank: '', color: '', size: '', method: '' };
+    try {
+      if (!it) return empty;
+      var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
+      if (!prods.length) return empty;
+      var sku = String(it.sku || '').toUpperCase();
+      // (a) exact variant-SKU match — a variant we published (strong signal).
+      if (sku) {
+        for (var i = 0; i < prods.length; i++) {
+          var p = prods[i]; if (!Array.isArray(p.variantSkus)) continue;
+          for (var j = 0; j < p.variantSkus.length; j++) {
+            var v = p.variantSkus[j];
+            if (v && v.sku && String(v.sku).toUpperCase() === sku) {
+              return { blank: p.name || '', color: v.color || '', size: v.size || '', method: _firstMethodCode(p.method) };
+            }
+          }
+        }
+      }
+      // (b) text match — tokenise the Etsy variant text against a product's known colours/sizes.
+      var text = (String(it.variant || it.variantText || '') + ' ' + String(it.name || '')).trim();
+      if (text) {
+        var toks = text.split(/\s*[\/,;|]\s*|\s-\s|\s+/).map(function (t) { return t.trim().toLowerCase(); }).filter(Boolean);
+        for (var k = 0; k < prods.length; k++) {
+          var pp = prods[k]; if (!Array.isArray(pp.variantSkus)) continue;
+          var kc = {}, ks = {};
+          pp.variantSkus.forEach(function (vv) { if (!vv) return; if (vv.color) kc[String(vv.color).toLowerCase()] = vv.color; if (vv.size) ks[String(vv.size).toLowerCase()] = vv.size; });
+          var mc = '', ms = '';
+          toks.forEach(function (t) { if (!mc && kc[t]) mc = kc[t]; if (!ms && ks[t]) ms = ks[t]; });
+          if (mc || ms) return { blank: pp.name || '', color: mc, size: ms, method: '' };
+        }
+      }
+      // (c) SKU-parse last resort — keep a parsed value ONLY if it exists in some catalog product.
+      var pc = _extractColor(it.sku), ps = _extractSize(it.sku);
+      if (pc || ps) {
+        for (var m = 0; m < prods.length; m++) {
+          var p3 = prods[m]; if (!Array.isArray(p3.variantSkus)) continue;
+          var hasC = pc && p3.variantSkus.some(function (x) { return x && x.color && String(x.color).toLowerCase() === String(pc).toLowerCase(); });
+          var hasS = ps && p3.variantSkus.some(function (x) { return x && x.size && String(x.size).toLowerCase() === String(ps).toLowerCase(); });
+          if (hasC || hasS) return { blank: p3.name || '', color: hasC ? pc : '', size: hasS ? ps : '', method: '' };
+        }
+      }
+    } catch (e) {}
+    return empty;
+  }
   // Re-render the OPEN factory order modal (operator/warehouse/admin all expose
   // window.xfomOpen + window._xfomNum) so a variant/product change refreshes the
   // item avatar to the new colour image — refreshBoard only repaints the table.
@@ -1015,14 +1076,14 @@
       var _synced = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
       // BLANK / product: factory's own pick (setup.product), else the item's blank
       // (suppressed for synced orders, which come in unset).
-      var blank = setup.product || (_synced ? '' : (it.blank || (typeof _productNameForSku === 'function' ? _productNameForSku(it.sku) : ''))) || '';
-      // COLOUR + SIZE: synced → only the factory's setup counts; manual → the
-      // resolved variant value (item value / SKU parse).
+      var rv = _synced ? resolveSyncedVariant(o, it) : null;   // mirror itemActions: resolved-or-empty (never blanket-blank)
+      var blank = setup.product || (rv ? rv.blank : (it.blank || (typeof _productNameForSku === 'function' ? _productNameForSku(it.sku) : ''))) || '';
+      // COLOUR + SIZE: factory setup wins; else a MAPPED synced value / the manual resolved value.
       var vo = (typeof variantOptions === 'function') ? variantOptions(num, sku, it) : { curColor: (it.color || ''), curSize: (it.size || '') };
-      var color = _synced ? (setup.color || '') : (vo.curColor || '');
-      var size = _synced ? (setup.size || '') : (vo.curSize || '');
-      // METHOD: factory pick, else the item's own method (suppressed for synced).
-      var method = (setup.printType || (_synced ? '' : (it.type || it.printType || it.tech || '')) || '').toString();
+      var color = setup.color || (rv ? rv.color : vo.curColor) || '';
+      var size = setup.size || (rv ? rv.size : vo.curSize) || '';
+      // METHOD: factory pick, else a mapped synced method / the item's own method.
+      var method = (setup.printType || (rv ? rv.method : (it.type || it.printType || it.tech || '')) || '').toString();
       return !!(blank && color && size && method);
     } catch (e) { return false; }
   }
@@ -1075,28 +1136,29 @@
       var _synced = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
       // Show the blank the OTHER board already picked (setup), so the selection persists
       // across boards; for synced orders the it.blank fallback is suppressed.
-      var curProd = setup.product || (_synced ? '' : (it.blank || _productNameForSku(it.sku))) || '', matched = false;
-      var prodOpts = '<option value="">Product</option>';
+      var rv = _synced ? resolveSyncedVariant(o, it) : null;   // synced ⇒ resolve buyer's variant; unmapped fields stay '' → "Select"
+      var curProd = setup.product || (rv ? rv.blank : (it.blank || _productNameForSku(it.sku))) || '', matched = false;
+      var prodOpts = '<option value="">Select</option>';
       prods.forEach(function (p) {
         var v = p.name || p.sku || p.id || ''; if (!v) return;
         var s = curProd && String(curProd) === String(v); if (s) matched = true;
         prodOpts += opt(v, p.name || p.sku || v, s);
       });
       if (curProd && !matched) prodOpts += opt(curProd, curProd, true);
-      var curPt = (setup.printType || (_synced ? '' : tech) || '').toString().toUpperCase();
+      var curPt = (setup.printType || (rv ? rv.method : tech) || '').toString().toUpperCase();
       // Offer only the chosen blank's supported methods (synced from the product's
       // saved methods); keep the item's current method even if not listed, and fall
       // back to the full set when no product/method is known.
       var _pmCodes = productMethodCodes(curProd);
       if (_pmCodes && curPt && _pmCodes.indexOf(curPt) < 0) _pmCodes = [curPt].concat(_pmCodes);
       if (!_pmCodes) _pmCodes = PRINT_METHODS;
-      var ptOpts = '<option value="">Method</option>';
+      var ptOpts = '<option value="">Select</option>';
       _pmCodes.forEach(function (m) { ptOpts += opt(m, PRINT_LABELS[m] || m, curPt === m); });
       var vo = variantOptions(num, sku, it);
       // Synced orders: the SELECTED colour/size come only from the factory's setup, not
       // the Etsy variant — so they start empty until picked. (Lists stay full.)
-      var _curColor = _synced ? (setup.color || '') : vo.curColor;
-      var _curSize = _synced ? (setup.size || '') : vo.curSize;
+      var _curColor = setup.color || (rv ? rv.color : vo.curColor) || '';
+      var _curSize = setup.size || (rv ? rv.size : vo.curSize) || '';
       // Labeled, fixed-width columns — BLANK · COLOR · SIZE · METHOD each get a
       // tiny uppercase mono micro-label above the live control, and every column
       // has a fixed width so the fields line up across rows regardless of the
@@ -1130,10 +1192,10 @@
       // The _vdd inner width is a touch under the column so the button + caret sit
       // inside; long blank names truncate with ellipsis inside the fixed column.
       pickers = '<div class="egdt-varstrip" style="display:inline-flex;align-items:flex-start;flex-wrap:nowrap;gap:16px;border:none;border-radius:0;padding:2px 0;background:transparent;max-width:100%;overflow:hidden">'
-        + _col('Blank', 200, _vdd(curProd, 'Product', 192, _prodItems))
-        + _col('Color', 96, _vdd(_curColor, 'Color', 88, _colorItems))
-        + _col('Size', 58, _vdd(_curSize, 'Size', 50, _sizeItems))
-        + _col('Method', 90, _vdd(_curMethodLabel, 'Method', 82, _methodItems))
+        + _col('Blank', 200, _vdd(curProd, 'Select', 192, _prodItems))
+        + _col('Color', 96, _vdd(_curColor, 'Select', 88, _colorItems))
+        + _col('Size', 58, _vdd(_curSize, 'Select', 50, _sizeItems))
+        + _col('Method', 90, _vdd(_curMethodLabel, 'Select', 82, _methodItems))
         + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
@@ -1275,6 +1337,13 @@
     if (!hasProduct) { try { hasProduct = !!chosenProduct(orderNum, dk); } catch (e) {} }
     if (!hasProduct) { try { var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : []; var base = String(it.sku || '').split('-')[0]; hasProduct = prods.some(function (p) { return (Array.isArray(p.variantSkus) && p.variantSkus.some(function (v) { return v && v.sku === it.sku; })) || (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()); }); } catch (e) {} }
     var hasMethod = !!(s.printType || it.printType || it.tech);
+    // Variant must be SET before boarding (no factory guessing). Accept the factory's pick,
+    // the item's own value, a well-formed SKU parse, or a mapped synced variant.
+    var _syncedGate = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
+    var _rvGate = null; try { _rvGate = _syncedGate ? resolveSyncedVariant(o, it) : null; } catch (e) {}
+    var hasColor = !!(s.color || it.color || _extractColor(it.sku) || (_rvGate && _rvGate.color));
+    var hasSize = !!(s.size || it.size || _extractSize(it.sku) || (_rvGate && _rvGate.size));
+    if (!hasMethod && _rvGate && _rvGate.method) hasMethod = true;
     var hasDesign = false;
     try { hasDesign = !!(window.EGStore && EGStore.getRawDesign && o && EGStore.getRawDesign(o.id, dk)); } catch (e) {}
     if (!hasDesign) { try { hasDesign = !!(window.EGStore && EGStore.getCachedImage && o && EGStore.getCachedImage(o.id, dk)); } catch (e) {} }
@@ -1282,6 +1351,8 @@
     if (!hasDesign && (it.designUrl || it.customerFile || it.file || it.thumb || it.designSrc)) hasDesign = true;
     var miss = [];
     if (!hasProduct) miss.push('product');
+    if (!hasColor) miss.push('color');
+    if (!hasSize) miss.push('size');
     if (!hasMethod) miss.push('method');
     if (!hasDesign) miss.push('design');
     return { ok: !miss.length, miss: miss };
@@ -1303,7 +1374,10 @@
     var n = 0;
     o.items.forEach(function (it) {
       var dk = itemDK(it);
-      var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || 'dtg').toLowerCase();
+      // No silent DTG default: route by the line's explicit method, else skip it (the push
+      // gate blocks a method-less order anyway; this is belt-and-suspenders).
+      var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || '').toLowerCase();
+      if (!board) { try { console.warn('[EGDesignTools] board-push skipped — line has no method (no DTG default):', o.id, it.sku); } catch (e) {} return; }
       var thumb = '';
       try {
         thumb = (EGStore.getRawDesign && (
@@ -2644,7 +2718,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-pushboard';
+  window.EG_BUILD = '2026-07-09-variant-select';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
@@ -2855,7 +2929,7 @@
     },
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, itemComplete: itemComplete, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, itemComplete: itemComplete, resolveSyncedVariant: resolveSyncedVariant, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     _vdd: _vdd, _vddOpen: _vddOpen, _vddClose: _vddClose,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,

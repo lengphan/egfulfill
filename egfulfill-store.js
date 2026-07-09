@@ -3229,7 +3229,7 @@
     methodLabel: function(item) {
       var raw = item && (item.printType || item.tech || item.method || item.printedType);
       var t = String(raw || '').toUpperCase();
-      if (!t) return 'DTG';
+      if (!t) return 'Select';   // no silent DTG default — an unset method reads "Select"
       if (/EMB|EMBROID/.test(t)) return 'EMB';
       if (/DTF/.test(t)) return 'DTF';
       if (/APL|APPLIQ/.test(t)) return 'APL';
@@ -3238,7 +3238,7 @@
       if (/SCR|SCREEN/.test(t)) return 'SCR';
       if (/DTG|DIRECT/.test(t)) return 'DTG';
       // Unknown — show the first token as-is (e.g. a custom method name).
-      return t.split(/[\s\/]+/)[0] || 'DTG';
+      return t.split(/[\s\/]+/)[0] || 'Select';
     },
 
     // Shared thread-colour chip layout for every factory order row, so the

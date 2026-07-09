@@ -1053,7 +1053,11 @@ function renderOrders(ordersOverride) {
       // An un-chosen "New item" (synthetic NEW-… SKU) shows a clean prompt — empty strip,
       // SKU "N/A", name "Pick a Blank" — instead of a misleading pre-filled product.
       const _unchosen = /^NEW-/i.test(String(item.sku || ''));
-      const autoBlank = _unchosen ? '' : (item.blank || skuToBlank(item.sku));
+      // Synced (Etsy) rows: resolve the buyer's variant against our catalog; an unmapped
+      // field stays '' → "Select" (never a guess). Manual rows keep their SKU-derived fallbacks.
+      const _syncedRow = /^etsy-/i.test(String(o.id || '')) || String(o.source || '').toLowerCase() === 'etsy';
+      const _rv = (_syncedRow && window.EGDesignTools && EGDesignTools.resolveSyncedVariant) ? EGDesignTools.resolveSyncedVariant(o, item) : null;
+      const autoBlank = _unchosen ? '' : (item.blank || (_rv ? _rv.blank : skuToBlank(item.sku)));
       // Per-item key for DOM ids + handlers — a stable unique id, NOT the SKU,
       // so two line items with the same SKU don't share selection/edit state.
       if (item.lineId) item.__uid = item.lineId;   // unify the row handle on the stable lineId
@@ -1080,7 +1084,7 @@ function renderOrders(ordersOverride) {
       // Always keep a placeholder, and inject the chosen blank when it's not standard.
       const _blankInStd = !!autoBlank && BLANK_OPTS.some(g => Array.isArray(g[1]) && g[1].includes(autoBlank));
       const _blankInjected = (autoBlank && !_blankInStd) ? `<option value="${String(autoBlank).replace(/"/g,'&quot;')}" selected>${String(autoBlank).replace(/</g,'&lt;')}</option>` : '';
-      const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Blank Product</option>${_blankInjected}${blankOpts}`;
+      const blankSelInner = `<option value=""${autoBlank?'':' selected'}>Select</option>${_blankInjected}${blankOpts}`;
       const printOpts = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']]
         .map(([v,l])=>`<option value="${v}"${(!_unchosen && v===item.tech)?' selected':''}>${l}</option>`).join('');
 
@@ -1143,22 +1147,20 @@ function renderOrders(ordersOverride) {
          only difference is the wrapper's pointer-events/opacity (set further
          down via the `needsSetup` ternary). No more separate locked layout. */
 
-      // Auto-set embroidery as the print method since this seller's workflow is
-      // embroidery-only — saves the print dropdown step. Factory boards still
-      // read item.tech to route the order, so we keep that field populated.
-      if (!item.tech) item.tech = 'EMB';
+      // No silent method default — an unset method stays "Select" until the seller picks
+      // (the factory never guesses). Factory boards read item.tech to route the order.
       // Variant pickers — pull real options from the catalog so size/color match
       // what the operator has stocked. _odmExtract* fall back to parsing the SKU.
       const _vOpts = (typeof odmGetVariantOptions === 'function') ? odmGetVariantOptions(item) : { colors:_ODM_DEFAULT_COLORS, sizes:_ODM_DEFAULT_SIZES };
-      const _curColor = _unchosen ? '' : (item.color || (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || (_vOpts.colors[0] || ''));
-      const _curSize  = _unchosen ? '' : (item.size  || (typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '') || (_vOpts.sizes[0]  || ''));
+      const _curColor = _unchosen ? '' : (item.color || (_rv ? _rv.color : '') || (_syncedRow ? '' : ((typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '') || (_vOpts.colors[0] || ''))));
+      const _curSize  = _unchosen ? '' : (item.size  || (_rv ? _rv.size  : '') || (_syncedRow ? '' : ((typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '') || (_vOpts.sizes[0]  || ''))));
       // Row STATUS DOT — the line is COMPLETE when it's a real configured line
       // (NOT an unchosen NEW-* placeholder) AND blank + colour + size + method are
       // all set. Lights the leading dot cobalt; checked rows light it via CSS.
       const _itemComplete = !_unchosen && !!(autoBlank && _curColor && _curSize && (item.tech || ''));
       const _skuEsc = item.sku.replace(/'/g,"\\'");
-      const _colorOpts = (_unchosen ? '<option value="" selected>Color</option>' : '') + _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
-      const _sizeOpts  = (_unchosen ? '<option value="" selected>Size</option>' : '') + _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
+      const _colorOpts = (!_curColor ? '<option value="" selected>Select</option>' : '') + _vOpts.colors.map(c => `<option value="${c}"${c===_curColor?' selected':''}>${c}</option>`).join('');
+      const _sizeOpts  = (!_curSize  ? '<option value="" selected>Select</option>' : '') + _vOpts.sizes.map(s => `<option value="${s}"${s===_curSize?' selected':''}>${s}</option>`).join('');
       const _variantSel = (key, opts, curVal, width) => `<select onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','${key}',this.value)" style="${SEL};width:${width}px;color:#374151;${lockStyle}">${opts}</select>`;
 
       // Variant pill — blank/color/size grouped into a single bordered control
@@ -1190,10 +1192,10 @@ function renderOrders(ordersOverride) {
             <div style="font-size:11.5px;color:#b0aaa4;margin-top:1px;font-family:monospace">${_unchosen?'N/A':item.sku}</div>
           </div>
           <div style="display:flex;align-items:flex-end;gap:14px;width:100%;min-width:0">
-            <div style="display:flex;flex-direction:column;gap:3px;flex:2.2 1 0;min-width:0"><span style="${_vlbl}">Blank</span><div style="${_vbox}"><select class="egsel-enh" id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" data-ph="Blank Product" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div></div>
-            <div style="display:flex;flex-direction:column;gap:3px;flex:1.3 1 0;min-width:0"><span style="${_vlbl}">Color</span><div style="${_vbox}"><select class="egsel-enh" data-ph="Color" onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div></div>
-            <div style="display:flex;flex-direction:column;gap:3px;flex:0.8 1 0;min-width:52px"><span style="${_vlbl}">Size</span><div style="${_vbox}"><select class="egsel-enh" data-ph="Size" onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div></div>
-            <div style="display:flex;flex-direction:column;gap:3px;flex:1.1 1 0;min-width:0"><span style="${_vlbl}">Method</span><div style="${_vbox}"><select class="egsel-enh" id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" data-ph="Type" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Type</option>${printOpts}</select></div></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:2.2 1 0;min-width:0"><span style="${_vlbl}">Blank</span><div style="${_vbox}"><select class="egsel-enh" id="blank-${o.no}-${escSku}" data-orig="${autoBlank||''}" data-ph="Select" onchange="saveItemField(${o.no},'${escSku}','blank',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${autoBlank||''}" style="${variantPillSelStyle};width:100%;${lockStyle}">${blankSelInner}</select></div></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1.3 1 0;min-width:0"><span style="${_vlbl}">Color</span><div style="${_vbox}"><select class="egsel-enh" data-ph="Select" onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','color',this.value)" title="Color" style="${variantPillSelStyle};width:100%;${lockStyle}">${_colorOpts}</select></div></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:0.8 1 0;min-width:52px"><span style="${_vlbl}">Size</span><div style="${_vbox}"><select class="egsel-enh" data-ph="Select" onchange="event.stopPropagation();orderSetItemVariant(${o.no},'${escSku}','size',this.value)" title="Size" style="${variantPillSelStyle};width:100%;${lockStyle}">${_sizeOpts}</select></div></div>
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1.1 1 0;min-width:0"><span style="${_vlbl}">Method</span><div style="${_vbox}"><select class="egsel-enh" id="tech-${o.no}-${escSku}" data-orig="${item.tech||''}" data-ph="Select" onchange="saveItemField(${o.no},'${escSku}','tech',this.value);markStep(this);this.title=this.options[this.selectedIndex].text" title="${item.tech?techLabel:''}" style="${variantPillSelStyle};width:100%;${lockStyle}"><option value="">Select</option>${printOpts}</select></div></div>
           </div>
           <div style="${needsSetup?'':'pointer-events:none;cursor:default;opacity:0.5;'}display:flex;align-items:center;gap:5px;width:auto">${designBtns()}</div>
           ${needsSetup ? `<button onclick="event.stopPropagation();orderDeleteInlineItem(${o.no},'${item.sku.replace(/'/g,"\\'")}')" title="Remove item" style="background:none;border:none;color:#c4c3be;cursor:pointer;padding:5px 6px;border-radius:5px;line-height:0;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;transition:color .15s,background .15s;width:26px;height:26px" onmouseover="this.style.color='#b83c3c';this.style.background='#fef2f2'" onmouseout="this.style.color='#c4c3be';this.style.background='transparent'"><svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>` : '<span></span>'}
@@ -1739,7 +1741,9 @@ function updatePushBtn(ordNo) {
 function pushOrderToProduction(ordNo, btn) {
   const o = ORDERS.find(x => x.no === ordNo);
   if (!o) return;
-  // Only Design is required to push. Blank/Print type are nice-to-have and can be filled by factory roles.
+  // Design AND a complete variant (blank/colour/size/method) are required to push — the
+  // factory never guesses. A synced order whose variant maps auto-fills; anything unmapped
+  // stays "Select" until the seller picks it.
   assignDesignKeys(o.itemsList);
   const missingDesign = [];
   const missingItems = [];
@@ -1776,6 +1780,27 @@ function pushOrderToProduction(ordNo, btn) {
       });
     }, 80);
     pushFailToast(missingDesign.length + ' item' + (missingDesign.length>1?'s':'') + ' still need a design — Upload, Templates, or Design Lab. (' + missingDesign[0] + (missingDesign.length>1?' …':'') + ')');
+    return;
+  }
+
+  // Variant gate — every item needs blank + colour + size + method SET before it can be
+  // pushed (no factory guessing). Uses the SAME resolution the row shows: a synced order
+  // whose variant maps is auto-complete; an unmapped one shows "Select" and blocks here.
+  const _pSynced = /^etsy-/i.test(String(o.id || '')) || String(o.source || '').toLowerCase() === 'etsy';
+  const missingSetup = [];
+  o.itemsList.forEach(item => {
+    const _label = () => { const n = item.listing || item.name || item.sku || 'Item'; return n.length > 22 ? n.slice(0,22)+'…' : n; };
+    if (/^NEW-/i.test(String(item.sku || ''))) { missingSetup.push(_label()); return; }
+    const rv = (_pSynced && window.EGDesignTools && EGDesignTools.resolveSyncedVariant) ? EGDesignTools.resolveSyncedVariant(o, item) : null;
+    const gBlank  = item.blank || (rv ? rv.blank : skuToBlank(item.sku));
+    const gColor  = item.color || (rv ? rv.color : (_pSynced ? '' : (typeof _odmExtractColor === 'function' ? _odmExtractColor(item.sku) : '')));
+    const gSize   = item.size  || (rv ? rv.size  : (_pSynced ? '' : (typeof _odmExtractSize  === 'function' ? _odmExtractSize(item.sku)  : '')));
+    const gMethod = item.tech  || (rv ? rv.method : '');
+    if (!(gBlank && gColor && gSize && gMethod)) missingSetup.push(_label());
+  });
+  if (missingSetup.length) {
+    if (!expanded.has(ordNo)) { expanded.add(ordNo); renderOrders(); }
+    pushFailToast(missingSetup.length + ' item' + (missingSetup.length>1?'s':'') + ' still need a variant — pick Blank / Color / Size / Method. (' + missingSetup[0] + (missingSetup.length>1?' …':'') + ')');
     return;
   }
 
@@ -2637,8 +2662,11 @@ function openDetailModal(ordNo) {
     // variant strip shows the field TITLES (Blank Product · Color · Size · Type) as
     // placeholders rather than defaulting to the first option.
     const _odmUnchosen = /^NEW-/i.test(String(item.sku || ''));
-    const curColor = _odmUnchosen ? '' : (item.color || _odmExtractColor(item.sku) || (variantOpts.colors[0] || ''));
-    const curSize  = _odmUnchosen ? '' : (item.size  || _odmExtractSize(item.sku)  || (variantOpts.sizes[0] || ''));
+    // Synced (Etsy) rows: resolve the buyer's variant to our catalog; unmapped ⇒ '' → "Select".
+    const _odmSynced = /^etsy-/i.test(String(o.id || '')) || String(o.source || '').toLowerCase() === 'etsy';
+    const _odmRv = (_odmSynced && window.EGDesignTools && EGDesignTools.resolveSyncedVariant) ? EGDesignTools.resolveSyncedVariant(o, item) : null;
+    const curColor = _odmUnchosen ? '' : (item.color || (_odmRv ? _odmRv.color : '') || (_odmSynced ? '' : (_odmExtractColor(item.sku) || (variantOpts.colors[0] || ''))));
+    const curSize  = _odmUnchosen ? '' : (item.size  || (_odmRv ? _odmRv.size  : '') || (_odmSynced ? '' : (_odmExtractSize(item.sku)  || (variantOpts.sizes[0] || ''))));
     const variantDisabled = needsSetup ? '' : 'disabled';
     // Minimal "inline text" variant pills — same look as the orders table row
     // metadata strip. Plain text per value with a dark `·` divider between
@@ -2653,8 +2681,8 @@ function openDetailModal(ordNo) {
     // the value. Hover underlines the text so the affordance is visible.
     const odmPillSelStyle = `border:none;background:transparent;outline:none;-webkit-appearance:none;appearance:none;font-family:inherit;font-size:13.5px;font-weight:500;color:${odmPillTextColor};padding:0;margin:0;cursor:${odmPillLocked?'default':'pointer'};text-align:center;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;width:auto;min-width:0`;
     const odmPillHover = odmPillLocked ? '' : ` onmouseover="this.style.color='#000';this.style.textDecoration='underline';this.style.textDecorationColor='#c4c3be';this.style.textUnderlineOffset='3px'" onmouseout="this.style.color='${odmPillTextColor}';this.style.textDecoration='none'"`;
-    const colorOptsHtml = (_odmUnchosen ? '<option value="" selected>Color</option>' : '') + variantOpts.colors.map(c => `<option value="${c.replace(/"/g,'&quot;')}" ${c===curColor?'selected':''}>${c}</option>`).join('');
-    const sizeOptsHtml  = (_odmUnchosen ? '<option value="" selected>Size</option>' : '') + variantOpts.sizes.map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${s===curSize?'selected':''}>${s}</option>`).join('');
+    const colorOptsHtml = (!curColor ? '<option value="" selected>Select</option>' : '') + variantOpts.colors.map(c => `<option value="${c.replace(/"/g,'&quot;')}" ${c===curColor?'selected':''}>${c}</option>`).join('');
+    const sizeOptsHtml  = (!curSize  ? '<option value="" selected>Select</option>' : '') + variantOpts.sizes.map(s => `<option value="${s.replace(/"/g,'&quot;')}" ${s===curSize?'selected':''}>${s}</option>`).join('');
     // Blank/base-product selector (before Color) — lets the seller pick the blank
     // for "pick a blank" lines and shows the base product for synced/manual ones.
     const _blankList = (typeof BLANK_CATALOG !== 'undefined') ? BLANK_CATALOG : [];
@@ -2668,19 +2696,19 @@ function openDetailModal(ordNo) {
     // shows the actual product, not the "Blank Product" placeholder.
     const _blankInject = (!_odmUnchosen && _curBlankName && !_blankSelId)
       ? `<option value="" selected>${_curBlankName.replace(/</g,'&lt;')}</option>` : '';
-    const blankOptsHtml = `<option value=""${(_blankSelId||_blankInject)?'':' selected'}>Blank Product</option>` + _blankInject + _blankList.map(p =>
+    const blankOptsHtml = `<option value=""${(_blankSelId||_blankInject)?'':' selected'}>Select</option>` + _blankInject + _blankList.map(p =>
       `<option value="${p.id}" ${String(p.id)===String(_blankSelId)?'selected':''}>${String(p.name||p.skuBase||'').replace(/</g,'&lt;')}</option>`).join('');
     // Custom-dropdown item lists (mirror the native <option>s above) — value baked
     // into each onclick, first/placeholder option NEVER hidden. odmSetBlank takes
     // the product ID; Colour/Size/Method take the value directly.
     const _sqAttr = s => String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const _vddBlankItems = _blankList.map(p => ({ label: String(p.name || p.skuBase || ''), click: `odmSetBlank(${idx},'${_sqAttr(p.id)}')` }));
-    const _vddBlankCur = _blankSelId ? String((_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).name || (_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).skuBase || '') : (_curBlankName && !_odmUnchosen ? _curBlankName : '');
+    const _vddBlankCur = _blankSelId ? String((_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).name || (_blankList.find(p => String(p.id) === String(_blankSelId)) || {}).skuBase || '') : ((_curBlankName && !_odmUnchosen) ? _curBlankName : (_odmRv ? _odmRv.blank : ''));
     const _vddColorItems = variantOpts.colors.map(c => ({ label: c, click: `odmSetVariant(${idx},'color','${_sqAttr(c)}')` }));
     const _vddSizeItems  = variantOpts.sizes.map(s => ({ label: s, click: `odmSetVariant(${idx},'size','${_sqAttr(s)}')` }));
     const _vddMethodDefs = [['DTG','DTG'],['DTF','DTF'],['EMB','Embroidery'],['APL','Applique'],['LSR','Laser']];
     const _vddMethodItems = _vddMethodDefs.map(([v,l]) => ({ label: l, click: `odmSetItemTech(${idx},'${_sqAttr(v)}')` }));
-    const _vddMethodCur = (!_odmUnchosen && item.tech) ? ((_vddMethodDefs.find(m => m[0] === String(item.tech).toUpperCase()) || [])[1] || item.tech) : '';
+    const _vddMethodCur = (!_odmUnchosen && item.tech) ? ((_vddMethodDefs.find(m => m[0] === String(item.tech).toUpperCase()) || [])[1] || item.tech) : (_odmRv && _odmRv.method ? ((_vddMethodDefs.find(m => m[0] === String(_odmRv.method).toUpperCase()) || [])[1] || _odmRv.method) : '');
     // Compact Upload / Templates / Design Lab trio — mirrors the inline expanded row
     // so the seller can pick a design source without leaving the order detail modal.
     const odmEscSku = String(item.sku || '').replace(/[^a-zA-Z0-9]/g, '_');
@@ -2773,20 +2801,20 @@ function openDetailModal(ordNo) {
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <div class="egdt-varstrip" style="display:inline-flex;align-items:center;flex-wrap:nowrap;border:none;border-radius:0;padding:2px 0;background:transparent;flex:0 0 auto;${odmPillLocked?'opacity:.85':''}">
           ${odmPillLocked
-            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:172px">${(_vddBlankCur||'Blank Product').replace(/</g,'&lt;')}</span>`
-            : EGDesignTools._vdd(_vddBlankCur, 'Blank Product', 172, _vddBlankItems)}
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:172px">${(_vddBlankCur||'Select').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(_vddBlankCur, 'Select', 172, _vddBlankItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
           ${odmPillLocked
-            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curColor||'—').replace(/</g,'&lt;')}</span>`
-            : EGDesignTools._vdd(curColor, 'Color', 92, _vddColorItems)}
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curColor||'Select').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(curColor, 'Select', 92, _vddColorItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
           ${odmPillLocked
-            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curSize||'—').replace(/</g,'&lt;')}</span>`
-            : EGDesignTools._vdd(curSize, 'Size', 52, _vddSizeItems)}
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(curSize||'Select').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(curSize, 'Select', 52, _vddSizeItems)}
           <span style="color:#c4c3be;font-weight:700;padding:0 15px;flex-shrink:0">·</span>
           ${odmPillLocked
-            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(_vddMethodCur||'Type').replace(/</g,'&lt;')}</span>`
-            : EGDesignTools._vdd(_vddMethodCur, 'Type', 104, _vddMethodItems)}
+            ? `<span style="font-size:11.5px;font-weight:600;color:#9ca3af">${(_vddMethodCur||'Select').replace(/</g,'&lt;')}</span>`
+            : EGDesignTools._vdd(_vddMethodCur, 'Select', 104, _vddMethodItems)}
         </div>
         ${_odmAllMode ? '<span style="font-size:11.5px;color:#9ca3af;font-weight:600;flex-shrink:0">One design for all ↑</span>' : designActions}
         <div style="margin-left:auto;display:inline-flex;align-items:center;gap:1px;flex-shrink:0" title="Quantity">
