@@ -32,6 +32,23 @@ function ssImg(u) {
   return '/api/ss/img?u=' + encodeURIComponent(abs);
 }
 
+// S&S descriptions arrive as messy HTML (inline styles, nested spans). Strip that down to a
+// small semantic whitelist so OUR css controls the look on the product page.
+function cleanDesc(html) {
+  if (!html) return '';
+  let s = String(html);
+  s = s.replace(/<\/?(?:span|font|div|o:p)[^>]*>/gi, '');                                   // unwrap span/font/div
+  s = s.replace(/\s(?:style|class|width|height|align|border|cellpadding|cellspacing|lang|dir)="[^"]*"/gi, '');
+  s = s.replace(/<(?!\/?(?:ul|ol|li|p|br|strong|b|em|i|h[3-6])\b)[^>]*>/gi, '');            // drop non-whitelisted tags, keep text
+  s = s.replace(/(?:<p>\s*<\/p>)+/gi, '').replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>');
+  return s.trim();
+}
+
+// Per-style detail cache — /api/ss/style/:id hits S&S twice; cache the resolved result so
+// repeat opens (and every visitor after the first) are instant instead of re-fetching live.
+const _styleCache = new Map();      // id -> { at, data }
+const STYLE_TTL = 15 * 60 * 1000;   // 15 min
+
 function num(v) { const n = Number(v); return isFinite(n) ? n : null; }
 function int(v) { const n = parseInt(v, 10); return isFinite(n) ? n : 0; }
 function creds() { return !!(SS_ACCOUNT && SS_KEY); }
@@ -196,6 +213,8 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
     const id = String(req.params.id || '').trim();
     if (!id) { reply.code(400); return { error: 'styleID required' }; }
+    const _hit = _styleCache.get(id);
+    if (_hit && (Date.now() - _hit.at) < STYLE_TTL) return _hit.data;   // instant on repeat
     try {
       const pr = await ssGet('/products/?style=' + encodeURIComponent(id) +
         '&fields=sku,colorName,sizeName,piecePrice,customerPrice,colorFrontImage,styleName,brandName');
@@ -227,12 +246,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
           const mTitle = meta.title || styleName || '';
           const t = ((mBrand ? mBrand + ' ' : '') + mTitle).trim();
           if (t) title = t;
-          if (meta.description) description = String(meta.description);
+          if (meta.description) description = cleanDesc(meta.description);
           if (!image) { const im = ssImg(meta.styleImage); if (im) image = im; }
         }
       } catch (e) {}
 
-      return { styleID: id, title, brand: brand || null, description, image, price, colors, sizes };
+      const out = { styleID: id, title, brand: brand || null, description, image, price, colors, sizes };
+      _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
+      return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
   });
 

@@ -92,7 +92,21 @@
   // image only when the card scrolls into view, via an IntersectionObserver, with
   // the fetches THROTTLED to a few at a time and results cached by styleID so
   // re-renders / re-scrolls never refetch.
-  var _imgCache = {};        // styleID -> resolved URL ('' = tried, no image found)
+  // Resolved images are cached by styleID AND persisted to localStorage (24h) so a REFRESH
+  // hydrates the grid INSTANTLY instead of re-fetching every card. '' = tried, no image.
+  var _IMGCACHE_KEY = 'eg_ss_imgcache', _IMGCACHE_TTL = 24 * 3600 * 1000, _saveT = null;
+  function _loadImgCache() {
+    try { var raw = JSON.parse(localStorage.getItem(_IMGCACHE_KEY) || '{}');
+      if (raw && raw.at && (Date.now() - raw.at) < _IMGCACHE_TTL && raw.map) return raw.map; } catch (e) {}
+    return {};
+  }
+  function _saveImgCache() {   // throttled — coalesce a burst of resolves into one write
+    if (_saveT) return;
+    _saveT = setTimeout(function () { _saveT = null;
+      try { localStorage.setItem(_IMGCACHE_KEY, JSON.stringify({ at: Date.now(), map: _imgCache })); } catch (e) {}
+    }, 800);
+  }
+  var _imgCache = _loadImgCache();   // styleID -> resolved URL ('' = tried, no image found)
   var _imgIO = null;         // IntersectionObserver watching the .img containers
   var _imgQueue = [];        // pending styleIDs to resolve (each with its DOM node)
   var _imgActive = 0;        // in-flight fetch count
@@ -127,6 +141,7 @@
           .then(function (d) {
             var url = (d && d.image) || '';
             _imgCache[sid] = url;                       // cache result (even '' = tried)
+            _saveImgCache();                            // persist so a refresh is instant
             if (url) _applyResolvedImg(wrap, url);
           })
           .catch(function () { /* leave placeholder; don't cache so a later scroll can retry */ })
