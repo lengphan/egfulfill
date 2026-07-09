@@ -13,22 +13,28 @@
   // Classic pointer bitmap (1 = fill). White outline derived from the 8-neighbourhood.
   // Straight vertical LEFT edge (col 0), a smooth 45° hypotenuse, and a tail that runs
   // parallel to it — no zig-zag on the right edge (that read as "crooked"). Tip = 0,0.
-  // Classic arrow: straight vertical LEFT edge + a DIAGONAL tail that comes straight OUT of the
-  // middle of the (slanted) head, down-right along the arrow's axis — not a vertical stem. Small. Tip = 0,0.
+  // Classic OS arrow: vertical LEFT edge, clean 45° head, and a diagonal tail-STEM that runs
+  // straight out of the middle of the head (down-right, parallel to the head edge) — the standard,
+  // unmistakable, not-crooked pointer. Tip = 0,0.
   var A = [
-    [1,0,0,0,0,0,0,0],
-    [1,1,0,0,0,0,0,0],
-    [1,1,1,0,0,0,0,0],
-    [1,1,1,1,0,0,0,0],
-    [1,1,1,1,1,0,0,0],
-    [1,1,1,1,1,1,0,0],
-    [1,1,1,1,1,1,1,0],
-    [1,1,1,1,1,0,0,0],
-    [1,1,0,0,1,1,0,0],
-    [1,0,0,0,0,1,1,0],
-    [0,0,0,0,0,0,1,1]
+    [1,0,0,0,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0,0,0,0],
+    [1,1,1,0,0,0,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0,0,0,0],
+    [1,1,1,1,1,0,0,0,0,0,0],
+    [1,1,1,1,1,1,0,0,0,0,0],
+    [1,1,1,1,1,1,1,0,0,0,0],
+    [1,1,1,1,1,1,1,1,0,0,0],
+    [1,1,1,1,1,1,1,1,1,0,0],
+    [1,1,1,1,1,1,1,1,1,1,0],
+    [1,1,1,1,1,1,1,0,0,0,0],
+    [1,1,1,0,1,1,1,0,0,0,0],
+    [1,1,0,0,0,1,1,1,0,0,0],
+    [1,0,0,0,0,0,1,1,1,0,0],
+    [0,0,0,0,0,0,0,1,1,1,0],
+    [0,0,0,0,0,0,0,0,1,1,0]
   ];
-  var H = A.length, W = A[0].length, S = 2;   // 8×11 bitmap → 16×22px, crisp + small
+  var H = A.length, W = A[0].length, S = 2;   // 11×16 bitmap → 22×32px, crisp
   function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
 
   var url;
