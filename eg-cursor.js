@@ -11,14 +11,25 @@
   try { if (matchMedia('(pointer:coarse)').matches) return; } catch (e) {}   // touch → keep native
 
   // Classic pointer bitmap (1 = fill). White outline derived from the 8-neighbourhood.
+  // Straight vertical LEFT edge (col 0), a smooth 45° hypotenuse, and a tail that runs
+  // parallel to it — no zig-zag on the right edge (that read as "crooked"). Tip = 0,0.
+  // Straight vertical LEFT edge + a mostly-VERTICAL tail (stem drops straight down, not a
+  // 45° jut — that angled tail read as "crooked"). Compact so the cursor stays small. Tip = 0,0.
   var A = [
-    [1,0,0,0,0,0,0,0,0],[1,1,0,0,0,0,0,0,0],[1,1,1,0,0,0,0,0,0],
-    [1,1,1,1,0,0,0,0,0],[1,1,1,1,1,0,0,0,0],[1,1,1,1,1,1,0,0,0],
-    [1,1,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,1,0],[1,1,1,1,1,0,0,0,0],
-    [1,1,0,1,1,1,0,0,0],[1,0,0,0,1,1,1,0,0],[0,0,0,0,0,1,1,1,0],
-    [0,0,0,0,0,0,1,1,0]
+    [1,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0],
+    [1,1,1,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0],
+    [1,1,1,1,1,0,0,0],
+    [1,1,1,1,1,1,0,0],
+    [1,1,1,1,1,1,1,0],
+    [1,1,1,1,1,0,0,0],
+    [1,1,1,0,1,1,0,0],
+    [1,1,0,0,1,1,0,0],
+    [1,0,0,0,1,1,0,0],
+    [0,0,0,0,1,1,0,0]
   ];
-  var H = A.length, W = A[0].length, S = 2;   // compact 9×13 bitmap → ~18×26px, crisp
+  var H = A.length, W = A[0].length, S = 2;   // 8×12 bitmap → 16×24px, crisp + small
   function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
 
   var url;
