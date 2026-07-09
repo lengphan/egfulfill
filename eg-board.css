@@ -11,6 +11,7 @@
   --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfa; --bos-panel:#f7f6f4;  /* "barely" near-white ground */
   --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-amber:#f8d264;  /* "violet" token now carries the COBALT accent */
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
+  --bos-cardline:#d7d4cc;  /* inner cards use a LIGHT hairline grey frame, not full ink (ink stays on buttons + the header/sidebar chrome frames) */
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
   --bos-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -31,7 +32,7 @@ html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
 /* INSET light hairline separators between rows (don't reach the box edges — 16px inset, unified) */
 html.eg-board-on .ni{border:none!important;position:relative!important;border-radius:0!important;
-  font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:11.5px!important;
+  font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.045em!important;font-size:13px!important;
   padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
 /* the inset separator itself (16px in on each side); not on the active row or the last row */
 html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:#e2dfd8;pointer-events:none}
@@ -74,7 +75,7 @@ html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
-  font-family:var(--bos-mono)!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
+  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
@@ -91,7 +92,7 @@ html.eg-board-on body:has(.sidebar) header .bos-controls > *{height:44px!importa
 html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
-html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:11px!important;
+html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:12.5px!important;
   font-weight:400!important;letter-spacing:.04em!important;text-transform:uppercase!important;font-variant-numeric:tabular-nums}
 /* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
    icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
@@ -109,7 +110,7 @@ html.eg-board-on .bos-controls .bal-chip::before{content:'BALANCE:\00a0'}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
 /* every pseudo label inherits the mono cell type */
-html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:11px!important;letter-spacing:.04em!important;text-transform:uppercase!important}
+html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:.04em!important;text-transform:uppercase!important}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
@@ -140,10 +141,10 @@ html.eg-board-on header > span,html.eg-board-on header #page-title{font-family:'
    every card = thin 1px BLACK frame, NO shadow, sharp. WHITE fill = content/data panel;
    PASTEL fill (KPI tiles below) = a metric. ════ */
 html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
-  background:#fff!important;border:1px solid var(--bos-ink)!important;box-shadow:none!important;border-radius:0!important}
+  background:#fff!important;border:1px solid var(--bos-cardline)!important;box-shadow:none!important;border-radius:0!important}
 /* ════ KPI TILES → flat framed cards (Tavus "Sparrow" card): pastel fill, THIN BLACK FRAME, NO shadow,
    Departure-Mono header on a black divider line ════ */
-html.eg-board-on .wcard{border:1px solid var(--bos-ink)!important;box-shadow:none!important;border-radius:0!important}
+html.eg-board-on .wcard{border:1px solid var(--bos-cardline)!important;box-shadow:none!important;border-radius:0!important}
 /* the card's eyebrow/label → Departure Mono; its underline → a full-width black frame line */
 html.eg-board-on .wcard .eg-card-dot{background:var(--bos-ink)!important}
 html.eg-board-on .wcard > div:first-child,html.eg-board-on .wcard [style*="text-transform:uppercase"]:first-child{font-family:var(--bos-mono)!important;letter-spacing:.04em!important}
@@ -213,8 +214,8 @@ html.eg-board-on #new-menu-dd > div > div:last-child{padding:13px 16px!important
 html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-family:var(--bos-mono)!important;font-size:11.5px!important;
   text-transform:uppercase!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
 
-/* KPI card header underline → a full-width BLACK frame line (matches the Tavus "Sparrow" card header rule) */
-html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-ink)!important;border-bottom-width:1px!important}
+/* KPI card header underline → light hairline grey (cards are no longer full-ink framed) */
+html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-cardline)!important;border-bottom-width:1px!important}
 
 /* SEARCH label — center it with the SAME 13px side padding as EN/NIGHT/ALERTS (was hugging the dividers) */
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search-btn){justify-content:center!important;gap:0!important;padding:0 13px!important}
@@ -352,7 +353,7 @@ html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
 html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
 /* settings Billing / API-Keys inner sub-panels were still rounded grey inside the sharp outer cards — square + 1px-black-frame them */
-html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:10px"],html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:12px"]{border:1px solid var(--bos-ink)!important;border-radius:0!important;box-shadow:none!important}
+html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:10px"],html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:12px"]{border:1px solid var(--bos-cardline)!important;border-radius:0!important;box-shadow:none!important}
 /* order-table expanded detail row: was stark #fff (td + inner div) — now transparent so it inherits
    the theme ground in BOTH light + dark, matching its parent row; just fix the beige border colour */
 html.eg-board-on .dtable tr.exp-row td{background:transparent!important;border-top-color:var(--bos-line)!important;border-bottom-color:var(--bos-line)!important}
