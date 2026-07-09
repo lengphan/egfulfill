@@ -902,11 +902,13 @@
       // Round node on the spine: OPAQUE light-grey by default → OPAQUE cobalt when complete/
       // checked. A background-coloured ring (row bg) makes the hairline spine read as passing
       // BEHIND the dot. In-flow first cell, so every dot lands at the same x = straight down.
-      '.egdt-dot{display:inline-block;width:9px;height:9px;border-radius:50%!important;background:#b6b4ac;flex:0 0 auto;vertical-align:middle;position:relative;z-index:2;box-shadow:0 0 0 3px var(--egdt-ring,#fbfaf8);transition:background .15s}' +
+      // The dot sits ON TOP of the continuous spine (no ring/gap cutting the line) — smaller, opaque,
+      // centred on the line. z-index:2 so it covers the line only where it overlaps.
+      '.egdt-dot{display:inline-block;width:7px;height:7px;border-radius:50%!important;background:#b6b4ac;flex:0 0 auto;vertical-align:middle;position:relative;z-index:2;justify-self:center;transition:background .15s}' +
       '.egdt-item-row.egdt-complete .egdt-dot,[id^="item-wrap-"].egdt-complete .egdt-dot{background:#2f4bf0}' +
       '.egdt-item-row:has(input[type=checkbox]:checked) .egdt-dot,[id^="item-wrap-"]:has(input[type=checkbox]:checked) .egdt-dot{background:#2f4bf0}' +
       // "Add item" affordance node — always grey (it's an action, not a status).
-      '.egdt-dot-add{display:inline-block;width:9px;height:9px;border-radius:50%!important;background:#b6b4ac;flex:0 0 auto;vertical-align:middle;position:relative;z-index:2;box-shadow:0 0 0 3px var(--egdt-ring,#fbfaf8)}' +
+      '.egdt-dot-add{display:inline-block;width:7px;height:7px;border-radius:50%!important;background:#b6b4ac;flex:0 0 auto;vertical-align:middle;position:relative;z-index:2;justify-self:center}' +
       // Factory rows are display:flex with gap:0 — give the pip breathing room (seller
       // rows are a grid whose column-gap already spaces it).
       '.egdt-item-row .egdt-dot{margin-right:11px}';
@@ -2524,7 +2526,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-dlab';
+  window.EG_BUILD = '2026-07-09-dot2';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}

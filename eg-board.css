@@ -385,7 +385,7 @@ html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td{--egdt-node-ring:var
    vertical spine runs at x=20px; every row's dot (8px first grid cell, padding-left 8px)
    and the Add-item dot land on it dead-straight. Ring on the dot = the row bg (#fbfaf8). */
 html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 10px 8px!important;--egdt-ring:#fbfaf8}
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:20px;top:-1px;bottom:22px;width:1.5px;background:var(--bos-cardline);z-index:0}
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:20px;top:-1px;bottom:22px;width:1px;background:var(--bos-cardline);z-index:0}
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){--egdt-ring:#1f1d1b}
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{background:#3a3631}
 html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
