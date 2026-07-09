@@ -391,9 +391,15 @@ html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-w
 html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
 html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
 html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
-/* factory (operator/warehouse/admin): .egdt-item-row sits directly in the detail <td> (padding:0). NO spine line. */
+/* factory (operator/warehouse/admin): .egdt-item-row sits in the detail <td>. Same hairline spine
+   as the seller — x=17.5 (the row's padding-left 14 + dot-half puts every dot's centre there), so
+   the line runs dead-straight through the dots. td padding-left forced to 0 so the geometry matches. */
 html.eg-board-on tr[id^="op-detail-"] > td,
-html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important}
+html.eg-board-on tr[id^="wh-detail-"] > td{position:relative;background:transparent!important;padding-left:0!important}
+html.eg-board-on tr[id^="op-detail-"] > td::before,
+html.eg-board-on tr[id^="wh-detail-"] > td::before{content:"";position:absolute;left:17.5px;top:-1px;bottom:16px;width:1px;background:var(--bos-line);z-index:0}
+html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td::before,
+html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td::before{background:#3a3631}
 html.eg-board-on .egdt-item-row{position:relative;background:transparent!important;border:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important}
 html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
 html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
