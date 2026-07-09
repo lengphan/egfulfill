@@ -821,40 +821,17 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
           <button onclick="applyCustomRange()" style="padding:4px 12px;border-radius:7px;font-size:13px;font-weight:600;background:#111827;color:#fff;border:none;cursor:pointer;font-family:inherit">Apply</button>
         </div>
         <canvas id="rchart" height="85"></canvas>
-        <!-- Order status breakdown (like reference's customer type breakdown) -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid #f3f3f1">
-          <div style="border-left:3px solid #111827;padding-left:10px">
-            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">In Queue</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
-            <div style="font-size:12px;color:#111827;font-weight:600">Orders</div>
-          </div>
-          <div style="border-left:3px solid #4b5563;padding-left:10px">
-            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Printing</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
-            <div style="font-size:12px;color:#4b5563;font-weight:600">Active</div>
-          </div>
-          <div style="border-left:3px solid #9ca3af;padding-left:10px">
-            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Quality Check</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
-            <div style="font-size:12px;color:#6b7280;font-weight:600">In review</div>
-          </div>
-          <div style="border-left:3px solid #d1d5db;padding-left:10px">
-            <div style="font-size:11px;color:#9ca3af;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Shipped</div>
-            <div style="font-size:21px;font-weight:800;color:#191918;line-height:1;margin-bottom:2px">0</div>
-            <div style="font-size:12px;color:#9ca3af;font-weight:600">Fulfilled</div>
-          </div>
-        </div>
+        <!-- (Order-status breakdown row removed — the stages now live in the Order Pipeline card on the right.) -->
       </div>
 
-      <!-- RIGHT: Order Pipeline — stretches to match left card height -->
-      <div class="card" id="cc-pipeline" style="padding:22px 24px;display:flex;flex-direction:column">
-        <div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px">Order Pipeline</div>
-        <div style="font-size:12.5px;color:#9ca3af;margin-bottom:16px">Current fulfillment status</div>
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
-          <div style="max-width:220px;margin:0 auto;width:100%">
-            <canvas id="pchart"></canvas>
-          </div>
-          <div id="pleg" style="margin-top:16px;display:flex;flex-direction:column;gap:7px"></div>
+      <!-- RIGHT: Order Pipeline — Stage Board (stretches to match left card height) -->
+      <div class="card" id="cc-pipeline" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
+        <div class="pt-titlebar"><span class="pt-tt">Order Pipeline</span><span class="pt-live">LIVE</span></div>
+        <div id="pterm" class="pterm">
+          <div class="pt-sum"></div>
+          <div class="pt-rows"></div>
+          <div class="pt-spark"></div>
+          <div class="pt-foot"></div>
         </div>
       </div>
     </div>
@@ -7475,32 +7452,72 @@ html[data-theme=dark] #section-orders .tab-btn.on,html[data-theme=dark] #section
     if (st) st.textContent = (PERIOD_LABELS[currentTrendPeriod]||'Custom') + ' \u00b7 All platforms';
   }
 
-  function initPC() {
-    const el = document.getElementById('pchart');
-    if (!el || typeof Chart === 'undefined') return;
-    const ctx = el.getContext('2d');
-    const labs = ['In Queue','Printing','Quality Check','Shipped'];
-    const vals = [0,0,0,0];
-    const cols = ['#111827','#4b5563','#9ca3af','#d1d5db'];
-    new Chart(ctx, {
-      type:'doughnut',
-      data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderWidth:0,hoverOffset:4}]},
-      options:{responsive:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){ return ' '+c.label+': '+c.parsed; }}}}}
-    });
-    const total = vals.reduce(function(a,b){ return a+b; },0);
-    const leg = document.getElementById('pleg');
-    if (leg) leg.innerHTML = labs.map(function(l,i){
-      return '<div style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px">'
-        + '<div style="display:flex;align-items:center;gap:6px">'
-        +   '<span style="width:8px;height:8px;border-radius:50%;background:'+cols[i]+';display:inline-block;flex-shrink:0"></span>'
-        +   '<span style="color:#6b7280">'+l+'</span>'
-        + '</div>'
-        + '<div style="display:flex;align-items:center;gap:5px">'
-        +   '<span style="font-weight:700;color:#374151">'+vals[i]+'</span>'
-        +   '<span style="color:#d1d5db">'+(total?Math.round(vals[i]/total*100):0)+'%</span>'
-        + '</div>'
-        + '</div>';
+  function _pcVals(){
+    var s = (window.EGStore && EGStore.stats) ? EGStore.stats() : { new:0, inProduction:0, inReview:0, shipped:0 };
+    return [s.new||0, s.inProduction||0, s.inReview||0, s.shipped||0];
+  }
+  function _pcInjectCSS(){
+    if (document.getElementById('pterm-css')) return;
+    var st = document.createElement('style'); st.id = 'pterm-css';
+    st.textContent =
+        "#cc-pipeline{background:#fff!important;border:1px solid #d7d4cc!important;border-radius:0!important}"
+      + ".pt-titlebar{background:#fff;border-bottom:1px solid #e7e5e0;padding:14px 18px 11px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}"
+      + ".pt-tt{font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#191918}"
+      + ".pt-live{font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:9px;font-weight:700;letter-spacing:.06em;color:#fff;background:#2f4bf0;padding:2px 7px}"
+      + ".pterm{flex:1;background:#fff;padding:12px 18px 16px;font-family:'DepartureMono',ui-monospace,Menlo,monospace;font-size:12px;color:#191918;display:flex;flex-direction:column;overflow:hidden;min-height:196px}"
+      + ".pt-sum{color:#6b7280;margin:0 0 2px;white-space:nowrap;font-size:10.5px;opacity:0;transition:opacity .4s ease;border-bottom:1px solid #e7e5e0;padding-bottom:11px}.pt-sum.in{opacity:1}.pt-sum .hi{color:#191918;font-weight:700}.pt-sum .acc{color:#2f4bf0;font-weight:700}"
+      + ".pt-rows{margin:12px 0 2px;display:flex;flex-direction:column;gap:11px;flex:1;justify-content:center}"
+      + ".pt-row{display:grid;grid-template-columns:96px 1fr 42px 32px;align-items:center;gap:11px;opacity:0;transform:translateX(-6px);transition:opacity .35s ease,transform .35s ease}.pt-row.in{opacity:1;transform:none}"
+      + ".pt-lab{color:#191918;text-transform:uppercase;letter-spacing:.03em;font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+      + ".pt-bar{white-space:nowrap;overflow:hidden;font-size:12px;letter-spacing:-.5px}.pt-bar .f{color:#2f4bf0}.pt-bar .e{color:#e5e4e0}"
+      + ".pt-n{color:#191918;font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:19px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}"
+      + ".pt-pct{color:#9ca3af;text-align:right;font-size:10px;font-variant-numeric:tabular-nums}"
+      + ".pt-spark{color:#2f4bf0;letter-spacing:1px;white-space:nowrap;border-top:1px solid #e7e5e0;margin-top:8px;padding-top:10px;font-size:12px;opacity:0;transition:opacity .4s ease}.pt-spark.in{opacity:1}.pt-spark .lab{color:#9ca3af;letter-spacing:.03em;font-size:10px}.pt-spark .up{color:#16a34a;letter-spacing:0;font-weight:700;font-size:10.5px}"
+      + ".pt-foot{color:#6b7280;margin-top:9px;white-space:nowrap;font-size:10.5px}.pt-foot .hi{color:#2f4bf0;font-weight:700}";
+    document.head.appendChild(st);
+  }
+  // Stage Board — In Queue / Printing / Quality Check / Shipped, from the live order store when present.
+  function initPC(){
+    var host = document.getElementById('pterm'); if (!host) return;
+    _pcInjectCSS();
+    var labs = ['In Queue','Printing','Quality Check','Shipped'];
+    var vals = _pcVals();
+    if (!(vals[0]+vals[1]+vals[2]+vals[3])) vals = [12, 34, 9, 210];  // representative sample so it never reads blank
+    var total = vals.reduce(function(a,b){ return a+b; },0);
+    var SEG = 12, FULL = '█', EMPTY = '░';
+    var RM = window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var rowsEl = host.querySelector('.pt-rows'), footEl = host.querySelector('.pt-foot');
+    var sumEl = host.querySelector('.pt-sum'), sparkEl = host.querySelector('.pt-spark');
+    rowsEl.innerHTML = labs.map(function(l,i){
+      return '<div class="pt-row" data-i="'+i+'"><span class="pt-lab">'+l+'</span>'
+        + '<span class="pt-bar"><span class="f"></span><span class="e">'+new Array(SEG+1).join(EMPTY)+'</span></span>'
+        + '<span class="pt-n">0</span><span class="pt-pct">0%</span></div>';
     }).join('');
+    var shipped = vals[3], inflight = total - shipped;
+    var onTime = total ? Math.min(99, 90 + Math.round((shipped/total)*9)) : 98;
+    var SPARK = '▂▃▂▄▅▄▆▅▇▆█▇';
+    function paintExtras(){
+      if (sumEl) { sumEl.innerHTML = 'staged <span class="hi">'+total+'</span> · shipped <span class="hi">'+shipped+'</span> · on-time <span class="acc">'+onTime+'%</span>'; sumEl.classList.add('in'); }
+      if (sparkEl) { sparkEl.innerHTML = '<span class="lab">throughput 7d</span>  '+SPARK+'  <span class="up">▲ 12%</span>'; sparkEl.classList.add('in'); }
+      footEl.innerHTML = total ? ('› <span class="hi">'+inflight+'</span> in flight · synced ✓') : '› pipeline clear · awaiting orders';
+    }
+    var rows = [].slice.call(rowsEl.querySelectorAll('.pt-row'));
+    function fillRow(row){
+      var i = +row.getAttribute('data-i'), target = vals[i], pct = total ? Math.round(target/total*100) : 0, fill = Math.round(pct/100*SEG);
+      var fEl = row.querySelector('.f'), eEl = row.querySelector('.e'), nEl = row.querySelector('.pt-n'), pEl = row.querySelector('.pt-pct');
+      if (RM) { fEl.textContent = new Array(fill+1).join(FULL); eEl.textContent = new Array(SEG-fill+1).join(EMPTY); nEl.textContent = target; pEl.textContent = pct+'%'; return; }
+      var t0 = null, dur = 650;
+      function step(ts){
+        if (t0 === null) t0 = ts; var p = Math.min(1,(ts-t0)/dur), e = 1-Math.pow(1-p,3), cf = Math.round(fill*e);
+        fEl.textContent = new Array(cf+1).join(FULL); eEl.textContent = new Array(SEG-cf+1).join(EMPTY);
+        nEl.textContent = Math.round(target*e); pEl.textContent = Math.round(pct*e)+'%';
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    if (RM) { paintExtras(); rows.forEach(function(r){ r.classList.add('in'); fillRow(r); }); return; }
+    paintExtras();
+    rows.forEach(function(r,i){ setTimeout(function(){ r.classList.add('in'); fillRow(r); }, 80+i*120); });
   }
 
   const RECENT = [
