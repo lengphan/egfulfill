@@ -381,9 +381,13 @@ html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){--egdt-ro
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]),
 html[data-theme=dark].eg-board-on tr[id^="op-detail-"] > td,
 html[data-theme=dark].eg-board-on tr[id^="wh-detail-"] > td{--egdt-node-ring:var(--bos-ground,#191817)}
-/* seller (orders.html): item-wrap grids live inside the exp-row wrapper div. NO spine
-   line (removed) — item rows read as a clean, lightly-indented group under the parent. */
-html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 10px 22px!important}
+/* seller (orders.html): item-wrap grids live inside the exp-row wrapper div. A hairline
+   vertical spine runs at x=20px; every row's dot (8px first grid cell, padding-left 8px)
+   and the Add-item dot land on it dead-straight. Ring on the dot = the row bg (#fbfaf8). */
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){position:relative;background:transparent!important;padding:2px 18px 10px 8px!important;--egdt-ring:#fbfaf8}
+html.eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{content:"";position:absolute;left:20px;top:-1px;bottom:22px;width:1.5px;background:var(--bos-cardline);z-index:0}
+html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"]){--egdt-ring:#1f1d1b}
+html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{background:#3a3631}
 html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
 html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
 html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
@@ -414,7 +418,7 @@ html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width
 /* ── Dashboard stat cards → TAVUS PRESS (replaces the old top:-1px lift) ──
    Each card rests on a dark offset shadow; hover sinks it toward the shadow; mousedown
    presses it fully in. No lingering state. Overrides the per-file .wcard/.stat-card hovers. */
-html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:5px 5px 0 var(--bos-ink)!important;transition:transform .13s cubic-bezier(.3,.7,.4,1),box-shadow .13s ease!important}
+html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:5px 5px 0 var(--bos-ink)!important;transition:transform .38s cubic-bezier(.22,.61,.36,1),box-shadow .38s cubic-bezier(.22,.61,.36,1)!important}
 html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
 html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
 html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:5px 5px 0 #3a3631!important}
