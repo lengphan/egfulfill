@@ -3855,7 +3855,7 @@ function renderOpOrders() {
           const sep = ei < o.itemList.length - 1 ? 'border-bottom:1px solid #e8e7e4' : '';
           const tBg  = OP_PT_BG[it.printType]  || '#f3f4f6';
           const tFg  = OP_PT_FG[it.printType]  || '#6b7280';
-          const tLbl = OP_PT_LBL[it.printType] || 'DTG';
+          const tLbl = OP_PT_LBL[it.printType] || '—';
           const itSt = o.flagged ? 'flagged' : (it.status || o.status);
           const dsMenuId = 'ds-dd-' + o.num.replace(/[^a-z0-9]/gi,'') + '-' + ei;
           // Thumbnail = live composite: catalog mockup as background + raw design
@@ -4594,7 +4594,7 @@ function opZoomProduct(orderNum, itemIdx) {
   var it = order.itemList[itemIdx];
   var tBg  = OP_PT_BG[it.printType]  || '#f3f4f6';
   var tFg  = OP_PT_FG[it.printType]  || '#6b7280';
-  var tLbl = OP_PT_LBL[it.printType] || 'DTG';
+  var tLbl = OP_PT_LBL[it.printType] || '—';
   // Zoom shows a LIVE composite: catalog mockup as background + raw design
   // overlaid at the seller's saved designPos. Mirrors the row avatar so the
   // operator sees exactly what the seller positioned — not a pre-baked thumb.

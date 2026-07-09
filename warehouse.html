@@ -4920,7 +4920,7 @@ function whRenderBatchView() {
       return shown.map(it => {
         const tBg2 = TYPE_BG[it.type||it.ws] || '#f3f4f6';
         const tFg2 = TYPE_FG[it.type||it.ws] || '#6b7280';
-        const lbl2 = (it.type||'DTG').substring(0,3).toUpperCase();
+        const lbl2 = (it.type||'—').substring(0,3).toUpperCase();
         const short = it.name.split('—').pop().trim().split('/')[0].trim();
         return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
           <span style="font-size:9.25px;font-weight:800;background:${tBg2};color:${tFg2};border-radius:3px;padding:1px 4px;flex-shrink:0">${lbl2}</span>
@@ -4979,7 +4979,7 @@ function whRenderBatchView() {
                 const imgSrc = whGetItemImg(it.file || '');
                 const thumbInner = imgSrc
                   ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:4px;display:block">`
-                  : `<span style="font-size:9.25px;font-weight:800;color:${tFg}">${(it.type||'DTG').substring(0,3).toUpperCase()}</span>`;
+                  : `<span style="font-size:9.25px;font-weight:800;color:${tFg}">${(it.type||'—').substring(0,3).toUpperCase()}</span>`;
                 return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e8e7e4">
                   <div onmouseenter="whShowImgTip(this,'${imgSrc||''}','${it.file||''}')" onmouseleave="whHideImgTip()" style="width:26px;height:26px;border-radius:5px;flex-shrink:0;background:${tBg};display:flex;align-items:center;justify-content:center;border:1px solid #e5e4e0;overflow:hidden;cursor:${imgSrc?'zoom-in':'default'}">${thumbInner}</div>
                   <div style="flex:1;min-width:0">
@@ -5209,7 +5209,7 @@ function whOpenBatchModal(orderNum) {
     const imgSrc2 = whGetItemImg(it.file || '');
     const thumbHtml = imgSrc2
       ? `<img src="${imgSrc2}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block">`
-      : `<span style="font-size:10.25px;font-weight:800;color:${tFg}">${(it.type||'DTG').substring(0,3).toUpperCase()}</span>`;
+      : `<span style="font-size:10.25px;font-weight:800;color:${tFg}">${(it.type||'—').substring(0,3).toUpperCase()}</span>`;
 
     return `<div style="display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid #e8e7e4;background:${ready?'#fff':'#fafaf9'};opacity:${ready||invPendPO?1:.72}">
       <input type="checkbox" data-bm-iid="${iid}" ${ready?'checked':''} ${ready?'':'disabled'} style="width:16px;height:16px;accent-color:#111827;flex-shrink:0;cursor:${ready?'pointer':'not-allowed'}">
@@ -6123,7 +6123,7 @@ function whRenderOrders() {
             const TYPE_FG = {DTG:'#5f52b0',Sublimation:'#904a18',Embroidery:'#286038',SCR:'#3a5a96'};
             const tBg  = TYPE_BG[it.type||it.ws] || '#f3f4f6';
             const tFg  = TYPE_FG[it.type||it.ws] || '#6b7280';
-            const tLbl = (it.type||it.ws||'DTG').substring(0,3).toUpperCase();
+            const tLbl = (it.type||it.ws||'—').substring(0,3).toUpperCase();
             const iid = it.id || String(ei);
             const typePill = `<span style="font-size:11.25px;font-weight:700;background:${tBg};color:${tFg};border-radius:4px;padding:1px 7px">${tLbl}</span>`;
             // Clickable file link → opens shared preview popup. Composite-only legacy orders still get a link.
@@ -6648,7 +6648,7 @@ function whPreviewFile(file, type) {
   const TBGS = {DTG:'ede9fe',Sublimation:'fff7ed',Embroidery:'f0fdf4',SCR:'dbeafe'};
   const TFGS = {DTG:'7c3aed',Sublimation:'c2410c',Embroidery:'15803d',SCR:'1d4ed8'};
   const bg = TBGS[type]||'f3f4f6', fg = TFGS[type]||'9ca3af';
-  const lbl = (type||'DTG').substring(0,3).toUpperCase();
+  const lbl = (type||'—').substring(0,3).toUpperCase();
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
   overlay.onclick = () => overlay.remove();
@@ -6917,12 +6917,12 @@ function whRenderMulti() {
       ${isOpen ? `<div style="border-top:1px solid #f3f3f1;background:#fafaf9">
         <div style="max-height:200px;overflow-y:auto;padding:8px 14px 4px">
           ${o.itemList.map(item => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f0ede9">
-            <div style="width:24px;height:24px;background:#f0ede9;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9.25px;font-weight:700;color:#6b7280;flex-shrink:0">${(item.type||'DTG').substring(0,3).toUpperCase()}</div>
+            <div style="width:24px;height:24px;background:#f0ede9;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9.25px;font-weight:700;color:#6b7280;flex-shrink:0">${(item.type||'—').substring(0,3).toUpperCase()}</div>
             <div style="font-size:13.25px;font-weight:600;color:#374151;flex:1;min-width:0">
               <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name} <span style="font-weight:400;color:#9ca3af">×${item.qty||1}</span></div>
               <div style="font-size:11.25px;color:#9ca3af;font-family:monospace;margin-top:1px">${item.sku}</div>
             </div>
-            <span style="font-size:11.25px;padding:2px 7px;border-radius:999px;background:#f3f3f1;color:#6b7280;white-space:nowrap;flex-shrink:0">${item.type||'DTG'}</span>
+            <span style="font-size:11.25px;padding:2px 7px;border-radius:999px;background:#f3f3f1;color:#6b7280;white-space:nowrap;flex-shrink:0">${item.type||'—'}</span>
           </div>`).join('')}
         </div>
         <div style="display:flex;gap:6px;padding:8px 14px;border-top:1px solid #f0ede9">
@@ -7113,23 +7113,23 @@ function openReviewModal(num) {
   const items = (o && o.itemList) || ORDER_DATA[num]?.items.map(i => ({name:i.name,sku:i.sku,file:i.file,type:i.ws?.includes('Sub')?'Sublimation':i.ws?.includes('Emb')?'Embroidery':'DTG',qty:1})) || [];
   document.getElementById('rev-items').innerHTML = items.map(item => `
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f9f9f8;border-radius:9px;border:1px solid #eeede9">
-      <div onclick="whPreviewFile(item.file||'design.png',item.type||'DTG')" style="width:40px;height:40px;border-radius:8px;overflow:hidden;border:1px solid #e5e4e0;flex-shrink:0;cursor:pointer">
-        <img src="https://placehold.co/40x40/${({'DTG':'ede9fe/7c3aed','Sublimation':'fff7ed/c2410c','Embroidery':'f0fdf4/15803d'})[item.type]||'f3f4f6/9ca3af'}?text=${(item.type||'DTG').substring(0,3).toUpperCase()}" style="width:100%;height:100%;object-fit:cover">
+      <div onclick="whPreviewFile(item.file||'design.png',item.type||'—')" style="width:40px;height:40px;border-radius:8px;overflow:hidden;border:1px solid #e5e4e0;flex-shrink:0;cursor:pointer">
+        <img src="https://placehold.co/40x40/${({'DTG':'ede9fe/7c3aed','Sublimation':'fff7ed/c2410c','Embroidery':'f0fdf4/15803d'})[item.type]||'f3f4f6/9ca3af'}?text=${(item.type||'—').substring(0,3).toUpperCase()}" style="width:100%;height:100%;object-fit:cover">
       </div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14.25px;font-weight:600;color:#191918">${item.name} <span style="color:#9ca3af;font-weight:400">×${item.qty||1}</span></div>
         <div style="font-size:12.75px;color:#9ca3af;margin-top:1px">SKU: ${item.sku||''} · ${item.file||''}</div>
       </div>
-      <span style="font-size:12.25px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:999px;flex-shrink:0">${item.type||'DTG'}</span>
+      <span style="font-size:12.25px;font-weight:700;background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:999px;flex-shrink:0">${item.type||'—'}</span>
     </div>`).join('');
 
   // Design Approvals (right column) — one card per item
   document.getElementById('rev-designs-list').innerHTML = items.map((item, idx) => {
     const approved = (o?.opStatus === 'approved');
     return `<div style="border:1px solid #e5e4e0;border-radius:10px;overflow:hidden;margin-bottom:12px">
-      <div style="background:#f6f5f4;height:130px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #e5e4e0;cursor:pointer" onclick="whPreviewFile('${item.file||'design.png'}','${item.type||'DTG'}')">
+      <div style="background:#f6f5f4;height:130px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #e5e4e0;cursor:pointer" onclick="whPreviewFile('${item.file||'design.png'}','${item.type||'—'}')">
         <div style="text-align:center">
-          <img src="https://placehold.co/80x80/${{DTG:'ede9fe/7c3aed',Sublimation:'fff7ed/c2410c',Embroidery:'f0fdf4/15803d'}[item.type]||'f3f4f6/9ca3af'}?text=${(item.type||'DTG').substring(0,3)}" style="width:80px;height:80px;border-radius:10px;border:1px solid #e5e4e0;display:block;margin:0 auto 6px;object-fit:cover">
+          <img src="https://placehold.co/80x80/${{DTG:'ede9fe/7c3aed',Sublimation:'fff7ed/c2410c',Embroidery:'f0fdf4/15803d'}[item.type]||'f3f4f6/9ca3af'}?text=${(item.type||'—').substring(0,3)}" style="width:80px;height:80px;border-radius:10px;border:1px solid #e5e4e0;display:block;margin:0 auto 6px;object-fit:cover">
           <div style="font-size:12.25px;color:#9ca3af">${item.file||'design.png'}</div>
         </div>
       </div>

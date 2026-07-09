@@ -1166,8 +1166,8 @@
       // stay the custom _vdd dropdowns (white menu, black border, offset shadow,
       // all options visible) — only the layout changes; selection logic is intact.
       var _numJs = jsAttr(num), _skuJs = jsAttr(sku);
-      // Mono micro-label above each column (DepartureMono for LABELS only).
-      var _mlbl = 'display:block;font-family:\'DepartureMono\',ui-monospace,SFMono-Regular,Menlo,monospace;font-size:8.5px;font-weight:600;color:#a8a5a0;text-transform:uppercase;letter-spacing:.09em;line-height:1;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      // Readable sans micro-label above each column (mono was too hard on the eyes in the dense item row).
+      var _mlbl = 'display:block;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:9px;font-weight:700;color:#a8a5a0;text-transform:uppercase;letter-spacing:.04em;line-height:1;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
       // Fixed-width column wrapper: label sits above the control; the column width
       // is fixed so fields align across rows. The control (_vdd) is passed the same
       // inner width so its button truncates with an ellipsis inside the column.
@@ -2718,7 +2718,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-variant-select';
+  window.EG_BUILD = '2026-07-09-lessmono';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}

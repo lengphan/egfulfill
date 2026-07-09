@@ -15,6 +15,7 @@
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
   --bos-mono:'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bos-sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;  /* readable body sans — mono is kept for nav/top-bar/buttons/card eyebrows only; data-dense reading (tables, form labels, order/settings detail) uses this */
 }
 html.eg-board-on body{background:var(--bos-ground)!important}
 
@@ -158,8 +159,8 @@ html.eg-board-on .wcard:nth-of-type(6n){background:#fdeee7!important}
 /* ════ TABLES (existing .dtable) — the card frames it, so the table itself is BORDERLESS (no inner box) ════ */
 html.eg-board-on .dtable{border:none!important;box-shadow:none!important;background:transparent!important}
 html.eg-board-on .dtable th{background:transparent!important;border-bottom:1.5px solid var(--bos-ink)!important;
-  color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;font-size:10px!important;letter-spacing:.06em!important;
-  text-transform:uppercase;font-weight:400!important;padding:11px 14px!important}
+  color:var(--bos-ink)!important;font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:.03em!important;
+  text-transform:uppercase;font-weight:600!important;padding:11px 14px!important}
 html.eg-board-on .dtable td{border-bottom:1px solid var(--bos-line)!important;padding:12px 14px!important;background:transparent!important}
 html.eg-board-on .dtable tr.main-row:hover td{background:#faf8f4!important}
 html.eg-board-on .dtable tr:last-child td{border-bottom:none!important}
@@ -286,13 +287,13 @@ html.eg-board-on[data-theme=dark] [style*="color:#191918"],html.eg-board-on[data
 /* order IDs + age + money + store-source → Departure Mono */
 html.eg-board-on .dtable td[data-col="order"] > div{font-family:var(--bos-mono)!important}
 html.eg-board-on .dtable td[data-col="total"]{font-variant-numeric:tabular-nums}
-html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em}
+html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:0}
 /* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
 html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) .fb:hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .filter-btn.active,html.eg-board-on:not([data-theme=dark]) .fb.active{border-bottom:2px solid var(--bos-ink)!important;color:var(--bos-ink)!important;background:transparent!important;box-shadow:none!important;border-radius:0!important}
 /* order-search input → mono + sharp */
-html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-mono)!important;font-size:12px!important;border-radius:0!important}
+html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-sans)!important;font-size:13px!important;border-radius:0!important}
 html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:0!important}
 /* the small in-row action buttons (Push, etc.) + Export → sharp mono framed */
 html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.03em;border-radius:0!important}
@@ -348,7 +349,7 @@ html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .b
 /* fields stay sharp but keep a READABLE sans face — mono was too hard to read for values/addresses/order details */
 html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1px solid #d0ccc4!important;background:#fff!important;color:var(--bos-ink)!important}
-html.eg-board-on label{font-family:var(--bos-mono)!important}
+html.eg-board-on label{font-family:var(--bos-sans)!important;letter-spacing:.01em!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
 html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
