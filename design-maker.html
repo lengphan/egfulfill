@@ -99,6 +99,9 @@ html.eg-board-on .panel-label,html.eg-board-on .lcard-label,html.eg-board-on .mo
 html.eg-board-on .tool-btn{border-radius:0!important}
 html.eg-board-on .tool-btn.on{background:var(--bos-violet)!important;color:#fff!important}
 html.eg-board-on .tool-btn span{font-family:var(--bos-mono)!important;letter-spacing:.03em!important}
+/* Product-picker trigger shows a real product NAME (mixed-case proper noun) — keep it readable
+   sans, not the mono-UPPERCASE .btn-out treatment. The #id outranks the .btn-out class rule. */
+html.eg-board-on #product-picker-btn,html.eg-board-on #selected-product-label{font-family:Inter,-apple-system,system-ui,sans-serif!important;text-transform:none!important;letter-spacing:0!important;font-weight:600!important;font-size:13.5px!important}
 /* position pills: sharp track + cells; selected pill = cobalt accent */
 html.eg-board-on:not([data-theme=dark]) .pos-pill{border-radius:0!important;font-family:var(--bos-mono)!important;
   text-transform:uppercase!important;letter-spacing:.03em!important;font-size:10.5px!important}
