@@ -1016,7 +1016,7 @@
     var num = o.num || o.id || '';
     assignDesignKeys(o.items);
     var sku = itemDK(it);
-    return isNewOrder(o) ? _trashHtml(num, sku) : '';
+    return can('item.delete', o) ? _trashHtml(num, sku) : '';
   }
 
   // ── Row STATUS DOT (per-row completeness + selection indicator) ─────────────
@@ -1071,7 +1071,7 @@
       // Locked/in-review lines already left setup — their variant/method are
       // baked onto the item, so treat them as complete (they render the read-only
       // Method/values metaRow, never a picker).
-      if (!isNewOrder(o)) return true;
+      if (!can('design.edit', o)) return true;
       var setup = getItemSetup(num, sku) || {};
       var _synced = !!(o && (o.source === 'etsy' || /^etsy-/i.test(String((o.id || '') + '|' + (o.num || '')))));
       // BLANK / product: factory's own pick (setup.product), else the item's blank
@@ -1115,7 +1115,7 @@
     // Pulse the Upload button while a NEW order's item still has no design — a
     // gold "needs upload" cue, like the seller side. Injected once.
     _ensurePulseCss();
-    var _pulse = (isNewOrder(o) && !_hasDesign) ? ' egdt-pulse' : '';
+    var _pulse = (can('design.edit', o) && !_hasDesign) ? ' egdt-pulse' : '';
     var uploadBtn = _hasDesign
       ? '<button class="btn" style="font-size:11px;padding:3px 9px;white-space:nowrap;background:#191918;color:#fff;border:1px solid #191918" title="Design attached — click to replace" onclick="' + _upOnclick + '">Uploaded</button>'
       : '<button class="btn btn-out' + _pulse + '" style="font-size:11px;padding:3px 9px;white-space:nowrap" title="Upload a design" onclick="' + _upOnclick + '">↑ Upload</button>';
@@ -1127,7 +1127,7 @@
     var selSm = 'border:1px solid #e5e4e0;border-radius:6px;background:#fff;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 7px;text-overflow:ellipsis';
     function _field(label, ctrl) { return '<div style="display:inline-flex;align-items:center;gap:7px;white-space:nowrap">' + '<span style="' + _lbl + '">' + label + '</span>' + ctrl + '</div>'; }
     var pickers = '';
-    if (isNewOrder(o)) {
+    if (can('design.edit', o)) {
       var setup = getItemSetup(num, sku);
       var prods = (window.EGStore && EGStore.getCatalogProducts) ? (EGStore.getCatalogProducts() || []) : [];
       // Marketplace (Etsy/synced) orders come in UNSET: ignore the synced variant so the
@@ -1209,7 +1209,7 @@
     var moreBtn = '<button title="More — Templates · Design Maker" onclick="EGDesignTools._moreMenu(\'' + jsAttr(num) + '\',\'' + jsAttr(sku) + '\',\'' + jsAttr(name) + '\',this,event)" style="background:#fff;border:1px solid #e5e4e0;border-radius:6px;cursor:pointer;color:#6b7280;padding:2px 8px 4px;font-size:14px;line-height:1;font-family:inherit;flex-shrink:0" onmouseover="this.style.borderColor=\'#191918\';this.style.color=\'#191918\'" onmouseout="this.style.borderColor=\'#e5e4e0\';this.style.color=\'#6b7280\'">⋯</button>';
     // Delete (trash) — only while New, keeps ≥1 item. A board can suppress it
     // here (opts.noTrash) and render EGDesignTools.itemTrash(o,it) elsewhere.
-    var delBtn = (isNewOrder(o) && !opts.noTrash) ? _trashHtml(num, sku) : '';
+    var delBtn = (can('item.delete', o) && !opts.noTrash) ? _trashHtml(num, sku) : '';
     // Upload/Templates/Design Maker now live as tabs inside the one Design panel,
     // so the row needs a single Design button — the ⋯ overflow menu is retired.
     // Left-packed so the controls sit right after the (capped) product title — no
@@ -1296,7 +1296,7 @@
   // handler as before. Uses .egdt-additem-node so eg-board.css can place the dot on
   // the spine at var(--egdt-spine-x), matching the item rows exactly.
   function addItemButton(o) {
-    if (!isNewOrder(o)) return '';
+    if (!can('item.add', o)) return '';
     var num = (o && (o.num || o.id)) || '';
     return '<div class="egdt-additem-node" onclick="event.stopPropagation()" '
       + 'style="display:flex;align-items:center;gap:11px;padding:10px 14px 12px 14px">'
@@ -1309,7 +1309,7 @@
 
   // Per-order "Push to production" — only while the order is new.
   function pushButton(o) {
-    if (!isNewOrder(o)) return '';
+    if (!can('push.approve', o)) return '';
     var num = (o && (o.num || o.id)) || '';
     return '<div style="display:flex;justify-content:flex-end;align-items:center;padding:6px 16px 4px 28px" onclick="event.stopPropagation()">'
       + '<button class="btn btn-dk" style="font-size:12px;padding:6px 16px" onclick="EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')">Push</button></div>';
@@ -1320,7 +1320,7 @@
   // Only renders while the order is still new. event.stopPropagation keeps the
   // row from toggling its expansion when Push is clicked.
   function pushButtonInline(o) {
-    if (!isNewOrder(o)) return '';
+    if (!can('push.approve', o)) return '';
     var num = (o && (o.num || o.id)) || '';
     return '<button id="egdt-push-' + jsAttr(num) + '" title="Push to production" onclick="event.stopPropagation();EGDesignTools.pushToProduction(\'' + jsAttr(num) + '\')" '
       + 'style="height:32px;padding:0 14px;display:inline-flex;align-items:center;border-radius:7px;border:1.5px solid #191918;background:#191918;color:#fff;cursor:pointer;flex-shrink:0;font-family:inherit;font-size:12.5px;font-weight:600;transition:background .15s" '
@@ -1799,7 +1799,7 @@
       ? { x: _qpArea.x, y: _qpArea.y, w: _qpArea.w, h: _qpArea.h }
       : { x: 25, y: 25, w: 50, h: 50 };
     if (!Array.isArray(it.textLayers)) it.textLayers = [];
-    var locked = !isNewOrder(o);
+    var locked = !can('design.edit.interactive', o);
     // 3rd arg accepts a boolean (applyAll) or an options object { applyAll, mount }.
     var _opts = (applyAll && typeof applyAll === 'object') ? applyAll : { applyAll: !!applyAll };
     applyAll = !!_opts.applyAll;
@@ -2718,7 +2718,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-lessmono';
+  window.EG_BUILD = '2026-07-09-boardcaps';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
@@ -2929,7 +2929,7 @@
     },
     upload: upload, templates: templates, designMaker: designMaker, designLab: designLab, openSellerPage: openSellerPage,
     // new-order setup
-    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, itemComplete: itemComplete, resolveSyncedVariant: resolveSyncedVariant, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
+    itemActions: itemActions, itemTrash: itemTrash, itemRowLayout: itemRowLayout, itemComplete: itemComplete, resolveSyncedVariant: resolveSyncedVariant, egBoard: egBoard, can: can, displaySku: displaySku, pushButton: pushButton, pushButtonInline: pushButtonInline, pushToProduction: pushToProduction,
     _vdd: _vdd, _vddOpen: _vddOpen, _vddClose: _vddClose,
     addItem: addItem, addItemButton: addItemButton,
     openQuickPos: openQuickPos, closeQuickPos: closeQuickPos, saveQuickPos: saveQuickPos, qpRemoveBg: qpRemoveBg,
