@@ -415,11 +415,19 @@ html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width
    Each card rests on a dark offset shadow; hover sinks it toward the shadow; mousedown
    presses it fully in. No lingering state. Overrides the per-file .wcard/.stat-card hovers. */
 html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:5px 5px 0 var(--bos-ink)!important;transition:transform .13s cubic-bezier(.3,.7,.4,1),box-shadow .13s ease!important}
-html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translate(3px,3px)!important;box-shadow:2px 2px 0 var(--bos-ink)!important}
+html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
 html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
 html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:5px 5px 0 #3a3631!important}
-html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:2px 2px 0 #3a3631!important}
+html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:0 0 0 #3a3631!important}
 html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-on .stat-card:active{box-shadow:0 0 0 #3a3631!important}
+/* KPI card delta + caption: were a faded rounded grey pill (#eeede9/#374151) + light-grey
+   (#9ca3af) caption from the pre-board theme — retheme to Board OS: mono, sharp, readable. */
+html.eg-board-on .trend-up,html.eg-board-on .trend-dn,html.eg-board-on .trend-down,html.eg-board-on .trend-flat{
+  font-family:var(--bos-mono)!important;border-radius:0!important;background:rgba(25,25,24,.07)!important;color:var(--bos-ink)!important;
+  font-size:11px!important;font-weight:400!important;padding:2px 7px!important;letter-spacing:.02em!important;border:none!important}
+html[data-theme=dark].eg-board-on .trend-up,html[data-theme=dark].eg-board-on .trend-dn,html[data-theme=dark].eg-board-on .trend-down,html[data-theme=dark].eg-board-on .trend-flat{
+  background:rgba(216,212,204,.14)!important;color:#e8e4dd!important}
+html.eg-board-on .wcard span[style*="color:#9ca3af"],html.eg-board-on .stat-card span[style*="color:#9ca3af"],html.eg-board-on .ccard span[style*="color:#9ca3af"]{color:var(--bos-grey)!important;font-family:var(--bos-mono)!important;font-size:11px!important;letter-spacing:.02em!important}
 
 /* ── RETRO-WINDOW "title bar" chrome on the stat cards ──────────────────────────
    Each card's mono eyebrow label reads like an old window title bar: a small cobalt
