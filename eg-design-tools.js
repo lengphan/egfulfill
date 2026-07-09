@@ -203,7 +203,7 @@
   function designLab() {
     // Dithered header (eg-dither, muted grey/beige/black 'noir' palette) replaces the icon tile.
     var card = function (icon, title, desc, cta, action, seed) {
-      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #e6e4df;border-radius:14px;overflow:hidden;padding:0;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease" onmouseover="this.style.borderColor=\'#2f4bf0\';this.style.boxShadow=\'0 8px 22px rgba(47,75,240,.15)\';this.style.transform=\'translateY(-3px)\'" onmouseout="this.style.borderColor=\'#e6e4df\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,.05)\';this.style.transform=\'\'">'
+      return '<button class="egdl-card" data-act="' + action + '" style="text-align:left;background:#fff;border:1px solid #d7d4cc;border-radius:0;overflow:hidden;padding:0;cursor:pointer;font-family:inherit;box-shadow:none;transition:border-color .13s ease,box-shadow .13s ease,transform .13s ease" onmouseover="this.style.borderColor=\'#191918\';this.style.boxShadow=\'4px 4px 0 #191918\';this.style.transform=\'translate(-1px,-1px)\'" onmouseout="this.style.borderColor=\'#d7d4cc\';this.style.boxShadow=\'none\';this.style.transform=\'\'">'
         + '<div class="egdl-art" data-dither="art" data-pop="noir" data-seed="' + seed + '" data-pixel="4" style="height:118px;position:relative;background:#e9e6e0"></div>'
         + '<div style="padding:18px 20px 20px">'
         +   '<div style="font-size:16px;font-weight:700;color:#191918;margin-bottom:6px">' + title + '</div>'
@@ -235,9 +235,11 @@
       b.addEventListener('click', function () {
         var act = b.getAttribute('data-act');
         if (act === 'templates') openSellerPage('product-templates.html', 'Templates', designLab);
-        else if (act === 'catalog') openSellerPage('products-dash.html', 'Catalog', designLab);   // seller product catalog
+        // Browse Catalog → the FACTORY board's OWN products section (not the seller catalog),
+        // so it stays inside the factory shell. Falls back to the seller page if not on a board.
+        else if (act === 'catalog') { close(); if (typeof window.showSection === 'function') showSection('products'); else openSellerPage('products-dash.html', 'Catalog', designLab); }
         else if (act === 'library') openSellerPage('image-library.html', 'Image Library', designLab);
-        else openSellerPage('design-maker.html', 'Design Maker', designLab);                      // Upload & Design
+        else openSellerPage('design-maker.html', 'Design Maker', designLab);                      // Upload & Design (shared editor)
       });
     });
   }
@@ -2522,7 +2524,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-rowspine';
+  window.EG_BUILD = '2026-07-09-dlab';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
