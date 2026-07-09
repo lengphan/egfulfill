@@ -488,6 +488,22 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           if (!res.ok) keyOnly = { http: res.status, body: keyOnly };
         }
       } catch (e) { keyOnly = { error: e.message }; }
+      // Capture the raw RESPONSE HEADERS + address from a CORRECTLY-authed single-receipt fetch
+      // (x-api-key = keystring:secret — the working auth). Etsy support asks for these headers +
+      // a receipt id for a deeper audit after Commercial Access is applied to the keystring.
+      let responseStatus = null, responseHeaders = {}, addrFromProbe = {};
+      try {
+        if (rc.receipt_id) {
+          const tok2 = await validToken(conn);
+          const res2 = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + tok2 } });
+          responseStatus = res2.status;
+          res2.headers.forEach((v, k) => { responseHeaders[k] = v; });
+          const b2 = await res2.json().catch(() => ({}));
+          addrFromProbe = res2.ok
+            ? { name: b2.name, first_line: b2.first_line, city: b2.city, state: b2.state, zip: b2.zip, formatted_address: b2.formatted_address }
+            : { http: res2.status, body: b2 };
+        }
+      } catch (e) { responseHeaders = { error: e.message }; }
       const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
         sharedSecretSet: !!SHARED_SECRET,
@@ -499,6 +515,9 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         address_from_list: addr(rc),
         address_from_single: single.error ? single : addr(single),
         address_keystring_only: keyOnly.error || keyOnly.http ? keyOnly : addr(keyOnly),
+        response_status: responseStatus,
+        response_headers: responseHeaders,
+        address_from_authed_probe: addrFromProbe,
         receipt_keys: Object.keys(rc)
       };
     } catch (e) { reply.code(400); return { error: e.message }; }
