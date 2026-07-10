@@ -5,6 +5,7 @@
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <script src="egfulfill-store.js"></script>
+<script src="eg-receipt-wallet.js" defer></script>
 <script src="egstore-api.js"></script>
 <script src="eg-admin-users.js"></script>
 <script src="eg-etsy.js"></script>
@@ -1994,6 +1995,8 @@ document.addEventListener('DOMContentLoaded', function(){
          Its Fraunces headline is the SINGLE source of truth for the balance.
     ══════════════════════════════════════════ -->
     <div id="bal-sec-pnl-overview">
+      <!-- Receipt wallet (eg-receipt-wallet.js) — read-only factory ledger, auto-mounted via data-egrw-factory -->
+      <div id="factory-receipt-mount" data-egrw-factory style="max-width:420px;margin-bottom:22px"></div>
       <!-- Profit & Costs — rendered into this mount div by EGFinancials.render('fin-mount').
            Same panel on admin + warehouse (one 'factory' wallet). -->
       <div id="fin-mount"></div>

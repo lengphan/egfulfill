@@ -91,10 +91,12 @@
 
   function rowHTML(t, runbal, showBal) {
     var pos = (Number(t.amt) || 0) > 0, sign = pos ? '+' : '−';
-    var chip = 'egrw-chip' + (t.pending ? ' pend' : t.rejected ? ' rej' : pos ? ' in' : '');
-    var amtCls = 'egrw-amt ' + (t.pending || t.rejected ? 'mut' : pos ? 'in' : 'out');
-    var amtInner = t.rejected ? ('<s>' + sign + '$' + money(t.amt) + '</s>') : (sign + '$' + money(t.amt));
-    var balLine = (showBal && !t.pending && !t.rejected) ? ('<div class="egrw-bal">bal $' + money(runbal) + '</div>') : '';
+    var soft = t.pending || t.rejected || t.muted;   // muted = informational (e.g. order payment in cash-on-hand model): no sign, no balance effect
+    var chip = 'egrw-chip' + (t.pending ? ' pend' : t.rejected ? ' rej' : t.muted ? '' : pos ? ' in' : '');
+    var amtCls = 'egrw-amt ' + (soft ? 'mut' : pos ? 'in' : 'out');
+    var amtStr = t.muted ? ('$' + money(t.amt)) : (sign + '$' + money(t.amt));
+    var amtInner = t.rejected ? ('<s>' + amtStr + '</s>') : amtStr;
+    var balLine = (showBal && !soft) ? ('<div class="egrw-bal">bal $' + money(runbal) + '</div>') : '';
     return '<div class="egrw-lead"><span class="' + chip + '">' + esc(t.cat) + '</span>'
       + '<span class="egrw-who"><b>' + esc(t.who) + '</b>' + (t.sub ? '<small>' + esc(t.sub) + '</small>' : '') + '</span></div>'
       + '<div><div class="' + amtCls + '">' + amtInner + '</div>' + balLine + '</div>';
@@ -203,11 +205,48 @@
       for (i = 0; i < led.length; i++) {
         t = led[i];
         html += '<div class="egrw-r">' + rowHTML(t, run, true) + '</div>';
-        if (!t.pending && !t.rejected) run -= (Number(t.amt) || 0);
+        if (!t.pending && !t.rejected && !t.muted) run -= (Number(t.amt) || 0);
       }
       rowsEl.innerHTML = html;
+    },
+
+    // Staff factory wallet: render read-only + keep in sync with EGStore's factory ledger.
+    mountFactory: function (mountId) {
+      var self = this;
+      function sync() {
+        if (typeof EGStore === 'undefined' || !EGStore.getFactoryLedger) return;
+        var bal = EGStore.getFactoryBalance ? EGStore.getFactoryBalance() : 0;
+        var CAT = { topup: 'DEPOSIT', charge: 'PAYMENT', refund: 'REFUND', cancellation: 'CANCEL', payout: 'PAYOUT', withdrawal: 'WITHDRAW', earning: 'EARNING' };
+        var led = (EGStore.getFactoryLedger() || []).slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }).map(function (e) {
+          var t = e.type, credit = (t === 'topup' || t === 'earning' || t === 'deposit'), charge = (t === 'charge');
+          return {
+            cat: CAT[t] || (t ? String(t).toUpperCase().slice(0, 9) : 'ADJUST'),
+            who: e.label || CAT[t] || 'Adjustment',
+            sub: e.orderId || '',
+            amt: charge ? Number(e.amount || 0) : (credit ? Number(e.amount || 0) : -Number(e.amount || 0)),
+            muted: charge
+          };
+        });
+        self.set(mountId, { balance: bal, ledger: led });
+      }
+      function boot() {
+        if (!document.getElementById(mountId)) return;
+        self.render(mountId, { mode: 'staff', label: 'Factory balance', col: 'Money in / out' });
+        sync();
+      }
+      if (document.readyState !== 'loading') boot(); else document.addEventListener('DOMContentLoaded', boot);
+      window.addEventListener('eg-factory-balance-changed', sync);
+      window.addEventListener('eg-balance-changed', sync);
+      return { sync: sync };
     }
   };
+
+  // Auto-mount any <div data-egrw-factory id="…"> as a staff factory receipt (zero per-page JS).
+  function autoInit() {
+    var nodes = document.querySelectorAll('[data-egrw-factory]');
+    for (var i = 0; i < nodes.length; i++) { if (nodes[i].id) EGReceiptWallet.mountFactory(nodes[i].id); }
+  }
+  if (document.readyState !== 'loading') autoInit(); else document.addEventListener('DOMContentLoaded', autoInit);
 
   window.EGReceiptWallet = EGReceiptWallet;
   window.EG_RECEIPT_WALLET_BUILD = EG_BUILD;
