@@ -559,8 +559,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         for (const f of ADDR_FIELDS) a[f] = (r && r[f] != null && r[f] !== '') ? r[f] : null;
         return a;
       };
-      // Present = any street/name/city/zip field is populated (all address_r-gated fields).
-      const hasAddr = (a) => !!(a.name || a.first_line || a.city || a.zip || a.formatted_address);
+      // "Has a SHIPPING address" = a DELIVERABLE line is present (street/city/zip/formatted).
+      // The recipient NAME alone does NOT count: Etsy releases the name on the standard tier
+      // while redacting the address lines, so counting the name would falsely report success.
+      const hasAddr = (a) => !!(a.first_line || a.city || a.zip || a.formatted_address);
       const isoDate = (secs) => { try { return secs ? new Date(secs * 1000).toISOString() : null; } catch (e) { return null; } };
 
       let receipts = [], total = null;
@@ -588,16 +590,19 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           status: r.status,
           buyer_email: (r.buyer_email != null && r.buyer_email !== '') ? r.buyer_email : null, // also address_r-gated — a second signal
           address: a,
+          has_name: !!a.name,
           has_shipping_address: hasAddr(a)
         };
       }).sort((x, y) => String(y.order_date || '').localeCompare(String(x.order_date || '')));
 
       const withAddr = rows.filter((x) => x.has_shipping_address).length;
+      const withName = rows.filter((x) => x.has_name).length;
       const scopes = String(conn.scopes || '');
       return {
         verdict: rows.length === 0 ? 'NO_RECEIPTS_FOUND'
-          : withAddr > 0 ? `ADDRESS_PRESENT — ${withAddr}/${rows.length} scanned receipts have a shipping address`
-          : `REDACTED — 0/${rows.length} scanned receipts have a shipping address`,
+          : withAddr > 0 ? `ADDRESS_PRESENT — ${withAddr}/${rows.length} scanned receipts have a full shipping address`
+          : withName > 0 ? `REDACTED — buyer NAME shows on ${withName}/${rows.length} but street/city/state/zip are all null. Etsy is still withholding the address (Commercial Access is not releasing address PII on this keystring).`
+          : `REDACTED — 0/${rows.length} scanned receipts have any address`,
         note: 'Buyer shipping address on receipts is gated by Etsy Commercial Access (app tier), NOT by an OAuth scope. REDACTED across fresh receipts = the entitlement has not propagated on Etsy\'s side; there is nothing to fix in our code.',
         address_r_in_scopes: /(^|\s)address_r(\s|$)/.test(scopes),
         granted_scopes: conn.scopes || null,
