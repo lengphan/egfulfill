@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="eg-board-on">
 <head>
 <script>try{if(localStorage.getItem('eg_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
@@ -269,6 +269,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
 </style>
 <script src="eg-theme.js"></script>
+<link rel="stylesheet" href="eg-board.css">
 </head>
 <body>
 
@@ -921,5 +922,6 @@ window.addEventListener('storage', function(e){
 </script>
 <script src="nav-drag.js"></script>
   <script src="eg-cursor.js" defer></script>
+  <script src="eg-board.js" defer></script>
 </body>
 </html>

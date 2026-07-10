@@ -315,6 +315,8 @@ html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border
 html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:400!important}
 html.eg-board-on .pill-btn{font-family:var(--bos-sans)!important;font-weight:600!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
 html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:uppercase!important;letter-spacing:.06em!important;font-weight:600!important;font-size:11px!important}
+/* settings sub-nav a touch larger so it isn't smaller than the form labels */
+html.eg-board-on .stab{font-size:12.5px!important;letter-spacing:.04em!important}
 html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:0!important}
 html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble{box-shadow:none!important}
 html.eg-board-on .cat-row{font-family:var(--bos-sans)!important}
@@ -356,7 +358,7 @@ html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .b
 /* fields stay sharp but keep a READABLE sans face — mono was too hard to read for values/addresses/order details */
 html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1px solid #d0ccc4!important;background:#fff!important;color:var(--bos-ink)!important}
-html.eg-board-on label{font-family:var(--bos-sans)!important;letter-spacing:.01em!important}
+html.eg-board-on label{font-family:var(--bos-sans)!important;letter-spacing:0!important;text-transform:none!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
 html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
