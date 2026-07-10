@@ -343,6 +343,12 @@
         listing: title || autoTitle,
         name: title || autoTitle,
         product: (product && product.name) || '',
+        // Blank NAME + clean mockup image, so the order thumbnail resolves the blank
+        // background on first load + after every hydrate (_itemMockupURL keys off these,
+        // and deliberately ignores the listing `img`). This is what makes the mini-designer
+        // background persist instead of falling back to the "needs a design" placeholder.
+        blank: (product && product.name) || '',
+        blankImg: (product && (product.mockup || (product.colorImages && product.colorImages[color]) || product.img)) || '',
         color: color, size: size,
         sku: sku, tech: tech, qty: qty
       });

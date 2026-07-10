@@ -400,7 +400,7 @@ html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-w
 html[data-theme=dark].eg-board-on .dtable tr.exp-row > td > div:has([id^="item-wrap-"])::before{background:#3a3631}
 html.eg-board-on [id^="item-wrap-"]{position:relative;background:transparent!important;border:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important;margin:0!important;padding:16px 6px!important}
 html.eg-board-on [id^="item-wrap-"]:hover{box-shadow:none!important}
-html.eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
+/* seller item selection now reads from the dot turning cobalt (eg-design-tools .egdt-dot), not a row background — cleaner */
 /* factory (operator/warehouse/admin): .egdt-item-row sits in the detail <td>. Same hairline spine
    as the seller — x=17.5 (the row's padding-left 14 + dot-half puts every dot's centre there), so
    the line runs dead-straight through the dots. td padding-left forced to 0 so the geometry matches. */
@@ -421,7 +421,6 @@ html.eg-board-on .egdt-item-row{position:relative;background:transparent!importa
 html.eg-board-on .egdt-item-row:hover{box-shadow:none!important}
 html.eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(47,75,240,.06)!important}
 /* dark — checked-row faint light tint (spine removed) */
-html[data-theme=dark].eg-board-on [id^="item-wrap-"]:has(> input[type=checkbox]:checked),
 html[data-theme=dark].eg-board-on .egdt-item-row:has(> input[type=checkbox]:checked){background:rgba(201,195,186,.06)!important}
 /* NB: modal bold text is intentionally left in the readable sans face — mono values/amounts
    inside fields were hard to read. Mono stays as the accent on labels/eyebrows/nav/chrome. */

@@ -11,27 +11,23 @@
   try { if (matchMedia('(pointer:coarse)').matches) return; } catch (e) {}   // touch → keep native
 
   // Classic OS pointer (1 = fill; white outline auto-derived from the 8-neighbourhood).
-  // Vertical LEFT edge (col 0), a clean 45° head that ends in a one-pixel barb (the arrow
-  // point), then a solid 3px-thick tail-STEM running down-right — the standard, crisp,
-  // not-crooked arrow. Tip (hotspot) = 0,0. 10×15 → 20×30px (a touch smaller than before).
+  // Vertical LEFT edge, a clean 45° head, then a compact solid diagonal tail-stem down-right —
+  // the standard, crisp, not-crooked pointer. Tip (hotspot) = 0,0. 8×12 → 16×24px (compact).
   var A = [
-    [1,0,0,0,0,0,0,0,0,0],
-    [1,1,0,0,0,0,0,0,0,0],
-    [1,1,1,0,0,0,0,0,0,0],
-    [1,1,1,1,0,0,0,0,0,0],
-    [1,1,1,1,1,0,0,0,0,0],
-    [1,1,1,1,1,1,0,0,0,0],
-    [1,1,1,1,1,1,1,0,0,0],
-    [1,1,1,1,1,1,1,1,0,0],
-    [1,1,1,1,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1,1,1,1],
-    [1,1,1,1,1,1,1,0,0,0],
-    [1,1,1,0,0,1,1,1,0,0],
-    [1,1,0,0,0,0,1,1,1,0],
-    [1,0,0,0,0,0,0,1,1,1],
-    [0,0,0,0,0,0,0,0,1,1]
+    [1,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0],
+    [1,1,1,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0],
+    [1,1,1,1,1,0,0,0],
+    [1,1,1,1,1,1,0,0],
+    [1,1,1,1,1,1,1,0],
+    [1,1,1,1,1,0,0,0],
+    [1,1,1,0,1,1,0,0],
+    [1,1,0,0,0,1,1,0],
+    [1,0,0,0,0,0,1,1],
+    [0,0,0,0,0,0,0,1]
   ];
-  var H = A.length, W = A[0].length, S = 2;   // 10×15 bitmap → 20×30px, crisp
+  var H = A.length, W = A[0].length, S = 2;   // 8×12 bitmap → 16×24px, crisp
   function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
 
   var url;
