@@ -532,6 +532,78 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
+  // Address scan (staff): the definitive "are buyer shipping addresses coming through now?"
+  // test. Scans recent receipts (or one via ?id) and returns a plain VERDICT plus, per
+  // receipt, whether Etsy sent the shipping address — so you can tell at a glance whether
+  // ANY recent order has one. New receipts populate first once Commercial Access
+  // propagates, so legacy orders may stay redacted while fresh ones fill in. Uncached
+  // (etsyGet sends no-cache). Read-only, mutates nothing.
+  //   GET /api/etsy/address-scan            -> newest ~10 receipts
+  //   GET /api/etsy/address-scan?limit=25   -> newest 25 (capped at 100)
+  //   GET /api/etsy/address-scan?id=<rid>   -> just that one receipt (test a brand-new order)
+  app.get('/api/etsy/address-scan', { preHandler: requireStaff }, async (req, reply) => {
+    try {
+      const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+      // Etsy v3 carries the shipping address inline on the receipt object (no nested obj).
+      const ADDR_FIELDS = ['name', 'first_line', 'second_line', 'city', 'state', 'zip', 'country_iso', 'formatted_address'];
+      const pickAddr = (r) => {
+        const a = {};
+        for (const f of ADDR_FIELDS) a[f] = (r && r[f] != null && r[f] !== '') ? r[f] : null;
+        return a;
+      };
+      // Present = any street/name/city/zip field is populated (all address_r-gated fields).
+      const hasAddr = (a) => !!(a.name || a.first_line || a.city || a.zip || a.formatted_address);
+      const isoDate = (secs) => { try { return secs ? new Date(secs * 1000).toISOString() : null; } catch (e) { return null; } };
+
+      let receipts = [], total = null;
+      const wantId = String((req.query && req.query.id) || '').trim();
+      if (wantId) {
+        // .catch → a mistyped / not-yet-propagated id degrades to NO_RECEIPTS_FOUND, not a 400.
+        const one = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${wantId}?includes=Transactions`).catch(() => null);
+        receipts = one && one.receipt_id ? [one] : [];
+      } else {
+        let limit = parseInt((req.query && req.query.limit) || '10', 10);
+        if (!(limit > 0)) limit = 10;
+        if (limit > 100) limit = 100;
+        // Etsy returns receipts newest-first by default; sort desc client-side too so the
+        // newest is always on top regardless of Etsy's ordering.
+        const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=${limit}&offset=0&includes=Transactions`);
+        receipts = Array.isArray(r.results) ? r.results : [];
+        total = (typeof r.count === 'number') ? r.count : null;
+      }
+
+      const rows = receipts.filter(Boolean).map((r) => {
+        const a = pickAddr(r);
+        return {
+          receipt_id: r.receipt_id,
+          order_date: isoDate(r.created_timestamp || r.create_timestamp),
+          status: r.status,
+          buyer_email: (r.buyer_email != null && r.buyer_email !== '') ? r.buyer_email : null, // also address_r-gated — a second signal
+          address: a,
+          has_shipping_address: hasAddr(a)
+        };
+      }).sort((x, y) => String(y.order_date || '').localeCompare(String(x.order_date || '')));
+
+      const withAddr = rows.filter((x) => x.has_shipping_address).length;
+      const scopes = String(conn.scopes || '');
+      return {
+        verdict: rows.length === 0 ? 'NO_RECEIPTS_FOUND'
+          : withAddr > 0 ? `ADDRESS_PRESENT — ${withAddr}/${rows.length} scanned receipts have a shipping address`
+          : `REDACTED — 0/${rows.length} scanned receipts have a shipping address`,
+        note: 'Buyer shipping address on receipts is gated by Etsy Commercial Access (app tier), NOT by an OAuth scope. REDACTED across fresh receipts = the entitlement has not propagated on Etsy\'s side; there is nothing to fix in our code.',
+        address_r_in_scopes: /(^|\s)address_r(\s|$)/.test(scopes),
+        granted_scopes: conn.scopes || null,
+        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only',
+        shop_id: conn.shop_id,
+        total_receipts_in_shop: total,
+        scanned: rows.length,
+        with_address: withAddr,
+        receipts: rows
+      };
+    } catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
   // OAuth code → tokens. Called by oauth-callback.html after Etsy redirects back.
   // requireAuth (not staff): a SELLER connects their OWN shop here — connected_by is
   // set to the caller, so importReceipt routes their orders to them (factory_order=false).
