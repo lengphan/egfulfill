@@ -427,26 +427,34 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       </div>
     </div>
 
-    <!-- ③ Receipt wallet (balance · top-up/withdraw · ledger) + analytics stats -->
-    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px" class="fi">
-      <div id="receipt-wallet-mount" style="width:100%;max-width:400px;flex:0 0 auto"></div>
-      <div style="flex:1;min-width:250px;display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;align-content:start">
-      <div class="card" style="padding:18px 20px">
-        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Fulfillment Charges</div>
-        <div id="stat-spent" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">$6,284</div>
-        <div id="stat-spent-sub" style="font-size:12.5px;color:#16a34a;font-weight:600">↓ 4.2% vs last month</div>
-      </div>
-      <div class="card" style="padding:18px 20px">
-        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Total Deposited</div>
-        <div id="stat-dep" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">$5,444</div>
-        <div id="stat-dep-sub" style="font-size:12.5px;color:#9ca3af;font-weight:600">4 deposits this period</div>
-      </div>
-      <div class="card" style="padding:18px 20px">
-        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Orders Charged</div>
-        <div id="stat-orders" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">47</div>
-        <div id="stat-orders-sub" style="font-size:12.5px;color:#9ca3af;font-weight:600">$133.70 avg charge</div>
-      </div>
+    <!-- ③ Wallet tabs — Wallet (the receipt, dead-centre) · Transactions (stats + detailed table) -->
+    <div class="fi" style="display:flex;gap:2px;border-bottom:1.5px solid #e5e4e0;margin-bottom:0">
+      <button id="wtab-wallet" onclick="setWalletTab('wallet')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid #111827;margin-bottom:-1.5px;background:none;cursor:pointer;color:#191918;font-family:inherit;transition:color .15s">Wallet</button>
+      <button id="wtab-tx" onclick="setWalletTab('tx')" style="padding:11px 20px;font-size:14px;font-weight:600;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:inherit;transition:color .15s">Transactions</button>
     </div>
+    <!-- WALLET tab: the receipt sits DEAD-CENTRE on a beige stage so the torn-paper shape reads (paper ≈ page bg otherwise) -->
+    <div id="wpane-wallet" class="fi" style="background:#f4f2ef;background-image:radial-gradient(#dcd8d0 1.1px,transparent 1.1px);background-size:22px 22px;border:1.5px solid #e5e4e0;border-top:none;padding:48px 20px;display:flex;justify-content:center;margin-bottom:20px">
+      <div id="receipt-wallet-mount" style="width:100%;max-width:420px"></div>
+    </div>
+    <!-- TRANSACTIONS tab (hidden until selected): the stat cards + the detailed table (table is reparented here in JS) -->
+    <div id="wpane-tx" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0 16px">
+        <div class="card" style="padding:18px 20px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Fulfillment Charges</div>
+          <div id="stat-spent" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">$6,284</div>
+          <div id="stat-spent-sub" style="font-size:12.5px;color:#16a34a;font-weight:600">↓ 4.2% vs last month</div>
+        </div>
+        <div class="card" style="padding:18px 20px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Total Deposited</div>
+          <div id="stat-dep" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">$5,444</div>
+          <div id="stat-dep-sub" style="font-size:12.5px;color:#9ca3af;font-weight:600">4 deposits this period</div>
+        </div>
+        <div class="card" style="padding:18px 20px">
+          <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Orders Charged</div>
+          <div id="stat-orders" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">47</div>
+          <div id="stat-orders-sub" style="font-size:12.5px;color:#9ca3af;font-weight:600">$133.70 avg charge</div>
+        </div>
+      </div>
     </div>
 
     <!-- ④ Unfunded Orders — hidden until needed -->
@@ -645,8 +653,8 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       </div>
     </div>
 
-    <!-- ⑥ Transaction History -->
-    <div class="card fi" style="overflow:hidden;animation-delay:.18s">
+    <!-- ⑥ Transaction History (reparented into the Transactions tab at runtime) -->
+    <div id="tx-history-card" class="card fi" style="overflow:hidden;animation-delay:.18s">
       <div style="padding:14px 20px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div>
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:1px">Transaction History</div>
@@ -988,11 +996,24 @@ function syncReceipt() {
   });
   EGReceiptWallet.set('receipt-wallet-mount', { balance: bal, ledger: led });
 }
+// Wallet | Transactions tabs — the receipt is the centred hero (Wallet); the stat cards + detailed table live in Transactions.
+function setWalletTab(t) {
+  var isW = t === 'wallet';
+  var pw = document.getElementById('wpane-wallet'), pt = document.getElementById('wpane-tx');
+  if (pw) pw.style.display = isW ? 'flex' : 'none';
+  if (pt) pt.style.display = isW ? 'none' : 'block';
+  var bw = document.getElementById('wtab-wallet'), bt = document.getElementById('wtab-tx');
+  if (bw) { bw.style.color = isW ? '#191918' : '#6b7280'; bw.style.borderBottomColor = isW ? '#111827' : 'transparent'; }
+  if (bt) { bt.style.color = isW ? '#6b7280' : '#191918'; bt.style.borderBottomColor = isW ? 'transparent' : '#111827'; }
+}
 document.addEventListener('DOMContentLoaded', function () {
   if (window.EGReceiptWallet && document.getElementById('receipt-wallet-mount')) {
     EGReceiptWallet.render('receipt-wallet-mount', { mode: 'seller' });
     syncReceipt();
   }
+  // move the detailed Transaction History table into the Transactions tab pane
+  var txc = document.getElementById('tx-history-card'), pane = document.getElementById('wpane-tx');
+  if (txc && pane) pane.appendChild(txc);
 });
 
 /* ── Unfunded order selection ── */
