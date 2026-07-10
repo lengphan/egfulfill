@@ -139,6 +139,12 @@ html.eg-board-on header > span,html.eg-board-on header #page-title,html.eg-board
 /* Dashboards use NO serif — Fraunces is a marketing-page face. Flip any inline Fraunces (hero headings, KPI numerals) to Inter, EXCEPT the brand wordmark logo. */
 html.eg-board-on [style*="Fraunces"]{font-family:var(--bos-sans)!important;letter-spacing:-.015em!important}
 html.eg-board-on a[href="index.html"] [style*="Fraunces"],html.eg-board-on a[href="index.html"][style*="Fraunces"]{font-family:'Fraunces',Georgia,serif!important;letter-spacing:0!important}
+/* Shared board breadcrumb — matches product-detail's .pd-crumbs. High specificity + !important + CSS :hover so loose header-link theme rules can't override the colour or the cobalt hover. */
+html.eg-board-on header .eg-crumb,html.eg-board-on .eg-crumb{display:flex!important;align-items:center;gap:8px;font-family:var(--bos-mono)!important;font-size:11px!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.05em!important;flex-wrap:wrap}
+html.eg-board-on header .eg-crumb a,html.eg-board-on .eg-crumb a{color:#9ca3af!important;display:inline-flex!important;align-items:center;height:auto!important;text-decoration:none!important;border-bottom:1.5px solid transparent!important;transition:color .12s,border-color .12s!important}
+html.eg-board-on header .eg-crumb a:hover,html.eg-board-on .eg-crumb a:hover{color:var(--bos-violet)!important;border-bottom-color:var(--bos-violet)!important}
+html.eg-board-on header .eg-crumb .sep,html.eg-board-on .eg-crumb .sep{color:#9ca3af!important;opacity:.7;display:inline-flex;align-items:center}
+html.eg-board-on header .eg-crumb .cur,html.eg-board-on .eg-crumb .cur{color:var(--bos-ink)!important}
 /* hide the now-redundant mobile hamburger on desktop (rail is always visible) */
 @media(min-width:861px){ html.eg-board-on #mob-ham{display:none!important} }
 
