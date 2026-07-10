@@ -1183,7 +1183,7 @@ function renderOrders(ordersOverride) {
       // the design action buttons (Upload / Templates / Design Lab) from the
       // setup pills to reduce clutter.
       return `
-        <div id="item-wrap-${o.no}-${escSku}"${_itemComplete?' class="egdt-complete"':''} onclick="event.stopPropagation()" style="display:grid;grid-template-columns:8px 52px minmax(150px,220px) minmax(340px,1fr) auto 26px;gap:13px;align-items:center;padding:13px 8px;background:transparent;${needsSetup?'':'opacity:0.42;pointer-events:none'}">
+        <div id="item-wrap-${o.no}-${escSku}"${_itemComplete?' class="egdt-complete"':''} onclick="event.stopPropagation();if(!event.target.closest('select,button,input,a,option,.egdt-dot')){var _c=this.querySelector('.item-chk');if(_c){_c.checked=!_c.checked;updatePushBtn(${o.no});}}" style="display:grid;grid-template-columns:8px 52px minmax(150px,220px) minmax(340px,1fr) auto 26px;gap:13px;align-items:center;padding:13px 8px;background:transparent;cursor:${needsSetup?'pointer':'default'};${needsSetup?'':'opacity:0.42;pointer-events:none'}">
           <span class="egdt-dot"${needsSetup?` role="button" tabindex="0" title="Select this item — click the dot" onclick="event.stopPropagation();var c=this.parentNode.querySelector('.item-chk');if(c){c.checked=!c.checked;updatePushBtn(${o.no});}" onmouseover="this.style.transform='scale(1.4)'" onmouseout="this.style.transform=''" style="cursor:pointer"`:` aria-hidden="true"`}></span>
           <input type="checkbox" class="item-chk" data-order="${o.no}" data-sku="${item.sku}" data-dk="${itemDK(item)}" onchange="updatePushBtn(${o.no})" style="display:none">
           ${itemCompositeThumb(o, item, 52)}
