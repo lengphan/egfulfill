@@ -79,7 +79,8 @@ async function etsyGet(conn, path) {
   const token = await validToken(conn);
   await rateLimit();
   const res = await fetch(API + path, {
-    headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }
+    // Gunjan step 2: bypass any local/intermediary cache so we never read a stale redacted response.
+    headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data.error || ('Etsy API ' + res.status)) + ' @ ' + path);
@@ -91,7 +92,7 @@ async function etsyGet(conn, path) {
 async function etsyFetch(conn, path, opts = {}) {
   const token = await validToken(conn);
   await rateLimit();
-  const res = await fetch(API + path, { method: opts.method || 'GET', headers: Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token }, opts.headers || {}), body: opts.body });
+  const res = await fetch(API + path, { method: opts.method || 'GET', headers: Object.assign({ 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' }, opts.headers || {}), body: opts.body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(((data && (data.error || data.message)) || ('Etsy API ' + res.status)) + ' @ ' + path);
   return data;
@@ -469,8 +470,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     try {
       const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
       if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
-      const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
-      const rc = (r.results || [])[0] || {};
+      // Gunjan step 4: ?id=<receipt_id> targets a SPECIFIC (e.g. brand-new, post-approval)
+      // receipt to check whether the redaction is legacy-only; else audit the newest one.
+      const wantId = String((req.query && req.query.id) || '').trim();
+      let rc;
+      if (wantId) {
+        rc = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${wantId}?includes=Transactions`).catch((e) => ({ error: e.message }));
+      } else {
+        const r = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
+        rc = (r.results || [])[0] || {};
+      }
       // Compare with the SINGLE-receipt endpoint: if the list is shallow, this one
       // returns the full address (then the fix is to import from here). If BOTH are
       // null, Etsy is withholding the buyer address from this app (a permissions gate).
@@ -483,7 +492,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       try {
         if (rc.receipt_id) {
           const tok = await validToken(conn);
-          const res = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': KEYSTRING, Authorization: 'Bearer ' + tok } });
+          const res = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': KEYSTRING, Authorization: 'Bearer ' + tok, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } });
           keyOnly = await res.json().catch(() => ({}));
           if (!res.ok) keyOnly = { http: res.status, body: keyOnly };
         }
@@ -495,7 +504,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       try {
         if (rc.receipt_id) {
           const tok2 = await validToken(conn);
-          const res2 = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + tok2 } });
+          const res2 = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + tok2, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } });
           responseStatus = res2.status;
           res2.headers.forEach((v, k) => { responseHeaders[k] = v; });
           const b2 = await res2.json().catch(() => ({}));
