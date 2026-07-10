@@ -659,10 +659,9 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
       if(p.material) specs.push(p.material); else if(p.type) specs.push(p.type);
       if(p.method) specs.push(p.method);
       var szs=Array.isArray(p.sizes)&&p.sizes.length?(p.sizes.length>1?(p.sizes[0]+'–'+p.sizes[p.sizes.length-1]):p.sizes[0]):'';
-      var last=[szs, price!=='—'?('from $'+price):''].filter(Boolean).join(' · ');
-      if(last) specs.push(last);
+      if(szs) specs.push(szs);
       if(!specs.length && colors.length) specs.push(colors.length+' colour'+(colors.length>1?'s':''));
-      specs=specs.slice(0,3);
+      specs=specs.slice(0,2);
       var mono="ui-monospace,SFMono-Regular,Menlo,'Courier New',monospace";
       var card = document.createElement('div');
       card.className = 'product-card fade-up visible';
@@ -679,15 +678,16 @@ section .bg-white[class*="rounded"]{background:#fdfcfa!important;border:1.5px so
         '<div style="display:flex;align-items:center;gap:8px;border-bottom:1.5px solid #191918;padding:10px 14px">' +
           '<span style="width:11px;height:11px;background:'+dot+';flex-shrink:0"></span>' +
           '<span style="font-family:'+mono+';font-size:12.5px;font-weight:700;letter-spacing:.02em;color:#191918">'+code+'</span>' +
-          '<span style="margin-left:auto;font-family:'+mono+';font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1.5px solid #191918;padding:2px 7px;white-space:nowrap">'+esc2(cat)+'</span>' +
+          '<span style="margin-left:auto;font-family:'+mono+';font-size:12.5px;font-weight:700;letter-spacing:.01em;color:#191918;white-space:nowrap">'+(price!=='—'?('from $'+price):esc2(cat))+'</span>' +
         '</div>' +
         // horizontal body: content on the LEFT, blank/animation panel on the RIGHT (Tavus #5000 card)
-        '<div style="display:flex;align-items:stretch;flex:1;min-height:198px">' +
-          '<div style="flex:1;min-width:0;padding:16px 16px 16px 15px;display:flex;flex-direction:column;gap:11px">' +
-            '<h4 style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:21px;margin:0;letter-spacing:-.01em;color:#191918;line-height:1.1">'+esc2(name)+'</h4>' +
-            '<ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px">'+
+        '<div style="display:flex;align-items:stretch;flex:1;min-height:150px">' +
+          '<div style="flex:1;min-width:0;padding:14px 15px;display:flex;flex-direction:column;gap:9px">' +
+            '<h4 style="font-family:Fraunces,Georgia,serif;font-weight:600;font-size:19px;margin:0;letter-spacing:-.01em;color:#191918;line-height:1.12">'+esc2(name)+'</h4>' +
+            '<ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px">'+
               specs.map(function(x){return '<li style="font-size:12.5px;color:#40403d;display:flex;gap:8px;align-items:baseline"><span style="width:6px;height:6px;background:'+dot+';flex-shrink:0;transform:translateY(1px)"></span>'+esc2(x)+'</li>';}).join('')+
             '</ul>'+
+            (colors.length ? '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap" title="'+colors.length+' colour'+(colors.length>1?'s':'')+' available">'+colors.slice(0,8).map(liveColorDot).join('')+(colors.length>8?'<span style="font-size:11px;color:#9ca3af;font-family:'+mono+'">+'+(colors.length-8)+'</span>':'')+'</div>' : '')+
             '<button class="card-cta" onclick="window.location=\'product-detail-public.html?name=\'+encodeURIComponent(this.closest(\'.product-card\').dataset.name)" style="margin-top:auto;align-self:flex-start;font-family:'+mono+';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border:1.5px solid #191918;background:#fff;color:#191918;box-shadow:3px 3px 0 #191918;padding:8px 15px;cursor:pointer;border-radius:0">View product →</button>'+
           '</div>' +
           '<div style="width:44%;max-width:238px;flex-shrink:0;border-left:1.5px solid #191918;background:#f0ede6;overflow:hidden">'+imgHTML+'</div>' +
