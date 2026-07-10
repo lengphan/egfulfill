@@ -48,6 +48,11 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   var shopRet = qs.get('shop');   // Shopify's return carries shop (+ hmac); Etsy's carries neither
   var stateRet = qs.get('state');
   if (code) platform = appKey ? 'tiktok' : (shopRet ? 'shopify' : 'etsy'); // pick platform from the return shape
+  // A login token handed to us by the opener via the URL hash — survives www/non-www origin
+  // splits where localStorage/opener can't be read. Read once, then wipe it from the URL.
+  var HASH_TOKEN = '';
+  try { HASH_TOKEN = (new URLSearchParams((location.hash || '').replace(/^#/, ''))).get('egtok') || ''; } catch (e) {}
+  if (HASH_TOKEN) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
   var names = {
     shopify: 'Shopify', etsy: 'Etsy', tiktok: 'TikTok Shop', tiktokshop: 'TikTok Shop',
     woocommerce: 'WooCommerce', amazon: 'Amazon', ebay: 'eBay', bigcommerce: 'BigCommerce'
@@ -74,6 +79,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       // even if the returning popup's localStorage looks empty.
       var tok0 = '';
       try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) tok0 = HASH_TOKEN || '';
       if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
       var ch = await challenge(verifier);
       var redirect = cfg.redirect_uri || (location.origin + '/oauth-callback.html');
@@ -100,8 +106,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var tok = '';
       try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
       if (!tok) tok = saved.token || '';
+      if (!tok) tok = HASH_TOKEN || '';
       if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
-      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
+      if (!tok) { fail('You’re not signed in to EGFULFILL on this browser. Open egful.store, sign in, then click Connect again.'); return; }
       if (!saved.verifier) { fail('Lost the security key (PKCE verifier). Click Connect again from the start — don’t reload this window.'); return; }
       var res = await fetch('/api/etsy/exchange', {
         method: 'POST',
@@ -125,6 +132,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var st = randStr().slice(0,24);
       var tok0 = '';
       try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) tok0 = HASH_TOKEN || '';
       if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
       localStorage.setItem(TIKTOK_KEY, JSON.stringify({ state: st, token: tok0 }));
       // TikTok uses the callback URL registered in the Partner Center — we don't pass
@@ -144,8 +152,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var tok = '';
       try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
       if (!tok) tok = saved.token || '';
+      if (!tok) tok = HASH_TOKEN || '';
       if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
-      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
+      if (!tok) { fail('You’re not signed in to EGFULFILL on this browser. Open egful.store, sign in, then click Connect again.'); return; }
       var res = await fetch('/api/tiktok/exchange', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },
@@ -171,6 +180,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var st = randStr().slice(0,24);
       var tok0 = '';
       try { tok0 = localStorage.getItem('eg_token') || ''; } catch (e) {}
+      if (!tok0) tok0 = HASH_TOKEN || '';
       if (!tok0) { try { tok0 = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
       var redirect = (cfg.redirect_uri || (location.origin + '/oauth-callback.html')).replace('://www.', '://');
       localStorage.setItem(SHOPIFY_KEY, JSON.stringify({ state: st, token: tok0, shop: shop, redirect: redirect }));
@@ -189,8 +199,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
       var tok = '';
       try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
       if (!tok) tok = saved.token || '';
+      if (!tok) tok = HASH_TOKEN || '';
       if (!tok) { try { tok = (window.opener && window.opener.localStorage && window.opener.localStorage.getItem('eg_token')) || ''; } catch (e) {} }
-      if (!tok) { fail('You’re not signed in to EGFULFILL. Sign in, then click Connect again.'); return; }
+      if (!tok) { fail('You’re not signed in to EGFULFILL on this browser. Open egful.store, sign in, then click Connect again.'); return; }
       var res = await fetch('/api/shopify/exchange', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + tok },

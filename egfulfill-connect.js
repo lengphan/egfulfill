@@ -224,6 +224,10 @@
   function _openPopup(platform, extra) {
     var url = _OAUTH_URL(platform);
     if (extra && extra.shop) url += '&shop=' + encodeURIComponent(extra.shop);
+    // Hand the popup our login token directly via the URL hash (never sent to any server;
+    // cleared on arrival) so connect works even if the popup's origin (www vs non-www) differs
+    // from the app's and localStorage/opener can't be read. Fixes spurious "Not signed in".
+    try { var _t = localStorage.getItem('eg_token'); if (_t) url += (url.indexOf('#') < 0 ? '#' : '&') + 'egtok=' + encodeURIComponent(_t); } catch (e) {}
     // Size generously so the provider's consent/login page fits with NO manual resize
     // or scroll, but clamp to the available screen. Center on the ACTIVE monitor.
     var availW = (window.screen && window.screen.availWidth) || 1280;
