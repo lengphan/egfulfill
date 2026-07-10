@@ -10,31 +10,28 @@
   if (window.__egCursor) return; window.__egCursor = 1;
   try { if (matchMedia('(pointer:coarse)').matches) return; } catch (e) {}   // touch → keep native
 
-  // Classic pointer bitmap (1 = fill). White outline derived from the 8-neighbourhood.
-  // Straight vertical LEFT edge (col 0), a smooth 45° hypotenuse, and a tail that runs
-  // parallel to it — no zig-zag on the right edge (that read as "crooked"). Tip = 0,0.
-  // Classic OS arrow: vertical LEFT edge, clean 45° head, and a diagonal tail-STEM that runs
-  // straight out of the middle of the head (down-right, parallel to the head edge) — the standard,
-  // unmistakable, not-crooked pointer. Tip = 0,0.
+  // Classic OS pointer (1 = fill; white outline auto-derived from the 8-neighbourhood).
+  // Vertical LEFT edge (col 0), a clean 45° head that ends in a one-pixel barb (the arrow
+  // point), then a solid 3px-thick tail-STEM running down-right — the standard, crisp,
+  // not-crooked arrow. Tip (hotspot) = 0,0. 10×15 → 20×30px (a touch smaller than before).
   var A = [
-    [1,0,0,0,0,0,0,0,0,0,0],
-    [1,1,0,0,0,0,0,0,0,0,0],
-    [1,1,1,0,0,0,0,0,0,0,0],
-    [1,1,1,1,0,0,0,0,0,0,0],
-    [1,1,1,1,1,0,0,0,0,0,0],
-    [1,1,1,1,1,1,0,0,0,0,0],
-    [1,1,1,1,1,1,1,0,0,0,0],
-    [1,1,1,1,1,1,1,1,0,0,0],
-    [1,1,1,1,1,1,1,1,1,0,0],
-    [1,1,1,1,1,1,1,1,1,1,0],
-    [1,1,1,1,1,1,1,0,0,0,0],
-    [1,1,1,0,1,1,1,0,0,0,0],
-    [1,1,0,0,0,1,1,1,0,0,0],
-    [1,0,0,0,0,0,1,1,1,0,0],
-    [0,0,0,0,0,0,0,1,1,1,0],
-    [0,0,0,0,0,0,0,0,1,1,0]
+    [1,0,0,0,0,0,0,0,0,0],
+    [1,1,0,0,0,0,0,0,0,0],
+    [1,1,1,0,0,0,0,0,0,0],
+    [1,1,1,1,0,0,0,0,0,0],
+    [1,1,1,1,1,0,0,0,0,0],
+    [1,1,1,1,1,1,0,0,0,0],
+    [1,1,1,1,1,1,1,0,0,0],
+    [1,1,1,1,1,1,1,1,0,0],
+    [1,1,1,1,1,1,1,1,1,0],
+    [1,1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,0,0,0],
+    [1,1,1,0,0,1,1,1,0,0],
+    [1,1,0,0,0,0,1,1,1,0],
+    [1,0,0,0,0,0,0,1,1,1],
+    [0,0,0,0,0,0,0,0,1,1]
   ];
-  var H = A.length, W = A[0].length, S = 2;   // 11×16 bitmap → 22×32px, crisp
+  var H = A.length, W = A[0].length, S = 2;   // 10×15 bitmap → 20×30px, crisp
   function fa(x, y) { return y >= 0 && y < H && x >= 0 && x < W && A[y][x]; }
 
   var url;
