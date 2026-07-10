@@ -36,7 +36,7 @@ html:not([data-theme=dark]) .card{background:#fdfcfa!important;border:1px solid 
 .pd-link{font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--pd-violet);cursor:pointer;text-decoration:none;border-bottom:1.5px solid var(--pd-violet)}
 .pd-meta{font-family:var(--pd-mono);font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--pd-grey)}
 /* technique tabs — segmented, sharp, connected */
-.tech-tab{padding:9px 14px;border:1.5px solid var(--pd-ink);border-radius:0;font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;background:#eceae4;color:var(--pd-grey);transition:background .1s,color .1s,box-shadow .1s;text-align:center;white-space:nowrap;margin:0 -1.5px -1.5px 0}
+.tech-tab{padding:9px 14px;border:1.5px solid var(--pd-ink);border-radius:0;font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;background:#eceae4;color:var(--pd-grey);transition:background .1s,color .1s,box-shadow .1s;text-align:center;white-space:nowrap}
 .tech-tab.on{background:var(--pd-paper);color:var(--pd-ink);box-shadow:2px 2px 0 var(--pd-ink)}
 .tech-tab:not(.on):hover{color:var(--pd-ink)}
 /* size buttons — segmented selector */
@@ -77,8 +77,16 @@ html:not([data-theme=dark]) .card{background:#fdfcfa!important;border:1px solid 
 /* spec panels — title-bar hairline cards */
 .pd-panel{border:1.5px solid var(--pd-ink)!important;box-shadow:5px 5px 0 var(--pd-ink)!important;background:var(--pd-paper)!important;border-radius:0!important;padding:0!important;overflow:hidden}
 .pd-panel-hd{border-bottom:1.5px solid var(--pd-ink);padding:11px 18px;font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-ink);display:flex;align-items:center;gap:9px;background:var(--pd-indigo)}
-.pd-panel-hd .rl{flex:1;height:8px;background:repeating-linear-gradient(90deg,var(--pd-ink) 0,var(--pd-ink) 1.5px,transparent 1.5px,transparent 5px)}
+.pd-panel-hd .rl{flex:1;height:6px;opacity:.5;background:repeating-linear-gradient(90deg,var(--pd-ink) 0,var(--pd-ink) 1px,transparent 1px,transparent 12px)}
 .pd-panel-bd{padding:18px 20px;display:flex;flex-direction:column;gap:11px}
+/* S&S description: render as formatted HTML (sanitised in JS) — real lists/paragraphs, not raw tags */
+#pd-about{font-size:14px;color:#374151;line-height:1.6}
+#pd-about ul,#pd-about ol{margin:0 0 9px;padding-left:20px}
+#pd-about li{margin:2px 0}
+#pd-about p{margin:0 0 9px}
+#pd-about strong,#pd-about b{font-weight:700;color:var(--pd-ink)}
+#pd-about a{color:var(--pd-violet);text-decoration:underline}
+#pd-about > *:last-child{margin-bottom:0}
 .pd-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .pd-row .k{font-size:13px;color:var(--pd-grey);white-space:nowrap}
 .pd-row .v{font-size:13px;color:var(--pd-ink);font-weight:600;text-align:right}
@@ -138,7 +146,7 @@ html[data-theme=dark] .pd-cta.primary{background:var(--pd-violet);color:#fff}
 html[data-theme=dark] .pd-cta.ghost{background:#201e24;color:#e8e4dd}
 html[data-theme=dark] .pd-panel{border-color:#5a5660!important;box-shadow:5px 5px 0 #5a5660!important;background:#201e24!important}
 html[data-theme=dark] .pd-panel-hd{background:#232a4a;border-bottom-color:#5a5660;color:#e8e4dd}
-html[data-theme=dark] .pd-panel-hd .rl{background:repeating-linear-gradient(90deg,#8b867d 0,#8b867d 1.5px,transparent 1.5px,transparent 5px)}
+html[data-theme=dark] .pd-panel-hd .rl{background:repeating-linear-gradient(90deg,#8b867d 0,#8b867d 1px,transparent 1px,transparent 12px)}
 html[data-theme=dark] .pd-row .v{color:#e8e4dd}
 html[data-theme=dark] .pd-row-note strong{color:#e8e4dd}
 html[data-theme=dark] .pd-row-note{border-top-color:#403d48}
@@ -318,7 +326,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   </header>
 
   <!-- Page content -->
-  <div style="padding:24px 32px;max-width:1500px;margin:0 auto">
+  <div style="padding:24px 32px;max-width:1200px;margin:0 auto">
 
     <!-- Product layout -->
     <div class="pd-layout" style="display:flex;gap:36px;align-items:flex-start">
@@ -395,7 +403,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
               <span class="pd-label">Technique</span>
               <span class="pd-link" onclick="if(window.EGGuides)EGGuides.openFile()">File guidelines ↗</span>
             </div>
-            <div id="pd-techs" style="display:flex;flex-wrap:wrap"></div>
+            <div id="pd-techs" style="display:flex;flex-wrap:wrap;gap:7px"></div>
           </div>
 
           <!-- Color -->
@@ -451,7 +459,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <!-- About this product — operator-authored description -->
     <div id="pd-about-wrap" class="pd-panel" style="display:none;margin-top:36px">
       <div class="pd-panel-hd"><span>About this product</span><span class="rl"></span></div>
-      <div class="pd-panel-bd"><div id="pd-about" style="font-size:14px;color:#374151;line-height:1.6;white-space:pre-wrap"></div></div>
+      <div class="pd-panel-bd"><div id="pd-about"></div></div>
     </div>
 
     <!-- Product specs section -->
@@ -630,12 +638,32 @@ var _images = [];
 function init() {
   document.getElementById('pd-name').textContent = _prod.name;
   document.getElementById('pd-sub').textContent = _prod.sub;
+  // Sanitise + render the S&S description HTML (real lists/bold), instead of dumping raw tags as text.
+  function pdFormatDesc(raw){
+    raw = String(raw || '').trim(); if (!raw) return '';
+    if (!/<[a-z!\/]/i.test(raw)) return raw.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}).replace(/\n/g,'<br>');
+    var ALLOW={UL:1,OL:1,LI:1,P:1,STRONG:1,B:1,EM:1,I:1,BR:1,H3:1,H4:1,H5:1,SPAN:1,DIV:1,A:1};
+    var EMPTYABLE={P:1,STRONG:1,B:1,EM:1,I:1,SPAN:1,DIV:1,H3:1,H4:1,H5:1};
+    var tpl=document.createElement('template'); tpl.innerHTML=raw;
+    (function clean(node){
+      Array.prototype.slice.call(node.childNodes).forEach(function(n){
+        if (n.nodeType!==1) return;
+        var tag=n.tagName;
+        if (!ALLOW[tag]) { if (tag==='SCRIPT'||tag==='STYLE'){ n.remove(); return; } while (n.firstChild) node.insertBefore(n.firstChild,n); n.remove(); return; }
+        Array.prototype.slice.call(n.attributes).forEach(function(a){ if (!(tag==='A'&&a.name==='href'&&/^(https?:|\/)/i.test(a.value))) n.removeAttribute(a.name); });
+        if (tag==='A'){ n.setAttribute('target','_blank'); n.setAttribute('rel','noopener'); }
+        clean(n);
+        if (EMPTYABLE[tag] && !n.textContent.trim() && !n.querySelector('img')) n.remove();
+      });
+    })(tpl.content);
+    return tpl.innerHTML.trim();
+  }
   // About card visible only when the operator authored a description.
   var aboutWrap = document.getElementById('pd-about-wrap');
   var aboutBody = document.getElementById('pd-about');
   if (aboutWrap && aboutBody) {
     var desc = String(_prod.description || '').trim();
-    if (desc) { aboutBody.textContent = desc; aboutWrap.style.display = ''; }
+    if (desc) { aboutBody.innerHTML = pdFormatDesc(desc); aboutWrap.style.display = ''; }
     else      { aboutWrap.style.display = 'none'; }
   }
   var fromParam = parseFloat(_params.get('from'));

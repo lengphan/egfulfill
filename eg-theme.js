@@ -36,7 +36,7 @@
     "h1{font-family:'Fraunces',serif!important;font-optical-sizing:auto;letter-spacing:-.02em}",
     /* topbar page-title → Fraunces 18px/600, uniform across boards (was 16px on admin/warehouse via
        #page-title, 18px inline elsewhere, all Inter). Matches the 'Welcome back' greeting. */
-    "#page-title,header>div[style*='margin-right:auto']{font-family:'Fraunces',serif!important;font-optical-sizing:auto;font-size:18px!important;font-weight:600!important;letter-spacing:-.01em!important}",
+    "#page-title,header>div[style*='margin-right:auto']:not(:has(a)){font-family:'Fraunces',serif!important;font-optical-sizing:auto;font-size:18px!important;font-weight:600!important;letter-spacing:-.01em!important}",
     /* status pills read in monospace, like the login's labels/eyebrows */
     '.badge,.b-new,.b-queue,.b-prod,.b-qc,.b-packed,.b-shipped{font-family:' + MONO + '!important;letter-spacing:.04em}',
     /* table headers + filter buttons → monospace (Tavus table language) */
