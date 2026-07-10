@@ -5,16 +5,16 @@ import { q } from '../db.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
-// x-api-key for Etsy v3 data calls. The DOCUMENTED standard is the keystring ALONE — Etsy
-// reads it to identify the app and therefore which access tier / Commercial Access
-// entitlement applies. A non-standard "keystring:shared_secret" still authenticates, but can
-// make Etsy fail to match the app to its Commercial Access grant and REDACT buyer addresses
-// to null even when the grant exists. So we DEFAULT to keystring-alone; set
-// ETSY_API_KEY_MODE=combined to revert to the legacy combined form. .trim() guards .env whitespace.
-const API_KEY_MODE = (process.env.ETSY_API_KEY_MODE || 'keystring').trim().toLowerCase();
-const API_KEY_HEADER = (API_KEY_MODE === 'combined' && SHARED_SECRET)
-  ? (KEYSTRING + ':' + SHARED_SECRET)
-  : KEYSTRING;
+// x-api-key for Etsy v3 data calls. THIS app REQUIRES the combined "keystring:shared_secret"
+// form — Etsy rejects keystring-alone with "Shared secret is required in x-api-key header"
+// (confirmed live from the receipts endpoint, 2026-07). So combined is correct and MANDATORY,
+// which also proves it is NOT the cause of buyer-address redaction — that is Etsy's Commercial
+// Access entitlement, applied server-side, independent of this header. Default = combined; set
+// ETSY_API_KEY_MODE=keystring only to reproduce the 400. .trim() guards .env whitespace.
+const API_KEY_MODE = (process.env.ETSY_API_KEY_MODE || 'combined').trim().toLowerCase();
+const API_KEY_HEADER = (API_KEY_MODE === 'keystring' || !SHARED_SECRET)
+  ? KEYSTRING
+  : (KEYSTRING + ':' + SHARED_SECRET);
 // Force the canonical (non-www) host: the served config, the authorize redirect_uri,
 // and the browser's post-Caddy origin must all agree, or Etsy rejects the token
 // exchange with a redirect_uri mismatch. Normalizing here makes a stale www value in
