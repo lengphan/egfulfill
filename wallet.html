@@ -427,20 +427,10 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
       </div>
     </div>
 
-    <!-- ③ Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px" class="fi" style="animation-delay:.08s">
-      <div class="card" style="padding:18px 20px;border-color:#d8d4cd">
-        <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Current Balance</div>
-        <div id="wallet-bal-big" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:10px">$0.00</div>
-        <div style="display:flex;gap:6px">
-          <button onclick="openDepositModal()" style="flex:1;background:#191918;color:#fff;border:none;border-radius:0;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:opacity .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>Add funds
-          </button>
-          <button onclick="openWithdrawModal()" style="flex:1;background:#fff;color:#191918;border:1.5px solid #40403d;border-radius:0;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px;transition:background .12s" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='#fff'">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 9V1M1 5l4 4 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Withdraw
-          </button>
-        </div>
-      </div>
+    <!-- ③ Receipt wallet (balance · top-up/withdraw · ledger) + analytics stats -->
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin-bottom:20px" class="fi">
+      <div id="receipt-wallet-mount" style="width:100%;max-width:400px;flex:0 0 auto"></div>
+      <div style="flex:1;min-width:250px;display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;align-content:start">
       <div class="card" style="padding:18px 20px">
         <div style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Fulfillment Charges</div>
         <div id="stat-spent" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">$6,284</div>
@@ -456,6 +446,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
         <div id="stat-orders" style="font-size:2rem;font-weight:800;color:#191918;letter-spacing:-0.04rem;line-height:1;margin-bottom:5px">47</div>
         <div id="stat-orders-sub" style="font-size:12.5px;color:#9ca3af;font-weight:600">$133.70 avg charge</div>
       </div>
+    </div>
     </div>
 
     <!-- ④ Unfunded Orders — hidden until needed -->
@@ -972,12 +963,37 @@ async function hydrateWalletTx() {
         var big = document.getElementById('wallet-bal-big'); if (big) big.textContent = '$' + Number(wallet.balance).toFixed(2);
       } catch (e) {}
     }
+    try { if (typeof syncReceipt === 'function') syncReceipt(); } catch (e) {}
   } catch (e) {}
 }
 // Keep the seller's history responsive to admin confirm/reject: refresh every 15s while
 // the tab is visible, and immediately when it regains focus — no manual reload needed.
 setInterval(function () { if (!document.hidden) hydrateWalletTx(); }, 15000);
 window.addEventListener('focus', function () { hydrateWalletTx(); });
+
+/* ── Receipt wallet (eg-receipt-wallet.js): the wallet drawn as one torn paper receipt.
+   Same data as the table (eg_balance + TX); the +/- buttons open the existing VietQR
+   top-up / withdraw modals. Component loads deferred, so render on DOMContentLoaded. ── */
+function syncReceipt() {
+  if (!window.EGReceiptWallet) return;
+  var mount = document.getElementById('receipt-wallet-mount');
+  if (!mount || !mount.querySelector('.egrw-num')) return;   // not rendered yet
+  var bal = parseFloat(localStorage.getItem('eg_balance') || '0') || 0;
+  var led = (TX || []).map(function (t) {
+    var pos = t.type === 'deposit';
+    var cat = t.pending ? (pos ? 'TOP-UP' : 'PAYOUT')
+            : pos ? (/refund/i.test(t.desc) ? 'REFUND' : 'TOP-UP')
+            : (/withdraw/i.test(t.desc) ? 'PAYOUT' : 'CHARGE');
+    return { cat: cat, who: t.desc, sub: t.ref || t.date, amt: pos ? t.amount : -t.amount, pending: t.pending, rejected: t.rejected };
+  });
+  EGReceiptWallet.set('receipt-wallet-mount', { balance: bal, ledger: led });
+}
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.EGReceiptWallet && document.getElementById('receipt-wallet-mount')) {
+    EGReceiptWallet.render('receipt-wallet-mount', { mode: 'seller' });
+    syncReceipt();
+  }
+});
 
 /* ── Unfunded order selection ── */
 let pendingFundOrders = [];
@@ -1298,6 +1314,7 @@ document.addEventListener('click',function(){ document.querySelectorAll('.eg-sel
 (function(){ function init(){ document.querySelectorAll('select[data-eg-select]').forEach(egEnhanceSelect); } if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init); })();
 </script>
 <script src="egfulfill-store.js"></script>
+<script src="eg-receipt-wallet.js" defer></script>
 <script src="eg-addfunds.js"></script>
 <script src="eg-withdraw.js" defer></script>
 <script defer src="eg-seller-plan.js"></script>
