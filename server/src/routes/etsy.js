@@ -628,14 +628,21 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // The user id is the prefix of the access token: "<user_id>.<token>".
       const userId = String(t.access_token).split('.')[0];
       const tmp = { access_token: t.access_token, refresh_token: t.refresh_token, token_expires_at: expires };
-      // Find the shop owned by this user.
+      // Find the shop owned by the AUTHORIZED account. Authorizing != owning: OAuth grants access
+      // to whatever Etsy account was logged in (which may be a buyer account, or the wrong login),
+      // NOT proof of shop ownership. If Etsy returns no shop for this user, refuse the connect with
+      // a clear message rather than silently storing shop_id=user_id — that fallback 404s every
+      // later receipts call ("Could not find a shop for user …") and forces a manual repair.
       let shopId = '', shopName = '';
       try {
         const shops = await etsyGet(tmp, `/users/${userId}/shops`);
-        const shop = Array.isArray(shops?.results) ? shops.results[0] : shops;
-        shopId = String(shop?.shop_id || userId);
-        shopName = shop?.shop_name || ('Etsy shop ' + shopId);
-      } catch (e) { shopId = userId; shopName = 'Etsy shop ' + userId; }
+        const shop = shops && (shops.shop_id ? shops : (Array.isArray(shops.results) ? shops.results[0] : null));
+        if (shop && shop.shop_id) { shopId = String(shop.shop_id); shopName = shop.shop_name || ('Etsy shop ' + shopId); }
+      } catch (e) { /* fall through to the no-shop guard below */ }
+      if (!shopId) {
+        reply.code(400);
+        return { error: 'That Etsy account has no shop we can access — you likely authorized while logged in as the wrong Etsy account (a buyer account, or one that doesn’t own your shop). Log in to Etsy as the shop OWNER, then connect again.' };
+      }
 
       // NB: last_sync_at=null on reconnect → the next sync is a FULL pull, so a newly-granted scope
       // (e.g. address_r just approved by Etsy) BACKFILLS shipping addresses onto existing unshipped orders.
@@ -894,18 +901,27 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       } catch (e) { out.users_shops_error = e.message; }
     }
     if (shop && shop.shop_id) {
-      if (String(shop.shop_id) !== String(conn.shop_id)) {
+      const idChanged = String(shop.shop_id) !== String(conn.shop_id);
+      const nameChanged = shop.shop_name && shop.shop_name !== conn.shop_name;
+      if (idChanged || nameChanged) {
         await q('update platform_connections set shop_id=$1, shop_name=$2, updated_at=now() where id=$3',
           [String(shop.shop_id), shop.shop_name || conn.shop_name, conn.id]);
         conn.shop_id = String(shop.shop_id); conn.shop_name = shop.shop_name || conn.shop_name;
-        out.repaired = { new_shop_id: conn.shop_id, shop_name: conn.shop_name };
+        out.repaired = { new_shop_id: conn.shop_id, shop_name: conn.shop_name, id_changed: idChanged, name_changed: nameChanged };
       }
       // The definitive test: can THIS token read the shop's receipts? 200 = owner/authorized;
-      // 403 = the connected Etsy account does not own this shop (reconnect as the owner).
+      // "Could not find a shop for user…" / 403 = the connected Etsy account does NOT own this
+      // shop (the wrong account authorized) → reconnect as the shop owner.
       try {
         const rc = await etsyGet(conn, `/shops/${conn.shop_id}/receipts?limit=1&includes=Transactions`);
         out.receipts_access = { ok: true, count: (rc.results || []).length };
-      } catch (e) { out.receipts_access = { ok: false, error: e.message }; }
+      } catch (e) {
+        out.receipts_access = { ok: false, error: e.message };
+        if (/could not find a shop for user|not authorized|403/i.test(e.message || '')) {
+          out.diagnosis = `The connected Etsy account (user ${userId}) does NOT own shop ${conn.shop_id} (${conn.shop_name}). ` +
+            `Disconnect, log in to Etsy as the shop owner, then reconnect.`;
+        }
+      }
     }
     return out;
   });
