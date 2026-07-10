@@ -617,7 +617,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     );
     const items = [
       ['EMB-APRON-NVY', 'Personalized Embroidered Linen Apron', 1, 'Navy / Embroidery', 32.00, 'https://placehold.co/600x600/6b7a4f/ffffff?text=Apron+Listing', 'EMB', 'The Rivera Kitchen'],
-      ['TEE-WHT-L', 'Custom Print Cotton Tee', 2, 'White / L', 5.00, 'https://placehold.co/600x600/efefef/333333?text=Tee+Listing', 'DTG', null]
+      ['TEE-WHT-L', 'Custom Print Cotton Tee', 2, 'White / L', 5.00, 'https://placehold.co/600x600/efefef/333333?text=Tee+Listing', null, null]   // method UNSET → arrives "Select" (no auto-DTG), demoing the new variant policy
     ];
     for (const it of items) {
       await q(
