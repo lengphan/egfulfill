@@ -4,13 +4,17 @@
 import { q } from '../db.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
-// Etsy's x-api-key header for API data calls must be "keystring:shared_secret"
-// (the shared secret is NOT needed for the PKCE token exchange, only here).
-// .trim() so a trailing newline/space in .env can't corrupt the x-api-key and get the
-// request silently rejected (hygiene — it is NOT the cause of address redaction; that is
-// Etsy's server-side PII gate on the app tier, per the 2024-10-21 v3 3.0.0 policy).
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
-const API_KEY_HEADER = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
+// x-api-key for Etsy v3 data calls. The DOCUMENTED standard is the keystring ALONE — Etsy
+// reads it to identify the app and therefore which access tier / Commercial Access
+// entitlement applies. A non-standard "keystring:shared_secret" still authenticates, but can
+// make Etsy fail to match the app to its Commercial Access grant and REDACT buyer addresses
+// to null even when the grant exists. So we DEFAULT to keystring-alone; set
+// ETSY_API_KEY_MODE=combined to revert to the legacy combined form. .trim() guards .env whitespace.
+const API_KEY_MODE = (process.env.ETSY_API_KEY_MODE || 'keystring').trim().toLowerCase();
+const API_KEY_HEADER = (API_KEY_MODE === 'combined' && SHARED_SECRET)
+  ? (KEYSTRING + ':' + SHARED_SECRET)
+  : KEYSTRING;
 // Force the canonical (non-www) host: the served config, the authorize redirect_uri,
 // and the browser's post-Caddy origin must all agree, or Etsy rejects the token
 // exchange with a redirect_uri mismatch. Normalizing here makes a stale www value in
@@ -504,7 +508,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       try {
         if (rc.receipt_id) {
           const tok2 = await validToken(conn);
-          const res2 = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': API_KEY_HEADER, Authorization: 'Bearer ' + tok2, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } });
+          // Explicit COMBINED key here so this stays a genuine A/B vs address_keystring_only above,
+          // even though the app now DEFAULTS to keystring-alone.
+          const combinedKey = SHARED_SECRET ? (KEYSTRING + ':' + SHARED_SECRET) : KEYSTRING;
+          const res2 = await fetch(API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`, { headers: { 'x-api-key': combinedKey, Authorization: 'Bearer ' + tok2, 'Cache-Control': 'no-cache, no-store', Pragma: 'no-cache' } });
           responseStatus = res2.status;
           res2.headers.forEach((v, k) => { responseHeaders[k] = v; });
           const b2 = await res2.json().catch(() => ({}));
@@ -595,6 +602,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         address_r_in_scopes: /(^|\s)address_r(\s|$)/.test(scopes),
         granted_scopes: conn.scopes || null,
         apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:shared_secret' : 'keystring-only',
+        server_keystring: KEYSTRING ? (KEYSTRING.slice(0, 5) + '…' + KEYSTRING.slice(-4)) : '(unset)',
         shop_id: conn.shop_id,
         total_receipts_in_shop: total,
         scanned: rows.length,

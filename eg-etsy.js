@@ -96,14 +96,20 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; }
       if (!res.ok) { _egSyncDone(false, '<div style="text-align:center;color:#dc2626">' + ((res.d && res.d.error) || 'Unknown error') + '</div>'); return; }
       var rows = (res.d.synced || []).map(function (x) {
-        if (x.error) return '<div style="display:flex;justify-content:space-between;gap:10px"><span>' + (x.shop || x.shop_id) + '</span><span style="color:#dc2626">error</span></div>';
+        if (x.error) {
+          var em = String(x.error).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return '<div style="display:flex;justify-content:space-between;gap:10px"><span style="font-weight:600;color:#191918">' + (x.shop || x.shop_id) + '</span><span style="color:#dc2626;font-weight:700">error</span></div>'
+            + '<div style="font-size:12px;color:#dc2626;margin-top:2px;line-height:1.5;word-break:break-word">' + em + '</div>';
+        }
         var extra = [];
         if (x.skipped) extra.push(x.skipped + ' old skipped');
         if (x.purgedShipped) extra.push(x.purgedShipped + ' removed');
         return '<div style="display:flex;justify-content:space-between;gap:10px"><span style="font-weight:600;color:#191918">' + (x.shop || x.shop_id) + '</span><span style="color:#15803d;font-weight:700">' + x.orders + ' orders</span></div>' + (extra.length ? '<div style="font-size:12px;color:#9ca3af;margin-top:1px">' + extra.join(' · ') + '</div>' : '');
       }).join('');
       if (res.d.catalog_listings_purged) rows += '<div style="font-size:12px;color:#9ca3af;margin-top:8px;padding-top:8px;border-top:1px solid #f0ede9">Removed ' + res.d.catalog_listings_purged + ' Etsy listings from the catalog.</div>';
-      _egSyncDone(true, rows || '<div style="text-align:center;color:#9ca3af">Nothing to sync</div>');
+      // Don't call a run "complete" if a shop errored — reflect it in the title/icon.
+      var allOk = !(res.d.synced || []).some(function (x) { return x.error; });
+      _egSyncDone(allOk, rows || '<div style="text-align:center;color:#9ca3af">Nothing to sync</div>');
       egRefreshEtsy();
     }).catch(function (e) { if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; } _egSyncDone(false, '<div style="text-align:center;color:#dc2626">' + (e.message || 'Network error') + '</div>'); });
   };
