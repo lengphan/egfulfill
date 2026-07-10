@@ -498,7 +498,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         }
       } catch (e) { keyOnly = { error: e.message }; }
       // Capture the raw RESPONSE HEADERS + address from a CORRECTLY-authed single-receipt fetch
-      // (x-api-key = keystring:secret — the working auth). Etsy support asks for these headers +
+      // (x-api-key = keystring:shared_secret — the working auth). Etsy support asks for these headers +
       // a receipt id for a deeper audit after Commercial Access is applied to the keystring.
       let responseStatus = null, responseHeaders = {}, addrFromProbe = {};
       try {
@@ -516,7 +516,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
         sharedSecretSet: !!SHARED_SECRET,
-        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only',
+        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:shared_secret' : 'keystring-only',
         connScopes: conn.scopes,
         scopes: conn.scopes,
         receipt_id: rc.receipt_id,
@@ -594,7 +594,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         note: 'Buyer shipping address on receipts is gated by Etsy Commercial Access (app tier), NOT by an OAuth scope. REDACTED across fresh receipts = the entitlement has not propagated on Etsy\'s side; there is nothing to fix in our code.',
         address_r_in_scopes: /(^|\s)address_r(\s|$)/.test(scopes),
         granted_scopes: conn.scopes || null,
-        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only',
+        apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:shared_secret' : 'keystring-only',
         shop_id: conn.shop_id,
         total_receipts_in_shop: total,
         scanned: rows.length,
@@ -863,7 +863,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
     const userId = String(conn.access_token).split('.')[0];
     const out = { stored_shop_id: conn.shop_id, stored_shop_name: conn.shop_name, token_user_id: userId,
-                  apiKeyMode: API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:secret' : 'keystring-only' };
+                  apiKeyMode: API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:shared_secret' : 'keystring-only' };
     let shop = null;
     // 1) Preferred when a name is supplied: findShops by name. Public data, no owner
     //    requirement — reliably yields the numeric shop_id.
