@@ -191,11 +191,10 @@
       btn.onclick = function () { _requestCustomIntegration(); };
     } else {
       if (shopWrap) shopWrap.style.display = 'none';
-      btn.onclick = function () {
-        // TikTok's Seller Center SSO cookies break inside a popup (1042 "Ticket expired") — go full-page.
-        if (_currentPlatform === 'tiktok' || _currentPlatform === 'tiktokshop') _fullPageConnect(_currentPlatform);
-        else _openPopup(_currentPlatform);
-      };
+      // All OAuth platforms (incl. TikTok) connect via the popup. NB: TikTok's Seller Center SSO
+      // can throw 1042 "Ticket expired" in a popup if you're NOT already logged into Seller Center —
+      // log into seller-us.tiktok.com first, then Connect. (_fullPageConnect remains as a fallback.)
+      btn.onclick = function () { _openPopup(_currentPlatform); };
     }
     document.getElementById('eg-connect-ov').classList.add('on');
   }
