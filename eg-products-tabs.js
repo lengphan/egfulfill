@@ -66,8 +66,8 @@
       ".epx-card .cardfoot{margin-top:auto;padding-top:10px}" +
       ".epx-add{border:1.5px solid #191918;background:#fff;color:#191918;font-family:" + mono + ";font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:8px 11px;cursor:pointer;border-radius:0;transition:background .12s,color .12s;width:100%}" +
       ".epx-add:hover{background:#2f4bf0;color:#fff;border-color:#2f4bf0}" +
-      ".epx-card .img{position:relative;height:285px;background:#fff;border-bottom:1.5px solid #191918;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:16px}" +
-      ".epx-card .img>img{width:100%;height:100%;object-fit:contain;object-position:center}" +
+      ".epx-card .img{position:relative;height:285px;background:#fff;border-bottom:1.5px solid #191918;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:0}" +
+      ".epx-card .img>img{width:100%;height:100%;object-fit:cover;object-position:center}" +
       ".epx-card .img .ph svg{width:56px;height:56px;opacity:.6}" +
       /* heart */
       ".epx-heart{position:absolute;top:7px;right:7px;z-index:2;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.92);border:1.5px solid #e5e4e0;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:transform .12s,border-color .12s;backdrop-filter:blur(2px)}" +
