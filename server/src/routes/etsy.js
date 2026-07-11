@@ -504,7 +504,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       // Capture the raw RESPONSE HEADERS + address from a CORRECTLY-authed single-receipt fetch
       // (x-api-key = keystring:shared_secret — the working auth). Etsy support asks for these headers +
       // a receipt id for a deeper audit after Commercial Access is applied to the keystring.
-      let responseStatus = null, responseHeaders = {}, addrFromProbe = {};
+      let responseStatus = null, responseHeaders = {}, addrFromProbe = {}, fullBody = null;
       try {
         if (rc.receipt_id) {
           const tok2 = await validToken(conn);
@@ -515,6 +515,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
           responseStatus = res2.status;
           res2.headers.forEach((v, k) => { responseHeaders[k] = v; });
           const b2 = await res2.json().catch(() => ({}));
+          fullBody = b2;
           addrFromProbe = res2.ok
             ? { name: b2.name, first_line: b2.first_line, city: b2.city, state: b2.state, zip: b2.zip, formatted_address: b2.formatted_address }
             : { http: res2.status, body: b2 };
@@ -522,6 +523,20 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       } catch (e) { responseHeaders = { error: e.message }; }
       const addr = (x) => ({ name: x.name, first_line: x.first_line, city: x.city, state: x.state, zip: x.zip, formatted_address: x.formatted_address });
       return {
+        // Copy-paste-ready trace for Etsy support: the exact request we send + the exact
+        // response Etsy returns for this one receipt (keystring shown, secret+token redacted).
+        support_log: {
+          note: 'Paste this whole support_log block to Etsy — the recipient name populates while every address field is null in response.body.',
+          request: {
+            method: 'GET',
+            url: API + `/shops/${conn.shop_id}/receipts/${rc.receipt_id}`,
+            headers: {
+              'x-api-key': (KEYSTRING || '<keystring>') + ':<shared_secret redacted>',
+              authorization: 'Bearer <oauth access token redacted>'
+            }
+          },
+          response: { status: responseStatus, headers: responseHeaders, body: fullBody }
+        },
         sharedSecretSet: !!SHARED_SECRET,
         apiKeyMode: API_KEY_HEADER && API_KEY_HEADER.indexOf(':') >= 0 ? 'keystring:shared_secret' : 'keystring-only',
         connScopes: conn.scopes,
