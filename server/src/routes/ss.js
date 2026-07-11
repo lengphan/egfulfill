@@ -413,27 +413,34 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       try {
         const styles = await fetchStyles();
         const have = new Set(((await q('select style_id from ss_style_images where image is not null')).rows).map((r) => String(r.style_id)));
-        const todo = styles.map((s) => String(s.styleID)).filter((id) => !have.has(id));
-        _warm.total = todo.length;
-        const CONC = 8;
-        for (let i = 0; i < todo.length && _warm.running; i += CONC) {
-          await Promise.all(todo.slice(i, i + CONC).map(async (id) => {
-            try {
-              let image = ''; const colors = [], seen = new Set();
-              const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
-              if (pr.ok && Array.isArray(pr.data)) {
-                for (const p of pr.data) {
-                  if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
-                  const c = String(p.colorName || '').trim();
-                  if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+        const allIds = styles.map((s) => String(s.styleID));
+        _warm.total = allIds.length;
+        const CONC = 3;   // GENTLE: keep parallel S&S calls + DB inserts low so live browsing isn't starved
+        // Up to 3 passes — each re-queries what's STILL uncached, so styles that failed under load
+        // (S&S slow/rate-limited) get retried instead of left blank. Stops early when nothing remains.
+        for (let pass = 0; pass < 3 && _warm.running; pass++) {
+          const have = new Set(((await q('select style_id from ss_style_images where image is not null')).rows).map((r) => String(r.style_id)));
+          const todo = allIds.filter((id) => !have.has(id));
+          _warm.done = _warm.total - todo.length;
+          if (!todo.length) break;
+          for (let i = 0; i < todo.length && _warm.running; i += CONC) {
+            await Promise.all(todo.slice(i, i + CONC).map(async (id) => {
+              try {
+                let image = ''; const colors = [], seen = new Set();
+                const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName', 20000);
+                if (pr.ok && Array.isArray(pr.data)) {
+                  for (const p of pr.data) {
+                    if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
+                    const c = String(p.colorName || '').trim();
+                    if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+                  }
                 }
-              }
-              if (image) await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
-                                  on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]);
-            } catch (e) {}
-            _warm.done++;
-          }));
-          await new Promise((r) => setTimeout(r, 100));   // gentle pacing between waves
+                if (image) { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
+                                      on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); _warm.done++; }
+              } catch (e) {}
+            }));
+            await new Promise((r) => setTimeout(r, 300));   // gentle pacing between waves
+          }
         }
       } catch (e) { _warm.error = e.message; }
       finally { _warm.running = false; }
