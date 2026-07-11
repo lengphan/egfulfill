@@ -149,6 +149,15 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
        synced_at timestamptz default now()
      )`).catch(() => {});
 
+  // Resolved style thumbnails. styleImage is null on this account, so the New In grid resolves the
+  // first product's colorFrontImage per card — expensive live. Cache it here so the FIRST viewer
+  // resolves a style (one light S&S call) and everyone after is instant. Progressive speedup, no sync.
+  q(`create table if not exists ss_style_images (
+       style_id text primary key,
+       image text,
+       at timestamptz default now()
+     )`).catch(() => {});
+
   // Favorited S&S styles — the factory's shortlist, shared across staff (like the
   // backorder/PO queues). Keyed by S&S styleID so favoriting is idempotent.
   q(`create table if not exists ss_favorites (
@@ -289,6 +298,30 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  // ── Lightweight, DB-cached style THUMBNAIL — powers the New In grid ──────────
+  // vs /api/ss/style/:id (two S&S calls + full colors/sizes/description just for an image), this
+  // does ONE small products call (image fields only) and PERSISTS the result in ss_style_images.
+  // First viewer of a style pays one light call; everyone after (any user/session) reads the DB.
+  app.get('/api/ss/style-img/:id', { preHandler: requireStaff }, async (req, reply) => {
+    const id = String(req.params.id || '').trim();
+    if (!id) { reply.code(400); return { error: 'styleID required' }; }
+    try {
+      const hit = (await q('select image from ss_style_images where style_id=$1', [id])).rows[0];
+      if (hit && hit.image) return { styleID: id, image: hit.image };          // cached → instant, no S&S
+    } catch (e) {}
+    let image = '';
+    try {
+      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage');
+      if (pr.ok && Array.isArray(pr.data)) {
+        for (const p of pr.data) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) { image = im; break; } }
+      }
+    } catch (e) {}
+    // Only persist a real hit, so a transient failure retries next time instead of caching a blank.
+    if (image) { try { await q(`insert into ss_style_images (style_id, image, at) values ($1,$2,now())
+                                on conflict (style_id) do update set image=excluded.image, at=now()`, [id, image]); } catch (e) {} }
+    return { styleID: id, image };
   });
 
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────

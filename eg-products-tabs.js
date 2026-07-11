@@ -146,7 +146,7 @@
       if (_imgCache[sid] === '') continue;   // known-empty, don't refetch
       _imgActive++;
       (function (sid, wrap) {
-        fetch('/api/ss/style/' + encodeURIComponent(sid), { headers: hdr() })
+        fetch('/api/ss/style-img/' + encodeURIComponent(sid), { headers: hdr() })  // light, DB-cached image resolver
           .then(function (r) { return r.ok ? r.json() : null; })
           .then(function (d) {
             var url = (d && d.image) || '';
