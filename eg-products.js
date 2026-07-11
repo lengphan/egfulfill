@@ -313,6 +313,7 @@ function addVariantRow(color, size, stock) {
 var _npmVarPage = 1;
 const NPM_VAR_PER_PAGE = 6;
 function npmRenderVariantPage() {
+  npmUpdateBulkBtn();
   const rows = [...document.querySelectorAll('#npm-variants .npm-variant-row')];
   const pager = document.getElementById('npm-variants-pager');
   const total = rows.length;
@@ -357,38 +358,71 @@ window.EGDescToText = function (html) {
   return s.trim();
 };
 
+// Bulk-fill variants. A STOCK number fills EVERY existing variant ("make them all 1000" — the
+// S&S case where colours/sizes synced but stock is blank). COLORS/SIZES also generate any new
+// colour×size combos (carrying the stock). Both can happen at once.
 function npmBulkGenerate() {
   const split = v => String(v || '').split(/[,/|]/).map(x => x.trim()).filter(Boolean);
   const colors = split(document.getElementById('npm-bulk-colors')?.value);
   const sizes  = split(document.getElementById('npm-bulk-sizes')?.value);
   const stock  = (document.getElementById('npm-bulk-stock')?.value || '').trim();
-  if (!colors.length && !sizes.length) {
-    if (typeof opPushToast === 'function') opPushToast('Enter at least one color or size to generate');
-    return;
-  }
-  const existing = new Set();
-  const rows = [...document.querySelectorAll('#npm-variants .npm-variant-row')];
-  rows.forEach(r => {
+  const setStock = (r, val) => { const sf = r.querySelector('.npm-v-stock'); if (sf) { sf.value = val; return true; } return false; };
+  const clearInputs = () => ['npm-bulk-colors','npm-bulk-sizes','npm-bulk-stock'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+
+  // Index existing rows by colour|size (drop fully-empty rows). Pagination only toggles display,
+  // so ALL variant rows are in the DOM here — a bulk update covers every variant, not just the page.
+  const existing = new Map(), exColors = new Set(), exSizes = new Set();
+  [...document.querySelectorAll('#npm-variants .npm-variant-row')].forEach(r => {
     const c = (r.querySelector('.npm-v-color')?.value || '').trim();
     const s = (r.querySelector('.npm-v-sizes')?.value || '').trim();
     if (!c && !s) { r.remove(); return; }
-    existing.add(c.toLowerCase() + '|' + s.toLowerCase());
+    existing.set(c.toLowerCase() + '|' + s.toLowerCase(), r);
+    if (c) exColors.add(c.toLowerCase());
+    if (s) exSizes.add(s.toLowerCase());
   });
-  const colorList = colors.length ? colors : [''];
-  const sizeList  = sizes.length  ? sizes  : [''];
+
+  if (!stock && !colors.length && !sizes.length) {
+    if (typeof opPushToast === 'function') opPushToast('Enter a stock number to fill every variant — or colors/sizes to generate');
+    return;
+  }
+
+  // 1) A stock value fills EVERY existing variant.
+  let updated = 0;
+  if (stock) existing.forEach(r => { if (setStock(r, stock)) updated++; });
+
+  // 2) Generate genuinely-new colour×size combos. Guard against the size-mirror pre-fill adding a
+  //    colour-less duplicate of a size (or a size-less duplicate of a colour) that already exists.
   let added = 0;
-  colorList.forEach(c => sizeList.forEach(s => {
-    const key = c.toLowerCase() + '|' + s.toLowerCase();
-    if (existing.has(key)) return;
-    existing.add(key);
-    addVariantRow(c, s, stock);
-    added++;
-  }));
-  ['npm-bulk-colors','npm-bulk-sizes','npm-bulk-stock'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
-  _npmVarPage = 1;
+  if (colors.length || sizes.length) {
+    const colorList = colors.length ? colors : [''];
+    const sizeList  = sizes.length  ? sizes  : [''];
+    colorList.forEach(c => sizeList.forEach(s => {
+      const key = c.toLowerCase() + '|' + s.toLowerCase();
+      if (existing.has(key)) return;                             // already handled in (1)
+      if (c === '' && exSizes.has(s.toLowerCase())) return;      // size already exists under a real colour
+      if (s === '' && exColors.has(c.toLowerCase())) return;     // colour already exists under a real size
+      existing.set(key, addVariantRow(c, s, stock));
+      added++;
+    }));
+  }
+
+  clearInputs();
+  if (added) _npmVarPage = 1;
   npmRenderVariantPage();
   if (typeof npmRefreshSizeWarnings === 'function') npmRefreshSizeWarnings();
-  if (added && typeof opPushToast === 'function') opPushToast('Generated ' + added + ' variant' + (added>1?'s':''));
+  const parts = [];
+  if (added) parts.push('Generated ' + added);
+  if (updated) parts.push('Set stock on ' + updated);
+  if (parts.length && typeof opPushToast === 'function') opPushToast(parts.join(' · '));
+}
+
+// The bulk button reads "Update" once variants exist (it fills their stock), else "Generate".
+function npmUpdateBulkBtn() {
+  const btn = document.getElementById('npm-bulk-btn');
+  if (!btn) return;
+  const has = [...document.querySelectorAll('#npm-variants .npm-variant-row')].some(r =>
+    (r.querySelector('.npm-v-color')?.value || '').trim() || (r.querySelector('.npm-v-sizes')?.value || '').trim());
+  btn.textContent = has ? 'Update' : 'Generate';
 }
 
 const _NPM_COLOR_CODES = {

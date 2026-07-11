@@ -2392,7 +2392,7 @@ html[data-theme=dark] #new-menu-btn svg [stroke="white"],html[data-theme=dark] #
                 <input class="input" id="npm-bulk-colors" placeholder="Colors (e.g. White, Black, Navy)" style="font-size:13px" autocomplete="off" onfocus="npmBulkSuggest(this,'color')" onclick="npmBulkSuggest(this,'color')" oninput="npmBulkSuggest(this,'color')" onkeydown="npmSuggestKey(event, this, 'color')"/>
                 <input class="input" id="npm-bulk-sizes" placeholder="Sizes (e.g. S, M, L, XL)" style="font-size:13px" autocomplete="off" onfocus="npmBulkSuggest(this,'sizes')" onclick="npmBulkSuggest(this,'sizes')" oninput="npmBulkSuggest(this,'sizes')" onkeydown="npmSuggestKey(event, this, 'sizes')"/>
                 <input class="input" id="npm-bulk-stock" type="number" placeholder="Stock" style="font-size:13px"/>
-                <button type="button" class="btn btn-dk" style="font-size:12.5px;padding:6px 12px;white-space:nowrap" onclick="npmBulkGenerate()">Generate</button>
+                <button type="button" id="npm-bulk-btn" class="btn btn-dk" style="font-size:12.5px;padding:6px 12px;white-space:nowrap" onclick="npmBulkGenerate()">Generate</button>
               </div>
             </div>
             <div id="npm-variants" style="display:flex;flex-direction:column;gap:6px"></div>
