@@ -180,17 +180,41 @@
     return _imgIO;
   }
 
-  // Wire lazy image resolution for every card in `container` that lacks a usable
-  // styleImage (or already has one cached). Called after each renderList().
+  // Resolve a whole page's card images in ONE batch request (the server checks its cache in a
+  // single query + resolves the misses in parallel) — far faster than a round-trip per card, and
+  // client-cached hits apply instantly. Called after each renderList().
   function _observeCardImages(container) {
-    var io = _ensureImgIO();
+    var need = [];
     container.querySelectorAll('.epx-card .img[data-needs-img="1"]').forEach(function (wrap) {
-      var sid = wrap.getAttribute('data-sid');
-      if (sid && _imgCache[sid]) { _applyResolvedImg(wrap, _imgCache[sid]); return; }  // cache hit — no observe
-      if (sid && _imgCache[sid] === '') return;
-      if (io) io.observe(wrap);
-      else if (sid) { _imgQueue.push({ id: sid, wrap: wrap }); _imgPump(); }  // no IO support → resolve eagerly
+      var sid = wrap.getAttribute('data-sid'); if (!sid) return;
+      if (_imgCache[sid]) { _applyResolvedImg(wrap, _imgCache[sid]); if (_colorCache[sid]) _applyColors(sid, _colorCache[sid]); return; }
+      if (_imgCache[sid] === '') return;
+      need.push({ sid: sid, wrap: wrap });
     });
+    // Fill chips on any card whose colours are already cached (incl. fast-path image cards).
+    container.querySelectorAll('.epx-swatches[data-sw]').forEach(function (el) {
+      if (el.children.length) return;
+      var sid = el.getAttribute('data-sw'); if (sid && _colorCache[sid]) _applyColors(sid, _colorCache[sid]);
+    });
+    if (!need.length) return;
+    var CHUNK = 60;
+    for (var i = 0; i < need.length; i += CHUNK) {
+      (function (slice) {
+        var ids = slice.map(function (n) { return n.sid; }).join(',');
+        fetch('/api/ss/style-imgs?ids=' + encodeURIComponent(ids), { headers: hdr() })
+          .then(function (r) { return r.ok ? r.json() : {}; })
+          .then(function (map) {
+            map = map || {};
+            slice.forEach(function (n) {
+              var d = map[n.sid], url = (d && d.image) || '';
+              if (url) { _imgCache[n.sid] = url; _applyResolvedImg(n.wrap, url); }
+              if (d && d.colors) _applyColors(n.sid, d.colors);
+            });
+            _saveImgCache();
+          })
+          .catch(function () { /* transient — leave placeholders, retry on next render */ });
+      })(need.slice(i, i + CHUNK));
+    }
   }
 
   var _colorCache = {};  // sid -> [colour names], filled by the lazy style-img resolver

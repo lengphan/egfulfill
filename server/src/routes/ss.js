@@ -186,7 +186,8 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
   let _stylesCache = { at: 0, data: null };
   async function fetchStyles() {
     const now = Date.now();
-    if (_stylesCache.data && (now - _stylesCache.at) < 5 * 60 * 1000) return _stylesCache.data;
+    if (_stylesCache.data && (now - _stylesCache.at) < 30 * 60 * 1000) return _stylesCache.data;   // 30-min cache: the catalog list rarely changes
+    try {
     const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage');
     if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
     const mapped = r.data.map((s) => ({
@@ -202,6 +203,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     })).filter((s) => s.styleID);
     _stylesCache = { at: now, data: mapped };
     return mapped;
+    } catch (e) {
+      // S&S slow / rate-limited — serve the last-known list (stale) so New In doesn't break with
+      // "couldn't reach the S&S catalog". The stale timestamp stays, so the next call retries a pull.
+      if (_stylesCache.data) return _stylesCache.data;
+      throw e;
+    }
   }
 
   app.get('/api/ss/styles', { preHandler: requireStaff }, async (req, reply) => {
@@ -340,6 +347,44 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     if (image) { try { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
                                 on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); } catch (e) {} }
     return { styleID: id, image, colors };
+  });
+
+  // ── BATCH thumbnail resolver — resolve a whole page of styles in ONE request ──
+  // The client sends all the page's style IDs; we check the DB cache in a single query and resolve
+  // the misses IN PARALLEL (bounded), caching each. Far fewer round-trips than /style-img per card,
+  // so the first/cold page load is much faster. GET /api/ss/style-imgs?ids=123,456,789
+  app.get('/api/ss/style-imgs', { preHandler: requireStaff }, async (req, reply) => {
+    const raw = String((req.query && req.query.ids) || '').trim();
+    if (!raw) return {};
+    const ids = [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 120);
+    const out = {};
+    try {
+      const rows = (await q('select style_id, image, colors from ss_style_images where style_id = any($1)', [ids])).rows;
+      for (const r of rows) { if (r.image) out[String(r.style_id)] = { image: r.image, colors: r.colors || [] }; }
+    } catch (e) {}
+    const misses = ids.filter((id) => !out[id]);
+    const CONC = 10;   // parallel S&S calls per wave — well under the 150/sec limit
+    for (let i = 0; i < misses.length; i += CONC) {
+      await Promise.all(misses.slice(i, i + CONC).map(async (id) => {
+        let image = ''; const colors = [], seen = new Set();
+        try {
+          const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
+          if (pr.ok && Array.isArray(pr.data)) {
+            for (const p of pr.data) {
+              if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
+              const c = String(p.colorName || '').trim();
+              if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+            }
+          }
+        } catch (e) {}
+        if (image) {
+          out[id] = { image, colors };
+          try { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
+                         on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); } catch (e) {}
+        }
+      }));
+    }
+    return out;
   });
 
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────
