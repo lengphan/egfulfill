@@ -79,12 +79,18 @@ function haversineMi(lat1, lon1, lat2, lon2) {
 }
 
 // One authenticated GET to S&S. Returns { ok, status, data } (data parsed JSON or raw text).
-async function ssGet(path) {
+async function ssGet(path, timeoutMs) {
   const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
-  const r = await fetch(SS_BASE + path, { headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
-  const txt = await r.text();
-  let data; try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
-  return { ok: r.ok, status: r.status, data };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 15000);   // never hang a request on a slow S&S
+  try {
+    const r = await fetch(SS_BASE + path, { headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' }, signal: ctrl.signal });
+    const txt = await r.text();
+    let data; try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: null, error: e && e.message };   // timeout/network → caller falls back
+  } finally { clearTimeout(timer); }
 }
 
 // Map one S&S product row → our ss_products columns. `meta` = the style's metadata
@@ -158,6 +164,9 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
        at timestamptz default now()
      )`).catch(() => {});
   q(`alter table ss_style_images add column if not exists colors jsonb`).catch(() => {});
+  // Persisted copy of the live styles LIST, so a cold server / S&S outage still has a fallback
+  // (New In never dies with "couldn't reach the S&S catalog").
+  q(`create table if not exists ss_styles_cache (id int primary key, data jsonb, at timestamptz default now())`).catch(() => {});
 
   // Favorited S&S styles — the factory's shortlist, shared across staff (like the
   // backorder/PO queues). Keyed by S&S styleID so favoriting is idempotent.
@@ -188,7 +197,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const now = Date.now();
     if (_stylesCache.data && (now - _stylesCache.at) < 30 * 60 * 1000) return _stylesCache.data;   // 30-min cache: the catalog list rarely changes
     try {
-    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage');
+    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 30000);   // 30s — big list
     if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
     const mapped = r.data.map((s) => ({
       styleID: String(s.styleID),
@@ -202,11 +211,16 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       image: ssImg(s.styleImage)
     })).filter((s) => s.styleID);
     _stylesCache = { at: now, data: mapped };
+    q(`insert into ss_styles_cache (id, data, at) values (1,$1,now()) on conflict (id) do update set data=excluded.data, at=now()`, [JSON.stringify(mapped)]).catch(() => {});
     return mapped;
     } catch (e) {
-      // S&S slow / rate-limited — serve the last-known list (stale) so New In doesn't break with
-      // "couldn't reach the S&S catalog". The stale timestamp stays, so the next call retries a pull.
+      // S&S slow / rate-limited / timed out — serve the last-known list so New In never dies with
+      // "couldn't reach". Memory first, then the DB copy (survives restarts + prolonged S&S outages).
       if (_stylesCache.data) return _stylesCache.data;
+      try {
+        const row = (await q('select data from ss_styles_cache where id=1')).rows[0];
+        if (row && Array.isArray(row.data) && row.data.length) { _stylesCache = { at: 0, data: row.data }; return row.data; }
+      } catch (e2) {}
       throw e;
     }
   }
@@ -386,6 +400,52 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     }
     return out;
   });
+
+  // ── Catalog PRE-WARM — resolve EVERY style's thumbnail + colours into ss_style_images so New In
+  // loads from our DB instead of live S&S (near-instant, no per-browse S&S calls). Staff-triggered,
+  // runs in the BACKGROUND; poll /api/ss/warm/status. POST /api/ss/warm/stop to cancel.
+  let _warm = { running: false, total: 0, done: 0, startedAt: 0, error: null };
+  app.post('/api/ss/warm', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured' }; }
+    if (_warm.running) return { ok: true, already: true, running: true, done: _warm.done, total: _warm.total };
+    _warm = { running: true, total: 0, done: 0, startedAt: Date.now(), error: null };
+    (async () => {
+      try {
+        const styles = await fetchStyles();
+        const have = new Set(((await q('select style_id from ss_style_images where image is not null')).rows).map((r) => String(r.style_id)));
+        const todo = styles.map((s) => String(s.styleID)).filter((id) => !have.has(id));
+        _warm.total = todo.length;
+        const CONC = 8;
+        for (let i = 0; i < todo.length && _warm.running; i += CONC) {
+          await Promise.all(todo.slice(i, i + CONC).map(async (id) => {
+            try {
+              let image = ''; const colors = [], seen = new Set();
+              const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
+              if (pr.ok && Array.isArray(pr.data)) {
+                for (const p of pr.data) {
+                  if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
+                  const c = String(p.colorName || '').trim();
+                  if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+                }
+              }
+              if (image) await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
+                                  on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]);
+            } catch (e) {}
+            _warm.done++;
+          }));
+          await new Promise((r) => setTimeout(r, 100));   // gentle pacing between waves
+        }
+      } catch (e) { _warm.error = e.message; }
+      finally { _warm.running = false; }
+    })();
+    return { ok: true, started: true };
+  });
+  app.get('/api/ss/warm/status', { preHandler: requireStaff }, async () => {
+    let cached = 0;
+    try { cached = (await q('select count(*)::int n from ss_style_images where image is not null')).rows[0]?.n || 0; } catch (e) {}
+    return { running: _warm.running, total: _warm.total, done: _warm.done, error: _warm.error, cached };
+  });
+  app.post('/api/ss/warm/stop', { preHandler: requireStaff }, async () => { _warm.running = false; return { ok: true }; });
 
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────
   app.get('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
