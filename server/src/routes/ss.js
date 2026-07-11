@@ -34,13 +34,20 @@ function ssImg(u) {
 
 // S&S descriptions arrive as messy HTML (inline styles, nested spans). Strip that down to a
 // small semantic whitelist so OUR css controls the look on the product page.
+// S&S descriptions are HTML (<ul><li>…</li></ul>). The product modal edits the description in a
+// PLAIN textarea (and pdFormatDesc renders newlines), so return clean TEXT with "• " bullets —
+// raw <ul><li> tags were showing verbatim in the create-product textarea.
 function cleanDesc(html) {
   if (!html) return '';
   let s = String(html);
-  s = s.replace(/<\/?(?:span|font|div|o:p)[^>]*>/gi, '');                                   // unwrap span/font/div
-  s = s.replace(/\s(?:style|class|width|height|align|border|cellpadding|cellspacing|lang|dir)="[^"]*"/gi, '');
-  s = s.replace(/<(?!\/?(?:ul|ol|li|p|br|strong|b|em|i|h[3-6])\b)[^>]*>/gi, '');            // drop non-whitelisted tags, keep text
-  s = s.replace(/(?:<p>\s*<\/p>)+/gi, '').replace(/(?:<br\s*\/?>\s*){3,}/gi, '<br><br>');
+  s = s.replace(/<\s*li[^>]*>/gi, '\n• ').replace(/<\s*\/\s*li\s*>/gi, '');                 // <li> → "• " bullet
+  s = s.replace(/<\s*br\s*\/?\s*>/gi, '\n');                                                // <br> → newline
+  s = s.replace(/<\s*\/\s*(?:p|div|ul|ol|h[1-6]|tr)\s*>/gi, '\n');                          // block close → newline
+  s = s.replace(/<[^>]+>/g, '');                                                            // strip all remaining tags
+  s = s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+       .replace(/&quot;/gi, '"').replace(/&#0?39;/gi, "'").replace(/&apos;/gi, "'")
+       .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCharCode(+n); } catch (e) { return ''; } });
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n');   // tidy whitespace
   return s.trim();
 }
 

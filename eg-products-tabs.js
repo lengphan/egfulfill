@@ -360,7 +360,7 @@
   function _prefillFromStyle(d) {
     if (!d) return;
     _setVal('npm-name', d.title);
-    _setVal('npm-notes', d.description);
+    _setVal('npm-notes', (window.EGDescToText ? window.EGDescToText(d.description) : d.description));
     if (d.price != null && d.price !== '') _setVal('npm-price', d.price);
     var colors = Array.isArray(d.colors) ? d.colors.join(', ') : '';
     var sizes = Array.isArray(d.sizes) ? d.sizes.join(', ') : '';

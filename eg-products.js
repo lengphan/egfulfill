@@ -339,6 +339,24 @@ function npmAddVariantRowUI() {
   const c = row && row.querySelector('.npm-v-color'); if (c) c.focus();
 }
 
+// Descriptions are edited in a PLAIN textarea. S&S / legacy products stored HTML
+// (<ul><li>…</li></ul>), which showed as raw tags. Convert HTML → clean "• " bullet text
+// (idempotent: already-plain text passes through untouched). Mirrors server cleanDesc().
+window.EGDescToText = function (html) {
+  if (!html) return '';
+  var s = String(html);
+  if (!/<[a-z!\/]/i.test(s)) return s;                                  // already plain text
+  s = s.replace(/<\s*li[^>]*>/gi, '\n• ').replace(/<\s*\/\s*li\s*>/gi, '');
+  s = s.replace(/<\s*br\s*\/?\s*>/gi, '\n');
+  s = s.replace(/<\s*\/\s*(?:p|div|ul|ol|h[1-6]|tr)\s*>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, '');
+  s = s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+       .replace(/&quot;/gi, '"').replace(/&#0?39;/gi, "'").replace(/&apos;/gi, "'")
+       .replace(/&#(\d+);/g, function (_, n) { try { return String.fromCharCode(+n); } catch (e) { return ''; } });
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+};
+
 function npmBulkGenerate() {
   const split = v => String(v || '').split(/[,/|]/).map(x => x.trim()).filter(Boolean);
   const colors = split(document.getElementById('npm-bulk-colors')?.value);
@@ -774,7 +792,7 @@ function openProductCard(id) {
   document.getElementById('npm-dpi').value = '';
   // Load saved description (preferring p.description, falling back to p.notes
   // for any legacy products written before the rename).
-  document.getElementById('npm-notes').value = p.description || p.notes || '';
+  document.getElementById('npm-notes').value = EGDescToText(p.description || p.notes || '');
   ['npm-dtg','npm-dtf','npm-emb','npm-apl','npm-lsr'].forEach(id => { const el=document.getElementById(id); if(el) el.checked = false; });
   ['npm-dtg-price','npm-dtf-price','npm-emb-price','npm-apl-price','npm-lsr-price'].forEach(id => { const el=document.getElementById(id); if(el) el.value = ''; });
   const _mp = p.methodPrices && typeof p.methodPrices === 'object' ? p.methodPrices : null;
