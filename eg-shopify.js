@@ -29,7 +29,7 @@
       var names = conns.map(function (c) { return c.shop_name || c.shop_id; }).join(', ');
       sub.innerHTML = names + ' · <span style="color:#15803d">connected</span>';
       actions.innerHTML =
-        '<button onclick="egDisconnectShopify(\'' + conns[0].shop_id + '\')" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
+        '<button onclick="egDisconnectShopify()" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
     });
   };
 
@@ -38,9 +38,17 @@
     EGConnect.start('shopify', { onComplete: function (r) { if (r && r.ok) setTimeout(egRefreshShopify, 400); } });
   };
 
-  window.egDisconnectShopify = function (shopId) {
-    if (!confirm('Disconnect this Shopify store? Imported orders stay; future syncs stop.')) return;
-    api('/shopify/connections/' + encodeURIComponent(shopId), { method: 'DELETE' }).then(egRefreshShopify);
+  window.egDisconnectShopify = function () {
+    if (!confirm('Disconnect Shopify? Imported orders stay; future syncs stop.')) return;
+    try { if (window.EGConnect) EGConnect.disconnect('shopify'); } catch (e) {}
+    // Remove EVERY Shopify connection, not just conns[0] — re-connects can leave duplicate rows.
+    api('/shopify/connections').then(function (res) {
+      var conns = (res.ok && res.d) || [];
+      if (!conns.length) { egRefreshShopify(); return; }
+      Promise.all(conns.map(function (c) {
+        return api('/shopify/connections/' + encodeURIComponent(c.shop_id), { method: 'DELETE' });
+      })).then(egRefreshShopify, egRefreshShopify);
+    });
   };
 
   document.addEventListener('DOMContentLoaded', function () { setTimeout(egRefreshShopify, 700); });

@@ -30,7 +30,7 @@
       var names = conns.map(function (c) { return c.shop_name || c.shop_id; }).join(', ');
       sub.innerHTML = names + ' · <span style="color:#15803d">connected</span>';
       actions.innerHTML =
-        '<button onclick="egDisconnectTiktok(\'' + conns[0].shop_id + '\')" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
+        '<button onclick="egDisconnectTiktok()" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
     });
   };
 
@@ -39,9 +39,17 @@
     EGConnect.start('tiktok', { onComplete: function (r) { if (r && r.ok) setTimeout(egRefreshTiktok, 400); } });
   };
 
-  window.egDisconnectTiktok = function (shopId) {
-    if (!confirm('Disconnect this TikTok shop? Imported orders stay; future syncs stop.')) return;
-    api('/tiktok/connections/' + encodeURIComponent(shopId), { method: 'DELETE' }).then(egRefreshTiktok);
+  window.egDisconnectTiktok = function () {
+    if (!confirm('Disconnect TikTok? Imported orders stay; future syncs stop.')) return;
+    try { if (window.EGConnect) EGConnect.disconnect('tiktok'); } catch (e) {}
+    // Remove EVERY TikTok connection, not just conns[0] — re-connects can leave duplicate rows.
+    api('/tiktok/connections').then(function (res) {
+      var conns = (res.ok && res.d) || [];
+      if (!conns.length) { egRefreshTiktok(); return; }
+      Promise.all(conns.map(function (c) {
+        return api('/tiktok/connections/' + encodeURIComponent(c.shop_id), { method: 'DELETE' });
+      })).then(egRefreshTiktok, egRefreshTiktok);
+    });
   };
 
   document.addEventListener('DOMContentLoaded', function () { setTimeout(egRefreshTiktok, 650); });

@@ -31,7 +31,7 @@
       sub.innerHTML = names + ' · <span style="color:#15803d">' + last + '</span>';
       actions.innerHTML =
         '<button onclick="egSyncEtsy(this)" class="btn btn-dk" style="font-size:12px;padding:5px 12px">Sync now</button>'
-        + '<button onclick="egDisconnectEtsy(\'' + conns[0].shop_id + '\')" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
+        + '<button onclick="egDisconnectEtsy()" style="background:none;border:none;font-size:12px;font-weight:600;color:#6b7280;padding:5px 8px;cursor:pointer;font-family:inherit">Disconnect</button>';
     });
   };
 
@@ -114,9 +114,18 @@
     }).catch(function (e) { if (btn) { btn.disabled = false; btn.textContent = 'Sync now'; } _egSyncDone(false, '<div style="text-align:center;color:#dc2626">' + (e.message || 'Network error') + '</div>'); });
   };
 
-  window.egDisconnectEtsy = function (shopId) {
-    if (!confirm('Disconnect this Etsy shop? Imported orders stay; future syncs stop.')) return;
-    api('/etsy/connections/' + encodeURIComponent(shopId), { method: 'DELETE' }).then(egRefreshEtsy);
+  window.egDisconnectEtsy = function () {
+    if (!confirm('Disconnect Etsy? Imported orders stay; future syncs stop.')) return;
+    try { if (window.EGConnect) EGConnect.disconnect('etsy'); } catch (e) {}
+    // Remove EVERY Etsy connection, not just conns[0] — re-connects can leave duplicate rows
+    // (different shop_id). Deleting only the first left the rest, so the row kept showing connected.
+    api('/etsy/connections').then(function (res) {
+      var conns = (res.ok && res.d) || [];
+      if (!conns.length) { egRefreshEtsy(); return; }
+      Promise.all(conns.map(function (c) {
+        return api('/etsy/connections/' + encodeURIComponent(c.shop_id), { method: 'DELETE' });
+      })).then(egRefreshEtsy, egRefreshEtsy);
+    });
   };
 
   // Push tracking back to Etsy for an Etsy order. Customer-facing: confirms first
