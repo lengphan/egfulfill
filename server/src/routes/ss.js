@@ -157,6 +157,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
        image text,
        at timestamptz default now()
      )`).catch(() => {});
+  q(`alter table ss_style_images add column if not exists colors jsonb`).catch(() => {});
 
   // Favorited S&S styles — the factory's shortlist, shared across staff (like the
   // backorder/PO queues). Keyed by S&S styleID so favoriting is idempotent.
@@ -232,6 +233,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     try {
       const g = await q(`select style_id, min(brand) as brand, min(style_name) as title, min(category) as category,
                                 (array_agg(image) filter (where image is not null))[1] as image,
+                                array_agg(distinct color) filter (where color is not null) as colors,
                                 min(price) as price, count(*)::int as variants
                          from ss_products where style_id is not null group by style_id`);
       if (!g.rows.length) return { synced: false, total: 0, styles: [] };
@@ -240,6 +242,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       let list = g.rows.map((r) => ({
         styleID: String(r.style_id), brand: r.brand || '', title: r.title || ('Style ' + r.style_id),
         category: r.category || '', image: proxify(r.image), price: r.price != null ? Number(r.price) : null,
+        colors: Array.isArray(r.colors) ? r.colors : [],
         favorited: favs.has(String(r.style_id)),
       }));
       if (search) list = list.filter((s) => (s.title + ' ' + s.brand + ' ' + s.category).toLowerCase().includes(search));
@@ -308,20 +311,25 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const id = String(req.params.id || '').trim();
     if (!id) { reply.code(400); return { error: 'styleID required' }; }
     try {
-      const hit = (await q('select image from ss_style_images where style_id=$1', [id])).rows[0];
-      if (hit && hit.image) return { styleID: id, image: hit.image };          // cached → instant, no S&S
+      const hit = (await q('select image, colors from ss_style_images where style_id=$1', [id])).rows[0];
+      if (hit && hit.image) return { styleID: id, image: hit.image, colors: hit.colors || [] };   // cached → instant
     } catch (e) {}
     let image = '';
+    const colors = [], seen = new Set();
     try {
-      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage');
+      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
       if (pr.ok && Array.isArray(pr.data)) {
-        for (const p of pr.data) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) { image = im; break; } }
+        for (const p of pr.data) {
+          if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
+          const c = String(p.colorName || '').trim();
+          if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+        }
       }
     } catch (e) {}
     // Only persist a real hit, so a transient failure retries next time instead of caching a blank.
-    if (image) { try { await q(`insert into ss_style_images (style_id, image, at) values ($1,$2,now())
-                                on conflict (style_id) do update set image=excluded.image, at=now()`, [id, image]); } catch (e) {} }
-    return { styleID: id, image };
+    if (image) { try { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
+                                on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); } catch (e) {} }
+    return { styleID: id, image, colors };
   });
 
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────

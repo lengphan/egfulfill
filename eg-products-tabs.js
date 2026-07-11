@@ -153,6 +153,7 @@
             _imgCache[sid] = url;                       // cache result (even '' = tried)
             _saveImgCache();                            // persist so a refresh is instant
             if (url) _applyResolvedImg(wrap, url);
+            if (d && d.colors) _applyColors(sid, d.colors);   // fill the colour chips
           })
           .catch(function () { /* leave placeholder; don't cache so a later scroll can retry */ })
           .then(function () { _imgActive--; _imgPump(); });
@@ -192,6 +193,7 @@
     });
   }
 
+  var _colorCache = {};  // sid -> [colour names], filled by the lazy style-img resolver
   // Colour-name → hex for New In swatches (mirrors eg-products.js OP_COLOR_HEX).
   var _COLOR_HEX = {
     white:'#ffffff','off white':'#f6f5f2',natural:'#efe9dc',ivory:'#f4efe3',cream:'#f2ebd8',bone:'#eae4d6',
@@ -214,17 +216,30 @@
     for (var key in _COLOR_HEX) { if (k.indexOf(key) !== -1) return _COLOR_HEX[key]; }
     return '#c4c0b8';
   }
-  // New In styles sometimes carry a `colors` array; render up to 6 swatches when present.
-  function _swatchRow(s) {
-    var list = Array.isArray(s.colors) ? s.colors : [];
-    if (!list.length) return '';
+  function _swatchChips(list) {
+    list = Array.isArray(list) ? list : [];
     var seen = {}, out = [];
     for (var i = 0; i < list.length && out.length < 6; i++) {
       var nm = String(list[i] || '').trim(); if (!nm) continue;
       var lk = nm.toLowerCase(); if (seen[lk]) continue; seen[lk] = 1;
       out.push('<span class="sw" title="' + esc(nm) + '" style="background:' + _colorHex(nm) + '"></span>');
     }
-    return out.length ? '<div class="epx-swatches">' + out.join('') + '</div>' : '';
+    return out.join('');
+  }
+  // Always render the swatch CONTAINER (with a data-sw id) so colours resolved lazily by the
+  // style-img resolver can fill it — the live New In feed has no `colors` on each row. Cached
+  // colours (and any feed-provided ones) render instantly.
+  function _swatchRow(s) {
+    var colors = (Array.isArray(s.colors) && s.colors.length) ? s.colors : (_colorCache[String(s.styleID)] || []);
+    return '<div class="epx-swatches" data-sw="' + esc(s.styleID) + '">' + _swatchChips(colors) + '</div>';
+  }
+  function _applyColors(sid, colors) {
+    if (!Array.isArray(colors) || !colors.length) return;
+    _colorCache[String(sid)] = colors;
+    var chips = _swatchChips(colors); if (!chips) return;
+    document.querySelectorAll('.epx-swatches[data-sw="' + String(sid).replace(/["\\]/g, '') + '"]').forEach(function (el) {
+      if (!el.children.length) el.innerHTML = chips;
+    });
   }
 
   function cardHTML(s) {
