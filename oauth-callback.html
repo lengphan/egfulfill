@@ -41,13 +41,24 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
 <script>
 (function () {
   var qs = new URLSearchParams(location.search);
-  var platform = (qs.get('platform') || 'shopify').toLowerCase().replace(/[^a-z]/g, '');
+  var startPlatform = (qs.get('platform') || '').toLowerCase().replace(/[^a-z]/g, '');
   var force = qs.get('force'); // 'fail' to simulate decline; otherwise success
-  var code = qs.get('code');      // present when Etsy / TikTok / Shopify redirects back
-  var appKey = qs.get('app_key'); // TikTok's return carries app_key
-  var shopRet = qs.get('shop');   // Shopify's return carries shop (+ hmac); Etsy's carries neither
+  // Etsy/Shopify return the auth code as `code`; TikTok Shop returns it as `auth_code`. Accept either.
+  var code = qs.get('code');
+  var authCode = qs.get('auth_code');
+  var anyCode = authCode || code;
+  var shopRet = qs.get('shop');   // Shopify's return carries shop (+ hmac); Etsy/TikTok don't
   var stateRet = qs.get('state');
-  if (code) platform = appKey ? 'tiktok' : (shopRet ? 'shopify' : 'etsy'); // pick platform from the return shape
+  // Persist the platform at flow START so the RETURN leg (providers strip ?platform) routes
+  // correctly. TikTok appends NO app_key, so return-shape detection alone misroutes it to Etsy.
+  var PLAT_KEY = 'eg_oauth_platform';
+  if (startPlatform) { try { localStorage.setItem(PLAT_KEY, startPlatform); } catch (e) {} }
+  var platform = startPlatform;
+  if (!platform && anyCode) {
+    try { platform = localStorage.getItem(PLAT_KEY) || ''; } catch (e) {}
+    if (!platform) platform = shopRet ? 'shopify' : (authCode ? 'tiktok' : 'etsy'); // shape fallback
+  }
+  if (!platform) platform = 'shopify';
   // A login token handed to us by the opener via the URL hash — survives www/non-www origin
   // splits where localStorage/opener can't be read. Read once, then wipe it from the URL.
   var HASH_TOKEN = '';
@@ -219,9 +230,12 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
 
   function fail(reason){ finish(false, null, reason); }
 
-  if (code && appKey) { tiktokExchange(code, stateRet); }   // returning from TikTok
-  else if (code && shopRet) { shopifyExchange(code); }      // returning from Shopify
-  else if (code) { etsyExchange(code, stateRet); }          // returning from Etsy
+  if (anyCode) {                                            // RETURN leg — route by the platform we started
+    try { localStorage.removeItem(PLAT_KEY); } catch (e) {}
+    if (platform === 'tiktok' || platform === 'tiktokshop') { tiktokExchange(anyCode, stateRet); }
+    else if (platform === 'shopify' || shopRet) { shopifyExchange(anyCode); }
+    else { etsyExchange(anyCode, stateRet); }
+  }
   else if (platform === 'etsy') { etsyStart(); }            // starting the Etsy flow
   else if (platform === 'tiktok' || platform === 'tiktokshop') { tiktokStart(); } // starting TikTok
   else if (platform === 'shopify') { shopifyStart(); }      // starting Shopify (shop domain in ?shop=)

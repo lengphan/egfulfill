@@ -1,9 +1,9 @@
 // TikTok Shop integration — OAuth connect (mirrors the Etsy flow).
 // A SELLER connects their OWN TikTok shop; an ADMIN/staff connects the factory shop.
 // Auth model differs from Etsy: no PKCE. The app has a service_id; the seller
-// authorizes at services.tiktokshop.com, TikTok redirects back to our registered
-// callback with ?code=<auth_code>&app_key=…&state=…, and we exchange the code for
-// tokens at auth.tiktok-shops.com (app_key + app_secret required, NO signature).
+// authorizes at services.tiktokshop.com (US: services.us.tiktokshop.com), TikTok redirects
+// back to the callback registered in Partner Center as ?auth_code=<code>&state=… (NO app_key),
+// and we exchange the code at auth.tiktok-shops.com (app_key + app_secret required, NO signature).
 import { q } from '../db.js';
 
 const APP_KEY    = process.env.TIKTOK_APP_KEY || '';
@@ -17,9 +17,9 @@ const AUTHORIZE_URL = process.env.TIKTOK_AUTHORIZE_URL || 'https://services.tikt
 // TikTok wraps every response as { code, message, data, request_id }; code===0 = ok.
 async function ttTokenRequest(path, extraParams) {
   const params = new URLSearchParams({ app_key: APP_KEY, app_secret: APP_SECRET, ...extraParams });
-  const res = await fetch(`${AUTH_HOST}${path}?${params.toString()}`, {
-    headers: { 'Content-Type': 'application/json' }
-  });
+  // TikTok documents token/get + token/refresh as POST with all params in the query string
+  // (no JSON body). Sending GET has worked but is fragile if TikTok tightens method validation.
+  const res = await fetch(`${AUTH_HOST}${path}?${params.toString()}`, { method: 'POST' });
   const body = await res.json().catch(() => ({}));
   if (!res.ok || (body && body.code !== 0)) {
     throw new Error((body && body.message) || ('TikTok token error ' + res.status));
