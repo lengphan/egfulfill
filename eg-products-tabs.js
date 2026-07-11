@@ -42,7 +42,7 @@
       "#op-prod-cat,#op-prod-status{border:1.5px solid #191918!important;border-radius:0!important;background:#fff!important;font-family:" + mono + "!important;text-transform:uppercase;font-size:11px!important;letter-spacing:.04em;padding:7px 26px 7px 11px!important}" +
       /* Catalog grid: big image-on-top cards, 4 per row (3 / 2 on narrower).
          align-items:stretch so every card in a row fills to the tallest. */
-      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))!important;gap:18px!important;align-items:stretch!important}" +
+      "#op-prod-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))!important;gap:18px!important;align-items:stretch!important}" +
       "@media (max-width:1100px){#op-prod-grid{grid-template-columns:repeat(3,1fr)!important}}" +
       "@media (max-width:760px){#op-prod-grid{grid-template-columns:repeat(2,1fr)!important}}" +
       "#op-prod-grid>.card{height:100%}" +
@@ -53,7 +53,7 @@
       "#epx-search:focus{border-color:#2f4bf0;box-shadow:2px 2px 0 #2f4bf0}" +
       ".epx-status{font-family:" + mono + ";font-size:11px;color:#6b7280;white-space:nowrap}" +
       /* card grid — BIG cards, image on TOP (4 per row, ~18px gap) */
-      ".epx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}" +
+      ".epx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}" +
       "@media (max-width:1100px){.epx-grid{grid-template-columns:repeat(3,1fr)}}" +
       "@media (max-width:760px){.epx-grid{grid-template-columns:repeat(2,1fr)}}" +
       ".epx-card{display:flex;flex-direction:column;border:1.5px solid #191918;background:#fff;border-radius:0;overflow:hidden;transition:box-shadow .14s ease,transform .14s ease}" +

@@ -523,6 +523,7 @@ function npmCollectMethods() {
 }
 
 var _npmPriceTiers = [];
+var _npmLoading = false;  // true while a SAVED product loads → suppress size-mismatch warnings (don't nag on open)
 // Standard apparel size progression. "+ Add size" walks FORWARD from the
 // largest size already in the tiers — so S → M → L → XL → 2XL happens
 // automatically. If a row has an unrecognised/custom size, fall back to the
@@ -607,6 +608,7 @@ function npmRefreshSizeWarnings(){
   // Reverse direction (variant size not priced) runs first and unconditionally,
   // so it still shows even when there are no priced→variant mismatches below.
   npmRefreshVariantWarning();
+  if (_npmLoading) { document.querySelectorAll('#npm-price-tier-rows .npm-tier-warn').forEach(function(w){ w.remove(); }); return; }
   var sizes = _npmVariantSizes();
   if (!sizes.size) {
     document.querySelectorAll('#npm-price-tier-rows .npm-tier-warn').forEach(function(w){ w.remove(); });
@@ -640,6 +642,7 @@ function npmRefreshSizeWarnings(){
 function npmRefreshVariantWarning(){
   var el = document.getElementById('npm-variant-warning');
   if (!el) return;
+  if (_npmLoading) { el.style.display = 'none'; el.innerHTML = ''; return; }
   var priced = {};
   _npmPriceTiers.forEach(function(t){ var s = String(t.size||'').trim().toLowerCase(); if (s) priced[s] = 1; });
   var missing = [], seen = {};
@@ -862,12 +865,16 @@ function openProductCard(id) {
   } else {
     _npmPriceTiers = [{ size:'S', price: p.price || '', shipping: p.shippingFee != null ? p.shippingFee : '' }];
   }
+  // Suppress the size-mismatch warnings while LOADING a saved product — they should prompt during
+  // fresh creation / S&S import, not nag every time you open an existing (flat-priced) product.
+  _npmLoading = true;
   npmRenderPriceTiers();
   document.getElementById('npm-variants').innerHTML = '';
   if (Array.isArray(p.variantSkus) && p.variantSkus.length) {
     p.variantSkus.forEach(v => { if (v) addVariantRow(v.color || '', v.size || '', v.stock != null ? v.stock : ''); });
   } else { addVariantRow(); }
   _npmVarPage = 1; npmRenderVariantPage();
+  _npmLoading = false;
   npmSeedColorImages(p.colorImages, p.mainColor);
   _npmSideMockups = { front: p.mockup || '', back: '', left: '', right: '', sleeve: '' };
   if (p.sideMockups && typeof p.sideMockups === 'object') {
