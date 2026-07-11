@@ -217,7 +217,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       const g = await q(`select style_id, min(brand) as brand, min(style_name) as title, min(category) as category,
                                 (array_agg(image) filter (where image is not null))[1] as image,
                                 min(price) as price, count(*)::int as variants
-                         from ss_products group by style_id`);
+                         from ss_products where style_id is not null group by style_id`);
       if (!g.rows.length) return { synced: false, total: 0, styles: [] };
       let favs = new Set();
       try { const fr = await q('select style_id from ss_favorites'); favs = new Set(fr.rows.map((r) => String(r.style_id))); } catch (e) {}
@@ -349,9 +349,13 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
       let prods = [];
       try { const r = await ssGet('/products/?style=' + encodeURIComponent(sid) + '&fields=' + PRODUCT_FIELDS); if (r.ok && Array.isArray(r.data)) prods = r.data; } catch (e) {}
       fetched += prods.length;
-      const meta = styleMap[String(sid)];
+      // GUARANTEE style_id: we fetched /products/?style=<sid>, so every product here belongs to
+      // <sid>. Fall back to { styleID: sid } so a missing p.styleID / empty styleMap can never leave
+      // style_id null — null style_ids all collapse into ONE card via GROUP BY style_id in New In.
+      const meta = styleMap[String(sid)] || { styleID: sid };
       for (const raw of prods) {
         const p = mapProduct(raw, styleMap[String(raw.styleID)] || meta);
+        if (p.style_id == null) p.style_id = String(sid);
         if (!p.sku) continue;
         try {
           await q(
