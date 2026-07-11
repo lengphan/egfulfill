@@ -384,6 +384,14 @@
     // Build the variant rows from the bulk color/size fields (clears them afterward).
     if ((colors || sizes) && typeof window.npmBulkGenerate === 'function') { try { window.npmBulkGenerate(); } catch (e) {} }
     if (d.image && typeof window.npmPaSetImage === 'function') { try { window.npmPaSetImage(d.image); } catch (e) {} }
+    // Auto-fill the per-colour images (one photo per colour) + the other product photos (deduped),
+    // so the seller doesn't set them by hand. Drag-drop still overrides (same underlying state).
+    if (d.colorImages && Object.keys(d.colorImages).length && typeof window.npmSeedColorImages === 'function') {
+      try { window.npmSeedColorImages(d.colorImages); } catch (e) {}
+    }
+    if (Array.isArray(d.extraImages) && d.extraImages.length && typeof window.npmSeedExtras === 'function') {
+      try { window.npmSeedExtras(d.extraImages); } catch (e) {}
+    }
     if (typeof window.autoNpmSKU === 'function') { try { window.autoNpmSKU(); } catch (e) {} }
   }
 

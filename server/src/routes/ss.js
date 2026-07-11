@@ -263,13 +263,15 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     if (_hit && (Date.now() - _hit.at) < STYLE_TTL) return _hit.data;   // instant on repeat
     try {
       const pr = await ssGet('/products/?style=' + encodeURIComponent(id) +
-        '&fields=sku,colorName,sizeName,piecePrice,customerPrice,colorFrontImage,styleName,brandName');
+        '&fields=sku,colorName,sizeName,piecePrice,customerPrice,colorFrontImage,colorBackImage,colorSideImage,colorOnModelFrontImage,colorOnModelBackImage,styleName,brandName');
       if (!pr.ok || !Array.isArray(pr.data)) { reply.code(pr.status || 502); return { error: 'S&S style fetch failed (' + pr.status + ')' }; }
       const rows = pr.data;
 
       // Distinct colors + sizes, order-preserving (first-seen wins).
       const colors = [], sizes = [], cseen = new Set(), sseen = new Set();
       let price = null, brand = null, styleName = null, image = null;
+      // One front image per colour + all OTHER angle/model photos (deduped, never a colour's front).
+      const colorImages = {}, frontUrls = new Set(), extraSet = new Set();
       for (const p of rows) {
         const c = p.colorName; if (c && !cseen.has(c)) { cseen.add(c); colors.push(c); }
         const s = p.sizeName;  if (s && !sseen.has(s)) { sseen.add(s); sizes.push(s); }
@@ -277,7 +279,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
         if (cp != null && (price == null || cp < price)) price = cp;
         if (!brand && p.brandName) brand = p.brandName;
         if (!styleName && p.styleName) styleName = p.styleName;
-        if (!image) { const im = ssImg(p.colorFrontImage); if (im) image = im; }
+        const front = ssImg(p.colorFrontImage);
+        if (!image && front) image = front;
+        if (c && front && !colorImages[c]) { colorImages[c] = front; frontUrls.add(front); }
+        [p.colorBackImage, p.colorSideImage, p.colorOnModelFrontImage, p.colorOnModelBackImage].forEach((raw) => { const im = ssImg(raw); if (im) extraSet.add(im); });
       }
 
       // Style-level metadata (descriptive title + description); best-effort — some
@@ -297,7 +302,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
         }
       } catch (e) {}
 
-      const out = { styleID: id, title, brand: brand || null, description, image, price, colors, sizes };
+      // Proxy S&S CDN urls (blocked cross-origin for canvas) → same-origin, canvas-safe for the design maker.
+      const proxify = (u) => (!u ? null : (/^https:\/\/cdn\.ssactivewear\.com\//i.test(u) ? '/api/ss/img?u=' + encodeURIComponent(u) : u));
+      const colorImagesProx = {};
+      Object.keys(colorImages).forEach((k) => { const pu = proxify(colorImages[k]); if (pu) colorImagesProx[k] = pu; });
+      const extraImages = [...extraSet].filter((u) => !frontUrls.has(u)).slice(0, 24).map(proxify).filter(Boolean);
+      const out = { styleID: id, title, brand: brand || null, description, image: proxify(image), price, colors, sizes, colorImages: colorImagesProx, extraImages };
       _styleCache.set(id, { at: Date.now(), data: out });   // cache for repeat opens
       return out;
     } catch (e) { reply.code(e.status || 502); return { error: 'S&S fetch error: ' + e.message }; }
