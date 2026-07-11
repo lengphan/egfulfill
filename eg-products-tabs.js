@@ -283,7 +283,9 @@
   }
 
   // New In prefers the SYNCED catalog (one query, images already resolved → instant, no per-card
-  // /api/ss/style calls). Falls back to LIVE S&S (+ lazy image hydration) when nothing is synced yet.
+  // /api/ss/style calls). Falls back to LIVE S&S (+ lazy image hydration) when the synced catalog is
+  // empty OR sparse — a partial/test sync must NOT hide the full live browse.
+  var MIN_SYNCED = 24; // below this, the synced table is a partial/test sync → browse LIVE instead.
   function loadNewIn(search) {
     var body = $('epx-newin-body'); if (!body) return;
     var status = $('epx-status'); if (status) status.textContent = 'Loading catalog…';
@@ -291,12 +293,15 @@
     fetch('/api/ss/styles-synced?limit=60' + qs, { headers: hdr() })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        if (d && d.synced && d.styles && d.styles.length) {                       // synced catalog → instant
+        // Prefer the synced fast-path ONLY when it's a real catalog (>= MIN_SYNCED styles). A stray
+        // 1-style test sync must not win over the thousands in the live catalog — that was the
+        // "New In shows only one product" bug (the synced table hid the live browse).
+        if (d && d.synced && d.styles && d.styles.length && (d.total || 0) >= MIN_SYNCED) {         // synced catalog → instant
           if (status) status.textContent = (d.total != null ? d.total.toLocaleString() + ' in catalog' + (d.styles.length < d.total ? ' · showing ' + d.styles.length : '') : '') + ' · synced';
           renderList(body, d.styles, search ? 'No synced styles match “' + esc(search) + '”.' : 'No styles synced.');
           return;
         }
-        _loadNewInLive(search, body, status);                                     // not synced → live S&S
+        _loadNewInLive(search, body, status);                                     // sparse/none synced → full live S&S
       })
       .catch(function () { _loadNewInLive(search, body, status); });
   }
