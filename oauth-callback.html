@@ -241,6 +241,18 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
   else if (platform === 'shopify') { shopifyStart(); }      // starting Shopify (shop domain in ?shop=)
   else { setTimeout(function () { finish(force !== 'fail'); }, 1500); } // demo for other platforms
 
+  // Full-page (redirect) connect mode: no popup/opener to postMessage — we navigated the whole
+  // tab (needed for TikTok, whose SSO cookies break inside a popup). eg_oauth_return holds the
+  // app page to come back to. Returns true if it scheduled the return.
+  function _returnFullPage(success) {
+    var ret = '';
+    try { ret = localStorage.getItem('eg_oauth_return') || ''; } catch (e) {}
+    if (!ret) return false;
+    try { localStorage.removeItem('eg_oauth_return'); } catch (e) {}
+    setTimeout(function () { location.href = ret; }, success ? 1200 : 3500);
+    return true;
+  }
+
   function finish(success, shopLabel, reason) {
     var card = document.getElementById('card');
     if (success) {
@@ -254,6 +266,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
           { kind: 'eg-connect-result', ok: true, platform: platform, shop: shopName }, '*'
         );
       } catch (_) {}
+      if (_returnFullPage(true)) return;
       setTimeout(function () { window.close(); }, 1100);
     } else {
       card.innerHTML =
@@ -266,6 +279,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-w
           { kind: 'eg-connect-result', ok: false, platform: platform, reason: 'declined' }, '*'
         );
       } catch (_) {}
+      _returnFullPage(false);
     }
   }
 

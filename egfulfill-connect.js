@@ -191,7 +191,11 @@
       btn.onclick = function () { _requestCustomIntegration(); };
     } else {
       if (shopWrap) shopWrap.style.display = 'none';
-      btn.onclick = function () { _openPopup(_currentPlatform); };
+      btn.onclick = function () {
+        // TikTok's Seller Center SSO cookies break inside a popup (1042 "Ticket expired") — go full-page.
+        if (_currentPlatform === 'tiktok' || _currentPlatform === 'tiktokshop') _fullPageConnect(_currentPlatform);
+        else _openPopup(_currentPlatform);
+      };
     }
     document.getElementById('eg-connect-ov').classList.add('on');
   }
@@ -219,6 +223,19 @@
   function _OAUTH_URL(platform) {
     var origin = (location.origin || '').replace('://www.', '://');
     return origin + '/oauth-callback.html?platform=' + encodeURIComponent(platform);
+  }
+
+  // Full-page (top-level) connect — navigate the WHOLE tab to the callback instead of a popup.
+  // Required for TikTok: its Seller Center passport SSO cookies get partitioned/blocked inside a
+  // popup (error 1042 "Ticket expired"); a top-level navigation makes them first-party. On return,
+  // the callback redirects back to eg_oauth_return (set here) instead of postMessage-ing an opener.
+  function _fullPageConnect(platform, extra) {
+    var url = _OAUTH_URL(platform);
+    if (extra && extra.shop) url += '&shop=' + encodeURIComponent(extra.shop);
+    try { localStorage.setItem('eg_oauth_return', location.href); } catch (e) {}
+    try { var _t = localStorage.getItem('eg_token'); if (_t) url += (url.indexOf('#') < 0 ? '#' : '&') + 'egtok=' + encodeURIComponent(_t); } catch (e) {}
+    try { _close(); } catch (e) {}
+    window.location.href = url;
   }
 
   function _openPopup(platform, extra) {
