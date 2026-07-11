@@ -120,7 +120,7 @@
   var _imgIO = null;         // IntersectionObserver watching the .img containers
   var _imgQueue = [];        // pending styleIDs to resolve (each with its DOM node)
   var _imgActive = 0;        // in-flight fetch count
-  var IMG_MAX = 3;           // concurrent /api/ss/style/:id requests
+  var IMG_MAX = 8;           // concurrent style-img resolves (higher = faster first/cold load)
 
   function _applyResolvedImg(imgWrap, url) {
     if (!imgWrap || !url) return;
@@ -301,28 +301,31 @@
   // /api/ss/style calls). Falls back to LIVE S&S (+ lazy image hydration) when the synced catalog is
   // empty OR sparse — a partial/test sync must NOT hide the full live browse.
   var MIN_SYNCED = 24; // below this, the synced table is a partial/test sync → browse LIVE instead.
-  function loadNewIn(search) {
+  var _newinLimit = 60, _newinPage = 1, _newinTotal = 0, _newinSearch = '';
+  function loadNewIn(search, page) {
     var body = $('epx-newin-body'); if (!body) return;
+    if (search != null) _newinSearch = search;   // a new search resets to page 1 (page arg omitted)
+    _newinPage = page || 1;
     var status = $('epx-status'); if (status) status.textContent = 'Loading catalog…';
-    var qs = search ? '&search=' + encodeURIComponent(search) : '';
-    fetch('/api/ss/styles-synced?limit=60' + qs, { headers: hdr() })
+    var offset = (_newinPage - 1) * _newinLimit;
+    var qs = (_newinSearch ? '&search=' + encodeURIComponent(_newinSearch) : '') + '&offset=' + offset;
+    fetch('/api/ss/styles-synced?limit=' + _newinLimit + qs, { headers: hdr() })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
-        // Prefer the synced fast-path ONLY when it's a real catalog (>= MIN_SYNCED styles). A stray
-        // 1-style test sync must not win over the thousands in the live catalog — that was the
-        // "New In shows only one product" bug (the synced table hid the live browse).
         if (d && d.synced && d.styles && d.styles.length && (d.total || 0) >= MIN_SYNCED) {         // synced catalog → instant
-          if (status) status.textContent = (d.total != null ? d.total.toLocaleString() + ' in catalog' + (d.styles.length < d.total ? ' · showing ' + d.styles.length : '') : '') + ' · synced';
-          renderList(body, d.styles, search ? 'No synced styles match “' + esc(search) + '”.' : 'No styles synced.');
+          _newinTotal = d.total || d.styles.length;
+          if (status) status.textContent = _newinTotal.toLocaleString() + ' in catalog · synced';
+          renderList(body, d.styles, _newinSearch ? 'No synced styles match “' + esc(_newinSearch) + '”.' : 'No styles synced.');
+          _renderPagers(body);
           return;
         }
-        _loadNewInLive(search, body, status);                                     // sparse/none synced → full live S&S
+        _loadNewInLive(_newinSearch, body, status, offset);                       // sparse/none synced → full live S&S
       })
-      .catch(function () { _loadNewInLive(search, body, status); });
+      .catch(function () { _loadNewInLive(_newinSearch, body, status, offset); });
   }
-  function _loadNewInLive(search, body, status) {
+  function _loadNewInLive(search, body, status, offset) {
     if (status) status.textContent = 'Searching S&S…';
-    var url = '/api/ss/styles?limit=60' + (search ? '&search=' + encodeURIComponent(search) : '');
+    var url = '/api/ss/styles?limit=' + _newinLimit + '&offset=' + (offset || 0) + (search ? '&search=' + encodeURIComponent(search) : '');
     fetch(url, { headers: hdr() })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
@@ -332,10 +335,53 @@
           return;
         }
         var list = (res.d && res.d.styles) || [];
-        if (status) status.textContent = res.d.total != null ? (res.d.total.toLocaleString() + ' in catalog' + (list.length < res.d.total ? ' · showing ' + list.length : '')) : '';
+        _newinTotal = (res.d && res.d.total != null) ? res.d.total : list.length;
+        if (status) status.textContent = _newinTotal.toLocaleString() + ' in catalog';
         renderList(body, list, search ? 'No S&S styles match “' + esc(search) + '”.' : 'No styles returned from S&S.');
+        _renderPagers(body);
       })
       .catch(function () { body.innerHTML = '<div class="epx-muted">Couldn’t reach the S&S catalog.</div>'; if (status) status.textContent = ''; });
+  }
+  // ── Pagination (mono): the S&S catalog is thousands of styles; 60/page, top-right + bottom-centre. ──
+  function _pageCount() { return Math.max(1, Math.ceil((_newinTotal || 0) / _newinLimit)); }
+  function _pageNumbers(cur, pages) {
+    var out = [];
+    for (var i = 1; i <= pages; i++) {
+      if (i === 1 || i === pages || (i >= cur - 1 && i <= cur + 1)) out.push(i);
+      else if (out[out.length - 1] !== '…') out.push('…');
+    }
+    return out;
+  }
+  function _pagerHTML(pos) {
+    var pages = _pageCount(); if (pages <= 1) return '';
+    var cur = _newinPage;
+    var pbtn = function (label, page, disabled, active) {
+      return '<button type="button" ' + (disabled ? 'disabled ' : '') + 'onclick="EGProdTabs.gotoNewInPage(' + page + ')" '
+        + 'style="font-family:' + mono + ';font-size:11px;min-width:26px;height:26px;padding:0 7px;border:1px solid '
+        + (active ? '#191918' : '#e5e4e0') + ';background:' + (active ? '#191918' : '#fff') + ';color:' + (active ? '#fff' : '#374151')
+        + ';border-radius:6px;cursor:' + (disabled ? 'default' : 'pointer') + ';opacity:' + (disabled ? '.4' : '1') + '">' + label + '</button>';
+    };
+    var inner = pbtn('‹', cur - 1, cur <= 1, false);
+    _pageNumbers(cur, pages).forEach(function (n) {
+      inner += (n === '…') ? '<span style="font-family:' + mono + ';font-size:11px;color:#9ca3af;padding:0 3px">…</span>' : pbtn(String(n), n, false, n === cur);
+    });
+    inner += pbtn('›', cur + 1, cur >= pages, false);
+    return '<div class="epx-pager" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;'
+      + (pos === 'top' ? 'justify-content:flex-end;margin:0 0 14px' : 'justify-content:center;margin:20px 0 4px') + '">' + inner + '</div>';
+  }
+  function _renderPagers(body) {
+    var grid = body && body.querySelector('.epx-grid'); if (!grid) return;
+    var topHTML = _pagerHTML('top');
+    if (topHTML) { var t = document.createElement('div'); t.innerHTML = topHTML; grid.parentNode.insertBefore(t.firstChild, grid); }
+    var botHTML = _pagerHTML('bottom');
+    if (botHTML) { var b = document.createElement('div'); b.innerHTML = botHTML; grid.parentNode.insertBefore(b.firstChild, grid.nextSibling); }
+  }
+  function gotoNewInPage(page) {
+    var pages = _pageCount();
+    page = Math.max(1, Math.min(pages, page));
+    if (page === _newinPage) return;
+    loadNewIn(_newinSearch, page);
+    var body = $('epx-newin-body'); if (body && body.scrollIntoView) { try { body.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }
   }
 
   function loadFavs() {
@@ -513,7 +559,7 @@
     show('newin');
   }
 
-  window.EGProdTabs = { init: init, loadNewIn: loadNewIn, loadFavs: loadFavs, _reresolve: _reresolve };
+  window.EGProdTabs = { init: init, loadNewIn: loadNewIn, loadFavs: loadFavs, gotoNewInPage: gotoNewInPage, _reresolve: _reresolve };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 350); });
   else setTimeout(init, 350);
 })();
