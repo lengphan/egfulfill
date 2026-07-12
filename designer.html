@@ -1140,7 +1140,7 @@ function cardHTML(c) {
         <span style="margin-left:auto;font-size:11.5px;font-weight:600;color:${dueSoon?'#dc2626':'#9ca3af'}">${formatDue(c.due)}</span>
       </div>
       ${c.specs && c.specs['Print Size'] ? `<div style="font-size:14px;font-weight:700;color:#191918;line-height:1.3;margin-bottom:2px">${c.specs['Print Size']}</div>` : ''}
-      <div style="font-family:monospace;font-size:12.5px;font-weight:600;color:#374151;letter-spacing:.04em;margin-bottom:4px">${c.designId || c.title || ''}</div>
+      <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;font-weight:600;color:#374151;letter-spacing:.04em;margin-bottom:4px">${c.designId || c.title || ''}</div>
       <div style="font-size:11.5px;color:#9ca3af;margin-bottom:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.order}${c.product && c.product !== '—' ? ' · '+c.product : ''}</div>
 
       <div style="display:flex;align-items:center;justify-content:space-between">

@@ -1149,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="display:flex;gap:8px;margin-bottom:10px">
             <div style="position:relative;flex:1;min-width:0">
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%)" width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/><rect x="7" y="2" width="2" height="12" rx=".5" fill="#9ca3af" opacity=".4"/><rect x="11" y="4" width="4" height="8" rx=".5" stroke="#9ca3af" stroke-width="1.2"/></svg>
-              <input id="scan-input" class="input scan-input" placeholder="Scan barcode or type SKU…" style="padding-left:34px;font-family:monospace;border-width:1.5px;transition:border-color .15s,box-shadow .15s;width:100%" onkeydown="if(event.key==='Enter')doScan()" oninput="scanAutoCheck(this.value)"/>
+              <input id="scan-input" class="input scan-input" placeholder="Scan barcode or type SKU…" style="padding-left:34px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;border-width:1.5px;transition:border-color .15s,box-shadow .15s;width:100%" onkeydown="if(event.key==='Enter')doScan()" oninput="scanAutoCheck(this.value)"/>
             </div>
             <button id="scan-submit-btn" class="btn btn-green" style="flex-shrink:0" onclick="doScan()">＋ Scan In</button>
           </div>
@@ -1162,11 +1162,11 @@ document.addEventListener('DOMContentLoaded', function(){
         <div style="border-left:1px solid #f0ede9;padding-left:24px;min-width:0">
           <div style="font-size:12px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Recent scans</div>
           <div id="scan-log" style="display:flex;flex-direction:column;max-height:140px;overflow-y:auto">
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+24 units · 9:14 AM</span></div>
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">WHT-GLD-M</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8821 · 9:03 AM</span></div>
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+48 units · 8:50 AM</span></div>
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8819 · 8:42 AM</span></div>
-            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0"><span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−2 · #FF-8820 · 8:57 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+24 units · 9:14 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">WHT-GLD-M</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8821 · 9:03 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#16a34a;font-weight:600;white-space:nowrap">+48 units · 8:50 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">BLK-GLD-SM</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−1 · #FF-8819 · 8:42 AM</span></div>
+            <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">MUG-11OZ-W</span><span style="color:#dc2626;font-weight:600;white-space:nowrap">−2 · #FF-8820 · 8:57 AM</span></div>
           </div>
         </div>
       </div>
@@ -1224,7 +1224,7 @@ document.addEventListener('DOMContentLoaded', function(){
         <div>
           <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">SKU</label>
           <div style="display:flex;gap:8px">
-            <input class="input" id="new-sku-input" placeholder="Enter SKU or generate automatically" style="font-family:monospace"/>
+            <input class="input" id="new-sku-input" placeholder="Enter SKU or generate automatically" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif"/>
             <button class="btn btn-out" style="white-space:nowrap;font-size:13px" onclick="generateSKU()">Auto-Generate</button>
           </div>
           <div id="sku-preview" style="display:none;margin-top:6px;font-size:12.5px;color:#6b7280"></div>
@@ -1340,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', function(){
     <div class="modal" style="max-width:720px">
       <div style="padding:18px 22px;border-bottom:1px solid #e8e7e4;display:flex;align-items:center;justify-content:space-between">
         <div>
-          <div style="display:flex;align-items:center;gap:10px"><div id="ep-num" style="font-size:16px;font-weight:800;color:#191918;font-family:monospace">PO-0000</div><span id="ep-status-badge" class="badge"></span></div>
+          <div style="display:flex;align-items:center;gap:10px"><div id="ep-num" style="font-size:16px;font-weight:800;color:#191918;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">PO-0000</div><span id="ep-status-badge" class="badge"></span></div>
           <div id="ep-supplier-line" style="font-size:12.5px;color:#9ca3af;margin-top:2px">—</div>
         </div>
         <button onclick="closeEditPO()" style="background:none;border:none;cursor:pointer;font-size:21px;color:#9ca3af;line-height:1">×</button>
@@ -1553,7 +1553,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <span data-h="ne" style="position:absolute;right:-5px;top:-5px;width:10px;height:10px;background:#111827;cursor:nesw-resize;border-radius:2px"></span>
             <span data-h="sw" style="position:absolute;left:-5px;bottom:-5px;width:10px;height:10px;background:#111827;cursor:nesw-resize;border-radius:2px"></span>
             <span data-h="se" style="position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;background:#111827;cursor:nwse-resize;border-radius:2px"></span>
-            <div id="npm-pa-readout" style="position:absolute;bottom:4px;left:4px;font-size:11px;font-weight:600;color:#374151;font-family:'SF Mono',monospace;background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e4e0;white-space:nowrap"></div>
+            <div id="npm-pa-readout" style="position:absolute;bottom:4px;left:4px;font-size:11px;font-weight:600;color:#374151;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;background:#fff;padding:1px 6px;border-radius:4px;border:1px solid #e5e4e0;white-space:nowrap"></div>
           </div>
         </div>
         <!-- Hidden picker shared by the stage empty-state click + Replace button. -->
@@ -1581,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <input class="input" id="npm-name" placeholder="e.g. Gildan 5000 Tee" oninput="autoNpmSKU()"/></div>
             <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Style / SKU</label>
               <div style="display:flex;gap:6px">
-                <input class="input" id="npm-sku" placeholder="e.g. G5000" style="flex:1;font-family:monospace" oninput="npmSkuTouched=true;npmUpdateVariantSKUs()"/>
+                <input class="input" id="npm-sku" placeholder="e.g. G5000" style="flex:1;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif" oninput="npmSkuTouched=true;npmUpdateVariantSKUs()"/>
                 <button class="btn btn-out" style="white-space:nowrap;font-size:13px;padding:0 12px" onclick="autoNpmSKU(true)">Auto SKU</button>
               </div></div>
             <!-- Category + Status are product-wide; price & shipping moved into
@@ -1860,7 +1860,7 @@ document.addEventListener('DOMContentLoaded', function(){
           </div>
           <div id="sh-detail-content" style="display:none">
             <div style="padding:12px 16px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
-              <span id="sh-d-order" style="font-size:15px;font-weight:700;color:#191918;font-family:monospace">—</span>
+              <span id="sh-d-order" style="font-size:15px;font-weight:700;color:#191918;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">—</span>
               <span id="sh-d-status" class="badge b-shipped">Shipped</span>
             </div>
             <div style="padding:16px">
@@ -1876,11 +1876,11 @@ document.addEventListener('DOMContentLoaded', function(){
                 <div style="display:flex;justify-content:center;gap:1px;margin-bottom:6px;height:36px;align-items:flex-end">
                   <div style="width:2px;height:100%;background:#111827"></div><div style="width:1px;height:80%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:1px;height:60%;background:#111827"></div><div style="width:2px;height:100%;background:#111827"></div><div style="width:1px;height:90%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:2px;height:70%;background:#111827"></div><div style="width:1px;height:100%;background:#111827"></div><div style="width:2px;height:85%;background:#111827"></div><div style="width:3px;height:100%;background:#111827"></div><div style="width:1px;height:60%;background:#111827"></div><div style="width:2px;height:100%;background:#111827"></div><div style="width:3px;height:80%;background:#111827"></div><div style="width:1px;height:100%;background:#111827"></div>
                 </div>
-                <div id="sh-d-tracking" style="font-family:monospace;font-size:11.5px;font-weight:700;color:#374151;letter-spacing:.08em;word-break:break-all"></div>
+                <div id="sh-d-tracking" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11.5px;font-weight:700;color:#374151;letter-spacing:.08em;word-break:break-all"></div>
               </div>
               <div style="border:1px dashed #d1d5db;border-radius:6px;padding:8px 12px;margin-bottom:14px;background:#fafaf9">
                 <div style="font-size:9.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Ref · Order</div>
-                <div id="sh-d-ref" style="font-size:13px;font-weight:700;color:#111827;font-family:monospace"></div>
+                <div id="sh-d-ref" style="font-size:13px;font-weight:700;color:#111827;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif"></div>
               </div>
               <div style="margin-bottom:16px">
                 <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Ship To</div>
@@ -2080,47 +2080,47 @@ document.addEventListener('DOMContentLoaded', function(){
          panel below. ══════════════════════════════════════════════════════ -->
     <div id="seller-grid-view">
       <div class="sd-listhead" style="display:flex;align-items:center;gap:10px;padding:0 0 12px;margin-bottom:16px;border-bottom:1.5px solid #191918;max-width:1180px">
-        <div id="seller-count" style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.08em">Sellers · 3</div>
+        <div id="seller-count" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.08em">Sellers · 3</div>
       </div>
       <div id="seller-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:18px;max-width:1180px;align-items:start">
         <!-- Demo cards (replaced by loadRealSellers when the API responds). -->
         <div class="seller-card-item" id="sc-seller-a" onclick="openSellerDetail('seller-a',this)" style="padding:16px">
           <div style="display:flex;align-items:flex-start;gap:12px">
-            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Seller A Store</div>
               <div style="font-family:var(--bos-sans,Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sellera@store.com</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
-            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
-            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">3 users</span>
+            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Active</span>
+            <span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">3 users</span>
           </div>
         </div>
         <div class="seller-card-item" id="sc-seller-b" onclick="openSellerDetail('seller-b',this)" style="padding:16px">
           <div style="display:flex;align-items:flex-start;gap:12px">
-            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SB</div>
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SB</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Seller B Store</div>
               <div style="font-family:var(--bos-sans,Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">sellerb@shop.com</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
-            <span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Suspended</span>
-            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
+            <span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Suspended</span>
+            <span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
           </div>
         </div>
         <div class="seller-card-item" id="sc-my-store" onclick="openSellerDetail('my-store',this)" style="padding:16px">
           <div style="display:flex;align-items:flex-start;gap:12px">
-            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">MS</div>
+            <div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">MS</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">My Store</div>
               <div style="font-family:var(--bos-sans,Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">owner@egops.com</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">
-            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
-            <span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
+            <span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Active</span>
+            <span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">1 user</span>
           </div>
         </div>
       </div>
@@ -2130,7 +2130,7 @@ document.addEventListener('DOMContentLoaded', function(){
          to replace the grid. "← Back to sellers" returns to the grid. All
          existing detail markup/ids/handlers are REUSED unchanged. ═════════ -->
     <div id="seller-detail-view" style="display:none;max-width:1180px">
-      <button onclick="backToSellers()" style="display:inline-flex;align-items:center;gap:7px;margin-bottom:16px;background:none;border:none;padding:6px 2px;cursor:pointer;font-family:var(--bos-mono,ui-monospace,monospace);font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em" onmouseover="this.style.opacity='.6'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Back to sellers</button>
+      <button onclick="backToSellers()" style="display:inline-flex;align-items:center;gap:7px;margin-bottom:16px;background:none;border:none;padding:6px 2px;cursor:pointer;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em" onmouseover="this.style.opacity='.6'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Back to sellers</button>
       <!-- Detail. Identity band + tabs share a single sticker-shadow
            card; the dark #191918 header sits flush against the tabs strip
            so the whole header reads as one unit. -->
@@ -2139,17 +2139,17 @@ document.addEventListener('DOMContentLoaded', function(){
           <!-- Dark identity band -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
             <div style="display:flex;align-items:center;gap:13px;min-width:0">
-              <div id="seller-detail-avatar" style="width:46px;height:46px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
+              <div id="seller-detail-avatar" style="width:46px;height:46px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">SA</div>
               <div style="min-width:0">
                 <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
                   <div id="seller-detail-name" style="font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:600;color:#fdfcfa;letter-spacing:0">Seller A Store</div>
-                  <span id="seller-detail-status" class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#f3eee2;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>
+                  <span id="seller-detail-status" class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#f3eee2;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Active</span>
                 </div>
                 <div id="seller-detail-email" style="font-family:var(--bos-sans,Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif);font-size:11px;color:#a8a39c;margin-top:3px;letter-spacing:.02em">sellera@store.com · Joined Jan 2025</div>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-              <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#fdfcfa;color:#191918;border:1.5px solid #fdfcfa;font-size:11px;font-weight:400;padding:6px 15px;border-radius:0;cursor:pointer;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
+              <button id="seller-toggle-btn" onclick="toggleSellerStatus()" style="background:#fdfcfa;color:#191918;border:1.5px solid #fdfcfa;font-size:11px;font-weight:400;padding:6px 15px;border-radius:0;cursor:pointer;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.05em;transition:opacity .12s,background .12s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Suspend</button>
             </div>
           </div>
           <!-- Tabs row, attached directly under the dark band. Three zones:
@@ -2158,9 +2158,9 @@ document.addEventListener('DOMContentLoaded', function(){
                buttons show depends on the active tab — see setSellerTab. -->
           <div class="sd-tabstrip" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px;border-bottom:1.5px solid #191918">
             <div style="display:flex;gap:0">
-              <button id="stab-balance" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid #111827;margin-bottom:-1.5px;background:none;cursor:pointer;color:#191918;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
-              <button id="stab-team" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('team',this)">Team &amp; Permissions</button>
-              <button id="stab-api" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:var(--bos-mono,ui-monospace,monospace);text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('api',this)">API &amp; Sync</button>
+              <button id="stab-balance" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid #111827;margin-bottom:-1.5px;background:none;cursor:pointer;color:#191918;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('balance',this)">Balance</button>
+              <button id="stab-team" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('team',this)">Team &amp; Permissions</button>
+              <button id="stab-api" style="padding:11px 15px;font-size:11.5px;font-weight:400;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;background:none;cursor:pointer;color:#6b7280;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.05em;transition:color .15s" onclick="setSellerTab('api',this)">API &amp; Sync</button>
             </div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
               <button id="seller-action-export" style="display:none;background:none;border:none;font-size:12.5px;font-weight:600;color:#6b7280;padding:4px 8px;border-radius:5px;cursor:pointer;font-family:inherit;align-items:center;gap:5px" onmouseover="this.style.background='#f6f5f4';this.style.color='#191918'" onmouseout="this.style.background='transparent';this.style.color='#6b7280'"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Export CSV</button>
@@ -2181,17 +2181,17 @@ document.addEventListener('DOMContentLoaded', function(){
               <div class="stat-card" style="padding:15px 16px 16px">
                 <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total paid</div>
                 <div id="seller-stat-paid" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">$0</div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
+                <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
               <div class="stat-card" style="padding:15px 16px 16px">
                 <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total refunded</div>
                 <div id="seller-stat-refunded" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">$0</div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
+                <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
               <div class="stat-card" style="padding:15px 16px 16px">
                 <div style="font-size:10.5px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em">Total orders</div>
                 <div id="seller-stat-orders" style="font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:600;color:#191918;line-height:1.05;letter-spacing:-.01em">0</div>
-                <div style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
+                <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10px;color:var(--bos-grey,#6b7280);margin-top:5px;text-transform:uppercase;letter-spacing:.04em">All time</div>
               </div>
             </div>
             <!-- Transactions table — sharp .dtable, framed by a top ink rule -->
@@ -2213,7 +2213,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <thead><tr><th>User</th><th>Role</th><th>Permissions</th><th>Last Active</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#e9eefe;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:var(--bos-violet,#2f4bf0)">SA</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Seller A (Owner)</div><div style="font-size:12px;color:#9ca3af">sellera@store.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#e9eefe;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;font-weight:400;color:var(--bos-violet,#2f4bf0)">SA</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Seller A (Owner)</div><div style="font-size:12px;color:#9ca3af">sellera@store.com</div></div></div></td>
                   <td><span class="badge b-new" style="font-size:11.5px">Owner</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px" disabled><option>Full Access</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">2m ago</td>
@@ -2221,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <td>—</td>
                 </tr>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#374151">MK</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Mike K.</div><div style="font-size:12px;color:#9ca3af">mike@sellera.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;font-weight:400;color:#374151">MK</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Mike K.</div><div style="font-size:12px;color:#9ca3af">mike@sellera.com</div></div></div></td>
                   <td><span class="badge b-queue" style="font-size:11.5px">Manager</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px"><option>Orders + Tracking</option><option>Full Access</option><option>View Only</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">1h ago</td>
@@ -2229,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', function(){
                   <td><button class="btn-ghost" style="font-size:13px">Remove</button></td>
                 </tr>
                 <tr>
-                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;font-weight:400;color:#374151">JL</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Jess L.</div><div style="font-size:12px;color:#9ca3af">jess@sellera.com</div></div></div></td>
+                  <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f2f2f0;border-radius:0;border:1.5px solid var(--bos-ink,#191918);display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;font-weight:400;color:#374151">JL</div><div><div style="font-size:13.5px;font-weight:600;color:#191918">Jess L.</div><div style="font-size:12px;color:#9ca3af">jess@sellera.com</div></div></div></td>
                   <td><span class="badge b-prod" style="font-size:11.5px">Support</span></td>
                   <td><select class="select" style="font-size:13px;padding:4px 8px"><option>View Only</option><option>Orders + Tracking</option><option>Full Access</option></select></td>
                   <td style="font-size:13px;color:#9ca3af">3h ago</td>
@@ -2302,7 +2302,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <div>
                 <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">API Key</label>
                 <div style="display:flex;gap:6px">
-                  <input value="sk_live_sa_••••••••f7a2" readonly style="flex:1;font-family:monospace;font-size:12.5px;padding:7px 10px;border:1px solid #e5e4e0;border-radius:6px;background:#fafaf9;color:#374151;outline:none"/>
+                  <input value="sk_live_sa_••••••••f7a2" readonly style="flex:1;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;padding:7px 10px;border:1px solid #e5e4e0;border-radius:6px;background:#fafaf9;color:#374151;outline:none"/>
                   <button class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Copy</button>
                   <button onclick="alert('Regenerate API key')" class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Regenerate</button>
                 </div>
@@ -2310,7 +2310,7 @@ document.addEventListener('DOMContentLoaded', function(){
               <div>
                 <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Webhook Endpoint</label>
                 <div style="display:flex;gap:6px">
-                  <input value="https://api.egfulfill.com/wh/sa" readonly style="flex:1;font-family:monospace;font-size:12.5px;padding:7px 10px;border:1px solid #e5e4e0;border-radius:6px;background:#fafaf9;color:#374151;outline:none"/>
+                  <input value="https://api.egfulfill.com/wh/sa" readonly style="flex:1;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;padding:7px 10px;border:1px solid #e5e4e0;border-radius:6px;background:#fafaf9;color:#374151;outline:none"/>
                   <button class="btn btn-out" style="font-size:12.5px;padding:6px 12px">Test</button>
                 </div>
               </div>
@@ -2584,13 +2584,13 @@ document.addEventListener('DOMContentLoaded', function(){
           <div>
             <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Key</label>
             <div style="display:flex;gap:6px">
-              <input class="input" value="ss_live_••••••••••••3f9a" type="password" style="font-family:monospace;font-size:13px"/>
+              <input class="input" value="ss_live_••••••••••••3f9a" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
               <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
             </div>
           </div>
           <div>
             <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Secret</label>
-            <input class="input" value="••••••••••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+            <input class="input" value="••••••••••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
           </div>
           <div>
             <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Store ID</label>
@@ -2631,12 +2631,12 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Base URL</label>
-              <input class="input" placeholder="https://api.pinkapi.com/v1" style="font-family:monospace;font-size:13px"/>
+              <input class="input" placeholder="https://api.pinkapi.com/v1" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
             </div>
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Key</label>
               <div style="display:flex;gap:6px">
-                <input class="input" placeholder="pk_live_••••••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+                <input class="input" placeholder="pk_live_••••••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
                 <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
               </div>
             </div>
@@ -2675,18 +2675,18 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Key</label>
-              <input class="input" placeholder="trello_api_key_••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+              <input class="input" placeholder="trello_api_key_••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
             </div>
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">User Token</label>
               <div style="display:flex;gap:6px">
-                <input class="input" placeholder="trello_token_••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+                <input class="input" placeholder="trello_token_••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
                 <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
               </div>
             </div>
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Default Board ID</label>
-              <input class="input" placeholder="trello_board_id" style="font-size:13px;font-family:monospace"/>
+              <input class="input" placeholder="trello_board_id" style="font-size:13px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif"/>
             </div>
           </div>
           <div style="display:flex;gap:8px">
@@ -2718,7 +2718,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div>
             <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">API Key</label>
             <div style="display:flex;gap:6px">
-              <input class="input" value="ssapi_live_••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+              <input class="input" value="ssapi_live_••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
               <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
             </div>
           </div>
@@ -2769,21 +2769,21 @@ document.addEventListener('DOMContentLoaded', function(){
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Incoming Orders Endpoint</label>
               <div style="display:flex;gap:6px">
-                <input class="input" value="https://egops.com/api/v1/orders/receive" readonly style="font-family:monospace;font-size:12.5px;color:#374151"/>
+                <input class="input" value="https://egops.com/api/v1/orders/receive" readonly style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#374151"/>
                 <button class="btn btn-out" style="font-size:13px;white-space:nowrap;padding:6px 10px" onclick="navigator.clipboard.writeText('https://egops.com/api/v1/orders/receive');this.textContent='Copied!'">Copy</button>
               </div>
             </div>
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Status Push (→ Seller)</label>
               <div style="display:flex;gap:6px">
-                <input class="input" value="https://egfulfill.com/api/v1/status/update" readonly style="font-family:monospace;font-size:12.5px;color:#374151"/>
+                <input class="input" value="https://egfulfill.com/api/v1/status/update" readonly style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#374151"/>
                 <button class="btn btn-out" style="font-size:13px;white-space:nowrap;padding:6px 10px" onclick="navigator.clipboard.writeText('https://egfulfill.com/api/v1/status/update');this.textContent='Copied!'">Copy</button>
               </div>
             </div>
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Webhook Secret</label>
               <div style="display:flex;gap:6px">
-                <input class="input" value="whsec_••••••••••••••••••••••••" type="password" style="font-family:monospace;font-size:13px"/>
+                <input class="input" value="whsec_••••••••••••••••••••••••" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
                 <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
               </div>
             </div>
@@ -2813,7 +2813,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <div>
               <label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Master API Key (warehouse-level)</label>
               <div style="display:flex;gap:6px">
-                <input class="input" value="egwh_live_••••••••••••••••2c7f" type="password" style="font-family:monospace;font-size:13px"/>
+                <input class="input" value="egwh_live_••••••••••••••••2c7f" type="password" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px"/>
                 <button class="btn btn-out" style="font-size:13px;padding:6px 10px" onclick="togglePwd(this)">Show</button>
               </div>
             </div>
@@ -2867,7 +2867,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <tr>
               <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#eef1fe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#2f4bf0">SA</div><div><div style="font-weight:600;font-size:14px">Seller A Store</div><div style="font-size:12px;color:#9ca3af">sellera@store.com</div></div></div></td>
               <td><div style="display:flex;align-items:center;gap:6px"><code style="font-size:12.5px;background:#f3f3f1;padding:2px 7px;border-radius:5px;color:#374151">egapi_sa_••••••••a1f2</code><button style="background:none;border:none;font-size:12px;color:#6b7280;cursor:pointer" onclick="alert('Copied.')">⎘</button></div></td>
-              <td><span style="font-size:12.5px;font-family:monospace;color:#374151">egops.com/wh/sa/…</span></td>
+              <td><span style="font-size:12.5px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151">egops.com/wh/sa/…</span></td>
               <td><span class="badge b-shipped">● Active</span></td>
               <td><span style="font-size:13px;color:#6b7280">2 min ago</span></td>
               <td><div style="display:flex;gap:6px"><button class="ibtn" style="font-size:13px" onclick="alert('Rotated.')">Rotate</button><button class="ibtn" style="font-size:13px;color:#dc2626" onclick="if(confirm('Revoke this key?'))alert('Revoked.')">Revoke</button></div></td>
@@ -2875,7 +2875,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <tr>
               <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#dbeafe;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1d4ed8">SB</div><div><div style="font-weight:600;font-size:14px">Seller B Store</div><div style="font-size:12px;color:#9ca3af">sellerb@shop.com</div></div></div></td>
               <td><div style="display:flex;align-items:center;gap:6px"><code style="font-size:12.5px;background:#f3f3f1;padding:2px 7px;border-radius:5px;color:#374151">egapi_sb_••••••••b3c4</code><button style="background:none;border:none;font-size:12px;color:#6b7280;cursor:pointer" onclick="alert('Copied.')">⎘</button></div></td>
-              <td><span style="font-size:12.5px;font-family:monospace;color:#374151">egops.com/wh/sb/…</span></td>
+              <td><span style="font-size:12.5px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151">egops.com/wh/sb/…</span></td>
               <td><span style="background:#fee2e2;color:#dc2626;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px">● Suspended</span></td>
               <td><span style="font-size:13px;color:#9ca3af">6 days ago</span></td>
               <td><div style="display:flex;gap:6px"><button class="ibtn" style="font-size:13px" onclick="alert('Reinstated.')">Reinstate</button><button class="ibtn" style="font-size:13px;color:#dc2626" onclick="if(confirm('Revoke this key?'))alert('Revoked.')">Revoke</button></div></td>
@@ -2883,7 +2883,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <tr>
               <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f0fdf4;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#16a34a">MS</div><div><div style="font-weight:600;font-size:14px">My Store</div><div style="font-size:12px;color:#9ca3af">owner@egops.com</div></div></div></td>
               <td><div style="display:flex;align-items:center;gap:6px"><code style="font-size:12.5px;background:#f3f3f1;padding:2px 7px;border-radius:5px;color:#374151">egapi_ms_••••••••d5e6</code><button style="background:none;border:none;font-size:12px;color:#6b7280;cursor:pointer" onclick="alert('Copied.')">⎘</button></div></td>
-              <td><span style="font-size:12.5px;font-family:monospace;color:#374151">egops.com/wh/ms/…</span></td>
+              <td><span style="font-size:12.5px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151">egops.com/wh/ms/…</span></td>
               <td><span class="badge b-shipped">● Active</span></td>
               <td><span style="font-size:13px;color:#6b7280">1h ago</span></td>
               <td><div style="display:flex;gap:6px"><button class="ibtn" style="font-size:13px" onclick="alert('Rotated.')">Rotate</button><button class="ibtn" style="font-size:13px;color:#dc2626" onclick="if(confirm('Revoke this key?'))alert('Revoked.')">Revoke</button></div></td>
@@ -2891,7 +2891,7 @@ document.addEventListener('DOMContentLoaded', function(){
             <tr>
               <td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:#f3f3f1;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#9ca3af">OP</div><div><div style="font-weight:600;font-size:14px">Operator Dashboard</div><div style="font-size:12px;color:#9ca3af">operator@egops.com</div></div></div></td>
               <td><div style="display:flex;align-items:center;gap:6px"><code style="font-size:12.5px;background:#f3f3f1;padding:2px 7px;border-radius:5px;color:#374151">egapi_op_••••••••f7g8</code><button style="background:none;border:none;font-size:12px;color:#6b7280;cursor:pointer" onclick="alert('Copied.')">⎘</button></div></td>
-              <td><span style="font-size:12.5px;font-family:monospace;color:#374151">egops.com/wh/op/…</span></td>
+              <td><span style="font-size:12.5px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151">egops.com/wh/op/…</span></td>
               <td><span class="badge b-shipped">● Active</span></td>
               <td><span style="font-size:13px;color:#6b7280">Just now</span></td>
               <td><div style="display:flex;gap:6px"><button class="ibtn" style="font-size:13px" onclick="alert('Rotated.')">Rotate</button><button class="ibtn" style="font-size:13px;color:#dc2626" onclick="if(confirm('Revoke this key?'))alert('Revoked.')">Revoke</button></div></td>
@@ -3994,7 +3994,7 @@ function loadAudit(){
       tb.innerHTML = rows.map(function(row){
         var role = row.actor_role || 'system';
         var roleColor = role==='seller' ? '#1d4ed8' : role==='admin' ? '#2f4bf0' : role==='system' ? '#9ca3af' : '#15803d';
-        var ent = row.entity_id ? ('<span style="font-family:monospace;font-size:12px;color:#191918">' + _auditEsc(row.entity_id) + '</span>') : '<span style="color:#9ca3af">—</span>';
+        var ent = row.entity_id ? ('<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;color:#191918">' + _auditEsc(row.entity_id) + '</span>') : '<span style="color:#9ca3af">—</span>';
         return '<tr style="border-bottom:1px solid #f0ede9">'
           + '<td style="padding:10px 14px;font-size:12.5px;color:#6b7280;white-space:nowrap">' + _auditWhen(row.ts) + '</td>'
           + '<td style="padding:10px 14px;font-size:12.5px"><div style="color:#191918;font-weight:600">' + _auditEsc(row.actor||'system') + '</div><div style="color:' + roleColor + ';font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em">' + _auditEsc(role) + '</div></td>'
@@ -4039,7 +4039,7 @@ function renderPlansEditor(){
   box.innerHTML = tiers.map(function(t){
     var esc = function(s){ return String(s==null?'':s).replace(/"/g,'&quot;').replace(/</g,'&lt;'); };
     return '<div data-plan="'+t.id+'" style="border:1px solid #e5e4e0;border-radius:10px;padding:14px 16px">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#191918">'+esc(t.name)+'</div><div style="font-size:11.5px;color:#9ca3af;font-family:monospace">'+esc(t.id)+'</div></div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:14px;font-weight:700;color:#191918">'+esc(t.name)+'</div><div style="font-size:11.5px;color:#9ca3af;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">'+esc(t.id)+'</div></div>'
       + '<div style="display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center">'
       +   '<div><label style="font-size:11.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">Price /mo ($)</label><input class="input pl-price" type="number" min="0" step="1" value="'+esc(t.monthlyPrice)+'" style="background:#fff"/></div>'
       +   '<div><label style="font-size:11.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">Feature line (sellers see this)</label><input class="input pl-tagline" value="'+esc(t.tagline)+'" style="background:#fff"/></div>'
@@ -4958,7 +4958,7 @@ function whRenderOrders() {
         ${window.EGTracking
           ? EGTracking.renderCell({ id: o.num, source: o.source, tracking: trackingNum, trackingLabelUrl: o.trackingLabelUrl, trackingCarrier: o.trackingCarrier })
           : (trackingNum
-              ? `<span onclick="admCp('${trackingNum}',this)" title="Click to copy" style="font-family:monospace;font-size:12.5px;color:#374151;cursor:pointer;padding:2px 5px;border-radius:4px;transition:background .15s;white-space:nowrap;display:inline-block" onmouseover="this.style.background='#f3f4f6'" onmouseout="if(!this._copied)this.style.background=''">${trackingNum}</span>`
+              ? `<span onclick="admCp('${trackingNum}',this)" title="Click to copy" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#374151;cursor:pointer;padding:2px 5px;border-radius:4px;transition:background .15s;white-space:nowrap;display:inline-block" onmouseover="this.style.background='#f3f4f6'" onmouseout="if(!this._copied)this.style.background=''">${trackingNum}</span>`
               : `<span style="color:#d1d5db;font-size:13px">—</span>`)
         }
       </td>
@@ -5089,8 +5089,8 @@ function whRenderOrders() {
               }
               const _hasFile = !!_dlUrl;
               const _idHtml = (_approved && _hasFile)
-                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.preventDefault();event.stopPropagation();try{EGStore&&EGStore.downloadDataUrl&&EGStore.downloadDataUrl(this.getAttribute('href'),this.getAttribute('download'));}catch(e){}" style="font-family:monospace;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
-                : `<span style="font-family:monospace;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
+                ? `<a href="${_dlUrl}" download="${_dlName.replace(/"/g,'&quot;')}" onclick="event.preventDefault();event.stopPropagation();try{EGStore&&EGStore.downloadDataUrl&&EGStore.downloadDataUrl(this.getAttribute('href'),this.getAttribute('download'));}catch(e){}" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;color:#15803d;text-decoration:underline;text-decoration-color:#86efac;cursor:pointer" title="Click to download ${_dlName}">${_dsnText} ↓</a>`
+                : `<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;color:#374151" title="${_approved ? 'Approved — no file attached yet' : 'Awaiting approval on the design board'}">${_dsnText}</span>`;
               _designLink = _idHtml;
               // Thread colour swatches — moved off the name row into metaRow.
               const _threads = (typeof EGStore !== 'undefined' && EGStore.getItemThreadColors)
@@ -5099,10 +5099,10 @@ function whRenderOrders() {
               const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
               const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
               const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
-              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
+              metaRow = `<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
                   <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:0;flex-wrap:wrap;row-gap:6px">
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
                     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Threads</span>${_threadSummary}</div>
                   </div>`;
             } else {
@@ -5112,10 +5112,10 @@ function whRenderOrders() {
               const _threadSummary = (typeof EGStore !== 'undefined' && EGStore.renderThreadChips) ? EGStore.renderThreadChips(_threads) : '';
               const _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
               const _sep = 'padding-left:18px;margin-left:18px;border-left:1px solid #e5e4e0';
-              metaRow = `<span style="font-family:monospace;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
+              metaRow = `<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:128px;min-width:128px;flex-shrink:0">${it.sku}</span>
                   <div style="display:flex;align-items:center;gap:0;flex:1;min-width:0;margin-left:0;flex-wrap:wrap;row-gap:6px">
                     <div style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="${_lbl}">Method</span><span style="font-weight:700;color:#9ca3af">${(typeof EGStore!=='undefined'&&EGStore.methodLabel)?EGStore.methodLabel(it):String(it.printType||it.tech||'DTG').toUpperCase()}</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:monospace;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
+                    <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;${_sep}"><span style="${_lbl}">Stock</span><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-weight:600;color:#9ca3af">${_stock.label === 'Out of stock' ? '0' : (_stock.label.match(/^\d+/) || ['—'])[0]}</span></div>
                     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;flex-wrap:wrap;row-gap:6px;${_sep}"><span style="${_lbl}">Threads</span>${_threadSummary}</div>
                   </div>`;
             }
@@ -5134,7 +5134,7 @@ function whRenderOrders() {
             const _fsColorAdm = _fs === 'working' ? '#191918' : '#9ca3af';
             const _fsChip = `<span class="eg-item-fs-chip eg-item-fs-slot" data-item-key="${_itKey}" style="position:absolute;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${_fsColorAdm};white-space:nowrap;display:inline-block${_fsLabelAdm?'':';display:none'}">${_fsLabelAdm}</span>`;
             const _title = `<span style="display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom">${_pickedBlank ? _pickedBlank : (_isNewSetup ? '<span style="color:#6b7280;font-style:italic">Pick a blank</span>' : ((it.variant && String(it.variant).trim()) ? it.variant : (it.name||'Item')))}</span> <span style="font-size:11.5px;font-weight:400;color:#9ca3af">×${it.qty||1}</span>${_threadInline}`;
-            const _meta = (window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:monospace;color:#9ca3af;font-size:11px;white-space:nowrap">' + ((window.EGDesignTools && EGDesignTools.displaySku) ? EGDesignTools.displaySku(o, it) : (it.sku||'')) + '</span>') : metaRow;
+            const _meta = (window.EGDesignTools && EGDesignTools.isNewOrder(o)) ? ('<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#9ca3af;font-size:11px;white-space:nowrap">' + ((window.EGDesignTools && EGDesignTools.displaySku) ? EGDesignTools.displaySku(o, it) : (it.sku||'')) + '</span>') : metaRow;
             return (window.EGDesignTools && EGDesignTools.itemRowLayout) ? EGDesignTools.itemRowLayout({
               setup: _isNewSetup, sep: sep, thumb: thumb, title: _title, meta: _meta, designLink: _designLink,
               selector: EGDesignTools.itemActions(o, it, { noTrash: true }),
@@ -5317,7 +5317,7 @@ function admZoomThumb(src, orderNum, sku, name) {
       + threads.map(function(t){
           return '<div title="' + (t.code||'—') + ' ' + (t.name||'') + '" style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 5px;background:#fff;border:1.5px solid #e5e4e0;border-radius:999px;font-size:12px;font-weight:600;color:#191918">'
               + '<span style="width:18px;height:18px;border-radius:50%;background:' + (t.hex||'#e5e4e0') + ';border:1.5px solid rgba(0,0,0,.18);flex-shrink:0"></span>'
-              + '<span style="font-family:monospace;letter-spacing:.02em">' + (t.code||'—') + '</span>'
+              + '<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.02em">' + (t.code||'—') + '</span>'
               + (t.name ? '<span style="color:#9ca3af;font-weight:500">' + t.name + '</span>' : '')
               + '</div>';
         }).join('')
@@ -5420,7 +5420,7 @@ function whMarkPrescan(orderNum) {
 // USPS_MOCK sample label (client-side) so a scanned order always has a viewable label without
 // live postage. A real label (from Generate Label) is used as-is when present.
 function _whMockLabel(name, addr, tracking) {
-  return '<div style="width:340px;border:2px solid #191918;padding:14px 16px;font-family:monospace;font-size:12px;color:#191918;background:#fff">'
+  return '<div style="width:340px;border:2px solid #191918;padding:14px 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;color:#191918;background:#fff">'
     + '<div style="font-weight:800;font-size:14px;border-bottom:2px solid #191918;padding-bottom:6px;margin-bottom:8px;display:flex;justify-content:space-between">USPS GROUND ADVANTAGE<span style="font-size:9px;color:#9ca3af">SAMPLE</span></div>'
     + '<div style="font-size:9px;color:#9ca3af;letter-spacing:.06em">SHIP TO</div>'
     + '<div style="font-weight:700">' + String(name || 'Recipient').replace(/</g, '&lt;') + '</div>'
@@ -5622,7 +5622,7 @@ function renderScanHistory() {
     <td style="padding:9px 16px;font-weight:600;color:#191918">#${r.order}</td>
     <td style="padding:9px 16px;color:#374151">${r.customer || ''}</td>
     <td style="padding:9px 16px;color:#374151">${r.carrier || ''}</td>
-    <td style="padding:9px 16px;font-family:monospace;font-size:12.5px;color:#374151">${r.tracking || ''}</td>
+    <td style="padding:9px 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#374151">${r.tracking || ''}</td>
     <td style="padding:9px 16px;color:#6b7280">${r.by || ''}</td>
     <td style="padding:9px 16px;color:#9ca3af;font-size:12.5px">${(typeof EGStore!=='undefined'&&EGStore.scanTimeAgo)?EGStore.scanTimeAgo(r.ts):''}</td>
   </tr>`).join('');
@@ -5854,7 +5854,7 @@ function whRenderMulti() {
         ${o.itemList.map(item => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f3f1">
           <div style="width:24px;height:24px;background:#f0ede9;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#6b7280;flex-shrink:0">${item.type.substring(0,3).toUpperCase()}</div>
           <div style="font-size:13px;font-weight:600;color:#374151;flex:1">${item.name} ×${item.qty}</div>
-          <span style="font-size:11px;color:#9ca3af;font-family:monospace">${item.sku}</span>
+          <span style="font-size:11px;color:#9ca3af;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${item.sku}</span>
         </div>`).join('')}
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="btn btn-green" style="font-size:12px;padding:3px 9px" onclick="whApproveSingle('${num}')">✓ Approve</button>
@@ -6402,18 +6402,18 @@ function loadRealSellers() {
           // Board-OS clickable card. Same template as the demo cards above:
           // cobalt square avatar + bold name + mono muted email + status badge.
           var badge = active
-            ? '<span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Active</span>'
-            : '<span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:var(--bos-mono,ui-monospace,monospace)">Suspended</span>';
+            ? '<span class="badge" style="font-size:10px;font-weight:400;color:#fff;background:var(--bos-violet,#2f4bf0);padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Active</span>'
+            : '<span class="badge" style="font-size:10px;font-weight:400;color:#191918;background:#e7e3da;padding:3px 8px;border-radius:0;letter-spacing:.05em;text-transform:uppercase;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">Suspended</span>';
           html += '<div class="seller-card-item" id="sc-' + esc(u.id) + '" onclick="openSellerDetail(\'' + esc(u.id) + '\',this)" style="padding:16px">'
             + '<div style="display:flex;align-items:flex-start;gap:12px">'
-            + '<div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:var(--bos-mono,ui-monospace,monospace);font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">' + esc(_sellerInitials(nm)) + '</div>'
+            + '<div style="width:44px;height:44px;background:var(--bos-violet,#2f4bf0);border-radius:0;display:flex;align-items:center;justify-content:center;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:15px;font-weight:400;color:#fff;flex-shrink:0;letter-spacing:.02em">' + esc(_sellerInitials(nm)) + '</div>'
             + '<div style="flex:1;min-width:0">'
             + '<div style="font-size:15px;font-weight:700;color:#191918;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(nm) + '</div>'
             + '<div style="font-family:var(--bos-sans,Inter,-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif);font-size:11px;color:var(--bos-grey,#6b7280);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(u.email||'') + '</div>'
             + '</div></div>'
             + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid #e5e4e0">'
             + badge
-            + '<span style="font-family:var(--bos-mono,ui-monospace,monospace);font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">' + (active?'Active':'Suspended') + '</span>'
+            + '<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;color:var(--bos-grey,#6b7280);text-transform:uppercase;letter-spacing:.04em">' + (active?'Active':'Suspended') + '</span>'
             + '</div></div>';
         });
         list.innerHTML = html;
@@ -6439,7 +6439,7 @@ function renderSellerTx(ledger){
     var ref = (t.ref && /^(FF-|etsy-|#)/i.test(String(t.ref))) ? String(t.ref).split('|')[0] : '—';
     var desc = t.note || TYPE_LABEL[t.type] || t.type || '—';
     return '<tr style="border-top:1px solid #f3f3f1"><td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px">'+esc(d)+'</td>'
-      + '<td style="font-family:monospace;font-size:12.5px;color:'+(ref==='—'?'#9ca3af':'#374151')+';padding:11px 12px">'+esc(ref)+'</td>'
+      + '<td style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:'+(ref==='—'?'#9ca3af':'#374151')+';padding:11px 12px">'+esc(ref)+'</td>'
       + '<td style="font-size:13px;color:#191918;padding:11px 12px">'+esc(desc)+'</td>'
       + '<td style="font-weight:600;color:'+(pos?'#15803d':'#dc2626')+';padding:11px 12px;text-align:right;font-variant-numeric:tabular-nums">'+(pos?'+':'−')+'$'+Math.abs(amt).toFixed(2)+'</td>'
       + '<td style="padding:11px 18px 11px 12px"><span style="font-size:11px;font-weight:600;color:#6b7280">Settled</span></td></tr>';
@@ -6925,7 +6925,7 @@ function doScan() {
   const time = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:5px 0;border-bottom:1px solid #f0ede9';
-  row.innerHTML = `<span style="font-family:monospace;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sku}${statusNote}</span><span style="color:${dir==='in'?'#16a34a':'#dc2626'};font-weight:600;white-space:nowrap">${dir==='in'?'+':'−'}${qty} unit${qty!==1?'s':''} · ${time}</span>`;
+  row.innerHTML = `<span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sku}${statusNote}</span><span style="color:${dir==='in'?'#16a34a':'#dc2626'};font-weight:600;white-space:nowrap">${dir==='in'?'+':'−'}${qty} unit${qty!==1?'s':''} · ${time}</span>`;
   if (log) log.insertBefore(row, log.firstChild);
   input.value = '';
   input.focus();
@@ -7243,7 +7243,7 @@ function renderPoHistory() {
     const badge = `<span class="badge ${meta.cls}"${meta.extra ? ' style="' + meta.extra + '"' : ''}>${meta.label}</span>`;
     const etaColor = po.status === 'delivered' ? '#9ca3af' : '#6b7280';
     return `<tr>
-      <td style="font-family:monospace;font-size:13.25px;font-weight:600;color:#191918">${po.num}</td>
+      <td style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13.25px;font-weight:600;color:#191918">${po.num}</td>
       <td>${poSupplierBadge(po.supplier)}</td>
       <td style="font-size:13.75px">${poItemsLabel(po)}</td>
       <td>${badge}</td>
@@ -7319,7 +7319,7 @@ function epRenderItems() {
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid #e5e4e0;border-radius:8px;background:#fff">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#191918">${c.name}${variantHtml}</div>
-          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:monospace">${c.sku}</span> · $${c.price.toFixed(2)}/unit</div>
+          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${c.sku}</span> · $${c.price.toFixed(2)}/unit</div>
         </div>
         ${qtyCtl}
         <div style="font-size:13px;font-weight:700;color:#191918;width:64px;text-align:right">$${lineTotal.toFixed(2)}</div>
@@ -7363,7 +7363,7 @@ function epSearchUpdate() {
       return `<div onmousedown="epAddItem('${it.sku}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #f3f3f1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:#191918">${it.name}${variantHtml}</div>
-          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:monospace">${it.sku}</span>${it.category?' · '+it.category:''}</div>
+          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${it.sku}</span>${it.category?' · '+it.category:''}</div>
         </div>
         <div style="font-size:13px;font-weight:700;color:#191918;flex-shrink:0">$${it.price.toFixed(2)}<span style="font-size:10.5px;color:#9ca3af;font-weight:500">/unit</span></div>
       </div>`;
@@ -7504,7 +7504,7 @@ function poSearchUpdate() {
       return `<div onmousedown="poAddToCart('${it.sku}')" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #f3f3f1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:#191918">${it.name}${variantHtml}</div>
-          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:monospace">${it.sku}</span>${it.category?' · '+it.category:''}</div>
+          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${it.sku}</span>${it.category?' · '+it.category:''}</div>
         </div>
         <div style="font-size:13px;font-weight:700;color:#191918;flex-shrink:0">$${it.price.toFixed(2)}<span style="font-size:10.5px;color:#9ca3af;font-weight:500">/unit</span></div>
       </div>`;
@@ -7575,7 +7575,7 @@ function poRenderCart() {
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid #e5e4e0;border-radius:8px;background:#fff">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:#191918">${c.name}${variantHtml}</div>
-          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:monospace">${c.sku}</span> · $${c.price.toFixed(2)}/unit</div>
+          <div style="font-size:11.5px;color:#9ca3af;margin-top:1px"><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${c.sku}</span> · $${c.price.toFixed(2)}/unit</div>
         </div>
         <input type="number" min="1" value="${c.qty}" oninput="poUpdateQty('${c.sku}', this.value)" style="width:64px;text-align:center;border:1.5px solid #e5e4e0;border-radius:6px;padding:5px 6px;font-size:12.5px;font-family:inherit;outline:none"/>
         <div style="font-size:13px;font-weight:700;color:#191918;width:64px;text-align:right">$${lineTotal.toFixed(2)}</div>
@@ -7667,11 +7667,11 @@ function renderBackorderBanner() {
     return `<div style="padding:8px 12px;border-bottom:1px solid #f3f3f1;display:flex;align-items:center;gap:8px" title="${bq.customer} · in stock ${item.stock}">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:baseline;gap:6px">
-          <a onclick="showSection('orders')" href="javascript:void(0)" style="font-weight:700;color:#191918;font-family:monospace;font-size:11.5px;text-decoration:none">#${bq.num}</a>
+          <a onclick="showSection('orders')" href="javascript:void(0)" style="font-weight:700;color:#191918;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11.5px;text-decoration:none">#${bq.num}</a>
           <span style="font-size:11px;color:#dc2626;font-weight:700">−${item.need}</span>
         </div>
         <div style="font-size:12px;font-weight:600;color:#191918;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</div>
-        <div style="font-family:monospace;font-size:10.5px;color:#9ca3af">${item.sku}</div>
+        <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:10.5px;color:#9ca3af">${item.sku}</div>
       </div>
       ${added
         ? `<span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:5px;background:#dcfce7;border:1px solid #86efac;color:#15803d;font-size:10.5px;font-weight:700;font-family:inherit;flex-shrink:0">✓</span>`
@@ -7758,7 +7758,7 @@ function bqRenderCart() {
     return `<div style="display:grid;grid-template-columns:1fr 90px 60px 90px 28px;align-items:center;gap:10px;padding:10px 14px;border:1px solid #e5e4e0;border-radius:8px;background:#fff">
       <div style="min-width:0">
         <div style="font-size:13px;font-weight:600;color:#191918;line-height:1.3">${c.name}${c.variant?' · '+c.variant:''}</div>
-        <div style="font-family:monospace;font-size:11px;color:#9ca3af;margin-top:1px">${c.sku}</div>
+        <div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;color:#9ca3af;margin-top:1px">${c.sku}</div>
       </div>
       <div style="font-size:12.5px;color:#6b7280;text-align:right">$${c.price.toFixed(2)} <span style="font-size:10.5px;color:#9ca3af">/unit</span></div>
       <input type="number" min="1" value="${c.qty}" onchange="bqCartSetQty('${c.sku}', this.value)" style="width:60px;padding:5px 6px;border:1.25px solid #e5e4e0;border-radius:5px;font-size:12.5px;text-align:center;font-family:inherit"/>
@@ -7817,7 +7817,7 @@ function bqSearchUpdate() {
       return `<div onmousedown="bqSearchPick('${it.sku}')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-bottom:1px solid #f3f3f1" onmouseover="this.style.background='#f6f5f4'" onmouseout="this.style.background=''">
         <div style="flex:1;min-width:0">
           <div style="font-size:12.5px;font-weight:600;color:#191918">${it.name}${variantHtml}</div>
-          <div style="font-size:11px;color:#9ca3af;font-family:monospace">${it.sku}</div>
+          <div style="font-size:11px;color:#9ca3af;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif">${it.sku}</div>
         </div>
         <div style="font-size:12px;font-weight:700;color:#191918;flex-shrink:0">$${it.price.toFixed(2)}</div>
       </div>`;
@@ -8147,7 +8147,7 @@ function openSkuLabelModal(preSelectSku) {
           <div style="font-size:13.5px;font-weight:700;color:#191918">${item.name||item.sku}</div>
           ${item.variant&&item.variant!=='—'?`<div style="font-size:12px;color:#6b7280;margin-top:1px">${item.variant}</div>`:''}
           <svg class="skl-bc" data-sku="${String(item.sku).replace(/"/g,'&quot;')}" style="max-width:100%;height:52px;margin-top:6px"></svg>
-          <div style="font-size:11px;font-family:monospace;letter-spacing:1.5px;color:#374151">${item.sku}</div>
+          <div style="font-size:11px;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:1.5px;color:#374151">${item.sku}</div>
         </div>
       </label>`).join('') || '<div style="padding:24px;text-align:center;color:#9ca3af;font-size:13px">No inventory items yet.</div>';
     list.querySelectorAll('.skl-bc').forEach(svg => {
@@ -8295,7 +8295,7 @@ function coRenderItems() {
         </div>
         <div style="flex:1">
           <label style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:3px">Auto SKU</label>
-          <div class="co-sku" style="font-family:monospace;font-size:12.5px;color:#9ca3af;padding:5px 9px;background:#f0ede9;border-radius:6px;border:1.5px solid #f0ede9;line-height:1.5">—</div>
+          <div class="co-sku" style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#9ca3af;padding:5px 9px;background:#f0ede9;border-radius:6px;border:1.5px solid #f0ede9;line-height:1.5">—</div>
         </div>
         <div style="flex-shrink:0;padding-top:17px;display:flex;gap:6px">
           <!-- Factory-only: Upload artwork directly (no Templates / Design Lab) -->
@@ -9112,7 +9112,7 @@ function udbRenderManageTypes(){
     </div>
     <input type="color" value="${t.color}" onchange="udbUpdateTypeColor('${t.id}', this.value)" style="width:32px;height:32px;border:1.5px solid #e5e4e0;border-radius:6px;cursor:pointer;padding:1px;background:#fff;flex-shrink:0" title="Edit color">
     <input value="${String(t.name).replace(/"/g,'&quot;')}" maxlength="20" onchange="udbUpdateTypeName('${t.id}', this.value)" style="flex:1;font-size:13.5px;font-weight:600;padding:6px 9px;border:1.5px solid #f0ede9;border-radius:6px;outline:none;font-family:inherit;text-transform:uppercase" onfocus="this.style.borderColor='#9ca3af'" onblur="this.style.borderColor='#f0ede9'">
-    <span style="font-family:monospace;font-size:11px;color:#b0aaa4;flex-shrink:0">${t.id}</span>
+    <span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;color:#b0aaa4;flex-shrink:0">${t.id}</span>
     <button onclick="udbDeleteType('${t.id}')" title="Delete" style="width:28px;height:28px;border:1.5px solid #fecaca;background:#fef2f2;color:#dc2626;border-radius:6px;cursor:pointer;font-size:14px;line-height:1;font-family:inherit;flex-shrink:0">×</button>
   </div>`).join('');
 }
@@ -9265,7 +9265,7 @@ function _thumbFor(c){
   if (c.thumb && /^(data:|https?:)/i.test(String(c.thumb))) return c.thumb;
   return '';
 }
-function udbCardHtml(c){const overdue=c.due&&(new Date(c.due)-new Date())/86400000<0,soon=udbIsDueSoon(c.due)&&!overdue;const prioBar=c.priority==='high'?`<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#ef4444;border-radius:10px 10px 0 0"></div>`:'';const _t=_thumbFor(c);const img=_t?`<img src="${_t}" class="kb-card-img" draggable="false" onerror="this.style.display='none'">`:`<div class="kb-card-img-ph"><svg width="32" height="32" fill="none" stroke="#bbb" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;return`<div id="udb-card-${c.id}" class="kb-card" draggable="true" ondragstart="udbDragStart(event,${c.id})" ondragend="udbDragEnd()" ondragover="udbCardDragOver(event,${c.id})" onclick="udbOpenCard(${c.id})">${prioBar}${img}<div class="kb-card-body"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:4px"><div style="min-width:0;flex:1">${c.specs&&c.specs['Print Size']?`<div style="font-size:14px;font-weight:700;color:#191918;line-height:1.25">${c.specs['Print Size']}</div>`:''}<div style="font-family:monospace;font-size:12.5px;font-weight:600;color:#374151;letter-spacing:.04em;margin-top:2px">${c.designId||c.title||''}</div></div>${udbTypeBadge(c.type)}</div>${c.due?`<div style="font-size:12px;font-weight:600;${overdue?'color:#dc2626':soon?'color:#f59e0b':'color:#9ca3af'}">Due ${c.due}</div>`:''}</div></div>`;}
+function udbCardHtml(c){const overdue=c.due&&(new Date(c.due)-new Date())/86400000<0,soon=udbIsDueSoon(c.due)&&!overdue;const prioBar=c.priority==='high'?`<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#ef4444;border-radius:10px 10px 0 0"></div>`:'';const _t=_thumbFor(c);const img=_t?`<img src="${_t}" class="kb-card-img" draggable="false" onerror="this.style.display='none'">`:`<div class="kb-card-img-ph"><svg width="32" height="32" fill="none" stroke="#bbb" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;return`<div id="udb-card-${c.id}" class="kb-card" draggable="true" ondragstart="udbDragStart(event,${c.id})" ondragend="udbDragEnd()" ondragover="udbCardDragOver(event,${c.id})" onclick="udbOpenCard(${c.id})">${prioBar}${img}<div class="kb-card-body"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;margin-bottom:4px"><div style="min-width:0;flex:1">${c.specs&&c.specs['Print Size']?`<div style="font-size:14px;font-weight:700;color:#191918;line-height:1.25">${c.specs['Print Size']}</div>`:''}<div style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;font-weight:600;color:#374151;letter-spacing:.04em;margin-top:2px">${c.designId||c.title||''}</div></div>${udbTypeBadge(c.type)}</div>${c.due?`<div style="font-size:12px;font-weight:600;${overdue?'color:#dc2626':soon?'color:#f59e0b':'color:#9ca3af'}">Due ${c.due}</div>`:''}</div></div>`;}
 function udbDragStart(e,id){UDB_DRAG_ID=id;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',String(id));}catch(_){}setTimeout(()=>{const el=document.getElementById('udb-card-'+id);if(el)el.classList.add('dragging');},0);}
 function udbDragEnd(){const el=document.getElementById('udb-card-'+UDB_DRAG_ID);if(el)el.classList.remove('dragging');document.querySelectorAll('.kb-col-body.drag-over').forEach(b=>b.classList.remove('drag-over'));document.querySelectorAll('.kb-col.dragging-into').forEach(c=>c.classList.remove('dragging-into'));UDB_DRAG_ID=null;UDB_DRAG_OVER_ID=null;udbRemoveGhost();}
 function udbCardDragOver(e,id){e.preventDefault();e.stopPropagation();document.querySelectorAll('.kb-col.dragging-into').forEach(c=>c.classList.remove('dragging-into'));const el=document.getElementById('udb-card-'+id);if(el){const col=el.closest('.kb-col');if(col)col.classList.add('dragging-into');}if(id===UDB_DRAG_ID)return;if(!el)return;const rect=el.getBoundingClientRect(),after=e.clientY>rect.top+rect.height/2;if(id!==UDB_DRAG_OVER_ID||after!==UDB_DRAG_AFTER){UDB_DRAG_OVER_ID=id;UDB_DRAG_AFTER=after;udbInsertGhost(id,after);}}
@@ -9337,7 +9337,7 @@ function udbClearBoard(){
   if(typeof udbToast==='function')udbToast('Board cleared');
 }
 window.udbBoardMenu=udbBoardMenu;window.udbClearBoard=udbClearBoard;
-function udbRenderList(){const tbody=document.getElementById('udb-list-tbody');if(!tbody)return;tbody.innerHTML=udbGetFiltered().map(c=>{const _t=_thumbFor(c);return `<tr>${_t ? `<td style="padding:4px 8px;width:52px"><img src="${_t}" style="width:44px;height:44px;object-fit:cover;border-radius:7px;border:1px solid #e5e4e0;display:block" onerror="this.style.display='none'"></td>` : `<td style="padding:4px 8px;width:52px"><div style="width:44px;height:44px;border-radius:7px;background:#f0ede9;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" fill="none" stroke="#ccc" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div></td>`}<td><div style="font-size:13.5px;font-weight:600;color:#191918">${c.title}</div><div style="font-size:12.5px;color:#9ca3af">${c.product||''}</div></td><td><span style="font-family:monospace;font-size:13px">#${c.order||'—'}</span></td><td>${udbTypeBadge(c.type)}</td><td>${udbStatBadge(c.col)}</td><td>${c.assignee||'<span style="color:#9ca3af">Unassigned</span>'}</td><td>${udbFmtDue(c.due)}</td><td style="white-space:nowrap">${udbListBtns(c)}</td></tr>`;}).join('');}
+function udbRenderList(){const tbody=document.getElementById('udb-list-tbody');if(!tbody)return;tbody.innerHTML=udbGetFiltered().map(c=>{const _t=_thumbFor(c);return `<tr>${_t ? `<td style="padding:4px 8px;width:52px"><img src="${_t}" style="width:44px;height:44px;object-fit:cover;border-radius:7px;border:1px solid #e5e4e0;display:block" onerror="this.style.display='none'"></td>` : `<td style="padding:4px 8px;width:52px"><div style="width:44px;height:44px;border-radius:7px;background:#f0ede9;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" fill="none" stroke="#ccc" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div></td>`}<td><div style="font-size:13.5px;font-weight:600;color:#191918">${c.title}</div><div style="font-size:12.5px;color:#9ca3af">${c.product||''}</div></td><td><span style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px">#${c.order||'—'}</span></td><td>${udbTypeBadge(c.type)}</td><td>${udbStatBadge(c.col)}</td><td>${c.assignee||'<span style="color:#9ca3af">Unassigned</span>'}</td><td>${udbFmtDue(c.due)}</td><td style="white-space:nowrap">${udbListBtns(c)}</td></tr>`;}).join('');}
 function udbListBtns(c){const open=`<button onclick="udbOpenCard(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer;margin-right:4px">Open</button>`;if(c.col==='review')return open+`<button onclick="udbApprove(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:none;background:#16a34a;color:#fff;cursor:pointer;margin-right:4px">Approve</button><button onclick="udbReject(${c.id})" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #dc2626;background:#fff;color:#dc2626;cursor:pointer">Reject</button>`;return open+`<button onclick="udbAdminAssign(${c.id},prompt('Assign to:'))" style="font-size:12px;padding:3px 8px;border-radius:5px;border:1.5px solid #e5e4e0;background:#fff;cursor:pointer">Assign</button>`;}
 function udbOpenCard(id){const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;const m=document.getElementById('udb-card-modal');if(!m)return;m.dataset.cardId=id;document.getElementById('ucm-title').textContent=c.title;document.getElementById('ucm-order').textContent='#'+(c.order||'—');document.getElementById('ucm-product').textContent=c.product||'';document.getElementById('ucm-type-badge').innerHTML=udbTypeBadge(c.type);document.getElementById('ucm-stat-badge').innerHTML=udbStatBadge(c.col);const priBadge=document.getElementById('ucm-pri-badge');if(priBadge)priBadge.style.display=c.priority==='high'?'':'none';const archBtn=document.getElementById('ucm-archive-btn');if(archBtn)archBtn.textContent=c.archived?'Unarchive':'Archive';const img=document.getElementById('ucm-ref-img'),ph=document.getElementById('ucm-ref-ph');{const _t=_thumbFor(c);if(_t){img.src=_t;img.style.display='block';if(ph)ph.style.display='none';}else{if(img)img.style.display='none';if(ph)ph.style.display='flex';}}const specsEl=document.getElementById('ucm-specs');if(specsEl)specsEl.innerHTML=Object.entries(c.specs||{}).length?Object.entries(c.specs).map(([k,v])=>`<div style="background:#f4f2ef;border-radius:7px;padding:7px 10px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${k}</div><input value="${String(v).replace(/"/g,'&quot;')}" onchange="udbUpdateSpec(${id},'${k}',this.value)" style="font-size:14px;font-weight:600;color:#191918;border:none;background:transparent;width:100%;outline:none;padding:0;font-family:inherit"></div>`).join(''):'<div style="color:#9ca3af;font-size:14px;padding:4px 0">No specs defined.</div>';udbRenderFiles(id);udbRenderActions(id);udbRenderHistoryList(id);m.classList.remove('modal-hidden');}
 function udbCloseCard(){const m=document.getElementById('udb-card-modal');if(m)m.classList.add('modal-hidden');}
@@ -10979,7 +10979,7 @@ function admRenderPendingTopups() {
         return '<tr style="border-top:1px solid #f3f3f1">'
           + '<td style="font-size:12.5px;color:#9ca3af;padding:10px 12px 10px 16px;white-space:nowrap">' + when + '</td>'
           + '<td style="font-size:13px;color:#191918;padding:10px 12px">' + String(who).replace(/</g, '&lt;') + '</td>'
-          + '<td style="font-family:monospace;font-size:12px;color:#b45309;padding:10px 12px">' + (t.ref || '—') + (t.method ? '<div style="font-family:inherit;font-size:11px;color:#6b7280;margin-top:2px">' + String(t.method).replace(/</g, '&lt;') + '</div>' : '') + '</td>'
+          + '<td style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;color:#b45309;padding:10px 12px">' + (t.ref || '—') + (t.method ? '<div style="font-family:inherit;font-size:11px;color:#6b7280;margin-top:2px">' + String(t.method).replace(/</g, '&lt;') + '</div>' : '') + '</td>'
           + '<td style="font-weight:700;color:#15803d;padding:10px 12px;text-align:right;white-space:nowrap">+$' + Number(t.amount_usd || 0).toFixed(2) + '<span style="color:#9ca3af;font-weight:500;font-size:11.5px"> ' + vnd + '</span></td>'
           + '<td style="padding:10px 16px 10px 12px;text-align:right;white-space:nowrap">'
             + (t.attachment ? '<button onclick="admViewProof(\'' + t.id + '\')" title="View payment proof" style="background:#fff;border:1.5px solid #e5e4e0;color:#374151;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit">Proof</button> ' : '')
@@ -11222,8 +11222,8 @@ function walRenderLedger() {
     return '<tr style="border-top:1px solid #f3f3f1">'
       + '<td style="font-size:12.5px;color:#9ca3af;padding:11px 12px 11px 18px;font-variant-numeric:tabular-nums">' + when + '</td>'
       + '<td style="padding:11px 12px"><span style="font-size:11px;font-weight:700;color:' + typeColor + ';text-transform:uppercase;letter-spacing:.04em">' + typeLbl + '</span></td>'
-      + '<td style="font-family:monospace;font-size:12.5px;color:#374151;padding:11px 12px">' + (e.orderId || '—') + '</td>'
-      + '<td style="font-family:monospace;font-size:12px;color:#9ca3af;padding:11px 12px">' + (e.txnId || '—') + '</td>'
+      + '<td style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12.5px;color:#374151;padding:11px 12px">' + (e.orderId || '—') + '</td>'
+      + '<td style="font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;color:#9ca3af;padding:11px 12px">' + (e.txnId || '—') + '</td>'
       + '<td style="font-size:13px;color:#191918;padding:11px 12px">' + (e.label || '—') + '</td>'
       + '<td style="font-weight:700;color:' + amtColor + ';padding:11px 18px 11px 12px;text-align:right;font-variant-numeric:tabular-nums">' + sign + '$' + Number(e.amount||0).toFixed(2) + '</td>'
       + '</tr>';

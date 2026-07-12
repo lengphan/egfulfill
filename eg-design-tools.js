@@ -962,7 +962,7 @@
     var st = document.createElement('style'); st.id = 'egdt-vdd-css';
     st.textContent =
       '.egdt-vdd{position:relative;display:inline-flex;align-items:center;flex-shrink:0}' +
-      '.egdt-vdd-btn{border:none;background:transparent;font-family:inherit;font-size:11.5px;font-weight:600;color:#374151;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 2px;outline:none}' +
+      '.egdt-vdd-btn{border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:#374151;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 2px;outline:none}' +
       '.egdt-vdd-btn svg{flex-shrink:0;opacity:.5}' +
       '.egdt-vdd-menu{display:none;position:fixed;z-index:99999;background:#fff;border:1.5px solid #191918;box-shadow:3px 3px 0 rgba(25,25,24,.16);min-width:130px;max-height:280px;overflow-y:auto}' +
       '.egdt-vdd-menu.open{display:block}' +
@@ -1133,7 +1133,7 @@
     // "new" selling-mode order reads identically to an in-review one; the values
     // just happen to be live controls. Replaces the old cluttered pill cluster.
     var _lbl = 'font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap';
-    var selSm = 'border:1px solid #e5e4e0;border-radius:6px;background:#fff;font-size:11.5px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 7px;text-overflow:ellipsis';
+    var selSm = 'border:1px solid #e5e4e0;border-radius:6px;background:#fff;font-size:13px;font-weight:600;color:#374151;font-family:inherit;cursor:pointer;outline:none;padding:3px 7px;text-overflow:ellipsis';
     function _field(label, ctrl) { return '<div style="display:inline-flex;align-items:center;gap:7px;white-space:nowrap">' + '<span style="' + _lbl + '">' + label + '</span>' + ctrl + '</div>'; }
     var pickers = '';
     if (can('design.edit', o)) {
@@ -1197,6 +1197,25 @@
       // Current values shown on each button (placeholder when unchosen). Method
       // shows its readable label to match the menu items.
       var _curMethodLabel = curPt ? (PRINT_LABELS[String(curPt).toUpperCase()] || curPt) : '';
+      // STOCK — read-only, informational: the variant's on-hand count from the
+      // shared inventory store. Not a control, just styled like the other column
+      // values (same 13px value). Mirrors the boards' sku resolution: exact sku,
+      // then the sku with a trailing print-method suffix (-DTG/-EMB/…) stripped.
+      var _stockTxt = '—';
+      try {
+        var _inv = (window.EGStore && EGStore.getInventory) ? (EGStore.getInventory() || []) : [];
+        if (_inv.length) {
+          var _base = String(it.sku || '').replace(/-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i, '');
+          var _skuCands = [it.sku, _base, sku].filter(Boolean).map(function (s) { return String(s).toUpperCase(); });
+          for (var _ii = 0; _ii < _inv.length; _ii++) {
+            if (_skuCands.indexOf(String(_inv[_ii].sku || '').toUpperCase()) >= 0) {
+              if (_inv[_ii].inStock != null) _stockTxt = String(_inv[_ii].inStock);
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+      var _stockCtrl = '<span title="On hand" style="display:inline-block;font-size:13px;font-weight:600;color:#374151;padding:2px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(_stockTxt) + '</span>';
       // Fixed-width labeled columns replace the old middot-separated inline row.
       // The _vdd inner width is a touch under the column so the button + caret sit
       // inside; long blank names truncate with ellipsis inside the fixed column.
@@ -1205,6 +1224,7 @@
         + _col('Color', 96, _vdd(_curColor, 'Select', 88, _colorItems))
         + _col('Size', 58, _vdd(_curSize, 'Select', 50, _sizeItems))
         + _col('Method', 90, _vdd(_curMethodLabel, 'Select', 82, _methodItems))
+        + _col('Stock', 70, _stockCtrl)
         + '</div>';
     }
     // DESIGN field carries the Upload control; Templates + Design Maker fold into
@@ -2782,7 +2802,7 @@
 
   // Build stamp — check `EG_BUILD` in the browser console to confirm a deploy actually
   // landed (ends the "is it cached?" guessing). Bump this string on meaningful changes.
-  window.EG_BUILD = '2026-07-09-boardcaps';
+  window.EG_BUILD = '2026-07-12-rowvals-stock';
   // Inject the row status-dot CSS once at load so the seller item-wraps get the
   // :has()/complete rules even before any factory itemRowLayout runs.
   try { if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureRowDotCss); else _ensureRowDotCss(); } } catch (e) {}
