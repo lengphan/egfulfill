@@ -331,6 +331,15 @@
   function _loadingHTML(msg) {
     return '<div class="epx-muted" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:48px 0"><span class="epx-spin"></span>' + esc(msg || 'Loading…') + '</div>';
   }
+  // Render + paginate, but NEVER let a render bug masquerade as a fetch failure ("couldn't reach").
+  // Surface the REAL error to console + on-page so client bugs are debuggable, not hidden.
+  function _safeRender(body, list, emptyMsg) {
+    try { renderList(body, list, emptyMsg); _renderPagers(body); }
+    catch (err) {
+      console.error('[NewIn] render failed:', err);
+      body.innerHTML = '<div class="epx-muted" style="color:#b91c1c;padding:32px;text-align:center;word-break:break-word">Display error: ' + esc((err && err.message) || String(err)) + '</div>';
+    }
+  }
   function loadNewIn(search, page) {
     var body = $('epx-newin-body'); if (!body) return;
     if (search != null) _newinSearch = search;   // a new search resets to page 1 (page arg omitted)
@@ -345,13 +354,12 @@
         if (d && d.synced && d.styles && d.styles.length && (d.total || 0) >= MIN_SYNCED) {         // synced catalog → instant
           _newinTotal = d.total || d.styles.length;
           if (status) status.textContent = _newinTotal.toLocaleString() + ' in catalog · synced';
-          renderList(body, d.styles, _newinSearch ? 'No synced styles match “' + esc(_newinSearch) + '”.' : 'No styles synced.');
-          _renderPagers(body);
+          _safeRender(body, d.styles, _newinSearch ? 'No synced styles match “' + esc(_newinSearch) + '”.' : 'No styles synced.');
           return;
         }
         _loadNewInLive(_newinSearch, body, status, offset);                       // sparse/none synced → full live S&S
       })
-      .catch(function () { _loadNewInLive(_newinSearch, body, status, offset); });
+      .catch(function (err) { console.error('[NewIn] synced fetch failed:', err); _loadNewInLive(_newinSearch, body, status, offset); });
   }
   function _loadNewInLive(search, body, status, offset) {
     if (status) status.textContent = 'Searching S&S…';
@@ -367,10 +375,9 @@
         var list = (res.d && res.d.styles) || [];
         _newinTotal = (res.d && res.d.total != null) ? res.d.total : list.length;
         if (status) status.textContent = _newinTotal.toLocaleString() + ' in catalog';
-        renderList(body, list, search ? 'No S&S styles match “' + esc(search) + '”.' : 'No styles returned from S&S.');
-        _renderPagers(body);
+        _safeRender(body, list, search ? 'No S&S styles match “' + esc(search) + '”.' : 'No styles returned from S&S.');
       })
-      .catch(function () { body.innerHTML = '<div class="epx-muted">Couldn’t reach the S&S catalog.</div>'; if (status) status.textContent = ''; });
+      .catch(function (err) { console.error('[NewIn] live fetch failed:', err); body.innerHTML = '<div class="epx-muted">Couldn’t reach the S&S catalog.</div>'; if (status) status.textContent = ''; });
   }
   // ── Pagination (mono): the S&S catalog is thousands of styles; 60/page, top-right + bottom-centre. ──
   function _pageCount() { return Math.max(1, Math.ceil((_newinTotal || 0) / _newinLimit)); }
