@@ -2684,17 +2684,34 @@
         if (!art) { done(false, 'Could not load that design'); return; }
         // 1) Fill the mockup — cache the reused artwork on this line (the row reads getRawDesign).
         try { if (window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(ord, key, art); } catch (e) {}
-        // 2) Mark the line as a REUSE so the push flow skips a fresh card (design already made).
-        try {
-          var m = JSON.parse(localStorage.getItem('eg_reused_lines') || '{}');
-          m[ord + '|' + key] = { libId: libId, at: Date.now() };
-          localStorage.setItem('eg_reused_lines', JSON.stringify(m));
-        } catch (e) {}
-        // 3) Re-render the board + row so the mockup fills immediately, then close the popover.
-        try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch (e) {}
-        try { if (typeof refreshBoard === 'function') refreshBoard(); } catch (e) {}
-        var pop = document.getElementById('egdt-dup-pop'); if (pop) pop.remove();
-        done(true, 'Design reused — mockup filled; it won’t need a new board card');
+        // Finalise: record the reuse (push skips this line), re-render, close the popover.
+        function _finish(madeDesignId, msg) {
+          try {
+            var m = JSON.parse(localStorage.getItem('eg_reused_lines') || '{}');
+            m[ord + '|' + key] = { libId: libId, designId: madeDesignId || null, at: Date.now() };
+            localStorage.setItem('eg_reused_lines', JSON.stringify(m));
+          } catch (e) {}
+          try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch (e) {}
+          try { if (typeof refreshBoard === 'function') refreshBoard(); } catch (e) {}
+          var pop = document.getElementById('egdt-dup-pop'); if (pop) pop.remove();
+          done(true, msg);
+        }
+        // 2) INHERIT the already-made files: if this exact artwork was digitised before, attach its
+        //    EMB to the factory (this line's order+sku). The PES stays keyed by that made Design ID,
+        //    which the seller already downloads — so emb→factory, pes→seller carry over, no re-work.
+        if (window.EGStore && EGStore.findMadeDesignByArtwork) {
+          EGStore.findMadeDesignByArtwork(art, function (madeDesignId) {
+            if (madeDesignId) {
+              try {
+                var emb = EGStore.getDesignAsset && EGStore.getDesignAsset(madeDesignId, 'emb');
+                if (emb && emb.dataUrl && EGStore.setItemEmbFile) EGStore.setItemEmbFile(ord, key, { name: emb.name, dataUrl: emb.dataUrl });
+              } catch (e) {}
+              _finish(madeDesignId, 'Reused ' + madeDesignId + ' — mockup + already-made files attached');
+            } else {
+              _finish(null, 'Design reused — mockup filled (no made files found for this artwork yet)');
+            }
+          });
+        } else { _finish(null, 'Design reused — mockup filled; it won’t need a new board card'); }
       })
       .catch(function () { done(false, 'Could not load that design'); });
   }

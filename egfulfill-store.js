@@ -3015,6 +3015,45 @@
     fetchDesignAsset: function(designId, kind, cb) {
       if (this.fetchDesignFile) this.fetchDesignFile(this._designAssetKey(designId, kind), cb); else if (cb) cb(null);
     },
+    // ── Made-design index (reuse: inherit files across orders by ARTWORK hash) ──
+    // When a design's EMB/PES is made, we index it by the SHA-256 of its ARTWORK, so the SAME
+    // artwork appearing on a future order line can inherit those files (factory EMB + seller PES)
+    // instead of being re-digitised. Keyed by artwork hash → the made design's Design ID.
+    MADE_BY_HASH_KEY: 'eg_made_by_hash',
+    _hashDataUrl: function(dataUrl, cb) {
+      cb = cb || function(){};
+      try {
+        var s = String(dataUrl || ''), b64 = s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s;
+        if (!b64 || !(window.crypto && crypto.subtle)) { cb(null); return; }
+        var bin = atob(b64), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        crypto.subtle.digest('SHA-256', bytes).then(function(buf) {
+          cb(Array.prototype.map.call(new Uint8Array(buf), function(x){ return x.toString(16).padStart(2, '0'); }).join(''));
+        }).catch(function(){ cb(null); });
+      } catch(e){ cb(null); }
+    },
+    recordMadeDesignHash: function(designId, artworkDataUrl) {
+      if (!designId || !artworkDataUrl) return;
+      var self = this;
+      this._hashDataUrl(artworkDataUrl, function(hex) {
+        if (!hex) return;
+        try {
+          var m = JSON.parse(localStorage.getItem(self.MADE_BY_HASH_KEY) || '{}');
+          if (!m || typeof m !== 'object') m = {};
+          m[hex] = { designId: designId, at: Date.now() };
+          localStorage.setItem(self.MADE_BY_HASH_KEY, JSON.stringify(m));
+        } catch(e){}
+      });
+    },
+    findMadeDesignByArtwork: function(artworkDataUrl, cb) {
+      cb = cb || function(){};
+      var self = this;
+      this._hashDataUrl(artworkDataUrl, function(hex) {
+        if (!hex) { cb(null); return; }
+        try { var m = JSON.parse(localStorage.getItem(self.MADE_BY_HASH_KEY) || '{}'); cb((m && m[hex]) ? m[hex].designId : null); }
+        catch(e){ cb(null); }
+      });
+    },
     DESIGN_FILE_PAID_KEY: 'eg_design_file_paid',
     hasPaidForDesignFile: function(designId) {
       try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_PAID_KEY) || '{}'); return !!m[designId]; } catch(e){ return false; }
@@ -3583,6 +3622,12 @@
           if (card && card.designId && self.setDesignAsset) {
             if (isPes)          self.setDesignAsset(card.designId, 'pes', { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
             else if (isMachine) self.setDesignAsset(card.designId, 'emb', { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
+            // Index this design by its ARTWORK hash so the SAME artwork on a future order line can
+            // INHERIT these made files (the reuse flow looks it up). Only a real made file counts.
+            if ((isMachine || isPes) && self.recordMadeDesignHash && self.getRawDesign) {
+              var _art = self.getRawDesign(opts.orderNum, opts.sku);
+              if (_art && /^data:/.test(String(_art))) self.recordMadeDesignHash(card.designId, _art);
+            }
           }
           // Stamp emb metadata on an existing card so the row's EMB detection is
           // unambiguous even when the item has no print method set.
