@@ -290,8 +290,8 @@ html.eg-board-on[data-theme=dark] [style*="background:#f4f2ef"],html.eg-board-on
 html.eg-board-on[data-theme=dark] [style*="color:#191918"],html.eg-board-on[data-theme=dark] [style*="color:#111827"]{color:#e8e4dd!important}
 
 /* ════ ORDERS / data tables — the DATA itself on-theme (was Inter / system-mono) ════ */
-/* order IDs + age + money + store-source → Departure Mono */
-html.eg-board-on .dtable td[data-col="order"] > div{font-family:var(--bos-mono)!important}
+/* order IDs + age + money + store-source → sans (content reads sans; mono stays on nav/header) */
+html.eg-board-on .dtable td[data-col="order"] > div{font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
 html.eg-board-on .dtable td[data-col="total"]{font-variant-numeric:tabular-nums}
 html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:0}
 /* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
@@ -312,7 +312,7 @@ html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tra
    ══════════════════════════════════════════════════════════════════════════════ */
 /* shape + type — safe in both themes */
 html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:0!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
-html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:400!important}
+html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:600!important}
 html.eg-board-on .pill-btn{font-family:var(--bos-sans)!important;font-weight:600!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
 html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:uppercase!important;letter-spacing:.06em!important;font-weight:600!important;font-size:11px!important}
 /* settings sub-nav a touch larger so it isn't smaller than the form labels */
@@ -453,7 +453,7 @@ html.eg-board-on .trend-up,html.eg-board-on .trend-dn,html.eg-board-on .trend-do
   font-size:11px!important;font-weight:400!important;padding:2px 7px!important;letter-spacing:.02em!important;border:none!important}
 html[data-theme=dark].eg-board-on .trend-up,html[data-theme=dark].eg-board-on .trend-dn,html[data-theme=dark].eg-board-on .trend-down,html[data-theme=dark].eg-board-on .trend-flat{
   background:rgba(216,212,204,.14)!important;color:#e8e4dd!important}
-html.eg-board-on .wcard span[style*="color:#9ca3af"],html.eg-board-on .stat-card span[style*="color:#9ca3af"],html.eg-board-on .ccard span[style*="color:#9ca3af"]{color:var(--bos-grey)!important;font-family:var(--bos-mono)!important;font-size:11px!important;letter-spacing:.02em!important}
+html.eg-board-on .wcard span[style*="color:#9ca3af"],html.eg-board-on .stat-card span[style*="color:#9ca3af"],html.eg-board-on .ccard span[style*="color:#9ca3af"]{color:var(--bos-grey)!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;font-size:11px!important;letter-spacing:.02em!important}
 
 /* ── RETRO-WINDOW "title bar" chrome on the stat cards ──────────────────────────
    Each card's mono eyebrow label reads like an old window title bar: a small cobalt
