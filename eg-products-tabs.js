@@ -63,6 +63,8 @@
       ".epx-card .mt{font-family:" + mono + ";font-size:10.5px;color:#6b7280;line-height:1.4}" +
       ".epx-swatches{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px}" +
       ".epx-swatches .sw{width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);flex:0 0 auto}" +
+      "@keyframes epxspin{to{transform:rotate(360deg)}}" +
+      ".epx-spin{width:16px;height:16px;border:2px solid #d1d5db;border-top-color:#191918;border-radius:50%;display:inline-block;animation:epxspin .7s linear infinite;flex:0 0 auto}" +
       ".epx-card .cardfoot{margin-top:auto;padding-top:10px}" +
       ".epx-add{border:1.5px solid #191918;background:#fff;color:#191918;font-family:" + mono + ";font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:8px 11px;cursor:pointer;border-radius:0;transition:background .12s,color .12s;width:100%}" +
       ".epx-add:hover{background:#2f4bf0;color:#fff;border-color:#2f4bf0}" +
@@ -326,10 +328,14 @@
   // empty OR sparse — a partial/test sync must NOT hide the full live browse.
   var MIN_SYNCED = 24; // below this, the synced table is a partial/test sync → browse LIVE instead.
   var _newinLimit = 60, _newinPage = 1, _newinTotal = 0, _newinSearch = '';
+  function _loadingHTML(msg) {
+    return '<div class="epx-muted" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:48px 0"><span class="epx-spin"></span>' + esc(msg || 'Loading…') + '</div>';
+  }
   function loadNewIn(search, page) {
     var body = $('epx-newin-body'); if (!body) return;
     if (search != null) _newinSearch = search;   // a new search resets to page 1 (page arg omitted)
     _newinPage = page || 1;
+    body.innerHTML = _loadingHTML('Loading the S&S catalog…');   // animated spinner so it's clearly working, not frozen
     var status = $('epx-status'); if (status) status.textContent = 'Loading catalog…';
     var offset = (_newinPage - 1) * _newinLimit;
     var qs = (_newinSearch ? '&search=' + encodeURIComponent(_newinSearch) : '') + '&offset=' + offset;

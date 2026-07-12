@@ -203,36 +203,39 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
   // live catalog. The whole style list (~thousands of small rows) is cached in
   // memory for 5 min so search/paging keystrokes don't refetch it every time.
   let _stylesCache = { at: 0, data: null };
-  async function fetchStyles() {
-    const now = Date.now();
-    if (_stylesCache.data && (now - _stylesCache.at) < 30 * 60 * 1000) return _stylesCache.data;   // 30-min cache: the catalog list rarely changes
-    try {
-    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 60000, true);   // 60s + BYPASS the cap: critical, one call, must never be starved
+  let _stylesRefreshing = null;
+  async function _pullStyles() {
+    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 60000, true);   // 60s + BYPASS the cap
     if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
     const mapped = r.data.map((s) => ({
       styleID: String(s.styleID),
       brand: s.brandName || '',
       title: ((s.brandName ? s.brandName + ' ' : '') + (s.title || '')).trim() || (s.title || ''),
       category: s.baseCategory || '',
-      // styleImage is frequently null/unusable on this account. ssImg CDN-prefixes any
-      // relative path (incl. a bare filename with no leading slash), so the client's fast
-      // path works when it IS present; when it's null the client lazy-loads the reliable
-      // colorFrontImage via GET /api/ss/style/:id (see eg-products-tabs.js).
       image: ssImg(s.styleImage)
     })).filter((s) => s.styleID);
-    _stylesCache = { at: now, data: mapped };
+    _stylesCache = { at: Date.now(), data: mapped };
     q(`insert into ss_styles_cache (id, data, at) values (1,$1,now()) on conflict (id) do update set data=excluded.data, at=now()`, [JSON.stringify(mapped)]).catch(() => {});
     return mapped;
-    } catch (e) {
-      // S&S slow / rate-limited / timed out — serve the last-known list so New In never dies with
-      // "couldn't reach". Memory first, then the DB copy (survives restarts + prolonged S&S outages).
-      if (_stylesCache.data) return _stylesCache.data;
+  }
+  async function fetchStyles() {
+    const now = Date.now();
+    if (_stylesCache.data && (now - _stylesCache.at) < 30 * 60 * 1000) return _stylesCache.data;   // fresh in-memory → serve
+    // Cold memory (right after a deploy/restart) → SEED from the DB copy so browsing is INSTANT, never hangs.
+    if (!_stylesCache.data) {
       try {
         const row = (await q('select data from ss_styles_cache where id=1')).rows[0];
-        if (row && Array.isArray(row.data) && row.data.length) { _stylesCache = { at: 0, data: row.data }; return row.data; }
-      } catch (e2) {}
-      throw e;
+        if (row && Array.isArray(row.data) && row.data.length) _stylesCache = { at: 0, data: row.data };   // mark stale → refreshed below
+      } catch (e) {}
     }
+    // Have (possibly stale) data → serve NOW + refresh S&S in the BACKGROUND. The request never blocks on S&S.
+    if (_stylesCache.data) {
+      if (!_stylesRefreshing) _stylesRefreshing = _pullStyles().catch(() => {}).then(() => { _stylesRefreshing = null; });
+      return _stylesCache.data;
+    }
+    // No memory + no DB copy yet (first ever) → pull once, coalesced across concurrent callers.
+    if (!_stylesRefreshing) _stylesRefreshing = _pullStyles().then((m) => { _stylesRefreshing = null; return m; }, (e) => { _stylesRefreshing = null; throw e; });
+    return _stylesRefreshing;
   }
 
   app.get('/api/ss/styles', { preHandler: requireStaff }, async (req, reply) => {
