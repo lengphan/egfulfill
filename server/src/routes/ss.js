@@ -611,4 +611,47 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     }
     return list;
   });
+
+  // ── S&S order placement (PO) — SAFE by default ────────────────────────────────
+  // Places a purchase order with S&S via REST v2 POST /orders (same Basic auth as catalog).
+  // TWO SAFETY GATES so a test can never charge/ship by accident:
+  //   1) DRY RUN unless env SS_ORDER_LIVE='1' → returns the built payload WITHOUT contacting S&S.
+  //   2) Even when live, testOrder:true (S&S Test mode) unless the request passes { live:true }.
+  // CONFIRM the exact S&S Orders field names (line identifier, testOrder flag, shippingMethod)
+  // against your S&S "Orders_Post" API doc before flipping SS_ORDER_LIVE — S&S gates those docs.
+  app.post('/api/ss/order', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const b = req.body || {};
+    const lines = (Array.isArray(b.lines) ? b.lines : [])
+      .map((l) => ({ identifier: String(l.sku || l.identifier || '').trim(), qty: parseInt(l.qty, 10) || 0 }))
+      .filter((l) => l.identifier && l.qty > 0);
+    if (!lines.length) { reply.code(400); return { error: 'No order lines — each needs a sku + qty.' }; }
+    const wantLive = b.live === true;
+    const payload = {
+      testOrder: !wantLive,                          // S&S Test mode unless the caller explicitly asks for a live order
+      poNumber: b.poNumber || ('EG-' + Date.now()),
+      shippingMethod: b.shippingMethod || '1',
+      warehouseAbbr: b.warehouseAbbr || undefined,   // pickup DC (optional)
+      shippingAddress: b.shippingAddress || undefined,
+      emailConfirmation: b.email || undefined,
+      lines
+    };
+    // GATE 1 — never contact S&S unless SS_ORDER_LIVE='1'. Default = DRY RUN (return the payload only).
+    if (String(process.env.SS_ORDER_LIVE || '') !== '1') {
+      return { dryRun: true, note: 'SS_ORDER_LIVE!=1 → NOT sent to S&S. Review this payload + confirm the fields against the S&S Orders doc, then set SS_ORDER_LIVE=1 to enable (starts in Test mode).', payload };
+    }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(SS_BASE + '/orders/', {
+        method: 'POST',
+        headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch (e) { data = txt; }
+      if (!r.ok) { reply.code(502); return { error: 'S&S rejected the order', status: r.status, testOrder: payload.testOrder, detail: data }; }
+      return { ok: true, testOrder: payload.testOrder, ssResponse: data };
+    } catch (e) {
+      reply.code(502); return { error: 'S&S order request failed', detail: String((e && e.message) || e) };
+    }
+  });
 }
