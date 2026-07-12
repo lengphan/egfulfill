@@ -63,8 +63,10 @@
       ".epx-card .mt{font-family:" + mono + ";font-size:10.5px;color:#6b7280;line-height:1.4}" +
       ".epx-swatches{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:2px}" +
       ".epx-swatches .sw{width:15px;height:15px;border-radius:4px;border:1px solid rgba(0,0,0,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);flex:0 0 auto}" +
-      "@keyframes epxspin{to{transform:rotate(360deg)}}" +
-      ".epx-spin{width:16px;height:16px;border:2px solid #d1d5db;border-top-color:#191918;border-radius:50%;display:inline-block;animation:epxspin .7s linear infinite;flex:0 0 auto}" +
+      "@keyframes epxbar{to{background-position:8px 0}}" +
+      ".epx-bar{width:240px;height:22px;border:1.5px solid #191918;padding:3px 4px;box-sizing:border-box}" +   /* sharp edges */
+      ".epx-bar>i{display:block;width:100%;height:100%;background:repeating-linear-gradient(90deg,#2f4bf0 0 4px,transparent 4px 8px);animation:epxbar .4s linear infinite}" +   /* cobalt accent */
+      "html[data-theme=dark] .epx-bar{border-color:#c9c3ba}" +
       ".epx-card .cardfoot{margin-top:auto;padding-top:10px}" +
       ".epx-add{border:1.5px solid #191918;background:#fff;color:#191918;font-family:" + mono + ";font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:8px 11px;cursor:pointer;border-radius:0;transition:background .12s,color .12s;width:100%}" +
       ".epx-add:hover{background:#2f4bf0;color:#fff;border-color:#2f4bf0}" +
@@ -329,7 +331,9 @@
   var MIN_SYNCED = 24; // below this, the synced table is a partial/test sync → browse LIVE instead.
   var _newinLimit = 60, _newinPage = 1, _newinTotal = 0, _newinSearch = '';
   function _loadingHTML(msg) {
-    return '<div class="epx-muted" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:48px 0"><span class="epx-spin"></span>' + esc(msg || 'Loading…') + '</div>';
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:13px;padding:56px 0">'
+      + '<div class="epx-bar"><i></i></div>'
+      + '<div class="epx-muted">' + esc(msg || 'Loading…') + '</div></div>';
   }
   // Render + paginate, but NEVER let a render bug masquerade as a fetch failure ("couldn't reach").
   // Surface the REAL error to console + on-page so client bugs are debuggable, not hidden.
@@ -391,6 +395,7 @@
   }
   function _pagerHTML(pos) {
     var pages = _pageCount(); if (pages <= 1) return '';
+    var mono = "'DepartureMono',ui-monospace,SFMono-Regular,Menlo,monospace";   // local: the module `mono` is scoped elsewhere
     var cur = _newinPage;
     var pbtn = function (label, page, disabled, active) {
       return '<button type="button" ' + (disabled ? 'disabled ' : '') + 'onclick="EGProdTabs.gotoNewInPage(' + page + ')" '
