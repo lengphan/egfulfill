@@ -754,12 +754,13 @@ let DB_COLUMNS = [
   { id:'incoming',   name:'Incoming',    color:'#9ca3af' },
   { id:'inprogress', name:'In Progress', color:'#6b7280' },
   { id:'review',     name:'In Review',   color:'#4b5563' },
+  { id:'fix',        name:'Fix',         color:'#b45309' },
   { id:'approved',   name:'Approved',    color:'#191918' },
   { id:'paid',       name:'Paid',        color:'#6b7280' },
 ];
 // Designer-customizable columns (color + name + order) — persisted per designer.
 const DB_COLS_KEY = 'eg_designer_board_cols';
-(function(){ try { if (localStorage.getItem('eg_designer_board_cols_ver') !== 'scheme1') { localStorage.removeItem(DB_COLS_KEY); localStorage.setItem('eg_designer_board_cols_ver','scheme1'); } var s = JSON.parse(localStorage.getItem(DB_COLS_KEY) || 'null'); if (Array.isArray(s) && s.length) DB_COLUMNS = s; } catch(e){} })();
+(function(){ try { if (localStorage.getItem('eg_designer_board_cols_ver') !== 'scheme1') { localStorage.removeItem(DB_COLS_KEY); localStorage.setItem('eg_designer_board_cols_ver','scheme1'); } var s = JSON.parse(localStorage.getItem(DB_COLS_KEY) || 'null'); if (Array.isArray(s) && s.length) { /* inject the Fix re-edit lane into pre-existing saved layouts (before Approved) without wiping custom columns */ if(!s.some(function(c){return c.id==='fix';})){var _ai=s.findIndex(function(c){return c.id==='approved';});var _fx={id:'fix',name:'Fix',color:'#b45309'};if(_ai>=0)s.splice(_ai,0,_fx);else s.push(_fx);try{localStorage.setItem(DB_COLS_KEY,JSON.stringify(s));}catch(e){}} DB_COLUMNS = s; } } catch(e){} })();
 function dbSaveCols(){ try { localStorage.setItem(DB_COLS_KEY, JSON.stringify(DB_COLUMNS)); } catch(e){} }
 
 // Preset palette + "+" for any custom color via the OS color wheel.
@@ -817,7 +818,9 @@ const DESIGN_STORE_KEY = 'egfulfill_design_cards';
   const VKEY = 'egfulfill_design_board_version', CURRENT = 'v4-dedupe';
   try {
     if (localStorage.getItem(VKEY) !== CURRENT) {
-      localStorage.removeItem(DESIGN_STORE_KEY);
+      // DATA-LOSS GUARD: cards are server-authoritative now and carry a durable thumb, but the
+      // localStorage blob (thumb/emb bytes) is NOT restored by the server hydrate — so wiping here
+      // would permanently destroy those. Never remove the cards; only stamp the version.
       localStorage.setItem(VKEY, CURRENT);
     }
   } catch(e) {}
@@ -830,8 +833,8 @@ function _thumbFor(c) {
   // Resolve the real pushed design first (cached by pushToDesignBoard via cacheRawDesign /
   // cacheImage, keyed by order+sku) — the card itself only stores a placehold.co placeholder.
   if (c.order && c.sku && typeof EGStore !== 'undefined') {
-    if (EGStore.getRawDesign) {
-      const raw = EGStore.getRawDesign(c.order, c.sku);
+    if (EGStore.getDisplayThumb) {
+      const raw = EGStore.getDisplayThumb(c.order, c.sku);
       if (raw && /^(data:|https?:)/i.test(String(raw))) return raw;
     }
     if (EGStore.getCachedImage) {
@@ -1065,12 +1068,19 @@ function dbDrop(e, colId) {
 function dbHydrateDesigns() {
   if (typeof EGStore === 'undefined' || !EGStore.hydrateOrderDesigns) return;
   window._dbDesignHydrated = window._dbDesignHydrated || {};
-  const orders = {};
-  DB_CARDS.forEach(function (c) { if (c && c.order) orders[c.order] = 1; });
-  Object.keys(orders).forEach(function (ord) {
-    if (window._dbDesignHydrated[ord]) return;
-    window._dbDesignHydrated[ord] = true;
-    try { EGStore.hydrateOrderDesigns(ord).then(function (rows) { if (rows && rows.length) { try { dbRender(); } catch (e) {} } }); } catch (e) {}
+  const allOrders = (EGStore.getOrders && EGStore.getOrders()) || [];
+  const seen = {};
+  DB_CARDS.forEach(function (c) {
+    if (!c || !c.order || seen[c.order]) return;
+    seen[c.order] = 1;
+    // The card stores the order NUMBER, but the server keys designs by order ID — for
+    // Etsy orders id ('etsy-…') ≠ num, so hydrating by num alone missed and the composite
+    // never resolved. Resolve the real order and pass (id, num) like the factory boards do.
+    const o = allOrders.find(function (x) { return x && (String(x.num) === String(c.order) || String(x.id) === String(c.order)); });
+    const oid = (o && o.id) || c.order, onum = (o && o.num) || c.order;
+    if (window._dbDesignHydrated[oid]) return;
+    window._dbDesignHydrated[oid] = true;
+    try { EGStore.hydrateOrderDesigns(oid, onum).then(function (rows) { if (rows && rows.length) { try { dbRender(); } catch (e) {} } }); } catch (e) {}
   });
 }
 function dbRender() {
@@ -1242,6 +1252,7 @@ function renderAction(c) {
   if (DB_ROLE==='designer') {
     if (c.col==='incoming'&&!c.assignee) el.innerHTML = `<button onclick="dbClaim()" class="btn btn-dk" style="width:100%;justify-content:center">Claim Card →</button>`;
     else if (c.col==='inprogress') el.innerHTML = `<button onclick="dbSubmit()" class="btn" style="width:100%;justify-content:center;background:#2f4bf0;color:#fff">Submit for Review →</button>`;
+    else if (c.col==='fix') el.innerHTML = `<div style="font-size:12.5px;color:#b45309;text-align:center;padding:7px;background:#fff7ed;border-radius:8px;font-weight:600;margin-bottom:8px">✎ Changes requested — re-edit the files, then resubmit</div><button onclick="dbSubmit()" class="btn" style="width:100%;justify-content:center;background:#2f4bf0;color:#fff">Resubmit for Review →</button>`;
     else if (c.col==='review') el.innerHTML = `<div style="font-size:13px;color:#9ca3af;text-align:center;padding:8px;background:#f9f8f7;border-radius:8px">Awaiting admin review…</div>`;
     else if (c.col==='approved') el.innerHTML = `<div style="font-size:13px;color:#15803d;text-align:center;padding:8px;background:#f0fdf4;border-radius:8px;font-weight:600">✓ $${c.payment} added to balance</div>`;
     else if (c.col==='paid') el.innerHTML = `<div style="font-size:13px;color:#2f4bf0;text-align:center;padding:8px;background:#f5f3ff;border-radius:8px;font-weight:600">💸 Payment released</div>`;
@@ -1273,9 +1284,9 @@ function dbSubmit() {
 }
 function dbMoveBack() {
   const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;
-  c.col = 'inprogress';
-  c.notes.push({author:'Admin',avatar:'A',text:'Changes requested — moved back to In Progress.',ts:now()});
-  dbSave(); closeCardModal(); dbRender(); toast('Moved back to In Progress');
+  c.col = 'fix';
+  c.notes.push({author:'Admin',avatar:'A',text:'Changes requested — moved to Fix for re-edit.',ts:now()});
+  dbSave(); closeCardModal(); dbRender(); toast('Moved to Fix');
 }
 function dbSetPayment() {
   const c = DB_CARDS.find(x=>x.id===DB_ACTIVE_CARD); if(!c) return;

@@ -2416,10 +2416,68 @@
       if (!orderId || !sku || !dataUrl) return { ok:false, error:'Missing data' };
       this._pushDesign(orderId, sku, dataUrl, null, 'raster');
       this._localCachePut(this.RAW_DESIGN_KEY, orderId + '|' + sku, dataUrl);
+      this._persistThumb(orderId, sku, dataUrl);   // durable small thumb → image on first paint after reload
       return { ok:true };
     },
     getRawDesign: function(orderId, sku) {
+      // Returns ONLY the real design bytes (in-memory session cache, refilled from the server
+      // by hydrateOrderDesigns). MUST NOT fall back to the low-res persisted thumb: the mini
+      // designer loads getRawDesign() on open and _qpPersist re-saves whatever's in the editor
+      // on close, so returning a thumb here would overwrite the print-ready full-res artwork
+      // with a 220px JPEG (and would trip the _hasDesign gate). Display surfaces that want a
+      // reload-safe image use getDisplayThumb() instead.
       return this._localCacheGet(this.RAW_DESIGN_KEY, orderId + '|' + sku);
+    },
+    // Display-ONLY resolver for card thumbnails / avatars: real bytes if cached, else the small
+    // persisted thumb so the image paints on first load without waiting for the server hydrate.
+    // NEVER feed this into the editor or any path that re-persists a design (it is lossy).
+    getDisplayThumb: function(orderId, sku) {
+      var v = this._localCacheGet(this.RAW_DESIGN_KEY, orderId + '|' + sku);
+      if (v) return v;
+      v = this._localCacheGet(this.IMAGE_CACHE_KEY, orderId + '|' + sku);
+      if (v) return v;
+      return this._getPersistThumb(orderId, sku);
+    },
+    // ── Durable first-paint thumbnails ────────────────────────────────────────
+    // Full-res design bytes live on the server (order_designs) + an in-memory session
+    // cache; both are gone/blank on first paint after a reload. We ALSO keep a tiny,
+    // persisted, downscaled thumbnail per line so the card + avatar show art instantly
+    // on load with no round-trip. Keyed "orderId|sku" like the other caches.
+    THUMB_CACHE_KEY: 'eg_design_thumbs',
+    _persistThumb: function(orderId, sku, src) {
+      if (!orderId || !sku || !src) return;
+      var self = this, key = orderId + '|' + sku;
+      function put(val){
+        try {
+          var m = JSON.parse(localStorage.getItem(self.THUMB_CACHE_KEY) || '{}');
+          if (!m || typeof m !== 'object') m = {};
+          m[key] = val;
+          var ks = Object.keys(m);
+          if (ks.length > 300) { ks.slice(0, ks.length - 300).forEach(function(k){ delete m[k]; }); } // cap ~300 newest (keep the shared localStorage quota safe)
+          localStorage.setItem(self.THUMB_CACHE_KEY, JSON.stringify(m));
+        } catch(e){ /* quota → drop; server hydrate still refills on load */ }
+      }
+      if (/^https?:/i.test(src)) { put(src); return; }          // real URL: tiny, store as-is
+      if (!/^data:image\//i.test(src)) return;                   // non-image data (e.g. emb) → skip
+      try {
+        var img = new Image();
+        img.onload = function(){
+          try {
+            var max = 220, w = img.width || max, h = img.height || max, s = Math.min(1, max / Math.max(w, h));
+            var cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(w * s)); cv.height = Math.max(1, Math.round(h * s));
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            put(cv.toDataURL('image/jpeg', 0.6));   // ~6–20KB → cheap to persist + keep on card
+          } catch(e){ /* cross-origin canvas taint → skip; hydrate covers it */ }
+        };
+        img.src = src;
+      } catch(e){}
+    },
+    _getPersistThumb: function(orderId, sku) {
+      try {
+        var m = JSON.parse(localStorage.getItem(this.THUMB_CACHE_KEY) || '{}');
+        return (m && m[orderId + '|' + sku]) || null;
+      } catch(e){ return null; }
     },
     IMAGE_CACHE_KEY: 'eg_image_cache',
     cacheImage: function(orderId, sku, dataUrl) {
@@ -2430,6 +2488,7 @@
       if (!orderId || !sku || !dataUrl) return { ok:false, error:'Missing image data' };
       this._pushDesign(orderId, sku, dataUrl, null, 'raster');
       this._localCachePut(this.IMAGE_CACHE_KEY, orderId + '|' + sku, dataUrl);
+      this._persistThumb(orderId, sku, dataUrl);   // durable first-paint thumb
       return { ok:true };
     },
     // Pull all server-stored designs for one order into the local caches (best
@@ -2456,6 +2515,7 @@
                 } else {
                   self._localCachePut(self.RAW_DESIGN_KEY, K + '|' + d.sku, d.data);
                   self._localCachePut(self.IMAGE_CACHE_KEY, K + '|' + d.sku, d.data);
+                  self._persistThumb(K, d.sku, d.data);   // cache durable thumb so the NEXT reload paints instantly
                 }
               });
             });

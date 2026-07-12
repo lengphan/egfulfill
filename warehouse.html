@@ -10088,10 +10088,11 @@ let UDB_COLS = [
   {id:'incoming',   name:'Incoming',    color:'#9ca3af'},
   {id:'inprogress', name:'In Progress', color:'#6b7280'},
   {id:'review',     name:'In Review',   color:'#4b5563'},
+  {id:'fix',        name:'Fix',         color:'#b45309'},
   {id:'approved',   name:'Approved',    color:'#191918'},
 ];
 const UDB_COLS_STORE_KEY = 'egfulfill_design_cols';
-(function(){try{var _cv="egfulfill_design_cols_ver";if(localStorage.getItem(_cv)!=="scheme1"){localStorage.removeItem(UDB_COLS_STORE_KEY);localStorage.setItem(_cv,"scheme1");}const r=localStorage.getItem(UDB_COLS_STORE_KEY);if(r){const saved=JSON.parse(r);if(Array.isArray(saved)&&saved.length){UDB_COLS=saved;}}}catch(e){}}());
+(function(){try{var _cv="egfulfill_design_cols_ver";if(localStorage.getItem(_cv)!=="scheme1"){localStorage.removeItem(UDB_COLS_STORE_KEY);localStorage.setItem(_cv,"scheme1");}var r=localStorage.getItem(UDB_COLS_STORE_KEY);if(r){var saved=JSON.parse(r);if(Array.isArray(saved)&&saved.length){/* inject the Fix re-edit lane into pre-existing saved layouts (before Approved) without wiping custom columns */ if(!saved.some(function(c){return c.id==='fix';})){var _ai=saved.findIndex(function(c){return c.id==='approved';});var _fx={id:'fix',name:'Fix',color:'#b45309'};if(_ai>=0)saved.splice(_ai,0,_fx);else saved.push(_fx);try{localStorage.setItem(UDB_COLS_STORE_KEY,JSON.stringify(saved));}catch(e){}}UDB_COLS=saved;}}}catch(e){}}());
 const UDB_DEFAULTS = [];
 const DESIGN_STORE_KEY = 'egfulfill_design_cards';
 /* One-time migration: wipe legacy demo cards so the board starts empty. Bump the version string to wipe again. */
@@ -10099,7 +10100,9 @@ const DESIGN_STORE_KEY = 'egfulfill_design_cards';
   const VKEY = 'egfulfill_design_board_version', CURRENT = 'v4-dedupe';
   try {
     if (localStorage.getItem(VKEY) !== CURRENT) {
-      localStorage.removeItem(DESIGN_STORE_KEY);
+      // DATA-LOSS GUARD: cards are server-authoritative now and carry a durable thumb, but the
+      // localStorage blob (thumb/emb bytes) is NOT restored by the server hydrate — so wiping here
+      // would permanently destroy those. Never remove the cards; only stamp the version.
       localStorage.setItem(VKEY, CURRENT);
     }
   } catch(e) {}
@@ -10410,8 +10413,8 @@ function udbRenderBoard() {
 function _thumbFor(c) {
   if (!c) return '';
   if (c.order && c.sku && typeof EGStore !== 'undefined') {
-    if (EGStore.getRawDesign) {
-      const raw = EGStore.getRawDesign(c.order, c.sku);
+    if (EGStore.getDisplayThumb) {
+      const raw = EGStore.getDisplayThumb(c.order, c.sku);
       if (raw && /^(data:|https?:)/i.test(String(raw))) return raw;
     }
     if (EGStore.getCachedImage) {
@@ -10674,10 +10677,10 @@ function udbApprove(id) {
   udbCloseCard(); udbOpenCard(id);
 }
 function udbReject(id) {
-  const reason=prompt('Rejection reason (optional):')||'';
+  const reason=prompt('What needs fixing? (optional):')||'';
   const c=UDB_CARDS.find(x=>x.id===id); if(!c) return;
-  c.col='inprogress'; c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Rejected',detail:reason||'Sent back to In Progress'});
-  udbUpdateStats(); udbRenderBoard(); udbRenderList(); udbToast('Design sent back for revision');
+  c.col='fix'; c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'Sent to Fix',detail:reason||'Needs changes — back to designer'});
+  udbUpdateStats(); udbRenderBoard(); udbRenderList(); udbSave(); udbToast('Sent to Fix — designer can re-edit');
   udbCloseCard(); udbOpenCard(id);
 }
 function udbClone(id) {
@@ -10694,7 +10697,14 @@ function udbAddNote(id) {
 function udbToggleChk(id,idx){const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;c.checklist[idx].d=!c.checklist[idx].d;udbRenderChecklist(id);udbRenderBoard();udbSave();}
 function udbAddCheck(id){const inp=document.getElementById('ucm-chk-inp');if(!inp)return;const txt=inp.value.trim();if(!txt)return;const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;c.checklist.push({t:txt,d:false});inp.value='';udbRenderChecklist(id);udbSave();udbToast('Task added');}
 function udbReplaceFile(id,fname){const inp=document.createElement('input');inp.type='file';inp.onchange=()=>{const file=inp.files[0];if(!file)return;const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;const ex=c.files.find(f=>f.name===fname),ver=ex?ex.ver+1:1;c.files=c.files.filter(f=>f.name!==fname);c.files.unshift({name:file.name,size:Math.round(file.size/1024)+'KB',ver,ts:udbNow(),by:'You'});c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'File replaced',detail:file.name+' (v'+ver+')'});udbRenderFiles(id);udbSave();udbToast('File replaced (v'+ver+')');};inp.click();}
-function udbAttachFile(id,file){const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;if(typeof EGStore!=='undefined'&&EGStore.validateUpload){const chk=EGStore.validateUpload(file);if(!chk.ok){EGStore.showUploadError(file&&file.name,chk.error);return;}}const ver=(c.files.filter(f=>f.name===file.name).length||0)+1;const f={name:file.name,size:Math.round(file.size/1024)+'KB',ver,ts:udbNow(),by:'You',previewUrl:null};if(/\.(png|jpe?g|gif|webp|svg)$/i.test(file.name)){const reader=new FileReader();reader.onload=e=>{f.previewUrl=e.target.result;udbRenderFiles(id);udbSave();};reader.readAsDataURL(file);}c.files.unshift(f);c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'File uploaded',detail:file.name+' v'+ver});udbRenderFiles(id);udbSave();udbToast('File attached: '+file.name);}
+function udbAttachFile(id,file){const c=UDB_CARDS.find(x=>x.id===id);if(!c)return;if(typeof EGStore!=='undefined'&&EGStore.validateUpload){const chk=EGStore.validateUpload(file);if(!chk.ok){EGStore.showUploadError(file&&file.name,chk.error);return;}}const ver=(c.files.filter(f=>f.name===file.name).length||0)+1;const f={name:file.name,size:Math.round(file.size/1024)+'KB',ver,ts:udbNow(),by:'You',previewUrl:null};
+  // Persist the file BYTES to the server (order_designs / emb) via the shared router so the
+  // upload survives reload + other devices — the card blob is localStorage-only and was the
+  // data-loss hole. It also caches a durable thumb (image on first paint) + auto-matches EMB threads.
+  if(typeof EGStore!=='undefined'&&EGStore.attachDesignFile&&c.order&&c.sku){
+    EGStore.attachDesignFile({orderNum:c.order,sku:c.sku,name:c.product||c.title,tech:c.type,byRole:UDB_ROLE,file:file,onDone:function(dataUrl,fname){if(/\.(png|jpe?g|gif|webp|svg)$/i.test(fname||''))f.previewUrl=dataUrl;udbRenderFiles(id);udbSave();}});
+  } else if(/\.(png|jpe?g|gif|webp|svg)$/i.test(file.name)){const reader=new FileReader();reader.onload=e=>{f.previewUrl=e.target.result;udbRenderFiles(id);udbSave();};reader.readAsDataURL(file);}
+  c.files.unshift(f);c.history.unshift({ts:udbNow(),by:'You',role:UDB_ROLE,action:'File uploaded',detail:file.name+' v'+ver});udbRenderFiles(id);udbSave();udbToast('File attached: '+file.name);}
 function udbOpenUpload(cardId){udbUpFileObj=null;const m=document.getElementById('udb-upload-modal');if(!m)return;m.dataset.cardId=cardId||'';document.getElementById('uup-idle').style.display='';document.getElementById('uup-file-info').style.display='none';m.classList.remove('modal-hidden');}
 function udbCloseUpload(){const m=document.getElementById('udb-upload-modal');if(m)m.classList.add('modal-hidden');}
 function udbUpIsEmb(f){return f && f.name && /\.(dst|emb|pes|exp|jef|vp3)$/i.test(f.name);}
