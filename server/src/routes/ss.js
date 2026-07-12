@@ -88,8 +88,8 @@ const _ssWaiters = [];
 const SS_MAX = 4;
 function _ssAcquire() { return _ssActive < SS_MAX ? (_ssActive++, Promise.resolve()) : new Promise((res) => _ssWaiters.push(res)); }
 function _ssRelease() { const next = _ssWaiters.shift(); if (next) next(); else _ssActive--; }
-async function ssGet(path, timeoutMs) {
-  await _ssAcquire();
+async function ssGet(path, timeoutMs, skipLimit) {
+  if (!skipLimit) await _ssAcquire();   // the critical styles LIST passes skipLimit so image resolves can't starve it
   const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || 15000);   // never hang a request on a slow S&S
@@ -100,7 +100,7 @@ async function ssGet(path, timeoutMs) {
     return { ok: r.ok, status: r.status, data };
   } catch (e) {
     return { ok: false, status: 0, data: null, error: e && e.message };   // timeout/network → caller falls back
-  } finally { clearTimeout(timer); _ssRelease(); }
+  } finally { clearTimeout(timer); if (!skipLimit) _ssRelease(); }
 }
 
 // Map one S&S product row → our ss_products columns. `meta` = the style's metadata
@@ -207,7 +207,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const now = Date.now();
     if (_stylesCache.data && (now - _stylesCache.at) < 30 * 60 * 1000) return _stylesCache.data;   // 30-min cache: the catalog list rarely changes
     try {
-    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 30000);   // 30s — big list
+    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 60000, true);   // 60s + BYPASS the cap: critical, one call, must never be starved
     if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
     const mapped = r.data.map((s) => ({
       styleID: String(s.styleID),
