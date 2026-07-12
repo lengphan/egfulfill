@@ -1380,9 +1380,13 @@
     if (!(window.EGStore && EGStore.pushToDesignBoard)) return -1;
     var all = (window._xfomDesignMode === 'all');
     var sharedId = (all && EGStore.nextDesignId) ? EGStore.nextDesignId() : null;
+    var _reused = {}; try { _reused = JSON.parse(localStorage.getItem('eg_reused_lines') || '{}'); } catch (e) {}
     var n = 0;
     o.items.forEach(function (it) {
       var dk = itemDK(it);
+      // A line that REUSES an already-made design is done — don't mint a fresh board card for it
+      // (only genuinely-new lines go to the board). Keyed by both num|dk and id|dk.
+      if (_reused[(o.num != null ? o.num : o.id) + '|' + dk] || _reused[o.id + '|' + dk]) { return; }
       // No silent DTG default: route by the line's explicit method, else skip it (the push
       // gate blocks a method-less order anyway; this is belt-and-suspenders).
       var board = (boardOverride && boardOverride !== '') ? boardOverride : String(it.printType || it.tech || '').toLowerCase();
@@ -2646,19 +2650,53 @@
     var pop = document.createElement('div'); pop.id = 'egdt-dup-pop';
     var r = el ? el.getBoundingClientRect() : { bottom: 80, left: 80 };
     pop.style.cssText = 'position:fixed;z-index:10150;top:' + (r.bottom + 6) + 'px;left:' + Math.max(8, r.left - 140) + 'px;background:#fff;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.16);padding:11px 13px;min-width:230px;max-width:330px;font-family:Inter,system-ui,sans-serif';
+    var _ord = el ? (el.getAttribute('data-dup-ord') || '') : '', _key = el ? (el.getAttribute('data-dup-key') || '') : '';
     if (!list || !list.length) {
-      pop.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600">✓ No match in any seller library — unique.</div>';
+      pop.innerHTML = '<div style="font-size:12.5px;color:#15803d;font-weight:600">✓ No match — this artwork is unique.</div>';
     } else {
       var multi = list.length > 1;
-      pop.innerHTML = '<div style="font-size:11px;font-weight:700;color:' + (multi ? '#b45309' : '#9ca3af') + ';text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">' + (multi ? '⚠ Same artwork · ' + list.length + ' sellers' : '1 seller has this') + '</div>'
+      pop.innerHTML = '<div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">⧉ Found ' + list.length + ' result' + (multi ? 's' : '') + '</div>'
+        + '<div style="font-size:11px;color:#9ca3af;margin-bottom:7px">Reuse a design already made before — click <b>Use</b> to drop it onto this line.</div>'
         + list.map(function (m) {
-          var th = m.thumb ? '<img src="' + m.thumb + '" style="width:30px;height:30px;object-fit:cover;border-radius:5px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:30px;height:30px;border-radius:5px;background:#f0ede9;flex-shrink:0"></div>';
+          var th = m.thumb ? '<img src="' + m.thumb + '" style="width:34px;height:34px;object-fit:cover;border-radius:5px;background:#f0ede9;flex-shrink:0" onerror="this.style.visibility=\'hidden\'"/>' : '<div style="width:34px;height:34px;border-radius:5px;background:#f0ede9;flex-shrink:0"></div>';
           var dt = ''; try { if (m.created_at) dt = new Date(m.created_at).toLocaleDateString(); } catch (e) {}
-          return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>' + th + '</span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.seller || '—') + '</div><div style="font-size:11px;color:#9ca3af">' + esc(m.name || '') + (dt ? ' · ' + dt : '') + '</div></div></div>';
+          var canUse = _ord && _key && m.id != null;
+          var useBtn = canUse ? '<button onclick="event.stopPropagation();EGDesignTools._dupReuseById(\'' + esc(String(_ord)).replace(/'/g, "\\'") + '\',\'' + esc(String(_key)).replace(/'/g, "\\'") + '\',\'' + esc(String(m.id)) + '\',this)" style="margin-left:auto;flex-shrink:0;font-size:11.5px;font-weight:700;color:#fff;background:#191918;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit">Use →</button>' : '';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #f0ede9"><span>' + th + '</span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:#191918;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(m.name || m.seller || 'Design') + '</div><div style="font-size:11px;color:#9ca3af">' + esc(m.seller || '') + (dt ? ' · ' + dt : '') + '</div></div>' + useBtn + '</div>';
         }).join('');
     }
     document.body.appendChild(pop);
     setTimeout(function () { document.addEventListener('click', function _c(e) { if (!pop.contains(e.target) && e.target !== el) { pop.remove(); document.removeEventListener('click', _c); } }); }, 0);
+  }
+  // Reuse an already-made design onto THIS line: pull the matched artwork from the design
+  // library, drop it on the line (fills the mockup), and mark the line as reused so the order
+  // push won't mint a fresh board card for it (the design is done). ord/key identify the line.
+  function _dupReuseById(ord, key, libId, btn) {
+    if (!ord || !key || !libId) return;
+    var _ot = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    function done(ok, msg) { if (btn) { btn.disabled = false; btn.textContent = _ot || 'Use →'; } if (msg) _egdtToast(msg); }
+    var tok = ''; try { tok = localStorage.getItem('eg_token') || ''; } catch (e) {}
+    fetch('/api/design_library/' + encodeURIComponent(libId), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var art = d && d.data;
+        if (!art) { done(false, 'Could not load that design'); return; }
+        // 1) Fill the mockup — cache the reused artwork on this line (the row reads getRawDesign).
+        try { if (window.EGStore && EGStore.cacheRawDesign) EGStore.cacheRawDesign(ord, key, art); } catch (e) {}
+        // 2) Mark the line as a REUSE so the push flow skips a fresh card (design already made).
+        try {
+          var m = JSON.parse(localStorage.getItem('eg_reused_lines') || '{}');
+          m[ord + '|' + key] = { libId: libId, at: Date.now() };
+          localStorage.setItem('eg_reused_lines', JSON.stringify(m));
+        } catch (e) {}
+        // 3) Re-render the board + row so the mockup fills immediately, then close the popover.
+        try { window.dispatchEvent(new StorageEvent('storage', { key: 'egfulfill_design_cards' })); } catch (e) {}
+        try { if (typeof refreshBoard === 'function') refreshBoard(); } catch (e) {}
+        var pop = document.getElementById('egdt-dup-pop'); if (pop) pop.remove();
+        done(true, 'Design reused — mockup filled; it won’t need a new board card');
+      })
+      .catch(function () { done(false, 'Could not load that design'); });
   }
   // Manual click path (kept for callers): run + show the popover.
   function dupCheck(orderNum, itemKey, btn) {
@@ -2949,7 +2987,7 @@
     uploadPanel: uploadPanel, _upFile: _upFile, _upRemoveBg: _upRemoveBg, _upSave: _upSave, _upClose: _upClose,
     _upTab: _upTab, _upFilterTpl: _upFilterTpl, _upApplyTemplate: _upApplyTemplate, _upOpenMaker: _upOpenMaker,
     _upLensShow: _upLensShow, _upLensMove: _upLensMove, _upLensHide: _upLensHide, _upPick: _upPick,
-    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, swapThumb: swapThumb, dupCheck: dupCheck, dupBadge: dupBadge, designOverlaySrc: designOverlaySrc,
+    onSetProduct: onSetProduct, onSetPrint: onSetPrint, onSetVariant: onSetVariant, removeItem: removeItem, isNewOrder: isNewOrder, getItemSetup: getItemSetup, setupProductImage: setupProductImage, blankMockupURL: blankMockupURL, orderListingImg: orderListingImg, itemListingURL: itemListingURL, swapItemImg: swapItemImg, swapThumb: swapThumb, dupCheck: dupCheck, dupBadge: dupBadge, _dupReuseById: _dupReuseById, designOverlaySrc: designOverlaySrc,
     adoptCustomerFile: adoptCustomerFile, dismissCustomerFile: dismissCustomerFile, customerFileControls: customerFileControls, isCustomerFileDismissed: isCustomerFileDismissed,
     autoThreadMatch: autoThreadMatch,
     openTemplates: openTemplates, _closeTemplates: closeTemplates, _filterTemplates: filterTemplates, _applyTemplate: applyTemplate, _templatesPage: openTemplatesPage, _moreMenu: _moreMenu,
