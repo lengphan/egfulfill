@@ -1363,10 +1363,11 @@ function dbHandleFiles(fl) {
       // (which reads getItemEmbFile / getRawDesign) gets a clickable download once
       // the card is approved. Keyed by the card's order + sku.
       if (_ordKey && c.sku && typeof EGStore !== 'undefined') {
-        if (isPes && EGStore.setDesignFile && c.designId) {
-          EGStore.setDesignFile(c.designId, {name:f.name, dataUrl:dataUrl, orderId:_ordKey, sku:c.sku});   // .PES → seller (design library)
+        if (isPes && EGStore.setDesignAsset && c.designId) {
+          EGStore.setDesignAsset(c.designId, 'pes', {name:f.name, dataUrl:dataUrl, orderId:_ordKey, sku:c.sku});   // .PES → seller (by design id)
         } else if (isMachine && EGStore.setItemEmbFile) {
-          EGStore.setItemEmbFile(_ordKey, c.sku, {name:f.name, dataUrl:dataUrl});   // machine file → factory
+          EGStore.setItemEmbFile(_ordKey, c.sku, {name:f.name, dataUrl:dataUrl});   // machine file → factory (per order)
+          if (EGStore.setDesignAsset && c.designId) EGStore.setDesignAsset(c.designId, 'emb', {name:f.name, dataUrl:dataUrl, orderId:_ordKey, sku:c.sku});  // ...and by design id (reuse)
           c.isEmb = true; c.embFileName = f.name;
         } else if (EGStore.cacheRawDesign) {
           EGStore.cacheRawDesign(_ordKey, c.sku, dataUrl);

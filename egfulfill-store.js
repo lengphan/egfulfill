@@ -2998,6 +2998,23 @@
           }).catch(function(){ if(cb)cb(null); });
       } catch(e){ if(cb)cb(null); }
     },
+    // ── Design-ID-keyed assets (reuse across orders) ──────────────────────────
+    // ALL of a design's deliverable files are addressable by its Design ID so a design can be
+    // REUSED on a new order line (adopt the Design ID → inherit every file). The .pes keeps the
+    // BARE design id (back-compat: the Image Library + entitlement read getDesignFile(designId));
+    // the EMB machine file rides a namespaced key ("DSN-1::emb") under the same id. Both persist
+    // through the durable design_files store (server /api/design_files) — no schema change.
+    _designAssetKey: function(designId, kind) { return (kind === 'pes') ? designId : (designId + '::' + kind); },
+    setDesignAsset: function(designId, kind, info) {
+      if (!designId || !kind || !this.setDesignFile) return;
+      this.setDesignFile(this._designAssetKey(designId, kind), Object.assign({ kind: kind }, info || {}));
+    },
+    getDesignAsset: function(designId, kind) {
+      return (designId && this.getDesignFile) ? this.getDesignFile(this._designAssetKey(designId, kind)) : null;
+    },
+    fetchDesignAsset: function(designId, kind, cb) {
+      if (this.fetchDesignFile) this.fetchDesignFile(this._designAssetKey(designId, kind), cb); else if (cb) cb(null);
+    },
     DESIGN_FILE_PAID_KEY: 'eg_design_file_paid',
     hasPaidForDesignFile: function(designId) {
       try { var m = JSON.parse(localStorage.getItem(this.DESIGN_FILE_PAID_KEY) || '{}'); return !!m[designId]; } catch(e){ return false; }
@@ -3559,10 +3576,13 @@
               byRole: opts.byRole || 'Factory'
             });
           }
-          // .PES → seller: register to the design library under the card's Design ID (durable,
-          // server-backed, reusable across orders). The seller's download stays gated by entitlement.
-          if (isPes && card && card.designId && self.setDesignFile) {
-            self.setDesignFile(card.designId, { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
+          // Key deliverable files by DESIGN ID so the whole design is reusable across orders:
+          //   • .pes → seller (bare design id → Image Library "Download …", entitlement-gated)
+          //   • .emb/.dst/… → factory machine file, ALSO under the design id (reuse w/o re-upload)
+          // (Raster artwork stays in the raw cache by order+sku and is resolved via the card on reuse.)
+          if (card && card.designId && self.setDesignAsset) {
+            if (isPes)          self.setDesignAsset(card.designId, 'pes', { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
+            else if (isMachine) self.setDesignAsset(card.designId, 'emb', { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
           }
           // Stamp emb metadata on an existing card so the row's EMB detection is
           // unambiguous even when the item has no print method set.
