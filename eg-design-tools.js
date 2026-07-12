@@ -2691,9 +2691,9 @@
       return;
     }
     var multi = list.length > 1;
-    el.textContent = '⚠ ' + list.length + ' seller' + (multi ? 's' : '');
+    el.textContent = '⧉ Found ' + list.length + ' result' + (multi ? 's' : '');
     el.style.color = '#b45309'; el.style.borderColor = '#fcd9a8'; el.style.background = '#fffbeb'; el.style.cursor = 'pointer';
-    el.title = 'Same artwork found in ' + list.length + ' other seller librar' + (multi ? 'ies' : 'y') + ' — click for who';
+    el.title = 'This artwork already exists on ' + list.length + ' design' + (multi ? 's' : '') + ' — click to reuse a made one.';
     el.onclick = function (e) { e.stopPropagation(); _dupPopover(el, list); };
   }
   // Run one pending badge.
