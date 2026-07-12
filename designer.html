@@ -1348,11 +1348,12 @@ function dbHandleFiles(fl) {
   if (rejected.length && typeof EGStore !== 'undefined' && EGStore.showUploadError) {
     EGStore.showUploadError(rejected[0].name, rejected[0].error + (rejected.length>1 ? ' (+'+(rejected.length-1)+' more file(s) rejected)' : ''));
   }
-  const embExts = /\.(emb|dst|pes|exp|jef|vp3)$/i;
+  // .pes → seller deliverable; other machine files → factory stitch file (emb→factory, pes→seller)
+  const machineExts = /\.(emb|dst|exp|jef|vp3)$/i, pesExt = /\.pes$/i;
   const _ordKey = c.order || c.orderNum;
   accepted.forEach(f => {
     const sz = f.size>1048576?(f.size/1048576).toFixed(1)+'MB':Math.round(f.size/1024)+'KB';
-    const isEmb = embExts.test(f.name);
+    const isPes = pesExt.test(f.name), isMachine = machineExts.test(f.name), isEmb = isPes || isMachine;
     const fobj = {name:f.name, size:sz, previewUrl:null};
     const reader = new FileReader();
     reader.onload = e => {
@@ -1362,8 +1363,10 @@ function dbHandleFiles(fl) {
       // (which reads getItemEmbFile / getRawDesign) gets a clickable download once
       // the card is approved. Keyed by the card's order + sku.
       if (_ordKey && c.sku && typeof EGStore !== 'undefined') {
-        if (isEmb && EGStore.setItemEmbFile) {
-          EGStore.setItemEmbFile(_ordKey, c.sku, {name:f.name, dataUrl:dataUrl});
+        if (isPes && EGStore.setDesignFile && c.designId) {
+          EGStore.setDesignFile(c.designId, {name:f.name, dataUrl:dataUrl, orderId:_ordKey, sku:c.sku});   // .PES → seller (design library)
+        } else if (isMachine && EGStore.setItemEmbFile) {
+          EGStore.setItemEmbFile(_ordKey, c.sku, {name:f.name, dataUrl:dataUrl});   // machine file → factory
           c.isEmb = true; c.embFileName = f.name;
         } else if (EGStore.cacheRawDesign) {
           EGStore.cacheRawDesign(_ordKey, c.sku, dataUrl);

@@ -3524,14 +3524,19 @@
       var self = this;
       var f = opts.file; if (!f) return;
       var fname = f.name || 'design';
-      var isEmb = /\.(emb|dst|pes|exp|jef|vp3)$/i.test(fname);
+      // File-type routing — the "emb → factory, pes → seller" rule:
+      //   • .pes         → the SELLER's reusable deliverable (design library, keyed by Design ID)
+      //   • .emb/.dst/…  → the FACTORY's machine/stitch file (per order → getItemEmbFile download)
+      //   • png/jpg/svg… → the raster design preview
+      var isPes = /\.pes$/i.test(fname);
+      var isMachine = /\.(emb|dst|exp|jef|vp3)$/i.test(fname);   // machine files, EXCLUDING .pes
       var reader = new FileReader();
       reader.onload = function(ev) {
         var dataUrl = ev.target.result;
         try {
-          if (isEmb) {
+          if (isMachine) {
             if (self.setItemEmbFile) self.setItemEmbFile(opts.orderNum, opts.sku, { name: fname, dataUrl: dataUrl });
-          } else {
+          } else if (!isPes) {
             if (self.cacheRawDesign) self.cacheRawDesign(opts.orderNum, opts.sku, dataUrl);
             if (self.cacheImage)     self.cacheImage(opts.orderNum, opts.sku, dataUrl);
             // Embroidery item → auto-match thread colours on the uploaded artwork
@@ -3549,14 +3554,19 @@
           if (!card && self.pushToDesignBoard) {
             card = self.pushToDesignBoard({
               orderNum: opts.orderNum, sku: opts.sku,
-              board: (opts.tech || (isEmb ? 'emb' : 'dtg')),
-              name: opts.name, thumb: isEmb ? null : dataUrl,
+              board: (opts.tech || ((isMachine || isPes) ? 'emb' : 'dtg')),
+              name: opts.name, thumb: (isMachine || isPes) ? null : dataUrl,
               byRole: opts.byRole || 'Factory'
             });
           }
+          // .PES → seller: register to the design library under the card's Design ID (durable,
+          // server-backed, reusable across orders). The seller's download stays gated by entitlement.
+          if (isPes && card && card.designId && self.setDesignFile) {
+            self.setDesignFile(card.designId, { name: fname, dataUrl: dataUrl, orderId: opts.orderNum, sku: opts.sku });
+          }
           // Stamp emb metadata on an existing card so the row's EMB detection is
           // unambiguous even when the item has no print method set.
-          if (card && isEmb) {
+          if (card && isMachine) {
             try {
               var cards = JSON.parse(localStorage.getItem('egfulfill_design_cards') || '[]');
               var rec = cards.find(function(c){ return c.id === card.id; });
