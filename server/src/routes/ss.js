@@ -79,7 +79,17 @@ function haversineMi(lat1, lon1, lat2, lon2) {
 }
 
 // One authenticated GET to S&S. Returns { ok, status, data } (data parsed JSON or raw text).
+// GLOBAL cap on concurrent S&S HTTP calls across the WHOLE process — the warm job, the batch image
+// resolver, and live browsing all share this, so no single caller can saturate the small VPS and
+// starve the others. This is what lets you browse while the warm runs. (The styles LIST is cached,
+// so browsing keeps working even when all these slots are busy with image resolves.)
+let _ssActive = 0;
+const _ssWaiters = [];
+const SS_MAX = 4;
+function _ssAcquire() { return _ssActive < SS_MAX ? (_ssActive++, Promise.resolve()) : new Promise((res) => _ssWaiters.push(res)); }
+function _ssRelease() { const next = _ssWaiters.shift(); if (next) next(); else _ssActive--; }
 async function ssGet(path, timeoutMs) {
+  await _ssAcquire();
   const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs || 15000);   // never hang a request on a slow S&S
@@ -90,7 +100,7 @@ async function ssGet(path, timeoutMs) {
     return { ok: r.ok, status: r.status, data };
   } catch (e) {
     return { ok: false, status: 0, data: null, error: e && e.message };   // timeout/network → caller falls back
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); _ssRelease(); }
 }
 
 // Map one S&S product row → our ss_products columns. `meta` = the style's metadata
@@ -415,7 +425,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
         const have = new Set(((await q('select style_id from ss_style_images where image is not null')).rows).map((r) => String(r.style_id)));
         const allIds = styles.map((s) => String(s.styleID));
         _warm.total = allIds.length;
-        const CONC = 3;   // GENTLE: keep parallel S&S calls + DB inserts low so live browsing isn't starved
+        const CONC = 2;   // leaves headroom under the global SS_MAX cap so live browsing gets slots too
         // Up to 3 passes — each re-queries what's STILL uncached, so styles that failed under load
         // (S&S slow/rate-limited) get retried instead of left blank. Stops early when nothing remains.
         for (let pass = 0; pass < 3 && _warm.running; pass++) {
