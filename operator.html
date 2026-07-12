@@ -3352,6 +3352,13 @@ function opSendBroadcast(){
 window.addEventListener('storage', function(e){
   if (e && (e.key === 'eg_broadcasts' || e.key === null)) opRebuildNotifList();
 });
+// Blank mockups resolve from the CATALOG, which hydrates async AFTER first paint — so the
+// chosen blank is empty on first load until a refresh. Re-render the order rows ONCE the
+// catalog lands so the blank fills in immediately (no manual refresh).
+(function(){ var done=false; window.addEventListener('storage', function(e){
+  if (done || !e || e.key !== 'eg_catalog_products') return;
+  try { if (window.EGStore && EGStore.getCatalogProducts && (EGStore.getCatalogProducts()||[]).length) { done=true; if (typeof renderOpOrders==='function') renderOpOrders(); } } catch(_){}
+}); })();
 window.addEventListener('eg-broadcasts-changed', opRebuildNotifList);
 document.addEventListener('DOMContentLoaded', opRebuildNotifList);
 
@@ -4549,11 +4556,12 @@ function opItemCompositeThumb(orderNum, itemIdx, it, prodImg, tBg, size) {
     ? '<img src="' + designSrc + '" style="position:absolute;left:' + pos.x + '%;top:' + pos.y + '%;width:' + pos.w + '%;height:' + pos.h + '%;object-fit:contain;pointer-events:none" onerror="this.style.display=\'none\'"/>'
     : '';
   var _qdk = (window.EGDesignTools && EGDesignTools.itemDK) ? EGDesignTools.itemDK(it) : (it.sku || '');
+  var _o = (typeof OP_ORDERS !== 'undefined') ? OP_ORDERS.find(function(x){ return String(x.num) === String(orderNum) || String(x.id) === String(orderNum); }) : null;
   return '<div onclick="event.stopPropagation();(window.EGDesignTools&&EGDesignTools.openQuickPos)?EGDesignTools.openQuickPos(\'' + orderNum + '\',\'' + String(_qdk).replace(/'/g, "\\'") + '\'):opZoomProduct(\'' + orderNum + '\',' + itemIdx + ')" '
     + 'style="position:relative;width:' + size + 'px;height:' + size + 'px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;cursor:pointer;transition:box-shadow .15s;background:#fff" '
     + 'title="Position design · Remove BG" onmouseover="this.style.boxShadow=\'0 0 0 2px #191918\'" onmouseout="this.style.boxShadow=\'\'">'
     + ((window.EGDesignTools && EGDesignTools.swapThumb)
-        ? EGDesignTools.swapThumb('<img src="' + mockup + '" onerror="this.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block"/>' + overlay, it)
+        ? EGDesignTools.swapThumb('<img src="' + mockup + '" onerror="this.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block"/>' + overlay, it, _o)
         : ('<img src="' + mockup + '" onerror="this.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block"/>' + overlay))
     + '</div>';
 }

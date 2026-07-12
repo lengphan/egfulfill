@@ -4656,6 +4656,11 @@ function admPollLive() {
   if (raw !== _admLivePollSig) { _admLivePollSig = raw; admMergeLiveOrders(); }
 }
 window.addEventListener('storage', e => { if (e.key === 'egfulfill_orders') admMergeLiveOrders(); });
+// Re-render rows once the catalog hydrates so the chosen blank mockup fills in on first load.
+(function(){ var done=false; window.addEventListener('storage', function(e){
+  if (done || !e || e.key !== 'eg_catalog_products') return;
+  try { if (window.EGStore && EGStore.getCatalogProducts && (EGStore.getCatalogProducts()||[]).length) { done=true; if (typeof whRenderOrders==='function') whRenderOrders(); } } catch(_){}
+}); })();
 setInterval(admPollLive, 2000);
 // Defer initial merge to DOMContentLoaded so let declarations later in the script have initialized
 document.addEventListener('DOMContentLoaded', admMergeLiveOrders);
@@ -5040,7 +5045,7 @@ function whRenderOrders() {
               : '';
             const thumb = (_isNewSetup && !_blankChosen && !_designSrc)
               ? `<div title="Pick a base blank to preview" style="width:52px;height:52px;border-radius:7px;flex-shrink:0;border:1px dashed #d1d5db;margin-right:10px;background:#fff"></div>`
-              : `<div onclick="event.stopPropagation();(window.EGDesignTools&&EGDesignTools.openQuickPos)?EGDesignTools.openQuickPos('${o.num}','${(window.EGDesignTools&&EGDesignTools.itemDK?EGDesignTools.itemDK(it):(it._dk||it.sku||'')).replace(/'/g,"\\'")}'):admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="Position design · Remove BG" style="position:relative;width:52px;height:52px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:#fff;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''">${(window.EGDesignTools&&EGDesignTools.swapThumb)?EGDesignTools.swapThumb(`<img src="${prodImg}" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}`, it):`<img src="${prodImg}" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}`}</div>`;
+              : `<div onclick="event.stopPropagation();(window.EGDesignTools&&EGDesignTools.openQuickPos)?EGDesignTools.openQuickPos('${o.num}','${(window.EGDesignTools&&EGDesignTools.itemDK?EGDesignTools.itemDK(it):(it._dk||it.sku||'')).replace(/'/g,"\\'")}'):admZoomThumb('${prodImg.replace(/'/g, "\\'")}','${o.num}','${(it.sku||'').replace(/'/g,"\\'")}','${(it.name||'').replace(/'/g,"\\'")}')" title="Position design · Remove BG" style="position:relative;width:52px;height:52px;border-radius:7px;flex-shrink:0;overflow:hidden;border:1px solid #e5e4e0;margin-right:10px;background:#fff;cursor:pointer;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 0 0 2px #191918'" onmouseout="this.style.boxShadow=''">${(window.EGDesignTools&&EGDesignTools.swapThumb)?EGDesignTools.swapThumb(`<img src="${prodImg}" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}`, it, o):`<img src="${prodImg}" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover;display:block">${_overlay}`}</div>`;
             const _stock = whStockState(it.sku);
             const _stockPill = `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:${_stock.color};white-space:nowrap;flex-shrink:0" title="Blank stock"><span style="width:5px;height:5px;border-radius:50%;background:${_stock.color};display:inline-block;flex-shrink:0"></span>${_stock.label}</span>`;
             // Simple rule (same as operator/warehouse): linked design card,

@@ -446,11 +446,20 @@
   // layer a = the composite passed in, layer b = the item's own listing photo, plus
   // the corner arrow. Used by the factory LIST rows so they get the same blank⇄listing
   // swap the seller + the detail modal already have. No listing → returns inner as-is.
-  function swapThumb(innerHtml, it) {
+  function swapThumb(innerHtml, it, o) {
     var listing = '';
     try {
       var cands = [it && it.img, it && it.sellerImg, it && it.listingImg, it && it.thumb];
       for (var i = 0; i < cands.length; i++) { if (cands[i] && /^(https?:|data:)/.test(String(cands[i]))) { listing = cands[i]; break; } }
+      // Factory items usually carry no listing of their OWN → fall back to the order's listing
+      // photo so the blank⇄listing swap is ALWAYS available (the user can see which product/mockup
+      // the line is for), not only when the item happens to have its own image. Resolve the order
+      // from the arg, else via findOrder so callers that only pass `it` still get the swap.
+      if (!listing) {
+        var ord = o || null;
+        if (!ord && it && typeof findOrder === 'function') { try { ord = findOrder(it.orderNum || it.order || it.no); } catch (e) {} }
+        if (ord) { try { listing = itemListingURL(ord, it) || orderListingImg(ord) || ''; } catch (e) {} }
+      }
     } catch (e) {}
     if (!listing) return innerHtml;
     return '<div class="egdt-swap" data-front="a" style="position:relative;width:100%;height:100%">'
