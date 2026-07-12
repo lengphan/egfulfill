@@ -410,9 +410,26 @@
     var c = COLLECTIONS[key];
     return api(c.path).then(function (r) {
       if (r.error) { console.warn('[egstore-api] hydrate ' + key + ':', r.error.message); return; }
+      var server = r.data || [];
+      // DATA-LOSS GUARD: an EMPTY server response must NEVER overwrite local rows. A card just
+      // created here may not have finished pushing (the push is debounced 500ms, or it failed),
+      // and the server POST intentionally can't delete on an empty body — so blindly writing []
+      // over the local cards silently empties the whole board. Instead keep local and re-seed the
+      // server from it (mirrors hydrateCatalog's "DB empty — seed it, don't wipe").
+      if (!server.length) {
+        if (readArr(key).length && token() && isStaff()) { try { pushCollection(key); } catch (e) {} }
+        return;
+      }
+      // MERGE, don't blind-overwrite: keep any local-only row the server hasn't caught up to yet
+      // (created here, push still in flight) so a poll landing mid-push can't drop it. Server rows
+      // are authoritative for anything they DO carry.
+      var srv = server.map(c.fromDb), idOf = c.idKey || 'id';
+      var seen = {}; srv.forEach(function (row) { if (row && row[idOf] != null) seen[String(row[idOf])] = 1; });
+      var localOnly = readArr(key).filter(function (row) { return row && row[idOf] != null && !seen[String(row[idOf])]; });
       _suspend[key] = true;
-      try { localStorage.setItem(key, JSON.stringify((r.data || []).map(c.fromDb))); } catch (e) {}
+      try { localStorage.setItem(key, JSON.stringify(srv.concat(localOnly))); } catch (e) {}
       _suspend[key] = false;
+      if (localOnly.length && token() && isStaff()) { try { pushCollection(key); } catch (e) {} }  // push the stragglers up
       try { window.dispatchEvent(new StorageEvent('storage', { key: key })); } catch (e) {}
     });
   }
