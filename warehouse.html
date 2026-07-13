@@ -865,7 +865,7 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
     <!-- CONTENT CARDS (individually draggable) -->
     <div class="sec-block fi" id="sec-1" draggable="false" ondragstart="secDs(event)" ondragover="secDo(event)" ondragleave="secDl(event)" ondrop="secDp(event)" ondragend="secDe(event)" style="animation-delay:.28s;margin-bottom:20px">
     <div class="sec-handle" title="Drag section"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="4" r="1.3" fill="currentColor"/><circle cx="10" cy="4" r="1.3" fill="currentColor"/><circle cx="6" cy="8" r="1.3" fill="currentColor"/><circle cx="10" cy="8" r="1.3" fill="currentColor"/><circle cx="6" cy="12" r="1.3" fill="currentColor"/><circle cx="10" cy="12" r="1.3" fill="currentColor"/></svg></div>
-    <div id="card-grid" style="display:grid;grid-template-columns:3fr 2fr;gap:16px;align-items:stretch">
+    <div id="card-grid" style="display:grid;grid-template-columns:1fr;gap:16px;align-items:stretch">
 
       <!-- LEFT: Revenue Trend with big summary + chart + order breakdown -->
       <div class="card" id="cc-trend" style="padding:20px 22px">
@@ -903,17 +903,6 @@ html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:
         </div>
         <canvas id="rchart" height="85"></canvas>
         <!-- (Order-status breakdown row removed — the stages now live in the Order Pipeline card on the right.) -->
-      </div>
-
-      <!-- RIGHT: Order Pipeline — Stage Board (stretches to match left card height) -->
-      <div class="card" id="cc-pipeline" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
-        <div class="pt-titlebar"><span class="pt-tt">Order Pipeline</span><span class="pt-live">LIVE</span></div>
-        <div id="pterm" class="pterm">
-          <div class="pt-sum"></div>
-          <div class="pt-rows"></div>
-          <div class="pt-spark"></div>
-          <div class="pt-foot"></div>
-        </div>
       </div>
     </div>
     </div><!-- /sec-1 -->
