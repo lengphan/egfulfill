@@ -1293,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', function(){
           <div style="padding:14px 16px">
             <label style="font-size:11.5px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">Supplier</label>
             <select id="bq-cart-supplier" class="select" style="width:100%;font-size:13px;margin-bottom:10px">
-              <option>SS Activewear</option><option>SanMar</option><option>AlphaBroder</option>
+              <option>S&amp;S Activewear</option><option>Otto Cap</option>
             </select>
             <!-- Catalog search — preserves the ability to add non-backorder items now that the modal is gone -->
             <div style="position:relative;margin-bottom:10px">
@@ -8834,9 +8834,8 @@ function showPsTab(id) {
 
 <script>
 const SUPPLIER_DATA = {
-  ssa:{logo:'SSA',logoBg:'#111827',logoColor:'#f3eee2',name:'SS Activewear',url:'api.ssactivewear.com',status:'Connected',statusClass:'b-shipped'},
-  sm:{logo:'SM',logoBg:'#1e3a8a',logoColor:'#fff',name:'SanMar',url:'sanmar.com',status:'Coming Soon',statusClass:'b-queue'},
-  ab:{logo:'AB',logoBg:'#dc2626',logoColor:'#fff',name:'AlphaBroder',url:'alphabroder.com',status:'Coming Soon',statusClass:'b-queue'}
+  ssa:{logo:'SSA',logoBg:'#111827',logoColor:'#f3eee2',name:'S&S Activewear',url:'api.ssactivewear.com',status:'Connected',statusClass:'b-shipped'},
+  sm:{logo:'OC',logoBg:'#c8102e',logoColor:'#fff',name:'Otto Cap',url:'sandbox-api.ottocap.com',status:'Connected',statusClass:'b-shipped'}
 };
 function selectSupplier(key) {
   document.querySelectorAll('.supplier-chip').forEach(c => { c.classList.remove('active'); c.style.opacity = c.id ? '.6' : '1'; });
