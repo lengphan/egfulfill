@@ -9,16 +9,17 @@
 @font-face{font-family:'Inter';src:url(fonts/Inter-Variable.woff2) format('woff2');font-weight:100 900;font-display:swap}
 
 :root{
-  --bos-ink:#18181b; --bos-paper:#ffffff; --bos-ground:#fafafa; --bos-panel:#f4f4f5;  /* shadcn/ui zinc: cool near-white ground (zinc-50) + white cards */
+  --bos-ink:oklch(0.147 0.004 49.3); --bos-paper:oklch(1 0 0); --bos-ground:oklch(0.986 0.002 67.8); --bos-panel:oklch(0.96 0.002 17.2);  /* OFFICIAL shadcn/ui "stone" tokens (OKLCH) mapped here — foreground / card / sidebar / muted */
   --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-violet-soft:#edeefe; --bos-amber:#f8d264;  /* "violet" token carries the COBALT accent; -soft = restrained tint for active nav/hover */
-  --bos-line:#f1f1f3; --bos-grey:#71717a; --bos-grey2:#a1a1aa;   /* zinc-500 / zinc-400 muted-foregrounds */
-  --bos-cardline:#e4e4e7;  /* shadcn/ui zinc-200 border. Cool neutral; low-hierarchy dividers even lighter (--bos-line, zinc-100-ish) */
+  --bos-grad:linear-gradient(135deg,#2f4bf0 0%,#7c5cff 100%); --bos-sh-acc:0 8px 22px rgba(47,75,240,.30);  /* cobalt->violet accent gradient + glow (primary buttons / hero cards) */
+  --bos-line:oklch(0.955 0.004 43); --bos-grey:oklch(0.547 0.021 43.1); --bos-grey2:oklch(0.68 0.014 43);   /* shadcn stone: --muted-foreground + a lighter step for tertiary labels */
+  --bos-cardline:oklch(0.922 0.005 34.3);  /* shadcn --border (stone). Low-hierarchy dividers even lighter via --bos-line */
   --bos-radius:12px; --bos-radius-sm:8px;
   --bos-shadow:0 1px 3px 0 rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);
   --bos-shadow-hover:0 8px 24px -4px rgba(0,0,0,.12);
   --bos-ease:cubic-bezier(.22,.61,.36,1);
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
-  --bos-hover:#f4f4f5;   /* shadcn zinc-100 muted / hover */
+  --bos-hover:oklch(0.96 0.002 17.2);   /* shadcn --muted / hover */
   --bos-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;   /* mono RETIRED — all board type is Inter sans (user pref: DepartureMono was too hard to read). Kept the var name so the 18 chrome rules that reference it flip in one place; they keep their uppercase/letter-spacing, just in sans. */
   --bos-sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;  /* readable body sans — mono is kept for nav/top-bar/buttons/card eyebrows only; data-dense reading (tables, form labels, order/settings detail) uses this */
 }
@@ -44,7 +45,10 @@ html.eg-board-on .ni{border:none!important;position:relative!important;border-ra
 html.eg-board-on .ni::after{display:none!important}
 html.eg-board-on .ni.on::after,html.eg-board-on aside.sidebar nav a.ni:last-of-type::after,html.eg-board-on .side-foot > a.ni:last-child::after{display:none!important}
 html.eg-board-on[data-theme=dark] .ni::after{background:#302e37!important}
-html.eg-board-on .ni svg{display:none!important}
+/* nav icons return — muted grey, accent on the active row (spacing already handled by .ni gap) */
+html.eg-board-on .ni svg{display:inline-flex!important;width:17px!important;height:17px!important;flex:0 0 auto!important;color:var(--bos-grey2)!important;transition:color .16s var(--bos-ease)}
+html.eg-board-on .ni:not(.on):hover svg{color:var(--bos-grey)!important}
+html.eg-board-on .ni.on svg{color:var(--bos-violet)!important}
 /* keep intentionally-hidden nav rows hidden (e.g. Product Templates) */
 html.eg-board-on .ni[style*="display:none"]{display:none!important}
 /* titles alone — no ■ marker (cleaner, less cluttered) */
@@ -203,8 +207,8 @@ html.eg-board-on[data-theme=dark] .b-packed,html.eg-board-on[data-theme=dark] .b
 html.eg-board-on[data-theme=dark] .b-shipped,html.eg-board-on[data-theme=dark] .b-s-shipped,html.eg-board-on[data-theme=dark] .b-s-fulfilled{background:#12271c!important;color:#5fce97!important;border-color:transparent!important}
 
 /* ════ BUTTONS ════ */
-html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)!important;color:#fff!important;
-  border:1px solid var(--bos-violet)!important;box-shadow:var(--bos-shadow)!important;border-radius:var(--bos-radius-sm)!important;
+html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-grad)!important;color:#fff!important;
+  border:none!important;box-shadow:var(--bos-sh-acc)!important;border-radius:var(--bos-radius-sm)!important;
   font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-weight:600;font-size:12.5px!important}
 html.eg-board-on .btn-out{border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;
   border-radius:var(--bos-radius-sm)!important;background:#fff!important;font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-weight:600;font-size:12.5px!important}
@@ -449,7 +453,7 @@ html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width
    Each card rests on a dark offset shadow; hover sinks it toward the shadow; mousedown
    presses it fully in. No lingering state. Overrides the per-file .wcard/.stat-card hovers. */
 html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:var(--bos-shadow)!important;transition:transform .16s var(--bos-ease),box-shadow .16s var(--bos-ease)!important}
-html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translateY(-2px)!important;box-shadow:var(--bos-shadow-hover)!important}
+html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translateY(-3px)!important;box-shadow:var(--bos-shadow-hover)!important}
 html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translateY(0)!important;box-shadow:var(--bos-shadow)!important}
 html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:0 1px 3px rgba(0,0,0,.35)!important}
 html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.42)!important}
