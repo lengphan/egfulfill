@@ -53,6 +53,16 @@
   if (document.body) inject(); else document.addEventListener('DOMContentLoaded', inject);
 })();
 /* ── Deposit modal ── */
+/* Reroute (owner request): the nav "Wallet" link + the top-bar balance pill open the Add Funds
+   modal DIRECTLY, skipping the wallet page. Capture-phase so it wins over the inline onclick;
+   guarded on openDepositModal so factory boards (no eg-addfunds.js) keep their own balance section. */
+document.addEventListener('click', function (e) {
+  if (typeof openDepositModal !== 'function') return;
+  var t = (e.target && e.target.closest) ? e.target.closest('a.ni[href="wallet.html"], .bal-chip') : null;
+  if (!t) return;
+  e.preventDefault(); e.stopPropagation();
+  openDepositModal();
+}, true);
 function openDepositModal(amount, method) {
   document.getElementById('deposit-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
