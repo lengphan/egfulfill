@@ -81,7 +81,7 @@ html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
-  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:none!important;letter-spacing:.04em!important;
+  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:none!important;letter-spacing:0!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
@@ -99,7 +99,7 @@ html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
 html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:12.5px!important;
-  font-weight:400!important;letter-spacing:.04em!important;text-transform:none!important;font-variant-numeric:tabular-nums}
+  font-weight:400!important;letter-spacing:0!important;text-transform:none!important;font-variant-numeric:tabular-nums}
 /* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
    icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
    values (#balance-val / #notif-dot / #hdr-lang-code) stay as real children so they still update. ── */
@@ -116,7 +116,7 @@ html.eg-board-on .bos-controls .bal-chip::before{content:'Balance:\00a0'}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
 /* every pseudo label inherits the mono cell type */
-html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:.04em!important;text-transform:none!important}
+html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:0!important;text-transform:none!important}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
@@ -131,7 +131,7 @@ html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!impor
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important}
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-hover)!important}
 html.eg-board-on .bos-controls #new-menu-btn{background:transparent!important;color:var(--bos-violet)!important;border:none!important;box-shadow:none!important;
-  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:none;letter-spacing:.04em;font-size:11px!important;
+  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:none;letter-spacing:0;font-size:11px!important;
   transform:none!important;padding:0 15px!important;justify-content:center!important}
 html.eg-board-on .bos-controls #new-menu-btn svg path{stroke:var(--bos-violet)!important}
 /* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
@@ -162,7 +162,7 @@ html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
 html.eg-board-on .wcard{border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;border-radius:var(--bos-radius)!important}
 /* the card's eyebrow/label → Departure Mono; its underline → a full-width black frame line */
 html.eg-board-on .wcard .eg-card-dot{background:var(--bos-ink)!important}
-html.eg-board-on .wcard > div:first-child,html.eg-board-on .wcard [style*="text-transform:uppercase"]:first-child{font-family:var(--bos-mono)!important;letter-spacing:.04em!important}
+html.eg-board-on .wcard > div:first-child,html.eg-board-on .wcard [style*="text-transform:uppercase"]:first-child{font-family:var(--bos-mono)!important;letter-spacing:0!important}
 /* KPI tiles → monotone WHITE (rainbow pastel fills retired; the metric reads from the number + a small accent dot, not the tile colour) */
 html.eg-board-on .wcard{background:var(--bos-paper)!important}
 
@@ -182,7 +182,7 @@ html.eg-board-on .dtable tr.exp-row td{border-top:none!important;background:#fbf
    own fill carries the stage colour now, so no stray "■" in front of the label. ════ */
 html.eg-board-on .badge,html.eg-board-on [class*="b-s-"],html.eg-board-on .b-new,html.eg-board-on .b-queue,
 html.eg-board-on .b-prod,html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.eg-board-on .b-shipped{
-  font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:none;letter-spacing:.05em!important;
+  font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:none;letter-spacing:0!important;
   border:1px solid transparent!important;border-radius:999px!important;padding:3px 10px!important;font-weight:600!important;gap:0!important}
 /* hide the inline coloured dot some badges render before their label */
 html.eg-board-on .badge>span[style*="border-radius:50%"],html.eg-board-on [class*="b-s-"]>span[style*="border-radius:50%"]{display:none!important}
@@ -231,7 +231,7 @@ html.eg-board-on #new-menu-dd > div > div:first-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:last-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child{padding:13px 16px!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-family:var(--bos-mono)!important;font-size:11.5px!important;
-  text-transform:none!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
+  text-transform:none!important;letter-spacing:0!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
 
 /* KPI card header underline → light hairline grey (cards are no longer full-ink framed) */
 html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-cardline)!important;border-bottom-width:1px!important}
@@ -245,7 +245,7 @@ html.eg-board-on #hdr-search{background:#faf9f7!important;border:1px solid var(-
 
 /* ════ dashboard STATUS-BREAKDOWN mini-cards (In Queue/Printing/QC/Shipped) — were the old grey rails +
    sans labels; now Departure-Mono labels + Board OS stage-colour rails ════ */
-html.eg-board-on [style*="border-left:3px solid"] [style*="uppercase"]{font-family:var(--bos-mono)!important;letter-spacing:.05em!important}
+html.eg-board-on [style*="border-left:3px solid"] [style*="uppercase"]{font-family:var(--bos-mono)!important;letter-spacing:0!important}
 html.eg-board-on [style*="border-left:3px solid #111827"]{border-left-color:var(--bos-blue)!important}
 html.eg-board-on [style*="border-left:3px solid #4b5563"]{border-left-color:var(--bos-amberp)!important}
 html.eg-board-on [style*="border-left:3px solid #9ca3af"]{border-left-color:var(--bos-violet)!important}
@@ -324,7 +324,7 @@ html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge
 html.eg-board-on .pill-btn{font-family:var(--bos-sans)!important;font-weight:600!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
 html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:var(--bos-radius-sm)!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:none!important;letter-spacing:0!important;font-weight:600!important;font-size:11.5px!important}
 /* settings sub-nav a touch larger so it isn't smaller than the form labels */
-html.eg-board-on .stab{font-size:12.5px!important;letter-spacing:.04em!important}
+html.eg-board-on .stab{font-size:12.5px!important;letter-spacing:0!important}
 html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:var(--bos-radius-sm)!important}
 html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble{box-shadow:none!important}
 html.eg-board-on .cat-row{font-family:var(--bos-sans)!important}
@@ -533,3 +533,12 @@ html.eg-board-on .ccard [style*="text-transform:uppercase"],html.eg-board-on .cc
 html.eg-board-on .wcard [style*="text-transform:uppercase"],html.eg-board-on .wcard [style*="text-transform: uppercase"],
 html.eg-board-on .stat-card [style*="text-transform:uppercase"],html.eg-board-on .stat-card [style*="text-transform: uppercase"],
 html.eg-board-on #trend-subtitle{text-transform:none!important;letter-spacing:.01em!important}
+
+/* ── NO MONO on the boards (user pref). Any element still hard-coded to a monospace family
+   (inline DepartureMono / ui-monospace / monospace) flips to the board sans. Numerals keep
+   tabular alignment via font-variant-numeric, which is unaffected. ── */
+html.eg-board-on [style*="DepartureMono"],html.eg-board-on [style*="ui-monospace"],html.eg-board-on [style*="monospace"]{font-family:var(--bos-sans)!important}
+/* dashboard period/filter selects + their spread tracking */
+html.eg-board-on .fb,html.eg-board-on .stab,html.eg-board-on .tab-sm,html.eg-board-on .tab-btn,html.eg-board-on .filter-btn{letter-spacing:0!important;font-family:var(--bos-sans)!important}
+/* Unify inline near-black PRIMARY buttons to the cobalt accent (one primary colour, shadcn-style) */
+html.eg-board-on button[style*="background:#191918"],html.eg-board-on button[style*="background:#111827"]{background:var(--bos-violet)!important;border-color:var(--bos-violet)!important;color:#fff!important}
