@@ -90,6 +90,19 @@ export function walletRoutes(app, requireAuth) {
       reply.code(403); return { error: 'staff only' };
     }
     const ref = (b.ref != null && b.ref !== '') ? String(b.ref) : null;
+    // SECURITY: a non-staff seller may DEBIT their own wallet freely (order charges), but a
+    // CREDIT must reference a REAL, server-confirmed top-up — Stripe / VietQR / manual each
+    // write a topup_requests row (status='received') on confirm. Without this, a client could
+    // self-credit by POSTing an arbitrary positive delta. Staff (admin adjustments / the
+    // /transfer + /withdrawals routes) are exempt; the shared factory/designer wallets are
+    // already staff-gated above. Idempotency (account,type,ref) still prevents double-credit.
+    if (delta > 0 && !isStaff(req.user)) {
+      const t = ref ? await q(
+        "select amount_usd from topup_requests where seller_id=$1 and status='received' and (ref=$2 or txn_id=$2) limit 1",
+        [account, ref]) : { rows: [] };
+      if (!t.rows[0]) { reply.code(403); return { error: 'a wallet credit must reference a confirmed payment' }; }
+      if (delta > Number(t.rows[0].amount_usd) + 0.01) { reply.code(400); return { error: 'credit exceeds the confirmed payment amount' }; }
+    }
     // Idempotent insert: if (account,type,ref) already exists, do nothing and
     // just return the current balance (duplicate:true) — never double-charge.
     if (ref) {
