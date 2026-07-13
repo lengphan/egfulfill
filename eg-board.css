@@ -10,7 +10,7 @@
 
 :root{
   --bos-ink:#18181b; --bos-paper:#ffffff; --bos-ground:#fafafa; --bos-panel:#f4f4f5;  /* shadcn/ui zinc: cool near-white ground (zinc-50) + white cards */
-  --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-amber:#f8d264;  /* "violet" token now carries the COBALT accent */
+  --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-violet-soft:#edeefe; --bos-amber:#f8d264;  /* "violet" token carries the COBALT accent; -soft = restrained tint for active nav/hover */
   --bos-line:#f1f1f3; --bos-grey:#71717a; --bos-grey2:#a1a1aa;   /* zinc-500 / zinc-400 muted-foregrounds */
   --bos-cardline:#e4e4e7;  /* shadcn/ui zinc-200 border. Cool neutral; low-hierarchy dividers even lighter (--bos-line, zinc-100-ish) */
   --bos-radius:12px; --bos-radius-sm:8px;
@@ -27,28 +27,28 @@ html.eg-board-on body{background:var(--bos-ground)!important}
 /* ════ VERTICAL SIDEBAR RAIL (main pages) ════ */
 @media(min-width:861px){
   html.eg-board-on aside.sidebar{
-    width:212px!important;top:50%!important;left:14px!important;bottom:auto!important;transform:translateY(-50%)!important;
-    height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
-    background:var(--bos-paper)!important;border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;
-    border-radius:16px!important}
-  html.eg-board-on [style*="margin-left:220px"]{margin-left:242px!important}
+    width:240px!important;position:fixed!important;top:0!important;left:0!important;bottom:0!important;transform:none!important;
+    height:100vh!important;min-height:100vh!important;max-height:100vh!important;overflow-y:auto!important;
+    background:var(--bos-paper)!important;border:none!important;border-right:1px solid var(--bos-cardline)!important;box-shadow:none!important;
+    border-radius:0!important;display:flex!important;flex-direction:column!important}
+  html.eg-board-on [style*="margin-left:220px"]{margin-left:240px!important}
 }
-html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
-html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
+html.eg-board-on .sidebar-logo{height:auto!important;padding:17px 18px!important;border-bottom:1px solid var(--bos-cardline)!important}
+html.eg-board-on aside.sidebar nav{flex:1 1 auto!important;padding:8px 10px!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
 /* INSET light hairline separators between rows (don't reach the box edges — 16px inset, unified) */
-html.eg-board-on .ni{border:none!important;position:relative!important;border-radius:0!important;
+html.eg-board-on .ni{border:none!important;position:relative!important;border-radius:8px!important;
   font-family:var(--bos-sans)!important;font-weight:500!important;text-transform:none!important;letter-spacing:-.006em!important;font-size:14px!important;
-  padding:10px 15px!important;margin:0!important;color:var(--bos-grey)!important;display:flex!important;align-items:center!important;gap:11px!important}
+  padding:9px 12px!important;margin:1px 0!important;color:var(--bos-grey)!important;display:flex!important;align-items:center!important;gap:11px!important}
 /* the inset separator itself (16px in on each side); not on the active row or the last row */
-html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:var(--bos-line);pointer-events:none}
+html.eg-board-on .ni::after{display:none!important}
 html.eg-board-on .ni.on::after,html.eg-board-on aside.sidebar nav a.ni:last-of-type::after,html.eg-board-on .side-foot > a.ni:last-child::after{display:none!important}
 html.eg-board-on[data-theme=dark] .ni::after{background:#302e37!important}
 html.eg-board-on .ni svg{display:none!important}
 /* keep intentionally-hidden nav rows hidden (e.g. Product Templates) */
 html.eg-board-on .ni[style*="display:none"]{display:none!important}
 /* titles alone — no ■ marker (cleaner, less cluttered) */
-html.eg-board-on .ni.on{background:var(--bos-violet)!important;color:#fff!important}
+html.eg-board-on .ni.on{background:var(--bos-violet-soft)!important;color:var(--bos-violet)!important;font-weight:600!important}
 html.eg-board-on .ni:not(.on):hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 html.eg-board-on .ni[data-badge],html.eg-board-on .ni [data-badge]{font-family:var(--bos-mono)!important;border-radius:0!important;font-size:10px!important}
 /* Profile is reachable from the account cell; hide it + the ACCOUNT section header so the rail ends at Settings */
@@ -60,7 +60,7 @@ html.eg-board-on .side-foot > a.ni{border:none!important}
 /* Log out (in nav OR footer): an INSET separator ABOVE it, none below; suppress the divider of the row before it */
 html.eg-board-on a.ni[onclick*="signOut"]::after{display:none!important}
 html.eg-board-on a.ni:has(+ a.ni[onclick*="signOut"])::after{display:none!important}
-html.eg-board-on a.ni[onclick*="signOut"]::before{content:'';position:absolute;left:16px;right:16px;top:0;height:1px;background:#e2dfd8;pointer-events:none}
+html.eg-board-on a.ni[onclick*="signOut"]::before{display:none!important}
 html.eg-board-on[data-theme=dark] a.ni[onclick*="signOut"]::before{background:#302e37!important}
 /* Settings is the last row in <nav>; keep it borderless so the line-above-Log-out is the only separator */
 html.eg-board-on aside.sidebar nav a.ni:last-of-type{border-bottom:none!important}
@@ -72,16 +72,16 @@ html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-sans)!im
   text-transform:none!important;color:var(--bos-grey2)!important;padding:14px 15px 6px!important;border-bottom:none!important}
 
 /* ════ TOP BAR — connected "page settings" block. NO header band/colour — transparent, matches the ground ════ */
-html.eg-board-on header{background:transparent!important;border-bottom:none!important;
-  height:auto!important;min-height:56px!important;padding:11px 18px!important;gap:12px!important}
+html.eg-board-on header{background:transparent!important;border-bottom:1px solid var(--bos-cardline)!important;
+  height:auto!important;min-height:60px!important;padding:11px 24px!important;gap:12px!important}
 /* out-specify the beige-neutraliser (which also matches the header's inline #f7f5f0) so the header stays clear */
 html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-board-on[data-theme=dark] header[style*="background"]{background:transparent!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
-  border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;background:var(--bos-paper)!important;overflow:visible;flex-wrap:nowrap;border-radius:12px}
+  border:none!important;box-shadow:none!important;background:transparent!important;overflow:visible;flex-wrap:nowrap;border-radius:0}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
-  height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
-  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:none!important;letter-spacing:0!important;
+  height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:transparent!important;
+  font-family:var(--bos-sans)!important;font-size:13px!important;text-transform:none!important;letter-spacing:0!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
@@ -139,7 +139,7 @@ html.eg-board-on .bos-logout{color:var(--bos-grey)!important}
 html.eg-board-on .bos-logout svg{display:none!important}
 
 /* page title: sans (Inter) — serif (Fraunces) is reserved for marketing pages, not the app */
-html.eg-board-on header > span,html.eg-board-on header #page-title,html.eg-board-on header div[style*="margin-right:auto"]:not(:has(a)){font-family:var(--bos-sans)!important;font-weight:600!important;font-size:18px!important;letter-spacing:-.01em!important}
+html.eg-board-on header > span,html.eg-board-on header #page-title,html.eg-board-on header div[style*="margin-right:auto"]:not(:has(a)){font-family:var(--bos-sans)!important;font-weight:700!important;font-size:22px!important;letter-spacing:-.025em!important}
 /* Dashboards use NO serif — Fraunces is a marketing-page face. Flip any inline Fraunces (hero headings, KPI numerals) to Inter, EXCEPT the brand wordmark logo. */
 html.eg-board-on [style*="Fraunces"]{font-family:var(--bos-sans)!important;letter-spacing:-.015em!important}
 html.eg-board-on a[href="index.html"] [style*="Fraunces"],html.eg-board-on a[href="index.html"][style*="Fraunces"]{font-family:'Fraunces',Georgia,serif!important;letter-spacing:0!important}
@@ -542,3 +542,25 @@ html.eg-board-on [style*="DepartureMono"],html.eg-board-on [style*="ui-monospace
 html.eg-board-on .fb,html.eg-board-on .stab,html.eg-board-on .tab-sm,html.eg-board-on .tab-btn,html.eg-board-on .filter-btn{letter-spacing:0!important;font-family:var(--bos-sans)!important}
 /* Unify inline near-black PRIMARY buttons to the cobalt accent (one primary colour, shadcn-style) */
 html.eg-board-on button[style*="background:#191918"],html.eg-board-on button[style*="background:#111827"]{background:var(--bos-violet)!important;border-color:var(--bos-violet)!important;color:#fff!important}
+
+/* ══════════════ UNIFIED FILTER CONTROL — borderless: just the name + its arrow, no box.
+   Change values HERE to restyle every filter / period / dropdown on every board at once. ══════════════ */
+html.eg-board-on .fb,html.eg-board-on .filter-btn,html.eg-board-on select[data-eg-select],
+html.eg-board-on #trend-period,html.eg-board-on #dash-platform,html.eg-board-on #dash-period{
+  border:none!important;background-color:transparent!important;box-shadow:none!important;border-radius:0!important;
+  font-family:var(--bos-sans)!important;font-size:13px!important;font-weight:500!important;letter-spacing:0!important;
+  color:var(--bos-grey)!important;padding:6px 6px!important;cursor:pointer;transition:color .12s}
+html.eg-board-on .fb:hover,html.eg-board-on .filter-btn:hover,html.eg-board-on select[data-eg-select]:hover,
+html.eg-board-on #trend-period:hover,html.eg-board-on #dash-platform:hover,html.eg-board-on #dash-period:hover{color:var(--bos-ink)!important}
+html.eg-board-on .fb.active,html.eg-board-on .filter-btn.active{color:var(--bos-violet)!important;font-weight:600!important}
+
+/* ══ ALL CARDS ROUNDED + LIGHT HAIRLINE — catch stragglers (settings/modal cards) on a dark or sharp border ══ */
+html.eg-board-on [style*="border:1.5px solid #191918"],html.eg-board-on [style*="border:1px solid #191918"],
+html.eg-board-on [style*="border:1.5px solid #111827"],html.eg-board-on [style*="border:1px solid #111827"],
+html.eg-board-on [style*="border:1.5px solid #1f2937"],html.eg-board-on [style*="border:1.5px solid #374151"]{
+  border-color:var(--bos-cardline)!important;border-width:1px!important;border-radius:var(--bos-radius)!important}
+/* settings/billing light sub-panels still square -> rounded hairline */
+html.eg-board-on [id^="panel-"] [style*="border:1.5px solid #e5e4e0"]{border-color:var(--bos-cardline)!important;border-radius:var(--bos-radius-sm)!important}
+
+/* page titles + section headings always sans (never mono) */
+html.eg-board-on h1,html.eg-board-on h2,html.eg-board-on h3{font-family:var(--bos-sans)!important}
