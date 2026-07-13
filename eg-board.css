@@ -9,16 +9,16 @@
 @font-face{font-family:'Inter';src:url(fonts/Inter-Variable.woff2) format('woff2');font-weight:100 900;font-display:swap}
 
 :root{
-  --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfa; --bos-panel:#f7f6f4;  /* "barely" near-white ground */
+  --bos-ink:#18181b; --bos-paper:#ffffff; --bos-ground:#fafafa; --bos-panel:#f4f4f5;  /* shadcn/ui zinc: cool near-white ground (zinc-50) + white cards */
   --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-amber:#f8d264;  /* "violet" token now carries the COBALT accent */
-  --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
-  --bos-cardline:#e9e6df;  /* MONOTONE redesign: light hairline. Low-hierarchy lines are near-invisible; weight lives in the text, not the borders */
-  --bos-radius:12px; --bos-radius-sm:9px;
-  --bos-shadow:0 1px 2px rgba(24,24,22,.04),0 1px 3px rgba(24,24,22,.05);
-  --bos-shadow-hover:0 6px 18px rgba(24,24,22,.09);
+  --bos-line:#f1f1f3; --bos-grey:#71717a; --bos-grey2:#a1a1aa;   /* zinc-500 / zinc-400 muted-foregrounds */
+  --bos-cardline:#e4e4e7;  /* shadcn/ui zinc-200 border. Cool neutral; low-hierarchy dividers even lighter (--bos-line, zinc-100-ish) */
+  --bos-radius:12px; --bos-radius-sm:8px;
+  --bos-shadow:0 1px 3px 0 rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);
+  --bos-shadow-hover:0 8px 24px -4px rgba(0,0,0,.12);
   --bos-ease:cubic-bezier(.22,.61,.36,1);
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
-  --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
+  --bos-hover:#f4f4f5;   /* shadcn zinc-100 muted / hover */
   --bos-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;   /* mono RETIRED — all board type is Inter sans (user pref: DepartureMono was too hard to read). Kept the var name so the 18 chrome rules that reference it flip in one place; they keep their uppercase/letter-spacing, just in sans. */
   --bos-sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;  /* readable body sans — mono is kept for nav/top-bar/buttons/card eyebrows only; data-dense reading (tables, form labels, order/settings detail) uses this */
 }
@@ -41,7 +41,7 @@ html.eg-board-on .ni{border:none!important;position:relative!important;border-ra
   font-family:var(--bos-sans)!important;font-weight:500!important;text-transform:none!important;letter-spacing:-.006em!important;font-size:14px!important;
   padding:10px 15px!important;margin:0!important;color:var(--bos-grey)!important;display:flex!important;align-items:center!important;gap:11px!important}
 /* the inset separator itself (16px in on each side); not on the active row or the last row */
-html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:#e2dfd8;pointer-events:none}
+html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:var(--bos-line);pointer-events:none}
 html.eg-board-on .ni.on::after,html.eg-board-on aside.sidebar nav a.ni:last-of-type::after,html.eg-board-on .side-foot > a.ni:last-child::after{display:none!important}
 html.eg-board-on[data-theme=dark] .ni::after{background:#302e37!important}
 html.eg-board-on .ni svg{display:none!important}
@@ -68,8 +68,8 @@ html.eg-board-on aside.sidebar nav a.ni:last-of-type{border-bottom:none!importan
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search-btn){height:44px!important;overflow:visible!important}
 html.eg-board-on #hdr-search-btn{height:100%!important}
 /* section label (ACCOUNT) — no border of its own; the ink row-dividers above/below do the separating */
-html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
-  text-transform:none;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
+html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:.03em!important;font-weight:600!important;
+  text-transform:none!important;color:var(--bos-grey2)!important;padding:14px 15px 6px!important;border-bottom:none!important}
 
 /* ════ TOP BAR — connected "page settings" block. NO header band/colour — transparent, matches the ground ════ */
 html.eg-board-on header{background:transparent!important;border-bottom:none!important;
@@ -187,12 +187,20 @@ html.eg-board-on .b-prod,html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.
 /* hide the inline coloured dot some badges render before their label */
 html.eg-board-on .badge>span[style*="border-radius:50%"],html.eg-board-on [class*="b-s-"]>span[style*="border-radius:50%"]{display:none!important}
 /* stage colours — orders table + seller dashboard share the same fills */
-html.eg-board-on .b-new,html.eg-board-on .b-s-new{background:var(--bos-blue)!important;color:#fff!important;border-color:var(--bos-blue)!important}
-html.eg-board-on .b-queue,html.eg-board-on .b-s-queue,html.eg-board-on .b-s-active{background:#fff!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
-html.eg-board-on .b-prod,html.eg-board-on .b-s-prod,html.eg-board-on .b-s-printing{background:var(--bos-amberp)!important;color:var(--bos-ink)!important;border-color:var(--bos-ink)!important}
-html.eg-board-on .b-qc,html.eg-board-on .b-s-qc,html.eg-board-on .b-s-review{background:var(--bos-violet)!important;color:#fff!important;border-color:var(--bos-violet)!important}
-html.eg-board-on .b-packed,html.eg-board-on .b-s-packed{background:var(--bos-pink)!important;color:#fff!important;border-color:var(--bos-pink)!important}
-html.eg-board-on .b-shipped,html.eg-board-on .b-s-shipped,html.eg-board-on .b-s-fulfilled{background:var(--bos-mint)!important;color:#fff!important;border-color:var(--bos-mint)!important}
+/* shadcn-style soft-tinted status pills — light */
+html.eg-board-on:not([data-theme=dark]) .b-new,html.eg-board-on:not([data-theme=dark]) .b-s-new{background:#e8f0fd!important;color:#2f6fe0!important;border-color:transparent!important}
+html.eg-board-on:not([data-theme=dark]) .b-queue,html.eg-board-on:not([data-theme=dark]) .b-s-queue,html.eg-board-on:not([data-theme=dark]) .b-s-active{background:#f4f4f5!important;color:#52525b!important;border-color:transparent!important}
+html.eg-board-on:not([data-theme=dark]) .b-prod,html.eg-board-on:not([data-theme=dark]) .b-s-prod,html.eg-board-on:not([data-theme=dark]) .b-s-printing{background:#f8efda!important;color:#b0791c!important;border-color:transparent!important}
+html.eg-board-on:not([data-theme=dark]) .b-qc,html.eg-board-on:not([data-theme=dark]) .b-s-qc,html.eg-board-on:not([data-theme=dark]) .b-s-review{background:#edebfe!important;color:#6a5bf2!important;border-color:transparent!important}
+html.eg-board-on:not([data-theme=dark]) .b-packed,html.eg-board-on:not([data-theme=dark]) .b-s-packed{background:#fbe9ef!important;color:#d6456f!important;border-color:transparent!important}
+html.eg-board-on:not([data-theme=dark]) .b-shipped,html.eg-board-on:not([data-theme=dark]) .b-s-shipped,html.eg-board-on:not([data-theme=dark]) .b-s-fulfilled{background:#e6f5ee!important;color:#12925a!important;border-color:transparent!important}
+/* dark — deep tint + bright text */
+html.eg-board-on[data-theme=dark] .b-new,html.eg-board-on[data-theme=dark] .b-s-new{background:#122038!important;color:#7fb0ff!important;border-color:transparent!important}
+html.eg-board-on[data-theme=dark] .b-queue,html.eg-board-on[data-theme=dark] .b-s-queue,html.eg-board-on[data-theme=dark] .b-s-active{background:#27272a!important;color:#a1a1aa!important;border-color:transparent!important}
+html.eg-board-on[data-theme=dark] .b-prod,html.eg-board-on[data-theme=dark] .b-s-prod,html.eg-board-on[data-theme=dark] .b-s-printing{background:#2a2211!important;color:#e0b055!important;border-color:transparent!important}
+html.eg-board-on[data-theme=dark] .b-qc,html.eg-board-on[data-theme=dark] .b-s-qc,html.eg-board-on[data-theme=dark] .b-s-review{background:#1e1b39!important;color:#a99bff!important;border-color:transparent!important}
+html.eg-board-on[data-theme=dark] .b-packed,html.eg-board-on[data-theme=dark] .b-s-packed{background:#2e1420!important;color:#f090b0!important;border-color:transparent!important}
+html.eg-board-on[data-theme=dark] .b-shipped,html.eg-board-on[data-theme=dark] .b-s-shipped,html.eg-board-on[data-theme=dark] .b-s-fulfilled{background:#12271c!important;color:#5fce97!important;border-color:transparent!important}
 
 /* ════ BUTTONS ════ */
 html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)!important;color:#fff!important;
@@ -233,7 +241,7 @@ html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search
 html.eg-board-on #hdr-search-btn{padding:0!important;margin:0!important;justify-content:center!important}
 /* expanded SEARCH box — give it breathing room so it doesn't hug the cell/button */
 html.eg-board-on #hdr-search-wrap > div{margin:0 8px!important}
-html.eg-board-on #hdr-search{background:#faf9f7!important;border:1px solid #e2dfd8!important;border-radius:0!important}
+html.eg-board-on #hdr-search{background:#faf9f7!important;border:1px solid var(--bos-cardline)!important;border-radius:var(--bos-radius-sm)!important}
 
 /* ════ dashboard STATUS-BREAKDOWN mini-cards (In Queue/Printing/QC/Shipped) — were the old grey rails +
    sans labels; now Departure-Mono labels + Board OS stage-colour rails ════ */
@@ -249,7 +257,7 @@ html.eg-board-on:not([data-theme=dark]) [style*="background:#f0ede9"],
 html.eg-board-on:not([data-theme=dark]) [style*="background:#f6f5f4"],
 html.eg-board-on:not([data-theme=dark]) [style*="background:#f7f5f0"],
 html.eg-board-on:not([data-theme=dark]) [style*="background:#f4f2ef"],
-html.eg-board-on:not([data-theme=dark]) [style*="background:#f6f4f0"]{background:#f2f2f0!important}
+html.eg-board-on:not([data-theme=dark]) [style*="background:#f6f4f0"]{background:#f4f4f5!important}
 
 /* ══════════════════ DARK MODE — Board OS (shared across every board) ══════════════════
    The whole board goes dark, not just the header: dark ground, dark surfaces, light frames + text. */
@@ -295,14 +303,14 @@ html.eg-board-on .dtable td[data-col="order"] > div{font-family:Inter,-apple-sys
 html.eg-board-on .dtable td[data-col="total"]{font-variant-numeric:tabular-nums}
 html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:0}
 /* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
-html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:none!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
+html.eg-board-on .fb{font-family:var(--bos-sans)!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important;border-radius:var(--bos-radius-sm)!important}
 html.eg-board-on:not([data-theme=dark]) .fb:hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .filter-btn.active,html.eg-board-on:not([data-theme=dark]) .fb.active{border-bottom:2px solid var(--bos-ink)!important;color:var(--bos-ink)!important;background:transparent!important;box-shadow:none!important;border-radius:0!important}
 /* order-search input → mono + sharp */
 html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-sans)!important;font-size:13px!important;border-radius:0!important}
-html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:0!important}
+html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:var(--bos-radius-sm)!important}
 /* the small in-row action buttons (Push, etc.) + Export → sharp mono framed */
-html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-sans)!important;font-weight:600;font-size:10px!important;text-transform:none;letter-spacing:.04em;border-radius:0!important}
+html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-sans)!important;font-weight:600;font-size:11px!important;text-transform:none;letter-spacing:0;border-radius:var(--bos-radius-sm)!important}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    THEME AUDIT — shared off-theme fixes (board-theme-audit sweep). Shape/type rules
@@ -312,12 +320,12 @@ html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tra
    ══════════════════════════════════════════════════════════════════════════════ */
 /* shape + type — safe in both themes */
 html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:var(--bos-radius-sm)!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
-html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;text-transform:none!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:600!important}
+html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:999px!important;box-shadow:none!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;text-transform:none!important;letter-spacing:0!important;font-size:10.5px!important;font-weight:600!important}
 html.eg-board-on .pill-btn{font-family:var(--bos-sans)!important;font-weight:600!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
-html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:none!important;letter-spacing:.06em!important;font-weight:600!important;font-size:11px!important}
+html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:var(--bos-radius-sm)!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:none!important;letter-spacing:0!important;font-weight:600!important;font-size:11.5px!important}
 /* settings sub-nav a touch larger so it isn't smaller than the form labels */
 html.eg-board-on .stab{font-size:12.5px!important;letter-spacing:.04em!important}
-html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:0!important}
+html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:var(--bos-radius-sm)!important}
 html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble{box-shadow:none!important}
 html.eg-board-on .cat-row{font-family:var(--bos-sans)!important}
 /* light-mode colour + fill */
@@ -335,9 +343,9 @@ html.eg-board-on:not([data-theme=dark]) .prod-card,html.eg-board-on:not([data-th
 html.eg-board-on:not([data-theme=dark]) .chat-bubble.them{background:#fff!important;color:var(--bos-ink)!important;border:1px solid var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .chat-bubble.me{background:var(--bos-ink)!important;color:#fff!important;border:1px solid var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .conv-item{border-bottom:1px solid var(--bos-line)!important}
-html.eg-board-on:not([data-theme=dark]) #conv-menu,html.eg-board-on:not([data-theme=dark]) .dtpl-panel,html.eg-board-on:not([data-theme=dark]) .up-panel{box-shadow:3px 3px 0 var(--bos-ink)!important;border:1.5px solid var(--bos-ink)!important;background:#fff!important}
+html.eg-board-on:not([data-theme=dark]) #conv-menu,html.eg-board-on:not([data-theme=dark]) .dtpl-panel,html.eg-board-on:not([data-theme=dark]) .up-panel{box-shadow:0 12px 32px rgba(24,24,22,.14)!important;border:1px solid var(--bos-cardline)!important;background:#fff!important}
 html.eg-board-on:not([data-theme=dark]) [style*="color:#9ca3af"]{color:var(--bos-grey)!important}
-html.eg-board-on:not([data-theme=dark]) [style*="background:#faf9f7"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fdfcfa"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fafaf9"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e9e6e0"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e8e6e1"],html.eg-board-on:not([data-theme=dark]) [style*="background:#ece9e3"]{background:#f2f2f0!important}
+html.eg-board-on:not([data-theme=dark]) [style*="background:#faf9f7"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fdfcfa"],html.eg-board-on:not([data-theme=dark]) [style*="background:#fafaf9"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e9e6e0"],html.eg-board-on:not([data-theme=dark]) [style*="background:#e8e6e1"],html.eg-board-on:not([data-theme=dark]) [style*="background:#ece9e3"]{background:#f4f4f5!important}
 html.eg-board-on:not([data-theme=dark]) [style*="border-color:#f0ede9"],html.eg-board-on:not([data-theme=dark]) [style*="border-bottom:1px solid #f0ede9"],html.eg-board-on:not([data-theme=dark]) [style*="1px solid #f3f0eb"],html.eg-board-on:not([data-theme=dark]) [style*="1px solid #f3f3f1"]{border-color:var(--bos-line)!important}
 /* dark-mode variants for the new classes (don't leave them white-on-dark) */
 html.eg-board-on[data-theme=dark] .input,html.eg-board-on[data-theme=dark] .select,html.eg-board-on[data-theme=dark] .finput{background:#201e24!important;border:1px solid #45424e!important;color:#e8e4dd!important}
@@ -346,7 +354,7 @@ html.eg-board-on[data-theme=dark] .pill-btn{background:#201e24!important;border:
 html.eg-board-on[data-theme=dark] .tab-sm.on,html.eg-board-on[data-theme=dark] .stab.on,html.eg-board-on[data-theme=dark] .chat-tab.on{background:#2c2a33!important;color:#e8e4dd!important;border:1px solid #45424e!important}
 html.eg-board-on[data-theme=dark] .chat-bubble.them{background:#201e24!important;color:#e8e4dd!important;border:1px solid #45424e!important}
 html.eg-board-on[data-theme=dark] .chat-bubble.me{background:var(--bos-violet)!important;color:#fff!important}
-html.eg-board-on[data-theme=dark] #conv-menu,html.eg-board-on[data-theme=dark] .dtpl-panel,html.eg-board-on[data-theme=dark] .up-panel{background:#201e24!important;border:1.5px solid #45424e!important;box-shadow:3px 3px 0 #000!important}
+html.eg-board-on[data-theme=dark] #conv-menu,html.eg-board-on[data-theme=dark] .dtpl-panel,html.eg-board-on[data-theme=dark] .up-panel{background:#201e24!important;border:1px solid #45424e!important;box-shadow:0 12px 32px rgba(0,0,0,.4)!important}
 
 /* tactile press — primary buttons travel 1px into their frame on click (pairs with eg-anim.js) */
 html.eg-board-on .btn,html.eg-board-on .btn-dk,html.eg-board-on .btn-out,html.eg-board-on .btn-green,html.eg-board-on .btn-amber,html.eg-board-on .btn-gold,html.eg-board-on .bos-controls > div:has(#new-menu-btn){transition:transform .08s ease,box-shadow .08s ease,background .15s ease}
@@ -449,7 +457,7 @@ html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-o
 /* KPI card delta + caption: were a faded rounded grey pill (#eeede9/#374151) + light-grey
    (#9ca3af) caption from the pre-board theme — retheme to Board OS: mono, sharp, readable. */
 html.eg-board-on .trend-up,html.eg-board-on .trend-dn,html.eg-board-on .trend-down,html.eg-board-on .trend-flat{
-  font-family:var(--bos-mono)!important;border-radius:0!important;background:rgba(25,25,24,.07)!important;color:var(--bos-ink)!important;
+  font-family:var(--bos-sans)!important;border-radius:999px!important;background:rgba(25,25,24,.06)!important;color:var(--bos-ink)!important;
   font-size:11px!important;font-weight:400!important;padding:2px 7px!important;letter-spacing:.02em!important;border:none!important}
 html[data-theme=dark].eg-board-on .trend-up,html[data-theme=dark].eg-board-on .trend-dn,html[data-theme=dark].eg-board-on .trend-down,html[data-theme=dark].eg-board-on .trend-flat{
   background:rgba(216,212,204,.14)!important;color:#e8e4dd!important}
