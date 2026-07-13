@@ -259,7 +259,7 @@ html[data-theme=dark] #orders-search::placeholder,html[data-theme=dark] #hdr-sea
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
    shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fff;color:#191918;border:1px solid #e4e4e7;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -2643,7 +2643,7 @@ function openDetailModal(ordNo) {
     // Newly-added rows render with a SKU lookup input where the product name would
     // be — searching the catalog (EGStore) and picking a product fills the row.
     if (item._searching) {
-      return `<div style="border:1px solid #111827;border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:52px 1fr auto;gap:11px;align-items:center;position:relative">
+      return `<div style="border:1px solid #e4e4e7;border-radius:8px;padding:10px 12px;display:grid;grid-template-columns:52px 1fr auto;gap:11px;align-items:center;position:relative">
         <div style="width:52px;height:52px;border-radius:7px;background:#f6f5f4;border:1px dashed #d1d5db;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#9ca3af">
           <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         </div>
@@ -3340,8 +3340,8 @@ function openQuickPositionModal(orderNo, sku, viewOnly) {
     modal.id = 'qp-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:24px';
     modal.innerHTML = `
-      <div style="background:#fdfcfa;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:480px;overflow:hidden" onclick="event.stopPropagation()">
-        <div style="padding:14px 18px;border-bottom:1.5px solid #40403d;display:flex;align-items:center;justify-content:space-between">
+      <div style="background:#fff;border:1.5px solid #e4e4e7;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);width:100%;max-width:480px;overflow:hidden" onclick="event.stopPropagation()">
+        <div style="padding:14px 18px;border-bottom:1.5px solid #e4e4e7;display:flex;align-items:center;justify-content:space-between">
           <div>
             <div id="qp-title" style="font-size:14px;font-weight:700;color:#191918">—</div>
             <div style="font-size:12px;color:#6b7280;margin-top:1px">Drag to move · drag the corner to resize</div>
@@ -3611,9 +3611,9 @@ function egConfirmModal(opts) {
   var confirmHover = danger ? '#b91c1c' : '#000';
   overlay.innerHTML =
     '<style>@keyframes egConfFade{from{opacity:0}to{opacity:1}}@keyframes egConfPop{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}</style>' +
-    '<div style="background:#fdfcfa;border:1px solid #d7d4cc;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);padding:20px 22px 16px;min-width:340px;max-width:420px;font-family:inherit;animation:egConfPop .18s cubic-bezier(.2,.9,.3,1.1)">'
+    '<div style="background:#fff;border:1px solid #e4e4e7;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);padding:20px 22px 16px;min-width:340px;max-width:420px;font-family:inherit;animation:egConfPop .18s cubic-bezier(.2,.9,.3,1.1)">'
     + '<div style="display:flex;align-items:flex-start;gap:11px;margin-bottom:14px">'
-      + '<div style="flex-shrink:0;width:30px;height:30px;border-radius:50%;background:'+(danger?'#fee2e2':'#fdfcfa')+';border:1.5px solid '+(danger?'#dc2626':'#40403d')+';display:flex;align-items:center;justify-content:center;margin-top:1px">'
+      + '<div style="flex-shrink:0;width:30px;height:30px;border-radius:50%;background:'+(danger?'#fee2e2':'#fff')+';border:1.5px solid '+(danger?'#dc2626':'#e4e4e7')+';display:flex;align-items:center;justify-content:center;margin-top:1px">'
         + '<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3v4.5M7 9.5v.5" stroke="'+(danger?'#dc2626':'#191918')+'" stroke-width="1.6" stroke-linecap="round"/><circle cx="7" cy="7" r="6" stroke="'+(danger?'#dc2626':'#191918')+'" stroke-width="1.3"/></svg>'
       + '</div>'
       + '<div style="flex:1;min-width:0">'
@@ -3671,7 +3671,7 @@ function orderRowMenuOpen(ev, ordNo) {
   if (!opts.length) return;
   const menu = document.createElement('div');
   menu.id = 'order-row-menu';
-  menu.style.cssText = 'position:fixed;background:#fdfcfa;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);z-index:9999;padding:6px;min-width:230px;font-family:inherit';
+  menu.style.cssText = 'position:fixed;background:#fff;border:1px solid #e4e4e7;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);z-index:9999;padding:6px;min-width:230px;font-family:inherit';
   menu.innerHTML = opts.map(o => {
     const hoverBg = o.danger ? '#fef2f2' : '#f6f5f4';
     const hoverColor = o.danger ? '#dc2626' : '#191918';
@@ -4412,7 +4412,7 @@ function embPreviewModal(emb) {
   overlay.id = 'emb-preview-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.78);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit;cursor:zoom-out';
   overlay.innerHTML = `
-    <div style="background:#fff;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:640px;overflow:hidden;cursor:default" onclick="event.stopPropagation()">
+    <div style="background:#fff;border:1.5px solid #e4e4e7;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);width:100%;max-width:640px;overflow:hidden;cursor:default" onclick="event.stopPropagation()">
       <div style="padding:14px 18px;border-bottom:1.5px solid #f0ede9;display:flex;align-items:center;justify-content:space-between;gap:10px">
         <div style="min-width:0">
           <div style="font-size:14px;font-weight:700;color:#191918">${emb.name || 'Embroidery file'}</div>
@@ -6169,7 +6169,7 @@ function openThreadPickerZoom(ordNo, sku) {
   overlay.id = 'tp-zoom-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(25,25,24,.62);z-index:9800;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(2px)';
   overlay.innerHTML = `
-    <div style="background:#fff;border:1.5px solid #40403d;border-radius:14px;box-shadow:4px 4px 0 #40403d;width:100%;max-width:620px;overflow:hidden" onclick="event.stopPropagation()">
+    <div style="background:#fff;border:1.5px solid #e4e4e7;border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 36px rgba(0,0,0,.18);width:100%;max-width:620px;overflow:hidden" onclick="event.stopPropagation()">
       <div style="padding:14px 18px;border-bottom:1.5px solid #f3f3f1;display:flex;align-items:center;justify-content:space-between">
         <div>
           <div style="font-size:14px;font-weight:700;color:#191918;display:flex;align-items:center;gap:7px"><span style="font-size:17px">🎯</span>Pick a thread colour</div>
@@ -6732,7 +6732,7 @@ function dtplOpenMenu(e, tplId) {
   const r = btn.getBoundingClientRect();
   const menu = document.createElement('div');
   menu.id = 'dtpl-menu';
-  menu.style.cssText = 'position:fixed;top:' + (r.bottom + 4) + 'px;left:' + Math.max(8, Math.min(window.innerWidth - 220, r.right - 200)) + 'px;background:#fdfcfa;border:1.5px solid #40403d;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);min-width:200px;z-index:10000;padding:5px;font-family:inherit';
+  menu.style.cssText = 'position:fixed;top:' + (r.bottom + 4) + 'px;left:' + Math.max(8, Math.min(window.innerWidth - 220, r.right - 200)) + 'px;background:#fff;border:1.5px solid #e4e4e7;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);min-width:200px;z-index:10000;padding:5px;font-family:inherit';
   menu.innerHTML = `
     <button onclick="event.stopPropagation();dtplRename('${tplId}')" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:7px 10px;border-radius:6px;font-size:13px;color:#191918;display:flex;align-items:center;gap:8px;font-family:inherit" onmouseover="this.style.background='#f3eee2'" onmouseout="this.style.background='transparent'">
       <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9 2l3 3-7 7H2v-3l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg> Rename

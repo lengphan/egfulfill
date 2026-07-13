@@ -72,10 +72,10 @@ html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-sans)!im
   text-transform:none!important;color:var(--bos-grey2)!important;padding:14px 15px 6px!important;border-bottom:none!important}
 
 /* ════ TOP BAR — connected "page settings" block. NO header band/colour — transparent, matches the ground ════ */
-html.eg-board-on header{background:transparent!important;border-bottom:1px solid var(--bos-cardline)!important;
+html.eg-board-on header{background:var(--bos-paper)!important;border-bottom:1px solid var(--bos-cardline)!important;
   height:auto!important;min-height:60px!important;padding:11px 24px!important;gap:12px!important}
 /* out-specify the beige-neutraliser (which also matches the header's inline #f7f5f0) so the header stays clear */
-html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-board-on[data-theme=dark] header[style*="background"]{background:transparent!important}
+html.eg-board-on:not([data-theme=dark]) header[style*="background"]{background:var(--bos-paper)!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
   border:none!important;box-shadow:none!important;background:transparent!important;overflow:visible;flex-wrap:nowrap;border-radius:0}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
@@ -84,7 +84,7 @@ html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!i
   font-family:var(--bos-sans)!important;font-size:13px!important;text-transform:none!important;letter-spacing:0!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
-html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
+html.eg-board-on .bos-controls > * + *::after{display:none!important}
 html.eg-board-on[data-theme=dark] .bos-controls > * + *::after{background:#403d48!important}
 /* some factory headers nest an inline <script> among the controls; the display:flex on
    .bos-controls > * would otherwise reveal its source text — keep script/style hidden */
@@ -479,7 +479,7 @@ html.eg-board-on .stat-card [style*="text-transform: uppercase"]{
   padding-bottom:0!important;margin-bottom:10px!important;
   border-bottom:none!important;
   color:var(--bos-grey)!important;font-family:var(--bos-sans)!important;letter-spacing:.01em!important;
-  text-transform:none!important;font-size:12px!important;font-weight:600!important;
+  text-transform:none!important;font-size:13px!important;font-weight:600!important;
   white-space:nowrap!important;overflow:hidden!important}
 /* the hairline strip runs FULL WIDTH to the content edge (matches the value line below) — no
    vertical end-cap. Base rule below already sets flex:1;align-self:stretch so it fills the row;
@@ -540,8 +540,8 @@ html.eg-board-on #trend-subtitle{text-transform:none!important;letter-spacing:.0
 html.eg-board-on [style*="DepartureMono"],html.eg-board-on [style*="ui-monospace"],html.eg-board-on [style*="monospace"]{font-family:var(--bos-sans)!important}
 /* dashboard period/filter selects + their spread tracking */
 html.eg-board-on .fb,html.eg-board-on .stab,html.eg-board-on .tab-sm,html.eg-board-on .tab-btn,html.eg-board-on .filter-btn{letter-spacing:0!important;font-family:var(--bos-sans)!important}
-/* Unify inline near-black PRIMARY buttons to the cobalt accent (one primary colour, shadcn-style) */
-html.eg-board-on button[style*="background:#191918"],html.eg-board-on button[style*="background:#111827"]{background:var(--bos-violet)!important;border-color:var(--bos-violet)!important;color:#fff!important}
+/* Unify inline near-black PRIMARY buttons/CTAs (button OR a) to the cobalt accent (one primary colour) */
+html.eg-board-on button[style*="background:#191918"],html.eg-board-on button[style*="background:#111827"],html.eg-board-on a[style*="background:#191918"],html.eg-board-on a[style*="background:#111827"]{background:var(--bos-violet)!important;border-color:var(--bos-violet)!important;color:#fff!important}
 
 /* ══════════════ UNIFIED FILTER CONTROL — borderless: just the name + its arrow, no box.
    Change values HERE to restyle every filter / period / dropdown on every board at once. ══════════════ */

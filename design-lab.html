@@ -209,7 +209,7 @@ html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px s
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
    shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
+.bal-chip{background:#fff;color:#191918;border:1px solid #e4e4e7;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
@@ -312,7 +312,7 @@ html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .
 /* Path-card icons → beige (match lettering) in dark mode */
 html[data-theme=dark] .dl-path-card svg [stroke]:not([stroke="none"]){stroke:#c9c3ba!important}
 html[data-theme=dark] .dl-path-card svg [fill]:not([fill="none"]){fill:#c9c3ba!important}
-html:not([data-theme=dark]) .dl-path-card{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
+html:not([data-theme=dark]) .dl-path-card{background:#fff!important;border:1px solid #e4e4e7!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
 html[data-theme=dark] .dl-path-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
 </style>
 <style id="eg-sel-outline">/* eg-sel-outline */
@@ -340,12 +340,12 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
   <script src="eg-anim.js" defer></script>
 <style id="eg-board-cards-fix">
 /* Unify the Design Lab family cards with the board look (flat, ink-framed, squared). Loaded LAST so it wins over the local soft-card styles. */
-html.eg-board-on .card,html.eg-board-on .dcard,html.eg-board-on .tcard,html.eg-board-on .stat-card,html.eg-board-on .ccard{background:#fff!important;border:1.5px solid #191918!important;border-radius:0!important;box-shadow:none!important}
+html.eg-board-on .card,html.eg-board-on .dcard,html.eg-board-on .tcard,html.eg-board-on .stat-card,html.eg-board-on .ccard{background:#fff!important;border:1px solid #e4e4e7!important;border-radius:12px!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important}
 html.eg-board-on .dcard,html.eg-board-on .tcard{transition:box-shadow .12s,transform .12s!important}
-html.eg-board-on .dcard:hover,html.eg-board-on .tcard:hover{box-shadow:4px 4px 0 #191918!important;transform:translate(-1px,-1px)!important;border-color:#191918!important}
+html.eg-board-on .dcard:hover,html.eg-board-on .tcard:hover{box-shadow:0 8px 24px -4px rgba(0,0,0,.12)!important;transform:translate(-1px,-1px)!important;border-color:#e4e4e7!important}
 html.eg-board-on .stat-card::before{display:none!important}
-html[data-theme=dark].eg-board-on .card,html[data-theme=dark].eg-board-on .dcard,html[data-theme=dark].eg-board-on .tcard,html[data-theme=dark].eg-board-on .stat-card,html[data-theme=dark].eg-board-on .ccard{background:transparent!important;border-color:#c9c3ba!important;box-shadow:none!important}
-html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on .tcard:hover{box-shadow:4px 4px 0 #c9c3ba!important;border-color:#c9c3ba!important}
+html[data-theme=dark].eg-board-on .card,html[data-theme=dark].eg-board-on .dcard,html[data-theme=dark].eg-board-on .tcard,html[data-theme=dark].eg-board-on .stat-card,html[data-theme=dark].eg-board-on .ccard{background:#151419!important;border-color:#6d6a78!important;box-shadow:none!important}
+html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on .tcard:hover{box-shadow:0 6px 18px rgba(0,0,0,.42)!important;border-color:#6d6a78!important}
 </style>
 </head>
 <body>
@@ -410,7 +410,7 @@ html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on
         
         <h1 style="font-size:1.3rem;font-weight:700;color:#191918;letter-spacing:-0.03em;margin:0">Welcome to Design Lab <svg width="16" height="16" viewBox="0 0 18 18" fill="none" style="display:inline-block;vertical-align:-2px;margin-left:1px"><path d="M9 2l1.3 4.2a2 2 0 001.5 1.5L16 9l-4.2 1.3a2 2 0 00-1.5 1.5L9 16l-1.3-4.2a2 2 0 00-1.5-1.5L2 9l4.2-1.3a2 2 0 001.5-1.5z" fill="#191918"/></svg></h1>
       </div>
-      <a href="design-maker.html" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:0;background:#2f4bf0;border:1.5px solid #191918;box-shadow:3px 3px 0 #191918;color:#fff;font-size:14px;font-weight:600;text-decoration:none;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='#2439c8'" onmouseout="this.style.background='#2f4bf0'">
+      <a href="design-maker.html" style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;background:#2f4bf0;border:1.5px solid #2f4bf0;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);color:#fff;font-size:14px;font-weight:600;text-decoration:none;transition:background .15s;flex-shrink:0" onmouseover="this.style.background='#2439c8'" onmouseout="this.style.background='#2f4bf0'">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         New Product
       </a>
@@ -420,42 +420,42 @@ html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:40px;animation-delay:.05s" class="fi">
 
       <!-- Row 1, left: Upload & design -->
-      <a href="design-maker.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+      <a href="design-maker.html" class="dl-path-card" style="display:block;background:#fff;border-radius:12px;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
         <div class="dl-art" data-dither="art" data-pop="noir" data-seed="7" style="height:118px;position:relative;background:#e9e6e0"></div>
         <div style="padding:18px 22px 20px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px;font-family:'Fraunces',serif">Upload & Design</div>
           <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Start with your artwork. Upload a file, place it on a blank, generate a mockup, and publish.</div>
-          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open editor <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open editor <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 1, right: Use a template -->
-      <a href="product-templates.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+      <a href="product-templates.html" class="dl-path-card" style="display:block;background:#fff;border-radius:12px;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
         <div class="dl-art" data-dither="art" data-pop="noir" data-seed="23" style="height:118px;position:relative;background:#e9e6e0"></div>
         <div style="padding:18px 22px 20px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px;font-family:'Fraunces',serif">Use a Template</div>
           <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Start from a saved product setup. Apply a fresh design to something you've already configured.</div>
-          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">View product templates <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">View product templates <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 2, left: Image Library — your uploaded design images + copyable links / IDs -->
-      <a href="image-library.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+      <a href="image-library.html" class="dl-path-card" style="display:block;background:#fff;border-radius:12px;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
         <div class="dl-art" data-dither="art" data-pop="noir" data-seed="41" style="height:118px;position:relative;background:#e9e6e0"></div>
         <div style="padding:18px 22px 20px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px;font-family:'Fraunces',serif">Image Library</div>
           <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Your uploaded design images — copy each image link or design ID to drop straight into an import sheet.</div>
-          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open library <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Open library <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
       <!-- Row 2, right: Browse catalog -->
-      <a href="products-dash.html" class="dl-path-card" style="display:block;background:#fff;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
+      <a href="products-dash.html" class="dl-path-card" style="display:block;background:#fff;border-radius:12px;overflow:hidden;padding:0;text-decoration:none;transition:border-color .15s,box-shadow .15s;cursor:pointer">
         <div class="dl-art" data-dither="art" data-pop="noir" data-seed="59" style="height:118px;position:relative;background:#e9e6e0"></div>
         <div style="padding:18px 22px 20px">
           <div style="font-size:15px;font-weight:700;color:#191918;margin-bottom:6px;font-family:'Fraunces',serif">Browse Catalog</div>
           <div style="font-size:14px;color:#9ca3af;line-height:1.6;margin-bottom:16px">Pick a blank product first — tees, mugs, hoodies, posters — then drop your design on top.</div>
-          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Browse blanks <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div style="font-size:12px;font-weight:700;color:#2f4bf0;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:5px">Browse blanks <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
       </a>
 
