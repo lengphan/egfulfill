@@ -4875,6 +4875,7 @@ function whRenderOrders() {
     return true;
   });
   rows = [...rows].sort((a, b) => {
+    var fa = a.flagged ? 1 : 0, fb = b.flagged ? 1 : 0; if (fa !== fb) return fb - fa;
     let va, vb;
     if (admSortCol === 'order')      { va = parseInt((a.num||'').replace(/\D/g,'')||0); vb = parseInt((b.num||'').replace(/\D/g,'')||0); }
     else if (admSortCol === 'seller')   { va = a.store||'';    vb = b.store||''; }
@@ -4930,7 +4931,7 @@ function whRenderOrders() {
     const mainRow = `<tr id="adm-row-${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select')&&!e.target.closest('a'))whToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s;${isActive?'background:#faf9f7;border-left:2px solid #111827;':''}${isOnHold?'opacity:.75;':''}">
       <td onclick="event.stopPropagation()" style="width:32px"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="whToggleOrder('${o.num}',this.checked)"/></td>
       <td data-col="order">
-        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};return '<div style="font-size:14px;font-weight:700;color:#191918">'+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
+        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};var bm=o.flagged?'<svg width="13" height="13" viewBox="0 0 24 24" fill="#2f4bf0" style="flex-shrink:0" aria-label="Flagged — rush"><title>Flagged — rush</title><path d="M6 2h12a1 1 0 0 1 1 1v18l-7-4.5L5 21V3a1 1 0 0 1 1-1z"/></svg>':'';return '<div style="font-size:14px;font-weight:700;color:#191918;display:flex;align-items:center;gap:5px">'+bm+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
         ${ageHtml}
       </td>
       <td data-col="seller">
@@ -5224,7 +5225,7 @@ function admRowMenuOpen(ev, num) {
   // amount to the seller. Refund pops a partial/full modal.
   if (!isTerminal) opts.push({ label:'Cancel & refund', icon:ICN.cancel, fn:"admCancelOrder('"+num+"')" });
   if (o.status === 'shipped' || (!isTerminal && o.status !== 'new')) opts.push({ label:'Refund (partial or full)', icon:ICN.refund, fn:"admOpenRefundModal('"+num+"')" });
-  if (!isTerminal) opts.push({ label:'Flag for review', icon:ICN.flag, danger:true, fn:"admEscalateException && admEscalateException('"+num+"')" });
+  if (!isTerminal) opts.push({ label:'Flag', icon:ICN.flag, danger:true, fn:"admEscalateException && admEscalateException('"+num+"')" });
   if (!opts.length) return;
   var menu = document.createElement('div');
   menu.id = 'adm-row-menu';

@@ -5640,7 +5640,7 @@ function whRowMenuOpen(ev, num) {
   if (!isTerminal && !onHold) opts.push({ label:'Put on hold', icon:ICN.pause, fn:"whToggleHold('"+num+"')" });
   if (onHold) opts.push({ label:'Resume from hold', icon:ICN.play, fn:"whToggleHold('"+num+"')" });
   opts.push({ label:'Chat with Seller', icon:ICN.chat, fn:"xOrderChatOpen('"+num+"',{subtitle:'"+(o.customer||'').replace(/'/g,"\\'")+" · "+(o.store||'').replace(/'/g,"\\'")+"'})" });
-  if (!isTerminal) opts.push({ label:'Flag for review', icon:ICN.flag, danger:true, fn:"whFlagOrder('"+num+"')" });
+  if (!isTerminal) opts.push({ label:'Flag', icon:ICN.flag, danger:true, fn:"whFlagOrder('"+num+"')" });
   if (!opts.length) return;
   var menu = document.createElement('div');
   menu.id = 'wh-row-menu';
@@ -6009,6 +6009,7 @@ function whRenderOrders() {
   }
   // Sort
   rows = [...rows].sort((a, b) => {
+    var fa = a.flagged ? 1 : 0, fb = b.flagged ? 1 : 0; if (fa !== fb) return fb - fa;
     let va, vb;
     if (whSortCol === 'order')    { va = parseInt((a.num||'').replace(/\D/g,''))||0; vb = parseInt((b.num||'').replace(/\D/g,''))||0; }
     else if (whSortCol === 'seller')   { va = a.store||'';    vb = b.store||''; }
@@ -6061,7 +6062,7 @@ function whRenderOrders() {
     const mainRow = `<tr id="wh-row-${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select')&&!e.target.closest('a'))whToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s;${isActive?'background:#faf9f7;border-left:2px solid #111827;':''}">
       <td onclick="event.stopPropagation()" style="width:32px"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="whToggleOrder('${o.num}',this.checked)"/></td>
       <td data-col="order">
-        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};return '<div style="font-size:14.25px;font-weight:700;color:#191918">'+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11.25px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
+        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};var bm=o.flagged?'<svg width="13" height="13" viewBox="0 0 24 24" fill="#2f4bf0" style="flex-shrink:0" aria-label="Flagged — rush"><title>Flagged — rush</title><path d="M6 2h12a1 1 0 0 1 1 1v18l-7-4.5L5 21V3a1 1 0 0 1 1-1z"/></svg>':'';return '<div style="font-size:14.25px;font-weight:700;color:#191918;display:flex;align-items:center;gap:5px">'+bm+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:11.25px;color:#9ca3af;margin-top:2px">'+x.eg+'</div>':'');})()}
         ${ageHtml}
       </td>
       <td data-col="seller">

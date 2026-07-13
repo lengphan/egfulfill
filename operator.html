@@ -3823,7 +3823,7 @@ function renderOpOrders() {
     const mainRow = `<tr data-num="${o.num}" onclick="(function(e){if(!e.target.closest('button')&&!e.target.closest('input')&&!e.target.closest('select'))opToggleDetail('${o.num}')})(event)" style="cursor:pointer;transition:background .1s${rowBg?`;background:${rowBg}`:''}">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${isSel?'checked':''} style="accent-color:#111827" onchange="toggleOrderSelect('${o.num}',this.checked)"/></td>
       <td data-col="order">
-        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};return '<div style="font-size:14px;font-weight:700;color:#191918">'+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:12px;color:#9ca3af;margin-top:1px">'+x.eg+'</div>':'');})()}
+        ${(function(){var x=window.egOrderIds?egOrderIds(o):{market:'',eg:(o.num||'')};var bm=o.flagged?'<svg width="13" height="13" viewBox="0 0 24 24" fill="#2f4bf0" style="flex-shrink:0" aria-label="Flagged — rush"><title>Flagged — rush</title><path d="M6 2h12a1 1 0 0 1 1 1v18l-7-4.5L5 21V3a1 1 0 0 1 1-1z"/></svg>':'';return '<div style="font-size:14px;font-weight:700;color:#191918;display:flex;align-items:center;gap:5px">'+bm+(x.market||('#'+x.eg))+'</div>'+(x.market?'<div style="font-size:12px;color:#9ca3af;margin-top:1px">'+x.eg+'</div>':'');})()}
       </td>
       <td data-col="seller" style="display:${opColVisible('seller')?'':'none'}">
         <div style="font-size:13.5px;font-weight:600;color:#374151">${o.store}</div>
@@ -4194,7 +4194,7 @@ function opRowMenuOpen(ev, num) {
   } else if (!isTerminal) {
     opts.push({ label: 'Create Label', icon: ICN.label, fn: `opOpenLabel('${num}')` });
   }
-  if (!isTerminal)             opts.push({ label: 'Flag for review',     icon: ICN.flag,  fn: `opRowFlag('${num}')`, danger:true });
+  if (!isTerminal)             opts.push({ label: 'Flag',     icon: ICN.flag,  fn: `opRowFlag('${num}')`, danger:true });
   if (!opts.length) return;
   const menu = document.createElement('div');
   menu.id = 'op-row-menu';
@@ -5519,6 +5519,7 @@ function opGetFilteredOrders() {
     });
   }
   return [...list].sort(function(a, b) {
+    var fa = a.flagged ? 1 : 0, fb = b.flagged ? 1 : 0; if (fa !== fb) return fb - fa;
     var va, vb;
     if (opSortCol === 'order')    { va = parseInt((a.num||'').replace(/\D/g,'')||0); vb = parseInt((b.num||'').replace(/\D/g,'')||0); }
     else if (opSortCol === 'seller')   { va = a.store||'';    vb = b.store||''; }
