@@ -58,7 +58,8 @@
       try {
         var prev = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
         if (prev && _identity(prev) && _identity(prev) !== _identity(d.user)) {
-          ['egfulfill_orders', 'eg_pending_patches', 'eg_thread_match', 'eg_thread_colors', 'eg_order_seq']
+          ['egfulfill_orders', 'eg_pending_patches', 'eg_thread_match', 'eg_thread_colors', 'eg_order_seq',
+           'eg_balance', 'eg_factory_balance', 'eg_designer_balance', 'eg_emb_paid', 'eg_design_file_paid']
             .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
         }
       } catch (e) {}
@@ -104,7 +105,15 @@
       return api('/auth/google', { method: 'POST', body: { credential: credential } })
         .then(function (r) { if (r.data) setSession(r.data); return { data: r.data ? { user: r.data.user } : null, error: r.error }; });
     },
-    signOut: function () { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY); return Promise.resolve(); },
+    signOut: function () {
+      localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY);
+      // Purge per-account wallet/entitlement caches so the next account that logs in on this
+      // browser starts clean (they re-hydrate from their OWN server ledger). Prevents a new
+      // seller from inheriting — and, via the migration path, PERSISTING — a prior balance.
+      ['eg_balance', 'eg_factory_balance', 'eg_designer_balance', 'eg_emb_paid', 'eg_design_file_paid']
+        .forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+      return Promise.resolve();
+    },
     getUser: function () { try { return Promise.resolve(JSON.parse(localStorage.getItem(USER_KEY) || 'null')); } catch (e) { return Promise.resolve(null); } },
     getRole: function () { return this.getUser().then(function (u) { return (u && u.role) || null; }); },
     routeAfterLogin: function () { var self = this; return this.getRole().then(function (role) { window.location.href = self.dashboardFor(role); }); },
