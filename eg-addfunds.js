@@ -40,6 +40,11 @@
       + '</div>'
       + '<div id="paypal-box" style="display:none;margin-bottom:14px"><div style="font-size:12.5px;color:#6b7280;margin-bottom:10px">You\'ll continue in PayPal\'s secure window to pay with your balance or bank, then return here.</div><button id="paypal-continue" onclick="walPayPalRedirect()" style="width:100%;display:inline-flex;align-items:center;justify-content:center;gap:9px;background:#ffc439;color:#003087;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M5 4h6a2.5 2.5 0 010 5H7L6 13H4l2-9z" stroke="#003087" stroke-width="1.3" stroke-linejoin="round"/></svg>Continue with PayPal</button><div id="paypal-err" style="font-size:12px;color:#dc2626;margin-top:8px;display:none"></div></div>'
       + '<div id="dep-card-box" style="display:none;margin-bottom:14px"></div>'
+      + '<div id="dep-fee-box" style="display:none;margin-bottom:14px;background:#fafafa;border:1px solid #e4e4e7;border-radius:10px;padding:11px 13px;font-size:13px">'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="color:#71717a">Card fee <span id="dep-fee-rate" style="color:#a1a1aa"></span></span><span id="dep-fee-amt" style="font-weight:600;color:#18181b;font-variant-numeric:tabular-nums">$0.00</span></div>'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;padding-top:6px;border-top:1px solid #f1f1f3"><span style="color:#18181b;font-weight:600">Total charged</span><span id="dep-fee-total" style="font-weight:700;color:#18181b;font-variant-numeric:tabular-nums">$0.00</span></div>'
+      +   '<div style="color:#a1a1aa;font-size:11.5px;margin-top:6px">Your wallet is credited the amount you entered; the card fee is added on top.</div>'
+      + '</div>'
       + '<button onclick="submitDeposit()" style="width:100%;background:#191918;color:#fff;border:none;border-radius:9px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">Pay Now</button>'
       + '<div style="text-align:center;margin-top:10px"><a href="wallet.html" style="font-size:13px;color:#374151;text-decoration:underline;text-decoration-color:#c4c3be;text-underline-offset:3px;font-weight:600">Go to Wallet →</a></div>'
       + '</div></div>';
@@ -489,6 +494,16 @@ function vqrSaveRate(v) {
 }
 // Live-sync the deposit modal: show the VietQR box + ₫ preview at the set rate,
 // recomputed from whichever amount the seller picked.
+/* Stripe card fee passed to the seller (gross-up): they enter the wallet credit they want; we
+   charge that PLUS the fee so Stripe's cut is fully covered and the wallet lands the full amount.
+   Single config pair — change here to update BOTH the modal display and the actual charge. */
+var EG_CARD_FEE_PCT = 0.031, EG_CARD_FEE_FIXED = 0.30;
+function _depCardFee(amount) {
+  amount = Number(amount) || 0;
+  if (amount <= 0) return { fee: 0, total: 0 };
+  var total = Math.round(((amount + EG_CARD_FEE_FIXED) / (1 - EG_CARD_FEE_PCT)) * 100) / 100;
+  return { fee: Math.round((total - amount) * 100) / 100, total: total };
+}
 function vqrSyncDepositUI() {
   var methodEl = document.getElementById('modal-method'); if (!methodEl) return;
   var isVqr = methodEl.value === 'vietqr';
@@ -524,6 +539,21 @@ function vqrSyncDepositUI() {
   var isCard = methodEl.value === 'card';
   var cardBox = document.getElementById('dep-card-box'); if (cardBox) cardBox.style.display = isCard ? 'block' : 'none';
   if (isCard) { if (_depStripeCards == null) _loadDepCards(); else _renderDepCardPicker(); }
+  // Card fee (gross-up): show the fee + total charged live, and put the total on the Pay button.
+  var _feeBox = document.getElementById('dep-fee-box');
+  var _amtV = parseFloat((document.getElementById('modal-amount') || {}).value) || 0;
+  var _payBtn = document.querySelector('#deposit-modal button[onclick*="submitDeposit"]');
+  if (isCard && _amtV > 0) {
+    var _f = _depCardFee(_amtV);
+    var _r = document.getElementById('dep-fee-rate'); if (_r) _r.textContent = '(' + (EG_CARD_FEE_PCT * 100).toFixed(1) + '% + $' + EG_CARD_FEE_FIXED.toFixed(2) + ')';
+    var _fa = document.getElementById('dep-fee-amt'); if (_fa) _fa.textContent = '$' + _f.fee.toFixed(2);
+    var _ft = document.getElementById('dep-fee-total'); if (_ft) _ft.textContent = '$' + _f.total.toFixed(2);
+    if (_feeBox) _feeBox.style.display = 'block';
+    if (_payBtn) _payBtn.textContent = 'Pay $' + _f.total.toFixed(2);
+  } else {
+    if (_feeBox) _feeBox.style.display = 'none';
+    if (_payBtn && _payBtn.textContent.indexOf('Pay') === 0) _payBtn.textContent = 'Pay Now';
+  }
   var btn = document.querySelector('#deposit-modal button[onclick="submitDeposit()"]');
   if (btn) {
     btn.style.display = '';
@@ -705,7 +735,8 @@ function submitDeposit() {
     var _cards = Array.isArray(_depStripeCards) ? _depStripeCards : [];
     var _sel = (_cards.length && _depCardIdx != null && _cards[_depCardIdx]) ? _cards[_depCardIdx] : null;
     if (!_sel || !_sel.id) { closeDepositModal(); if (typeof openCardTopUp === 'function') openCardTopUp(); return; }
-    _chargeSavedCard(amount, _sel);
+    // Charge the grossed-up TOTAL (amount + card fee); credit the wallet the entered amount.
+    _chargeSavedCard(_depCardFee(amount).total, _sel, amount);
     return;
   }
   let bal = parseFloat(localStorage.getItem('eg_balance') || '0');
@@ -731,7 +762,7 @@ function _afterCardCredit(amount, ref, txnId){
 }
 // Charge a saved card. The server confirms the PaymentIntent; if Stripe needs a
 // 3-D Secure step it returns a clientSecret we finish on the client, then verify.
-function _chargeSavedCard(amount, card){
+function _chargeSavedCard(amount, card, creditAmt){
   var tok=''; try{ tok=localStorage.getItem('eg_token')||''; }catch(e){}
   var H={ 'Content-Type':'application/json', Authorization:'Bearer '+tok };
   var btn = document.querySelector('#_afm-pay, [onclick="submitDeposit()"]');
@@ -740,7 +771,7 @@ function _chargeSavedCard(amount, card){
   fetch((window.EG_API_BASE||'')+'/api/stripe/charge-saved',{ method:'POST', headers:H, body:JSON.stringify({ amount:amount, paymentMethodId:card.id }) })
     .then(function(r){ return r.json(); })
     .then(function(d){
-      if (d && d.ok){ done(); _afterCardCredit(d.amount||amount, d.ref, d.txnId); return; }
+      if (d && d.ok){ done(); _afterCardCredit(creditAmt != null ? creditAmt : (d.amount||amount), d.ref, d.txnId); return; }
       if (d && d.clientSecret && typeof Stripe==='function'){
         // 3-D Secure — finish on the client, then re-verify server-side.
         fetch((window.EG_API_BASE||'')+'/api/stripe/config',{ headers: tok?{Authorization:'Bearer '+tok}:{} })
@@ -751,7 +782,7 @@ function _chargeSavedCard(amount, card){
               var pi=res.paymentIntent||{};
               fetch((window.EG_API_BASE||'')+'/api/stripe/verify-intent',{ method:'POST', headers:H, body:JSON.stringify({ id: pi.id }) })
                 .then(function(r){ return r.json(); }).then(function(v){
-                  done(); if(v&&v.ok) _afterCardCredit(v.amount||amount, v.ref, v.txnId||pi.id); else done('Payment not confirmed — your wallet was not charged.');
+                  done(); if(v&&v.ok) _afterCardCredit(creditAmt != null ? creditAmt : (v.amount||amount), v.ref, v.txnId||pi.id); else done('Payment not confirmed — your wallet was not charged.');
                 }).catch(function(){ done('Could not reach the payment server.'); });
             });
           }).catch(function(){ done('Could not verify the card.'); });
