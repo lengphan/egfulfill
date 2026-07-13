@@ -1,10 +1,30 @@
 // Standalone Otto Cap credential check — verifies the OAuth2 password-grant token exchange
 // against Otto Cap's /authenticate/token/ endpoint. No DB needed.
 //
-//   Run on the VPS:  cd server && node --env-file=.env check-ottocap.mjs
+//   Run on the VPS:  cd server && node check-ottocap.mjs
+//   (or point it at a specific env file:  node check-ottocap.mjs /path/to/.env )
 //
-// Reads OTTOCAP_USERNAME / OTTOCAP_PASSWORD / OTTOCAP_CLIENT_ID / OTTOCAP_CLIENT_SECRET /
-// OTTOCAP_API_BASE from the environment (defaults to the sandbox base).
+// It loads the .env itself (older Node lacks --env-file), searching an optional CLI path,
+// then ../.env (repo root) and ./.env. Reads OTTOCAP_USERNAME / PASSWORD / CLIENT_ID /
+// CLIENT_SECRET / API_BASE.
+import { readFileSync } from 'node:fs';
+
+(function loadEnv() {
+  const paths = [process.argv[2], '../.env', './.env', './server/.env'].filter(Boolean);
+  let loadedFrom = null;
+  for (const p of paths) {
+    let txt; try { txt = readFileSync(p, 'utf8'); } catch (e) { continue; }
+    for (const line of txt.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)$/);
+      if (!m || /^\s*#/.test(line)) continue;
+      let v = m[2].trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      if (process.env[m[1]] === undefined) process.env[m[1]] = v;   // don't override real env vars
+    }
+    loadedFrom = p; break;   // first readable file wins
+  }
+  console.log(loadedFrom ? ('Loaded env from ' + loadedFrom) : 'No .env file found — using process env only');
+})();
 
 const USER = (process.env.OTTOCAP_USERNAME || '').trim();
 const PASS = (process.env.OTTOCAP_PASSWORD || '').trim();
