@@ -1322,6 +1322,21 @@
     // ── SKU-aware image lookup ──
     // Resolves an order line's thumbnail by matching its SKU against the shared
     // product catalog (eg_catalog_products) FIRST, so a seller's own created
+    // Resolve a colour's image from a product's colorImages map, TOLERANT of key/value
+    // mismatches — the #1 reason a colour chip "doesn't change the image": the map is keyed
+    // "White" but the variant colour is "white " / "WHITE" / "Royal Blue" vs "royal-blue".
+    // Tries exact → trim+lowercase+collapsed-space → alphanumeric-only. Returns '' if none.
+    colorImageFor: function(colorImages, color) {
+      if (!colorImages || typeof colorImages !== 'object' || color == null || color === '') return '';
+      if (colorImages[color]) return colorImages[color];                                  // 1) exact
+      var norm = function(s){ return String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' '); };
+      var loose = function(s){ return norm(s).replace(/[^a-z0-9]/g, ''); };
+      var keys = Object.keys(colorImages), t = norm(color);
+      for (var i = 0; i < keys.length; i++) { if (norm(keys[i]) === t) return colorImages[keys[i]]; }   // 2) normalized
+      var lt = loose(color);
+      for (var j = 0; j < keys.length; j++) { if (lt && loose(keys[j]) === lt) return colorImages[keys[j]]; }  // 3) loose
+      return '';
+    },
     // product shows its real uploaded photo. Order lines carry variant SKUs
     // (e.g. "G5000-WHT-L") while catalog products store a base SKU ("G5000"),
     // so we match exact OR base-prefix (base + "-…"). Only when no catalog

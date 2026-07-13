@@ -505,8 +505,11 @@ function selectColor(idx) {
   });
   var name = _prod.colorNames[idx];
   document.getElementById('pd-color-name').textContent = name;
-  // If the operator assigned a photo to this colour, show it in the hero.
-  var ci = _prod.colorImages && _prod.colorImages[name];
+  // If the operator assigned a photo to this colour, show it in the hero. Tolerant lookup
+  // (case/space/punctuation) so "White" still matches a "white " / "WHITE" colorImages key.
+  var ci = (typeof EGStore !== 'undefined' && EGStore.colorImageFor)
+    ? EGStore.colorImageFor(_prod.colorImages, name)
+    : (_prod.colorImages && _prod.colorImages[name]);
   var heroEl = document.getElementById('hero-inner');
   if (ci) {
     heroEl.style.background = '#efece7';

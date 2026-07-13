@@ -395,7 +395,7 @@
     for (var i = 0; i < prods.length; i++) {
       var p = prods[i];
       if (String(p.name || p.sku || p.id) === String(s.product)) {
-        if (color && p.colorImages && p.colorImages[color]) return p.colorImages[color];
+        if (color && p.colorImages) { var _ci = (window.EGStore && EGStore.colorImageFor) ? EGStore.colorImageFor(p.colorImages, color) : (p.colorImages[color] || ''); if (_ci) return _ci; }
         return p.img || p.image || '';
       }
     }

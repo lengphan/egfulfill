@@ -11178,7 +11178,7 @@ function whPrintLabel(num) {
             (p.sku && base && p.sku.toUpperCase() === base.toUpperCase()));
           if (product) {
             const color = it.color || (product.mainColor || '');
-            if (color && product.colorImages && product.colorImages[color]) return product.colorImages[color];
+            if (color && product.colorImages) { const _ci = (typeof EGStore !== 'undefined' && EGStore.colorImageFor) ? EGStore.colorImageFor(product.colorImages, color) : (product.colorImages[color] || ''); if (_ci) return _ci; }
             return product.mockup || product.img || '';
           }
         }
