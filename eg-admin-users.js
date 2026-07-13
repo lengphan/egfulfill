@@ -65,7 +65,7 @@
             + '<th style="text-align:left;padding:8px 10px;font-size:10.5px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Joined</th><th></th></tr></thead>'
           + '<tbody>' + (rows || '<tr><td colspan="4" style="padding:16px;color:#9ca3af;font-size:13px">No users yet.</td></tr>') + '</tbody></table></div>';
     },
-    setRole: function (id, role) { api('/users/' + id, { method: 'PATCH', body: { role: role } }).then(function (r) { msg(r.error ? ('Error: ' + r.error) : ('Role updated → ' + role), !r.error); }); },
+    setRole: function (id, role) { api('/users/' + id, { method: 'PATCH', body: { role: role } }).then(function (r) { msg(r.error ? ('Error: ' + r.error) : ('Role updated → ' + role + ' · they must log out + back in for it to take effect (the role is baked into their login token).'), !r.error); }); },
     // Soft enable/disable — keeps the user + all their orders/attribution intact,
     // just blocks (or restores) login. Use this instead of Delete to avoid orphaning.
     setActive: function (id, email, active) {
