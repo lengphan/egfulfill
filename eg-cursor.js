@@ -7,6 +7,10 @@
    No-ops on touch. Load once per page:  <script src="eg-cursor.js" defer></script>  */
 (function () {
   'use strict';
+  /* DISABLED — the custom cobalt pixel cursor is retired. Every board uses the default OS
+     cursor now (user preference; part of the monotone redesign). Kept as a loaded no-op so
+     the ~20 <script src="eg-cursor.js"> tags across the app don't 404. */
+  return;
   if (window.__egCursor) return; window.__egCursor = 1;
   try { if (matchMedia('(pointer:coarse)').matches) return; } catch (e) {}   // touch → keep native
 

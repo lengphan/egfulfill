@@ -12,7 +12,11 @@
   --bos-ink:#191918; --bos-paper:#fff; --bos-ground:#fcfcfa; --bos-panel:#f7f6f4;  /* "barely" near-white ground */
   --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-amber:#f8d264;  /* "violet" token now carries the COBALT accent */
   --bos-line:#e7e5e0; --bos-grey:#6b7280; --bos-grey2:#9ca3af;
-  --bos-cardline:#d7d4cc;  /* inner cards use a LIGHT hairline grey frame, not full ink (ink stays on buttons + the header/sidebar chrome frames) */
+  --bos-cardline:#e9e6df;  /* MONOTONE redesign: light hairline. Low-hierarchy lines are near-invisible; weight lives in the text, not the borders */
+  --bos-radius:12px; --bos-radius-sm:9px;
+  --bos-shadow:0 1px 2px rgba(24,24,22,.04),0 1px 3px rgba(24,24,22,.05);
+  --bos-shadow-hover:0 6px 18px rgba(24,24,22,.09);
+  --bos-ease:cubic-bezier(.22,.61,.36,1);
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
   --bos-hover:#f2f0eb;   /* unified, very subtle light-grey hover (left nav + top nav) */
   --bos-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;   /* mono RETIRED — all board type is Inter sans (user pref: DepartureMono was too hard to read). Kept the var name so the 18 chrome rules that reference it flip in one place; they keep their uppercase/letter-spacing, just in sans. */
@@ -25,8 +29,8 @@ html.eg-board-on body{background:var(--bos-ground)!important}
   html.eg-board-on aside.sidebar{
     width:212px!important;top:50%!important;left:14px!important;bottom:auto!important;transform:translateY(-50%)!important;
     height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;overflow-y:auto!important;
-    background:#fcfcfa!important;border:1.5px solid var(--bos-ink)!important;box-shadow:4px 4px 0 var(--bos-ink)!important;
-    border-radius:0!important}
+    background:var(--bos-paper)!important;border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;
+    border-radius:16px!important}
   html.eg-board-on [style*="margin-left:220px"]{margin-left:242px!important}
 }
 html.eg-board-on .sidebar-logo{height:auto!important;padding:14px 15px!important;border-bottom:1.5px solid var(--bos-ink)!important}
@@ -34,8 +38,8 @@ html.eg-board-on aside.sidebar nav{flex:0 0 auto!important;padding:0!important}
 /* each nav row = a bordered cell with a ■ marker (icon out) */
 /* INSET light hairline separators between rows (don't reach the box edges — 16px inset, unified) */
 html.eg-board-on .ni{border:none!important;position:relative!important;border-radius:0!important;
-  font-family:var(--bos-mono)!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.045em!important;font-size:13px!important;
-  padding:12px 15px!important;margin:0!important;color:var(--bos-ink)!important;display:flex!important;align-items:center!important;gap:10px!important}
+  font-family:var(--bos-sans)!important;font-weight:500!important;text-transform:none!important;letter-spacing:-.006em!important;font-size:14px!important;
+  padding:10px 15px!important;margin:0!important;color:var(--bos-grey)!important;display:flex!important;align-items:center!important;gap:11px!important}
 /* the inset separator itself (16px in on each side); not on the active row or the last row */
 html.eg-board-on .ni::after{content:'';position:absolute;left:16px;right:16px;bottom:0;height:1px;background:#e2dfd8;pointer-events:none}
 html.eg-board-on .ni.on::after,html.eg-board-on aside.sidebar nav a.ni:last-of-type::after,html.eg-board-on .side-foot > a.ni:last-child::after{display:none!important}
@@ -65,7 +69,7 @@ html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#hdr-search
 html.eg-board-on #hdr-search-btn{height:100%!important}
 /* section label (ACCOUNT) — no border of its own; the ink row-dividers above/below do the separating */
 html.eg-board-on aside.sidebar nav > div:not(.ni){font-family:var(--bos-mono)!important;font-size:9.5px!important;letter-spacing:.1em!important;
-  text-transform:uppercase;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
+  text-transform:none;color:var(--bos-grey2)!important;padding:11px 15px 6px!important;border-bottom:none!important}
 
 /* ════ TOP BAR — connected "page settings" block. NO header band/colour — transparent, matches the ground ════ */
 html.eg-board-on header{background:transparent!important;border-bottom:none!important;
@@ -73,11 +77,11 @@ html.eg-board-on header{background:transparent!important;border-bottom:none!impo
 /* out-specify the beige-neutraliser (which also matches the header's inline #f7f5f0) so the header stays clear */
 html.eg-board-on:not([data-theme=dark]) header[style*="background"],html.eg-board-on[data-theme=dark] header[style*="background"]{background:transparent!important}
 html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important;align-items:stretch!important;gap:0!important;
-  border:1.5px solid var(--bos-ink)!important;border-bottom:none!important;box-shadow:4px 4px 0 var(--bos-ink)!important;background:#fff!important;overflow:visible;flex-wrap:nowrap}
+  border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;background:var(--bos-paper)!important;overflow:visible;flex-wrap:nowrap;border-radius:12px}
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:#fff!important;
-  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:uppercase!important;letter-spacing:.04em!important;
+  font-family:var(--bos-mono)!important;font-size:12.5px!important;text-transform:none!important;letter-spacing:.04em!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{content:''!important;position:absolute!important;left:0;top:12px;bottom:12px;width:1px!important;background:#dcd9d2!important;pointer-events:none;z-index:2}
@@ -95,24 +99,24 @@ html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
 html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:12.5px!important;
-  font-weight:400!important;letter-spacing:.04em!important;text-transform:uppercase!important;font-variant-numeric:tabular-nums}
+  font-weight:400!important;letter-spacing:.04em!important;text-transform:none!important;font-variant-numeric:tabular-nums}
 /* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
    icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
    values (#balance-val / #notif-dot / #hdr-lang-code) stay as real children so they still update. ── */
 html.eg-board-on #hdr-search-btn > svg{display:none!important}
-html.eg-board-on #hdr-search-btn::before{content:'SEARCH'}
+html.eg-board-on #hdr-search-btn::before{content:'Search'}
 /* language cell already shows #hdr-lang-code "EN" natively */
 html.eg-board-on #hdr-theme-track{display:none!important}
-html.eg-board-on:not([data-theme=dark]) #pref-btn::before{content:'NIGHT'}
-html.eg-board-on[data-theme=dark] #pref-btn::before{content:'DAY'}
+html.eg-board-on:not([data-theme=dark]) #pref-btn::before{content:'Night'}
+html.eg-board-on[data-theme=dark] #pref-btn::before{content:'Day'}
 html.eg-board-on .bos-controls button:has(#notif-dot) > svg{display:none!important}
-html.eg-board-on .bos-controls button:has(#notif-dot)::before{content:'ALERTS'}
-html.eg-board-on .bos-controls .bal-chip::before{content:'BALANCE:\00a0'}
+html.eg-board-on .bos-controls button:has(#notif-dot)::before{content:'Alerts'}
+html.eg-board-on .bos-controls .bal-chip::before{content:'Balance:\00a0'}
 /* user cell: keep only the first name (drop avatar block + email line) */
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
 /* every pseudo label inherits the mono cell type */
-html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:.04em!important;text-transform:uppercase!important}
+html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:.04em!important;text-transform:none!important}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
@@ -127,7 +131,7 @@ html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!impor
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important}
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-hover)!important}
 html.eg-board-on .bos-controls #new-menu-btn{background:transparent!important;color:var(--bos-violet)!important;border:none!important;box-shadow:none!important;
-  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:uppercase;letter-spacing:.04em;font-size:11px!important;
+  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:none;letter-spacing:.04em;font-size:11px!important;
   transform:none!important;padding:0 15px!important;justify-content:center!important}
 html.eg-board-on .bos-controls #new-menu-btn svg path{stroke:var(--bos-violet)!important}
 /* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
@@ -140,7 +144,7 @@ html.eg-board-on header > span,html.eg-board-on header #page-title,html.eg-board
 html.eg-board-on [style*="Fraunces"]{font-family:var(--bos-sans)!important;letter-spacing:-.015em!important}
 html.eg-board-on a[href="index.html"] [style*="Fraunces"],html.eg-board-on a[href="index.html"][style*="Fraunces"]{font-family:'Fraunces',Georgia,serif!important;letter-spacing:0!important}
 /* Shared board breadcrumb — matches product-detail's .pd-crumbs. High specificity + !important + CSS :hover so loose header-link theme rules can't override the colour or the cobalt hover. */
-html.eg-board-on header .eg-crumb,html.eg-board-on .eg-crumb{display:flex!important;align-items:center;gap:8px;font-family:var(--bos-mono)!important;font-size:11px!important;font-weight:400!important;text-transform:uppercase!important;letter-spacing:.05em!important;flex-wrap:wrap}
+html.eg-board-on header .eg-crumb,html.eg-board-on .eg-crumb{display:flex!important;align-items:center;gap:8px;font-family:var(--bos-sans)!important;font-size:12px!important;font-weight:500!important;text-transform:none!important;letter-spacing:-.005em!important;flex-wrap:wrap}
 html.eg-board-on header .eg-crumb a,html.eg-board-on .eg-crumb a{color:#9ca3af!important;display:inline-flex!important;align-items:center;height:auto!important;text-decoration:none!important;border-bottom:1.5px solid transparent!important;transition:color .12s,border-color .12s!important}
 html.eg-board-on header .eg-crumb a:hover,html.eg-board-on .eg-crumb a:hover{color:var(--bos-violet)!important;border-bottom-color:var(--bos-violet)!important}
 html.eg-board-on header .eg-crumb .sep,html.eg-board-on .eg-crumb .sep{color:#9ca3af!important;opacity:.7;display:inline-flex;align-items:center}
@@ -152,25 +156,21 @@ html.eg-board-on header .eg-crumb .cur,html.eg-board-on .eg-crumb .cur{color:var
    every card = thin 1px BLACK frame, NO shadow, sharp. WHITE fill = content/data panel;
    PASTEL fill (KPI tiles below) = a metric. ════ */
 html.eg-board-on .card,html.eg-board-on .ccard,html.eg-board-on .stat-card{
-  background:#fff!important;border:1px solid var(--bos-cardline)!important;box-shadow:none!important;border-radius:0!important}
+  background:#fff!important;border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;border-radius:var(--bos-radius)!important}
 /* ════ KPI TILES → flat framed cards (Tavus "Sparrow" card): pastel fill, THIN BLACK FRAME, NO shadow,
    Departure-Mono header on a black divider line ════ */
-html.eg-board-on .wcard{border:1px solid var(--bos-cardline)!important;box-shadow:none!important;border-radius:0!important}
+html.eg-board-on .wcard{border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;border-radius:var(--bos-radius)!important}
 /* the card's eyebrow/label → Departure Mono; its underline → a full-width black frame line */
 html.eg-board-on .wcard .eg-card-dot{background:var(--bos-ink)!important}
 html.eg-board-on .wcard > div:first-child,html.eg-board-on .wcard [style*="text-transform:uppercase"]:first-child{font-family:var(--bos-mono)!important;letter-spacing:.04em!important}
-html.eg-board-on .wcard:nth-of-type(6n+1){background:#e7f7ef!important}
-html.eg-board-on .wcard:nth-of-type(6n+2){background:#fdecf3!important}
-html.eg-board-on .wcard:nth-of-type(6n+3){background:#fdf4de!important}
-html.eg-board-on .wcard:nth-of-type(6n+4){background:#f1eafe!important}
-html.eg-board-on .wcard:nth-of-type(6n+5){background:#e9eefe!important}
-html.eg-board-on .wcard:nth-of-type(6n){background:#fdeee7!important}
+/* KPI tiles → monotone WHITE (rainbow pastel fills retired; the metric reads from the number + a small accent dot, not the tile colour) */
+html.eg-board-on .wcard{background:var(--bos-paper)!important}
 
 /* ════ TABLES (existing .dtable) — the card frames it, so the table itself is BORDERLESS (no inner box) ════ */
 html.eg-board-on .dtable{border:none!important;box-shadow:none!important;background:transparent!important}
-html.eg-board-on .dtable th{background:transparent!important;border-bottom:1.5px solid var(--bos-ink)!important;
-  color:var(--bos-ink)!important;font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:.03em!important;
-  text-transform:uppercase;font-weight:600!important;padding:11px 14px!important}
+html.eg-board-on .dtable th{background:transparent!important;border-bottom:1px solid var(--bos-cardline)!important;
+  color:var(--bos-grey2)!important;font-family:var(--bos-sans)!important;font-size:11.5px!important;letter-spacing:0!important;
+  text-transform:none;font-weight:600!important;padding:11px 14px!important}
 html.eg-board-on .dtable td{border-bottom:1px solid var(--bos-line)!important;padding:12px 14px!important;background:transparent!important}
 html.eg-board-on .dtable tr.main-row:hover td{background:#faf8f4!important}
 html.eg-board-on .dtable tr:last-child td{border-bottom:none!important}
@@ -182,8 +182,8 @@ html.eg-board-on .dtable tr.exp-row td{border-top:none!important;background:#fbf
    own fill carries the stage colour now, so no stray "■" in front of the label. ════ */
 html.eg-board-on .badge,html.eg-board-on [class*="b-s-"],html.eg-board-on .b-new,html.eg-board-on .b-queue,
 html.eg-board-on .b-prod,html.eg-board-on .b-qc,html.eg-board-on .b-packed,html.eg-board-on .b-shipped{
-  font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:uppercase;letter-spacing:.05em!important;
-  border:1.5px solid var(--bos-ink)!important;border-radius:0!important;padding:2px 8px!important;font-weight:400!important;gap:0!important}
+  font-family:var(--bos-mono)!important;font-size:10px!important;text-transform:none;letter-spacing:.05em!important;
+  border:1px solid transparent!important;border-radius:999px!important;padding:3px 10px!important;font-weight:600!important;gap:0!important}
 /* hide the inline coloured dot some badges render before their label */
 html.eg-board-on .badge>span[style*="border-radius:50%"],html.eg-board-on [class*="b-s-"]>span[style*="border-radius:50%"]{display:none!important}
 /* stage colours — orders table + seller dashboard share the same fills */
@@ -196,10 +196,10 @@ html.eg-board-on .b-shipped,html.eg-board-on .b-s-shipped,html.eg-board-on .b-s-
 
 /* ════ BUTTONS ════ */
 html.eg-board-on .btn-dk,html.eg-board-on .btn-gold{background:var(--bos-violet)!important;color:#fff!important;
-  border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;border-radius:0!important;
+  border:1px solid var(--bos-violet)!important;box-shadow:var(--bos-shadow)!important;border-radius:var(--bos-radius-sm)!important;
   font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-weight:600;font-size:12.5px!important}
-html.eg-board-on .btn-out{border:1.5px solid var(--bos-ink)!important;box-shadow:3px 3px 0 var(--bos-ink)!important;
-  border-radius:0!important;background:#fff!important;font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-weight:600;font-size:12.5px!important}
+html.eg-board-on .btn-out{border:1px solid var(--bos-cardline)!important;box-shadow:var(--bos-shadow)!important;
+  border-radius:var(--bos-radius-sm)!important;background:#fff!important;font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-weight:600;font-size:12.5px!important}
 
 /* ════ DRAG-TO-REORDER handles — sharp + unobtrusive (was a rounded grey box + soft shadow on hover) ════ */
 html.eg-board-on .wcard .drag-handle,html.eg-board-on .ccard-handle,html.eg-board-on .sec-handle{
@@ -223,7 +223,7 @@ html.eg-board-on #new-menu-dd > div > div:first-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:last-child{display:none!important}
 html.eg-board-on #new-menu-dd > div > div:last-child{padding:13px 16px!important}
 html.eg-board-on #new-menu-dd > div > div:last-child > div:first-child{font-family:var(--bos-mono)!important;font-size:11.5px!important;
-  text-transform:uppercase!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
+  text-transform:none!important;letter-spacing:.04em!important;font-weight:400!important;color:var(--bos-ink)!important;margin:0!important}
 
 /* KPI card header underline → light hairline grey (cards are no longer full-ink framed) */
 html.eg-board-on .wcard *:has(> .eg-card-dot){border-bottom-color:var(--bos-cardline)!important;border-bottom-width:1px!important}
@@ -295,14 +295,14 @@ html.eg-board-on .dtable td[data-col="order"] > div{font-family:Inter,-apple-sys
 html.eg-board-on .dtable td[data-col="total"]{font-variant-numeric:tabular-nums}
 html.eg-board-on .dtable td[data-col="store"] > div:last-child{font-family:var(--bos-sans)!important;font-size:11px!important;letter-spacing:0}
 /* filter-bar buttons (Stores · Source · Date range · Columns · the All/status tabs) → mono uppercase, sharp */
-html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:uppercase!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
+html.eg-board-on .fb{font-family:var(--bos-mono)!important;text-transform:none!important;letter-spacing:.03em!important;font-size:11px!important;border-radius:0!important}
 html.eg-board-on:not([data-theme=dark]) .fb:hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 html.eg-board-on:not([data-theme=dark]) .filter-btn.active,html.eg-board-on:not([data-theme=dark]) .fb.active{border-bottom:2px solid var(--bos-ink)!important;color:var(--bos-ink)!important;background:transparent!important;box-shadow:none!important;border-radius:0!important}
 /* order-search input → mono + sharp */
 html.eg-board-on input[placeholder*="Search orders"]{font-family:var(--bos-sans)!important;font-size:13px!important;border-radius:0!important}
 html.eg-board-on .search-box,html.eg-board-on input[placeholder*="Search orders"]{border-radius:0!important}
 /* the small in-row action buttons (Push, etc.) + Export → sharp mono framed */
-html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-sans)!important;font-weight:600;font-size:10px!important;text-transform:uppercase;letter-spacing:.04em;border-radius:0!important}
+html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tracking"] button{font-family:var(--bos-sans)!important;font-weight:600;font-size:10px!important;text-transform:none;letter-spacing:.04em;border-radius:0!important}
 
 /* ══════════════════════════════════════════════════════════════════════════════
    THEME AUDIT — shared off-theme fixes (board-theme-audit sweep). Shape/type rules
@@ -311,10 +311,10 @@ html.eg-board-on td[data-col="actions"] button,html.eg-board-on td[data-col="tra
    the balance is a plain connected cell now; #new-menu-dd left to its own rules above.)
    ══════════════════════════════════════════════════════════════════════════════ */
 /* shape + type — safe in both themes */
-html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:0!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
-html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;text-transform:uppercase!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:600!important}
+html.eg-board-on .input,html.eg-board-on .select,html.eg-board-on .finput{border-radius:var(--bos-radius-sm)!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important}
+html.eg-board-on .badge,html.eg-board-on .cat-count,html.eg-board-on .tech-badge,html.eg-board-on .trend-up,html.eg-board-on .trend-dn{border-radius:0!important;box-shadow:none!important;font-family:Inter,-apple-system,'Segoe UI',sans-serif!important;text-transform:none!important;letter-spacing:.04em!important;font-size:10px!important;font-weight:600!important}
 html.eg-board-on .pill-btn{font-family:var(--bos-sans)!important;font-weight:600!important;text-transform:none!important;letter-spacing:0!important;font-size:12px!important}
-html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:uppercase!important;letter-spacing:.06em!important;font-weight:600!important;font-size:11px!important}
+html.eg-board-on .tab-sm,html.eg-board-on .stab,html.eg-board-on .chat-tab{border-radius:0!important;box-shadow:none!important;font-family:var(--bos-sans)!important;text-transform:none!important;letter-spacing:.06em!important;font-weight:600!important;font-size:11px!important}
 /* settings sub-nav a touch larger so it isn't smaller than the form labels */
 html.eg-board-on .stab{font-size:12.5px!important;letter-spacing:.04em!important}
 html.eg-board-on .ibtn,html.eg-board-on .btn,html.eg-board-on .cat-row,html.eg-board-on .prod-card,html.eg-board-on .gw-card,html.eg-board-on .dl-path-card,html.eg-board-on .chat-bubble,html.eg-board-on .dropzone,html.eg-board-on .up-item,html.eg-board-on .up-item-head,html.eg-board-on .act-btn,html.eg-board-on .copy-btn,html.eg-board-on .eg-tab-x,html.eg-board-on #mob-ham,html.eg-board-on #conv-menu,html.eg-board-on .dtpl-panel,html.eg-board-on .up-panel,html.eg-board-on aside.sidebar [style*="border-radius:10px"]{border-radius:0!important}
@@ -356,12 +356,12 @@ html.eg-board-on .btn:active,html.eg-board-on .btn-dk:active,html.eg-board-on .b
    rules never reached, so they kept rounded grey inputs + sans fonts. Theme the native controls
    directly + sharpen/frame the modal shells. ── */
 /* fields stay sharp but keep a READABLE sans face — mono was too hard to read for values/addresses/order details */
-html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:0!important}
+html.eg-board-on input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on select,html.eg-board-on textarea{border-radius:var(--bos-radius-sm)!important}
 html.eg-board-on:not([data-theme=dark]) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),html.eg-board-on:not([data-theme=dark]) select,html.eg-board-on:not([data-theme=dark]) textarea{border:1px solid #d0ccc4!important;background:#fff!important;color:var(--bos-ink)!important}
 html.eg-board-on label{font-family:var(--bos-sans)!important;letter-spacing:0!important;text-transform:none!important}
 html.eg-board-on button[style*="border-radius"]{border-radius:0!important}
 /* modal card shells (identified by their soft big-blur drop shadow) -> sharp, black-framed, offset shadow */
-html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:0!important;border:1.5px solid var(--bos-ink)!important;box-shadow:6px 6px 0 var(--bos-ink)!important}
+html.eg-board-on [style*="0 20px 60px"],html.eg-board-on [style*="0 20px 50px"],html.eg-board-on [style*="0 18px 50px"],html.eg-board-on [style*="0 12px 40px"],html.eg-board-on [style*="0 24px 64px"],html.eg-board-on [style*="0 24px 60px"]{border-radius:16px!important;border:1px solid var(--bos-cardline)!important;box-shadow:0 24px 60px rgba(24,24,22,.18),0 8px 24px rgba(24,24,22,.10)!important}
 /* settings Billing / API-Keys inner sub-panels were still rounded grey inside the sharp outer cards — square + 1px-black-frame them */
 html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:10px"],html.eg-board-on:not([data-theme=dark]) [id^="panel-"] [style*="border:1.5px solid #e5e4e0"][style*="border-radius:12px"]{border:1px solid var(--bos-cardline)!important;border-radius:0!important;box-shadow:none!important}
 /* order-table expanded detail row: was stark #fff (td + inner div) — now transparent so it inherits
@@ -440,12 +440,12 @@ html.eg-board-on [style*="max-width:1600px"],html.eg-board-on [style*="max-width
 /* ── Dashboard stat cards → TAVUS PRESS (replaces the old top:-1px lift) ──
    Each card rests on a dark offset shadow; hover sinks it toward the shadow; mousedown
    presses it fully in. No lingering state. Overrides the per-file .wcard/.stat-card hovers. */
-html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:5px 5px 0 var(--bos-ink)!important;transition:transform .38s cubic-bezier(.22,.61,.36,1),box-shadow .38s cubic-bezier(.22,.61,.36,1)!important}
-html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
-html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translate(5px,5px)!important;box-shadow:0 0 0 var(--bos-ink)!important}
-html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:5px 5px 0 #3a3631!important}
-html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:0 0 0 #3a3631!important}
-html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-on .stat-card:active{box-shadow:0 0 0 #3a3631!important}
+html.eg-board-on .wcard,html.eg-board-on .stat-card{position:relative;top:0!important;box-shadow:var(--bos-shadow)!important;transition:transform .16s var(--bos-ease),box-shadow .16s var(--bos-ease)!important}
+html.eg-board-on .wcard:hover,html.eg-board-on .stat-card:hover{top:0!important;transform:translateY(-2px)!important;box-shadow:var(--bos-shadow-hover)!important}
+html.eg-board-on .wcard:active,html.eg-board-on .stat-card:active{top:0!important;transform:translateY(0)!important;box-shadow:var(--bos-shadow)!important}
+html[data-theme=dark].eg-board-on .wcard,html[data-theme=dark].eg-board-on .stat-card{box-shadow:0 1px 3px rgba(0,0,0,.35)!important}
+html[data-theme=dark].eg-board-on .wcard:hover,html[data-theme=dark].eg-board-on .stat-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.42)!important}
+html[data-theme=dark].eg-board-on .wcard:active,html[data-theme=dark].eg-board-on .stat-card:active{box-shadow:0 1px 3px rgba(0,0,0,.35)!important}
 /* KPI card delta + caption: were a faded rounded grey pill (#eeede9/#374151) + light-grey
    (#9ca3af) caption from the pre-board theme — retheme to Board OS: mono, sharp, readable. */
 html.eg-board-on .trend-up,html.eg-board-on .trend-dn,html.eg-board-on .trend-down,html.eg-board-on .trend-flat{
@@ -468,9 +468,10 @@ html.eg-board-on .wcard [style*="text-transform: uppercase"],
 html.eg-board-on .stat-card [style*="text-transform:uppercase"],
 html.eg-board-on .stat-card [style*="text-transform: uppercase"]{
   display:flex!important;align-items:center!important;gap:8px!important;
-  padding-bottom:8px!important;margin-bottom:12px!important;
-  border-bottom:1px solid var(--bos-ink)!important;
-  color:var(--bos-ink)!important;font-family:var(--bos-mono)!important;letter-spacing:.05em!important;
+  padding-bottom:0!important;margin-bottom:10px!important;
+  border-bottom:none!important;
+  color:var(--bos-grey)!important;font-family:var(--bos-sans)!important;letter-spacing:.01em!important;
+  text-transform:none!important;font-size:12px!important;font-weight:600!important;
   white-space:nowrap!important;overflow:hidden!important}
 /* the hairline strip runs FULL WIDTH to the content edge (matches the value line below) — no
    vertical end-cap. Base rule below already sets flex:1;align-self:stretch so it fills the row;
@@ -482,23 +483,22 @@ html.eg-board-on .wcard [style*="text-transform:uppercase"] > .eg-card-dot,
 html.eg-board-on .wcard [style*="text-transform: uppercase"] > .eg-card-dot,
 html.eg-board-on .stat-card [style*="text-transform:uppercase"] > .eg-card-dot,
 html.eg-board-on .stat-card [style*="text-transform: uppercase"] > .eg-card-dot{
-  background:var(--bos-violet)!important;flex:0 0 auto!important;width:8px!important;height:8px!important;
-  border-radius:0!important;margin:0!important;display:block!important}
+  background:var(--bos-violet)!important;flex:0 0 auto!important;width:7px!important;height:7px!important;
+  border-radius:50%!important;margin:0!important;display:block!important}
 /* cards WITHOUT a built-in ■ marker get a cobalt accent square from ::before instead;
    cards that already have .eg-card-dot suppress it via the :has() guard so it never doubles */
 html.eg-board-on .wcard [style*="text-transform:uppercase"]:not(:has(> .eg-card-dot))::before,
 html.eg-board-on .wcard [style*="text-transform: uppercase"]:not(:has(> .eg-card-dot))::before,
 html.eg-board-on .stat-card [style*="text-transform:uppercase"]:not(:has(> .eg-card-dot))::before,
 html.eg-board-on .stat-card [style*="text-transform: uppercase"]:not(:has(> .eg-card-dot))::before{
-  content:""!important;flex:0 0 auto!important;width:8px!important;height:8px!important;
+  content:""!important;flex:0 0 auto!important;width:7px!important;height:7px!important;border-radius:50%!important;
   background:var(--bos-violet)!important;display:block!important}
 /* strip of repeating horizontal ink hairlines filling the row next to the label */
 html.eg-board-on .wcard [style*="text-transform:uppercase"]::after,
 html.eg-board-on .wcard [style*="text-transform: uppercase"]::after,
 html.eg-board-on .stat-card [style*="text-transform:uppercase"]::after,
 html.eg-board-on .stat-card [style*="text-transform: uppercase"]::after{
-  content:""!important;flex:1 1 auto!important;align-self:stretch!important;min-width:18px!important;
-  margin-left:2px!important;background:repeating-linear-gradient(var(--bos-ink) 0 1px,transparent 1px 3px)!important}
+  display:none!important}
 /* dark mode — light ink hairlines + rule, keep the cobalt dot */
 html[data-theme=dark].eg-board-on .wcard [style*="text-transform:uppercase"],
 html[data-theme=dark].eg-board-on .wcard [style*="text-transform: uppercase"],
@@ -516,3 +516,12 @@ html[data-theme=dark].eg-board-on .wcard [style*="text-transform: uppercase"] > 
 html[data-theme=dark].eg-board-on .stat-card [style*="text-transform:uppercase"] > .eg-card-dot,
 html[data-theme=dark].eg-board-on .stat-card [style*="text-transform: uppercase"] > .eg-card-dot{
   background:var(--bos-violet)!important}
+
+/* ── MONOTONE de-cap of inline content eyebrows/labels (chart "This month · All platforms",
+   KPI mini-labels, etc. use inline text-transform:uppercase). The redesign is normal-case, so
+   flip them inside card content. Scoped to cards so the brand wordmark + chrome stay intact. ── */
+html.eg-board-on .card [style*="text-transform:uppercase"],html.eg-board-on .card [style*="text-transform: uppercase"],
+html.eg-board-on .ccard [style*="text-transform:uppercase"],html.eg-board-on .ccard [style*="text-transform: uppercase"],
+html.eg-board-on .wcard [style*="text-transform:uppercase"],html.eg-board-on .wcard [style*="text-transform: uppercase"],
+html.eg-board-on .stat-card [style*="text-transform:uppercase"],html.eg-board-on .stat-card [style*="text-transform: uppercase"],
+html.eg-board-on #trend-subtitle{text-transform:none!important;letter-spacing:.01em!important}
