@@ -1584,6 +1584,10 @@ document.addEventListener('DOMContentLoaded', function(){
                 <input class="input" id="npm-sku" placeholder="e.g. G5000" style="flex:1;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif" oninput="npmSkuTouched=true;npmUpdateVariantSKUs()"/>
                 <button class="btn btn-out" style="white-space:nowrap;font-size:13px;padding:0 12px" onclick="autoNpmSKU(true)">Auto SKU</button>
               </div></div>
+            <!-- Supplier — the PO-routing backbone. Products are grouped by
+                 supplier when purchase orders are split. -->
+            <div><label style="font-size:12.5px;font-weight:600;color:#6b7280;display:block;margin-bottom:5px">Supplier</label>
+              <select class="select" id="npm-supplier" style="width:100%"><option>S&amp;S Activewear</option><option>Otto Cap</option></select></div>
             <!-- Category + Status are product-wide; price & shipping moved into
                  the Sizes table below so each size can carry its own pricing. -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">

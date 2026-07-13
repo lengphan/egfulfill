@@ -824,6 +824,8 @@ function openProductCard(id) {
   const addItemEl0 = document.getElementById('npm-add-item-ship'); if (addItemEl0) addItemEl0.value = (p.additionalItemShipping != null ? p.additionalItemShipping : '');
   const catEl = document.getElementById('npm-cat'); if (catEl && p.type) catEl.value = p.type;
   const stEl  = document.getElementById('npm-status'); if (stEl && p.status) stEl.value = p.status;
+  // Supplier — existing products predate this field, so default to S&S Activewear.
+  const supEl = document.getElementById('npm-supplier'); if (supEl) supEl.value = p.supplier || 'S&S Activewear';
   document.getElementById('npm-w').value = '';
   document.getElementById('npm-h').value = '';
   document.getElementById('npm-dpi').value = '';
@@ -918,6 +920,7 @@ function openNewProductModal() {
   npmSeedExtras([]);
   const cat = document.getElementById('npm-cat'); if (cat) cat.value = 'Apparel';
   const st = document.getElementById('npm-status'); if (st) st.value = 'Active';
+  const sup = document.getElementById('npm-supplier'); if (sup) sup.value = 'S&S Activewear';
   document.getElementById('npm-variants').innerHTML = '';
   addVariantRow();
   _npmVarPage = 1; npmRenderVariantPage();
@@ -1415,6 +1418,9 @@ function npmCommit(status) {
   const additionalItemShipping = (_addItemShipRaw != null && _addItemShipRaw !== '') ? (parseFloat(_addItemShipRaw) || 0) : null;
   const description = (document.getElementById('npm-notes')?.value || '').trim();
   const type  = document.getElementById('npm-cat')?.value || 'Apparel';
+  // Supplier — routes this product to the right vendor when POs are split.
+  // Defaults to S&S Activewear so legacy products (no picker / no value) stay valid.
+  const supplier = document.getElementById('npm-supplier')?.value || 'S&S Activewear';
   const method = npmCollectMethods();
   const methodPrices = (typeof npmCollectMethodPrices === 'function') ? npmCollectMethodPrices() : {};
   const sizePrices = (typeof npmCollectPriceTiers === 'function') ? npmCollectPriceTiers() : [];
@@ -1463,6 +1469,7 @@ function npmCommit(status) {
     const p = OP_PRODUCTS.find(x => x.id === opEditProductId);
     if (p) {
       p.name = name; p.sku = sku; p.price = price; p.type = type;
+      p.supplier = supplier;
       p.shippingFee = shippingFee;
       p.additionalItemShipping = additionalItemShipping;
       p.description = description;
@@ -1483,7 +1490,7 @@ function npmCommit(status) {
     if (typeof addShiftEvent === 'function') addShiftEvent('note','Product updated: '+name,'SKU: '+sku+' · '+status);
   } else {
     const newId = (OP_PRODUCTS.reduce((m,x)=>Math.max(m,x.id||0),0)) + 1;
-    OP_PRODUCTS.unshift({ id:newId, name, sku, type, method, methodPrices, sizePrices, variants, variantSkus, colorImages, mainColor: mainColor || '', mockup: _npmMockup || '', sideMockups: Object.assign({}, _npmSideMockups), images: npmCollectExtras(), price, shippingFee, additionalItemShipping, description, status, img: avatar || 'https://placehold.co/400x400/f0ede9/6b7280?text='+encodeURIComponent(fallback), fallback, printAreas, dpi });
+    OP_PRODUCTS.unshift({ id:newId, name, sku, type, supplier, method, methodPrices, sizePrices, variants, variantSkus, colorImages, mainColor: mainColor || '', mockup: _npmMockup || '', sideMockups: Object.assign({}, _npmSideMockups), images: npmCollectExtras(), price, shippingFee, additionalItemShipping, description, status, img: avatar || 'https://placehold.co/400x400/f0ede9/6b7280?text='+encodeURIComponent(fallback), fallback, printAreas, dpi });
     if (typeof addShiftEvent === 'function') addShiftEvent(status==='Active'?'approve':'note', (status==='Active'?'Product published: ':'Draft saved: ')+name, 'SKU: '+sku);
   }
   opPersistProducts();

@@ -462,6 +462,8 @@
 
   function _prefillFromStyle(d) {
     if (!d) return;
+    // New In is the S&S Activewear catalog, so any product added from it is sourced there.
+    var _sup = $('npm-supplier'); if (_sup) _sup.value = 'S&S Activewear';
     _setVal('npm-name', d.title);
     _setVal('npm-notes', (window.EGDescToText ? window.EGDescToText(d.description) : d.description));
     if (d.price != null && d.price !== '') _setVal('npm-price', d.price);
