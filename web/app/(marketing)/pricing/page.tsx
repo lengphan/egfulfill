@@ -23,7 +23,7 @@ export default function PricingPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-20">
       <div className="text-center">
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Simple, pay-as-you-go.</h1>
+        <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">Simple, pay-as-you-go.</h1>
         <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
           No monthly fee. No minimums. You only pay the per-order fulfillment cost when an order actually
           ships — funded from your wallet.

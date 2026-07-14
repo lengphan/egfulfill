@@ -12,7 +12,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-svh flex-col bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
-          <Link href="/" className="text-xl font-extrabold tracking-tight">
+          <Link href="/" className="font-display text-2xl font-semibold tracking-tight">
             egfulfill
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
@@ -42,7 +42,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-lg font-extrabold tracking-tight">egfulfill</div>
+            <div className="font-display text-xl font-semibold tracking-tight">egfulfill</div>
             <div className="mt-1 text-sm text-muted-foreground">Hands-off print-on-demand fulfillment.</div>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
