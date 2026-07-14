@@ -5,13 +5,30 @@
    Loaded AFTER eg-theme.js (wins the cascade) + paired with eg-board.js (tags + relabels the live controls).
    Presentation only — no markup/logic rewrite. Scoped to html.eg-board-on. */
 
+/* ══════════════════════ DESIGN-SYSTEM RULES — keep future edits coherent ══════════════════════
+   Read this before adding or changing any rule below. The look is one system; stay inside it.
+   • TOKEN PALETTE (values are AUTHORITATIVE — never change what they resolve to, only reference them):
+       --bos-ink   = primary text / dark UI      --bos-paper  = white cards
+       --bos-ground= muted page ground           --bos-cardline = card border   --bos-line = lighter divider
+       --bos-grey / --bos-grey2 = muted text      --bos-violet = the ONE accent  --bos-violet-soft = active-nav tint
+       --bos-grad  = blue→violet accent gradient  --bos-hover  = row/cell hover
+   • RADIUS: 12px cards (--bos-radius) / 8px small (--bos-radius-sm). Nothing sharp-cornered.
+   • SHADOW: soft only (--bos-shadow / --bos-shadow-hover). No hard offset shadows.
+   • MOTION: ~220ms with --bos-ease; keep transitions short and subtle.
+   • TYPE: Inter/SF sans everywhere — NO MONOSPACE anywhere (--bos-mono now resolves to Inter; kept only
+     as a var so legacy references flip in one place).
+   • CASE: normal-case for all content, nav items and headings. The ONE deliberate uppercase is the tiny
+     tracked SECTION LABELS (sidebar OPERATIONS / ACCOUNT eyebrows) — nothing else.
+   • ACCENT: exactly ONE accent — --bos-violet (or --bos-grad). Everything else is ink/grey/paper/ground.
+   ═════════════════════════════════════════════════════════════════════════════════════════════════ */
+
 @font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:block}
 @font-face{font-family:'Inter';src:url(fonts/Inter-Variable.woff2) format('woff2');font-weight:100 900;font-display:swap}
 
 :root{
-  --bos-ink:oklch(0.147 0.004 49.3); --bos-paper:oklch(1 0 0); --bos-ground:oklch(0.965 0.003 55); --bos-panel:oklch(0.96 0.002 17.2);  /* preset b7WjKTi4W EXACT: --foreground / --card(white) / muted-grey ground so white cards pop / --muted */
-  --bos-violet:oklch(0.488 0.243 264.376); --bos-violet-dk:oklch(0.42 0.22 264); --bos-violet-soft:oklch(0.945 0.035 264); --bos-amber:#f8d264;  /* preset --primary (blue) + darker + soft tint for active nav */
-  --bos-grad:linear-gradient(135deg,oklch(0.488 0.243 264.376) 0%,oklch(0.56 0.22 288) 100%); --bos-sh-acc:0 8px 22px oklch(0.488 0.243 264.376 / .32);  /* preset blue -> violet accent gradient + glow */
+  --bos-ink:oklch(0.147 0.004 49.3); --bos-paper:oklch(1 0 0); --bos-ground:oklch(0.965 0.003 55); --bos-panel:oklch(0.96 0.002 17.2);  /* preset b7WjLthiq (Taupe) EXACT: --foreground / --card(white) / muted-grey ground so white cards pop / --muted. Neutral Taupe scale unchanged from prior preset. */
+  --bos-violet:oklch(0.511 0.262 276.966); --bos-violet-dk:oklch(0.457 0.24 277.023); --bos-violet-soft:oklch(0.945 0.03 277); --bos-amber:#f8d264;  /* preset b7WjLthiq INDIGO: --sidebar-primary (indigo-600, the accent) + --primary (deeper indigo, hover/pressed) + soft indigo tint for active nav */
+  --bos-grad:linear-gradient(135deg,oklch(0.511 0.262 276.966) 0%,oklch(0.57 0.235 292) 100%); --bos-sh-acc:0 8px 22px oklch(0.511 0.262 276.966 / .32);  /* indigo -> violet accent gradient + glow */
   --bos-line:oklch(0.948 0.003 45); --bos-grey:oklch(0.547 0.021 43.1); --bos-grey2:oklch(0.68 0.013 43);   /* preset: light divider + EXACT --muted-foreground + lighter tertiary */
   --bos-cardline:oklch(0.922 0.005 34.3);  /* preset --border EXACT. Low-hierarchy dividers even lighter via --bos-line */
   --bos-radius:12px; --bos-radius-sm:8px;
@@ -87,7 +104,7 @@ html.eg-board-on .bos-controls{margin-left:auto!important;display:flex!important
 /* every cell: ink divider, fixed height, mono, ■ + label layout */
 html.eg-board-on .bos-controls > *{position:relative!important;border-radius:0!important;margin:0!important;
   height:42px!important;display:flex!important;align-items:center!important;gap:7px!important;padding:0 13px!important;background:transparent!important;
-  font-family:var(--bos-sans)!important;font-size:13px!important;text-transform:none!important;letter-spacing:0!important;
+  font-family:var(--bos-sans)!important;font-size:14px!important;text-transform:none!important;letter-spacing:0!important;
   color:var(--bos-ink)!important;box-shadow:none!important;white-space:nowrap;cursor:pointer;transition:background .12s}
 /* inset "unfinished" cell divider — a short centred rule like the sidebar's .ni::after, not a full-height border */
 html.eg-board-on .bos-controls > * + *::after{display:none!important}
@@ -104,7 +121,7 @@ html.eg-board-on body:has(.sidebar) header .bos-controls > *{height:44px!importa
 html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
-html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:12.5px!important;
+html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:14px!important;
   font-weight:400!important;letter-spacing:0!important;text-transform:none!important;font-variant-numeric:tabular-nums}
 /* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
    icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
@@ -122,7 +139,7 @@ html.eg-board-on .bos-controls .bal-chip::before{content:'Balance:\00a0'}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
 /* every pseudo label inherits the mono cell type */
-html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:12.5px!important;letter-spacing:0!important;text-transform:none!important}
+html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:14px!important;letter-spacing:0!important;text-transform:none!important}
 /* alerts count sits inline after the label */
 html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
   border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
@@ -552,7 +569,9 @@ html.eg-board-on button[style*="background:#191918"],html.eg-board-on button[sty
 /* ══════════════ UNIFIED FILTER CONTROL — borderless: just the name + its arrow, no box.
    Change values HERE to restyle every filter / period / dropdown on every board at once. ══════════════ */
 html.eg-board-on .fb,html.eg-board-on .filter-btn,html.eg-board-on select[data-eg-select],
-html.eg-board-on #trend-period,html.eg-board-on #dash-platform,html.eg-board-on #dash-period{
+html.eg-board-on #trend-period,html.eg-board-on #dash-platform,html.eg-board-on #dash-period,
+html.eg-board-on select[id*=platform],html.eg-board-on select[id*=period],html.eg-board-on select[id*=dash],
+html.eg-board-on select[id*=bank],html.eg-board-on .period-btn{
   border:none!important;background-color:transparent!important;box-shadow:none!important;border-radius:0!important;
   font-family:var(--bos-sans)!important;font-size:13px!important;font-weight:500!important;letter-spacing:0!important;
   color:var(--bos-grey)!important;padding:6px 6px!important;cursor:pointer;transition:color .12s}
