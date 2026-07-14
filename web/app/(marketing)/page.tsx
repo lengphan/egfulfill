@@ -84,7 +84,7 @@ export default function MarketingHome() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden">
+      <section className="relative isolate overflow-hidden">
         {/* dot-grid texture */}
         <div
           aria-hidden
@@ -99,7 +99,20 @@ export default function MarketingHome() {
         {/* animated violet aurora */}
         <div
           aria-hidden
-          className="eg-aurora pointer-events-none absolute left-1/2 top-[-120px] -z-10 h-[420px] w-[680px] rounded-full bg-primary/20 blur-[130px]"
+          className="eg-aurora pointer-events-none absolute left-1/2 top-[-180px] -z-10 h-[560px] w-[880px] rounded-full blur-[110px]"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, oklch(0.55 0.245 280 / 0.55), oklch(0.62 0.2 300 / 0.30) 45%, transparent 70%)",
+          }}
+        />
+        {/* secondary indigo bloom, offset for aurora depth */}
+        <div
+          aria-hidden
+          className="eg-float-2 pointer-events-none absolute left-[38%] top-[-60px] -z-10 h-[320px] w-[420px] rounded-full blur-[100px]"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, oklch(0.6 0.19 262 / 0.35), transparent 68%)",
+          }}
         />
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
