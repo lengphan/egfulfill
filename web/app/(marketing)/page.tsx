@@ -8,6 +8,12 @@ import {
 } from "@phosphor-icons/react/dist/ssr"
 import { buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 const stats = [
   { value: "2.4M+", label: "orders shipped" },
@@ -20,6 +26,50 @@ const steps = [
   { n: "01", title: "Connect your stores", body: "OAuth into Etsy, Shopify or TikTok Shop in about two minutes." },
   { n: "02", title: "Upload your designs", body: "Map artwork to products once — we handle placement and print files." },
   { n: "03", title: "We fulfill, hands-off", body: "Print, pack, ship, and track. You just watch orders go out." },
+]
+
+const testimonials = [
+  {
+    quote:
+      "I went from spending three hours a day on orders to basically zero. They just ship. I check tracking sometimes for fun.",
+    name: "Maya R.",
+    role: "Etsy · 4k orders/mo",
+  },
+  {
+    quote:
+      "The wallet made it click for me — I can see exactly what each order costs before it prints. No mystery invoices.",
+    name: "Devon K.",
+    role: "Shopify apparel",
+  },
+  {
+    quote:
+      "TikTok Shop blew up overnight and egfulfill just absorbed it. Same queue, same flow, tracking pushed back automatically.",
+    name: "Priya S.",
+    role: "TikTok Shop",
+  },
+]
+
+const faqs = [
+  {
+    q: "Which marketplaces do you sync with?",
+    a: "Etsy, Shopify, TikTok Shop and WooCommerce today, with more on the way. Orders flow into one queue automatically and tracking is pushed back to each marketplace.",
+  },
+  {
+    q: "Is there a monthly fee?",
+    a: "No. The platform is free — you only pay the per-order fulfillment cost when an order ships, funded from your prepaid wallet.",
+  },
+  {
+    q: "How does shipping pricing work?",
+    a: "We rate-shop across carriers and buy the cheapest available label, billed at cost. You always see the exact charge on each order.",
+  },
+  {
+    q: "Can I use my own designs?",
+    a: "Yes. Upload artwork to your library, map it to products once, and our mini designer handles placement and print-ready files.",
+  },
+  {
+    q: "What about quality control?",
+    a: "Every order is quality-checked at each stage on a vetted print network — intake, print, and pack — before it ships.",
+  },
 ]
 
 export default function MarketingHome() {
@@ -194,6 +244,43 @@ export default function MarketingHome() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Testimonials ── */}
+      <section className="mx-auto max-w-6xl px-6 py-24">
+        <h2 className="max-w-2xl font-display text-4xl font-semibold tracking-tight">
+          Sellers who stopped touching orders.
+        </h2>
+        <div className="mt-10 grid gap-5 md:grid-cols-3">
+          {testimonials.map((t) => (
+            <Card key={t.name} className="gap-4 p-7">
+              <div className="font-display text-4xl leading-[0.5] text-primary">&ldquo;</div>
+              <p className="text-sm leading-relaxed text-foreground/90">{t.quote}</p>
+              <div className="mt-2 flex items-center gap-3">
+                <span className="size-9 shrink-0 rounded-full bg-muted" aria-hidden />
+                <div>
+                  <div className="text-sm font-semibold">{t.name}</div>
+                  <div className="text-xs text-muted-foreground">{t.role}</div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="border-t border-border bg-muted/30">
+        <div className="mx-auto max-w-3xl px-6 py-24">
+          <h2 className="text-center font-display text-4xl font-semibold tracking-tight">Questions, answered.</h2>
+          <Accordion multiple={false} className="mt-10 w-full">
+            {faqs.map((f, i) => (
+              <AccordionItem key={i} value={`faq-${i}`}>
+                <AccordionTrigger className="text-left text-base font-medium">{f.q}</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
       </section>
 
