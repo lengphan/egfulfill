@@ -1,0 +1,32 @@
+import { Card } from "@/components/ui/card"
+
+/** Universal content block — a card with an optional header (title + description + actions).
+ *  Use for tables, lists, forms, any titled section. Keeps every page's section chrome identical. */
+export function SectionCard({
+  title,
+  description,
+  actions,
+  bodyClassName,
+  children,
+}: {
+  title?: string
+  description?: string
+  actions?: React.ReactNode
+  bodyClassName?: string
+  children: React.ReactNode
+}) {
+  return (
+    <Card className="gap-0 overflow-hidden p-0">
+      {(title || actions) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div>
+            {title && <div className="text-[15px] font-bold">{title}</div>}
+            {description && <div className="text-[13px] text-muted-foreground">{description}</div>}
+          </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        </div>
+      )}
+      <div className={bodyClassName}>{children}</div>
+    </Card>
+  )
+}
