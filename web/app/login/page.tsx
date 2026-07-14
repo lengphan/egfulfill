@@ -50,7 +50,7 @@ export default function LoginPage() {
     <div className="flex min-h-svh items-center justify-center bg-background p-6">
       <Card className="w-full max-w-sm gap-0 p-0">
         <div className="border-b border-border px-6 py-5 text-center">
-          <div className="text-xl font-extrabold tracking-tight">egfulfill</div>
+          <div className="font-display text-2xl font-semibold tracking-tight">egfulfill</div>
           <div className="mt-1 text-sm text-muted-foreground">Sign in to your account</div>
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-6">

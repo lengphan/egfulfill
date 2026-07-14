@@ -102,12 +102,7 @@ export default function MarketingHome() {
         />
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
-          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur">
-            <span className="size-1.5 rounded-full bg-primary" />
-            TikTok Shop sync is live
-          </span>
-
-          <h1 className="mx-auto mt-7 max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance sm:text-7xl">
+          <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance sm:text-7xl">
             What if every order <span className="text-primary italic">printed itself?</span>
           </h1>
 
