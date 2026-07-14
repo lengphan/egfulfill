@@ -1,6 +1,6 @@
 /* eg-receipt-wallet.js — the wallet, drawn as ONE clean card (shadcn/ui zinc).
    (Was a torn-paper receipt; retired for the minimal board theme — single box, thin light
-   lines across, sans type, cobalt top-up.) Shared by the seller wallet (wallet.html) + the
+   lines across, sans type, indigo top-up.) Shared by the seller wallet (wallet.html) + the
    staff boards (admin/warehouse balance section). API + data flow unchanged.
    Usage:
      <div id="my-mount"></div>
@@ -14,7 +14,7 @@
    ledger row: cat=short chip label, who=name, sub=ref/date, amt=SIGNED number (+ in / − out).
    Presentation only — the page owns the data + the real top-up/withdraw flows. */
 (function () {
-  var EG_BUILD = '2026-07-13-cleanwallet-1';
+  var EG_BUILD = '2026-07-14-indigo-1';
   var CSS_ID = 'egrw-css';
 
   function injectCSS() {
@@ -23,7 +23,8 @@
     s.id = CSS_ID;
     s.textContent = [
       '.egrw{--rw-card:#fff;--rw-border:#e4e4e7;--rw-line:#f1f1f3;--rw-ink:#18181b;--rw-muted:#71717a;--rw-faint:#a1a1aa;',
-      '--rw-cobalt:#2f4bf0;--rw-cobalt-dk:#2439c8;--rw-in:#12925a;--rw-in-soft:#e6f5ee;--rw-pend:#b0791c;--rw-pend-soft:#f8efda;',
+      /* accent tracks the board theme token (--bos-violet indigo, preset b7WjLthiq); hex fallback = indigo-600/700 when off-board */
+      '--rw-cobalt:var(--bos-violet,#4f46e5);--rw-cobalt-dk:var(--bos-violet-dk,#4338ca);--rw-in:#12925a;--rw-in-soft:#e6f5ee;--rw-pend:#b0791c;--rw-pend-soft:#f8efda;',
       "--rw-sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;",
       'width:100%;max-width:430px;font-family:var(--rw-sans);color:var(--rw-ink);letter-spacing:-.006em}',
       '.egrw *{box-sizing:border-box}',
