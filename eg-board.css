@@ -9,17 +9,17 @@
 @font-face{font-family:'Inter';src:url(fonts/Inter-Variable.woff2) format('woff2');font-weight:100 900;font-display:swap}
 
 :root{
-  --bos-ink:oklch(0.21 0.008 62); --bos-paper:oklch(0.994 0.003 80); --bos-ground:oklch(0.955 0.007 74); --bos-panel:oklch(0.928 0.009 74);  /* tweakcn "Taupe" base (preset b7WjKTi4W): warm taupe GROUND so white cards pop; cream-white cards */
-  --bos-violet:#2f4bf0; --bos-violet-dk:#2439c8; --bos-violet-soft:#edeefe; --bos-amber:#f8d264;  /* "violet" token carries the COBALT accent; -soft = restrained tint for active nav/hover */
-  --bos-grad:linear-gradient(135deg,#2f4bf0 0%,#7c5cff 100%); --bos-sh-acc:0 8px 22px rgba(47,75,240,.30);  /* cobalt->violet accent gradient + glow (primary buttons / hero cards) */
-  --bos-line:oklch(0.925 0.007 76); --bos-grey:oklch(0.55 0.016 66); --bos-grey2:oklch(0.685 0.012 70);   /* Taupe: light row divider + warm muted-foreground + lighter tertiary */
-  --bos-cardline:oklch(0.905 0.009 76);  /* Taupe --border (warm). Low-hierarchy dividers even lighter via --bos-line */
+  --bos-ink:oklch(0.147 0.004 49.3); --bos-paper:oklch(1 0 0); --bos-ground:oklch(0.965 0.003 55); --bos-panel:oklch(0.96 0.002 17.2);  /* preset b7WjKTi4W EXACT: --foreground / --card(white) / muted-grey ground so white cards pop / --muted */
+  --bos-violet:oklch(0.488 0.243 264.376); --bos-violet-dk:oklch(0.42 0.22 264); --bos-violet-soft:oklch(0.945 0.035 264); --bos-amber:#f8d264;  /* preset --primary (blue) + darker + soft tint for active nav */
+  --bos-grad:linear-gradient(135deg,oklch(0.488 0.243 264.376) 0%,oklch(0.56 0.22 288) 100%); --bos-sh-acc:0 8px 22px oklch(0.488 0.243 264.376 / .32);  /* preset blue -> violet accent gradient + glow */
+  --bos-line:oklch(0.948 0.003 45); --bos-grey:oklch(0.547 0.021 43.1); --bos-grey2:oklch(0.68 0.013 43);   /* preset: light divider + EXACT --muted-foreground + lighter tertiary */
+  --bos-cardline:oklch(0.922 0.005 34.3);  /* preset --border EXACT. Low-hierarchy dividers even lighter via --bos-line */
   --bos-radius:12px; --bos-radius-sm:8px;
   --bos-shadow:0 1px 3px 0 rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);
   --bos-shadow-hover:0 8px 24px -4px rgba(0,0,0,.12);
   --bos-ease:cubic-bezier(.22,.61,.36,1);
   --bos-mint:#12b886; --bos-pink:#f06595; --bos-amberp:#f2b705; --bos-blue:#4c6ef5; --bos-coral:#f6704f;
-  --bos-hover:oklch(0.945 0.009 74);   /* Taupe --muted / hover */
+  --bos-hover:oklch(0.96 0.002 17.2);   /* preset --muted / --accent EXACT */
   --bos-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;   /* mono RETIRED — all board type is Inter sans (user pref: DepartureMono was too hard to read). Kept the var name so the 18 chrome rules that reference it flip in one place; they keep their uppercase/letter-spacing, just in sans. */
   --bos-sans:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;  /* readable body sans — mono is kept for nav/top-bar/buttons/card eyebrows only; data-dense reading (tables, form labels, order/settings detail) uses this */
 }
