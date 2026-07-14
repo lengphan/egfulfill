@@ -22,6 +22,13 @@ const stats = [
   { value: "48hrs", label: "avg to doorstep" },
 ]
 
+const previewRows = [
+  { id: "#4142", product: "Hoodie · black", status: "Production", tone: "bg-amber-100 text-amber-700", amount: "$63.75" },
+  { id: "#4140", product: "Tee · 2-pack", status: "Shipped", tone: "bg-emerald-100 text-emerald-700", amount: "$27.00" },
+  { id: "#4131", product: "Embroidered cap", status: "QC", tone: "bg-violet-100 text-violet-700", amount: "$31.50" },
+  { id: "#4126", product: "Crewneck · sand", status: "Packed", tone: "bg-pink-100 text-pink-700", amount: "$44.20" },
+]
+
 const steps = [
   { n: "01", title: "Connect your stores", body: "OAuth into Etsy, Shopify or TikTok Shop in about two minutes." },
   { n: "02", title: "Upload your designs", body: "Map artwork to products once — we handle placement and print files." },
@@ -118,6 +125,23 @@ export default function MarketingHome() {
             </Link>
           </div>
 
+          {/* avatar-stack social proof */}
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <div className="flex -space-x-2.5">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span
+                  key={i}
+                  className="size-8 rounded-full bg-muted ring-2 ring-background"
+                  aria-hidden
+                />
+              ))}
+            </div>
+            <div className="text-left">
+              <div className="text-sm text-amber-500">★★★★★</div>
+              <div className="text-xs text-muted-foreground">2,400+ sellers shipping hands-off</div>
+            </div>
+          </div>
+
           {/* integration row */}
           <div className="mt-12 flex flex-col items-center gap-3">
             <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
@@ -141,7 +165,33 @@ export default function MarketingHome() {
               <span className="size-2.5 rounded-full bg-muted-foreground/25" />
               <span className="size-2.5 rounded-full bg-muted-foreground/25" />
             </div>
-            <div className="aspect-[16/9] bg-gradient-to-br from-primary/5 via-muted to-background" />
+            <div className="bg-gradient-to-br from-primary/[0.03] to-background p-6 text-left">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold">Order queue</div>
+                  <div className="text-xs text-muted-foreground">Live across your stores</div>
+                </div>
+                <span className="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground">
+                  + New
+                </span>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
+                {previewRows.map((r, i) => (
+                  <div
+                    key={r.id}
+                    className={
+                      "grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 text-sm " +
+                      (i > 0 ? "border-t border-border" : "")
+                    }
+                  >
+                    <span className="font-mono text-xs text-muted-foreground">{r.id}</span>
+                    <span className="truncate">{r.product}</span>
+                    <span className={"rounded-full px-2.5 py-0.5 text-xs font-medium " + r.tone}>{r.status}</span>
+                    <span className="font-medium tabular-nums">{r.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
