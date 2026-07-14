@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navTitle } from "@/lib/nav"
+import { getWallet } from "@/lib/api"
 
 function IconButton({
   label,
@@ -44,11 +45,25 @@ function IconButton({
   )
 }
 
-export function TopBar({ balance = 12480 }: { balance?: number }) {
+export function TopBar({ balance: initialBalance = 12480 }: { balance?: number }) {
   const pathname = usePathname()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [balance, setBalance] = useState(initialBalance)
   useEffect(() => setMounted(true), [])
+
+  // Real balance (server-authoritative); silently keeps the fallback if no session/API.
+  useEffect(() => {
+    let cancelled = false
+    getWallet()
+      .then((w) => {
+        if (!cancelled) setBalance(w.balance)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const title = navTitle(pathname)
   const money = balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
