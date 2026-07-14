@@ -5,7 +5,6 @@ import {
   Truck,
   Wallet,
   ArrowRight,
-  GlobeHemisphereWest as Globe,
 } from "@phosphor-icons/react/dist/ssr"
 import { buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -16,7 +15,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Reveal } from "@/components/motion/reveal"
-import { DeploymentGlobe } from "@/components/motion/deployment-globe"
 
 const stats = [
   { value: "2.4M+", label: "orders shipped" },
@@ -80,35 +78,21 @@ export default function MarketingHome() {
     <>
       {/* ── Hero ── */}
       <section className="relative isolate overflow-hidden">
-        {/* dot-grid texture */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10"
-          style={{
-            backgroundImage: "radial-gradient(circle, var(--border) 1px, transparent 1px)",
-            backgroundSize: "22px 22px",
-            maskImage: "radial-gradient(ellipse 70% 55% at 50% 30%, black, transparent)",
-            WebkitMaskImage: "radial-gradient(ellipse 70% 55% at 50% 30%, black, transparent)",
-          }}
-        />
-        {/* animated violet aurora */}
-        <div
-          aria-hidden
-          className="eg-aurora pointer-events-none absolute left-1/2 top-[-180px] -z-10 h-[560px] w-[880px] rounded-full blur-[110px]"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, oklch(0.55 0.245 280 / 0.55), oklch(0.62 0.2 300 / 0.30) 45%, transparent 70%)",
-          }}
-        />
-        {/* secondary indigo bloom, offset for aurora depth */}
-        <div
-          aria-hidden
-          className="eg-float-2 pointer-events-none absolute left-[38%] top-[-60px] -z-10 h-[320px] w-[420px] rounded-full blur-[100px]"
-          style={{
-            background:
-              "radial-gradient(ellipse at center, oklch(0.6 0.19 262 / 0.35), transparent 68%)",
-          }}
-        />
+        {/* soft drifting aura — on-theme, slowly moving, clean */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div
+            className="eg-drift-1 absolute left-[10%] top-[-14%] h-[460px] w-[580px] rounded-full blur-[120px]"
+            style={{ background: "radial-gradient(circle at center, oklch(0.62 0.2 285 / 0.30), transparent 68%)" }}
+          />
+          <div
+            className="eg-drift-2 absolute right-[6%] top-[-8%] h-[420px] w-[520px] rounded-full blur-[120px]"
+            style={{ background: "radial-gradient(circle at center, oklch(0.68 0.16 305 / 0.22), transparent 68%)" }}
+          />
+          <div
+            className="eg-drift-3 absolute left-[36%] top-[12%] h-[400px] w-[500px] rounded-full blur-[130px]"
+            style={{ background: "radial-gradient(circle at center, oklch(0.7 0.12 245 / 0.18), transparent 70%)" }}
+          />
+        </div>
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
           <Reveal delay={0}>
@@ -170,55 +154,6 @@ export default function MarketingHome() {
                 <span>WooCommerce</span>
               </div>
             </div>
-          </Reveal>
-
-          {/* signature globe visual */}
-          <Reveal delay={0.4} y={28}>
-          <div className="eg-float relative mx-auto mt-16 max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0f] p-5 text-left shadow-2xl shadow-primary/20 sm:p-7">
-            {/* header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-white/[0.06] text-primary ring-1 ring-white/10">
-                  <Globe size={18} weight="duotone" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold text-white">Global fulfillment network</div>
-                  <div className="text-xs text-white/40">Prints ship worldwide, hands-off</div>
-                </div>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/70">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-70" />
-                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
-                </span>
-                Live
-              </span>
-            </div>
-
-            {/* globe canvas */}
-            <div className="relative mt-2 h-[300px] sm:h-[360px]">
-              <DeploymentGlobe />
-              {/* stat chips overlaid bottom-left */}
-              <div className="absolute bottom-1 left-0 flex flex-wrap gap-2">
-                {[
-                  { v: "2.4M+", l: "orders shipped" },
-                  { v: "99.2%", l: "on-time" },
-                  { v: "200+", l: "regions" },
-                ].map((s) => (
-                  <div key={s.l} className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 backdrop-blur">
-                    <div className="text-sm font-semibold tabular-nums text-white">{s.v}</div>
-                    <div className="text-[11px] text-white/45">{s.l}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* footer labels */}
-            <div className="mt-3 flex items-center justify-between text-[11px] text-white/35">
-              <span>Vetted print network</span>
-              <span>200+ edge locations</span>
-            </div>
-          </div>
           </Reveal>
         </div>
       </section>

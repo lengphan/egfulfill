@@ -130,18 +130,22 @@
     }
 }
 
-/* Marketing motion — lightweight CSS animations (respect reduced-motion). */
-@keyframes eg-aurora {
-  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.75; }
-  50% { transform: translate(-50%, 26px) scale(1.14); opacity: 1; }
+/* Marketing motion — soft drifting aura (respect reduced-motion). */
+@keyframes eg-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(7%, 8%) scale(1.15); }
 }
-@keyframes eg-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-9px); }
+@keyframes eg-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1.08); }
+  50% { transform: translate(-9%, 5%) scale(1); }
 }
-.eg-aurora { animation: eg-aurora 9s ease-in-out infinite; }
-.eg-float { animation: eg-float 4.5s ease-in-out infinite; }
-.eg-float-2 { animation: eg-float 5.5s ease-in-out infinite; animation-delay: 0.8s; }
+@keyframes eg-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1.04); }
+  50% { transform: translate(5%, -7%) scale(1.18); }
+}
+.eg-drift-1 { animation: eg-drift-1 18s ease-in-out infinite; }
+.eg-drift-2 { animation: eg-drift-2 22s ease-in-out infinite; }
+.eg-drift-3 { animation: eg-drift-3 26s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .eg-aurora, .eg-float, .eg-float-2 { animation: none; }
+  .eg-drift-1, .eg-drift-2, .eg-drift-3 { animation: none; }
 }
