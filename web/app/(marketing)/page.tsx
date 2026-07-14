@@ -166,7 +166,7 @@ export default function MarketingHome() {
 
           {/* app preview */}
           <Reveal delay={0.4} y={28}>
-          <div className="mx-auto mt-16 max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
+          <div className="eg-float mx-auto mt-16 max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
             <div className="flex h-9 items-center gap-1.5 border-b border-border px-4">
               <span className="size-2.5 rounded-full bg-muted-foreground/25" />
               <span className="size-2.5 rounded-full bg-muted-foreground/25" />

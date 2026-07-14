@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Check } from "@phosphor-icons/react/dist/ssr"
 import { buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Reveal } from "@/components/motion/reveal"
 
 const included = [
   "Unlimited store connections (Etsy, Shopify, TikTok)",
@@ -22,16 +23,17 @@ const examples = [
 export default function PricingPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-20">
-      <div className="text-center">
+      <Reveal className="text-center">
         <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-6xl">Simple, pay-as-you-go.</h1>
         <p className="mx-auto mt-5 max-w-xl text-lg text-muted-foreground">
           No monthly fee. No minimums. You only pay the per-order fulfillment cost when an order actually
           ships — funded from your wallet.
         </p>
-      </div>
+      </Reveal>
 
       <div className="mx-auto mt-14 grid max-w-4xl gap-6 lg:grid-cols-[1.2fr_1fr]">
         {/* What's included */}
+        <Reveal delay={0.08}>
         <Card className="gap-0 p-8">
           <div className="text-sm font-semibold uppercase tracking-wide text-primary">Everything, included</div>
           <div className="mt-2 flex items-baseline gap-2">
@@ -53,8 +55,10 @@ export default function PricingPage() {
             Start free
           </Link>
         </Card>
+        </Reveal>
 
         {/* Example per-order costs */}
+        <Reveal delay={0.16}>
         <Card className="gap-0 p-8">
           <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Example base costs
@@ -74,6 +78,7 @@ export default function PricingPage() {
             Shipping is bought at the cheapest available rate and billed at cost.
           </p>
         </Card>
+        </Reveal>
       </div>
     </div>
   )

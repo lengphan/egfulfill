@@ -139,14 +139,9 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-9px); }
 }
-@keyframes eg-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
 .eg-aurora { animation: eg-aurora 9s ease-in-out infinite; }
 .eg-float { animation: eg-float 4.5s ease-in-out infinite; }
 .eg-float-2 { animation: eg-float 5.5s ease-in-out infinite; animation-delay: 0.8s; }
-.eg-marquee { animation: eg-marquee 30s linear infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .eg-aurora, .eg-float, .eg-float-2, .eg-marquee { animation: none; }
+  .eg-aurora, .eg-float, .eg-float-2 { animation: none; }
 }
