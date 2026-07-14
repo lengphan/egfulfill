@@ -1,6 +1,7 @@
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { StatusBadge } from "@/components/app/status-badge"
+import { RevenueChart } from "@/components/app/revenue-chart"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -28,6 +29,8 @@ export default function DashboardPage() {
         <StatCard label="Open orders" value="37" sub="in the pipeline" />
         <StatCard label="Avg turnaround" value="1.8d" sub="order → shipped" />
       </StatGrid>
+
+      <RevenueChart />
 
       <SectionCard
         title="Recent orders"
