@@ -5,6 +5,7 @@ import {
   Truck,
   Wallet,
   ArrowRight,
+  GlobeHemisphereWest as Globe,
 } from "@phosphor-icons/react/dist/ssr"
 import { buttonVariants } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -15,19 +16,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Reveal } from "@/components/motion/reveal"
+import { DeploymentGlobe } from "@/components/motion/deployment-globe"
 
 const stats = [
   { value: "2.4M+", label: "orders shipped" },
   { value: "3", label: "marketplaces synced" },
   { value: "99.2%", label: "on-time fulfillment" },
   { value: "48hrs", label: "avg to doorstep" },
-]
-
-const previewRows = [
-  { id: "#4142", product: "Hoodie · black", status: "Production", tone: "bg-amber-100 text-amber-700", amount: "$63.75" },
-  { id: "#4140", product: "Tee · 2-pack", status: "Shipped", tone: "bg-emerald-100 text-emerald-700", amount: "$27.00" },
-  { id: "#4131", product: "Embroidered cap", status: "QC", tone: "bg-violet-100 text-violet-700", amount: "$31.50" },
-  { id: "#4126", product: "Crewneck · sand", status: "Packed", tone: "bg-pink-100 text-pink-700", amount: "$44.20" },
 ]
 
 const steps = [
@@ -134,7 +129,7 @@ export default function MarketingHome() {
               <Link href="/login" className={buttonVariants({ size: "lg" })}>
                 Start for free <ArrowRight size={16} weight="bold" />
               </Link>
-              <Link href="/#how" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              <Link href="/how-it-works" className={buttonVariants({ variant: "outline", size: "lg" })}>
                 See how it works
               </Link>
             </div>
@@ -177,40 +172,51 @@ export default function MarketingHome() {
             </div>
           </Reveal>
 
-          {/* app preview */}
+          {/* signature globe visual */}
           <Reveal delay={0.4} y={28}>
-          <div className="eg-float mx-auto mt-16 max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-primary/5">
-            <div className="flex h-9 items-center gap-1.5 border-b border-border px-4">
-              <span className="size-2.5 rounded-full bg-muted-foreground/25" />
-              <span className="size-2.5 rounded-full bg-muted-foreground/25" />
-              <span className="size-2.5 rounded-full bg-muted-foreground/25" />
-            </div>
-            <div className="bg-gradient-to-br from-primary/[0.03] to-background p-6 text-left">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold">Order queue</div>
-                  <div className="text-xs text-muted-foreground">Live across your stores</div>
-                </div>
-                <span className="inline-flex h-7 items-center rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground">
-                  + New
+          <div className="eg-float relative mx-auto mt-16 max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0f] p-5 text-left shadow-2xl shadow-primary/20 sm:p-7">
+            {/* header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-white/[0.06] text-primary ring-1 ring-white/10">
+                  <Globe size={18} weight="duotone" />
                 </span>
+                <div>
+                  <div className="text-sm font-semibold text-white">Global fulfillment network</div>
+                  <div className="text-xs text-white/40">Prints ship worldwide, hands-off</div>
+                </div>
               </div>
-              <div className="mt-4 overflow-hidden rounded-lg border border-border bg-card">
-                {previewRows.map((r, i) => (
-                  <div
-                    key={r.id}
-                    className={
-                      "grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 text-sm " +
-                      (i > 0 ? "border-t border-border" : "")
-                    }
-                  >
-                    <span className="font-mono text-xs text-muted-foreground">{r.id}</span>
-                    <span className="truncate">{r.product}</span>
-                    <span className={"rounded-full px-2.5 py-0.5 text-xs font-medium " + r.tone}>{r.status}</span>
-                    <span className="font-medium tabular-nums">{r.amount}</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/70">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-70" />
+                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                </span>
+                Live
+              </span>
+            </div>
+
+            {/* globe canvas */}
+            <div className="relative mt-2 h-[300px] sm:h-[360px]">
+              <DeploymentGlobe />
+              {/* stat chips overlaid bottom-left */}
+              <div className="absolute bottom-1 left-0 flex flex-wrap gap-2">
+                {[
+                  { v: "2.4M+", l: "orders shipped" },
+                  { v: "99.2%", l: "on-time" },
+                  { v: "200+", l: "regions" },
+                ].map((s) => (
+                  <div key={s.l} className="rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 backdrop-blur">
+                    <div className="text-sm font-semibold tabular-nums text-white">{s.v}</div>
+                    <div className="text-[11px] text-white/45">{s.l}</div>
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* footer labels */}
+            <div className="mt-3 flex items-center justify-between text-[11px] text-white/35">
+              <span>Vetted print network</span>
+              <span>200+ edge locations</span>
             </div>
           </div>
           </Reveal>

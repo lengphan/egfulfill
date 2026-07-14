@@ -2,8 +2,8 @@ import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 
 const nav = [
-  { label: "Features", href: "/#features" },
-  { label: "How it works", href: "/#how" },
+  { label: "Features", href: "/features" },
+  { label: "How it works", href: "/how-it-works" },
   { label: "Pricing", href: "/pricing" },
 ]
 
@@ -47,8 +47,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
             <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link href="/#how" className="hover:text-foreground">How it works</Link>
-            <Link href="/#features" className="hover:text-foreground">Features</Link>
+            <Link href="/how-it-works" className="hover:text-foreground">How it works</Link>
+            <Link href="/features" className="hover:text-foreground">Features</Link>
             <Link href="/login" className="hover:text-foreground">Log in</Link>
           </nav>
         </div>
