@@ -57,3 +57,30 @@ export function getWallet(account?: string) {
   const qs = account ? `?account=${encodeURIComponent(account)}` : ""
   return api<WalletResponse>(`/api/wallet${qs}`)
 }
+
+// ─────────────────────────── Catalog ───────────────────────────
+// GET /api/catalog_products → the full product objects (lossless `data` jsonb).
+// Field names mirror the static store, so keep this shape permissive.
+export type CatalogProduct = {
+  id?: string | number
+  name?: string
+  sku?: string
+  type?: string
+  method?: string
+  material?: string
+  status?: string
+  price?: number | string
+  basePrice?: number | string
+  base_price?: number | string
+  mainColor?: string
+  sizes?: string[]
+  images?: string[]
+  img?: string
+  image?: string
+  hero?: string
+  colorImages?: Record<string, string>
+}
+
+export function getCatalogProducts() {
+  return api<CatalogProduct[]>(`/api/catalog_products`)
+}

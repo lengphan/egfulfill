@@ -1,0 +1,290 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
+import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
+import { motion, useReducedMotion } from "motion/react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+
+// ── helpers ───────────────────────────────────────────────────
+const priceOf = (p: CatalogProduct) =>
+  Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
+
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+const imageOf = (p: CatalogProduct) =>
+  p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages)[0] : "") || ""
+
+const colorsOf = (p: CatalogProduct) => (p.colorImages ? Object.keys(p.colorImages) : [])
+
+// Common garment/thread colour names → a swatch hex (best-effort; unknown = neutral).
+const SWATCH: Record<string, string> = {
+  black: "#191918", white: "#f4f2ef", navy: "#25314d", "sport grey": "#b7b7b3",
+  grey: "#9ca3af", gray: "#9ca3af", heather: "#b9b6b0", sand: "#d8cbb4", natural: "#e8e0cf",
+  maroon: "#6d2233", red: "#c0392b", royal: "#2f4bf0", blue: "#3457d5", green: "#3f7d4e",
+  forest: "#2f5540", pink: "#e59bb4", khaki: "#c3b091", gold: "#d4a017", purple: "#6d4aec",
+}
+const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
+
+// A stable, cheerful placeholder tint per product (no image) — index-based, no randomness.
+const TINTS = [
+  "from-violet-100 to-indigo-50 text-violet-500",
+  "from-amber-100 to-orange-50 text-amber-600",
+  "from-emerald-100 to-teal-50 text-emerald-600",
+  "from-sky-100 to-blue-50 text-sky-600",
+  "from-pink-100 to-rose-50 text-pink-600",
+]
+
+// ── demo fallback (no session / API) ──────────────────────────
+const DEMO: CatalogProduct[] = [
+  { id: 1, name: "Heavyweight Hoodie", sku: "HOOD-HW", type: "Apparel", method: "DTG", price: 42, status: "Active", sizes: ["S", "M", "L", "XL", "2XL"], colorImages: { Black: "", Navy: "", Maroon: "" } },
+  { id: 2, name: "Classic Tee", sku: "TEE-CL", type: "Apparel", method: "DTG", price: 18, status: "Active", sizes: ["S", "M", "L", "XL"], colorImages: { Black: "", White: "", "Sport Grey": "" } },
+  { id: 3, name: "Embroidered Cap", sku: "CAP-EMB", type: "Headwear", method: "Embroidery", price: 24, status: "Active", sizes: ["OS"], colorImages: { Black: "", Khaki: "", Navy: "" } },
+  { id: 4, name: "Canvas Tote", sku: "TOTE-CV", type: "Bags", method: "DTG", price: 14, status: "Draft", sizes: ["OS"], colorImages: { Natural: "" } },
+  { id: 5, name: "Ceramic Mug 15oz", sku: "MUG-15", type: "Drinkware", method: "Sublimation", price: 12.8, status: "Active", sizes: ["15oz"], colorImages: { White: "" } },
+  { id: 6, name: "Crewneck Sweatshirt", sku: "CREW-STD", type: "Apparel", method: "DTG", price: 34, status: "Active", sizes: ["S", "M", "L", "XL"], colorImages: { Sand: "", Black: "", Forest: "" } },
+]
+
+export function ProductsCatalog() {
+  const reduce = useReducedMotion()
+  const [products, setProducts] = useState<CatalogProduct[] | null>(null)
+  const [isDemo, setIsDemo] = useState(false)
+  const [query, setQuery] = useState("")
+  const [cat, setCat] = useState<string>("All")
+
+  useEffect(() => {
+    let alive = true
+    getCatalogProducts()
+      .then((rows) => {
+        if (!alive) return
+        if (rows && rows.length) {
+          setProducts(rows)
+        } else {
+          setProducts(DEMO)
+          setIsDemo(true)
+        }
+      })
+      .catch(() => {
+        if (!alive) return
+        setProducts(DEMO)
+        setIsDemo(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    ;(products ?? []).forEach((p) => p.type && set.add(p.type))
+    return ["All", ...Array.from(set)]
+  }, [products])
+
+  const filtered = useMemo(() => {
+    return (products ?? []).filter((p) => {
+      if (cat !== "All" && p.type !== cat) return false
+      if (!query) return true
+      const hay = `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase()
+      return hay.includes(query.toLowerCase())
+    })
+  }, [products, cat, query])
+
+  const stats = useMemo(() => {
+    const list = products ?? []
+    const active = list.filter((p) => (p.status ?? "Active") === "Active").length
+    const prices = list.map(priceOf).filter((n) => n > 0)
+    const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+    return { total: list.length, cats: Math.max(0, new Set(list.map((p) => p.type).filter(Boolean)).size), active, avg }
+  }, [products])
+
+  // ── loading skeleton ──
+  if (products === null) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-[92px] animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-[280px] animate-pulse rounded-2xl bg-muted" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <StatGrid>
+        <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
+        <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
+        <StatCard label="Active" value={String(stats.active)} sub="published" tone="pos" />
+        <StatCard label="Avg price" value={usd(stats.avg)} sub="across catalog" />
+      </StatGrid>
+
+      {/* toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCat(c)}
+              className={
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors " +
+                (cat === c
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground")
+              }
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products…"
+              className="w-52 pl-9"
+            />
+          </div>
+          <Button size="sm">
+            <Plus size={14} weight="bold" /> Add product
+          </Button>
+        </div>
+      </div>
+
+      {isDemo && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+          <Sparkle size={14} weight="fill" />
+          Showing sample products — sign in to load your live catalog.
+        </div>
+      )}
+
+      {/* grid */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-20 text-center">
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Package size={26} weight="duotone" />
+          </span>
+          <div className="font-medium">No products match that.</div>
+          <div className="text-sm text-muted-foreground">Try a different search or category.</div>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filtered.map((p, i) => {
+            const img = imageOf(p)
+            const colors = colorsOf(p)
+            const tint = TINTS[i % TINTS.length]
+            const status = p.status ?? "Active"
+            return (
+              <motion.div
+                key={String(p.id ?? p.sku ?? i)}
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
+                whileHover={reduce ? undefined : { y: -4 }}
+                className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+              >
+                {/* image / placeholder */}
+                <div className="relative aspect-square overflow-hidden bg-muted/40">
+                  {img ? (
+                    <Image
+                      src={img}
+                      alt={p.name ?? "Product"}
+                      fill
+                      unoptimized
+                      className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                    />
+                  ) : (
+                    <div className={"flex size-full items-center justify-center bg-gradient-to-br " + tint}>
+                      <span className="font-display text-4xl font-semibold">
+                        {(p.name ?? "?").trim().charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <span
+                    className={
+                      "absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur " +
+                      (status === "Active"
+                        ? "bg-emerald-500/15 text-emerald-700"
+                        : status === "Draft"
+                          ? "bg-muted/70 text-muted-foreground"
+                          : "bg-amber-500/15 text-amber-700")
+                    }
+                  >
+                    <span
+                      className={
+                        "size-1.5 rounded-full " +
+                        (status === "Active" ? "bg-emerald-500" : status === "Draft" ? "bg-muted-foreground" : "bg-amber-500")
+                      }
+                    />
+                    {status}
+                  </span>
+                </div>
+
+                {/* body */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold">{p.name ?? "Untitled"}</div>
+                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.sku ?? "—"}</div>
+                    </div>
+                    <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between">
+                    {/* color swatches */}
+                    <div className="flex items-center gap-1.5">
+                      {colors.slice(0, 5).map((c) => (
+                        <span
+                          key={c}
+                          title={c}
+                          className="size-4 rounded-full border border-black/10"
+                          style={{ background: swatchHex(c) }}
+                        />
+                      ))}
+                      {colors.length > 5 && (
+                        <span className="text-[11px] text-muted-foreground">+{colors.length - 5}</span>
+                      )}
+                      {colors.length === 0 && <span className="text-[11px] text-muted-foreground">—</span>}
+                    </div>
+                    {/* type + method */}
+                    <div className="flex items-center gap-1.5">
+                      {p.type && (
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {p.type}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* sizes */}
+                  {p.sizes && p.sizes.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {p.sizes.slice(0, 6).map((s) => (
+                        <span
+                          key={s}
+                          className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
