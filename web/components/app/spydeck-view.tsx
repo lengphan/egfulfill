@@ -57,11 +57,15 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 }
 
 // One research card — image (price + TRENDING overlay) + heart-to-save + estimate
-// stat boxes + the listing's up-to-13 keyword tags.
-function ResultCard({ l, saved, onToggleSave }: { l: EtsyListing; saved: boolean; onToggleSave: (l: EtsyListing) => void }) {
+// stat boxes + the listing's up-to-13 keyword tags (clickable to research + copy all).
+function ResultCard({ l, saved, onToggleSave, onSearchTag }: { l: EtsyListing; saved: boolean; onToggleSave: (l: EtsyListing) => void; onSearchTag: (t: string) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
+  const [copied, setCopied] = useState(false)
+  const copyAll = async () => {
+    try { await navigator.clipboard.writeText(tags.join(", ")); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
+  }
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       <button
@@ -105,19 +109,78 @@ function ResultCard({ l, saved, onToggleSave }: { l: EtsyListing; saved: boolean
             <StatBox label="Sold" sub="all time" value={fmtK(e.totalSold)} />
           </div>
 
-          {/* Keyword tags (up to 13) — the listing's Etsy tags for keyword research. */}
+          {/* Keyword tags (up to 13) — click to research the term, or copy them all. */}
           {tags.length > 0 && (
             <div className="mt-3">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</span>
+                <button type="button" onClick={(ev) => { ev.preventDefault(); copyAll() }} className="text-[10px] font-medium text-primary hover:underline">
+                  {copied ? "Copied!" : "Copy all"}
+                </button>
+              </div>
               <div className="flex flex-wrap gap-1">
                 {tags.map((t) => (
-                  <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-tight text-muted-foreground">{t}</span>
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={(ev) => { ev.preventDefault(); onSearchTag(t) }}
+                    title={`Research "${t}"`}
+                    className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-tight text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  >
+                    {t}
+                  </button>
                 ))}
               </div>
             </div>
           )}
         </div>
       </a>
+    </div>
+  )
+}
+
+// Curated popular POD niches for the discovery cloud (before a search). Weight = heat.
+const SEED_NICHES: { text: string; weight: number }[] = [
+  { text: "custom name necklace", weight: 10 }, { text: "comfort colors tee", weight: 10 },
+  { text: "mama sweatshirt", weight: 9 }, { text: "retro groovy", weight: 9 },
+  { text: "birth flower", weight: 8 }, { text: "pet portrait", weight: 8 },
+  { text: "personalized gift", weight: 8 }, { text: "bachelorette", weight: 7 },
+  { text: "teacher gift", weight: 7 }, { text: "vintage aesthetic", weight: 6 },
+  { text: "embroidered crewneck", weight: 6 }, { text: "coquette", weight: 6 },
+  { text: "y2k", weight: 5 }, { text: "cottagecore", weight: 5 },
+  { text: "boho wall art", weight: 5 }, { text: "minimalist jewelry", weight: 5 },
+  { text: "monogram", weight: 4 }, { text: "funny shirt", weight: 4 },
+  { text: "wedding gift", weight: 4 }, { text: "in my era", weight: 4 },
+  { text: "christmas", weight: 3 }, { text: "halloween", weight: 3 },
+  { text: "custom pet", weight: 3 }, { text: "trendy", weight: 3 },
+]
+
+// Interactive keyword/niche cloud — hotter terms render bigger; click to research.
+function KeywordCloud({ words, onPick }: { words: { text: string; weight: number }[]; onPick: (t: string) => void }) {
+  const weights = words.map((w) => w.weight)
+  const max = Math.max(...weights, 1)
+  const min = Math.min(...weights, 0)
+  const norm = (w: number) => (max === min ? 0.5 : (w - min) / (max - min))
+  const sizeOf = (w: number) => 12 + norm(w) * 17 // 12–29px
+  const toneOf = (w: number) => {
+    const t = norm(w)
+    if (t > 0.72) return "text-primary font-bold"
+    if (t > 0.42) return "text-foreground font-semibold"
+    return "text-muted-foreground font-medium"
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 p-5">
+      {words.map((w) => (
+        <button
+          key={w.text}
+          onClick={() => onPick(w.text)}
+          style={{ fontSize: sizeOf(w.weight) }}
+          title={`Research "${w.text}"`}
+          className={"cursor-pointer leading-none transition-all duration-150 hover:scale-110 hover:text-primary " + toneOf(w.weight)}
+        >
+          {w.text}
+        </button>
+      ))}
     </div>
   )
 }
@@ -186,9 +249,11 @@ export function SpyDeckView() {
     }
   }
 
-  const run = async () => {
-    const q = query.trim()
+  const run = async (term?: string) => {
+    const q = (term ?? query).trim()
     if (!q) return
+    if (term != null && term !== query) setQuery(term)
+    setView("search")
     setLoading(true)
     setError(null)
     try {
@@ -221,6 +286,22 @@ export function SpyDeckView() {
     }
   }, [results])
 
+  // Cloud: aggregate the actual tags across search results (real niche keywords);
+  // before any search, fall back to the curated trending niches.
+  const cloud = useMemo(() => {
+    const list = results ?? []
+    if (list.length) {
+      const counts: Record<string, number> = {}
+      for (const l of list) for (const raw of l.tags ?? []) {
+        const k = raw.trim().toLowerCase()
+        if (k) counts[k] = (counts[k] || 0) + 1
+      }
+      const words = Object.entries(counts).map(([text, weight]) => ({ text, weight })).sort((a, b) => b.weight - a.weight).slice(0, 40)
+      if (words.length >= 6) return { words, live: true }
+    }
+    return { words: SEED_NICHES, live: false }
+  }, [results])
+
   if (checked && !entitled) return <SpyDeckLocked />
 
   return (
@@ -231,6 +312,15 @@ export function SpyDeckView() {
         <StatCard label="Shops" value={results === null ? "—" : String(stats.shops)} sub="unique sellers" />
         <StatCard label="Most viewed" value={results === null ? "—" : stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
       </StatGrid>
+
+      {view === "search" && (
+        <SectionCard
+          title={cloud.live ? "Keywords in these results" : "Trending keywords & niches"}
+          description={cloud.live ? "Aggregated from the current search — click any to dig in" : "Popular niches to explore — bigger = hotter. Click to research."}
+        >
+          <KeywordCloud words={cloud.words} onPick={(t) => run(t)} />
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Product research"
@@ -264,7 +354,7 @@ export function SpyDeckView() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={run} disabled={loading || !query.trim()}>
+            <Button onClick={() => run()} disabled={loading || !query.trim()}>
               {loading ? "Searching…" : "Search"}
             </Button>
           </div>
@@ -292,7 +382,7 @@ export function SpyDeckView() {
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {saved.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} />
               ))}
             </div>
           )
@@ -320,6 +410,7 @@ export function SpyDeckView() {
                 l={l}
                 saved={savedIds.has(String(l.listing_id))}
                 onToggleSave={toggleSave}
+                onSearchTag={(t) => run(t)}
               />
             ))}
           </div>
