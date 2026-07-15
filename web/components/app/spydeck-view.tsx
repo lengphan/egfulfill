@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, ArrowSquareOut, Binoculars, LockSimple, Check, TrendUp, Heart } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -15,21 +15,52 @@ import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-// Compact number (1,240 → 1.2k) for the stat boxes.
-const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n))
+// Compact number/money (1,240 → 1.2K) — ported from eg-scout.js (_fmt / _money).
+const fmtK = (n: number) => {
+  n = Math.round(n || 0)
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B"
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M"
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K"
+  return String(n)
+}
+const moneyK = (n: number) => "$" + fmtK(n).replace("$", "")
 
-// A small labelled stat box — the old SpyDeck research card treatment.
-function StatBox({ label, value }: { label: string; value: string }) {
+// SpyDeck estimates — ported VERBATIM from eg-scout.js `_est()`. Etsy's API doesn't
+// expose views/sold/revenue, so these four are ESTIMATES derived from favorites +
+// listing age. Signals, not exact figures.
+function estFor(l: EtsyListing) {
+  const fav = l.num_favorers || 0
+  const price = l.price != null ? Number(l.price) : 0
+  const created = l.created || 0
+  const nowS = Date.now() / 1000
+  const ageDays = created ? Math.max(1, (nowS - created) / 86400) : 45
+  const totalSold = Math.round(fav * 3.5) || fav
+  const perDay = totalSold / ageDays
+  const sold24 = Math.max(0, Math.round(perDay))
+  const views24 = Math.max(sold24, Math.round(perDay * 36 + (fav / ageDays) * 10))
+  const revenue = Math.round(totalSold * price)
+  const vel = fav / ageDays
+  const trending = (ageDays <= 30 && vel >= 1.2) || vel >= 6
+  return { totalSold, sold24, views24, revenue, trending }
+}
+
+// A small labelled stat box — the old SpyDeck research card treatment. `sub` is the
+// time-window qualifier (24h / All time).
+function StatBox({ label, sub, value }: { label: string; sub?: string; value: string }) {
   return (
     <div className="rounded-lg bg-muted/60 px-1.5 py-1.5 text-center leading-tight">
       <div className="truncate text-[13px] font-bold tabular-nums">{value}</div>
-      <div className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}{sub ? <span className="ml-0.5 font-normal normal-case text-muted-foreground/70">{sub}</span> : null}
+      </div>
     </div>
   )
 }
 
-// One research card — image + TRENDING badge + a heart-to-save + Price/Views/Favorites.
-function ResultCard({ l, trending, saved, onToggleSave }: { l: EtsyListing; trending: boolean; saved: boolean; onToggleSave: (l: EtsyListing) => void }) {
+// One research card — image + TRENDING badge + heart-to-save + estimate stat boxes.
+function ResultCard({ l, saved, onToggleSave }: { l: EtsyListing; saved: boolean; onToggleSave: (l: EtsyListing) => void }) {
+  const e = estFor(l)
+  const trending = e.trending
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
       {/* Save/favorite — stops the card link, toggles the saved state. */}
@@ -59,14 +90,17 @@ function ResultCard({ l, trending, saved, onToggleSave }: { l: EtsyListing; tren
           )}
         </div>
         <div className="flex flex-1 flex-col p-3">
-          <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
-          <div className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
-            {l.shop_name || "—"} <ArrowSquareOut size={11} className="opacity-0 transition-opacity group-hover:opacity-100" />
+          {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <StatBox label="Views" sub="24h" value={fmtK(e.views24)} />
+            <StatBox label="Sold" sub="24h" value={fmtK(e.sold24)} />
+            <StatBox label="Revenue" sub="all" value={moneyK(e.revenue)} />
+            <StatBox label="Sold" sub="all" value={fmtK(e.totalSold)} />
           </div>
-          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-            <StatBox label="Price" value={money(l.price, l.currency)} />
-            <StatBox label="Views" value={l.views != null ? compact(l.views) : "—"} />
-            <StatBox label="Favorites" value={l.num_favorers != null ? compact(l.num_favorers) : "—"} />
+          <div className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
+          <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs">
+            <span className="truncate text-muted-foreground">{l.shop_name || "—"}</span>
+            <span className="shrink-0 font-semibold tabular-nums">{money(l.price, l.currency)}</span>
           </div>
         </div>
       </a>
@@ -173,13 +207,6 @@ export function SpyDeckView() {
     }
   }, [results])
 
-  // Mark the standouts "Trending": the 75th-percentile of favorites among results.
-  const trendThreshold = useMemo(() => {
-    const favs = (results ?? []).map((l) => l.num_favorers ?? 0).filter((n) => n > 0).sort((a, b) => a - b)
-    if (favs.length < 4) return Infinity // too few to call anything trending
-    return favs[Math.floor(favs.length * 0.75)] || Infinity
-  }, [results])
-
   if (checked && !entitled) return <SpyDeckLocked />
 
   return (
@@ -233,6 +260,12 @@ export function SpyDeckView() {
           <div className="border-b border-border bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">{error}</div>
         )}
 
+        {view === "search" && results && results.length > 0 && (
+          <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-5 py-2 text-xs text-muted-foreground">
+            <Info size={13} /> Sold, revenue &amp; 24h numbers are <span className="font-medium">estimates</span> from favorites &amp; listing age (Etsy doesn&apos;t publish them) — use as a signal, not exact figures.
+          </div>
+        )}
+
         {view === "saved" ? (
           saved.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
@@ -245,7 +278,7 @@ export function SpyDeckView() {
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {saved.map((l) => (
-                <ResultCard key={l.listing_id} l={l} trending={false} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} />
               ))}
             </div>
           )
@@ -271,7 +304,6 @@ export function SpyDeckView() {
               <ResultCard
                 key={l.listing_id}
                 l={l}
-                trending={trendThreshold !== Infinity && (l.num_favorers ?? 0) >= trendThreshold}
                 saved={savedIds.has(String(l.listing_id))}
                 onToggleSave={toggleSave}
               />
