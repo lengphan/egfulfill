@@ -119,6 +119,13 @@ export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }
 
+export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  })
+}
+
 export type NewOrderItem = {
   name?: string
   sku?: string

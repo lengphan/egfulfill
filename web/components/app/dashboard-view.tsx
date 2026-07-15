@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Sparkle } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
-import { StatusBadge } from "@/components/app/status-badge"
+import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { RevenueChart, type RevenuePoint } from "@/components/app/revenue-chart"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { clickableProps } from "@/lib/a11y"
+import { sellerStatus } from "@/lib/order-status"
 
 const DAY = 864e5
 const usd = (n: number) =>
@@ -25,18 +26,8 @@ const usd = (n: number) =>
 const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
 const tsOf = (o: OrderRow) => (o.created_at ? new Date(o.created_at).getTime() : NaN)
 
-function stageOf(o: OrderRow): string {
-  const s = String(o.factory_status || o.status || "new").toLowerCase()
-  if (["new", "draft"].includes(s)) return "New"
-  if (["queued", "in_queue", "prescan", "ready_print", "awaiting_scan", "scanned"].includes(s)) return "Queued"
-  if (["printing", "production"].includes(s)) return "Production"
-  if (s === "qc") return "QC"
-  if (["packing", "packed"].includes(s)) return "Packed"
-  if (["shipped", "fulfilled", "delivered"].includes(s)) return "Shipped"
-  if (["hold", "on_hold", "unfunded"].includes(s)) return "On hold"
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-const CLOSED = new Set(["Shipped", "Cancelled"])
+// "Open" = not yet shipped or closed (canonical seller groups).
+const OPEN_GROUPS = new Set(["received", "production", "attention"])
 
 // Bucket revenue into `n` buckets of `daysPer` days each (current + previous window).
 function bucketize(orders: OrderRow[], n: number, daysPer: number, now: number, label: (idx: number) => string): RevenuePoint[] {
@@ -114,7 +105,7 @@ export function DashboardView() {
     const list = orders ?? []
     const in30 = list.filter((o) => !isNaN(tsOf(o)) && now - tsOf(o) < 30 * DAY)
     const rev30 = in30.reduce((s, o) => s + totalOf(o), 0)
-    const open = list.filter((o) => !CLOSED.has(stageOf(o))).length
+    const open = list.filter((o) => OPEN_GROUPS.has(sellerStatus(o).group)).length
     return { count30: in30.length, rev30, open }
   }, [orders, now])
 
@@ -190,7 +181,7 @@ export function DashboardView() {
                   <TableCell className="truncate font-mono text-xs font-semibold">{numOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
-                  <TableCell><StatusBadge status={stageOf(o)} /></TableCell>
+                  <TableCell><SellerStatusBadge order={o} /></TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{usd(totalOf(o))}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{fmtDate(o.created_at)}</TableCell>
                 </TableRow>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { StatusBadge } from "@/components/app/status-badge"
+import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,17 +28,6 @@ const fmtMsgTime = (s?: string) => {
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-function stageOf(o: OrderRow): string {
-  const s = String(o.factory_status || o.status || "new").toLowerCase()
-  if (["new", "draft"].includes(s)) return "New"
-  if (["queued", "in_queue", "prescan", "ready_print", "awaiting_scan", "scanned"].includes(s)) return "Queued"
-  if (["printing", "production"].includes(s)) return "Production"
-  if (s === "qc") return "QC"
-  if (["packing", "packed"].includes(s)) return "Packed"
-  if (["shipped", "fulfilled", "delivered"].includes(s)) return "Shipped"
-  if (["hold", "on_hold", "unfunded"].includes(s)) return "On hold"
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
 const itemImg = (it: OrderItem) => it.img || ""
 const fmtDateTime = (s?: string | null) => {
   if (!s) return "—"
@@ -140,7 +129,7 @@ export default function OrderDetailPage() {
           </Button>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl font-semibold tracking-tight">{num}</h1>
-            <StatusBadge status={stageOf(order)} />
+            <SellerStatusBadge order={order} />
           </div>
         </div>
         <div className="text-sm text-muted-foreground">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
-import { StatusBadge } from "@/components/app/status-badge"
+import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,20 +18,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, type OrderRow } from "@/lib/api"
 import { clickableProps } from "@/lib/a11y"
-
-// factory_status/status → a shared stage word StatusBadge knows (keeps colours consistent).
-function stageOf(o: OrderRow): string {
-  const s = String(o.factory_status || o.status || "new").toLowerCase()
-  if (["new", "draft"].includes(s)) return "New"
-  if (["queued", "in_queue", "prescan", "ready_print", "awaiting_scan", "scanned"].includes(s)) return "Queued"
-  if (["printing", "production"].includes(s)) return "Production"
-  if (s === "qc") return "QC"
-  if (["packing", "packed"].includes(s)) return "Packed"
-  if (["shipped", "fulfilled", "delivered"].includes(s)) return "Shipped"
-  if (["hold", "on_hold", "unfunded"].includes(s)) return "On hold"
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-const IN_PROD = new Set(["Queued", "Production", "QC", "Packed"])
+import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
@@ -53,9 +40,6 @@ const fmtDate = (s?: string | null) => {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-const FILTERS = ["All", "New", "Production", "Shipped"] as const
-type Filter = (typeof FILTERS)[number]
-
 // Demo fallback (no session / standalone dev).
 const DEMO: OrderRow[] = [
   { id: "etsy-4142", seq: 4142, source: "etsy", customer: { name: "A. Nguyen" }, factory_status: "printing", total: 63.75, created_at: "2026-04-12", items: [{ name: "Hoodie · black", qty: 1 }] },
@@ -71,7 +55,7 @@ export function OrdersList() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState<Filter>("All")
+  const [filter, setFilter] = useState<SellerFilter>("All")
 
   const load = useCallback(() => {
     getOrders()
@@ -96,21 +80,18 @@ export function OrdersList() {
 
   const stats = useMemo(() => {
     const list = orders ?? []
-    const by = (pred: (o: OrderRow) => boolean) => list.filter(pred).length
+    const byGroup = (g: string) => list.filter((o) => sellerStatus(o).group === g).length
     return {
-      neu: by((o) => stageOf(o) === "New"),
-      prod: by((o) => IN_PROD.has(stageOf(o))),
-      shipped: by((o) => stageOf(o) === "Shipped"),
-      hold: by((o) => stageOf(o) === "On hold"),
+      received: byGroup("received"),
+      prod: byGroup("production"),
+      shipped: byGroup("shipped"),
+      attention: byGroup("attention"),
     }
   }, [orders])
 
   const filtered = useMemo(() => {
     return (orders ?? []).filter((o) => {
-      const stage = stageOf(o)
-      if (filter === "New" && stage !== "New") return false
-      if (filter === "Production" && !IN_PROD.has(stage)) return false
-      if (filter === "Shipped" && stage !== "Shipped") return false
+      if (!matchesFilter(o, filter)) return false
       if (!query) return true
       const hay = `${numOf(o)} ${customerOf(o)} ${itemsLabel(o)} ${storeOf(o)}`.toLowerCase()
       return hay.includes(query.toLowerCase())
@@ -120,10 +101,10 @@ export function OrdersList() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="New" value={String(stats.neu)} sub="awaiting review" />
-        <StatCard label="In production" value={String(stats.prod)} sub="on the floor" />
+        <StatCard label="Received" value={String(stats.received)} sub="new orders" />
+        <StatCard label="In production" value={String(stats.prod)} sub="being fulfilled" />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="fulfilled" tone="pos" />
-        <StatCard label="Needs attention" value={String(stats.hold)} sub="unfunded / on hold" tone={stats.hold ? "neg" : undefined} />
+        <StatCard label="Needs attention" value={String(stats.attention)} sub="action needed" tone={stats.attention ? "neg" : undefined} />
       </StatGrid>
 
       <SectionCard
@@ -139,7 +120,7 @@ export function OrdersList() {
         {/* toolbar */}
         <div className="flex flex-col gap-3 border-b border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
+            {SELLER_FILTERS.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -207,7 +188,7 @@ export function OrdersList() {
                   <TableCell className="truncate text-muted-foreground">{storeOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{customerOf(o)}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
-                  <TableCell><StatusBadge status={stageOf(o)} /></TableCell>
+                  <TableCell><SellerStatusBadge order={o} /></TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{usd(totalOf(o))}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{fmtDate(o.created_at)}</TableCell>
                 </TableRow>
