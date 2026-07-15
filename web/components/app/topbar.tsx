@@ -46,12 +46,14 @@ function IconButton({
   )
 }
 
-export function TopBar({ balance: initialBalance = 12480 }: { balance?: number }) {
+export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const pathname = usePathname()
   const router = useRouter()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
-  const [balance, setBalance] = useState(initialBalance)
+  // null until the real balance loads — never show a fake default (that made the
+  // topbar disagree with the Wallet page).
+  const [balance, setBalance] = useState<number | null>(initialBalance ?? null)
   const [name, setName] = useState("Account")
   useEffect(() => {
     const id = setTimeout(() => {
@@ -81,7 +83,7 @@ export function TopBar({ balance: initialBalance = 12480 }: { balance?: number }
   }, [])
 
   const title = navTitle(pathname)
-  const money = balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
+  const money = balance == null ? "—" : balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-border bg-card px-6">

@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, type OrderRow } from "@/lib/api"
+import { getToken } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 
@@ -58,19 +59,22 @@ export function OrdersList() {
   const [filter, setFilter] = useState<SellerFilter>("All")
 
   const load = useCallback(() => {
+    // Signed in → show real data (empty state if none). Only fall back to samples
+    // when there's no session at all (standalone/marketing preview).
+    const signedIn = !!getToken()
     getOrders()
       .then((rows) => {
         if (rows && rows.length) {
           setOrders(rows)
           setIsDemo(false)
         } else {
-          setOrders(DEMO)
-          setIsDemo(true)
+          setOrders(signedIn ? [] : DEMO)
+          setIsDemo(!signedIn)
         }
       })
       .catch(() => {
-        setOrders(DEMO)
-        setIsDemo(true)
+        setOrders(signedIn ? [] : DEMO)
+        setIsDemo(!signedIn)
       })
   }, [])
   useEffect(() => {
@@ -157,12 +161,31 @@ export function OrdersList() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <Package size={22} weight="duotone" />
             </span>
-            <div className="font-medium">No orders here</div>
-            <div className="text-sm text-muted-foreground">Nothing matches that filter or search.</div>
+            {(orders?.length ?? 0) === 0 ? (
+              <>
+                <div className="font-medium">No orders yet</div>
+                <div className="max-w-xs text-sm text-muted-foreground">
+                  Orders will appear here once you create one or connect a store to sync.
+                </div>
+                <div className="mt-1 flex gap-2">
+                  <Button size="sm" onClick={() => router.push("/orders/new")}>
+                    <Plus size={14} weight="bold" /> New order
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => router.push("/stores")}>
+                    Connect a store
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="font-medium">No orders here</div>
+                <div className="text-sm text-muted-foreground">Nothing matches that filter or search.</div>
+              </>
+            )}
           </div>
         ) : (
           <Table className="table-fixed">

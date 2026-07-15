@@ -23,19 +23,28 @@ function parseAddress(text: string): { street: string; street2: string; city: st
   return { street: streetLines[0] ?? "", street2: streetLines.slice(1).join(", "), city, state, zip }
 }
 
+// Split a pasted "Name / street / City, ST ZIP" block → name (first line) + address.
+function parseBlock(text: string) {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
+  const name = lines[0] ?? ""
+  const addr = parseAddress(lines.slice(1).join("\n"))
+  return { name, addr }
+}
+const zip5 = (z: string) => z.split("-")[0].trim() // USPS ZIPCode wants 5 digits, not ZIP+4
+
 type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: ValidatedAddress } | { kind: "bad"; msg: string }
 
-type Line = { name: string; qty: string; price: string; color: string; size: string }
-const emptyLine = (): Line => ({ name: "", qty: "1", price: "", color: "", size: "" })
+type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string }
+const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "" })
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function NewOrderPage() {
   const router = useRouter()
-  const [name, setName] = useState("")
+  const [block, setBlock] = useState("")
   const [email, setEmail] = useState("")
-  const [addressText, setAddressText] = useState("")
   const [valid, setValid] = useState<Valid>({ kind: "idle" })
+  const parsed = useMemo(() => parseBlock(block), [block])
   const [lines, setLines] = useState<Line[]>([emptyLine()])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,9 +61,9 @@ export default function NewOrderPage() {
   }, [])
 
   async function onValidate() {
-    const p = parseAddress(addressText)
+    const p = parsed.addr
     if (!p.street || !p.zip) {
-      setValid({ kind: "bad", msg: "Need at least a street line and a City, ST ZIP line." })
+      setValid({ kind: "bad", msg: "Add a name, a street line, and a City, ST ZIP line." })
       return
     }
     setValid({ kind: "checking" })
@@ -64,7 +73,7 @@ export default function NewOrderPage() {
         secondaryAddress: p.street2 || undefined,
         city: p.city,
         state: p.state,
-        ZIPCode: p.zip,
+        ZIPCode: zip5(p.zip),
       })
       if (r.ok && r.address) setValid({ kind: "ok", addr: r.address })
       else setValid({ kind: "bad", msg: r.error || "USPS couldn't verify this address." })
@@ -90,12 +99,12 @@ export default function NewOrderPage() {
   const addLine = () => setLines((prev) => [...prev, emptyLine()])
   const removeLine = (i: number) => setLines((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))
 
-  const canSave = name.trim() && lines.some((l) => l.name.trim())
+  const canSave = parsed.name.trim() && lines.some((l) => l.name.trim())
 
   async function onSubmit() {
     setError(null)
     if (!canSave) {
-      setError("Add a customer name and at least one item.")
+      setError("Add a customer name (first line) and at least one item.")
       return
     }
     setSaving(true)
@@ -106,31 +115,33 @@ export default function NewOrderPage() {
         .filter((l) => l.name.trim())
         .map((l) => ({
           name: l.name.trim(),
+          sku: l.sku || undefined,
+          img: l.img || undefined,
           qty: Number(l.qty) || 1,
           unitPrice: Number(l.price) || 0,
           color: l.color.trim() || undefined,
           size: l.size.trim() || undefined,
         }))
-      const parsed = valid.kind === "ok" ? valid.addr : parseAddress(addressText)
-      const address =
-        addressText.trim()
-          ? {
-              name: name.trim(),
-              street: "street" in parsed ? parsed.street : "",
-              street2: "street2" in parsed ? parsed.street2 : "",
-              city: parsed.city,
-              state: parsed.state,
-              zip: parsed.zip,
-              validated: valid.kind === "ok",
-              raw: addressText.trim(),
-            }
-          : undefined
+      const fa = valid.kind === "ok" ? valid.addr : parsed.addr
+      const hasAddress = !!(fa.street || fa.city)
+      const address = hasAddress
+        ? {
+            name: parsed.name,
+            street: fa.street,
+            street2: fa.street2,
+            city: fa.city,
+            state: fa.state,
+            zip: fa.zip,
+            validated: valid.kind === "ok",
+            raw: block.trim(),
+          }
+        : undefined
       const r = await createOrder({
         id,
         seq,
         source: "manual",
         status: "new",
-        customer: { name: name.trim(), email: email.trim() || undefined },
+        customer: { name: parsed.name, email: email.trim() || undefined },
         address,
         total: pricing.total,
         items,
@@ -154,19 +165,9 @@ export default function NewOrderPage() {
 
       <SectionCard title="Customer & shipping">
         <div className="space-y-4 p-5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Name</span>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Customer name"
-              className="h-11 text-base"
-            />
-          </label>
-
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Shipping address</span>
+              <span className="text-sm font-medium">Customer &amp; shipping address</span>
               {valid.kind === "ok" && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
                   <CheckCircle size={14} weight="fill" /> Validated
@@ -179,26 +180,28 @@ export default function NewOrderPage() {
               )}
             </div>
             <textarea
-              value={addressText}
+              value={block}
               onChange={(e) => {
-                setAddressText(e.target.value)
+                setBlock(e.target.value)
                 setValid({ kind: "idle" })
               }}
-              rows={4}
-              placeholder={"Paste the full address…\n123 Main St, Apt 4\nSacramento, CA 95826"}
+              rows={5}
+              placeholder={"Ava Brodeur\n43 Calumet Rd\nFairhaven, MA 02719"}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             />
-            <div className="flex items-center gap-3">
-              <Button type="button" variant="outline" size="sm" onClick={onValidate} disabled={valid.kind === "checking" || !addressText.trim()}>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" size="sm" onClick={onValidate} disabled={valid.kind === "checking" || !parsed.addr.street}>
                 {valid.kind === "checking" ? "Checking…" : "Validate address"}
               </Button>
+              {parsed.name && <span className="text-xs text-muted-foreground">Name: <span className="font-medium text-foreground">{parsed.name}</span></span>}
               {valid.kind === "ok" && (
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="truncate text-xs text-emerald-600">
                   {[valid.addr.street, valid.addr.street2, valid.addr.city, valid.addr.state, `${valid.addr.zip}${valid.addr.zip4 ? "-" + valid.addr.zip4 : ""}`].filter(Boolean).join(", ")}
                 </span>
               )}
               {valid.kind === "bad" && <span className="truncate text-xs text-amber-600">{valid.msg}</span>}
             </div>
+            <p className="text-xs text-muted-foreground">First line is the customer name, then the shipping address (street, then City, ST ZIP).</p>
           </div>
 
           <label className="flex flex-col gap-1.5">
