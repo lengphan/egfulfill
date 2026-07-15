@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -57,6 +58,7 @@ export function OrdersList() {
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<SellerFilter>("All")
+  const [importOpen, setImportOpen] = useState(false)
 
   const load = useCallback(() => {
     // Signed in → show real data (empty state if none). Only fall back to samples
@@ -115,6 +117,9 @@ export function OrdersList() {
         title="Orders"
         actions={
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <UploadSimple size={14} weight="bold" /> Import
+            </Button>
             <Button size="sm" variant="outline" onClick={() => router.push("/orders/new")}>
               <Plus size={14} weight="bold" /> New order
             </Button>
@@ -220,6 +225,8 @@ export function OrdersList() {
           </Table>
         )}
       </SectionCard>
+
+      <ImportOrdersDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => load()} />
     </div>
   )
 }

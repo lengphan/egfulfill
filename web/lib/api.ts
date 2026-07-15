@@ -133,6 +133,15 @@ export type CatalogProduct = {
   colorImages?: Record<string, string>
 }
 
+// Google Sheets import — server reads the sheet and returns a 2D row array,
+// then the client reuses the same CSV parsing/validation (lib/order-import).
+export function getSheetsConfig() {
+  return api<{ enabled?: boolean; templateUrl?: string; canCreate?: boolean }>(`/api/sheets/config`)
+}
+export function getSheetRows(url: string) {
+  return api<{ rows?: string[][]; title?: string; tab?: string; error?: string }>(`/api/sheets?url=${encodeURIComponent(url)}`)
+}
+
 export function getCatalogProducts() {
   return api<CatalogProduct[]>(`/api/catalog_products`)
 }
