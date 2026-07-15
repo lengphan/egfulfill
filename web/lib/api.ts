@@ -85,6 +85,37 @@ export function getCatalogProducts() {
   return api<CatalogProduct[]>(`/api/catalog_products`)
 }
 
+// ─────────────────────────── Orders ───────────────────────────
+// GET /api/orders → order rows (orders table) each with an aggregated items[].
+export type OrderItem = {
+  name?: string
+  sku?: string
+  qty?: number
+  color?: string
+  size?: string
+  img?: string
+  unit_price?: number | string
+  print_type?: string
+}
+export type OrderRow = {
+  id: string
+  seq?: number | null
+  store?: string | null
+  source?: string | null
+  customer?: { name?: string; email?: string } | null
+  status?: string | null
+  factory_status?: string | null
+  total?: number | string | null
+  tracking?: string | null
+  created_at?: string | null
+  meta?: Record<string, unknown> | null
+  items?: OrderItem[]
+}
+
+export function getOrders() {
+  return api<OrderRow[]>(`/api/orders`)
+}
+
 // ─────────────────────────── Stores / channels ───────────────────────────
 // Etsy is the fully-wired channel today (etsy.js). Shopify/TikTok/WooCommerce
 // have credentials but no seller-facing OAuth route yet → shown as "coming soon".
