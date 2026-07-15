@@ -44,29 +44,29 @@ function estFor(l: EtsyListing) {
   return { totalSold, sold24, views24, revenue, trending }
 }
 
-// A small labelled stat box — the old SpyDeck research card treatment. `sub` is the
-// time-window qualifier (24h / All time).
+// A labelled stat box — bold value on top, small label + time-window below.
 function StatBox({ label, sub, value }: { label: string; sub?: string; value: string }) {
   return (
-    <div className="rounded-lg bg-muted/60 px-1.5 py-1.5 text-center leading-tight">
-      <div className="truncate text-[13px] font-bold tabular-nums">{value}</div>
-      <div className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}{sub ? <span className="ml-0.5 font-normal normal-case text-muted-foreground/70">{sub}</span> : null}
+    <div className="rounded-lg bg-muted/60 px-2 py-2 text-center leading-none">
+      <div className="truncate text-[15px] font-bold tabular-nums">{value}</div>
+      <div className="mt-1 text-[10px] font-medium text-muted-foreground">
+        {label}{sub ? <span className="text-muted-foreground/60"> · {sub}</span> : null}
       </div>
     </div>
   )
 }
 
-// One research card — image + TRENDING badge + heart-to-save + estimate stat boxes.
+// One research card — image (price + TRENDING overlay) + heart-to-save + estimate
+// stat boxes + the listing's up-to-13 keyword tags.
 function ResultCard({ l, saved, onToggleSave }: { l: EtsyListing; saved: boolean; onToggleSave: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
+  const tags = (l.tags ?? []).slice(0, 13)
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
-      {/* Save/favorite — stops the card link, toggles the saved state. */}
       <button
         type="button"
-        onClick={(e) => { e.preventDefault(); onToggleSave(l) }}
+        onClick={(ev) => { ev.preventDefault(); onToggleSave(l) }}
         aria-label={saved ? "Remove from saved" : "Save listing"}
         aria-pressed={saved}
         className={
@@ -88,20 +88,34 @@ function ResultCard({ l, saved, onToggleSave }: { l: EtsyListing; saved: boolean
               <TrendUp size={11} weight="bold" /> Trending
             </span>
           )}
+          {/* Price — always visible on the image, out of the stats. */}
+          <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
+            {money(l.price, l.currency)}
+          </span>
         </div>
         <div className="flex flex-1 flex-col p-3">
+          <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
+
           {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="mt-2.5 grid grid-cols-2 gap-1.5">
             <StatBox label="Views" sub="24h" value={fmtK(e.views24)} />
             <StatBox label="Sold" sub="24h" value={fmtK(e.sold24)} />
-            <StatBox label="Revenue" sub="all" value={moneyK(e.revenue)} />
-            <StatBox label="Sold" sub="all" value={fmtK(e.totalSold)} />
+            <StatBox label="Revenue" sub="all time" value={moneyK(e.revenue)} />
+            <StatBox label="Sold" sub="all time" value={fmtK(e.totalSold)} />
           </div>
-          <div className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-xs">
-            <span className="truncate text-muted-foreground">{l.shop_name || "—"}</span>
-            <span className="shrink-0 font-semibold tabular-nums">{money(l.price, l.currency)}</span>
-          </div>
+
+          {/* Keyword tags (up to 13) — the listing's Etsy tags for keyword research. */}
+          {tags.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{tags.length} keywords</div>
+              <div className="flex flex-wrap gap-1">
+                {tags.map((t) => (
+                  <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[10px] leading-tight text-muted-foreground">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </a>
     </div>

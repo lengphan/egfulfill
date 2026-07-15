@@ -394,6 +394,7 @@ export type EtsyListing = {
   views: number | null
   num_favorers?: number | null
   created?: number | null // unix seconds — listing age drives the sales estimates
+  tags?: string[] // Etsy listing tags (up to 13) — keyword research
   shop_name: string | null
 }
 // SpyDeck saved/favorited research listings (server-authoritative, per seller).
