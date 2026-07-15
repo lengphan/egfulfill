@@ -27,6 +27,7 @@ import { walletRoutes } from './routes/wallet.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
 import { teamRoutes } from './routes/team.js';
 import { sandboxRoutes } from './routes/sandbox.js';
+import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { auditRoutes } from './audit.js';
 import { addClient } from './events.js';
 
@@ -137,6 +138,7 @@ walletRoutes(app, requireAuth);                        // SERVER-authoritative w
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
+adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
 auditRoutes(app, requireAdmin);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 
 const port = Number(process.env.PORT) || 3000;

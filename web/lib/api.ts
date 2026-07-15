@@ -155,6 +155,12 @@ export function googleLogin(credential: string) {
   })
 }
 
+// ─────────────────── Integration credentials (masked, read-only, staff) ───────────────────
+export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null }
+export function getAdminSecrets() {
+  return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
+}
+
 // ─────────────────────────── Stores / channels ───────────────────────────
 // Etsy is the fully-wired channel today (etsy.js). Shopify/TikTok/WooCommerce
 // have credentials but no seller-facing OAuth route yet → shown as "coming soon".

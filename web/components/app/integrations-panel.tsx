@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { ArrowsClockwise, ShieldCheck } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
-import { api, ApiError } from "@/lib/api"
+import { api, ApiError, getAdminSecrets, type SecretMeta } from "@/lib/api"
 
 type Level = "live" | "configured" | "off" | "error" | "restricted" | "checking"
 type Result = { level: Level; detail?: string }
@@ -143,11 +143,19 @@ export function IntegrationsPanel() {
   const [results, setResults] = useState<Record<string, Result>>(
     Object.fromEntries(INTEGRATIONS.map((i) => [i.key, { level: "checking" as Level }]))
   )
+  const [secrets, setSecrets] = useState<Record<string, SecretMeta[]>>({})
   const [checking, setChecking] = useState(false)
 
   const runChecks = useCallback(() => {
     setChecking(true)
     setResults(Object.fromEntries(INTEGRATIONS.map((i) => [i.key, { level: "checking" as Level }])))
+    getAdminSecrets()
+      .then((r) => {
+        const byI: Record<string, SecretMeta[]> = {}
+        for (const s of r.secrets) (byI[s.integration] ??= []).push(s)
+        setSecrets(byI)
+      })
+      .catch(() => setSecrets({}))
     Promise.all(
       INTEGRATIONS.map(async (i) => {
         try {
@@ -207,6 +215,22 @@ export function IntegrationsPanel() {
                       {res.detail && (
                         <div className="mt-2 truncate font-mono text-[11px] text-muted-foreground" title={res.detail}>
                           {res.detail}
+                        </div>
+                      )}
+                      {(secrets[i.key] ?? []).length > 0 && (
+                        <div className="mt-2 space-y-1 border-t border-border pt-2">
+                          {(secrets[i.key] ?? []).map((s) => (
+                            <div key={s.name} className="flex items-center justify-between gap-2 text-[11px]">
+                              <span className="text-muted-foreground">{s.label}</span>
+                              <span className="font-mono">
+                                {s.set ? (
+                                  <span className="text-foreground">••••{s.last4}</span>
+                                ) : (
+                                  <span className="text-muted-foreground/50">not set</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
