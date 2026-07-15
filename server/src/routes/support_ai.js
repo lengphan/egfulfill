@@ -1,20 +1,52 @@
-// support_ai.js — account-aware AI auto-reply for the seller Support chat.
+// support_ai.js — account-aware AI auto-reply for the seller Support chat, plus an
+// admin-editable AI config (key + model) surfaced in Settings › Integrations.
 //
 // A seller posts to their support thread (order_messages under `support-<sellerId>`);
-// the client then calls POST /api/support/ai-reply. We load the recent conversation
-// plus that seller's REAL orders + wallet balance, ask Claude (Haiku) for a concise,
-// grounded reply, and insert it back into the thread as role 'assistant'. The chat
-// page polls, so the answer just appears. No side effects beyond one message row.
+// the client calls POST /api/support/ai-reply. We load the recent conversation plus
+// that seller's REAL orders + wallet balance, ask Claude for a concise grounded reply,
+// and insert it back as role 'assistant'. The chat page polls, so it just appears.
 //
-// Requires ANTHROPIC_API_KEY in the server env. If it's missing the route is a no-op
-// ({ ok:false, disabled:true }) so nothing breaks — the human-support flow still works.
+// The Anthropic key + model are read from the `settings` table (admin-writable via
+// PUT /api/admin/ai-config), falling back to ANTHROPIC_API_KEY / SUPPORT_AI_MODEL in
+// the env. With no key configured either way the route is a graceful no-op.
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 
-const KEY = process.env.ANTHROPIC_API_KEY || '';
-const MODEL = process.env.SUPPORT_AI_MODEL || 'claude-haiku-4-5-20251001';
 const API_URL = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+
+// Selectable models for the admin dropdown (id must be a valid Anthropic model id).
+const AI_MODELS = [
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — fast & low cost (recommended)' },
+  { id: 'claude-sonnet-5',          label: 'Claude Sonnet 5 — balanced' },
+  { id: 'claude-opus-4-8',          label: 'Claude Opus 4.8 — most capable' },
+];
+
+let _settingsReady = null;
+function ensureSettings() {
+  if (_settingsReady) return _settingsReady;
+  _settingsReady = q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`)
+    .catch((e) => { _settingsReady = null; throw e; });
+  return _settingsReady;
+}
+
+// Resolve the effective AI config: DB settings first, then env, then defaults.
+async function aiConfig() {
+  let key = '', model = '';
+  try {
+    await ensureSettings();
+    const r = await q("select key, value from settings where key in ('support_ai_key','support_ai_model')");
+    for (const row of r.rows) {
+      if (row.key === 'support_ai_key') key = (row.value || '').trim();
+      if (row.key === 'support_ai_model') model = (row.value || '').trim();
+    }
+  } catch { /* settings unavailable → env fallback */ }
+  key = key || (process.env.ANTHROPIC_API_KEY || '').trim();
+  model = model || (process.env.SUPPORT_AI_MODEL || '').trim() || DEFAULT_MODEL;
+  const fromEnv = !!(process.env.ANTHROPIC_API_KEY || '').trim();
+  return { key, model, fromEnv };
+}
 
 // Seller-friendly status label from the factory status (mirrors the front-end SELLER_STATUS).
 function sellerStatus(o) {
@@ -57,14 +89,12 @@ async function accountContext(sellerId) {
   } catch { /* orders unavailable */ }
   try {
     const b = await q(`select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1`, [String(sellerId)]);
-    const bal = Number(b.rows[0]?.bal || 0);
-    lines.push(`Wallet balance: $${bal.toFixed(2)}.`);
+    lines.push(`Wallet balance: $${Number(b.rows[0]?.bal || 0).toFixed(2)}.`);
   } catch { /* wallet unavailable */ }
   return lines.join('\n');
 }
 
-// Map the stored thread into alternating Claude messages (seller=user, others=assistant),
-// merging consecutive same-role turns so the API always sees clean alternation.
+// Map the stored thread into alternating Claude messages (seller=user, others=assistant).
 function toMessages(rows) {
   const out = [];
   for (const m of rows) {
@@ -75,14 +105,45 @@ function toMessages(rows) {
     if (last && last.role === role) last.content += '\n' + text;
     else out.push({ role, content: text });
   }
-  // Claude requires the first message to be a user turn.
   while (out.length && out[0].role !== 'user') out.shift();
   return out;
 }
 
-export function supportAiRoutes(app, requireAuth) {
+export function supportAiRoutes(app, requireAuth, requireStaff) {
+  // ── Admin config (Settings › Integrations): key status + model selector ──────
+  app.get('/api/admin/ai-config', { preHandler: requireStaff }, async () => {
+    const cfg = await aiConfig();
+    return {
+      keySet: !!cfg.key,
+      last4: cfg.key ? cfg.key.slice(-4) : null,
+      fromEnv: cfg.fromEnv,        // true if the active key comes from the env (can't be cleared here)
+      model: cfg.model,
+      models: AI_MODELS,
+    };
+  });
+
+  app.put('/api/admin/ai-config', { preHandler: requireStaff }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const b = req.body || {};
+    await ensureSettings();
+    if (b.clearKey) {
+      await q("delete from settings where key='support_ai_key'");
+    } else if (typeof b.key === 'string' && b.key.trim()) {
+      await q("insert into settings (key,value,updated_at) values ('support_ai_key',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.key.trim()]);
+    }
+    if (typeof b.model === 'string' && b.model.trim()) {
+      const valid = AI_MODELS.some((m) => m.id === b.model.trim());
+      if (!valid) { reply.code(400); return { error: 'Unknown model' }; }
+      await q("insert into settings (key,value,updated_at) values ('support_ai_model',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.model.trim()]);
+    }
+    const cfg = await aiConfig();
+    return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, fromEnv: cfg.fromEnv, model: cfg.model };
+  });
+
+  // ── The seller-facing auto-reply ─────────────────────────────────────────────
   app.post('/api/support/ai-reply', { preHandler: requireAuth }, async (req, reply) => {
-    if (!KEY) return { ok: false, disabled: true };
+    const { key, model } = await aiConfig();
+    if (!key) return { ok: false, disabled: true };
     const sellerId = req.user.sub;
     const threadId = 'support-' + sellerId;
 
@@ -91,7 +152,6 @@ export function supportAiRoutes(app, requireAuth) {
          where order_id=$1 order by created_at asc, id asc limit 20`, [threadId]);
     const messages = toMessages(hist.rows);
     if (!messages.length) return { ok: false, empty: true };
-    // Only answer when the seller spoke last (avoid double-replying to our own message).
     if (messages[messages.length - 1].role !== 'user') return { ok: true, skipped: true };
 
     let text = '';
@@ -99,9 +159,9 @@ export function supportAiRoutes(app, requireAuth) {
       const ctx = await accountContext(sellerId);
       const r = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': KEY, 'anthropic-version': '2023-06-01' },
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
-          model: MODEL,
+          model,
           max_tokens: 600,
           system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx,
           messages,

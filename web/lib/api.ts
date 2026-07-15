@@ -149,6 +149,16 @@ export type CatalogProduct = {
   colorImages?: Record<string, string>
 }
 
+// AI assistant config (admin) — key status + model, editable in Settings › Integrations.
+export type AiModel = { id: string; label: string }
+export type AiConfig = { keySet?: boolean; last4?: string | null; fromEnv?: boolean; model?: string; models?: AiModel[]; ok?: boolean; error?: string }
+export function getAiConfig() {
+  return api<AiConfig>(`/api/admin/ai-config`)
+}
+export function setAiConfig(body: { key?: string; model?: string; clearKey?: boolean }) {
+  return api<AiConfig>(`/api/admin/ai-config`, { method: "PUT", body: JSON.stringify(body) })
+}
+
 // Google Sheets import — server reads the sheet and returns a 2D row array,
 // then the client reuses the same CSV parsing/validation (lib/order-import).
 export function getSheetsConfig() {

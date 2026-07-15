@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck } from "@phosphor-icons/react"
+import { ArrowsClockwise, ShieldCheck, Sparkle, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
-import { api, ApiError, getAdminSecrets, type SecretMeta } from "@/lib/api"
+import { Input } from "@/components/ui/input"
+import { api, ApiError, getAdminSecrets, getAiConfig, setAiConfig, type SecretMeta, type AiConfig } from "@/lib/api"
 
 type Level = "live" | "configured" | "off" | "error" | "restricted" | "checking"
 type Result = { level: Level; detail?: string }
@@ -184,9 +185,14 @@ export function IntegrationsPanel() {
         </Button>
       }
     >
+      {/* The one editable credential — the AI assistant key + model. */}
+      <div className="border-b border-border p-5">
+        <AiAssistantCard />
+      </div>
+
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
         <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
-        Read-only. Swap a key by updating the server <code className="font-mono">.env</code> — status here reflects it on the next recheck.
+        The credentials below are read-only — swap one by updating the server <code className="font-mono">.env</code>; status reflects it on the next recheck.
       </div>
 
       <div className="space-y-6 p-5">
@@ -242,5 +248,109 @@ export function IntegrationsPanel() {
         })}
       </div>
     </SectionCard>
+  )
+}
+
+// ── AI Assistant (Claude) — the one editable credential + model selector ──────
+function AiAssistantCard() {
+  const [cfg, setCfg] = useState<AiConfig | null>(null)
+  const [keyInput, setKeyInput] = useState("")
+  const [model, setModel] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    getAiConfig()
+      .then((c) => { setCfg(c); setModel(c.model ?? "") })
+      .catch(() => setCfg({ models: [] }))
+  }, [])
+  useEffect(() => {
+    const id = setTimeout(load, 0)
+    return () => clearTimeout(id)
+  }, [load])
+
+  const dirty = !!keyInput.trim() || (!!cfg && model !== (cfg.model ?? ""))
+  const save = async () => {
+    setSaving(true); setErr(null); setSaved(false)
+    try {
+      const r = await setAiConfig({ key: keyInput.trim() || undefined, model: model || undefined })
+      if (r.error) throw new Error(r.error)
+      setCfg((prev) => ({ ...(prev ?? {}), ...r }))
+      setKeyInput("")
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save. Admin only.")
+    } finally {
+      setSaving(false)
+    }
+  }
+  const removeKey = async () => {
+    setSaving(true); setErr(null)
+    try {
+      const r = await setAiConfig({ clearKey: true })
+      setCfg((prev) => ({ ...(prev ?? {}), ...r }))
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't remove the key.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const models = cfg?.models ?? []
+  return (
+    <div className="rounded-xl border border-border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Sparkle size={16} weight="fill" />
+          </span>
+          <div>
+            <div className="font-semibold">AI Assistant (Claude)</div>
+            <div className="text-xs text-muted-foreground">Powers the account-aware auto-reply in seller Support chat.</div>
+          </div>
+        </div>
+        <span className={"shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium " + (cfg?.keySet ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground")}>
+          {cfg?.keySet ? `Key ••••${cfg.last4 ?? ""}${cfg.fromEnv ? " · env" : ""}` : "No key"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Anthropic API key</span>
+          <Input
+            type="password"
+            value={keyInput}
+            onChange={(e) => { setKeyInput(e.target.value); setSaved(false) }}
+            placeholder={cfg?.keySet ? "Enter a new key to replace" : "sk-ant-…"}
+            className="font-mono text-xs"
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Model</span>
+          <select
+            value={model}
+            onChange={(e) => { setModel(e.target.value); setSaved(false) }}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+          >
+            {models.length === 0 && <option value={model}>{model || "—"}</option>}
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {err && <div className="mt-2 text-sm text-destructive">{err}</div>}
+      <div className="mt-3 flex items-center gap-3">
+        <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+        {cfg?.keySet && !cfg.fromEnv && (
+          <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
+        )}
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.</p>
+    </div>
   )
 }
