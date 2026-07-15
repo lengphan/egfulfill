@@ -171,6 +171,26 @@ export function getGoogleClientId() {
   return api<{ clientId: string }>(`/api/auth/google/client-id`)
 }
 
+// ─────────────────────────── Auth: signup / password reset ───────────────────────────
+export function signupUser(body: { email: string; password: string; name?: string; store_name?: string }) {
+  return api<{ token?: string; user?: Record<string, unknown>; error?: string }>(`/api/auth/signup`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+export function forgotPassword(email: string) {
+  return api<{ ok?: boolean; message?: string; error?: string }>(`/api/auth/forgot`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  })
+}
+export function resetPassword(token: string, password: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/auth/reset`, {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  })
+}
+
 export function googleLogin(credential: string) {
   return api<{ token?: string; user?: Record<string, unknown>; error?: string }>(`/api/auth/google`, {
     method: "POST",

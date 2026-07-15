@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -95,9 +96,14 @@ export default function LoginPage() {
 
           <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
 
-          <p className="text-center text-xs text-muted-foreground">
-            Trouble signing in? Contact your account admin.
-          </p>
+          <div className="flex items-center justify-between text-xs">
+            <Link href="/forgot-password" className="font-medium text-muted-foreground hover:text-foreground">
+              Forgot password?
+            </Link>
+            <Link href="/signup" className="font-medium text-foreground hover:underline">
+              Create account
+            </Link>
+          </div>
         </form>
       </Card>
     </div>
