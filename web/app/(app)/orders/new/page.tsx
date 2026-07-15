@@ -34,6 +34,17 @@ function parseBlock(text: string) {
 }
 const zip5 = (z: string) => z.split("-")[0].trim() // USPS ZIPCode wants 5 digits, not ZIP+4
 
+// USPS's Addresses API now gates access behind an approval ("not authorized for
+// access to Addresses API"). Validation is optional here — the order saves the
+// address as entered — so turn that (and other USPS errors) into a calm note.
+function friendlyValidationError(raw?: string): string {
+  const s = (raw || "").toLowerCase()
+  if (s.includes("addresses api") || s.includes("not authorized") || s.includes("access control")) {
+    return "Address check is unavailable right now — you can still save the order as entered."
+  }
+  return raw || "Couldn't verify this address — you can still save it as entered."
+}
+
 type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: ValidatedAddress } | { kind: "bad"; msg: string }
 
 type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string }
@@ -78,9 +89,9 @@ export default function NewOrderPage() {
         ZIPCode: zip5(p.zip),
       })
       if (r.ok && r.address) setValid({ kind: "ok", addr: r.address })
-      else setValid({ kind: "bad", msg: r.error || "USPS couldn't verify this address." })
+      else setValid({ kind: "bad", msg: friendlyValidationError(r.error) })
     } catch (e) {
-      setValid({ kind: "bad", msg: e instanceof Error ? e.message : "Validation unavailable." })
+      setValid({ kind: "bad", msg: friendlyValidationError(e instanceof Error ? e.message : "") })
     }
   }
 
@@ -198,11 +209,11 @@ export default function NewOrderPage() {
         <h1 className="font-display text-2xl font-semibold tracking-tight">New order</h1>
       </div>
 
-      <SectionCard title="Customer & shipping">
+      <SectionCard title="Shipping">
         <div className="space-y-4 p-5">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Customer &amp; shipping address</span>
+              <span className="text-sm font-medium">Name &amp; Address</span>
               {valid.kind === "ok" && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
                   <CheckCircle size={14} weight="fill" /> Validated
@@ -221,7 +232,7 @@ export default function NewOrderPage() {
                 setValid({ kind: "idle" })
               }}
               rows={5}
-              placeholder={"Ava Brodeur\n43 Calumet Rd\nFairhaven, MA 02719"}
+              placeholder={"e.g.\nJane Doe\n123 Main St\nSpringfield, IL 62704"}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
             />
             <div className="flex flex-wrap items-center gap-3">
