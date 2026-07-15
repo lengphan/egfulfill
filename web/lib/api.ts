@@ -128,6 +128,21 @@ export type NewOrderItem = {
   size?: string
   printType?: string
 }
+export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: string }
+export function getOrderDesigns(id: string) {
+  return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
+}
+export type OrderMessage = { id: number | string; sender_role?: string; body?: string; created_at?: string }
+export function getOrderMessages(id: string) {
+  return api<OrderMessage[] | { messages?: OrderMessage[] }>(`/api/orders/${encodeURIComponent(id)}/messages`)
+}
+export function postOrderMessage(id: string, body: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  })
+}
+
 export function createOrder(order: {
   id: string
   customer?: { name?: string; email?: string }

@@ -3,11 +3,28 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Package, MapPin, Truck, Clock } from "@phosphor-icons/react"
+import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatusBadge } from "@/components/app/status-badge"
 import { Button } from "@/components/ui/button"
-import { getOrders, type OrderRow, type OrderItem } from "@/lib/api"
+import { Input } from "@/components/ui/input"
+import {
+  getOrders,
+  getOrderDesigns,
+  getOrderMessages,
+  postOrderMessage,
+  type OrderRow,
+  type OrderItem,
+  type OrderDesign,
+  type OrderMessage,
+} from "@/lib/api"
+
+const designSrc = (d?: string) => (!d ? "" : d.startsWith("data:") || d.startsWith("http") ? d : `data:image/png;base64,${d}`)
+const fmtMsgTime = (s?: string) => {
+  if (!s) return ""
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+}
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -37,16 +54,46 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const id = decodeURIComponent(String(params?.id ?? ""))
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
+  const [messages, setMessages] = useState<OrderMessage[]>([])
+  const [msg, setMsg] = useState("")
 
   useEffect(() => {
     let alive = true
     getOrders()
       .then((rows) => alive && setOrders(rows ?? []))
       .catch(() => alive && setOrders([]))
+    if (id) {
+      getOrderDesigns(id)
+        .then((r) => {
+          const list = Array.isArray(r) ? r : (r?.designs ?? [])
+          const by: Record<string, OrderDesign> = {}
+          for (const d of list) if (d.sku && d.data && !by[d.sku]) by[d.sku] = d
+          if (alive) setDesigns(by)
+        })
+        .catch(() => {})
+      getOrderMessages(id)
+        .then((r) => alive && setMessages(Array.isArray(r) ? r : (r?.messages ?? [])))
+        .catch(() => {})
+    }
     return () => {
       alive = false
     }
-  }, [])
+  }, [id])
+
+  const sendMsg = async () => {
+    const text = msg.trim()
+    if (!text) return
+    setMsg("")
+    setMessages((prev) => [...prev, { id: `tmp-${prev.length}`, sender_role: "seller", body: text, created_at: new Date().toISOString() }])
+    try {
+      await postOrderMessage(id, text)
+      const r = await getOrderMessages(id)
+      setMessages(Array.isArray(r) ? r : (r?.messages ?? []))
+    } catch {
+      /* keep optimistic message */
+    }
+  }
 
   const order = useMemo(() => (orders ?? []).find((o) => o.id === id) ?? null, [orders, id])
 
@@ -110,7 +157,9 @@ export default function OrderDetailPage() {
             ) : (
               <div className="divide-y divide-border">
                 {items.map((it, i) => {
-                  const img = itemImg(it)
+                  const design = it.sku ? designs[it.sku] : undefined
+                  const artwork = designSrc(design?.data)
+                  const img = artwork || itemImg(it)
                   const qty = Number(it.qty) || 1
                   const unit = Number(it.unit_price) || 0
                   return (
@@ -122,6 +171,11 @@ export default function OrderDetailPage() {
                           <div className="flex size-full items-center justify-center text-muted-foreground">
                             <Package size={18} weight="duotone" />
                           </div>
+                        )}
+                        {artwork && (
+                          <span className="absolute bottom-0 right-0 flex size-4 items-center justify-center rounded-tl bg-primary text-primary-foreground" title={design?.name || "Design attached"}>
+                            <PenNib size={9} weight="fill" />
+                          </span>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -163,6 +217,48 @@ export default function OrderDetailPage() {
               </ol>
             </SectionCard>
           )}
+
+          <SectionCard title="Order activity" description="Messages & notes on this order">
+            <div className="flex flex-col">
+              <div className="max-h-72 min-h-[80px] flex-1 space-y-3 overflow-y-auto p-5">
+                {messages.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">No messages yet — start the conversation.</div>
+                ) : (
+                  messages.map((m) => {
+                    const mine = (m.sender_role ?? "seller") === "seller"
+                    return (
+                      <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                        <div className={"max-w-[80%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                          {m.body}
+                        </div>
+                        <span className="mt-0.5 text-[10px] text-muted-foreground">
+                          {m.sender_role ? `${m.sender_role} · ` : ""}
+                          {fmtMsgTime(m.created_at)}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              <div className="flex items-center gap-2 border-t border-border p-3">
+                <Input
+                  value={msg}
+                  onChange={(e) => setMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      sendMsg()
+                    }
+                  }}
+                  placeholder="Add a message or note…"
+                  className="h-10"
+                />
+                <Button size="icon" className="size-10" onClick={sendMsg} disabled={!msg.trim()}>
+                  <PaperPlaneTilt size={16} weight="fill" />
+                </Button>
+              </div>
+            </div>
+          </SectionCard>
         </div>
 
         {/* summary */}
