@@ -385,6 +385,21 @@ export type EtsyListing = {
   num_favorers?: number | null
   shop_name: string | null
 }
+// SpyDeck saved/favorited research listings (server-authoritative, per seller).
+export type SavedListing = EtsyListing & { saved_at?: string }
+export function getSpydeckSaves() {
+  return api<SavedListing[]>(`/api/spydeck/saves`)
+}
+export function saveSpydeckListing(listing: EtsyListing) {
+  return api<{ ok?: boolean; error?: string }>(`/api/spydeck/saves`, {
+    method: "POST",
+    body: JSON.stringify({ listing_id: String(listing.listing_id), data: listing }),
+  })
+}
+export function unsaveSpydeckListing(listingId: number | string) {
+  return api<{ ok?: boolean }>(`/api/spydeck/saves/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
+}
+
 export function searchEtsy(q: string, opts?: { sort?: string; limit?: number }) {
   const p = new URLSearchParams({ q })
   if (opts?.sort) p.set("sort", opts.sort)

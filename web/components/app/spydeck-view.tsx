@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, ArrowSquareOut, Binoculars, LockSimple, Check, TrendUp } from "@phosphor-icons/react"
+import { MagnifyingGlass, ArrowSquareOut, Binoculars, LockSimple, Check, TrendUp, Heart } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, ApiError, type EtsyListing } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, ApiError, type EtsyListing, type SavedListing } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 
 const money = (n: number | null, cur = "USD") =>
@@ -24,6 +24,52 @@ function StatBox({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-muted/60 px-1.5 py-1.5 text-center leading-tight">
       <div className="truncate text-[13px] font-bold tabular-nums">{value}</div>
       <div className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+    </div>
+  )
+}
+
+// One research card — image + TRENDING badge + a heart-to-save + Price/Views/Favorites.
+function ResultCard({ l, trending, saved, onToggleSave }: { l: EtsyListing; trending: boolean; saved: boolean; onToggleSave: (l: EtsyListing) => void }) {
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md">
+      {/* Save/favorite — stops the card link, toggles the saved state. */}
+      <button
+        type="button"
+        onClick={(e) => { e.preventDefault(); onToggleSave(l) }}
+        aria-label={saved ? "Remove from saved" : "Save listing"}
+        aria-pressed={saved}
+        className={
+          "absolute right-2 top-2 z-10 flex size-8 items-center justify-center rounded-full backdrop-blur transition-colors " +
+          (saved ? "bg-rose-600 text-white" : "bg-black/45 text-white hover:bg-black/65")
+        }
+      >
+        <Heart size={15} weight={saved ? "fill" : "regular"} />
+      </button>
+      <a href={l.url} target="_blank" rel="noopener noreferrer" className="flex flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
+        <div className="relative aspect-square overflow-hidden bg-muted/40">
+          {l.image ? (
+            <Image src={l.image} alt={l.title} fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+          ) : (
+            <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
+          )}
+          {trending && (
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+              <TrendUp size={11} weight="bold" /> Trending
+            </span>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col p-3">
+          <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
+          <div className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+            {l.shop_name || "—"} <ArrowSquareOut size={11} className="opacity-0 transition-opacity group-hover:opacity-100" />
+          </div>
+          <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+            <StatBox label="Price" value={money(l.price, l.currency)} />
+            <StatBox label="Views" value={l.views != null ? compact(l.views) : "—"} />
+            <StatBox label="Favorites" value={l.num_favorers != null ? compact(l.num_favorers) : "—"} />
+          </div>
+        </div>
+      </a>
     </div>
   )
 }
@@ -48,6 +94,49 @@ export function SpyDeckView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
+  const [view, setView] = useState<"search" | "saved">("search")
+  const [saved, setSaved] = useState<SavedListing[]>([])
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+
+  // Load the seller's saved listings once entitled.
+  useEffect(() => {
+    if (!entitled) return
+    const id = setTimeout(() => {
+      getSpydeckSaves()
+        .then((rows) => {
+          const list = rows ?? []
+          setSaved(list)
+          setSavedIds(new Set(list.map((l) => String(l.listing_id))))
+        })
+        .catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [entitled])
+
+  const toggleSave = async (l: EtsyListing) => {
+    const key = String(l.listing_id)
+    const isSaved = savedIds.has(key)
+    // Optimistic update.
+    setSavedIds((prev) => {
+      const next = new Set(prev)
+      if (isSaved) next.delete(key)
+      else next.add(key)
+      return next
+    })
+    setSaved((prev) => (isSaved ? prev.filter((x) => String(x.listing_id) !== key) : [{ ...l }, ...prev]))
+    try {
+      if (isSaved) await unsaveSpydeckListing(l.listing_id)
+      else await saveSpydeckListing(l)
+    } catch {
+      // Revert on failure.
+      setSavedIds((prev) => {
+        const next = new Set(prev)
+        if (isSaved) next.add(key)
+        else next.delete(key)
+        return next
+      })
+    }
+  }
 
   const run = async () => {
     const q = query.trim()
@@ -100,85 +189,91 @@ export function SpyDeckView() {
         <StatCard label="Most viewed" value={results === null ? "—" : stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
       </StatGrid>
 
-      <SectionCard title="Product research" description="Search active Etsy listings in your niche">
-        <div className="flex items-center gap-2 border-b border-border p-4">
-          <div className="relative max-w-md flex-1">
-            <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && run()}
-              placeholder="e.g. vintage sunset tee"
-              className="pl-9"
-            />
+      <SectionCard
+        title="Product research"
+        description="Spy live Etsy listings and save the winners"
+        actions={
+          <div className="flex rounded-lg border border-border p-0.5">
+            {(["search", "saved"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className={
+                  "rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " +
+                  (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : "Search"}
+              </button>
+            ))}
           </div>
-          <Button onClick={run} disabled={loading || !query.trim()}>
-            {loading ? "Searching…" : "Search"}
-          </Button>
-        </div>
+        }
+      >
+        {view === "search" && (
+          <div className="flex items-center gap-2 border-b border-border p-4">
+            <div className="relative max-w-md flex-1">
+              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && run()}
+                placeholder="e.g. vintage sunset tee"
+                className="pl-9"
+              />
+            </div>
+            <Button onClick={run} disabled={loading || !query.trim()}>
+              {loading ? "Searching…" : "Search"}
+            </Button>
+          </div>
+        )}
 
-        {error && (
+        {error && view === "search" && (
           <div className="border-b border-border bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">{error}</div>
         )}
 
-        {results === null ? (
+        {view === "saved" ? (
+          saved.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-20 text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <Heart size={24} weight="duotone" />
+              </span>
+              <div className="font-medium">No saved listings yet</div>
+              <div className="max-w-xs text-sm text-muted-foreground">Tap the heart on any research card to save it here for later.</div>
+            </div>
+          ) : (
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {saved.map((l) => (
+                <ResultCard key={l.listing_id} l={l} trending={false} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} />
+              ))}
+            </div>
+          )
+        ) : results === null ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <Binoculars size={26} weight="duotone" />
             </span>
             <div className="font-medium">Research the competition</div>
-            <div className="max-w-xs text-sm text-muted-foreground">Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged <span className="font-medium text-rose-600">Trending</span>.</div>
+            <div className="max-w-xs text-sm text-muted-foreground">Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged <span className="font-medium text-rose-600">Trending</span>. Heart the winners to save them.</div>
           </div>
         ) : loading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-[240px] animate-pulse rounded-2xl bg-muted" />
+              <div key={i} className="h-[300px] animate-pulse rounded-2xl bg-muted" />
             ))}
           </div>
         ) : results.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">No listings found. Try another keyword.</div>
         ) : (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {results.map((l) => {
-              const trending = trendThreshold > 0 && (l.num_favorers ?? 0) >= trendThreshold
-              return (
-                <a
-                  key={l.listing_id}
-                  href={l.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-muted/40">
-                    {l.image ? (
-                      <Image src={l.image} alt={l.title} fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-muted-foreground">
-                        <Binoculars size={22} weight="duotone" />
-                      </div>
-                    )}
-                    {trending && (
-                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
-                        <TrendUp size={11} weight="bold" /> Trending
-                      </span>
-                    )}
-                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                      <ArrowSquareOut size={10} weight="bold" /> Etsy
-                    </span>
-                  </div>
-                  <div className="flex flex-1 flex-col p-3">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
-                    <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
-                    {/* Stat boxes — the old SpyDeck research treatment, on real Etsy data. */}
-                    <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-                      <StatBox label="Price" value={money(l.price, l.currency)} />
-                      <StatBox label="Views" value={l.views != null ? compact(l.views) : "—"} />
-                      <StatBox label="Favorites" value={l.num_favorers != null ? compact(l.num_favorers) : "—"} />
-                    </div>
-                  </div>
-                </a>
-              )
-            })}
+            {results.map((l) => (
+              <ResultCard
+                key={l.listing_id}
+                l={l}
+                trending={trendThreshold !== Infinity && (l.num_favorers ?? 0) >= trendThreshold}
+                saved={savedIds.has(String(l.listing_id))}
+                onToggleSave={toggleSave}
+              />
+            ))}
           </div>
         )}
       </SectionCard>
