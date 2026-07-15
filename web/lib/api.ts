@@ -84,3 +84,46 @@ export type CatalogProduct = {
 export function getCatalogProducts() {
   return api<CatalogProduct[]>(`/api/catalog_products`)
 }
+
+// ─────────────────────────── Stores / channels ───────────────────────────
+// Etsy is the fully-wired channel today (etsy.js). Shopify/TikTok/WooCommerce
+// have credentials but no seller-facing OAuth route yet → shown as "coming soon".
+export type EtsyConnection = {
+  id: number | string
+  platform: string
+  shop_id: string
+  shop_name: string | null
+  scopes: string | null
+  last_sync_at: string | null
+  created_at: string
+}
+
+export type EtsyConfig = {
+  keystring: string
+  redirect_uri: string
+  scopes: string
+  configured: boolean
+}
+
+export function getEtsyConnections() {
+  return api<EtsyConnection[]>(`/api/etsy/connections`)
+}
+
+export function getEtsyConfig() {
+  return api<EtsyConfig>(`/api/etsy/config`)
+}
+
+export function syncEtsy() {
+  return api<{ ok?: boolean; imported?: number; error?: string }>(`/api/etsy/sync`, { method: "POST" })
+}
+
+export function disconnectEtsy(shopId: string) {
+  return api<{ ok: boolean }>(`/api/etsy/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
+}
+
+export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
+  return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
