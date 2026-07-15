@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
@@ -49,6 +50,7 @@ const DEMO: CatalogProduct[] = [
 ]
 
 export function ProductsCatalog() {
+  const router = useRouter()
   const reduce = useReducedMotion()
   const [products, setProducts] = useState<CatalogProduct[] | null>(null)
   const [isDemo, setIsDemo] = useState(false)
@@ -187,11 +189,12 @@ export function ProductsCatalog() {
             return (
               <motion.div
                 key={String(p.id ?? p.sku ?? i)}
+                onClick={() => router.push(`/products/${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`)}
                 initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
                 whileHover={reduce ? undefined : { y: -4 }}
-                className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
               >
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-muted/40">
