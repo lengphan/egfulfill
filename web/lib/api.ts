@@ -127,3 +127,56 @@ export function exchangeEtsy(body: { code: string; code_verifier: string; redire
     body: JSON.stringify(body),
   })
 }
+
+// ─────────────────────────── API keys (sandbox) ───────────────────────────
+// GET returns key metadata only; POST returns the full key exactly ONCE.
+export type ApiKey = {
+  id: number | string
+  label: string | null
+  prefix: string
+  mode: string
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
+export function getApiKeys() {
+  return api<{ keys: ApiKey[] }>(`/api/keys`)
+}
+
+export function createApiKey(label: string) {
+  return api<{ id: number | string; key: string; prefix: string; label: string; mode: string; created_at: string }>(
+    `/api/keys`,
+    { method: "POST", body: JSON.stringify({ label }) }
+  )
+}
+
+export function revokeApiKey(id: number | string) {
+  return api<{ ok: boolean }>(`/api/keys/${encodeURIComponent(String(id))}`, { method: "DELETE" })
+}
+
+// ─────────────────────────── Team ───────────────────────────
+export type TeamMember = {
+  id: number | string
+  email: string
+  user_id: string | null
+  role: string
+  permissions: string[] | string | null
+  status: string
+  invited_at: string | null
+}
+
+export function getTeam() {
+  return api<TeamMember[]>(`/api/team`)
+}
+
+export function inviteMember(body: { email: string; role?: string; permissions?: string[] }) {
+  return api<{ ok?: boolean; id?: number | string; error?: string }>(`/api/team/invite`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+}
+
+export function removeMember(id: number | string) {
+  return api<{ ok: boolean }>(`/api/team/members/${encodeURIComponent(String(id))}`, { method: "DELETE" })
+}
