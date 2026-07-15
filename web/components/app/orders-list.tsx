@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatusBadge } from "@/components/app/status-badge"
@@ -65,6 +66,7 @@ const DEMO: OrderRow[] = [
 ]
 
 export function OrdersList() {
+  const router = useRouter()
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
@@ -127,7 +129,7 @@ export function OrdersList() {
         title="Orders"
         actions={
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={() => router.push("/stores")}>
               <Plus size={14} weight="bold" /> New order
             </Button>
           </div>
@@ -181,25 +183,29 @@ export function OrdersList() {
             <div className="text-sm text-muted-foreground">Nothing matches that filter or search.</div>
           </div>
         ) : (
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Order</TableHead>
-                <TableHead>Store</TableHead>
-                <TableHead>Customer</TableHead>
+                <TableHead className="w-[88px]">Order</TableHead>
+                <TableHead className="w-[104px]">Store</TableHead>
+                <TableHead className="w-[168px]">Customer</TableHead>
                 <TableHead>Items</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Date</TableHead>
+                <TableHead className="w-[120px]">Status</TableHead>
+                <TableHead className="w-[104px] text-right">Total</TableHead>
+                <TableHead className="w-[84px] text-right">Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-mono text-xs font-medium">{numOf(o)}</TableCell>
-                  <TableCell className="text-muted-foreground">{storeOf(o)}</TableCell>
-                  <TableCell className="font-medium">{customerOf(o)}</TableCell>
-                  <TableCell className="max-w-[220px] truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
+                <TableRow
+                  key={o.id}
+                  onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}
+                  className="cursor-pointer"
+                >
+                  <TableCell className="truncate font-mono text-xs font-medium">{numOf(o)}</TableCell>
+                  <TableCell className="truncate text-muted-foreground">{storeOf(o)}</TableCell>
+                  <TableCell className="truncate font-medium">{customerOf(o)}</TableCell>
+                  <TableCell className="truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
                   <TableCell><StatusBadge status={stageOf(o)} /></TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{usd(totalOf(o))}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{fmtDate(o.created_at)}</TableCell>

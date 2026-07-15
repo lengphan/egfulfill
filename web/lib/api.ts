@@ -103,10 +103,13 @@ export type OrderRow = {
   store?: string | null
   source?: string | null
   customer?: { name?: string; email?: string } | null
+  address?: Record<string, unknown> | null
   status?: string | null
   factory_status?: string | null
   total?: number | string | null
   tracking?: string | null
+  carrier?: string | null
+  timeline?: Array<{ status?: string; at?: string }> | null
   created_at?: string | null
   meta?: Record<string, unknown> | null
   items?: OrderItem[]
