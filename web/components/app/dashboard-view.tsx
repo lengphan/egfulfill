@@ -6,7 +6,7 @@ import { Sparkle } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
-import { RevenueChart, type RevenuePoint } from "@/components/app/revenue-chart"
+import { RevenueChart } from "@/components/app/revenue-chart"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -19,32 +19,14 @@ import {
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
+import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
 const usd = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
-const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
-const tsOf = (o: OrderRow) => (o.created_at ? new Date(o.created_at).getTime() : NaN)
 
 // "Open" = not yet shipped or closed (canonical seller groups).
 const OPEN_GROUPS = new Set(["received", "production", "attention"])
-
-// Bucket revenue into `n` buckets of `daysPer` days each (current + previous window).
-function bucketize(orders: OrderRow[], n: number, daysPer: number, now: number, label: (idx: number) => string): RevenuePoint[] {
-  const span = daysPer * DAY
-  const windowMs = n * span
-  const cur = new Array(n).fill(0)
-  const prev = new Array(n).fill(0)
-  for (const o of orders) {
-    const t = tsOf(o)
-    if (isNaN(t)) continue
-    const age = now - t
-    const total = totalOf(o)
-    if (age >= 0 && age < windowMs) cur[n - 1 - Math.floor(age / span)] += total
-    else if (age >= windowMs && age < 2 * windowMs) prev[n - 1 - Math.floor((age - windowMs) / span)] += total
-  }
-  return cur.map((rev, idx) => ({ label: label(idx), revenue: Math.round(rev), prev: Math.round(prev[idx]) }))
-}
 
 const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
 const itemsLabel = (o: OrderRow) => {
@@ -109,18 +91,7 @@ export function DashboardView() {
     return { count30: in30.length, rev30, open }
   }, [orders, now])
 
-  const series = useMemo<Record<string, RevenuePoint[]>>(() => {
-    const list = orders ?? []
-    return {
-      "7d": bucketize(list, 7, 1, now, (i) =>
-        new Date(now - (6 - i) * DAY).toLocaleDateString("en-US", { weekday: "short" })
-      ),
-      "4w": bucketize(list, 4, 7, now, (i) => `W${i + 1}`),
-      "3m": bucketize(list, 3, 30, now, (i) =>
-        new Date(now - (2 - i) * 30 * DAY).toLocaleDateString("en-US", { month: "short" })
-      ),
-    }
-  }, [orders, now])
+  const series = useMemo(() => revenueSeries(orders ?? [], now), [orders, now])
 
   const recent = useMemo(
     () => [...(orders ?? [])].sort((a, b) => (tsOf(b) || 0) - (tsOf(a) || 0)).slice(0, 6),
