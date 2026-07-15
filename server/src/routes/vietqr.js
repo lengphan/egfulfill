@@ -106,10 +106,22 @@ export function vietqrRoutes(app, requireAuth) {
         // Show the bank's reference number (what the payer sees on their bank
         // screen, e.g. 6156…) as the transaction id — fall back to VietQR's id.
         const bankRef = String(b.referencenumber || '').trim() || txid;
-        await q(
-          "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%'",
+        // Auto-approve any pending top-up whose reference note is inside the transfer
+        // content, AND credit that seller's wallet — a direct status flip alone left
+        // the balance untouched (the credit only lived in the admin-confirm route),
+        // so real VietQR payments were never recorded. Idempotent by (account,type,ref).
+        const appr = await q(
+          "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%' returning *",
           [content, bankRef]
-        ).catch(() => {});
+        ).catch(() => ({ rows: [] }));
+        for (const rec of (appr.rows || [])) {
+          if (!rec.seller_id) continue;
+          await q(
+            `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+             values ($1,$2,'topup',$3,$4,null) on conflict do nothing`,
+            [rec.seller_id, Number(rec.amount_usd) || 0, String(rec.id), (rec.method ? rec.method + ' top-up' : 'VietQR top-up')]
+          ).catch(() => {});
+        }
       }
       return { error: false, errorReason: null, toastMessage: 'OK', object: { reftransactionid: txid } };
     } catch (e) {
@@ -194,8 +206,22 @@ export function vietqrRoutes(app, requireAuth) {
       });
       const gd = await gr.json().catch(() => ({}));
       if (!gr.ok) { reply.code(502); return { error: 'VietQR generate failed: ' + JSON.stringify(gd).slice(0, 300) }; }
+      // Record a PENDING top-up keyed by our ref (note) BEFORE the seller pays, so the
+      // transaction-sync callback can match content→ref, flip it to received, and credit
+      // the seller's wallet. Without this row a real VietQR payment lands untracked.
+      let rate = 25400;
+      try { const rr = await q("select value from settings where key='vqr_rate'"); const n = rr.rows[0] ? Number(rr.rows[0].value) : 0; if (n > 0) rate = n; } catch { /* default rate */ }
+      const amountUsd = Math.round((amount / rate) * 100) / 100;
+      try {
+        await q(
+          `insert into topup_requests (seller_id, seller_email, amount_usd, vnd, ref, method, status)
+           values ($1,$2,$3,$4,$5,'VietQR','pending')`,
+          [req.user.sub, req.user.email || null, amountUsd, amount, note]
+        );
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'vietqr pending topup insert failed'); }
       return {
         ok: true,
+        amountUsd,                           // credited USD once paid (VND ÷ rate)
         content: gd.content || note,        // full addInfo (may carry VietQR's VA prefix)
         note,                                // our ref — what the wallet polls on
         qrCode: gd.qrCode || '',             // EMVCo QR string (render client-side)

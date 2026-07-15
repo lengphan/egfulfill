@@ -30,6 +30,7 @@ import { teamRoutes } from './routes/team.js';
 import { sandboxRoutes } from './routes/sandbox.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { auditRoutes } from './audit.js';
+import { supportAiRoutes } from './routes/support_ai.js';
 import { addClient } from './events.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -152,6 +153,7 @@ teamRoutes(app, requireAuth);                          // seller team members + 
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
 adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
 auditRoutes(app, requireAdmin);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
+supportAiRoutes(app, requireAuth);                     // account-aware AI auto-reply for the seller Support chat (needs ANTHROPIC_API_KEY; no-op without it)
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })
