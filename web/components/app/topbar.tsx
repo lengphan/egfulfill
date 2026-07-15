@@ -56,12 +56,20 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const [balance, setBalance] = useState<number | null>(initialBalance ?? null)
   const [name, setName] = useState("Account")
   useEffect(() => {
-    const id = setTimeout(() => {
-      setMounted(true)
+    const sync = () => {
       const u = getUser()
       if (u?.name) setName(u.name)
+    }
+    const id = setTimeout(() => {
+      setMounted(true)
+      sync()
     }, 0)
-    return () => clearTimeout(id)
+    // Reflect a profile name change made in Settings without a reload.
+    window.addEventListener("eg-user-changed", sync)
+    return () => {
+      clearTimeout(id)
+      window.removeEventListener("eg-user-changed", sync)
+    }
   }, [])
 
   const logout = () => {

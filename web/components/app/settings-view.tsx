@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
-import { getUser } from "@/lib/auth"
+import { getUser, updateUser } from "@/lib/auth"
 import {
   getApiKeys,
   createApiKey,
@@ -17,6 +17,7 @@ import {
   getTeam,
   inviteMember,
   removeMember,
+  updateProfile,
   type ApiKey,
   type TeamMember,
 } from "@/lib/api"
@@ -30,16 +31,40 @@ const fmtDate = (s: string | null) => {
 // ─────────────────────────── Profile ───────────────────────────
 function ProfilePanel() {
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null)
+  const [name, setName] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
   useEffect(() => {
-    const id = setTimeout(() => setUser(getUser()), 0)
+    const id = setTimeout(() => {
+      const u = getUser()
+      setUser(u)
+      setName(u?.name ?? "")
+    }, 0)
     return () => clearTimeout(id)
   }, [])
 
-  const rows = [
-    { label: "Name", value: user?.name || "—" },
-    { label: "Email", value: user?.email || "—" },
-    { label: "Role", value: user?.role || "seller" },
-  ]
+  const dirty = !!user && name.trim() !== (user.name ?? "") && !!name.trim()
+
+  const save = async () => {
+    if (!dirty) return
+    setSaving(true); setErr(null); setSaved(false)
+    try {
+      const r = await updateProfile({ name: name.trim() })
+      if (r.error) throw new Error(r.error)
+      const nextName = r.name ?? name.trim()
+      updateUser({ name: nextName })
+      setUser((u) => (u ? { ...u, name: nextName } : u))
+      setSaved(true)
+      // Let the topbar/sidebar pick up the new name.
+      window.dispatchEvent(new CustomEvent("eg-user-changed"))
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save your name.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <SectionCard title="Profile" description="Your account details">
@@ -57,16 +82,33 @@ function ProfilePanel() {
           <div className="text-sm text-muted-foreground">{user?.email || "Not signed in"}</div>
         </div>
       </div>
-      <dl className="divide-y divide-border">
-        {rows.map((r) => (
-          <div key={r.label} className="flex items-center justify-between px-5 py-3.5 text-sm">
-            <dt className="text-muted-foreground">{r.label}</dt>
-            <dd className="font-medium capitalize">{r.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
-        Profile editing is handled on the account server — coming to this screen soon.
+      <div className="space-y-4 p-5">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Display name</span>
+          <Input
+            value={name}
+            onChange={(e) => { setName(e.target.value); setSaved(false) }}
+            onKeyDown={(e) => { if (e.key === "Enter") save() }}
+            placeholder="Your name"
+            disabled={!user}
+            className="max-w-sm"
+          />
+        </label>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-muted-foreground">Email</span>
+          <div className="text-sm">{user?.email || "—"}</div>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-muted-foreground">Role</span>
+          <div className="text-sm capitalize">{user?.role || "seller"}</div>
+        </div>
+        {err && <div className="text-sm text-destructive">{err}</div>}
+        <div className="flex items-center gap-3">
+          <Button onClick={save} disabled={!dirty || saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+          {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+        </div>
       </div>
     </SectionCard>
   )

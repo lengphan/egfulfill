@@ -33,6 +33,16 @@ export function setSession(token: string, user: User) {
   }
 }
 
+// Merge fields into the cached user (e.g. after a profile update). Token unchanged.
+export function updateUser(patch: Partial<User>) {
+  try {
+    const cur = getUser() ?? {}
+    localStorage.setItem(USER_KEY, JSON.stringify({ ...cur, ...patch }))
+  } catch {
+    /* ignore */
+  }
+}
+
 export function clearSession() {
   try {
     localStorage.removeItem(TOKEN_KEY)

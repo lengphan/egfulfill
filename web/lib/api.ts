@@ -229,6 +229,28 @@ export function postOrderMessage(id: string, text: string, opts?: { by?: string;
 export function getMe() {
   return api<{ sub?: string; role?: string; email?: string }>(`/api/me`)
 }
+// Update the signed-in user's profile (currently just the display name).
+export function updateProfile(patch: { name?: string }) {
+  return api<{ id?: string; name?: string; email?: string; role?: string; error?: string }>(`/api/me`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  })
+}
+
+// Seller design cards (their own orders' cards; staff see all). Powers the Design Lab.
+export type DesignCard = {
+  id: number | string
+  title?: string
+  product?: string
+  type?: string
+  sku?: string
+  thumb?: string
+  order_id?: string
+  pay_status?: string
+}
+export function getDesignCards() {
+  return api<DesignCard[]>(`/api/design_cards`)
+}
 
 export function createOrder(order: {
   id: string

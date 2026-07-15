@@ -2,6 +2,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { signup, login, verify, isStaff, googleAuth } from './auth.js';
+import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
@@ -69,6 +70,17 @@ app.post('/api/auth/login', async (req, reply) => {
   catch (e) { reply.code(400); return { error: e.message }; }
 });
 app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
+
+// Update the signed-in user's own profile (currently just the display name). The JWT
+// carries sub/role/email (not name), so a name change needs no re-issue — the client
+// just refreshes its cached user.
+app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
+  const name = (req.body && typeof req.body.name === 'string') ? req.body.name.trim().slice(0, 120) : undefined;
+  if (name === undefined) { reply.code(400); return { error: 'Nothing to update' }; }
+  const r = await q('update users set name=$1 where id=$2 returning id, email, role, name', [name, req.user.sub]);
+  if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
+  return r.rows[0];
+});
 
 // ── Realtime (SSE) — one-way push so boards + mobile update the instant something
 // changes, instead of waiting for the poll. EventSource can't send headers, so the
