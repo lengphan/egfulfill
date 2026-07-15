@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { getUser } from "@/lib/auth"
 import {
   getApiKeys,
@@ -327,6 +328,7 @@ export function SettingsView() {
       <TabsList>
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="keys">API keys</TabsTrigger>
+        <TabsTrigger value="integrations">Integrations</TabsTrigger>
         <TabsTrigger value="team">Team</TabsTrigger>
         <TabsTrigger value="billing">Billing</TabsTrigger>
       </TabsList>
@@ -336,6 +338,9 @@ export function SettingsView() {
       </TabsContent>
       <TabsContent value="keys">
         <ApiKeysPanel />
+      </TabsContent>
+      <TabsContent value="integrations">
+        <IntegrationsPanel />
       </TabsContent>
       <TabsContent value="team">
         <TeamPanel />
