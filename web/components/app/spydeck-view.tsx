@@ -159,13 +159,15 @@ export function SpyDeckView() {
 
   const stats = useMemo(() => {
     const list = results ?? []
-    const prices = list.map((l) => l.price).filter((p): p is number => p != null)
-    const avg = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : 0
+    // Median, not mean — one mis-priced Etsy listing (a $4k custom order) blew the
+    // average up to five figures. Median is the "typical price" a seller cares about.
+    const prices = list.map((l) => l.price).filter((p): p is number => p != null && p > 0).sort((a, b) => a - b)
+    const median = prices.length ? prices[Math.floor((prices.length - 1) / 2)] : 0
     const views = list.map((l) => l.views).filter((v): v is number => v != null)
     const shops = new Set(list.map((l) => l.shop_name).filter(Boolean))
     return {
       count: list.length,
-      avg,
+      median,
       shops: shops.size,
       topViews: views.length ? Math.max(...views) : 0,
     }
@@ -184,7 +186,7 @@ export function SpyDeckView() {
     <div className="space-y-4">
       <StatGrid>
         <StatCard label="Results" value={results === null ? "—" : String(stats.count)} sub={searched ? `for "${searched}"` : "run a search"} />
-        <StatCard label="Avg price" value={results === null ? "—" : money(stats.avg)} sub="in results" />
+        <StatCard label="Median price" value={results === null ? "—" : money(stats.median)} sub="typical listing" />
         <StatCard label="Shops" value={results === null ? "—" : String(stats.shops)} sub="unique sellers" />
         <StatCard label="Most viewed" value={results === null ? "—" : stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
       </StatGrid>

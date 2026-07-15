@@ -239,7 +239,6 @@ export default function NewOrderPage() {
               <Button type="button" variant="outline" size="sm" onClick={onValidate} disabled={valid.kind === "checking" || !parsed.addr.street}>
                 {valid.kind === "checking" ? "Checking…" : "Validate address"}
               </Button>
-              {parsed.name && <span className="text-xs text-muted-foreground">Name: <span className="font-medium text-foreground">{parsed.name}</span></span>}
               {valid.kind === "ok" && (
                 <span className="truncate text-xs text-emerald-600">
                   {[valid.addr.street, valid.addr.street2, valid.addr.city, valid.addr.state, `${valid.addr.zip}${valid.addr.zip4 ? "-" + valid.addr.zip4 : ""}`].filter(Boolean).join(", ")}

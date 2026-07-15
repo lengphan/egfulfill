@@ -56,6 +56,29 @@ async function oauthToken() {
   return _oauth.token;
 }
 
+// USPS gates the Addresses API behind its OWN scope/entitlement, separate from the
+// Labels approval ("not authorized for access to Addresses API"). The default token
+// (all entitled scopes) often omits it, so we mint a token that EXPLICITLY requests
+// the addresses scope. If the app isn't entitled to that scope yet, USPS rejects the
+// token request → we fall back to the default token (same behaviour as before).
+let _addrOauth = { token: '', exp: 0 };
+async function addressToken() {
+  if (_addrOauth.token && Date.now() < _addrOauth.exp - 60000) return _addrOauth.token;
+  if (!KEY || !SECRET) throw new Error('Server missing USPS_CONSUMER_KEY / USPS_CONSUMER_SECRET');
+  const scope = process.env.USPS_ADDRESSES_SCOPE || 'addresses';
+  try {
+    const res = await fetch(`${BASE}/oauth2/v3/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: KEY, client_secret: SECRET, scope }).toString()
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.access_token) return oauthToken();   // not entitled to this scope → default token
+    _addrOauth = { token: d.access_token, exp: Date.now() + ((d.expires_in || 28800) * 1000), scope: d.scope || '' };
+    return _addrOauth.token;
+  } catch { return oauthToken(); }
+}
+
 // 2) Payment authorization token — needs CRID + MID + EPS account.
 async function paymentToken() {
   if (_pay.token && Date.now() < _pay.exp - 60000) return _pay.token;
@@ -159,13 +182,19 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
   // manual-order modal. Read-only USPS lookup, no payment scope.
   app.get('/api/usps/validate-address', { preHandler: requireAuth }, async (req, reply) => {
     try {
-      const oauth = await oauthToken();
+      const oauth = await addressToken();
       const qy = req.query || {};
       const p = new URLSearchParams();
       ['streetAddress', 'secondaryAddress', 'city', 'state', 'ZIPCode'].forEach((k) => { if (qy[k]) p.set(k, qy[k]); });
       const res = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + oauth } });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { reply.code(400); return { error: (data.error && (data.error.message || data.error)) || data.message || ('HTTP ' + res.status) }; }
+      if (!res.ok) {
+        let msg = (data.error && (data.error.message || data.error)) || data.message || ('HTTP ' + res.status);
+        if (/not authorized|access control|addresses api/i.test(String(msg))) {
+          msg = 'USPS hasn\'t granted this app access to the Addresses API. In the USPS Developer Portal, add the "Addresses" API to your app (separate from Labels), then retry — the server already requests the addresses OAuth scope.';
+        }
+        reply.code(400); return { error: msg };
+      }
       const a = data.address || data;
       return { ok: true, address: { street: a.streetAddress || '', street2: a.secondaryAddress || '', city: a.city || '', state: a.state || '', zip: a.ZIPCode || '', zip4: a.ZIPPlus4 || '' }, raw: data };
     } catch (e) { reply.code(400); return { error: e.message }; }
