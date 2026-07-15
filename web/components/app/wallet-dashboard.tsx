@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getWallet, type LedgerRow } from "@/lib/api"
+import { getToken } from "@/lib/auth"
 
 type TxType = "Deposit" | "Charge" | "Refund" | "Payout"
 type Row = {
@@ -91,20 +92,38 @@ function mapLedger(balance: number, ledger: LedgerRow[]): View {
   return { balance, charges, deposited, ordersCharged, avgCharge: ordersCharged ? charges / ordersCharged : 0, rows }
 }
 
+const ZERO: View = { balance: 0, charges: 0, deposited: 0, ordersCharged: 0, avgCharge: 0, rows: [] }
+
 export function WalletDashboard() {
-  const [view, setView] = useState<View>(DEMO)
+  const [view, setView] = useState<View | null>(null)
   const [topUpOpen, setTopUpOpen] = useState(false)
 
   const refresh = useCallback(() => {
+    // Signed in → the real server balance (server-authoritative), or zeros if empty.
+    // Demo numbers are ONLY for the signed-out standalone preview — never a real account.
+    const signedIn = !!getToken()
+    if (!signedIn) { setView(DEMO); return }
     getWallet()
       .then((w) => setView(mapLedger(w.balance, w.ledger)))
-      .catch(() => {
-        /* no session / no API → keep demo */
-      })
+      .catch(() => setView((v) => v ?? ZERO))
   }, [])
   useEffect(() => {
-    refresh()
+    const id = setTimeout(refresh, 0)
+    return () => clearTimeout(id)
   }, [refresh])
+
+  if (!view) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+        <div className="h-64 animate-pulse rounded-2xl bg-muted" />
+      </div>
+    )
+  }
 
   const kpis = [
     { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },

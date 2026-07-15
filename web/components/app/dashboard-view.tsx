@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { getToken } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
 import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
@@ -57,19 +58,22 @@ export function DashboardView() {
   const [now, setNow] = useState(0)
 
   const load = useCallback(() => {
+    // Signed in → always show real data (empty state if none). Demo is only the
+    // signed-out marketing preview, never shown to a real account with 0 orders.
+    const signedIn = !!getToken()
     getOrders()
       .then((rows) => {
         if (rows && rows.length) {
           setOrders(rows)
           setIsDemo(false)
         } else {
-          setOrders(DEMO)
-          setIsDemo(true)
+          setOrders(signedIn ? [] : DEMO)
+          setIsDemo(!signedIn)
         }
       })
       .catch(() => {
-        setOrders(DEMO)
-        setIsDemo(true)
+        setOrders(signedIn ? [] : DEMO)
+        setIsDemo(!signedIn)
       })
     getWallet()
       .then((w) => setBalance(w.balance))

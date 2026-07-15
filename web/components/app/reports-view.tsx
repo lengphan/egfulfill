@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, type OrderRow } from "@/lib/api"
+import { getToken } from "@/lib/auth"
 import { revenueSeries, channelBreakdown, topProducts, orderTotalOf, orderTs } from "@/lib/analytics"
 import { sellerStatus } from "@/lib/order-status"
 
@@ -34,12 +35,14 @@ export function ReportsView() {
   const [now, setNow] = useState(0)
 
   const load = useCallback(() => {
+    // Demo only when signed out; a signed-in account with no orders sees empty (real) charts.
+    const signedIn = !!getToken()
     getOrders()
       .then((rows) => {
         if (rows && rows.length) { setOrders(rows); setIsDemo(false) }
-        else { setOrders(DEMO); setIsDemo(true) }
+        else { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) }
       })
-      .catch(() => { setOrders(DEMO); setIsDemo(true) })
+      .catch(() => { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) })
   }, [])
   useEffect(() => {
     const id = setTimeout(() => { setNow(Date.now()); load() }, 0)
