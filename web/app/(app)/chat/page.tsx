@@ -4,8 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { PaperPlaneTilt, Headset, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, getMe, type ChatEntry } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, type ChatEntry } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
+
+// Common questions offered as one-tap chips (the assistant answers from real account data).
+const SUGGESTIONS = [
+  "Where's my latest order?",
+  "What's my wallet balance?",
+  "How do I top up my wallet?",
+  "How do I connect my Etsy shop?",
+]
+
+// Wall-clock at call time (event handlers only) — module scope keeps the
+// render-purity lint from flagging Date.now while the value stays live.
+const nowMs = () => Date.now()
 
 const fmtTime = (ts?: number) => {
   if (!ts) return ""
@@ -20,8 +32,17 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
+  const [aiTyping, setAiTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Session-unique base + counter for idempotent client message ids (kept out of
+  // render — Date.now/Math.random are only allowed in effects).
+  const cidBase = useRef("")
+  const cidSeq = useRef(0)
   const myName = getUser()?.name || "You"
+
+  useEffect(() => {
+    cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
+  }, [])
 
   // Resolve the thread id (from the stored user, falling back to /api/me).
   useEffect(() => {
@@ -61,24 +82,35 @@ export default function ChatPage() {
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [messages?.length])
+  }, [messages?.length, aiTyping])
 
-  const send = async () => {
-    const text = input.trim()
+  const submit = async (raw: string) => {
+    const text = raw.trim()
     if (!text || !threadId || sending) return
     setSending(true)
     setInput("")
-    const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: Date.now() }])
+    const clientId = `c-${cidBase.current}-${cidSeq.current++}`
+    setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
     try {
       await postOrderMessage(threadId, text, { clientId, by: myName })
       await load()
+      // Ask the account-aware assistant to reply (no-op if the server key isn't set).
+      setAiTyping(true)
+      try {
+        const r = await requestAiReply()
+        if (r.ok || r.reply) await load()
+      } catch {
+        /* AI unavailable — a human teammate will follow up */
+      } finally {
+        setAiTyping(false)
+      }
     } catch {
       /* keep the optimistic bubble; polling will reconcile */
     } finally {
       setSending(false)
     }
   }
+  const send = () => submit(input)
 
   return (
     <div className="mx-auto flex h-[calc(100svh-7rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card">
@@ -104,28 +136,51 @@ export default function ChatPage() {
             <CircleNotch size={22} className="animate-spin" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <Headset size={22} weight="duotone" />
             </span>
             <div className="font-medium">How can we help?</div>
-            <div className="max-w-xs text-sm text-muted-foreground">Ask about an order, billing, integrations — anything. We&apos;ll get back to you here.</div>
+            <div className="max-w-xs text-sm text-muted-foreground">Ask about an order, billing, integrations — anything. Our assistant answers from your account, and a teammate follows up when needed.</div>
+            <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => submit(s)}
+                  disabled={!threadId || sending}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
-          messages.map((m) => {
-            const mine = (m.role ?? "seller") === "seller"
-            return (
-              <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
-                <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                  {m.text}
+          <>
+            {messages.map((m) => {
+              const mine = (m.role ?? "seller") === "seller"
+              return (
+                <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                  <div className={"max-w-[75%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                    {m.text}
+                  </div>
+                  <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
+                    {!mine ? `${m.by || "Support"} · ` : ""}
+                    {fmtTime(m.ts)}
+                  </span>
                 </div>
-                <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
-                  {!mine ? `${m.by || "Support"} · ` : ""}
-                  {fmtTime(m.ts)}
-                </span>
+              )
+            })}
+            {aiTyping && (
+              <div className="flex items-start">
+                <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                </div>
               </div>
-            )
-          })
+            )}
+          </>
         )}
       </div>
 

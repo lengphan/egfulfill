@@ -245,6 +245,14 @@ export function postOrderMessage(id: string, text: string, opts?: { by?: string;
 export function getMe() {
   return api<{ sub?: string; role?: string; email?: string }>(`/api/me`)
 }
+// Ask the account-aware AI to reply in the seller's support thread. No-op server-side
+// if ANTHROPIC_API_KEY isn't configured ({ ok:false, disabled:true }).
+export function requestAiReply() {
+  return api<{ ok?: boolean; reply?: string; disabled?: boolean; skipped?: boolean; error?: string }>(`/api/support/ai-reply`, {
+    method: "POST",
+    body: "{}",
+  })
+}
 // Update the signed-in user's profile (currently just the display name).
 export function updateProfile(patch: { name?: string }) {
   return api<{ id?: string; name?: string; email?: string; role?: string; error?: string }>(`/api/me`, {
