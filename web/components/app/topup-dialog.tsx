@@ -156,7 +156,7 @@ const PROVIDERS = [
   { key: "PingPong", to: "helennguyen958@gmail.com", hint: "Send to this PingPong account, attach your receipt, then submit." },
   { key: "LianLian", to: "phanmylinh0410@gmail.com", hint: "Send to this LianLian account, attach your receipt, then submit." },
 ]
-function TransferTopUp({ onClose }: { onClose: () => void }) {
+function TransferTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () => void }) {
   const [provider, setProvider] = useState(PROVIDERS[0])
   const [amount, setAmount] = useState("50")
   const [ref, setRef] = useState("")
@@ -184,6 +184,7 @@ function TransferTopUp({ onClose }: { onClose: () => void }) {
       const r = await createTopupRequest({ amount: amt, method: provider.key, ref: ref.trim() || undefined, attachment: proof?.dataUrl })
       if (r.error) throw new Error(r.error)
       setPhase("sent")
+      onFunded() // refresh the wallet so the pending request shows immediately
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't submit the request.")
     } finally {
@@ -282,7 +283,7 @@ export function TopUpDialog({ open, onOpenChange, onFunded }: { open: boolean; o
             <CardTopUp onFunded={onFunded} onClose={close} />
           </TabsContent>
           <TabsContent value="transfer" className="mt-4">
-            <TransferTopUp onClose={close} />
+            <TransferTopUp onFunded={onFunded} onClose={close} />
           </TabsContent>
         </Tabs>
       </DialogContent>

@@ -103,6 +103,22 @@ export function verifyStripeIntent(id: string) {
 // ─────────────────── Wallet top-up: manual transfer request (PayPal/PingPong/…) ───────────────────
 // Creates a pending topup_request an admin reconciles → wallet credited. Same path
 // the old wallet used for remittance methods; no third-party API needed.
+// The seller's own top-up requests (pending / received / rejected) — surfaced in the
+// wallet so a manual/VietQR top-up is visible immediately, before it's confirmed.
+export type TopupRequest = {
+  id: string
+  amount_usd: number | string
+  vnd?: number | string | null
+  method?: string | null
+  ref?: string | null
+  status: "pending" | "received" | "rejected"
+  txn_id?: string | null
+  created_at: string
+}
+export function getMyTopups() {
+  return api<TopupRequest[]>(`/api/topups`)
+}
+
 export function createTopupRequest(body: { amount: number; method: string; note?: string; ref?: string; name?: string; attachment?: string }) {
   return api<{ id?: number | string; status?: string; error?: string }>(`/api/topups`, {
     method: "POST",

@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getWallet, type LedgerRow } from "@/lib/api"
+import { getWallet, getMyTopups, type LedgerRow, type TopupRequest } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 type TxType = "Deposit" | "Charge" | "Refund" | "Payout"
@@ -96,6 +96,7 @@ const ZERO: View = { balance: 0, charges: 0, deposited: 0, ordersCharged: 0, avg
 
 export function WalletDashboard() {
   const [view, setView] = useState<View | null>(null)
+  const [pending, setPending] = useState<TopupRequest[]>([])
   const [topUpOpen, setTopUpOpen] = useState(false)
 
   const refresh = useCallback(() => {
@@ -106,6 +107,11 @@ export function WalletDashboard() {
     getWallet()
       .then((w) => setView(mapLedger(w.balance, w.ledger)))
       .catch(() => setView((v) => v ?? ZERO))
+    // Surface the seller's own top-up requests that haven't landed in the ledger yet
+    // (received ones already show as ledger deposits) so a submitted top-up is visible.
+    getMyTopups()
+      .then((rows) => setPending((rows ?? []).filter((r) => r.status === "pending" || r.status === "rejected")))
+      .catch(() => setPending([]))
   }, [])
   useEffect(() => {
     const id = setTimeout(refresh, 0)
@@ -186,6 +192,32 @@ export function WalletDashboard() {
             </Button>
           </div>
         </div>
+        {pending.length > 0 && (
+          <div className="border-b border-border bg-muted/30 px-4 py-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Awaiting confirmation</div>
+            <div className="space-y-1.5">
+              {pending.map((p) => {
+                const rejected = p.status === "rejected"
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className={rejected ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}>
+                        {rejected ? "Rejected" : "Pending"}
+                      </Badge>
+                      <span className="text-muted-foreground">
+                        {p.method || "Top-up"}{p.ref ? ` · ${p.ref}` : ""} · {new Date(p.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    <span className={"font-semibold tabular-nums " + (rejected ? "text-muted-foreground line-through" : "text-foreground")}>
+                      {usd(Number(p.amount_usd) || 0, true)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">Pending top-ups credit your balance once confirmed (VietQR auto-confirms on payment; manual transfers are reviewed by our team).</div>
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
