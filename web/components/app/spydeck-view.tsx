@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, ApiError, type EtsyListing, type SavedListing } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
+import { detectTrademarks } from "@/lib/trademarks"
 
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -62,6 +63,7 @@ function ResultCard({ l, saved, onToggleSave, onSearchTag }: { l: EtsyListing; s
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
+  const tmHits = detectTrademarks(`${l.title} ${(l.tags ?? []).join(" ")}`)
   const [copied, setCopied] = useState(false)
   const copyAll = async () => {
     try { await navigator.clipboard.writeText(tags.join(", ")); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {}
@@ -100,6 +102,17 @@ function ResultCard({ l, saved, onToggleSave, onSearchTag }: { l: EtsyListing; s
         <div className="flex flex-1 flex-col p-3">
           <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
           <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
+
+          {/* Trademark heads-up — static keyword match, not legal advice. */}
+          {tmHits.length > 0 && (
+            <div
+              className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-700"
+              title="Heuristic check — a listing mentioning a known brand may risk trademark takedown. Verify before copying the idea."
+            >
+              <Warning size={13} weight="fill" className="mt-px shrink-0" />
+              <span>Possible trademark: {tmHits.slice(0, 3).join(", ")}{tmHits.length > 3 ? "…" : ""}</span>
+            </div>
+          )}
 
           {/* Estimate boxes — Views/Sold (24h) + Revenue/Sold (all time). */}
           <div className="mt-2.5 grid grid-cols-2 gap-1.5">
