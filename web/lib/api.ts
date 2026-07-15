@@ -183,6 +183,7 @@ export type OrderItem = {
   img?: string
   unit_price?: number | string
   print_type?: string
+  factory_status?: string | null
 }
 export type OrderRow = {
   id: string
@@ -204,6 +205,14 @@ export type OrderRow = {
 
 export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
+}
+
+// Staff: set one line item's factory_status (drives the production boards).
+export function postItemStatus(id: string, sku: string, status: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/item-status`, {
+    method: "POST",
+    body: JSON.stringify({ sku, status }),
+  })
 }
 
 export function updateOrder(id: string, patch: { status?: string; factoryStatus?: string; tracking?: string }) {
