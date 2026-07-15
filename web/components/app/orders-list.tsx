@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, type OrderRow } from "@/lib/api"
+import { clickableProps } from "@/lib/a11y"
 
 // factory_status/status → a shared stage word StatusBadge knows (keeps colours consistent).
 function stageOf(o: OrderRow): string {
@@ -199,8 +200,8 @@ export function OrdersList() {
               {filtered.map((o) => (
                 <TableRow
                   key={o.id}
-                  onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}
-                  className="cursor-pointer"
+                  {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), `Open order ${numOf(o)}`)}
+                  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
                   <TableCell className="truncate font-mono text-xs font-medium">{numOf(o)}</TableCell>
                   <TableCell className="truncate text-muted-foreground">{storeOf(o)}</TableCell>

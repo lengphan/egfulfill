@@ -226,7 +226,7 @@ export function IntegrationsPanel() {
                                 {s.set ? (
                                   <span className="text-foreground">••••{s.last4}</span>
                                 ) : (
-                                  <span className="text-muted-foreground/50">not set</span>
+                                  <span className="text-muted-foreground">not set</span>
                                 )}
                               </span>
                             </div>

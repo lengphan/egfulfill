@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { clickableProps } from "@/lib/a11y"
 
 // ── helpers ───────────────────────────────────────────────────
 const priceOf = (p: CatalogProduct) =>
@@ -189,12 +190,15 @@ export function ProductsCatalog() {
             return (
               <motion.div
                 key={String(p.id ?? p.sku ?? i)}
-                onClick={() => router.push(`/products/${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`)}
+                {...clickableProps(
+                  () => router.push(`/products/${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`),
+                  `View ${p.name ?? "product"}`
+                )}
                 initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.04, ease: [0.21, 0.5, 0.28, 1] }}
                 whileHover={reduce ? undefined : { y: -4 }}
-                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md"
+                className="group cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-muted/40">

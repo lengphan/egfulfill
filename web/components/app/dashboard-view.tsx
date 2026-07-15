@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { clickableProps } from "@/lib/a11y"
 
 const DAY = 864e5
 const usd = (n: number) =>
@@ -183,8 +184,8 @@ export function DashboardView() {
               {recent.map((o) => (
                 <TableRow
                   key={o.id}
-                  onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}
-                  className="cursor-pointer"
+                  {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), `Open order ${numOf(o)}`)}
+                  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
                 >
                   <TableCell className="truncate font-mono text-xs font-semibold">{numOf(o)}</TableCell>
                   <TableCell className="truncate font-medium">{o.customer?.name || "—"}</TableCell>
