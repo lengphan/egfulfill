@@ -12,9 +12,9 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 
-type Point = { label: string; revenue: number; prev: number }
+export type RevenuePoint = { label: string; revenue: number; prev: number }
 
-const DATA: Record<string, Point[]> = {
+const DATA: Record<string, RevenuePoint[]> = {
   "7d": [
     { label: "Mon", revenue: 1240, prev: 980 },
     { label: "Tue", revenue: 1580, prev: 1120 },
@@ -45,10 +45,11 @@ const chartConfig = {
   prev: { label: "Previous", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
-export function RevenueChart() {
-  const [period, setPeriod] = useState<keyof typeof DATA>("4w")
+export function RevenueChart({ data: dataProp }: { data?: Record<string, RevenuePoint[]> }) {
+  const source = dataProp ?? DATA
+  const [period, setPeriod] = useState<string>("4w")
   const [compare, setCompare] = useState(false)
-  const data = DATA[period]
+  const data = source[period] ?? []
 
   return (
     <SectionCard
@@ -62,7 +63,7 @@ export function RevenueChart() {
           </label>
           <ToggleGroup
             value={[period]}
-            onValueChange={(v) => v[0] && setPeriod(v[0] as keyof typeof DATA)}
+            onValueChange={(v) => v[0] && setPeriod(v[0])}
             variant="outline"
             size="sm"
           >
