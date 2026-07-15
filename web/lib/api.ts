@@ -382,6 +382,7 @@ export type EtsyListing = {
   image: string | null
   images?: string[]
   views: number | null
+  num_favorers?: number | null
   shop_name: string | null
 }
 export function searchEtsy(q: string, opts?: { sort?: string; limit?: number }) {

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, Eye, ArrowSquareOut, Binoculars, LockSimple, Check } from "@phosphor-icons/react"
+import { MagnifyingGlass, ArrowSquareOut, Binoculars, LockSimple, Check, TrendUp } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -14,6 +14,19 @@ import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// Compact number (1,240 → 1.2k) for the stat boxes.
+const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n))
+
+// A small labelled stat box — the old SpyDeck research card treatment.
+function StatBox({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-muted/60 px-1.5 py-1.5 text-center leading-tight">
+      <div className="truncate text-[13px] font-bold tabular-nums">{value}</div>
+      <div className="text-[8.5px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+    </div>
+  )
+}
 
 export function SpyDeckView() {
   // Plan gate: SpyDeck is a paid add-on (bundled-free on Pro/Enterprise). Assume
@@ -69,6 +82,13 @@ export function SpyDeckView() {
     }
   }, [results])
 
+  // Mark the standouts "Trending": the 75th-percentile of favorites among results.
+  const trendThreshold = useMemo(() => {
+    const favs = (results ?? []).map((l) => l.num_favorers ?? 0).filter((n) => n > 0).sort((a, b) => a - b)
+    if (favs.length < 4) return Infinity // too few to call anything trending
+    return favs[Math.floor(favs.length * 0.75)] || Infinity
+  }, [results])
+
   if (checked && !entitled) return <SpyDeckLocked />
 
   return (
@@ -107,7 +127,7 @@ export function SpyDeckView() {
               <Binoculars size={26} weight="duotone" />
             </span>
             <div className="font-medium">Research the competition</div>
-            <div className="max-w-xs text-sm text-muted-foreground">Search any keyword to see live Etsy listings — prices, shops and views.</div>
+            <div className="max-w-xs text-sm text-muted-foreground">Search any keyword to spy live Etsy listings — price, views and favorites, with the standouts flagged <span className="font-medium text-rose-600">Trending</span>.</div>
           </div>
         ) : loading ? (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -119,40 +139,46 @@ export function SpyDeckView() {
           <div className="py-16 text-center text-sm text-muted-foreground">No listings found. Try another keyword.</div>
         ) : (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {results.map((l) => (
-              <a
-                key={l.listing_id}
-                href={l.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              >
-                <div className="relative aspect-square overflow-hidden bg-muted/40">
-                  {l.image ? (
-                    <Image src={l.image} alt={l.title} fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
-                  ) : (
-                    <div className="flex size-full items-center justify-center text-muted-foreground">
-                      <Binoculars size={22} weight="duotone" />
-                    </div>
-                  )}
-                  <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                    <ArrowSquareOut size={10} weight="bold" /> Etsy
-                  </span>
-                </div>
-                <div className="p-3">
-                  <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
-                  <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="font-semibold tabular-nums">{money(l.price, l.currency)}</span>
-                    {l.views != null && (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                        <Eye size={13} /> {l.views.toLocaleString()}
+            {results.map((l) => {
+              const trending = trendThreshold > 0 && (l.num_favorers ?? 0) >= trendThreshold
+              return (
+                <a
+                  key={l.listing_id}
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  <div className="relative aspect-square overflow-hidden bg-muted/40">
+                    {l.image ? (
+                      <Image src={l.image} alt={l.title} fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+                    ) : (
+                      <div className="flex size-full items-center justify-center text-muted-foreground">
+                        <Binoculars size={22} weight="duotone" />
+                      </div>
+                    )}
+                    {trending && (
+                      <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                        <TrendUp size={11} weight="bold" /> Trending
                       </span>
                     )}
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                      <ArrowSquareOut size={10} weight="bold" /> Etsy
+                    </span>
                   </div>
-                </div>
-              </a>
-            ))}
+                  <div className="flex flex-1 flex-col p-3">
+                    <div className="line-clamp-2 text-sm font-medium leading-snug">{l.title}</div>
+                    <div className="mt-1 truncate text-xs text-muted-foreground">{l.shop_name || "—"}</div>
+                    {/* Stat boxes — the old SpyDeck research treatment, on real Etsy data. */}
+                    <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                      <StatBox label="Price" value={money(l.price, l.currency)} />
+                      <StatBox label="Views" value={l.views != null ? compact(l.views) : "—"} />
+                      <StatBox label="Favorites" value={l.num_favorers != null ? compact(l.num_favorers) : "—"} />
+                    </div>
+                  </div>
+                </a>
+              )
+            })}
           </div>
         )}
       </SectionCard>
