@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { createOrder, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
+import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
+import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
+import { orderTotal } from "@/lib/pricing"
 
 // Best-effort parse of a pasted US address block → structured fields.
 // Last non-empty line is expected as "City, ST 12345" (comma optional).
@@ -37,6 +39,17 @@ export default function NewOrderPage() {
   const [lines, setLines] = useState<Line[]>([emptyLine()])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Existing orders → next per-seller display # (canonical _nextSellerSeq).
+  const [existing, setExisting] = useState<Array<{ id?: string; seq?: number | null }>>([])
+  useEffect(() => {
+    let alive = true
+    getOrders()
+      .then((rows) => alive && setExisting(rows ?? []))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function onValidate() {
     const p = parseAddress(addressText)
@@ -60,8 +73,15 @@ export default function NewOrderPage() {
     }
   }
 
-  const total = useMemo(
-    () => lines.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 0), 0),
+  // Canonical order total: Σ(unit × qty) + first-item/additional shipping.
+  const pricing = useMemo(
+    () =>
+      orderTotal(
+        lines
+          .filter((l) => l.name.trim())
+          .map((l) => ({ qty: Number(l.qty) || 1, unitPrice: Number(l.price) || 0, size: l.size })),
+        []
+      ),
     [lines]
   )
 
@@ -80,7 +100,8 @@ export default function NewOrderPage() {
     }
     setSaving(true)
     try {
-      const id = `FF-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+      const id = nextOrderId()
+      const seq = nextSellerSeq(existing)
       const items: NewOrderItem[] = lines
         .filter((l) => l.name.trim())
         .map((l) => ({
@@ -106,11 +127,12 @@ export default function NewOrderPage() {
           : undefined
       const r = await createOrder({
         id,
+        seq,
         source: "manual",
         status: "new",
         customer: { name: name.trim(), email: email.trim() || undefined },
         address,
-        total,
+        total: pricing.total,
         items,
       })
       if (r.error) throw new Error(r.error)
@@ -230,9 +252,19 @@ export default function NewOrderPage() {
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-between border-t border-border px-5 py-3">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="text-lg font-semibold tabular-nums">{usd(total)}</span>
+        <div className="space-y-1.5 border-t border-border px-5 py-4">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{usd(pricing.subtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Shipping</span>
+            <span className="tabular-nums">{usd(pricing.shipping)}</span>
+          </div>
+          <div className="flex items-center justify-between border-t border-border pt-1.5 font-semibold">
+            <span>Total</span>
+            <span className="text-lg tabular-nums">{usd(pricing.total)}</span>
+          </div>
         </div>
       </SectionCard>
 

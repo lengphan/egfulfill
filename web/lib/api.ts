@@ -152,6 +152,7 @@ export function postOrderMessage(id: string, body: string) {
 
 export function createOrder(order: {
   id: string
+  seq?: number
   customer?: { name?: string; email?: string }
   address?: Record<string, unknown>
   source?: string
