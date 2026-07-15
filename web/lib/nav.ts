@@ -12,7 +12,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react"
 
-export type NavItem = { label: string; href: string; icon: Icon }
+export type NavItem = { label: string; href: string; icon: Icon; gate?: "spydeck" }
 export type NavSection = { heading?: string; items: NavItem[] }
 
 /** Seller-side navigation, ported from the static site's sidebar. */
@@ -23,7 +23,7 @@ export const sellerNav: NavSection[] = [
       { label: "Orders", href: "/orders", icon: ShoppingBag },
       { label: "Products", href: "/products", icon: Tag },
       { label: "Stores", href: "/stores", icon: Storefront },
-      { label: "SpyDeck", href: "/spydeck", icon: Binoculars },
+      { label: "SpyDeck", href: "/spydeck", icon: Binoculars, gate: "spydeck" },
       { label: "Reports", href: "/reports", icon: ChartBar },
       { label: "Wallet", href: "/wallet", icon: Wallet },
       { label: "Design Lab", href: "/design", icon: PenNib },

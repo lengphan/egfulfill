@@ -1,13 +1,27 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { SignOut } from "@phosphor-icons/react"
+import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav } from "@/lib/nav"
+import { hasSpydeck } from "@/lib/plans"
 
 export function Sidebar() {
   const pathname = usePathname()
+  // Plan-gated items (SpyDeck) — read entitlement after mount and re-check when the
+  // plan/add-on changes (setPlan/setSpydeckAddon fire "eg-plan-changed").
+  const [spydeck, setSpydeck] = useState(true)
+  useEffect(() => {
+    const sync = () => setSpydeck(hasSpydeck())
+    const id = setTimeout(sync, 0)
+    window.addEventListener("eg-plan-changed", sync)
+    return () => {
+      clearTimeout(id)
+      window.removeEventListener("eg-plan-changed", sync)
+    }
+  }, [])
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-card md:flex">
@@ -29,6 +43,7 @@ export function Sidebar() {
             {section.items.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
+              const locked = item.gate === "spydeck" && !spydeck
               return (
                 <Link
                   key={item.href}
@@ -45,7 +60,8 @@ export function Sidebar() {
                     weight={active ? "fill" : "regular"}
                     className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")}
                   />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {locked && <LockSimple size={13} weight="fill" className="shrink-0 text-muted-foreground/60" />}
                 </Link>
               )
             })}

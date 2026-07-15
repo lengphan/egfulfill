@@ -1,18 +1,35 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { MagnifyingGlass, Eye, ArrowSquareOut, Binoculars } from "@phosphor-icons/react"
+import Link from "next/link"
+import { MagnifyingGlass, Eye, ArrowSquareOut, Binoculars, LockSimple, Check } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 import { searchEtsy, ApiError, type EtsyListing } from "@/lib/api"
+import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function SpyDeckView() {
+  // Plan gate: SpyDeck is a paid add-on (bundled-free on Pro/Enterprise). Assume
+  // entitled until we can read localStorage after mount, then re-check on plan change.
+  const [entitled, setEntitled] = useState(true)
+  const [checked, setChecked] = useState(false)
+  useEffect(() => {
+    const sync = () => { setEntitled(hasSpydeck()); setChecked(true) }
+    const id = setTimeout(sync, 0)
+    window.addEventListener("eg-plan-changed", sync)
+    return () => {
+      clearTimeout(id)
+      window.removeEventListener("eg-plan-changed", sync)
+    }
+  }, [])
+
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<EtsyListing[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -51,6 +68,8 @@ export function SpyDeckView() {
       topViews: views.length ? Math.max(...views) : 0,
     }
   }, [results])
+
+  if (checked && !entitled) return <SpyDeckLocked />
 
   return (
     <div className="space-y-4">
@@ -137,6 +156,45 @@ export function SpyDeckView() {
           </div>
         )}
       </SectionCard>
+    </div>
+  )
+}
+
+// Shown when the seller isn't entitled to SpyDeck — an upsell to the Plan tab.
+function SpyDeckLocked() {
+  const cfg = getSpydeckConfig()
+  const perks = [
+    "Trending Etsy listings in your niche",
+    "Keyword & sales-volume estimates",
+    "Competitor pricing at a glance",
+    "One-click add-to-store",
+  ]
+  return (
+    <div className="mx-auto max-w-xl py-8">
+      <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-8 text-center">
+        <span className="relative flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Binoculars size={26} weight="fill" />
+          <span className="absolute -bottom-1 -right-1 flex size-6 items-center justify-center rounded-full border-2 border-card bg-foreground text-background">
+            <LockSimple size={11} weight="fill" />
+          </span>
+        </span>
+        <h2 className="mt-4 text-xl font-semibold tracking-tight">SpyDeck is a research add-on</h2>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Unlock product research to find winning listings before you print. Included free on Pro &amp; Enterprise,
+          or add it to any plan for ${cfg.price}/mo.
+        </p>
+        <ul className="mt-5 grid w-full gap-2 text-left sm:grid-cols-2">
+          {perks.map((p) => (
+            <li key={p} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Check size={15} weight="bold" className="mt-0.5 shrink-0 text-primary" />
+              <span>{p}</span>
+            </li>
+          ))}
+        </ul>
+        <Link href="/settings" className={cn(buttonVariants(), "mt-6 w-full sm:w-auto")}>
+          Upgrade or add SpyDeck
+        </Link>
+      </div>
     </div>
   )
 }
