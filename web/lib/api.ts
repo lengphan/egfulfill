@@ -25,8 +25,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!res.ok) {
     let message = res.statusText
     try {
-      const body = (await res.json()) as { error?: string }
-      if (body?.error) message = body.error
+      const body = (await res.json()) as { error?: unknown; message?: unknown }
+      const err = body?.error ?? body?.message
+      // Coerce non-string error bodies so they never render as "[object Object]".
+      if (err != null) message = typeof err === "string" ? err : JSON.stringify(err)
     } catch {
       /* non-JSON error body */
     }
@@ -79,6 +81,33 @@ export function createVietqrPayment(amount: number) {
 }
 export function vietqrStatus(ref: string) {
   return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
+}
+
+// ─────────────────── Wallet top-up: Stripe (card, API) ───────────────────
+export function getStripeConfig() {
+  return api<{ publishableKey: string; enabled: boolean }>(`/api/stripe/config`)
+}
+export function createStripeIntent(amount: number) {
+  return api<{ clientSecret?: string; id?: string; error?: string }>(`/api/stripe/create-intent`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  })
+}
+export function verifyStripeIntent(id: string) {
+  return api<{ ok?: boolean; amount?: number; status?: string; ref?: string; error?: string }>(`/api/stripe/verify-intent`, {
+    method: "POST",
+    body: JSON.stringify({ id }),
+  })
+}
+
+// ─────────────────── Wallet top-up: manual transfer request (PayPal/PingPong/…) ───────────────────
+// Creates a pending topup_request an admin reconciles → wallet credited. Same path
+// the old wallet used for remittance methods; no third-party API needed.
+export function createTopupRequest(body: { amount: number; method: string; note?: string; ref?: string; name?: string }) {
+  return api<{ id?: number | string; status?: string; error?: string }>(`/api/topups`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
 }
 
 // ─────────────────────────── Catalog ───────────────────────────
