@@ -10,6 +10,7 @@ import {
   Storefront,
   Gear,
   Code,
+  Question,
   type Icon,
 } from "@phosphor-icons/react"
 
@@ -35,6 +36,7 @@ export const sellerNav: NavSection[] = [
     heading: "Account",
     items: [
       { label: "Developers", href: "/developers", icon: Code },
+      { label: "Help", href: "/help", icon: Question },
       { label: "Settings", href: "/settings", icon: Gear },
     ],
   },
