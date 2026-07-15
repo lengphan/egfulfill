@@ -159,6 +159,17 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
     var sc = ' ' + (_oauth.scope || '').toLowerCase() + ' ';
     out.hasPaymentsScope = /[\s:]payments[\s]/.test(sc);
     out.hasLabelsScope = /[\s:]labels[\s]/.test(sc);
+    out.hasAddressesScope = /[\s:]addresses[\s]/.test(sc);
+    // Addresses API — mint the addresses-scoped token and run a known-good lookup so
+    // we can see whether validation actually works (vs. the entitlement error).
+    try {
+      const at = await addressToken();
+      out.addressTokenScope = _addrOauth.scope || '(fell back to default token)';
+      const p = new URLSearchParams({ streetAddress: '1600 Pennsylvania Ave NW', city: 'Washington', state: 'DC', ZIPCode: '20500' });
+      const ar = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + at } });
+      const ad = await ar.json().catch(() => ({}));
+      out.addresses = ar.ok ? 'ok' : ('FAILED: ' + ((ad.error && (ad.error.message || ad.error)) || ad.message || ('HTTP ' + ar.status)));
+    } catch (e) { out.addresses = 'FAILED: ' + e.message; }
     try { await paymentToken(); out.payment = 'ok'; out.qualified = true; }
     catch (e) { out.payment = 'FAILED: ' + e.message; out.qualified = false; }
     // EPS account / funds inquiry (Payments 3.0 GET /payment-account). Also needs
