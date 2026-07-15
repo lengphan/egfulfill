@@ -9,6 +9,7 @@ import {
   ChatCircleDots,
   Storefront,
   Gear,
+  Code,
   type Icon,
 } from "@phosphor-icons/react"
 
@@ -32,7 +33,10 @@ export const sellerNav: NavSection[] = [
   },
   {
     heading: "Account",
-    items: [{ label: "Settings", href: "/settings", icon: Gear }],
+    items: [
+      { label: "Developers", href: "/developers", icon: Code },
+      { label: "Settings", href: "/settings", icon: Gear },
+    ],
   },
 ]
 

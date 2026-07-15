@@ -1,0 +1,196 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning } from "@phosphor-icons/react"
+import { SectionCard } from "@/components/app/section-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { createApiKey } from "@/lib/api"
+import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-endpoints"
+
+const KEY_STORE = "eg_playground_key" // convenience only — sessionStorage, never the JWT
+
+const methodTone: Record<string, string> = {
+  GET: "bg-emerald-100 text-emerald-700",
+  POST: "bg-sky-100 text-sky-700",
+}
+
+export function ApiPlayground() {
+  const [apiKey, setApiKey] = useState("")
+  const [selected, setSelected] = useState<ApiEndpoint>(API_ENDPOINTS[0])
+  const [body, setBody] = useState(selected.body ?? "")
+  const [param, setParam] = useState(selected.param?.placeholder ?? "")
+  const [sending, setSending] = useState(false)
+  const [res, setRes] = useState<{ status: number; ok: boolean; text: string } | null>(null)
+  const [keyErr, setKeyErr] = useState<string | null>(null)
+  const [genLoading, setGenLoading] = useState(false)
+  const [freshKey, setFreshKey] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  // Restore a previously pasted/generated key (session-scoped).
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try { const k = sessionStorage.getItem(KEY_STORE); if (k) setApiKey(k) } catch {}
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  const rememberKey = (k: string) => {
+    setApiKey(k)
+    try { sessionStorage.setItem(KEY_STORE, k) } catch {}
+  }
+
+  const pick = (e: ApiEndpoint) => {
+    setSelected(e)
+    setBody(e.body ?? "")
+    setParam(e.param?.placeholder ?? "")
+    setRes(null)
+  }
+
+  const resolvedPath = useMemo(
+    () => (selected.param ? selected.path.replace(`:${selected.param.name}`, encodeURIComponent(param || selected.param.placeholder)) : selected.path),
+    [selected, param]
+  )
+
+  const generateKey = async () => {
+    setGenLoading(true); setKeyErr(null)
+    try {
+      const r = await createApiKey("Playground key")
+      setFreshKey(r.key)
+      setCopied(false)
+      rememberKey(r.key)
+    } catch (e) {
+      setKeyErr(e instanceof Error ? e.message : "Couldn't generate a key. Are you signed in?")
+    } finally {
+      setGenLoading(false)
+    }
+  }
+
+  const send = async () => {
+    setSending(true); setRes(null)
+    try {
+      const init: RequestInit = {
+        method: selected.method,
+        headers: { "X-API-Key": apiKey.trim(), ...(selected.method === "POST" ? { "Content-Type": "application/json" } : {}) },
+      }
+      if (selected.method === "POST") init.body = body || "{}"
+      const r = await fetch(resolvedPath, init)
+      const text = await r.text()
+      let pretty = text
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2) } catch {}
+      setRes({ status: r.status, ok: r.ok, text: pretty })
+    } catch (e) {
+      setRes({ status: 0, ok: false, text: e instanceof Error ? e.message : "Request failed (network)." })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Key bar */}
+      <SectionCard title="Your test key" description="Sandbox calls authenticate with a test API key (egk_test_…). It's sent as X-API-Key.">
+        <div className="space-y-3 p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={apiKey}
+                onChange={(e) => rememberKey(e.target.value)}
+                placeholder="Paste an egk_test_… key, or generate one"
+                className="pl-9 font-mono text-xs"
+              />
+            </div>
+            <Button variant="outline" onClick={generateKey} disabled={genLoading}>
+              {genLoading ? <CircleNotch size={15} className="animate-spin" /> : <Lightning size={15} weight="bold" />} Generate
+            </Button>
+          </div>
+          {keyErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {keyErr}</div>}
+          {freshKey && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <code className="min-w-0 flex-1 truncate font-mono text-xs text-emerald-800">{freshKey}</code>
+              <span className="shrink-0 text-[11px] font-medium text-emerald-700">Copy now — shown once</span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => { try { await navigator.clipboard.writeText(freshKey); setCopied(true) } catch {} }}
+              >
+                {copied ? <Check size={13} weight="bold" /> : <Copy size={13} weight="bold" />}
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">Keys are managed in <span className="font-medium text-foreground">Settings → API keys</span>. Everything here hits the sandbox — no real orders, labels or charges.</p>
+        </div>
+      </SectionCard>
+
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        {/* Endpoint list */}
+        <div className="space-y-1 rounded-xl border border-border p-2">
+          {API_ENDPOINTS.map((e) => (
+            <button
+              key={e.id}
+              onClick={() => pick(e)}
+              className={
+                "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors " +
+                (selected.id === e.id ? "bg-primary/10 text-primary" : "hover:bg-accent")
+              }
+            >
+              <span className={"rounded px-1.5 py-0.5 font-mono text-[10px] font-bold " + methodTone[e.method]}>{e.method}</span>
+              <span className="truncate font-medium">{e.title}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Request / response */}
+        <div className="space-y-4">
+          <SectionCard title={selected.title}>
+            <div className="space-y-4 p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={"rounded px-2 py-1 font-mono text-xs font-bold " + methodTone[selected.method]}>{selected.method}</span>
+                <code className="rounded bg-muted px-2 py-1 font-mono text-xs">{resolvedPath}</code>
+              </div>
+              <p className="text-sm text-muted-foreground">{selected.description}</p>
+
+              {selected.param && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium capitalize">{selected.param.name}</span>
+                  <Input value={param} onChange={(e) => setParam(e.target.value)} placeholder={selected.param.placeholder} className="max-w-xs font-mono text-xs" />
+                </label>
+              )}
+
+              {selected.method === "POST" && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">Request body</span>
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    rows={Math.min(16, (body.match(/\n/g)?.length ?? 6) + 2)}
+                    spellCheck={false}
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                </label>
+              )}
+
+              <Button onClick={send} disabled={sending || !apiKey.trim()}>
+                {sending ? <CircleNotch size={15} className="animate-spin" /> : <Play size={15} weight="fill" />} Send request
+              </Button>
+              {!apiKey.trim() && <span className="ml-2 text-xs text-muted-foreground">Add a test key above to send.</span>}
+            </div>
+          </SectionCard>
+
+          {res && (
+            <SectionCard
+              title="Response"
+              actions={
+                <span className={"rounded-full px-2.5 py-0.5 text-xs font-semibold " + (res.ok ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                  {res.status || "ERR"}
+                </span>
+              }
+            >
+              <pre className="max-h-[420px] overflow-auto rounded-b-xl bg-muted/40 p-4 font-mono text-xs leading-relaxed">{res.text}</pre>
+            </SectionCard>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
