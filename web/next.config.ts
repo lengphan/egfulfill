@@ -5,8 +5,10 @@ import type { NextConfig } from "next"
 // Override with API_ORIGIN in Vercel env if the API domain changes.
 // NB: use `|| default`, NOT `?? default` — an EMPTY/whitespace API_ORIGIN must fall
 // back too, or the rewrite destination has no host → Vercel 502 DNS_HOSTNAME_EMPTY.
+const FALLBACK = "https://egful.store"
 const RAW = (process.env.API_ORIGIN || "").trim().replace(/\/+$/, "")
-const API_ORIGIN = /^https?:\/\/[^/]+/.test(RAW) ? RAW : "https://egful.store"
+// Always resolve to a real https origin — never an empty host (Vercel 502 DNS_HOSTNAME_EMPTY).
+const API_ORIGIN = /^https?:\/\/[^/]+/.test(RAW) ? RAW : FALLBACK
 
 const nextConfig: NextConfig = {
   async rewrites() {
