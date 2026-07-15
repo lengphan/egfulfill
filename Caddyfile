@@ -11,6 +11,23 @@ www.egful.store {
 	redir https://egful.store{uri} permanent
 }
 
+# API-only origin. Once the apex (egful.store) moves to Vercel, the browser calls
+# api.egful.store DIRECTLY for /api — so the 60MB base64 print-file uploads bypass
+# Vercel's ~4.5MB proxy body limit. CORS is handled by @fastify/cors (CORS_ORIGIN).
+# Safe to deploy now: it's additive and doesn't touch the egful.store block below.
+api.egful.store {
+	encode gzip
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /vqr/* {
+		reverse_proxy api:3000
+	}
+	handle {
+		respond 404
+	}
+}
+
 egful.store {
 	encode gzip
 
