@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import QRCode from "qrcode"
-import { CheckCircle, Warning, CircleNotch, Copy, Check } from "@phosphor-icons/react"
+import { CheckCircle, Warning, CircleNotch, Copy, Check, UploadSimple, X } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -50,8 +50,12 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
       if (p.error) throw new Error(typeof p.error === "string" ? p.error : JSON.stringify(p.error))
       if (!(p.qrCode || p.qrLink)) throw new Error("VietQR returned no QR — check the server's VietQR keys, or that you're signed in.")
       setPayment(p)
-      if (p.qrLink) setQrImg(p.qrLink)
-      else if (p.qrCode) setQrImg(await QRCode.toDataURL(p.qrCode, { width: 240, margin: 1 }))
+      // Prefer the EMVCo VA string — we render it locally so it ALWAYS shows.
+      // Only fall back to a server image if it's a real http(s) URL (an `imgId`
+      // alone isn't loadable and rendered as a broken image).
+      if (p.qrCode) setQrImg(await QRCode.toDataURL(p.qrCode, { width: 240, margin: 1 }))
+      else if (p.qrLink && /^https?:\/\//i.test(p.qrLink)) setQrImg(p.qrLink)
+      else throw new Error("VietQR returned no scannable code — check the server's VietQR keys.")
       const ref = p.note || ""
       if (ref) {
         pollRef.current = setInterval(async () => {
@@ -148,26 +152,36 @@ function CardTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () =>
 
 // ───────────────────────────── Transfer (manual) ─────────────────────────────
 const PROVIDERS = [
-  { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, then submit — we credit your wallet once it lands." },
-  { key: "PingPong", to: null, hint: "Submit and we'll email you the PingPong beneficiary details." },
-  { key: "LianLian", to: null, hint: "Submit and we'll email you the LianLian beneficiary details." },
-  { key: "Payoneer", to: null, hint: "Submit and we'll email you the Payoneer details." },
+  { key: "PayPal", to: "admin@embroiderygoods.com", hint: "Send to this PayPal, attach your receipt, then submit — we credit your wallet once it lands." },
+  { key: "PingPong", to: "helennguyen958@gmail.com", hint: "Send to this PingPong account, attach your receipt, then submit." },
+  { key: "LianLian", to: "phanmylinh0410@gmail.com", hint: "Send to this LianLian account, attach your receipt, then submit." },
 ]
 function TransferTopUp({ onClose }: { onClose: () => void }) {
   const [provider, setProvider] = useState(PROVIDERS[0])
   const [amount, setAmount] = useState("50")
   const [ref, setRef] = useState("")
+  const [proof, setProof] = useState<{ name: string; dataUrl: string } | null>(null)
+  const [dragOver, setDragOver] = useState(false)
   const [phase, setPhase] = useState<"form" | "sent">("form")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  const takeFile = (file?: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith("image/")) { setError("Please attach an image (PNG/JPG)."); return }
+    if (file.size > 8 * 1024 * 1024) { setError("Screenshot is over 8MB — please compress it."); return }
+    const reader = new FileReader()
+    reader.onload = () => { setError(null); setProof({ name: file.name, dataUrl: String(reader.result || "") }) }
+    reader.readAsDataURL(file)
+  }
 
   const submit = async () => {
     const amt = Number(amount) || 0
     if (amt <= 0) { setError("Enter an amount."); return }
     setSaving(true); setError(null)
     try {
-      const r = await createTopupRequest({ amount: amt, method: provider.key, ref: ref.trim() || undefined })
+      const r = await createTopupRequest({ amount: amt, method: provider.key, ref: ref.trim() || undefined, attachment: proof?.dataUrl })
       if (r.error) throw new Error(r.error)
       setPhase("sent")
     } catch (e) {
@@ -212,6 +226,33 @@ function TransferTopUp({ onClose }: { onClose: () => void }) {
         <span className="text-sm font-medium">Reference / transaction note (optional)</span>
         <Input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="e.g. your PayPal transaction ID" />
       </label>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium">Payment screenshot <span className="font-normal text-muted-foreground">(optional)</span></span>
+        {proof ? (
+          <div className="flex items-center gap-3 rounded-xl border border-border p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={proof.dataUrl} alt="Payment receipt" className="size-14 shrink-0 rounded-lg border border-border object-cover" />
+            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{proof.name}</span>
+            <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" onClick={() => setProof(null)} aria-label="Remove screenshot">
+              <X size={15} weight="bold" />
+            </Button>
+          </div>
+        ) : (
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); takeFile(e.dataTransfer.files?.[0]) }}
+            className={"flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed px-4 py-6 text-center transition-colors " + (dragOver ? "border-primary bg-primary/5" : "border-border hover:bg-accent")}
+          >
+            <UploadSimple size={20} className="text-muted-foreground" />
+            <span className="text-sm font-medium">Drop a screenshot or <span className="text-primary">browse</span></span>
+            <span className="text-xs text-muted-foreground">Helps us confirm your transfer faster</span>
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => takeFile(e.target.files?.[0])} />
+          </label>
+        )}
+      </div>
+
       {error && <div className="text-sm text-destructive">{error}</div>}
       <Button className="w-full" onClick={submit} disabled={saving}>{saving ? "Submitting…" : "I've sent it — submit request"}</Button>
       <p className="text-center text-xs text-muted-foreground">{provider.hint}</p>

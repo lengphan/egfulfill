@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
+import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { getUser } from "@/lib/auth"
 import {
   getApiKeys,
@@ -341,7 +342,7 @@ export function SettingsView() {
         <TabsTrigger value="keys">API keys</TabsTrigger>
         {isStaff && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
-        <TabsTrigger value="billing">Billing</TabsTrigger>
+        <TabsTrigger value="plan">Plan</TabsTrigger>
       </TabsList>
 
       <TabsContent value="profile">
@@ -358,13 +359,8 @@ export function SettingsView() {
       <TabsContent value="team">
         <TeamPanel />
       </TabsContent>
-      <TabsContent value="billing">
-        <SectionCard title="Billing" description="Wallet, invoices and payout methods">
-          <div className="p-5 text-sm text-muted-foreground">
-            Manage funds on the <span className="font-medium text-foreground">Wallet</span> page. Linked payout
-            accounts and invoices appear here.
-          </div>
-        </SectionCard>
+      <TabsContent value="plan">
+        <SubscriptionPanel />
       </TabsContent>
     </Tabs>
   )

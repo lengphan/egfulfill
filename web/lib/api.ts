@@ -103,7 +103,7 @@ export function verifyStripeIntent(id: string) {
 // ─────────────────── Wallet top-up: manual transfer request (PayPal/PingPong/…) ───────────────────
 // Creates a pending topup_request an admin reconciles → wallet credited. Same path
 // the old wallet used for remittance methods; no third-party API needed.
-export function createTopupRequest(body: { amount: number; method: string; note?: string; ref?: string; name?: string }) {
+export function createTopupRequest(body: { amount: number; method: string; note?: string; ref?: string; name?: string; attachment?: string }) {
   return api<{ id?: number | string; status?: string; error?: string }>(`/api/topups`, {
     method: "POST",
     body: JSON.stringify(body),
