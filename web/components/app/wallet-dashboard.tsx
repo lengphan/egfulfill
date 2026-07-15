@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Plus, ArrowLineDown, DownloadSimple, Bank } from "@phosphor-icons/react"
+import { TopUpDialog } from "@/components/app/topup-dialog"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -92,20 +93,18 @@ function mapLedger(balance: number, ledger: LedgerRow[]): View {
 
 export function WalletDashboard() {
   const [view, setView] = useState<View>(DEMO)
+  const [topUpOpen, setTopUpOpen] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  const refresh = useCallback(() => {
     getWallet()
-      .then((w) => {
-        if (!cancelled) setView(mapLedger(w.balance, w.ledger))
-      })
+      .then((w) => setView(mapLedger(w.balance, w.ledger)))
       .catch(() => {
         /* no session / no API → keep demo */
       })
-    return () => {
-      cancelled = true
-    }
   }, [])
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   const kpis = [
     { label: "Available balance", value: usd(view.balance), sub: "Ready for fulfillment", tone: "pos" as const },
@@ -123,10 +122,12 @@ export function WalletDashboard() {
         <Button variant="outline">
           <ArrowLineDown size={16} /> Withdraw
         </Button>
-        <Button>
+        <Button onClick={() => setTopUpOpen(true)}>
           <Plus size={16} weight="bold" /> Add Funds
         </Button>
       </div>
+
+      <TopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} onFunded={refresh} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (

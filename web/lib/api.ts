@@ -58,6 +58,29 @@ export function getWallet(account?: string) {
   return api<WalletResponse>(`/api/wallet${qs}`)
 }
 
+// ─────────────────── Wallet top-up: VietQR ───────────────────
+// create-payment returns the VA-backed EMVCo QR string (`qrCode`) that MUST be
+// rendered as-is; `note` is the reference the status poll matches on. The wallet
+// is credited server-side by the VietQR callback — the client just polls.
+export type VietqrPayment = {
+  ok?: boolean
+  qrCode?: string
+  qrLink?: string
+  note?: string
+  content?: string
+  amount?: number
+  error?: string
+}
+export function createVietqrPayment(amount: number) {
+  return api<VietqrPayment>(`/api/vietqr/create-payment`, {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  })
+}
+export function vietqrStatus(ref: string) {
+  return api<{ paid: boolean; transaction?: unknown }>(`/api/vietqr/status?ref=${encodeURIComponent(ref)}`)
+}
+
 // ─────────────────────────── Catalog ───────────────────────────
 // GET /api/catalog_products → the full product objects (lossless `data` jsonb).
 // Field names mirror the static store, so keep this shape permissive.
