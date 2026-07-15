@@ -16,13 +16,13 @@ import {
   type OrderRow,
   type OrderItem,
   type OrderDesign,
-  type OrderMessage,
+  type ChatEntry,
 } from "@/lib/api"
 
 const designSrc = (d?: string) => (!d ? "" : d.startsWith("data:") || d.startsWith("http") ? d : `data:image/png;base64,${d}`)
-const fmtMsgTime = (s?: string) => {
-  if (!s) return ""
-  const d = new Date(s)
+const fmtMsgTime = (ts?: number) => {
+  if (!ts) return ""
+  const d = new Date(ts)
   return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
@@ -44,7 +44,7 @@ export default function OrderDetailPage() {
   const id = decodeURIComponent(String(params?.id ?? ""))
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
-  const [messages, setMessages] = useState<OrderMessage[]>([])
+  const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function OrderDetailPage() {
         })
         .catch(() => {})
       getOrderMessages(id)
-        .then((r) => alive && setMessages(Array.isArray(r) ? r : (r?.messages ?? [])))
+        .then((r) => alive && setMessages(Array.isArray(r) ? r : []))
         .catch(() => {})
     }
     return () => {
@@ -74,11 +74,12 @@ export default function OrderDetailPage() {
     const text = msg.trim()
     if (!text) return
     setMsg("")
-    setMessages((prev) => [...prev, { id: `tmp-${prev.length}`, sender_role: "seller", body: text, created_at: new Date().toISOString() }])
+    const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setMessages((prev) => [...prev, { id: clientId, role: "seller", text, ts: Date.now() }])
     try {
-      await postOrderMessage(id, text)
+      await postOrderMessage(id, text, { clientId })
       const r = await getOrderMessages(id)
-      setMessages(Array.isArray(r) ? r : (r?.messages ?? []))
+      setMessages(Array.isArray(r) ? r : [])
     } catch {
       /* keep optimistic message */
     }
@@ -214,15 +215,15 @@ export default function OrderDetailPage() {
                   <div className="py-6 text-center text-sm text-muted-foreground">No messages yet — start the conversation.</div>
                 ) : (
                   messages.map((m) => {
-                    const mine = (m.sender_role ?? "seller") === "seller"
+                    const mine = (m.role ?? "seller") === "seller"
                     return (
                       <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
                         <div className={"max-w-[80%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                          {m.body}
+                          {m.text}
                         </div>
                         <span className="mt-0.5 text-[10px] text-muted-foreground">
-                          {m.sender_role ? `${m.sender_role} · ` : ""}
-                          {fmtMsgTime(m.created_at)}
+                          {m.by ? `${m.by} · ` : m.role && m.role !== "seller" ? `${m.role} · ` : ""}
+                          {fmtMsgTime(m.ts)}
                         </span>
                       </div>
                     )

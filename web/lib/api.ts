@@ -201,15 +201,33 @@ export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: s
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }
-export type OrderMessage = { id: number | string; sender_role?: string; body?: string; created_at?: string }
-export function getOrderMessages(id: string) {
-  return api<OrderMessage[] | { messages?: OrderMessage[] }>(`/api/orders/${encodeURIComponent(id)}/messages`)
+// The messages endpoint returns reconstructed chat entries (NOT raw rows):
+// { id, by, role, text, ts, system?, attachment? }. Order chat AND support chat
+// (order id `support-<sellerId>`) share these endpoints.
+export type ChatEntry = {
+  id: number | string
+  by?: string
+  role?: string
+  text?: string
+  ts?: number
+  system?: boolean
+  attachment?: unknown
 }
-export function postOrderMessage(id: string, body: string) {
+export function getOrderMessages(id: string) {
+  return api<ChatEntry[]>(`/api/orders/${encodeURIComponent(id)}/messages`)
+}
+// POST reads b.text / b.role / b.by / b.clientId (idempotent by clientId). Sending
+// `{body}` posts an EMPTY message — the server keys off `text`.
+export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ body }),
+    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId }),
   })
+}
+
+// Current user's id (sub) from the JWT — used to address the seller's own support thread.
+export function getMe() {
+  return api<{ sub?: string; role?: string; email?: string }>(`/api/me`)
 }
 
 export function createOrder(order: {

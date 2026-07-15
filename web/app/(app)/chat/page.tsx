@@ -1,133 +1,147 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { PaperPlaneTilt } from "@phosphor-icons/react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { PaperPlaneTilt, Headset, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { getOrderMessages, postOrderMessage, getMe, type ChatEntry } from "@/lib/api"
+import { getUser, getToken } from "@/lib/auth"
 
-type Convo = { id: string; name: string; sub: string; last: string; time: string; unread: number }
-type Msg = { me: boolean; text: string; time: string }
-
-const CONVOS: Convo[] = [
-  { id: "4142", name: "A. Nguyen", sub: "Order #4142", last: "Can you rush #4142?", time: "2m", unread: 2 },
-  { id: "print", name: "Factory · Print", sub: "Production", last: "QC passed on batch 12", time: "1h", unread: 0 },
-  { id: "4140", name: "M. Tran", sub: "Order #4140", last: "Thanks so much!", time: "3h", unread: 0 },
-  { id: "support", name: "Support", sub: "Ticket #55", last: "Ticket #55 resolved", time: "1d", unread: 0 },
-]
-
-const THREADS: Record<string, Msg[]> = {
-  "4142": [
-    { me: false, text: "Hi! Any update on my hoodie order?", time: "10:02" },
-    { me: true, text: "It's in production now — shipping tomorrow.", time: "10:04" },
-    { me: false, text: "Can you rush #4142?", time: "10:06" },
-    { me: true, text: "Sure, I've bumped it to the front of the queue.", time: "10:07" },
-  ],
-  print: [{ me: false, text: "QC passed on batch 12.", time: "09:12" }],
-  "4140": [{ me: false, text: "Thanks so much!", time: "Yesterday" }],
-  support: [{ me: false, text: "Ticket #55 resolved. Anything else?", time: "Mon" }],
+const fmtTime = (ts?: number) => {
+  if (!ts) return ""
+  const d = new Date(ts)
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
 export default function ChatPage() {
-  const [activeId, setActiveId] = useState("4142")
-  const [threads, setThreads] = useState<Record<string, Msg[]>>(THREADS)
+  // The seller's own support thread rides on order_messages under `support-<sellerId>`.
+  const [threadId, setThreadId] = useState<string | null>(null)
+  const [signedOut, setSignedOut] = useState(false)
+  const [messages, setMessages] = useState<ChatEntry[] | null>(null)
   const [input, setInput] = useState("")
+  const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const myName = getUser()?.name || "You"
 
-  const active = CONVOS.find((c) => c.id === activeId) ?? CONVOS[0]
-  const messages = threads[activeId] ?? []
+  // Resolve the thread id (from the stored user, falling back to /api/me).
+  useEffect(() => {
+    let alive = true
+    const id = setTimeout(async () => {
+      if (!getToken()) { setSignedOut(true); return }
+      let uid = getUser()?.id
+      if (!uid) {
+        try { uid = (await getMe()).sub } catch {}
+      }
+      if (!alive) return
+      if (uid) setThreadId(`support-${uid}`)
+      else setSignedOut(true)
+    }, 0)
+    return () => { alive = false; clearTimeout(id) }
+  }, [])
 
-  // Auto-scroll to the newest message.
+  const load = useCallback(async () => {
+    if (!threadId) return
+    try {
+      const r = await getOrderMessages(threadId)
+      setMessages(Array.isArray(r) ? r : [])
+    } catch {
+      setMessages((prev) => prev ?? [])
+    }
+  }, [threadId])
+
+  // Initial load + light polling while the page is open.
+  useEffect(() => {
+    if (!threadId) return
+    const t = setTimeout(load, 0)
+    const iv = setInterval(load, 5000)
+    return () => { clearTimeout(t); clearInterval(iv) }
+  }, [threadId, load])
+
+  // Auto-scroll to newest.
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [messages.length, activeId])
+  }, [messages?.length])
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim()
-    if (!text) return
-    const now = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-    setThreads((prev) => ({ ...prev, [activeId]: [...(prev[activeId] ?? []), { me: true, text, time: now }] }))
+    if (!text || !threadId || sending) return
+    setSending(true)
     setInput("")
+    const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: Date.now() }])
+    try {
+      await postOrderMessage(threadId, text, { clientId, by: myName })
+      await load()
+    } catch {
+      /* keep the optimistic bubble; polling will reconcile */
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
-    // Fill the viewport below the topbar (h-16) + main padding (py-6) → no dead space.
-    <div className="flex h-[calc(100svh-7rem)] gap-4">
-      {/* conversations */}
-      <div className="hidden w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card sm:flex">
-        <div className="border-b border-border px-4 py-3 font-semibold">Conversations</div>
-        <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
-          {CONVOS.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className={
-                "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent " +
-                (c.id === activeId ? "bg-accent" : "")
-              }
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
-                {c.name.charAt(0)}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">{c.name}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{c.time}</span>
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">{c.last}</span>
-              </span>
-              {c.unread > 0 && (
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  {c.unread}
-                </span>
-              )}
-            </button>
-          ))}
+    <div className="mx-auto flex h-[calc(100svh-7rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card">
+      {/* header */}
+      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Headset size={18} weight="duotone" />
+        </span>
+        <div className="min-w-0">
+          <div className="truncate font-semibold">EGFULFILL Support</div>
+          <div className="truncate text-xs text-muted-foreground">Typically replies within a couple of hours</div>
         </div>
       </div>
 
-      {/* thread */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
-            {active.name.charAt(0)}
-          </span>
-          <div className="min-w-0">
-            <div className="truncate font-semibold">{active.name}</div>
-            <div className="truncate text-xs text-muted-foreground">{active.sub}</div>
+      {/* messages */}
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+        {signedOut ? (
+          <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+            Sign in to chat with support.
           </div>
-        </div>
-
-        <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-          {messages.map((m, i) => (
-            <div key={i} className={"flex " + (m.me ? "justify-end" : "justify-start")}>
-              <div className={"max-w-[72%] rounded-2xl px-3.5 py-2 text-sm " + (m.me ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                {m.text}
-                <span className={"ml-2 align-baseline text-[10px] " + (m.me ? "text-primary-foreground/60" : "text-muted-foreground")}>
-                  {m.time}
+        ) : messages === null ? (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <CircleNotch size={22} className="animate-spin" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+              <Headset size={22} weight="duotone" />
+            </span>
+            <div className="font-medium">How can we help?</div>
+            <div className="max-w-xs text-sm text-muted-foreground">Ask about an order, billing, integrations — anything. We&apos;ll get back to you here.</div>
+          </div>
+        ) : (
+          messages.map((m) => {
+            const mine = (m.role ?? "seller") === "seller"
+            return (
+              <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                  {m.text}
+                </div>
+                <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
+                  {!mine ? `${m.by || "Support"} · ` : ""}
+                  {fmtTime(m.ts)}
                 </span>
               </div>
-            </div>
-          ))}
-        </div>
+            )
+          })
+        )}
+      </div>
 
-        <div className="flex items-center gap-2 border-t border-border p-3">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                send()
-              }
-            }}
-            placeholder="Type a message…  (Enter to send)"
-            className="h-10"
-          />
-          <Button size="icon" className="size-10" onClick={send} disabled={!input.trim()}>
-            <PaperPlaneTilt size={16} weight="fill" />
-          </Button>
-        </div>
+      {/* composer */}
+      <div className="flex items-center gap-2 border-t border-border p-3">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
+          placeholder={signedOut ? "Sign in to send a message" : "Type a message…  (Enter to send)"}
+          disabled={signedOut || !threadId}
+          className="h-10"
+        />
+        <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !threadId || !input.trim() || sending}>
+          <PaperPlaneTilt size={16} weight="fill" />
+        </Button>
       </div>
     </div>
   )
