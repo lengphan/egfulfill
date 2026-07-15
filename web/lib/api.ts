@@ -226,6 +226,25 @@ export function getEtsyConfig() {
   return api<EtsyConfig>(`/api/etsy/config`)
 }
 
+// ─────────────────── SpyDeck: public Etsy listing search ───────────────────
+export type EtsyListing = {
+  listing_id: number
+  title: string
+  price: number | null
+  currency: string
+  url: string
+  image: string | null
+  images?: string[]
+  views: number | null
+  shop_name: string | null
+}
+export function searchEtsy(q: string, opts?: { sort?: string; limit?: number }) {
+  const p = new URLSearchParams({ q })
+  if (opts?.sort) p.set("sort", opts.sort)
+  if (opts?.limit) p.set("limit", String(opts.limit))
+  return api<{ count: number; query: string; results: EtsyListing[] }>(`/api/etsy/search?${p.toString()}`)
+}
+
 export function syncEtsy() {
   return api<{ ok?: boolean; imported?: number; error?: string }>(`/api/etsy/sync`, { method: "POST" })
 }
