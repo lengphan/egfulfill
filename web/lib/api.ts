@@ -116,6 +116,18 @@ export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }
 
+// ─────────────────────────── Auth: Google ───────────────────────────
+export function getGoogleClientId() {
+  return api<{ clientId: string }>(`/api/auth/google/client-id`)
+}
+
+export function googleLogin(credential: string) {
+  return api<{ token?: string; user?: Record<string, unknown>; error?: string }>(`/api/auth/google`, {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  })
+}
+
 // ─────────────────────────── Stores / channels ───────────────────────────
 // Etsy is the fully-wired channel today (etsy.js). Shopify/TikTok/WooCommerce
 // have credentials but no seller-facing OAuth route yet → shown as "coming soon".

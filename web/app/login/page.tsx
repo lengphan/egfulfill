@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { setSession } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
+import { GoogleSignIn } from "@/components/auth/google-signin"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -82,6 +83,18 @@ export default function LoginPage() {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
           </Button>
+
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-2 text-xs text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
+
           <p className="text-center text-xs text-muted-foreground">
             Trouble signing in? Contact your account admin.
           </p>
