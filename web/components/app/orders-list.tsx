@@ -129,7 +129,7 @@ export function OrdersList() {
         title="Orders"
         actions={
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => router.push("/stores")}>
+            <Button size="sm" variant="outline" onClick={() => router.push("/orders/new")}>
               <Plus size={14} weight="bold" /> New order
             </Button>
           </div>

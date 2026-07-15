@@ -121,7 +121,7 @@ export function TopBar({ balance: initialBalance = 12480 }: { balance?: number }
             <CaretDown size={12} className="opacity-80" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => router.push("/orders")}>Manual order</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/orders/new")}>Manual order</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/stores")}>Sync from platforms</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

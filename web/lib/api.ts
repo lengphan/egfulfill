@@ -119,6 +119,30 @@ export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }
 
+export type NewOrderItem = {
+  name?: string
+  sku?: string
+  qty?: number
+  unitPrice?: number
+  color?: string
+  size?: string
+  printType?: string
+}
+export function createOrder(order: {
+  id: string
+  customer?: { name?: string; email?: string }
+  address?: Record<string, unknown>
+  source?: string
+  status?: string
+  total?: number
+  items?: NewOrderItem[]
+}) {
+  return api<{ ok?: boolean; id?: string; error?: string }>(`/api/orders`, {
+    method: "POST",
+    body: JSON.stringify(order),
+  })
+}
+
 // ─────────────────────────── Auth: Google ───────────────────────────
 export function getGoogleClientId() {
   return api<{ clientId: string }>(`/api/auth/google/client-id`)
