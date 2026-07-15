@@ -52,10 +52,16 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/how-it-works" className="hover:text-foreground">How it works</Link>
             <Link href="/features" className="hover:text-foreground">Features</Link>
             <Link href="/login" className="hover:text-foreground">Log in</Link>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
           </nav>
         </div>
-        <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-          © 2026 EGFULFILL. All rights reserved.
+        <div className="flex flex-col items-center justify-between gap-2 border-t border-border py-4 text-xs text-muted-foreground sm:flex-row sm:px-6">
+          <span>© 2026 EGFULFILL. All rights reserved.</span>
+          <span className="flex gap-4">
+            <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms of Service</Link>
+          </span>
         </div>
       </footer>
     </div>
