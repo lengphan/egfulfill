@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle } from "@phosphor-icons/react"
+import Image from "next/image"
+import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle, Package, Storefront, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
@@ -98,6 +100,39 @@ export default function NewOrderPage() {
     setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const addLine = () => setLines((prev) => [...prev, emptyLine()])
   const removeLine = (i: number) => setLines((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))
+
+  // Catalog picker — pickerTarget is the line index to fill, or null to append a new line.
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerTarget, setPickerTarget] = useState<number | null>(null)
+  const openPicker = (target: number | null) => {
+    setPickerTarget(target)
+    setPickerOpen(true)
+  }
+  const applyPick = (p: PickedProduct) => {
+    const patch: Partial<Line> = {
+      name: p.name,
+      sku: p.sku,
+      img: p.img,
+      price: p.price ? String(p.price) : "",
+      color: p.color,
+      size: p.sizes[0] ?? "",
+    }
+    if (pickerTarget == null) setLines((prev) => [...prev, { ...emptyLine(), ...patch }])
+    else setLine(pickerTarget, patch)
+  }
+
+  // Drop / choose an image for a line (optional — can be added later on the order detail).
+  const setLineImage = (i: number, file?: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Image is over 8MB — please compress it.")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setLine(i, { img: String(reader.result || "") })
+    reader.readAsDataURL(file)
+  }
+  const [dragLine, setDragLine] = useState<number | null>(null)
 
   const canSave = parsed.name.trim() && lines.some((l) => l.name.trim())
 
@@ -214,14 +249,49 @@ export default function NewOrderPage() {
       <SectionCard
         title="Items"
         actions={
-          <Button size="sm" variant="outline" onClick={addLine}>
-            <Plus size={14} weight="bold" /> Add item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={() => openPicker(null)}>
+              <Storefront size={14} weight="bold" /> Add from catalog
+            </Button>
+            <Button size="sm" variant="outline" onClick={addLine}>
+              <Plus size={14} weight="bold" /> Blank item
+            </Button>
+          </div>
         }
       >
         <div className="divide-y divide-border">
           {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_64px_88px_auto] items-end gap-3 px-5 py-4 sm:grid-cols-[1fr_72px_96px_100px_100px_auto]">
+            <div key={i} className="flex items-start gap-3 px-5 py-4">
+              {/* Image slot — drag-drop / click to upload, or pick from catalog. Optional. */}
+              <label
+                onDragOver={(e) => { e.preventDefault(); setDragLine(i) }}
+                onDragLeave={() => setDragLine((d) => (d === i ? null : d))}
+                onDrop={(e) => { e.preventDefault(); setDragLine(null); setLineImage(i, e.dataTransfer.files?.[0]) }}
+                title="Drop or click to add an image"
+                className={
+                  "group relative flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border text-muted-foreground transition-colors " +
+                  (dragLine === i ? "border-primary bg-primary/5" : "border-dashed border-border hover:bg-accent")
+                }
+              >
+                {l.img ? (
+                  <>
+                    <Image src={l.img} alt="" fill unoptimized sizes="64px" className="object-cover" />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setLine(i, { img: "" }) }}
+                      className="absolute right-0.5 top-0.5 z-10 flex size-4 items-center justify-center rounded-full bg-foreground/70 text-background opacity-0 transition-opacity group-hover:opacity-100"
+                      aria-label="Remove image"
+                    >
+                      <X size={9} weight="bold" />
+                    </button>
+                  </>
+                ) : (
+                  <Package size={20} weight="duotone" className="text-muted-foreground/50" />
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setLineImage(i, e.target.files?.[0])} />
+              </label>
+
+              <div className="grid flex-1 grid-cols-[1fr_64px_88px_auto] items-end gap-3 sm:grid-cols-[1fr_72px_96px_100px_100px_auto]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
                 <Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder="e.g. Classic Tee" className="h-9" />
@@ -252,6 +322,7 @@ export default function NewOrderPage() {
               >
                 <Trash size={15} weight="bold" />
               </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -281,6 +352,8 @@ export default function NewOrderPage() {
           {saving ? "Creating…" : "Create order"}
         </Button>
       </div>
+
+      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={applyPick} />
     </div>
   )
 }

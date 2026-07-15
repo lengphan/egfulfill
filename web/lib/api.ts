@@ -181,6 +181,7 @@ export function updateOrder(id: string, patch: { status?: string; factoryStatus?
 export type NewOrderItem = {
   name?: string
   sku?: string
+  img?: string
   qty?: number
   unitPrice?: number
   color?: string
