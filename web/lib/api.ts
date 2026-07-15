@@ -161,6 +161,20 @@ export function getAdminSecrets() {
   return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
 }
 
+// ─────────────────── Address validation (USPS) ───────────────────
+export type ValidatedAddress = { street: string; street2: string; city: string; state: string; zip: string; zip4: string }
+export function validateAddress(a: {
+  streetAddress: string
+  secondaryAddress?: string
+  city: string
+  state: string
+  ZIPCode: string
+}) {
+  const p = new URLSearchParams()
+  Object.entries(a).forEach(([k, v]) => v && p.set(k, v))
+  return api<{ ok?: boolean; address?: ValidatedAddress; error?: string }>(`/api/usps/validate-address?${p.toString()}`)
+}
+
 // ─────────────────────────── Stores / channels ───────────────────────────
 // Etsy is the fully-wired channel today (etsy.js). Shopify/TikTok/WooCommerce
 // have credentials but no seller-facing OAuth route yet → shown as "coming soon".
