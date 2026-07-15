@@ -1,13 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch } from "@phosphor-icons/react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, type ChatEntry } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getOrders, type ChatEntry, type OrderRow } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 
-// Common questions offered as one-tap chips (the assistant answers from real account data).
+const nowMs = () => Date.now()
+const fmtTime = (ts?: number) => {
+  if (!ts) return ""
+  const d = new Date(ts)
+  return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
 const SUGGESTIONS = [
   "Where's my latest order?",
   "What's my wallet balance?",
@@ -15,27 +21,19 @@ const SUGGESTIONS = [
   "How do I connect my Etsy shop?",
 ]
 
-// Wall-clock at call time (event handlers only) — module scope keeps the
-// render-purity lint from flagging Date.now while the value stays live.
-const nowMs = () => Date.now()
-
-const fmtTime = (ts?: number) => {
-  if (!ts) return ""
-  const d = new Date(ts)
-  return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-}
+// A conversation in the left rail — Support (AI + team) or a per-order thread (factory).
+type Convo = { id: string; kind: "support" | "order"; title: string; sub: string }
 
 export default function ChatPage() {
-  // The seller's own support thread rides on order_messages under `support-<sellerId>`.
-  const [threadId, setThreadId] = useState<string | null>(null)
+  const [supportId, setSupportId] = useState<string | null>(null)
   const [signedOut, setSignedOut] = useState(false)
+  const [orders, setOrders] = useState<OrderRow[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  // Session-unique base + counter for idempotent client message ids (kept out of
-  // render — Date.now/Math.random are only allowed in effects).
   const cidBase = useRef("")
   const cidSeq = useRef(0)
   const myName = getUser()?.name || "You"
@@ -44,41 +42,56 @@ export default function ChatPage() {
     cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
   }, [])
 
-  // Resolve the thread id (from the stored user, falling back to /api/me).
+  // Resolve identity (support thread) + load the seller's orders as conversations.
   useEffect(() => {
     let alive = true
     const id = setTimeout(async () => {
       if (!getToken()) { setSignedOut(true); return }
       let uid = getUser()?.id
-      if (!uid) {
-        try { uid = (await getMe()).sub } catch {}
-      }
+      if (!uid) { try { uid = (await getMe()).sub } catch {} }
       if (!alive) return
-      if (uid) setThreadId(`support-${uid}`)
-      else setSignedOut(true)
+      if (uid) {
+        const sid = `support-${uid}`
+        setSupportId(sid)
+        setActiveId((cur) => cur ?? sid)
+      } else {
+        setSignedOut(true)
+      }
+      getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [])
 
+  const convos = useMemo<Convo[]>(() => {
+    const list: Convo[] = []
+    if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: "Assistant + team" })
+    for (const o of orders.slice(0, 30)) {
+      list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
+    }
+    return list
+  }, [supportId, orders])
+
+  const active = useMemo(() => convos.find((c) => c.id === activeId) ?? null, [convos, activeId])
+  const isSupport = active?.kind === "support"
+
   const load = useCallback(async () => {
-    if (!threadId) return
+    if (!activeId) return
     try {
-      const r = await getOrderMessages(threadId)
+      const r = await getOrderMessages(activeId)
       setMessages(Array.isArray(r) ? r : [])
     } catch {
       setMessages((prev) => prev ?? [])
     }
-  }, [threadId])
+  }, [activeId])
 
-  // Initial load + light polling while the page is open.
+  // Load + poll the active thread; reset messages when switching.
   useEffect(() => {
-    if (!threadId) return
-    const t = setTimeout(load, 0)
+    if (!activeId) return
+    const t = setTimeout(() => { setMessages(null); load() }, 0)
     const iv = setInterval(load, 5000)
     return () => { clearTimeout(t); clearInterval(iv) }
-  }, [threadId, load])
+  }, [activeId, load])
 
-  // Auto-scroll to newest.
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
@@ -86,26 +99,28 @@ export default function ChatPage() {
 
   const submit = async (raw: string) => {
     const text = raw.trim()
-    if (!text || !threadId || sending) return
+    if (!text || !activeId || sending) return
     setSending(true)
     setInput("")
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
     setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
     try {
-      await postOrderMessage(threadId, text, { clientId, by: myName })
+      await postOrderMessage(activeId, text, { clientId, by: myName })
       await load()
-      // Ask the account-aware assistant to reply (no-op if the server key isn't set).
-      setAiTyping(true)
-      try {
-        const r = await requestAiReply()
-        if (r.ok || r.reply) await load()
-      } catch {
-        /* AI unavailable — a human teammate will follow up */
-      } finally {
-        setAiTyping(false)
+      // Only the Support thread gets an AI reply; order threads are seller↔factory.
+      if (isSupport) {
+        setAiTyping(true)
+        try {
+          const r = await requestAiReply()
+          if (r.ok || r.reply) await load()
+        } catch {
+          /* human follows up */
+        } finally {
+          setAiTyping(false)
+        }
       }
     } catch {
-      /* keep the optimistic bubble; polling will reconcile */
+      /* optimistic bubble stays; polling reconciles */
     } finally {
       setSending(false)
     }
@@ -113,90 +128,126 @@ export default function ChatPage() {
   const send = () => submit(input)
 
   return (
-    <div className="mx-auto flex h-[calc(100svh-7rem)] max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card">
-      {/* header */}
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Headset size={18} weight="duotone" />
-        </span>
-        <div className="min-w-0">
-          <div className="truncate font-semibold">EGFULFILL Support</div>
-          <div className="truncate text-xs text-muted-foreground">Typically replies within a couple of hours</div>
+    <div className="flex h-[calc(100svh-7rem)] gap-4">
+      {/* conversation rail */}
+      <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
+        <div className="border-b border-border px-4 py-3 font-semibold">Conversations</div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {signedOut ? (
+            <div className="p-4 text-sm text-muted-foreground">Sign in to see your conversations.</div>
+          ) : convos.length === 0 ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
+          ) : (
+            convos.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveId(c.id)}
+                className={"flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent " + (c.id === activeId ? "bg-accent" : "")}
+              >
+                <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (c.kind === "support" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                  {c.kind === "support" ? <Headset size={17} weight="duotone" /> : <Package size={16} weight="duotone" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{c.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{c.sub}</span>
+                </span>
+              </button>
+            ))
+          )}
         </div>
-      </div>
+      </aside>
 
-      {/* messages */}
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
-        {signedOut ? (
-          <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
-            Sign in to chat with support.
+      {/* active thread */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card">
+        {/* header — also the mobile conversation switcher */}
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (isSupport ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+            {isSupport ? <Headset size={18} weight="duotone" /> : <Package size={16} weight="duotone" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold">{active?.title || "Chat"}</div>
+            <div className="truncate text-xs text-muted-foreground">{isSupport ? "Assistant replies instantly; the team follows up" : active?.sub || "Order thread"}</div>
           </div>
-        ) : messages === null ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <CircleNotch size={22} className="animate-spin" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-              <Headset size={22} weight="duotone" />
-            </span>
-            <div className="font-medium">How can we help?</div>
-            <div className="max-w-xs text-sm text-muted-foreground">Ask about an order, billing, integrations — anything. Our assistant answers from your account, and a teammate follows up when needed.</div>
-            <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => submit(s)}
-                  disabled={!threadId || sending}
-                  className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((m) => {
-              const mine = (m.role ?? "seller") === "seller"
-              return (
-                <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
-                  <div className={"max-w-[75%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                    {m.text}
-                  </div>
-                  <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
-                    {!mine ? `${m.by || "Support"} · ` : ""}
-                    {fmtTime(m.ts)}
-                  </span>
-                </div>
-              )
-            })}
-            {aiTyping && (
-              <div className="flex items-start">
-                <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
-                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
-                </div>
+          {convos.length > 1 && (
+            <select
+              value={activeId ?? ""}
+              onChange={(e) => setActiveId(e.target.value)}
+              className="h-8 max-w-[45%] rounded-md border border-input bg-transparent px-2 text-xs md:hidden"
+              aria-label="Switch conversation"
+            >
+              {convos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* messages */}
+        <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+          {signedOut ? (
+            <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">Sign in to chat.</div>
+          ) : messages === null ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                {isSupport ? <Headset size={22} weight="duotone" /> : <Package size={20} weight="duotone" />}
+              </span>
+              <div className="font-medium">{isSupport ? "How can we help?" : `Chat about order ${active?.title ?? ""}`}</div>
+              <div className="max-w-xs text-sm text-muted-foreground">
+                {isSupport ? "Ask about an order, billing, integrations — our assistant answers from your account, and a teammate follows up when needed." : "Message the fulfillment team about this order — questions, changes, or artwork."}
               </div>
-            )}
-          </>
-        )}
-      </div>
+              {isSupport && (
+                <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">
+                  {SUGGESTIONS.map((s) => (
+                    <button key={s} onClick={() => submit(s)} disabled={!activeId || sending} className="rounded-full border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {messages.map((m) => {
+                const mine = (m.role ?? "seller") === "seller"
+                return (
+                  <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
+                    <div className={"max-w-[75%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                      {m.text}
+                    </div>
+                    <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
+                      {!mine ? `${m.by || (isSupport ? "Support" : "Factory")} · ` : ""}
+                      {fmtTime(m.ts)}
+                    </span>
+                  </div>
+                )
+              })}
+              {aiTyping && (
+                <div className="flex items-start">
+                  <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
+                    <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
+                    <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
+                    <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
-      {/* composer */}
-      <div className="flex items-center gap-2 border-t border-border p-3">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
-          placeholder={signedOut ? "Sign in to send a message" : "Type a message…  (Enter to send)"}
-          disabled={signedOut || !threadId}
-          className="h-10"
-        />
-        <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !threadId || !input.trim() || sending}>
-          <PaperPlaneTilt size={16} weight="fill" />
-        </Button>
+        {/* composer */}
+        <div className="flex items-center gap-2 border-t border-border p-3">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
+            placeholder={signedOut ? "Sign in to send a message" : "Type a message…  (Enter to send)"}
+            disabled={signedOut || !activeId}
+            className="h-10"
+          />
+          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || !input.trim() || sending}>
+            <PaperPlaneTilt size={16} weight="fill" />
+          </Button>
+        </div>
       </div>
     </div>
   )
