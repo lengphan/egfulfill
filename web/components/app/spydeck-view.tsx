@@ -148,13 +148,16 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
-            className={"mt-3 flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
-          >
-            {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded — draft</> : <><Storefront size={13} weight="bold" /> Make product</>}
-          </button>
+          {/* Pinned to the card bottom so cards with more keywords don't misalign the button row */}
+          <div className="mt-auto pt-3">
+            <button
+              type="button"
+              onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
+              className={"flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+            >
+              {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded — draft</> : <><Storefront size={13} weight="bold" /> Make product</>}
+            </button>
+          </div>
         </div>
       </a>
     </div>
