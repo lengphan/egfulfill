@@ -15,7 +15,7 @@ const COLS = [
   { id: "incoming", label: "Incoming", accent: "bg-slate-400" },
   { id: "inprogress", label: "In progress", accent: "bg-violet-500" },
   { id: "review", label: "In review", accent: "bg-amber-500" },
-  { id: "fix", label: "Needs fix", accent: "bg-red-500" },
+  { id: "fix", label: "Fix", accent: "bg-red-500" },
   { id: "approved", label: "Approved", accent: "bg-emerald-500" },
 ] as const
 const colOf = (c: DesignCard) => {
@@ -237,6 +237,8 @@ function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: Design
   const col = colOf(card)
 
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
+  // Only warehouse + admin set the design fee / credit; operators & designers can't.
+  const canFee = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" })()
 
   // Fallback credit for a card approved before a payout was set (auto-credit needs an
   // amount at approval time). Idempotent by DSN-<id> so it can never double-pay.
@@ -255,15 +257,15 @@ function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: Design
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle className="truncate">{card.title || "Design card"}</DialogTitle></DialogHeader>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader><DialogTitle className="line-clamp-2 pr-6 text-base leading-snug">{card.title || "Design card"}</DialogTitle></DialogHeader>
         <div className="flex gap-4">
-          <div className="relative size-28 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
+          <div className="relative size-44 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
             {card.thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={String(card.thumb)} alt="" className="size-full object-contain" />
             ) : (
-              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={26} weight="duotone" /></div>
+              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={34} weight="duotone" /></div>
             )}
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
@@ -279,13 +281,17 @@ function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: Design
           </div>
         </div>
 
-        <label className="flex items-center gap-2">
-          <span className="text-sm font-medium">Payout</span>
-          <div className="relative w-32">
-            <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
-          </div>
-        </label>
+        {canFee ? (
+          <label className="flex items-center gap-2">
+            <span className="text-sm font-medium">Payout</span>
+            <div className="relative w-32">
+              <CurrencyDollar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={pay} onChange={(e) => setPay(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" className="h-9 pl-7" inputMode="decimal" onBlur={() => patch(card.id, { payment: Number(pay) || 0 })} />
+            </div>
+          </label>
+        ) : (
+          amt(card.payment) > 0 && <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div>
+        )}
 
         {err && <div className="text-sm text-destructive">{err}</div>}
 
@@ -296,7 +302,7 @@ function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: Design
           {col === "review" && (
             <>
               <Button size="sm" onClick={() => move("approved")}><CheckCircle size={14} weight="bold" /> Approve</Button>
-              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}><ArrowClockwise size={14} weight="bold" /> Needs fix</Button>
+              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => move("fix")}><ArrowClockwise size={14} weight="bold" /> Fix</Button>
             </>
           )}
           {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
