@@ -36,8 +36,8 @@ const STAFF_TOOLS: StaffNavItem[] = [
   { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["warehouse", "admin"] },
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
-  // Admin-only seller pages (full superuser access).
-  { label: "Seller orders", href: "/orders", icon: ShoppingBag, roles: ["admin"] },
+  // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
+  // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
   { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin"] },
