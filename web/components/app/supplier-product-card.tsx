@@ -55,7 +55,7 @@ export function SupplierProductCard({
   const colors = data.colors ?? []
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
       <div className="relative aspect-square bg-muted">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element

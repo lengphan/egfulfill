@@ -55,6 +55,10 @@ export function AllSuppliers() {
   const isAdmin = getUser()?.role === "admin"
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
+  const [brand, setBrand] = useState("")
+  const [cat, setCat] = useState("")
+  const [minP, setMinP] = useState("")
+  const [maxP, setMaxP] = useState("")
   const [items, setItems] = useState<Item[] | null>(null)
   const [ssOff, setSsOff] = useState(0)
   const [ottoOff, setOttoOff] = useState(0)
@@ -77,8 +81,9 @@ export function AllSuppliers() {
     ])
     setSsTotal(ss.total ?? 0); setOttoTotal(otto.total ?? 0)
     const ssStyles = ss.styles ?? []
-    // Resolve S&S thumbnails for this page (batched, cached).
-    const need = ssStyles.filter((s) => !s.image).map((s) => s.styleID)
+    // Resolve S&S thumbnails + colors for this page (batched, cached). Resolve when EITHER
+    // the image OR the colors are missing (a style can have a thumbnail but no colors yet).
+    const need = ssStyles.filter((s) => !s.image || !s.colors?.length).map((s) => s.styleID)
     if (need.length) {
       const imgs = await getSsStyleImgs(need).catch(() => ({} as Record<string, { image: string | null; colors: string[] }>))
       for (const s of ssStyles) { const hit = imgs[s.styleID]; if (hit) { s.image = s.image ?? hit.image; s.colors = s.colors?.length ? s.colors : (hit.colors ?? []) } }
@@ -152,6 +157,23 @@ export function AllSuppliers() {
     } catch (e) { setMsg(e instanceof Error ? e.message : "Import failed.") } finally { setImporting(false); if (fileRef.current) fileRef.current.value = "" }
   }
 
+  // Filters (brand / category / price) — applied to what's loaded, like SpyDeck.
+  const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : "Otto Cap")
+  const catOf = (it: Item) => (it.supplier === "ss" ? it.ss.category || "" : it.otto.category || "")
+  const priceOf = (it: Item) => Number(it.supplier === "ss" ? it.ss.price : it.otto.price) || 0
+  const brands = Array.from(new Set((items ?? []).map(brandOf).filter(Boolean))).sort()
+  const cats = Array.from(new Set((items ?? []).map(catOf).filter(Boolean))).sort()
+  const visible = (items ?? []).filter((it) => {
+    if (brand && brandOf(it) !== brand) return false
+    if (cat && catOf(it) !== cat) return false
+    const p = priceOf(it)
+    if (minP && p < Number(minP)) return false
+    if (maxP && p > Number(maxP)) return false
+    return true
+  })
+  const anyFilter = !!(brand || cat || minP || maxP)
+  const clearFilters = () => { setBrand(""); setCat(""); setMinP(""); setMaxP("") }
+
   const total = ssTotal + ottoTotal
   const canLoadMore = (items?.length ?? 0) < total
 
@@ -176,28 +198,52 @@ export function AllSuppliers() {
         )}
       </div>
 
+      {/* Filters — brand / category / price, applied to what's loaded */}
+      {items !== null && items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm">
+          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="">All brands</option>
+            {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select value={cat} onChange={(e) => setCat(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="">All categories</option>
+            {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">$</span>
+            <Input value={minP} onChange={(e) => setMinP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="min" inputMode="decimal" className="h-8 w-16 px-2" />
+            <span className="text-muted-foreground">–</span>
+            <Input value={maxP} onChange={(e) => setMaxP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="max" inputMode="decimal" className="h-8 w-16 px-2" />
+          </div>
+          {anyFilter && <button onClick={clearFilters} className="text-xs font-medium text-primary hover:underline">Clear filters</button>}
+          <span className="ml-auto text-xs text-muted-foreground">{visible.length.toLocaleString()} shown</span>
+        </div>
+      )}
+
       {msg && <div className="border-b border-border px-4 py-2 text-sm text-muted-foreground">{msg}</div>}
 
       {items === null ? (
         <Loading label="Loading catalog…" />
-      ) : items.length === 0 ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">No blanks match “{debounced}”.</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">
-            {items.map((it) => (
-              <SupplierProductCard
-                key={keyOf(it)}
-                data={cardData(it)}
-                supplierLabel={it.supplier === "ss" ? "S&S" : "Otto"}
-                added={added.has(keyOf(it))}
-                adding={addingId === keyOf(it)}
-                onAdd={() => addToCatalog(it)}
-                onFavorite={(on) => favorite(it, on)}
-                loadColors={loadColors(it)}
-              />
-            ))}
-          </div>
+          {visible.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">{anyFilter ? "No loaded blanks match these filters — load more to widen the pool." : `No blanks match “${debounced}”.`}</div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">
+              {visible.map((it) => (
+                <SupplierProductCard
+                  key={keyOf(it)}
+                  data={cardData(it)}
+                  supplierLabel={it.supplier === "ss" ? "S&S" : "Otto"}
+                  added={added.has(keyOf(it))}
+                  adding={addingId === keyOf(it)}
+                  onAdd={() => addToCatalog(it)}
+                  onFavorite={(on) => favorite(it, on)}
+                  loadColors={loadColors(it)}
+                />
+              ))}
+            </div>
+          )}
           {canLoadMore && (
             <div className="flex justify-center border-t border-border p-4">
               <Button variant="outline" size="sm" onClick={loadMore} disabled={loading}>
