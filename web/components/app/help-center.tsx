@@ -19,101 +19,21 @@ import { SectionCard } from "@/components/app/section-card"
 import { buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { HELP_CATEGORIES, HELP_ARTICLES, type HelpArticle } from "@/lib/help"
 
-type Article = { title: string; href?: string }
-type Category = { id: string; icon: Icon; title: string; desc: string; articles: Article[] }
-
-const CATEGORIES: Category[] = [
-  {
-    id: "getting-started",
-    icon: Rocket,
-    title: "Getting started",
-    desc: "Set up your account, connect a store, and place your first order.",
-    articles: [
-      { title: "How to create your EGFULFILL account", href: "/dashboard" },
-      { title: "Connecting your first store", href: "/stores" },
-      { title: "Placing a sample order", href: "/orders/new" },
-      { title: "Setting up your branding profile", href: "/settings" },
-      { title: "Understanding the dashboard overview", href: "/dashboard" },
-    ],
-  },
-  {
-    id: "orders",
-    icon: Package,
-    title: "Orders & fulfillment",
-    desc: "Track orders, manage status changes, and handle resubmissions.",
-    articles: [
-      { title: "How order statuses work", href: "/orders" },
-      { title: "Importing orders from CSV or Sheets", href: "/orders" },
-      { title: "Tracking a shipment", href: "/orders" },
-      { title: "Cancelling or editing an order", href: "/orders" },
-      { title: "What happens if an item fails QC?" },
-    ],
-  },
-  {
-    id: "products",
-    icon: GridFour,
-    title: "Products & designs",
-    desc: "Upload artwork, generate mockups, and manage your catalog.",
-    articles: [
-      { title: "Browsing the product catalog", href: "/products" },
-      { title: "Using the Design Lab", href: "/design" },
-      { title: "Accepted file formats and DPI requirements" },
-      { title: "Generating product mockups", href: "/design" },
-      { title: "Print area and bleed zone guidelines" },
-    ],
-  },
-  {
-    id: "billing",
-    icon: CreditCard,
-    title: "Billing & plans",
-    desc: "Top up your wallet, upgrade your plan, and manage payments.",
-    articles: [
-      { title: "How the wallet balance works", href: "/wallet" },
-      { title: "Topping up (VietQR, card, or transfer)", href: "/wallet" },
-      { title: "Upgrading or downgrading your plan", href: "/settings" },
-      { title: "Adding SpyDeck to your plan", href: "/settings" },
-      { title: "Understanding your charges", href: "/wallet" },
-    ],
-  },
-  {
-    id: "integrations",
-    icon: PlugsConnected,
-    title: "Integrations",
-    desc: "Connect Shopify, Etsy, WooCommerce, Amazon and more.",
-    articles: [
-      { title: "Connecting Etsy", href: "/stores" },
-      { title: "Connecting Shopify", href: "/stores" },
-      { title: "Syncing product listings automatically", href: "/stores" },
-      { title: "Disconnecting or re-authorizing a store", href: "/stores" },
-      { title: "Why some buyer addresses are hidden" },
-    ],
-  },
-  {
-    id: "api",
-    icon: Code,
-    title: "API & developers",
-    desc: "REST API reference, the sandbox playground, and auth guides.",
-    articles: [
-      { title: "API overview and authentication", href: "/developers" },
-      { title: "Creating orders via API", href: "/developers" },
-      { title: "Trying endpoints in the Playground", href: "/developers" },
-      { title: "Generating and revoking API keys", href: "/settings" },
-      { title: "Rate limits and error codes", href: "/developers" },
-    ],
-  },
-]
+const ICONS: Record<string, Icon> = { Rocket, Package, GridFour, CreditCard, PlugsConnected, Code }
 
 export function HelpCenter() {
   const [query, setQuery] = useState("")
 
+  // Categories with their articles, filtered by the search query.
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return CATEGORIES
-    return CATEGORIES.map((c) => ({
-      ...c,
-      articles: c.articles.filter((a) => a.title.toLowerCase().includes(q) || c.title.toLowerCase().includes(q)),
-    })).filter((c) => c.articles.length)
+    return HELP_CATEGORIES.map((c) => {
+      let articles = HELP_ARTICLES.filter((a) => a.category === c.id)
+      if (q) articles = articles.filter((a) => a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q) || c.title.toLowerCase().includes(q))
+      return { ...c, articles }
+    }).filter((c) => c.articles.length)
   }, [query])
 
   return (
@@ -137,12 +57,12 @@ export function HelpCenter() {
       {/* Category shortcuts (hidden while searching) */}
       {!query && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {CATEGORIES.map((c) => {
-            const Icon = c.icon
+          {HELP_CATEGORIES.map((c) => {
+            const Ico = ICONS[c.icon] ?? Rocket
             return (
               <a key={c.id} href={`#${c.id}`} className="group rounded-xl border border-border p-4 transition-colors hover:border-primary hover:bg-accent">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Icon size={18} weight="duotone" />
+                  <Ico size={18} weight="duotone" />
                 </span>
                 <div className="mt-3 font-semibold">{c.title}</div>
                 <div className="mt-1 text-sm text-muted-foreground">{c.desc}</div>
@@ -152,7 +72,7 @@ export function HelpCenter() {
         </div>
       )}
 
-      {/* Article sections */}
+      {/* Article sections — each row links to its dedicated answer page */}
       {results.length === 0 ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
           No articles match “{query}”. Try a different search, or email support below.
@@ -160,29 +80,26 @@ export function HelpCenter() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {results.map((c) => {
-            const Icon = c.icon
+            const Ico = ICONS[c.icon] ?? Rocket
             return (
               <div key={c.id} id={c.id} className="scroll-mt-20">
                 <SectionCard
                   title={
                     <span className="flex items-center gap-2">
-                      <Icon size={17} weight="duotone" className="text-primary" /> {c.title}
+                      <Ico size={17} weight="duotone" className="text-primary" /> {c.title}
                     </span>
                   }
                 >
                   <div className="divide-y divide-border">
-                    {c.articles.map((a, i) =>
-                      a.href ? (
-                        <Link key={i} href={a.href} className="flex items-center justify-between gap-3 px-5 py-3 text-sm transition-colors hover:bg-accent">
-                          <span>{a.title}</span>
-                          <CaretRight size={14} className="shrink-0 text-muted-foreground" />
-                        </Link>
-                      ) : (
-                        <div key={i} className="flex items-center justify-between gap-3 px-5 py-3 text-sm text-muted-foreground">
-                          <span>{a.title}</span>
-                        </div>
-                      )
-                    )}
+                    {c.articles.map((a: HelpArticle) => (
+                      <Link key={a.slug} href={`/help/${a.slug}`} className="flex items-center justify-between gap-3 px-5 py-3 text-sm transition-colors hover:bg-accent">
+                        <span>
+                          <span className="block">{a.title}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{a.summary}</span>
+                        </span>
+                        <CaretRight size={14} className="shrink-0 text-muted-foreground" />
+                      </Link>
+                    ))}
                   </div>
                 </SectionCard>
               </div>
