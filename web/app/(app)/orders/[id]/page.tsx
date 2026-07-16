@@ -19,8 +19,8 @@ import {
   type OrderDesign,
   type ChatEntry,
 } from "@/lib/api"
+import { designSrc, itemImage } from "@/lib/order-image"
 
-const designSrc = (d?: string) => (!d ? "" : d.startsWith("data:") || d.startsWith("http") ? d : `data:image/png;base64,${d}`)
 const fmtMsgTime = (ts?: number) => {
   if (!ts) return ""
   const d = new Date(ts)
@@ -29,7 +29,7 @@ const fmtMsgTime = (ts?: number) => {
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const itemImg = (it: OrderItem) => it.img || ""
+const itemImg = (it: OrderItem) => itemImage(it)
 const fmtDateTime = (s?: string | null) => {
   if (!s) return "—"
   const d = new Date(s)
