@@ -77,6 +77,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
        image text, category text, data jsonb,
        synced_at timestamptz default now()
      )`).catch(() => {});
+  q(`alter table otto_products add column if not exists brand text`).catch(() => {});
 
   // Import a parsed catalog (array of normalized rows). Admin-only, whole-batch upsert by sku.
   app.post('/api/otto/import', { preHandler: requireAdmin }, async (req, reply) => {
@@ -87,14 +88,14 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
       const sku = String(r.sku || '').trim();
       if (!sku) continue;
       await q(
-        `insert into otto_products (sku, style, name, description, color, size, price, image, category, data, synced_at)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+        `insert into otto_products (sku, style, name, description, color, size, price, image, category, brand, data, synced_at)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
          on conflict (sku) do update set style=excluded.style, name=excluded.name, description=excluded.description,
            color=excluded.color, size=excluded.size, price=excluded.price, image=excluded.image,
-           category=excluded.category, data=excluded.data, synced_at=now()`,
+           category=excluded.category, brand=excluded.brand, data=excluded.data, synced_at=now()`,
         [sku, r.style || null, r.name || null, r.description || null, r.color || null, r.size || null,
          (r.price != null && r.price !== '' && isFinite(Number(r.price))) ? Number(r.price) : null,
-         r.image || null, r.category || null, JSON.stringify(r.data || {})]
+         r.image || null, r.category || null, r.brand || null, JSON.stringify(r.data || {})]
       ).catch(() => {});
       n++;
     }
@@ -140,7 +141,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
     try {
       const total = await q(`select count(*)::int as n from (select coalesce(style, sku) g from otto_products ${where} group by coalesce(style, sku)) t`, params);
       const r = await q(
-        `select coalesce(style, sku) as style,
+        `select coalesce(style, sku) as style, min(brand) as brand,
                 min(name) as name, min(description) as description, min(price) as price, max(price) as price_max,
                 (array_agg(image) filter (where image is not null))[1] as image,
                 array_agg(distinct color) filter (where color is not null) as colors,

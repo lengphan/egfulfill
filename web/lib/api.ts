@@ -270,8 +270,8 @@ export function getOttoInventory(sku: string) {
 
 // Otto Cap has no live catalog API — we import their Product Data export into otto_products
 // and browse from there (live price/stock still per-SKU via getOttoInventory).
-export type OttoImportRow = { sku: string; style?: string; name?: string; description?: string; color?: string; size?: string; price?: string | number; image?: string; category?: string; data?: Record<string, unknown> }
-export type OttoStyle = { style: string; name: string | null; description: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; skus: string[]; category: string | null; favorited?: boolean }
+export type OttoImportRow = { sku: string; style?: string; name?: string; description?: string; color?: string; size?: string; price?: string | number; image?: string; category?: string; brand?: string; data?: Record<string, unknown> }
+export type OttoStyle = { style: string; brand?: string | null; name: string | null; description: string | null; price: number | string | null; price_max?: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; skus: string[]; category: string | null; favorited?: boolean }
 export function getOttoStatus() {
   return api<{ count?: number; last?: string | null }>(`/api/otto/products/status`)
 }

@@ -29,6 +29,7 @@ function mapOttoRows(rows: string[][]): OttoImportRow[] {
   const iSku = pick("sku_no", "sku", "item number", "itemnumber")
   const iStyle = pick("sku_parent", "style", "parent")
   const iName = pick("name", "product", "title")
+  const iBrand = pick("brand", "manufacturer")
   const iDesc = exact("description") >= 0 ? exact("description") : pick("description_short", "desc")
   const iColor = pick("color", "colour"); const iSize = pick("size")
   const iPrice = pick("1+", "price", "msrp", "wholesale", "net", "cost")
@@ -40,7 +41,7 @@ function mapOttoRows(rows: string[][]): OttoImportRow[] {
     const row = rows[r]; const g = (i: number) => (i >= 0 && i < row.length ? String(row[i] || "").trim() : "")
     const sku = g(iSku) || g(iStyle); if (!sku) continue
     let image = ""; for (const i of imageOrder) { const v = g(i); if (v && /^https?:\/\//i.test(v)) { image = v; break } if (v && !image) image = v }
-    out.push({ sku, style: g(iStyle) || undefined, name: g(iName) || undefined, description: g(iDesc) || undefined, color: g(iColor) || undefined, size: g(iSize) || undefined, price: g(iPrice) ? g(iPrice).replace(/[^0-9.]/g, "") : undefined, image: driveImg(image) || undefined, category: g(iCat) || undefined })
+    out.push({ sku, style: g(iStyle) || undefined, name: g(iName) || undefined, brand: g(iBrand) || undefined, description: g(iDesc) || undefined, color: g(iColor) || undefined, size: g(iSize) || undefined, price: g(iPrice) ? g(iPrice).replace(/[^0-9.]/g, "") : undefined, image: driveImg(image) || undefined, category: g(iCat) || undefined })
   }
   return out
 }
@@ -55,6 +56,7 @@ export function AllSuppliers() {
   const isAdmin = getUser()?.role === "admin"
   const [search, setSearch] = useState("")
   const [debounced, setDebounced] = useState("")
+  const [sup, setSup] = useState<"" | "ss" | "otto">("")
   const [brand, setBrand] = useState("")
   const [cat, setCat] = useState("")
   const [minP, setMinP] = useState("")
@@ -114,7 +116,7 @@ export function AllSuppliers() {
 
   const cardData = (it: Item) => it.supplier === "ss"
     ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, colors: it.ss.colors, favorited: it.ss.favorited }
-    : { id: it.otto.style, title: it.otto.name || it.otto.style, subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
+    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 
@@ -157,13 +159,15 @@ export function AllSuppliers() {
     } catch (e) { setMsg(e instanceof Error ? e.message : "Import failed.") } finally { setImporting(false); if (fileRef.current) fileRef.current.value = "" }
   }
 
-  // Filters (brand / category / price) — applied to what's loaded, like SpyDeck.
-  const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : "Otto Cap")
+  // Filters (supplier / brand / category / price) — applied to what's loaded, like SpyDeck.
+  const brandOf = (it: Item) => (it.supplier === "ss" ? it.ss.brand || "" : it.otto.brand || "Otto Cap")
   const catOf = (it: Item) => (it.supplier === "ss" ? it.ss.category || "" : it.otto.category || "")
   const priceOf = (it: Item) => Number(it.supplier === "ss" ? it.ss.price : it.otto.price) || 0
-  const brands = Array.from(new Set((items ?? []).map(brandOf).filter(Boolean))).sort()
-  const cats = Array.from(new Set((items ?? []).map(catOf).filter(Boolean))).sort()
+  const pool = (items ?? []).filter((it) => !sup || it.supplier === sup)
+  const brands = Array.from(new Set(pool.map(brandOf).filter(Boolean))).sort()
+  const cats = Array.from(new Set(pool.map(catOf).filter(Boolean))).sort()
   const visible = (items ?? []).filter((it) => {
+    if (sup && it.supplier !== sup) return false
     if (brand && brandOf(it) !== brand) return false
     if (cat && catOf(it) !== cat) return false
     const p = priceOf(it)
@@ -171,8 +175,8 @@ export function AllSuppliers() {
     if (maxP && p > Number(maxP)) return false
     return true
   })
-  const anyFilter = !!(brand || cat || minP || maxP)
-  const clearFilters = () => { setBrand(""); setCat(""); setMinP(""); setMaxP("") }
+  const anyFilter = !!(sup || brand || cat || minP || maxP)
+  const clearFilters = () => { setSup(""); setBrand(""); setCat(""); setMinP(""); setMaxP("") }
 
   const total = ssTotal + ottoTotal
   const canLoadMore = (items?.length ?? 0) < total
@@ -201,6 +205,11 @@ export function AllSuppliers() {
       {/* Filters — brand / category / price, applied to what's loaded */}
       {items !== null && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm">
+          <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto"); setBrand(""); setCat("") }} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+            <option value="">All suppliers</option>
+            <option value="ss">S&amp;S Activewear</option>
+            <option value="otto">Otto Cap</option>
+          </select>
           <select value={brand} onChange={(e) => setBrand(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
             <option value="">All brands</option>
             {brands.map((b) => <option key={b} value={b}>{b}</option>)}

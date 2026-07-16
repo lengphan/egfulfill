@@ -83,18 +83,23 @@ export function SupplierProductCard({
           {priceLabel && <span className="ml-auto shrink-0 font-semibold text-foreground">{priceLabel}</span>}
         </div>
 
-        {colors.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {colors.slice(0, 8).map((c) => (
-              <button key={c} onClick={() => pickColor(c)} title={c}
-                className={"rounded-full border px-1.5 py-0.5 text-[10px] leading-tight transition-colors " + (activeColor === c ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50")}>
-                {c}
-              </button>
-            ))}
-            {colors.length > 8 && <span className="self-center px-0.5 text-[10px] text-muted-foreground">+{colors.length - 8}</span>}
-          </div>
-        )}
-        {(data.sizesCount ?? 0) > 0 && <div className="mt-1 text-[10px] text-muted-foreground">{data.sizesCount} sizes</div>}
+        {/* Colors — one clean line (+N for the rest) so every card is the same height */}
+        <div className="mt-2 flex h-6 items-center gap-1 overflow-hidden">
+          {colors.length === 0 ? (
+            <span className="text-[10px] text-muted-foreground/60">—</span>
+          ) : (
+            <>
+              {colors.slice(0, 4).map((c) => (
+                <button key={c} onClick={() => pickColor(c)} title={c}
+                  className={"shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] leading-tight transition-colors " + (activeColor === c ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50")}>
+                  {c}
+                </button>
+              ))}
+              {colors.length > 4 && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">+{colors.length - 4}</span>}
+            </>
+          )}
+        </div>
+        <div className="mt-1 h-3.5 text-[10px] text-muted-foreground">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : ""}</div>
 
         <div className="mt-auto pt-3">
           <button onClick={onAdd} disabled={added || adding}
