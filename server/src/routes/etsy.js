@@ -303,6 +303,55 @@ async function syncAllEtsy(opts = {}) {
   return { ok: true, synced: summary };
 }
 
+// Public listing search (keystring only, no seller OAuth) → normalized cards. Reused
+// by the /api/etsy/search route AND the SpyDeck trending aggregator. Throws on failure
+// with an `.status` for the caller to map.
+export async function searchListings(query, opts = {}) {
+  if (!KEYSTRING) { const e = new Error('Server missing ETSY_KEYSTRING'); e.status = 500; throw e; }
+  const limit = Math.min(48, Math.max(1, parseInt(opts.limit, 10) || 24));
+  const offset = Math.max(0, parseInt(opts.offset, 10) || 0);
+  const sort = opts.sort === 'created' ? 'created' : 'score';   // 'created' powers the daily feed
+  const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&includes=Images,Shop';
+  const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error((d && d.error) || ('Etsy search error ' + r.status)); e.status = (r.status >= 400 && r.status < 500) ? r.status : 502; throw e; }
+  const base = d.results || [];
+  const pickImg = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
+  // findAllListingsActive frequently DROPS the Images include → batch-fetch images and merge.
+  const imgsById = {};
+  const ids = base.map((l) => l.listing_id).filter(Boolean);
+  if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
+    try {
+      const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images';
+      const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
+      if (br.ok) {
+        const bd = await br.json().catch(() => ({}));
+        (bd.results || []).forEach((l) => { const arr = (l.images || []).map(pickImg).filter(Boolean); if (arr.length) imgsById[l.listing_id] = arr; });
+      }
+    } catch (e) { /* image enrich is best-effort */ }
+  }
+  const results = base.map((l) => {
+    const inlineImgs = (l.images || []).map(pickImg).filter(Boolean);
+    const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
+    return {
+      listing_id: l.listing_id,
+      title: l.title || '',
+      description: l.description || '',
+      price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
+      currency: (l.price && l.price.currency_code) || 'USD',
+      url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
+      tags: Array.isArray(l.tags) ? l.tags : [],
+      image: images[0] || null,
+      images: images,
+      created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
+      views: (typeof l.views === 'number' ? l.views : null),
+      shop_name: (l.shop && l.shop.shop_name) || null,
+      num_favorers: l.num_favorers || 0,
+    };
+  });
+  return { count: d.count || results.length, query, offset, limit, results };
+}
+
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
   // ensure table exists even on a DB that booted before this feature (idempotent)
@@ -348,58 +397,11 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // the app keystring alone can query public active listings. requireAuth so only signed-in
   // users hit it (plan-gating layers on top later). Shared by the seller + admin Scout modal.
   app.get('/api/etsy/search', { preHandler: requireAuth }, async (req, reply) => {
-    if (!KEYSTRING) { reply.code(500); return { error: 'Server missing ETSY_KEYSTRING' }; }
     const query = String((req.query && (req.query.q || req.query.keywords)) || '').trim();
     if (!query) { reply.code(400); return { error: 'Missing search query (?q=)' }; }
-    const limit = Math.min(48, Math.max(1, parseInt((req.query && req.query.limit) || '24', 10) || 24));
-    const offset = Math.max(0, parseInt((req.query && req.query.offset) || '0', 10) || 0);
-    const sort = (req.query && req.query.sort === 'created') ? 'created' : 'score';   // 'created' powers the daily feed
     try {
-      // Show ALL Etsy results — no hard shop-location filter (shop_location=US returned nothing).
-      // Etsy's public search is already English/US-market by default; we don't over-filter and risk
-      // an empty grid.
-      const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&includes=Images,Shop';
-      const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) { reply.code(r.status >= 400 && r.status < 500 ? r.status : 502); return { error: (d && d.error) || ('Etsy search error ' + r.status) }; }
-      const base = d.results || [];
-      const pickImg = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
-      // findAllListingsActive frequently DROPS the Images include, so cards came back with no
-      // thumbnail. getListingsByListingIds DOES return images — fetch them in ONE batch call and
-      // merge, so every card has a picture AND the FULL image set (used by the Make/publish flow).
-      const imgsById = {};
-      const ids = base.map((l) => l.listing_id).filter(Boolean);
-      if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
-        try {
-          const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images';
-          const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
-          if (br.ok) {
-            const bd = await br.json().catch(() => ({}));
-            (bd.results || []).forEach((l) => { const arr = (l.images || []).map(pickImg).filter(Boolean); if (arr.length) imgsById[l.listing_id] = arr; });
-          }
-        } catch (e) { /* image enrich is best-effort — never fail the search over a thumbnail */ }
-      }
-      const results = base.map((l) => {
-        const inlineImgs = (l.images || []).map(pickImg).filter(Boolean);
-        const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
-        return {
-          listing_id: l.listing_id,
-          title: l.title || '',
-          description: l.description || '',
-          price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
-          currency: (l.price && l.price.currency_code) || 'USD',
-          url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
-          tags: Array.isArray(l.tags) ? l.tags : [],
-          image: images[0] || null,
-          images: images,                                                     // ALL listing images (for Make/publish)
-          created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,  // unix s
-          views: (typeof l.views === 'number' ? l.views : null),
-          shop_name: (l.shop && l.shop.shop_name) || null,
-          num_favorers: l.num_favorers || 0
-        };
-      });
-      return { count: d.count || results.length, query: query, offset: offset, limit: limit, results };
-    } catch (e) { reply.code(502); return { error: e.message }; }
+      return await searchListings(query, { limit: req.query && req.query.limit, offset: req.query && req.query.offset, sort: req.query && req.query.sort });
+    } catch (e) { reply.code(e.status || 502); return { error: e.message }; }
   });
 
   // Same-origin image proxy for Etsy's public CDN. The factory boards run canvas

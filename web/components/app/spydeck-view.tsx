@@ -9,7 +9,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, ApiError, type EtsyListing, type SavedListing } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, ApiError, type EtsyListing, type SavedListing } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
 
@@ -218,9 +218,21 @@ export function SpyDeckView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
-  const [view, setView] = useState<"search" | "saved">("search")
+  const [view, setView] = useState<"trending" | "search" | "saved">("trending")
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
+
+  // Auto-load the daily trending feed (server-cached) so SpyDeck opens populated.
+  useEffect(() => {
+    if (!entitled) return
+    const id = setTimeout(() => {
+      getSpydeckTrending()
+        .then((r) => setTrending({ products: r.products ?? [], keywords: r.keywords ?? [] }))
+        .catch(() => setTrending({ products: [], keywords: [] }))
+    }, 0)
+    return () => clearTimeout(id)
+  }, [entitled])
 
   // Load the seller's saved listings once entitled.
   useEffect(() => {
@@ -340,7 +352,7 @@ export function SpyDeckView() {
         description="Spy live Etsy listings and save the winners"
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
-            {(["search", "saved"] as const).map((v) => (
+            {(["trending", "search", "saved"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -349,7 +361,7 @@ export function SpyDeckView() {
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : "Search"}
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "trending" ? "Trending" : "Search"}
               </button>
             ))}
           </div>
@@ -383,7 +395,38 @@ export function SpyDeckView() {
           </div>
         )}
 
-        {view === "saved" ? (
+        {view === "trending" ? (
+          trending === null ? (
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}
+            </div>
+          ) : trending.products.length === 0 ? (
+            <div className="py-16 text-center text-sm text-muted-foreground">Today&apos;s trending feed isn&apos;t available yet — try a search, or check back shortly.</div>
+          ) : (
+            <>
+              {trending.keywords.length > 0 && (
+                <div className="border-b border-border p-4">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trending keywords today</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {trending.keywords.map((k) => (
+                      <button key={k} onClick={() => run(k)} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-5 py-2 text-xs text-muted-foreground">
+                <TrendUp size={13} /> Auto-refreshed daily — top listings by estimated 24h sales. Estimates, not exact figures.
+              </div>
+              <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {trending.products.map((l) => (
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} />
+                ))}
+              </div>
+            </>
+          )
+        ) : view === "saved" ? (
           saved.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-20 text-center">
               <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">

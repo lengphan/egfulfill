@@ -411,6 +411,11 @@ export type SavedListing = EtsyListing & { saved_at?: string }
 export function getSpydeckSaves() {
   return api<SavedListing[]>(`/api/spydeck/saves`)
 }
+// Daily trending feed (server-cached) — auto-populates SpyDeck without a search.
+export type TrendingFeed = { date?: string; products?: EtsyListing[]; keywords?: string[]; error?: string }
+export function getSpydeckTrending() {
+  return api<TrendingFeed>(`/api/spydeck/trending`)
+}
 export function saveSpydeckListing(listing: EtsyListing) {
   return api<{ ok?: boolean; error?: string }>(`/api/spydeck/saves`, {
     method: "POST",
