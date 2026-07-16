@@ -11,6 +11,7 @@ import {
 } from "@/lib/api"
 import { OttoSuppliers } from "@/components/app/otto-suppliers"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
+import { FavoritesView } from "@/components/app/favorites-view"
 import { Loading } from "@/components/app/loading"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -30,7 +31,7 @@ export function SuppliersView() {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
-  const [supplier, setSupplier] = useState<"ss" | "otto">("ss")
+  const [supplier, setSupplier] = useState<"ss" | "otto" | "favorites">("ss")
 
   useEffect(() => {
     const id = setTimeout(() => { if (getToken()) getSsStatus().then(setStatus).catch(() => setStatus({ configured: false })) }, 0)
@@ -128,12 +129,12 @@ export function SuppliersView() {
 
       {/* Supplier tabs */}
       <div className="flex w-fit rounded-lg border border-border p-0.5">
-        {([{ id: "ss", label: "S&S Activewear" }, { id: "otto", label: "Otto Cap" }] as const).map((t) => (
+        {([{ id: "ss", label: "S&S Activewear" }, { id: "otto", label: "Otto Cap" }, { id: "favorites", label: "Favorites" }] as const).map((t) => (
           <button key={t.id} onClick={() => setSupplier(t.id)} className={"rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (supplier === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{t.label}</button>
         ))}
       </div>
 
-      {supplier === "otto" ? <OttoSuppliers /> : (
+      {supplier === "favorites" ? <FavoritesView /> : supplier === "otto" ? <OttoSuppliers /> : (
       <SectionCard title="S&S Activewear" description="The full S&S catalog — every style; thumbnails resolve as you browse">
         <div className="flex items-center gap-2 border-b border-border p-4">
           <div className="relative max-w-md flex-1">
