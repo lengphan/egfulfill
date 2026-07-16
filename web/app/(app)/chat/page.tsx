@@ -191,7 +191,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100svh-7rem)] gap-4">
+    <div className={"flex gap-4 " + (isStaffUser ? "h-[calc(100svh-3.5rem)]" : "h-[calc(100svh-6.5rem)]")}>
       {/* conversation rail */}
       <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
         <div className="border-b border-border px-4 py-3 font-semibold">Conversations</div>

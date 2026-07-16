@@ -379,6 +379,7 @@ export type DesignCard = {
   claimed_by?: string | null
   payment?: number | string | null
   pay_status?: string | null
+  credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null
   is_emb?: boolean
   customer?: string | null

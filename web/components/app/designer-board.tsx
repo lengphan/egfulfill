@@ -6,17 +6,17 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, walletTransfer, getWallet, type DesignCard, type LedgerRow } from "@/lib/api"
+import { getDesignCards, saveDesignCards, walletTransfer, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
-// Kanban lanes — cleaner, linear left-to-right pipeline.
+// Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
+// once (no separate Paid lane; the credit is idempotent per card).
 const COLS = [
   { id: "incoming", label: "Incoming", accent: "bg-slate-400" },
   { id: "inprogress", label: "In progress", accent: "bg-violet-500" },
   { id: "review", label: "In review", accent: "bg-amber-500" },
   { id: "fix", label: "Needs fix", accent: "bg-red-500" },
   { id: "approved", label: "Approved", accent: "bg-emerald-500" },
-  { id: "paid", label: "Paid", accent: "bg-sky-500" },
 ] as const
 const colOf = (c: DesignCard) => {
   const v = String(c.col || "incoming").toLowerCase()
@@ -30,15 +30,13 @@ export function DesignerBoard() {
   const [dragId, setDragId] = useState<string | number | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
-  const [view, setView] = useState<"kanban" | "list" | "earnings">("kanban")
-  const [ledger, setLedger] = useState<{ balance: number; rows: LedgerRow[] } | null>(null)
+  const [view, setView] = useState<"board" | "list">("board")
   const me = getUser()?.name || "Designer"
 
   useEffect(() => {
     const id = setTimeout(() => {
       if (!getToken()) { setCards([]); return }
       getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
-      getWallet("designer").then((w) => setLedger({ balance: w.balance ?? 0, rows: w.ledger ?? [] })).catch(() => setLedger({ balance: 0, rows: [] }))
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -64,15 +62,27 @@ export function DesignerBoard() {
 
   const stats = useMemo(() => {
     const list = cards ?? []
-    const payable = list.filter((c) => colOf(c) === "approved").reduce((s, c) => s + amt(c.payment), 0)
-    const paid = list.filter((c) => colOf(c) === "paid").reduce((s, c) => s + amt(c.payment), 0)
-    return { total: list.length, active: list.filter((c) => ["inprogress", "review", "fix"].includes(colOf(c))).length, payable, paid }
+    const approved = list.filter((c) => colOf(c) === "approved").length
+    const credited = list.filter((c) => c.credited).reduce((s, c) => s + amt(c.payment), 0)
+    return { total: list.length, active: list.filter((c) => ["inprogress", "review", "fix"].includes(colOf(c))).length, approved, credited }
   }, [cards])
+
+  // Move a card; entering "approved" credits the designer ONCE (idempotent by DSN-<id> +
+  // the card's `credited` flag), so re-dragging it never double-pays.
+  const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
+    patch(card.id, { col: to, ...extra })
+    if (to === "approved" && !card.credited && amt(card.payment) > 0) {
+      walletTransfer({ fromAccount: "factory", toAccount: "designer", amount: amt(card.payment), ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
+        .then((r) => { if (!r.error) patch(card.id, { credited: true, pay_status: "paid" }) })
+        .catch(() => {})
+    }
+  }, [patch])
 
   const drop = (col: string) => {
     setOverCol(null)
     if (dragId == null) return
-    patch(dragId, { col })
+    const card = (cards ?? []).find((c) => c.id === dragId)
+    if (card) moveCard(card, col)
     setDragId(null)
   }
 
@@ -84,11 +94,11 @@ export function DesignerBoard() {
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><PenNib size={18} weight="fill" /></span>
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Designer</h1>
-          <p className="truncate text-sm text-muted-foreground">{view === "kanban" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
+          <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
         <div className="ml-auto flex rounded-lg border border-border p-0.5">
-          {(["kanban", "list", "earnings"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={"rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " + (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v}</button>
+          {([{ id: "board", label: "Board" }, { id: "list", label: "List" }] as const).map((v) => (
+            <button key={v.id} onClick={() => setView(v.id)} className={"rounded-md px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
           ))}
         </div>
       </div>
@@ -96,13 +106,11 @@ export function DesignerBoard() {
       <StatGrid>
         <StatCard label="Open cards" value={String(stats.total)} sub="on the board" />
         <StatCard label="In progress" value={String(stats.active)} sub="being worked" />
-        <StatCard label="Payable" value={money(stats.payable)} sub="approved, awaiting credit" tone={stats.payable ? "pos" : undefined} />
-        <StatCard label="Paid out" value={money(stats.paid)} sub="credited to designers" />
+        <StatCard label="Approved" value={String(stats.approved)} sub="in the approved lane" />
+        <StatCard label="Credited" value={money(stats.credited)} sub="paid to designers" tone={stats.credited ? "pos" : undefined} />
       </StatGrid>
 
-      {view === "earnings" ? (
-        <DesignerEarnings ledger={ledger} />
-      ) : cards === null ? (
+      {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "list" ? (
         <DesignerList cards={cards} onOpen={setOpenId} />
@@ -165,7 +173,7 @@ export function DesignerBoard() {
         </div>
       )}
 
-      {openCard && <CardDialog card={openCard} me={me} onClose={() => setOpenId(null)} patch={patch} remove={(id) => persist((cards ?? []).filter((c) => c.id !== id))} />}
+      {openCard && <CardDialog card={openCard} me={me} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => persist((cards ?? []).filter((c) => c.id !== id))} />}
     </div>
   )
 }
@@ -221,68 +229,25 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
   )
 }
 
-// Earnings — the designer wallet's ledger (credits in, payouts/withdrawals out).
-function DesignerEarnings({ ledger }: { ledger: { balance: number; rows: LedgerRow[] } | null }) {
-  const fmtDT = (s?: string) => {
-    if (!s) return "—"
-    const d = new Date(s)
-    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-  }
-  if (ledger === null) return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-  const earned = ledger.rows.filter((r) => Number(r.delta) > 0).reduce((s, r) => s + Number(r.delta), 0)
-  return (
-    <div className="space-y-4">
-      <StatGrid>
-        <StatCard label="Balance" value={money(ledger.balance)} sub="designer wallet" tone={ledger.balance ? "pos" : undefined} />
-        <StatCard label="Total earned" value={money(earned)} sub="all time" />
-        <StatCard label="Entries" value={String(ledger.rows.length)} sub="ledger records" />
-      </StatGrid>
-      <div className="overflow-hidden rounded-2xl border border-border">
-        {ledger.rows.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">No earnings yet — credit a designer from an approved card.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr><th className="px-4 py-2.5 font-medium">When</th><th className="px-4 py-2.5 font-medium">Detail</th><th className="px-4 py-2.5 font-medium">Type</th><th className="px-4 py-2.5 text-right font-medium">Amount</th></tr>
-            </thead>
-            <tbody>
-              {ledger.rows.map((r) => {
-                const d = Number(r.delta) || 0
-                return (
-                  <tr key={String(r.id)} className="border-t border-border">
-                    <td className="px-4 py-2 text-muted-foreground">{fmtDT(r.created_at)}</td>
-                    <td className="px-4 py-2">{r.note || r.ref || "—"}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{String(r.type || "").replace(/-(in|out)$/, "")}</td>
-                    <td className={"px-4 py-2 text-right font-semibold tabular-nums " + (d >= 0 ? "text-emerald-600" : "text-foreground")}>{d >= 0 ? "+" : "−"}{money(Math.abs(d))}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Card detail — claim, move, set payout, approve + credit the designer.
-function CardDialog({ card, me, onClose, patch, remove }: { card: DesignCard; me: string; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; remove: (id: string | number) => void }) {
+// Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
+function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: DesignCard; me: string; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void }) {
   const [pay, setPay] = useState(String(amt(card.payment) || ""))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const col = colOf(card)
 
-  const move = (to: string, extra?: Partial<DesignCard>) => patch(card.id, { col: to, ...extra })
+  const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
 
-  const approveAndCredit = async () => {
+  // Fallback credit for a card approved before a payout was set (auto-credit needs an
+  // amount at approval time). Idempotent by DSN-<id> so it can never double-pay.
+  const creditNow = async () => {
     const amount = Number(pay) || 0
     if (amount <= 0) { setErr("Set a payout amount first."); return }
     setBusy(true); setErr(null)
     try {
       const r = await walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
       if (r.error) throw new Error(r.error)
-      patch(card.id, { col: "paid", pay_status: "paid", payment: amount })
-      onClose()
+      patch(card.id, { credited: true, pay_status: "paid", payment: amount })
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't credit the designer.")
     } finally { setBusy(false) }
@@ -335,8 +300,11 @@ function CardDialog({ card, me, onClose, patch, remove }: { card: DesignCard; me
             </>
           )}
           {col === "fix" && <Button size="sm" onClick={() => move("inprogress")}><ArrowClockwise size={14} weight="bold" /> Back to work</Button>}
-          {col === "approved" && <Button size="sm" onClick={approveAndCredit} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit designer {money(Number(pay) || 0)}</>}</Button>}
-          {col === "paid" && <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Paid {money(amt(card.payment))}</span>}
+          {col === "approved" && (
+            card.credited
+              ? <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-600"><CheckCircle size={15} weight="fill" /> Credited {money(amt(card.payment))}</span>
+              : <Button size="sm" onClick={creditNow} disabled={busy}>{busy ? <CircleNotch size={14} className="animate-spin" /> : <><CurrencyDollar size={14} weight="bold" /> Credit {money(Number(pay) || 0)}</>}</Button>
+          )}
           <button onClick={() => remove(card.id)} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
         </div>
       </DialogContent>

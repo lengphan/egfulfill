@@ -1,4 +1,4 @@
-import { Printer, Package, ShieldCheck, PenNib, Storefront, type Icon } from "@phosphor-icons/react"
+import { Printer, Package, ShieldCheck, PenNib, Storefront, CurrencyDollar, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -6,6 +6,7 @@ export type StaffNavItem = { label: string; href: string; icon: Icon; roles: str
 const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Operator", href: "/operator", icon: Printer, roles: ["operator", "admin"] },
   { label: "Designer", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
+  { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer", "admin"] },
   { label: "Warehouse", href: "/warehouse", icon: Package, roles: ["warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
