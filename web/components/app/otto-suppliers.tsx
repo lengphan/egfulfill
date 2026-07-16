@@ -86,8 +86,17 @@ export function OttoSuppliers() {
     if (!file) return
     setImporting(true); setErr(null); setMsg(null)
     try {
-      const text = await file.text()
-      const rows = parseCSV(text)
+      let rows: string[][]
+      if (/\.xlsx?$/i.test(file.name)) {
+        // Lazy-load SheetJS only when an actual spreadsheet is imported (keeps the bundle small).
+        const XLSX = await import("xlsx")
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: "" }) as unknown[][]
+        rows = raw.map((r) => r.map((c) => String(c ?? "")))
+      } else {
+        rows = parseCSV(await file.text())
+      }
       const products = mapRows(rows)
       if (!products.length) throw new Error("No product rows found — check the file has a header row with SKU/Style columns.")
       const r = await importOttoProducts(products)
@@ -135,9 +144,9 @@ export function OttoSuppliers() {
         <span className="text-xs text-muted-foreground">{status ? `${status.count.toLocaleString()} SKUs` : "…"}</span>
         {isAdmin && (
           <>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
             <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing}>
-              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} {importing ? "Importing…" : "Import Product Data (CSV)"}
+              {importing ? <CircleNotch size={14} className="animate-spin" /> : <UploadSimple size={14} weight="bold" />} {importing ? "Importing…" : "Import Product Data (CSV / XLSX)"}
             </Button>
           </>
         )}

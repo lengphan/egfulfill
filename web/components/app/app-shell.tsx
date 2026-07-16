@@ -7,15 +7,11 @@ import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
 import { PageTransition } from "@/components/motion/page-transition"
 import { getUser } from "@/lib/auth"
-import { isStaffRole, landingFor } from "@/lib/staff-nav"
+import { isStaffRole, landingFor, staffCanUseAppPath } from "@/lib/staff-nav"
 
-// Pages staff are allowed to use inside the seller (app) group (shared surfaces).
-// Everything else in (app) is seller-only — staff hitting those get sent to their board.
-const STAFF_SHARED = ["/chat", "/settings", "/help"]
-
-// The (app) shell is role-aware: sellers see the seller Sidebar; staff who land on a
-// shared page (chat/settings/help) see the StaffSidebar instead; staff on a seller-only
-// page are bounced to their own board so they only ever see what their role should.
+// The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
+// (per their role — admin all, operator/warehouse a curated set, designer none) see the
+// StaffSidebar instead; staff on a page their role can't use are bounced to their board.
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -25,8 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const id = setTimeout(() => {
       const role = getUser()?.role
       if (isStaffRole(role)) {
-        const allowed = STAFF_SHARED.some((p) => pathname === p || pathname.startsWith(p + "/"))
-        if (!allowed) { router.replace(landingFor(role)); return }
+        if (!staffCanUseAppPath(role, pathname)) { router.replace(landingFor(role)); return }
         setMode("staff")
       } else {
         setMode("seller")

@@ -211,12 +211,12 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
                           <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={13} weight="duotone" /></div>
                         )}
                       </div>
-                      <span className="truncate font-medium">{c.title || "Design"}</span>
-                      {c.is_emb && <span className="inline-flex items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+                      <span className="max-w-[200px] truncate font-medium">{c.title || "Design"}</span>
+                      {c.is_emb && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-2 font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{c.product || c.type || "—"}</td>
+                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground"><div className="max-w-[220px] truncate">{c.product || c.type || "—"}</div></td>
                   <td className="px-4 py-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span></td>
                   <td className="px-4 py-2 text-right font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</td>
                 </tr>

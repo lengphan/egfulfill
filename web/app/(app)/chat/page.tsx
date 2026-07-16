@@ -39,6 +39,7 @@ export default function ChatPage() {
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [streaming, setStreaming] = useState("") // assistant reply revealed word-by-word
+  const revealingRef = useRef(false)             // pause polling while the typewriter runs
   const scrollRef = useRef<HTMLDivElement>(null)
   const cidBase = useRef("")
   const cidSeq = useRef(0)
@@ -91,7 +92,9 @@ export default function ChatPage() {
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
 
   const load = useCallback(async () => {
-    if (!activeId) return
+    // While the typewriter is revealing, don't let a poll pull in the already-persisted
+    // assistant message — that would show a duplicate bubble next to the streaming one.
+    if (!activeId || revealingRef.current) return
     try {
       const r = await getOrderMessages(activeId)
       setMessages(Array.isArray(r) ? r : [])
@@ -144,8 +147,10 @@ export default function ChatPage() {
           const r = await requestAiReply()
           if (r.ok && r.reply) {
             setAiTyping(false)
+            revealingRef.current = true  // pause polling so no duplicate bubble appears
             await revealReply(r.reply)   // typewriter the reply in
             setStreaming("")
+            revealingRef.current = false
             await load()                 // reconcile with the persisted message
             setAiNote(null)
           }
