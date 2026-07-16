@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning, SlidersHorizontal } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning, SlidersHorizontal, CheckCircle, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
+import { MakeProductDialog } from "@/components/app/make-product-dialog"
 
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -59,7 +60,7 @@ function StatBox({ label, sub, value }: { label: string; sub?: string; value: st
 
 // One research card — image (price + TRENDING overlay) + heart-to-save + estimate
 // stat boxes + the listing's up-to-13 keyword tags (clickable to research + copy all).
-function ResultCard({ l, saved, onToggleSave, onSearchTag }: { l: EtsyListing; saved: boolean; onToggleSave: (l: EtsyListing) => void; onSearchTag: (t: string) => void }) {
+function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProduct }: { l: EtsyListing; saved: boolean; uploaded?: boolean; onToggleSave: (l: EtsyListing) => void; onSearchTag: (t: string) => void; onMakeProduct: (l: EtsyListing) => void }) {
   const e = estFor(l)
   const trending = e.trending
   const tags = (l.tags ?? []).slice(0, 13)
@@ -146,6 +147,14 @@ function ResultCard({ l, saved, onToggleSave, onSearchTag }: { l: EtsyListing; s
               </div>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
+            className={"mt-3 flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+          >
+            {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded — draft</> : <><Storefront size={13} weight="bold" /> Make product</>}
+          </button>
         </div>
       </a>
     </div>
@@ -228,9 +237,18 @@ export function SpyDeckView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
-  const [view, setView] = useState<"trending" | "search" | "saved">("trending")
+  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded">("trending")
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
+  const [makeListing, setMakeListing] = useState<EtsyListing | null>(null)
+  const [uploaded, setUploaded] = useState<EtsyListing[]>([])
+  const [uploadedIds, setUploadedIds] = useState<Set<string>>(new Set())
+  const onPublished = (l: EtsyListing) => {
+    const k = String(l.listing_id)
+    setUploadedIds((prev) => new Set(prev).add(k))
+    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l }, ...prev]))
+  }
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
   // Filters — server-side (category/price/sort re-run the search) + client-side
   // (min sold-per-day / min favorites filter the shown cards live).
@@ -397,7 +415,7 @@ export function SpyDeckView() {
         description="Spy live Etsy listings and save the winners"
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
-            {(["trending", "search", "saved"] as const).map((v) => (
+            {(["trending", "search", "saved", "uploaded"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -406,7 +424,7 @@ export function SpyDeckView() {
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "trending" ? "Trending" : "Search"}
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : "Search"}
               </button>
             ))}
           </div>
@@ -512,10 +530,26 @@ export function SpyDeckView() {
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {applyClientFilters(trending.products).map((l) => (
-                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} />
+                  <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
                 ))}
               </div>
             </>
+          )
+        ) : view === "uploaded" ? (
+          uploaded.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-20 text-center">
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <Storefront size={24} weight="duotone" />
+              </span>
+              <div className="font-medium">Nothing uploaded yet</div>
+              <div className="max-w-xs text-sm text-muted-foreground">Hit &ldquo;Make product&rdquo; on any card to publish it as an Etsy draft — it&apos;ll show here.</div>
+            </div>
+          ) : (
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {uploaded.map((l) => (
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
+              ))}
+            </div>
           )
         ) : view === "saved" ? (
           saved.length === 0 ? (
@@ -529,7 +563,7 @@ export function SpyDeckView() {
           ) : (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {saved.map((l) => (
-                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} />
+                <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
               ))}
             </div>
           )
@@ -556,13 +590,17 @@ export function SpyDeckView() {
                 key={l.listing_id}
                 l={l}
                 saved={savedIds.has(String(l.listing_id))}
+                uploaded={uploadedIds.has(String(l.listing_id))}
                 onToggleSave={toggleSave}
                 onSearchTag={(t) => run(t)}
+                onMakeProduct={setMakeListing}
               />
             ))}
           </div>
         )}
       </SectionCard>
+
+      <MakeProductDialog open={!!makeListing} onOpenChange={(v) => !v && setMakeListing(null)} listing={makeListing} onPublished={onPublished} />
     </div>
   )
 }

@@ -497,6 +497,7 @@ export function getEtsyConfig() {
 export type EtsyListing = {
   listing_id: number
   title: string
+  description?: string
   price: number | null
   currency: string
   url: string
