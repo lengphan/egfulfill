@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GoogleSignIn } from "@/components/auth/google-signin"
 import { signupUser } from "@/lib/api"
 import { setSession } from "@/lib/auth"
 
@@ -60,6 +61,13 @@ export default function SignupPage() {
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Creating…" : "Create account"}
         </Button>
+
+        <div className="relative py-1">
+          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+          <div className="relative flex justify-center"><span className="bg-card px-2 text-xs text-muted-foreground">or</span></div>
+        </div>
+        <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
+
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/login" className="font-medium text-foreground hover:underline">
