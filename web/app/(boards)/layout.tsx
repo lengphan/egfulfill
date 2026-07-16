@@ -1,15 +1,17 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { CircleNotch } from "@phosphor-icons/react"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { getUser, getToken } from "@/lib/auth"
-import { STAFF_ROLES } from "@/lib/staff-nav"
+import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
 
-// Staff-only shell. Sellers (or signed-out) are bounced to the seller dashboard.
+// Staff-only shell. Sellers (or signed-out) are bounced to the seller dashboard, and a
+// staffer who hits a board their role can't access is sent to their own landing board.
 export default function BoardsLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [ok, setOk] = useState<boolean | null>(null)
   useEffect(() => {
     const id = setTimeout(() => {
@@ -17,12 +19,19 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
       if (!getToken() || !role || !STAFF_ROLES.includes(role)) {
         setOk(false)
         router.replace(getToken() ? "/dashboard" : "/login")
-      } else {
-        setOk(true)
+        return
       }
+      // Per-role board gating: only the boards this role's nav includes are reachable.
+      const allowed = staffNav(role).some((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+      if (!allowed) {
+        setOk(false)
+        router.replace(landingFor(role))
+        return
+      }
+      setOk(true)
     }, 0)
     return () => clearTimeout(id)
-  }, [router])
+  }, [router, pathname])
 
   if (ok !== true) {
     return (

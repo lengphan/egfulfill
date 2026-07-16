@@ -13,6 +13,20 @@ const STAFF_ITEMS: StaffNavItem[] = [
 
 export const STAFF_ROLES = ["operator", "warehouse", "designer", "admin"]
 
+// Where a user should land after login / where staff get bounced if they hit a seller page.
+export function landingFor(role?: string | null): string {
+  switch (role) {
+    case "admin": return "/admin"
+    case "operator": return "/operator"
+    case "warehouse": return "/warehouse"
+    case "designer": return "/designer"
+    default: return "/dashboard" // sellers
+  }
+}
+export function isStaffRole(role?: string | null): boolean {
+  return !!role && STAFF_ROLES.includes(role)
+}
+
 export function staffNav(role?: string | null): StaffNavItem[] {
   if (!role) return []
   return STAFF_ITEMS.filter((i) => i.roles.includes(role))

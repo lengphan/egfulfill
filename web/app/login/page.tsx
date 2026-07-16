@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { setSession } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
+import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 
 export default function LoginPage() {
@@ -40,7 +41,7 @@ export default function LoginPage() {
       const user = (j.user ?? j.data?.user ?? {}) as Record<string, unknown>
       if (!token) throw new Error("No session token returned")
       setSession(token, user)
-      router.push("/dashboard")
+      router.push(landingFor(typeof user.role === "string" ? user.role : null))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed")
     } finally {
