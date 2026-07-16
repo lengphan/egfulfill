@@ -1,18 +1,23 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ShieldCheck, CheckCircle, XCircle, CircleNotch, UserPlus } from "@phosphor-icons/react"
+import { ShieldCheck, CheckCircle, XCircle, CircleNotch, UserPlus, Plus, PencilSimple, Trash, Package as PackageIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
+import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   getOrders, getUsers, updateUserAdmin, createUserAdmin, getAudit, getTopups, confirmTopup, rejectTopup,
-  type OrderRow, type AdminUser, type AuditRow, type TopupRequest,
+  getCatalogProducts, saveCatalogProducts,
+  type OrderRow, type AdminUser, type AuditRow, type TopupRequest, type CatalogProduct,
 } from "@/lib/api"
+
+const prodImg = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
+const prodPrice = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 import { getToken } from "@/lib/auth"
 import { orderStage } from "@/lib/factory-status"
 
@@ -35,6 +40,9 @@ export function AdminBoard() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [topups, setTopups] = useState<TopupRequest[]>([])
   const [audit, setAudit] = useState<AuditRow[] | null>(null)
+  const [products, setProducts] = useState<CatalogProduct[]>([])
+  const [editing, setEditing] = useState<CatalogProduct | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   // New-user form
   const [nu, setNu] = useState({ email: "", password: "", role: "operator" })
@@ -51,11 +59,20 @@ export function AdminBoard() {
     const id = setTimeout(() => {
       if (!getToken()) return
       getOrders().then((r) => setOrders(r ?? [])).catch(() => {})
+      getCatalogProducts().then((r) => setProducts(r ?? [])).catch(() => {})
       loadUsers()
       loadTopups()
     }, 0)
     return () => clearTimeout(id)
   }, [loadUsers, loadTopups])
+
+  // Whole-catalog persist on any product add/edit/delete.
+  const persistProducts = (next: CatalogProduct[]) => { setProducts(next); saveCatalogProducts(next).catch(() => {}) }
+  const saveProduct = (p: CatalogProduct) => {
+    const exists = products.some((x) => x.id === p.id)
+    persistProducts(exists ? products.map((x) => (x.id === p.id ? p : x)) : [p, ...products])
+  }
+  const deleteProduct = (id: CatalogProduct["id"]) => persistProducts(products.filter((x) => x.id !== id))
 
   const stats = useMemo(() => {
     const shipped = orders.filter((o) => orderStage(o.items ?? []) === "shipped").length
@@ -122,6 +139,7 @@ export function AdminBoard() {
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="topups">Top-ups{stats.pending ? ` (${stats.pending})` : ""}</TabsTrigger>
           <TabsTrigger value="activity" onClick={onActivityTab}>Activity</TabsTrigger>
         </TabsList>
@@ -209,6 +227,56 @@ export function AdminBoard() {
           </SectionCard>
         </TabsContent>
 
+        {/* Products */}
+        <TabsContent value="products">
+          <SectionCard
+            title="Catalog products"
+            description="What sellers browse and the Design Maker uses as blanks. Upload a mockup image per product."
+            actions={<Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true) }}><Plus size={14} weight="bold" /> New product</Button>}
+          >
+            {products.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
+                <PackageIcon size={22} weight="duotone" />
+                <div className="font-medium text-foreground">No products yet</div>
+                <div className="text-sm">Add your first blank — with a mockup image — for sellers and the maker.</div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Product</TableHead><TableHead>Type</TableHead><TableHead>Method</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="w-24" /></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((p) => (
+                    <TableRow key={String(p.id)}>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-muted">
+                            {prodImg(p) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={prodImg(p)} alt="" className="size-full object-contain" />
+                            ) : (
+                              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PackageIcon size={14} weight="duotone" /></div>
+                            )}
+                          </div>
+                          <span className="font-medium">{p.name || "Untitled"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.type || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.method || "—"}</TableCell>
+                      <TableCell><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{p.status || "Active"}</span></TableCell>
+                      <TableCell className="text-right tabular-nums">{usd(prodPrice(p))}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="icon" variant="ghost" className="size-8" onClick={() => { setEditing(p); setEditorOpen(true) }} aria-label="Edit"><PencilSimple size={14} /></Button>
+                        <Button size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-red-600" onClick={() => deleteProduct(p.id)} aria-label="Delete"><Trash size={14} /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </SectionCard>
+        </TabsContent>
+
         {/* Top-ups */}
         <TabsContent value="topups">
           <SectionCard title="Pending top-ups" description="Confirm credits the seller's wallet; reject leaves it untouched">
@@ -264,6 +332,8 @@ export function AdminBoard() {
           </SectionCard>
         </TabsContent>
       </Tabs>
+
+      <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={orders.length + products.length + 1000} />
     </div>
   )
 }

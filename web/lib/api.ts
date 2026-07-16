@@ -203,6 +203,10 @@ export function getSheetRows(url: string) {
 export function getCatalogProducts() {
   return api<CatalogProduct[]>(`/api/catalog_products`)
 }
+// Staff: whole-catalog upsert (send the full array; missing ids are removed).
+export function saveCatalogProducts(products: CatalogProduct[]) {
+  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/catalog_products`, { method: "POST", body: JSON.stringify(products) })
+}
 
 // ─────────────────────────── Orders ───────────────────────────
 // GET /api/orders → order rows (orders table) each with an aggregated items[].
