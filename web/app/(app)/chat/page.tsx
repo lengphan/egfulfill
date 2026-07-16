@@ -21,8 +21,10 @@ const SUGGESTIONS = [
   "How do I connect my Etsy shop?",
 ]
 
-// A conversation in the left rail — Support (AI + team) or a per-order thread (factory).
-type Convo = { id: string; kind: "support" | "order"; title: string; sub: string }
+// A conversation in the left rail — Support (AI + team), a per-order thread, or the
+// internal staff-only Factory channel.
+type Convo = { id: string; kind: "support" | "order" | "staff"; title: string; sub: string }
+const STAFF_CHANNEL = "staff-general"
 
 export default function ChatPage() {
   const [supportId, setSupportId] = useState<string | null>(null)
@@ -37,16 +39,21 @@ export default function ChatPage() {
   const cidBase = useRef("")
   const cidSeq = useRef(0)
   const myName = getUser()?.name || "You"
+  const isStaffUser = (() => { const r = getUser()?.role; return !!r && r !== "seller" })()
 
   useEffect(() => {
     cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
   }, [])
 
-  // Resolve identity (support thread) + load the seller's orders as conversations.
+  // Staff chat the shared internal Factory channel; sellers get support + their orders.
   useEffect(() => {
     let alive = true
     const id = setTimeout(async () => {
       if (!getToken()) { setSignedOut(true); return }
+      if (isStaffUser) {
+        setActiveId((cur) => cur ?? STAFF_CHANNEL)
+        return
+      }
       let uid = getUser()?.id
       if (!uid) { try { uid = (await getMe()).sub } catch {} }
       if (!alive) return
@@ -60,19 +67,20 @@ export default function ChatPage() {
       getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
-  }, [])
+  }, [isStaffUser])
 
   const convos = useMemo<Convo[]>(() => {
+    if (isStaffUser) return [{ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" }]
     const list: Convo[] = []
     if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: "Assistant + team" })
     for (const o of orders.slice(0, 30)) {
       list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
     }
     return list
-  }, [supportId, orders])
+  }, [isStaffUser, supportId, orders])
 
   const active = useMemo(() => convos.find((c) => c.id === activeId) ?? null, [convos, activeId])
-  const isSupport = active?.kind === "support"
+  const isSupport = active?.kind === "support" // AI auto-reply only on the seller support thread
 
   const load = useCallback(async () => {
     if (!activeId) return
@@ -191,9 +199,9 @@ export default function ChatPage() {
               <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
                 {isSupport ? <Headset size={22} weight="duotone" /> : <Package size={20} weight="duotone" />}
               </span>
-              <div className="font-medium">{isSupport ? "How can we help?" : `Chat about order ${active?.title ?? ""}`}</div>
+              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "Factory channel" : `Chat about order ${active?.title ?? ""}`}</div>
               <div className="max-w-xs text-sm text-muted-foreground">
-                {isSupport ? "Ask about an order, billing, integrations — our assistant answers from your account, and a teammate follows up when needed." : "Message the fulfillment team about this order — questions, changes, or artwork."}
+                {isSupport ? "Ask about an order, billing, integrations — our assistant answers from your account, and a teammate follows up when needed." : active?.kind === "staff" ? "Internal team chat — coordinate production, designs, and orders with the rest of the factory." : "Message the fulfillment team about this order — questions, changes, or artwork."}
               </div>
               {isSupport && (
                 <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">

@@ -5,7 +5,7 @@ export type StaffNavItem = { label: string; href: string; icon: Icon; roles: str
 // Staff boards, gated by role. Admin sees everything.
 const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Operator", href: "/operator", icon: Printer, roles: ["operator", "admin"] },
-  { label: "Designer", href: "/designer", icon: PenNib, roles: ["designer", "admin"] },
+  { label: "Designer", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   { label: "Warehouse", href: "/warehouse", icon: Package, roles: ["warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["admin"] },

@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, walletTransfer, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, walletTransfer, getWallet, type DesignCard, type LedgerRow } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
 // Kanban lanes — cleaner, linear left-to-right pipeline.
@@ -30,13 +30,15 @@ export function DesignerBoard() {
   const [dragId, setDragId] = useState<string | number | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
-  const [view, setView] = useState<"kanban" | "list">("kanban")
+  const [view, setView] = useState<"kanban" | "list" | "earnings">("kanban")
+  const [ledger, setLedger] = useState<{ balance: number; rows: LedgerRow[] } | null>(null)
   const me = getUser()?.name || "Designer"
 
   useEffect(() => {
     const id = setTimeout(() => {
       if (!getToken()) { setCards([]); return }
       getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
+      getWallet("designer").then((w) => setLedger({ balance: w.balance ?? 0, rows: w.ledger ?? [] })).catch(() => setLedger({ balance: 0, rows: [] }))
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -85,7 +87,7 @@ export function DesignerBoard() {
           <p className="truncate text-sm text-muted-foreground">{view === "kanban" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
         <div className="ml-auto flex rounded-lg border border-border p-0.5">
-          {(["kanban", "list"] as const).map((v) => (
+          {(["kanban", "list", "earnings"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} className={"rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " + (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v}</button>
           ))}
         </div>
@@ -98,7 +100,9 @@ export function DesignerBoard() {
         <StatCard label="Paid out" value={money(stats.paid)} sub="credited to designers" />
       </StatGrid>
 
-      {cards === null ? (
+      {view === "earnings" ? (
+        <DesignerEarnings ledger={ledger} />
+      ) : cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "list" ? (
         <DesignerList cards={cards} onOpen={setOpenId} />
@@ -212,6 +216,50 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
             })}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// Earnings — the designer wallet's ledger (credits in, payouts/withdrawals out).
+function DesignerEarnings({ ledger }: { ledger: { balance: number; rows: LedgerRow[] } | null }) {
+  const fmtDT = (s?: string) => {
+    if (!s) return "—"
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  }
+  if (ledger === null) return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+  const earned = ledger.rows.filter((r) => Number(r.delta) > 0).reduce((s, r) => s + Number(r.delta), 0)
+  return (
+    <div className="space-y-4">
+      <StatGrid>
+        <StatCard label="Balance" value={money(ledger.balance)} sub="designer wallet" tone={ledger.balance ? "pos" : undefined} />
+        <StatCard label="Total earned" value={money(earned)} sub="all time" />
+        <StatCard label="Entries" value={String(ledger.rows.length)} sub="ledger records" />
+      </StatGrid>
+      <div className="overflow-hidden rounded-2xl border border-border">
+        {ledger.rows.length === 0 ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">No earnings yet — credit a designer from an approved card.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr><th className="px-4 py-2.5 font-medium">When</th><th className="px-4 py-2.5 font-medium">Detail</th><th className="px-4 py-2.5 font-medium">Type</th><th className="px-4 py-2.5 text-right font-medium">Amount</th></tr>
+            </thead>
+            <tbody>
+              {ledger.rows.map((r) => {
+                const d = Number(r.delta) || 0
+                return (
+                  <tr key={String(r.id)} className="border-t border-border">
+                    <td className="px-4 py-2 text-muted-foreground">{fmtDT(r.created_at)}</td>
+                    <td className="px-4 py-2">{r.note || r.ref || "—"}</td>
+                    <td className="px-4 py-2 text-muted-foreground">{String(r.type || "").replace(/-(in|out)$/, "")}</td>
+                    <td className={"px-4 py-2 text-right font-semibold tabular-nums " + (d >= 0 ? "text-emerald-600" : "text-foreground")}>{d >= 0 ? "+" : "−"}{money(Math.abs(d))}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
