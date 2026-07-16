@@ -1,5 +1,5 @@
 // Sandbox endpoint catalog for the API Playground — mirrors server/src/routes/sandbox.js
-// (/api/test/*, API-KEY-authed, fully simulated: no real orders/labels/charges).
+// (/api/v1/*, API-KEY-authed, fully simulated: no real orders/labels/charges).
 export type ApiEndpoint = {
   id: string
   method: "GET" | "POST"
@@ -14,21 +14,21 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   {
     id: "ping",
     method: "GET",
-    path: "/api/test/ping",
+    path: "/api/v1/ping",
     title: "Validate key",
     description: "Checks your test key and confirms the sandbox is reachable.",
   },
   {
     id: "products",
     method: "GET",
-    path: "/api/test/products",
+    path: "/api/v1/products",
     title: "List products",
     description: "Returns the catalog blanks you can print on (simulated set).",
   },
   {
     id: "create-order",
     method: "POST",
-    path: "/api/test/orders",
+    path: "/api/v1/orders",
     title: "Create order",
     description: "Simulates creating a fulfillment order. Needs an items array and a shipping_address.",
     body: JSON.stringify(
@@ -51,7 +51,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   {
     id: "get-order",
     method: "GET",
-    path: "/api/test/orders/:id",
+    path: "/api/v1/orders/:id",
     title: "Retrieve order",
     description: "Looks up an order by id (any well-formed id resolves in the sandbox).",
     param: { name: "id", placeholder: "ord_test123" },
@@ -59,7 +59,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   {
     id: "rates",
     method: "POST",
-    path: "/api/test/shipping-rates",
+    path: "/api/v1/shipping-rates",
     title: "Rate-shop shipment",
     description: "Returns simulated carrier rates for a shipment. Needs a to_address.",
     body: JSON.stringify(
@@ -75,7 +75,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   {
     id: "label-domestic",
     method: "POST",
-    path: "/api/test/shipping-labels/domestics",
+    path: "/api/v1/shipping-labels/domestics",
     title: "Buy domestic label",
     description: "Simulates buying a US label. Needs to_address, from_address and parcel (no wallet charge).",
     body: JSON.stringify(
@@ -92,7 +92,7 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   {
     id: "label-international",
     method: "POST",
-    path: "/api/test/shipping-labels/internationals",
+    path: "/api/v1/shipping-labels/internationals",
     title: "Buy international label",
     description: "Simulates an international label with customs. Adds customs_items to the domestic fields.",
     body: JSON.stringify(

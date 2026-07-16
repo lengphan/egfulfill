@@ -16,7 +16,9 @@ const methodTone: Record<string, string> = {
 }
 
 export function ApiPlayground() {
-  const [apiKey, setApiKey] = useState("")
+  const [env, setEnv] = useState<"test" | "live">("test")
+  const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
+  const apiKey = keys[env]
   const [selected, setSelected] = useState<ApiEndpoint>(API_ENDPOINTS[0])
   const [body, setBody] = useState(selected.body ?? "")
   const [param, setParam] = useState(selected.param?.placeholder ?? "")
@@ -27,16 +29,18 @@ export function ApiPlayground() {
   const [freshKey, setFreshKey] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Restore a previously pasted/generated key (session-scoped).
+  // Restore previously pasted/generated keys per environment (session-scoped).
   useEffect(() => {
     const id = setTimeout(() => {
-      try { const k = sessionStorage.getItem(KEY_STORE); if (k) setApiKey(k) } catch {}
+      try {
+        setKeys({ test: sessionStorage.getItem(KEY_STORE + "_test") || "", live: sessionStorage.getItem(KEY_STORE + "_live") || "" })
+      } catch {}
     }, 0)
     return () => clearTimeout(id)
   }, [])
   const rememberKey = (k: string) => {
-    setApiKey(k)
-    try { sessionStorage.setItem(KEY_STORE, k) } catch {}
+    setKeys((prev) => ({ ...prev, [env]: k }))
+    try { sessionStorage.setItem(KEY_STORE + "_" + env, k) } catch {}
   }
 
   const pick = (e: ApiEndpoint) => {
@@ -54,7 +58,7 @@ export function ApiPlayground() {
   const generateKey = async () => {
     setGenLoading(true); setKeyErr(null)
     try {
-      const r = await createApiKey("Playground key")
+      const r = await createApiKey(env === "live" ? "Live playground key" : "Playground key", env)
       setFreshKey(r.key)
       setCopied(false)
       rememberKey(r.key)
@@ -114,20 +118,37 @@ export function ApiPlayground() {
       </details>
 
       {/* Key bar */}
-      <SectionCard title="Your test key" description="Sandbox calls authenticate with a test API key (egk_test_…). It's sent as X-API-Key.">
+      <SectionCard
+        title={<span className="flex items-center gap-2">Your API key
+          <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase " + (env === "live" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700")}>{env}</span>
+        </span>}
+        description="Calls authenticate with this key, sent as the X-API-Key header."
+        actions={
+          <div className="flex rounded-lg border border-border p-0.5">
+            {(["test", "live"] as const).map((m) => (
+              <button key={m} onClick={() => setEnv(m)} className={"rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m}</button>
+            ))}
+          </div>
+        }
+      >
         <div className="space-y-3 p-5">
+          {env === "live" && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={apiKey}
                 onChange={(e) => rememberKey(e.target.value)}
-                placeholder="Paste an egk_test_… key, or generate one"
+                placeholder={env === "live" ? "Paste an egk_live_… key, or generate one" : "Paste an egk_test_… key, or generate one"}
                 className="pl-9 font-mono text-xs"
               />
             </div>
             <Button variant="outline" onClick={generateKey} disabled={genLoading}>
-              {genLoading ? <CircleNotch size={15} className="animate-spin" /> : <Lightning size={15} weight="bold" />} Generate
+              {genLoading ? <CircleNotch size={15} className="animate-spin" /> : <Lightning size={15} weight="bold" />} Generate {env}
             </Button>
           </div>
           {keyErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {keyErr}</div>}
@@ -144,7 +165,7 @@ export function ApiPlayground() {
               </Button>
             </div>
           )}
-          <p className="text-xs text-muted-foreground">Keys are managed in <span className="font-medium text-foreground">Settings → API keys</span>. Everything here hits the sandbox — no real orders, labels or charges.</p>
+          <p className="text-xs text-muted-foreground">Keys are managed in <span className="font-medium text-foreground">Settings → API keys</span>. {env === "live" ? "A live key makes calls create real records." : "A test key hits the sandbox — no real orders, labels or charges."}</p>
         </div>
       </SectionCard>
 

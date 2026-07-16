@@ -14,7 +14,8 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 
 const PREFIX = 'egk_test_';
-const genKey  = () => PREFIX + crypto.randomBytes(24).toString('base64url');       // ~32 url-safe chars
+const LIVE_PREFIX = 'egk_live_';
+const genKey  = (mode) => (mode === 'live' ? LIVE_PREFIX : PREFIX) + crypto.randomBytes(24).toString('base64url'); // ~32 url-safe chars
 const hashKey = (k) => crypto.createHash('sha256').update(k).digest('hex');
 const rid     = (p) => p + '_' + crypto.randomBytes(8).toString('hex');            // fake object id
 const nowISO  = () => new Date().toISOString();
@@ -84,15 +85,16 @@ export function sandboxRoutes(app, requireAuth) {
 
   app.post('/api/keys', { preHandler: requireAuth }, async (req) => {
     await ensure();
-    const label  = ((req.body && req.body.label) || 'Test key').toString().slice(0, 60);
-    const full   = genKey();
-    const prefix = full.slice(0, PREFIX.length + 4) + '…';
+    const mode   = (req.body && req.body.mode === 'live') ? 'live' : 'test';
+    const label  = ((req.body && req.body.label) || (mode === 'live' ? 'Live key' : 'Test key')).toString().slice(0, 60);
+    const full   = genKey(mode);
+    const prefix = full.slice(0, (mode === 'live' ? LIVE_PREFIX : PREFIX).length + 4) + '…';
     const r = await q(
       `insert into api_keys(seller_id, label, prefix, key_hash, mode)
-       values($1,$2,$3,$4,'test') returning id, created_at`,
-      [String(req.user.sub), label, prefix, hashKey(full)]);
+       values($1,$2,$3,$4,$5) returning id, created_at`,
+      [String(req.user.sub), label, prefix, hashKey(full), mode]);
     // The full key is returned ONCE here and never again — the UI must tell the user to copy it.
-    return { id: r.rows[0].id, key: full, prefix, label, mode: 'test', created_at: r.rows[0].created_at };
+    return { id: r.rows[0].id, key: full, prefix, label, mode, created_at: r.rows[0].created_at };
   });
 
   app.delete('/api/keys/:id', { preHandler: requireAuth }, async (req) => {
@@ -217,5 +219,116 @@ export function sandboxRoutes(app, requireAuth) {
       created: nowISO(),
       _note: 'Simulated — no label was purchased and no wallet charge was made.'
     };
+  });
+
+  // ─────────────────────────  /api/v1/*  (mode-aware: TEST simulates, LIVE is real)  ────────
+  // A LIVE key (egk_live_…) makes these do the real thing; a TEST key simulates. Same paths,
+  // so a partner flips one key to go from sandbox → production (PayPal-style).
+  const priceLines = (items) => (items || []).map((it, i) => {
+    const prod = SANDBOX_PRODUCTS.find((p) => p.id === it.product_id);
+    const qty  = Math.max(1, parseInt(it.quantity, 10) || 1);
+    const unit = (it.unit_price != null && it.unit_price !== '') ? parseFloat(it.unit_price) : (prod ? prod.base_price : 12.0);
+    return { line: i + 1, sku: it.product_id || it.sku || null, product: prod ? prod.name : (it.name || 'Custom item'),
+      color: it.color || null, size: it.size || null, method: it.method || 'DTG', quantity: qty,
+      unit_price: +unit.toFixed(2), line_total: +(unit * qty).toFixed(2) };
+  });
+
+  // Insert a REAL order (live keys) for the key's seller, straight into the fulfillment queue.
+  async function createRealOrder(sellerId, b) {
+    const priced = priceLines(b.items);
+    const total = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
+    const id = 'API-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+    const customer = b.customer || (b.shipping_address ? { name: b.shipping_address.name || null } : {});
+    await q(`insert into orders (id, seller_id, source, customer, address, status, factory_status, total, created_at, meta)
+             values ($1,$2,'api',$3,$4,'new','',$5, now(), $6)`,
+      [id, String(sellerId), JSON.stringify(customer), JSON.stringify(b.shipping_address || {}), total,
+       JSON.stringify({ external_id: b.external_id || null, via: 'api' })]);
+    for (const l of priced) {
+      await q(`insert into order_items (order_id, sku, name, qty, color, size, unit_price, print_type)
+               values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [id, l.sku, l.product, l.quantity, l.color, l.size, l.unit_price, l.method]).catch(() => {});
+    }
+    return { id, total, items: priced };
+  }
+
+  app.get('/api/v1/ping', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    return { ok: true, mode: k.mode, live: k.mode === 'live', seller_id: k.seller_id, time: nowISO(),
+      message: k.mode === 'live' ? 'Live API reachable — calls create real records.' : 'Sandbox reachable — your test key is valid.' };
+  });
+
+  app.get('/api/v1/products', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    if (k.mode === 'live') {
+      try { const r = await q('select id, name, type, method, price, base_price from catalog_products order by name limit 200');
+        return { object: 'list', mode: 'live', data: r.rows, count: r.rowCount }; }
+      catch { return { object: 'list', mode: 'live', data: [], count: 0 }; }
+    }
+    return { object: 'list', mode: 'test', data: SANDBOX_PRODUCTS, count: SANDBOX_PRODUCTS.length };
+  });
+
+  app.post('/api/v1/orders', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    const b = req.body || {};
+    const items = Array.isArray(b.items) ? b.items : null;
+    if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
+    if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address']);
+    if (k.mode === 'live') {
+      const o = await createRealOrder(k.seller_id, b);
+      return { object: 'order', mode: 'live', id: o.id, status: 'received', items: o.items,
+        shipping_address: b.shipping_address, totals: { items: o.total, currency: 'USD' }, created: nowISO() };
+    }
+    const priced = priceLines(items);
+    const itemsTotal = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
+    return { object: 'order', mode: 'test', id: rid('ord'), status: 'received', items: priced,
+      shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
+      created: nowISO(), _note: 'Simulated — send a live key (egk_live_…) to create a real order.' };
+  });
+
+  app.get('/api/v1/orders/:id', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    if (k.mode === 'live') {
+      try {
+        const r = await q('select id, seq, status, factory_status, total, tracking, carrier, created_at from orders where id=$1 and seller_id=$2',
+          [req.params.id, String(k.seller_id)]);
+        if (!r.rows.length) { reply.code(404); return { error: 'Order not found', mode: 'live' }; }
+        const o = r.rows[0];
+        return { object: 'order', mode: 'live', id: o.id, status: o.factory_status || o.status || 'received',
+          tracking: { carrier: o.carrier || null, code: o.tracking || null }, total: o.total, created: o.created_at };
+      } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
+    }
+    return { object: 'order', mode: 'test', id: req.params.id, status: 'in_production',
+      tracking: { carrier: 'USPS', code: null, url: null }, _note: 'Simulated lookup.' };
+  });
+
+  // Shipping (v1) — simulated for both modes for now; live USPS-direct label buying is
+  // enabled per-account (it moves real money), so it stays a sandbox response here.
+  app.post('/api/v1/shipping-rates', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    if (!(req.body || {}).to_address) return bad(reply, 'A rate request needs a "to_address" object.', ['to_address']);
+    return { object: 'rate_list', mode: k.mode, rates: sandboxRates(),
+      _note: k.mode === 'live' ? 'Sample rates — live USPS-direct label buying is enabled per-account.' : 'Simulated rates.' };
+  });
+  app.post('/api/v1/shipping-labels/domestics', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    const b = req.body || {}; const miss = ['to_address', 'from_address', 'parcel'].filter((f) => !b[f]);
+    if (miss.length) return bad(reply, 'A domestic label needs to_address, from_address and parcel.', miss);
+    const chosen = sandboxRates()[0]; const id = rid('lbl');
+    return { object: 'label', mode: k.mode, id, carrier: 'USPS', service: b.service || chosen.service,
+      tracking_code: 'EGTEST' + crypto.randomBytes(5).toString('hex').toUpperCase(),
+      rate: { amount: chosen.amount, currency: 'USD' },
+      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`, tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
+      created: nowISO(), _note: k.mode === 'live' ? 'Sample label — live USPS-direct buying is enabled per-account.' : 'Simulated — no label purchased.' };
+  });
+  app.post('/api/v1/shipping-labels/internationals', async (req, reply) => {
+    const k = await requireKey(req, reply); if (k.error) return k;
+    const b = req.body || {}; const miss = ['to_address', 'from_address', 'parcel', 'customs_items'].filter((f) => !b[f]);
+    if (miss.length) return bad(reply, 'An international label needs to_address, from_address, parcel and customs_items.', miss);
+    const id = rid('lbl');
+    return { object: 'label', mode: k.mode, id, carrier: 'USPS', service: b.service || 'Priority Mail International',
+      tracking_code: 'LZ' + crypto.randomBytes(5).toString('hex').toUpperCase() + 'US', rate: { amount: 28.40, currency: 'USD' },
+      customs: { contents_type: 'merchandise', items: b.customs_items },
+      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`, tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
+      created: nowISO(), _note: k.mode === 'live' ? 'Sample label — live USPS-direct buying is enabled per-account.' : 'Simulated — no label purchased.' };
   });
 }

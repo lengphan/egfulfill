@@ -708,10 +708,10 @@ export function getApiKeys() {
   return api<{ keys: ApiKey[] }>(`/api/keys`)
 }
 
-export function createApiKey(label: string) {
+export function createApiKey(label: string, mode: "test" | "live" = "test") {
   return api<{ id: number | string; key: string; prefix: string; label: string; mode: string; created_at: string }>(
     `/api/keys`,
-    { method: "POST", body: JSON.stringify({ label }) }
+    { method: "POST", body: JSON.stringify({ label, mode }) }
   )
 }
 
