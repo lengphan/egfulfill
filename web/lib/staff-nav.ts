@@ -41,7 +41,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
   { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin"] },
-  { label: "Developers", href: "/developers", icon: Code, roles: ["admin"] },
+  { label: "Developers", href: "/developers", icon: Code, roles: ["operator", "warehouse", "admin"] },
 ]
 export function staffTools(role?: string | null): StaffNavItem[] {
   if (!role) return []
