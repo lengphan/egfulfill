@@ -443,9 +443,12 @@ export function googleLogin(credential: string) {
 }
 
 // ─────────────────── Integration credentials (masked, read-only, staff) ───────────────────
-export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null }
+export type SecretMeta = { name: string; label: string; integration: string; set: boolean; last4: string | null; editable?: boolean }
 export function getAdminSecrets() {
   return api<{ secrets: SecretMeta[] }>(`/api/admin/secrets`)
+}
+export function setAdminSecret(name: string, value: string) {
+  return api<{ ok?: boolean; name?: string; set?: boolean; last4?: string | null; error?: string }>(`/api/admin/secrets`, { method: "PUT", body: JSON.stringify({ name, value }) })
 }
 
 // ─────────────────── Address validation (USPS) ───────────────────

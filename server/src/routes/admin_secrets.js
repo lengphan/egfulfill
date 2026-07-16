@@ -4,6 +4,8 @@
 // credential (exactly what Stripe/AWS dashboards show). Reads straight from
 // process.env — no DB, no decryption. Powers the last-4 display in Settings ›
 // Integrations, which is already gated to staff in the UI.
+import { setSecret, SECRET_NAMES } from '../secrets.js';
+
 const SECRET_DEFS = [
   { name: 'ETSY_KEYSTRING',        label: 'Keystring',        integration: 'etsy' },
   { name: 'ETSY_SHARED_SECRET',    label: 'Shared secret',    integration: 'etsy' },
@@ -31,7 +33,21 @@ export function adminSecretsRoutes(app, requireStaff) {
   app.get('/api/admin/secrets', { preHandler: requireStaff }, async () => ({
     secrets: SECRET_DEFS.map((d) => {
       const v = (process.env[d.name] || '').trim();
-      return { name: d.name, label: d.label, integration: d.integration, set: !!v, last4: v ? v.slice(-4) : null };
+      const editable = SECRET_NAMES.includes(d.name);
+      return { name: d.name, label: d.label, integration: d.integration, set: !!v, last4: v ? v.slice(-4) : null, editable };
     }),
   }));
+
+  // Admin: set/replace/clear one secret in the DB (loaded into env at boot; also
+  // applied live). Whitelisted names only. Takes full effect on the next restart.
+  app.put('/api/admin/secrets', { preHandler: requireStaff }, async (req, reply) => {
+    if (!req.user || req.user.role !== 'admin') { reply.code(403); return { error: 'Admin only' }; }
+    const b = req.body || {};
+    const name = String(b.name || '');
+    if (!SECRET_NAMES.includes(name)) { reply.code(400); return { error: 'Unknown or non-editable secret' }; }
+    try { await setSecret(name, b.value, req.user.sub); }
+    catch (e) { reply.code(400); return { error: (e && e.message) || 'Save failed' }; }
+    const v = (process.env[name] || '').trim();
+    return { ok: true, name, set: !!v, last4: v ? v.slice(-4) : null };
+  });
 }

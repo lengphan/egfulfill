@@ -1,11 +1,47 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ArrowsClockwise, ShieldCheck, Sparkle, Check } from "@phosphor-icons/react"
+import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { api, ApiError, getAdminSecrets, getAiConfig, setAiConfig, type SecretMeta, type AiConfig } from "@/lib/api"
+import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, type SecretMeta, type AiConfig } from "@/lib/api"
+
+// One integration credential row — read-only status, plus inline edit for whitelisted
+// secrets (saved to the DB; applied on the next server restart).
+function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState("")
+  const [busy, setBusy] = useState(false)
+  const save = async (clear = false) => {
+    setBusy(true)
+    try { await setAdminSecret(s.name, clear ? "" : val.trim()); setEditing(false); setVal(""); onSaved() } catch {} finally { setBusy(false) }
+  }
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className="w-24 shrink-0 truncate text-[11px] text-muted-foreground">{s.label}</span>
+        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-7 flex-1 font-mono text-xs" autoFocus />
+        <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
+        {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-red-600" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
+        <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setVal("") }}><X size={12} /></Button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="text-muted-foreground">{s.label}</span>
+      <span className="flex items-center gap-1.5 font-mono">
+        {s.set ? <span className="text-foreground">••••{s.last4}</span> : <span className="text-muted-foreground">not set</span>}
+        {s.editable && (
+          <button onClick={() => setEditing(true)} className="text-muted-foreground transition-colors hover:text-primary" title={s.set ? "Replace" : "Set"} aria-label="Edit credential">
+            <PencilSimple size={12} />
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
 
 type Level = "live" | "configured" | "off" | "error" | "restricted" | "checking"
 type Result = { level: Level; detail?: string }
@@ -147,6 +183,17 @@ export function IntegrationsPanel() {
   const [secrets, setSecrets] = useState<Record<string, SecretMeta[]>>({})
   const [checking, setChecking] = useState(false)
 
+  // Re-fetch just the secret metadata (after an edit) — no full integration recheck.
+  const reloadSecrets = useCallback(() => {
+    getAdminSecrets()
+      .then((r) => {
+        const byI: Record<string, SecretMeta[]> = {}
+        for (const s of r.secrets) (byI[s.integration] ??= []).push(s)
+        setSecrets(byI)
+      })
+      .catch(() => {})
+  }, [])
+
   const runChecks = useCallback(() => {
     setChecking(true)
     setResults(Object.fromEntries(INTEGRATIONS.map((i) => [i.key, { level: "checking" as Level }])))
@@ -192,7 +239,7 @@ export function IntegrationsPanel() {
 
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
         <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
-        The credentials below are read-only — swap one by updating the server <code className="font-mono">.env</code>; status reflects it on the next recheck.
+        Click the <PencilSimple size={11} className="inline" /> to set or replace a credential — it&apos;s saved to the database and applied on the next server restart (no more editing <code className="font-mono">.env</code>).
       </div>
 
       <div className="space-y-6 p-5">
@@ -224,18 +271,9 @@ export function IntegrationsPanel() {
                         </div>
                       )}
                       {(secrets[i.key] ?? []).length > 0 && (
-                        <div className="mt-2 space-y-1 border-t border-border pt-2">
+                        <div className="mt-2 space-y-1.5 border-t border-border pt-2">
                           {(secrets[i.key] ?? []).map((s) => (
-                            <div key={s.name} className="flex items-center justify-between gap-2 text-[11px]">
-                              <span className="text-muted-foreground">{s.label}</span>
-                              <span className="font-mono">
-                                {s.set ? (
-                                  <span className="text-foreground">••••{s.last4}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">not set</span>
-                                )}
-                              </span>
-                            </div>
+                            <SecretRow key={s.name} s={s} onSaved={reloadSecrets} />
                           ))}
                         </div>
                       )}
