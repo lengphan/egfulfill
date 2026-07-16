@@ -670,6 +670,21 @@ export function disconnectEtsy(shopId: string) {
   return api<{ ok: boolean }>(`/api/etsy/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
 }
 
+// ── Shopify (per-store OAuth) — parallel to Etsy ──
+export type ShopifyConfig = { api_key: string; scopes: string; redirect_uri: string; configured: boolean }
+export function getShopifyConfig() {
+  return api<ShopifyConfig>(`/api/shopify/config`)
+}
+export function getShopifyConnections() {
+  return api<EtsyConnection[]>(`/api/shopify/connections`)
+}
+export function exchangeShopify(body: { shop: string; code: string; params: Record<string, string> }) {
+  return api<{ shop_name?: string; error?: string }>(`/api/shopify/exchange`, { method: "POST", body: JSON.stringify(body) })
+}
+export function disconnectShopify(shopId: string) {
+  return api<{ ok: boolean }>(`/api/shopify/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
+}
+
 export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
   return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {
     method: "POST",

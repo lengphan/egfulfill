@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { CheckCircle, XCircle, CircleNotch } from "@phosphor-icons/react"
-import { exchangeEtsy } from "@/lib/api"
+import { exchangeEtsy, exchangeShopify } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
+import { clearShopifyOAuth } from "@/lib/shopify-oauth"
 
 type State =
   | { kind: "working" }
@@ -31,6 +32,24 @@ export default function OAuthCallbackPage() {
         setState({ kind: "error", message: "No authorization code returned." })
         return
       }
+
+      // Shopify callbacks carry a `shop` param (+ hmac). Etsy's don't.
+      const shopParam = params.get("shop")
+      if (shopParam) {
+        try {
+          const allParams = Object.fromEntries(params.entries())
+          const data = await exchangeShopify({ shop: shopParam.toLowerCase(), code, params: allParams })
+          if (data.error) throw new Error(data.error)
+          clearShopifyOAuth()
+          setState({ kind: "ok", shop: data.shop_name || "your Shopify store" })
+          setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
+        } catch (e: unknown) {
+          clearShopifyOAuth()
+          setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
+        }
+        return
+      }
+
       const pkce = readPkce()
       if (!pkce?.verifier) {
         setState({ kind: "error", message: "Lost the security key. Start the connection again from Stores — don't reload this window." })

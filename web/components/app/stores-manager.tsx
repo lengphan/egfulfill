@@ -11,15 +11,20 @@ import {
 } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import {
   getEtsyConnections,
   getEtsyConfig,
   syncEtsy,
   disconnectEtsy,
+  getShopifyConfig,
+  getShopifyConnections,
+  disconnectShopify,
   type EtsyConnection,
 } from "@/lib/api"
 import { startEtsyConnect } from "@/lib/etsy-oauth"
+import { startShopifyConnect } from "@/lib/shopify-oauth"
 
 const fmtDate = (s: string | null) => {
   if (!s) return "never"
@@ -30,7 +35,7 @@ const fmtDate = (s: string | null) => {
 // Channels shown even when unconnected. Only Etsy has a live OAuth route today.
 const CHANNELS = [
   { key: "etsy", name: "Etsy", blurb: "Sync orders & push tracking back", live: true },
-  { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: false },
+  { key: "shopify", name: "Shopify", blurb: "Storefront order sync", live: true },
   { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace order sync", live: false },
   { key: "woocommerce", name: "WooCommerce", blurb: "WordPress store sync", live: false },
 ]
@@ -42,16 +47,14 @@ export function StoresManager() {
   const [busy, setBusy] = useState<string | null>(null) // shop_id or "connect"
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; msg: string } | null>(null)
 
+  const [shopDomain, setShopDomain] = useState("")
+
   const load = useCallback(() => {
-    getEtsyConnections()
-      .then((rows) => {
-        setConns(rows ?? [])
-        setIsDemo(false)
-      })
-      .catch(() => {
-        setConns([])
-        setIsDemo(true)
-      })
+    Promise.all([
+      getEtsyConnections().catch(() => [] as EtsyConnection[]),
+      getShopifyConnections().catch(() => [] as EtsyConnection[]),
+    ]).then(([e, s]) => { setConns([...(e ?? []), ...(s ?? [])]); setIsDemo(false) })
+      .catch(() => { setConns([]); setIsDemo(true) })
   }, [])
 
   useEffect(() => {
@@ -81,6 +84,20 @@ export function StoresManager() {
     }
   }
 
+  const onConnectShopify = async () => {
+    setBusy("connect-shopify"); setNotice(null)
+    try {
+      const cfg = await getShopifyConfig()
+      if (!cfg.configured || !cfg.api_key) {
+        setNotice({ tone: "err", msg: "Shopify isn't configured on the server yet (SHOPIFY_API_KEY / SECRET)." }); setBusy(null); return
+      }
+      startShopifyConnect(cfg, shopDomain) // redirects away
+    } catch (e) {
+      setNotice({ tone: "err", msg: e instanceof Error ? e.message : "Enter your store as mystore.myshopify.com" })
+      setBusy(null)
+    }
+  }
+
   const onSync = async () => {
     setBusy("sync")
     setNotice(null)
@@ -100,7 +117,8 @@ export function StoresManager() {
     setBusy(c.shop_id)
     setNotice(null)
     try {
-      await disconnectEtsy(c.shop_id)
+      if ((c.platform || "").toLowerCase() === "shopify") await disconnectShopify(c.shop_id)
+      else await disconnectEtsy(c.shop_id)
       setNotice({ tone: "ok", msg: `Disconnected ${c.shop_name || "shop"}.` })
       setConns((prev) => (prev ?? []).filter((x) => x.shop_id !== c.shop_id))
     } catch (e) {
@@ -228,7 +246,14 @@ export function StoresManager() {
               </span>
               <div className="mt-3 font-semibold">{ch.name}</div>
               <p className="mt-1 flex-1 text-sm text-muted-foreground">{ch.blurb}</p>
-              {ch.live ? (
+              {ch.key === "shopify" ? (
+                <div className="mt-4 space-y-2">
+                  <Input value={shopDomain} onChange={(e) => setShopDomain(e.target.value)} placeholder="mystore.myshopify.com" className="h-9 text-sm" />
+                  <Button size="sm" className="w-full" onClick={onConnectShopify} disabled={busy === "connect-shopify" || !shopDomain.trim()}>
+                    <Plus size={14} weight="bold" /> {busy === "connect-shopify" ? "Redirecting…" : "Connect"}
+                  </Button>
+                </div>
+              ) : ch.live ? (
                 <Button size="sm" className="mt-4" onClick={onConnect} disabled={busy === "connect"}>
                   <Plus size={14} weight="bold" />
                   {busy === "connect" ? "Redirecting…" : "Connect"}
