@@ -153,7 +153,7 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
             <button
               type="button"
               onClick={(ev) => { ev.preventDefault(); onMakeProduct(l) }}
-              className={"flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+              className={"flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (uploaded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
             >
               {uploaded ? <><CheckCircle size={13} weight="fill" /> Uploaded — draft</> : <><Storefront size={13} weight="bold" /> Make product</>}
             </button>

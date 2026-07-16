@@ -189,7 +189,7 @@ export function OttoSuppliers() {
                     <button
                       onClick={() => addToCatalog(s)}
                       disabled={isAdded || addingId === s.style}
-                      className={"mt-auto flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors " + (isAdded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
+                      className={"mt-auto flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (isAdded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
                     >
                       {addingId === s.style ? <CircleNotch size={13} className="animate-spin" /> : isAdded ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
                     </button>

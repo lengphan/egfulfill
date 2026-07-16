@@ -177,7 +177,7 @@ export default function ChatPage() {
   const escalate = async () => {
     if (!activeId) return
     const clientId = `c-${cidBase.current}-${cidSeq.current++}`
-    const text = "🙋 I'd like to talk to a human — please have someone follow up."
+    const text = "I'd like to talk to a human — please have someone follow up."
     setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
     setAiNote("Flagged for a teammate — someone will reply here shortly.")
     try { await postOrderMessage(activeId, text, { clientId, by: myName }); await load() } catch {}

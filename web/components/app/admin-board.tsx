@@ -281,7 +281,7 @@ export function AdminBoard() {
         <TabsContent value="topups">
           <SectionCard title="Pending top-ups" description="Confirm credits the seller's wallet; reject leaves it untouched">
             {topups.length === 0 ? (
-              <div className="py-14 text-center text-sm text-muted-foreground">No pending top-ups 🎉</div>
+              <div className="py-14 text-center text-sm text-muted-foreground">No pending top-ups</div>
             ) : (
               <div className="divide-y divide-border">
                 {topups.map((t) => (

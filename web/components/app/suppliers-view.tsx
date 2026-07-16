@@ -118,7 +118,7 @@ export function SuppliersView() {
       {/* Supplier tabs */}
       <div className="flex w-fit rounded-lg border border-border p-0.5">
         {([{ id: "ss", label: "S&S Activewear" }, { id: "otto", label: "Otto Cap" }] as const).map((t) => (
-          <button key={t.id} onClick={() => setSupplier(t.id)} className={"rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (supplier === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{t.label}</button>
+          <button key={t.id} onClick={() => setSupplier(t.id)} className={"rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (supplier === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{t.label}</button>
         ))}
       </div>
 
