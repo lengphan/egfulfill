@@ -57,7 +57,7 @@ export default function LoginPage() {
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-6">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Email or username</span>
+            <span className="text-sm font-medium">Email/Username</span>
             <Input
               type="text"
               value={email}

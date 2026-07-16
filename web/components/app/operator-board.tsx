@@ -8,7 +8,8 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { getOrders, postItemStatus, type OrderRow, type OrderItem } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { FACTORY_STAGES, TONE_CLASS, normalizeStage, nextStage, stageMeta, orderStage } from "@/lib/factory-status"
+import { FACTORY_STAGES, normalizeStage, nextStage, stageMeta, orderStage } from "@/lib/factory-status"
+import { StageBadge } from "@/components/app/stage-badge"
 
 const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
 const fmtDate = (s?: string | null) => {
@@ -21,13 +22,6 @@ const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(B
 type Filter = "All" | "New" | "Queued" | "Printing" | "QC" | "Packed" | "Shipped"
 const FILTERS: Filter[] = ["All", "New", "Queued", "Printing", "QC", "Packed", "Shipped"]
 const filterId = (f: Filter) => (f === "New" ? "" : f.toLowerCase())
-
-function StageBadge({ status }: { status?: string | null }) {
-  const id = normalizeStage(status)
-  if (!id) return <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">New</span>
-  const m = stageMeta(id)
-  return <span className={"rounded-full px-2 py-0.5 text-xs font-medium " + (m ? TONE_CLASS[m.tone] : "bg-muted")}>{m?.label ?? id}</span>
-}
 
 export function OperatorBoard() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)

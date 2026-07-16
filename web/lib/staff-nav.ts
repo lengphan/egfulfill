@@ -1,11 +1,12 @@
-import { Printer, type Icon } from "@phosphor-icons/react"
+import { Printer, Package, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
-// Staff boards, gated by role. Only routes that exist are listed (Warehouse/Admin
-// get added here as they're built). Admin sees everything.
+// Staff boards, gated by role. Only routes that exist are listed (Admin gets added
+// here as it's built). Admin sees everything.
 const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Operator", href: "/operator", icon: Printer, roles: ["operator", "admin"] },
+  { label: "Warehouse", href: "/warehouse", icon: Package, roles: ["warehouse", "admin"] },
 ]
 
 export const STAFF_ROLES = ["operator", "warehouse", "designer", "admin"]

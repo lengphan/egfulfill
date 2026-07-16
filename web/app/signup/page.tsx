@@ -49,7 +49,7 @@ export default function SignupPage() {
           <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="My Store" autoComplete="organization" />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Email or username</span>
+          <span className="text-sm font-medium">Email/Username</span>
           <Input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="username" required />
         </label>
         <label className="flex flex-col gap-1.5">
