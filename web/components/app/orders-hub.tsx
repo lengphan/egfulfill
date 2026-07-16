@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck } from "@phosphor-icons/react"
+import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, DownloadSimple, Warning, Flag, MapPin } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, type OrderRow, type OrderItem, type DesignCard } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, stageMeta, orderStage, isException } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
@@ -27,6 +27,45 @@ const fmtDate = (s?: string | null) => {
 }
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
+
+// USPS mail classes offered for a direct label buy (Labels 3.0 values).
+const MAIL_CLASSES: { id: string; label: string }[] = [
+  { id: "USPS_GROUND_ADVANTAGE", label: "Ground Advantage" },
+  { id: "PRIORITY_MAIL", label: "Priority Mail" },
+  { id: "PRIORITY_MAIL_EXPRESS", label: "Priority Express" },
+]
+
+// Warehouse return address — set once, persisted locally (used as the label "from").
+const FROM_STORE = "eg_ship_from"
+const BLANK_ADDR: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
+
+// Pull a shippable recipient out of an order's stored address (handles Etsy + manual key shapes).
+const toAddrOf = (o: OrderRow): ShipAddress => {
+  const a = (o.address ?? {}) as Record<string, string>
+  return {
+    name: o.customer?.name || a.name || "",
+    street: a.street || a.first_line || a.line1 || a.address1 || "",
+    street2: a.street2 || a.second_line || a.line2 || a.address2 || "",
+    city: a.city || "",
+    state: a.state || a.province || "",
+    zip: a.zip || a.postal_code || a.postcode || "",
+  }
+}
+const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
+
+// Open a bought label in a new tab, whatever shape it came back as (URL / base64 / mock HTML).
+const openLabel = (r: UspsLabelResult) => {
+  if (r.labelUrl) { window.open(r.labelUrl, "_blank"); return }
+  const w = window.open("", "_blank")
+  if (!w) return
+  if (r.labelHtml) { w.document.write(r.labelHtml); w.document.close(); return }
+  if (r.labelImage) {
+    const mime = (r.imageType || "").toUpperCase() === "PDF" ? "application/pdf" : "image/png"
+    const src = r.labelImage.startsWith("data:") ? r.labelImage : `data:${mime};base64,${r.labelImage}`
+    if (mime === "application/pdf") w.location.href = src
+    else { w.document.write(`<img src="${src}" style="max-width:100%"/>`); w.document.close() }
+  }
+}
 
 // Filters derive from the canonical pipeline so they always match the status model.
 const FILTERS: { label: string; id: string }[] = [
@@ -53,11 +92,25 @@ export function OrdersHub() {
   const [carrier, setCarrier] = useState("USPS")
   const [tracking, setTracking] = useState("")
 
+  // ── Label buy (USPS-direct) ──
+  const [from, setFrom] = useState<ShipAddress>(BLANK_ADDR)
+  const [to, setTo] = useState<ShipAddress>(BLANK_ADDR)
+  const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
+  const [labelErr, setLabelErr] = useState<string | null>(null)
+  const [labels, setLabels] = useState<Record<string, UspsLabelResult>>({})
+
   const load = useCallback(() => {
     if (!getToken()) { setOrders([]); return }
     getOrders().then((rows) => setOrders(rows ?? [])).catch(() => setOrders([]))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  // Restore the saved warehouse "from" address.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK_ADDR, ...JSON.parse(raw) }) } catch {}
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
 
   const patchItem = (orderId: string, sku: string, to: string) =>
     setOrders((prev) => (prev ?? []).map((o) => (o.id !== orderId ? o : { ...o, items: (o.items ?? []).map((it) => (it.sku === sku ? { ...it, factory_status: to } : it)) })))
@@ -86,6 +139,38 @@ export function OrdersHub() {
       for (const it of order.items ?? []) if (it.sku) { patchItem(order.id, it.sku, "shipped"); await postItemStatus(order.id, it.sku, "shipped") }
       await updateOrder(order.id, { tracking: tracking.trim() || undefined, carrier, factoryStatus: "shipped", status: "shipped" })
       setShipOpen(null); setTracking(""); load()
+    } catch { load() } finally { setBusy(null) }
+  }
+  // Open the fulfill panel for an order — prefill recipient from the order address.
+  const openFulfill = (o: OrderRow) => {
+    setShipOpen(o.id); setLabelErr(null); setCarrier("USPS"); setTracking("")
+    setTo(toAddrOf(o))
+  }
+  // Buy a real USPS-direct label (directUsps → skips the Shippo/EasyPost aggregator).
+  // On success the server writes tracking + flips the order to shipped; we mirror locally.
+  const buyLabel = async (o: OrderRow) => {
+    setLabelErr(null)
+    if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }
+    if (!addrComplete(from)) { setLabelErr("Set your warehouse 'From' address (street, city, state, ZIP)."); return }
+    setBusy(`label:${o.id}`)
+    try {
+      try { localStorage.setItem(FROM_STORE, JSON.stringify(from)) } catch {}
+      const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
+      if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }
+      setLabels((prev) => ({ ...prev, [o.id]: r }))
+      for (const it of o.items ?? []) if (it.sku) patchItem(o.id, it.sku, "shipped")
+      openLabel(r)
+      setShipOpen(null); load()
+    } catch (e) {
+      setLabelErr(e instanceof Error ? e.message : "Label request failed.")
+    } finally { setBusy(null) }
+  }
+  // Order-level status: flag / hold / advance every line at once.
+  const setOrderStatus = async (o: OrderRow, to: string) => {
+    setBusy(`ord:${o.id}`)
+    try {
+      for (const it of o.items ?? []) if (it.sku) { patchItem(o.id, it.sku, to); await postItemStatus(o.id, it.sku, to) }
+      await updateOrder(o.id, { factoryStatus: to }).catch(() => {})
     } catch { load() } finally { setBusy(null) }
   }
   // Send a line item to the Designer board as a new card (whole-board upsert).
@@ -176,25 +261,59 @@ export function OrdersHub() {
               const items = o.items ?? []
               const stage = orderStage(items)
               const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
+              const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
+              const label = labels[o.id]
+              const track = label?.trackingNumber || o.tracking
               return (
                 <div key={o.id} className="p-5">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
-                      <StageBadge status={stage} />
-                      <span className="text-sm text-muted-foreground">{o.customer?.name || "—"}</span>
-                      <span className="text-xs text-muted-foreground">· {(o.store || o.source || "manual")} · {fmtDate(o.created_at)}{addrLine(o) ? ` · ${addrLine(o)}` : ""}</span>
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
+                        <StageBadge status={stage} />
+                        <span className="truncate text-sm font-medium">{o.customer?.name || "—"}</span>
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize">{o.store || o.source || "manual"}</span>
+                        <span>{fmtDate(o.created_at)}</span>
+                        <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
+                        {addrLine(o) && <span className="inline-flex items-center gap-0.5"><MapPin size={11} weight="fill" /> {addrLine(o)}</span>}
+                        {track && <span className="inline-flex items-center gap-0.5 font-medium text-emerald-600"><Truck size={11} weight="fill" /> {o.carrier || label?.carrier || "USPS"} {track}</span>}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Order-level status / flag — applies to every line at once */}
+                      {(canDesign || canFulfill) && !allShipped && (
+                        <div className="relative">
+                          <select
+                            value=""
+                            onChange={(e) => { if (e.target.value) setOrderStatus(o, e.target.value) }}
+                            disabled={busy === `ord:${o.id}`}
+                            className="h-8 rounded-md border border-input bg-transparent pl-7 pr-2 text-xs font-medium"
+                            aria-label="Flag or set order status"
+                            title="Flag or set order status"
+                          >
+                            <option value="">Flag / status…</option>
+                            <optgroup label="Set all items to">
+                              {ALL_STATUSES.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id)).map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
+                            </optgroup>
+                            <optgroup label="Exceptions">
+                              {EXCEPTION_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                            </optgroup>
+                          </select>
+                          <Flag size={13} weight="fill" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        </div>
+                      )}
                       {canFulfill && stage === "" && (
                         <Button size="sm" onClick={() => receiveOrder(o)} disabled={busy?.startsWith(o.id)}>Receive <ArrowRight size={13} weight="bold" /></Button>
                       )}
                       {allShipped ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {o.carrier || "Shipped"}{o.tracking ? ` · ${o.tracking}` : ""}</span>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
                       ) : (
                         <>
-                          {canFulfill && stage === "packing" && shipOpen !== o.id && (
-                            <Button size="sm" onClick={() => { setShipOpen(o.id); setCarrier("USPS"); setTracking("") }}><Truck size={14} weight="bold" /> Ship</Button>
+                          {label && <Button size="sm" variant="ghost" onClick={() => openLabel(label)} title="Reopen label"><Printer size={14} weight="bold" /> Label</Button>}
+                          {canFulfill && shipOpen !== o.id && (
+                            <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>
                           )}
                           <Button size="sm" variant="outline" onClick={() => advanceOrder(o)}>Advance all <ArrowRight size={13} weight="bold" /></Button>
                         </>
@@ -202,23 +321,93 @@ export function OrdersHub() {
                     </div>
                   </div>
 
-                  {/* Ship form (warehouse/admin) */}
+                  {/* Fulfill panel (warehouse/admin): buy a USPS-direct label, or record tracking manually */}
                   {canFulfill && shipOpen === o.id && (
-                    <div className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Carrier</span>
-                        <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-                          {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </label>
-                      <label className="flex flex-1 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Tracking number (optional)</span>
-                        <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" className="h-9" />
-                      </label>
-                      <Button size="sm" onClick={() => shipOrder(o)} disabled={busy === `ship:${o.id}`}>
-                        {busy === `ship:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> Mark shipped</>}
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setShipOpen(null)}>Cancel</Button>
+                    <div className="mb-3 space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {/* Ship to — prefilled from the order */}
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          <Input value={to.name ?? ""} onChange={(e) => setTo({ ...to, name: e.target.value })} placeholder="Recipient name" className="h-9" />
+                          <Input value={to.street ?? ""} onChange={(e) => setTo({ ...to, street: e.target.value })} placeholder="Street address" className="h-9" />
+                          <Input value={to.street2 ?? ""} onChange={(e) => setTo({ ...to, street2: e.target.value })} placeholder="Apt, suite (optional)" className="h-9" />
+                          <div className="grid grid-cols-[1fr_4rem_5rem] gap-2">
+                            <Input value={to.city ?? ""} onChange={(e) => setTo({ ...to, city: e.target.value })} placeholder="City" className="h-9" />
+                            <Input value={to.state ?? ""} onChange={(e) => setTo({ ...to, state: e.target.value })} placeholder="ST" className="h-9" />
+                            <Input value={to.zip ?? ""} onChange={(e) => setTo({ ...to, zip: e.target.value })} placeholder="ZIP" className="h-9" />
+                          </div>
+                        </div>
+                        {/* Ship from — your warehouse, saved for next time */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship from</span>
+                            <span className="text-[10px] text-muted-foreground">saved for next time</span>
+                          </div>
+                          <Input value={from.name ?? ""} onChange={(e) => setFrom({ ...from, name: e.target.value })} placeholder="Warehouse / sender name" className="h-9" />
+                          <Input value={from.street ?? ""} onChange={(e) => setFrom({ ...from, street: e.target.value })} placeholder="Street address" className="h-9" />
+                          <Input value={from.street2 ?? ""} onChange={(e) => setFrom({ ...from, street2: e.target.value })} placeholder="Suite (optional)" className="h-9" />
+                          <div className="grid grid-cols-[1fr_4rem_5rem] gap-2">
+                            <Input value={from.city ?? ""} onChange={(e) => setFrom({ ...from, city: e.target.value })} placeholder="City" className="h-9" />
+                            <Input value={from.state ?? ""} onChange={(e) => setFrom({ ...from, state: e.target.value })} placeholder="ST" className="h-9" />
+                            <Input value={from.zip ?? ""} onChange={(e) => setFrom({ ...from, zip: e.target.value })} placeholder="ZIP" className="h-9" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Package + service */}
+                      <div className="flex flex-wrap items-end gap-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Service</span>
+                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                            {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                          </select>
+                        </label>
+                        <label className="flex w-20 flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">Weight oz</span>
+                          <Input type="number" min={1} value={pkg.weightOz} onChange={(e) => setPkg({ ...pkg, weightOz: Number(e.target.value) })} className="h-9" />
+                        </label>
+                        <label className="flex w-16 flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">L in</span>
+                          <Input type="number" min={1} value={pkg.length} onChange={(e) => setPkg({ ...pkg, length: Number(e.target.value) })} className="h-9" />
+                        </label>
+                        <label className="flex w-16 flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">W in</span>
+                          <Input type="number" min={1} value={pkg.width} onChange={(e) => setPkg({ ...pkg, width: Number(e.target.value) })} className="h-9" />
+                        </label>
+                        <label className="flex w-16 flex-col gap-1">
+                          <span className="text-xs text-muted-foreground">H in</span>
+                          <Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" />
+                        </label>
+                        <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}`} className="ml-auto">
+                          {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
+                        </Button>
+                      </div>
+
+                      {labelErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {labelErr}</div>}
+
+                      {/* Manual fallback — record a label bought elsewhere */}
+                      <details className="rounded-lg border border-border bg-card">
+                        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-muted-foreground">Already have a label? Record tracking manually</summary>
+                        <div className="flex flex-wrap items-end gap-2 border-t border-border p-3">
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">Carrier</span>
+                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                              {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                          </label>
+                          <label className="flex flex-1 flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">Tracking number</span>
+                            <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 9400 1000 0000 0000 0000 00" className="h-9" />
+                          </label>
+                          <Button size="sm" variant="outline" onClick={() => shipOrder(o)} disabled={busy === `ship:${o.id}`}>
+                            {busy === `ship:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Truck size={14} weight="bold" /> Mark shipped</>}
+                          </Button>
+                        </div>
+                      </details>
+
+                      <div className="flex justify-end">
+                        <Button size="sm" variant="ghost" onClick={() => setShipOpen(null)}>Close</Button>
+                      </div>
                     </div>
                   )}
 

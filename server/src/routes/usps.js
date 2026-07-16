@@ -222,7 +222,8 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       // PREFERRED PATH — when a shipping aggregator (Shippo/EasyPost) is configured,
       // buy a REAL label through it (test keys → real design, watermarked, no charge).
       // Restricted to USPS here so a UPS test-account gap can't fail the buy.
-      if (shippingEnabled()) {
+      // Pass directUsps:true to SKIP the aggregator and buy USPS-direct (Labels 3.0).
+      if (shippingEnabled() && !b.directUsps) {
         try {
           const buy = await aggregatorBuyCheapest(to, from,
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },

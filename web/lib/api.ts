@@ -277,6 +277,14 @@ export function saveInventory(items: InventoryItem[]) {
   return api<{ ok?: boolean; count?: number }>(`/api/inventory`, { method: "POST", body: JSON.stringify(items) })
 }
 
+// ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
+export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
+export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
+export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string }) {
+  // directUsps:true → skip the Shippo/EasyPost aggregator, buy USPS-direct.
+  return api<UspsLabelResult>(`/api/usps/label`, { method: "POST", body: JSON.stringify({ ...body, directUsps: true }) })
+}
+
 // ── Purchase orders (staff) — draft → placed → received ──
 export type POLine = { sku: string; name?: string; variant?: string; qty: number; price?: number }
 export type PurchaseOrder = { num: string; supplier?: string | null; items: POLine[]; status: string; total?: number; meta?: Record<string, unknown> | null; created_at?: string }
