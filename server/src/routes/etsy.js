@@ -310,8 +310,14 @@ export async function searchListings(query, opts = {}) {
   if (!KEYSTRING) { const e = new Error('Server missing ETSY_KEYSTRING'); e.status = 500; throw e; }
   const limit = Math.min(48, Math.max(1, parseInt(opts.limit, 10) || 24));
   const offset = Math.max(0, parseInt(opts.offset, 10) || 0);
-  const sort = opts.sort === 'created' ? 'created' : 'score';   // 'created' powers the daily feed
-  const u = API + '/listings/active?keywords=' + encodeURIComponent(query) + '&limit=' + limit + '&offset=' + offset + '&sort_on=' + sort + '&includes=Images,Shop';
+  const sort = ['created', 'price'].includes(opts.sort) ? opts.sort : 'score';
+  const sortOrder = opts.sortOrder === 'asc' ? 'asc' : opts.sortOrder === 'desc' ? 'desc' : null;
+  const params = ['keywords=' + encodeURIComponent(query), 'limit=' + limit, 'offset=' + offset, 'sort_on=' + sort, 'includes=Images,Shop'];
+  if (sortOrder) params.push('sort_order=' + sortOrder);
+  if (opts.taxonomyId && /^\d+$/.test(String(opts.taxonomyId))) params.push('taxonomy_id=' + opts.taxonomyId);
+  const minP = Number(opts.minPrice); if (minP > 0) params.push('min_price=' + minP);
+  const maxP = Number(opts.maxPrice); if (maxP > 0) params.push('max_price=' + maxP);
+  const u = API + '/listings/active?' + params.join('&');
   const r = await fetch(u, { headers: { 'x-api-key': API_KEY_HEADER } });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) { const e = new Error((d && d.error) || ('Etsy search error ' + r.status)); e.status = (r.status >= 400 && r.status < 500) ? r.status : 502; throw e; }
@@ -397,11 +403,31 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // the app keystring alone can query public active listings. requireAuth so only signed-in
   // users hit it (plan-gating layers on top later). Shared by the seller + admin Scout modal.
   app.get('/api/etsy/search', { preHandler: requireAuth }, async (req, reply) => {
-    const query = String((req.query && (req.query.q || req.query.keywords)) || '').trim();
+    const qy = req.query || {};
+    const query = String((qy.q || qy.keywords) || '').trim();
     if (!query) { reply.code(400); return { error: 'Missing search query (?q=)' }; }
     try {
-      return await searchListings(query, { limit: req.query && req.query.limit, offset: req.query && req.query.offset, sort: req.query && req.query.sort });
+      return await searchListings(query, {
+        limit: qy.limit, offset: qy.offset, sort: qy.sort, sortOrder: qy.sortOrder,
+        taxonomyId: qy.taxonomyId || qy.taxonomy_id, minPrice: qy.minPrice, maxPrice: qy.maxPrice,
+      });
     } catch (e) { reply.code(e.status || 502); return { error: e.message }; }
+  });
+
+  // Etsy's real top-level categories (buyer taxonomy) for the SpyDeck filter. Public
+  // (keystring), rarely changes → cached in memory for the process lifetime.
+  let _taxCache = null;
+  app.get('/api/etsy/categories', { preHandler: requireAuth }, async () => {
+    if (_taxCache) return { categories: _taxCache };
+    try {
+      const r = await fetch(API + '/buyer-taxonomy/nodes', { headers: { 'x-api-key': API_KEY_HEADER } });
+      const d = await r.json().catch(() => ({}));
+      const top = (d.results || []).filter((n) => (n.level === 1 || n.level === 0) && n.id && n.name)
+        .map((n) => ({ id: n.id, name: n.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (top.length) _taxCache = top;
+      return { categories: top };
+    } catch (e) { return { categories: [] }; }
   });
 
   // Same-origin image proxy for Etsy's public CDN. The factory boards run canvas

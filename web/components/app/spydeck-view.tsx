@@ -1,15 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning, SlidersHorizontal } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, ApiError, type EtsyListing, type SavedListing } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
 
@@ -168,6 +168,16 @@ const SEED_NICHES: { text: string; weight: number }[] = [
   { text: "custom pet", weight: 3 }, { text: "trendy", weight: 3 },
 ]
 
+// One labelled filter control.
+function FilterField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-muted-foreground">{label}{hint ? <span className="text-muted-foreground/60"> · {hint}</span> : null}</span>
+      {children}
+    </label>
+  )
+}
+
 // Interactive keyword/niche cloud — hotter terms render bigger; click to research.
 function KeywordCloud({ words, onPick }: { words: { text: string; weight: number }[]; onPick: (t: string) => void }) {
   const weights = words.map((w) => w.weight)
@@ -222,6 +232,30 @@ export function SpyDeckView() {
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
+  // Filters — server-side (category/price/sort re-run the search) + client-side
+  // (min sold-per-day / min favorites filter the shown cards live).
+  const [categories, setCategories] = useState<EtsyCategory[]>([])
+  const [cat, setCat] = useState("")
+  const [sortSel, setSortSel] = useState("relevance")
+  const [minPrice, setMinPrice] = useState("")
+  const [maxPrice, setMaxPrice] = useState("")
+  const [minSold, setMinSold] = useState("")
+  const [minFav, setMinFav] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    if (!entitled) return
+    const id = setTimeout(() => { getEtsyCategories().then((r) => setCategories(r.categories ?? [])).catch(() => {}) }, 0)
+    return () => clearTimeout(id)
+  }, [entitled])
+
+  // Client-side filters applied to whatever grid is shown.
+  const applyClientFilters = useCallback((list: EtsyListing[]) => {
+    const ms = Number(minSold) || 0
+    const mf = Number(minFav) || 0
+    if (!ms && !mf) return list
+    return list.filter((l) => (!ms || estFor(l).sold24 >= ms) && (!mf || (l.num_favorers ?? 0) >= mf))
+  }, [minSold, minFav])
 
   // Auto-load the daily trending feed (server-cached) so SpyDeck opens populated.
   useEffect(() => {
@@ -282,7 +316,16 @@ export function SpyDeckView() {
     setLoading(true)
     setError(null)
     try {
-      const r = await searchEtsy(q, { limit: 24 })
+      const sortMap: Record<string, { sort?: string; sortOrder?: string }> = {
+        relevance: {}, newest: { sort: "created" }, price_asc: { sort: "price", sortOrder: "asc" }, price_desc: { sort: "price", sortOrder: "desc" },
+      }
+      const r = await searchEtsy(q, {
+        limit: 48,
+        ...sortMap[sortSel],
+        taxonomyId: cat || undefined,
+        minPrice: Number(minPrice) || undefined,
+        maxPrice: Number(maxPrice) || undefined,
+      })
       setResults(r.results ?? [])
       setSearched(q)
     } catch (e) {
@@ -368,20 +411,66 @@ export function SpyDeckView() {
         }
       >
         {view === "search" && (
-          <div className="flex items-center gap-2 border-b border-border p-4">
-            <div className="relative max-w-md flex-1">
-              <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && run()}
-                placeholder="e.g. vintage sunset tee"
-                className="pl-9"
-              />
+          <div className="border-b border-border p-4">
+            <div className="flex items-center gap-2">
+              <div className="relative max-w-md flex-1">
+                <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && run()}
+                  placeholder="e.g. vintage sunset tee"
+                  className="pl-9"
+                />
+              </div>
+              <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
+                <SlidersHorizontal size={15} weight="bold" /> Filters
+              </Button>
+              <Button onClick={() => run()} disabled={loading || !query.trim()}>
+                {loading ? "Searching…" : "Search"}
+              </Button>
             </div>
-            <Button onClick={() => run()} disabled={loading || !query.trim()}>
-              {loading ? "Searching…" : "Search"}
-            </Button>
+
+            {showFilters && (
+              <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
+                <FilterField label="Category">
+                  <select value={cat} onChange={(e) => setCat(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                    <option value="">All</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </FilterField>
+                <FilterField label="Sort by">
+                  <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                    <option value="relevance">Relevance</option>
+                    <option value="newest">Newest</option>
+                    <option value="price_asc">Price: low → high</option>
+                    <option value="price_desc">Price: high → low</option>
+                  </select>
+                </FilterField>
+                <FilterField label="Min price ($)">
+                  <Input value={minPrice} onChange={(e) => setMinPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" className="h-9" inputMode="decimal" />
+                </FilterField>
+                <FilterField label="Max price ($)">
+                  <Input value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Any" className="h-9" inputMode="decimal" />
+                </FilterField>
+                <FilterField label="Min sold/day" hint="estimated">
+                  <Input value={minSold} onChange={(e) => setMinSold(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <FilterField label="Min favorites">
+                  <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
+                </FilterField>
+                <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-6">
+                  <Button size="sm" onClick={() => run()} disabled={!query.trim()}>Apply filters</Button>
+                  <button
+                    onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav("") }}
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Reset
+                  </button>
+                  <span className="ml-auto text-xs text-muted-foreground">Category, price &amp; sort search Etsy; sold/day &amp; favorites filter results live.</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -420,7 +509,7 @@ export function SpyDeckView() {
                 <TrendUp size={13} /> Auto-refreshed daily — top listings by estimated 24h sales. Estimates, not exact figures.
               </div>
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {trending.products.map((l) => (
+                {applyClientFilters(trending.products).map((l) => (
                   <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} />
                 ))}
               </div>
@@ -460,7 +549,7 @@ export function SpyDeckView() {
           <div className="py-16 text-center text-sm text-muted-foreground">No listings found. Try another keyword.</div>
         ) : (
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {results.map((l) => (
+            {applyClientFilters(results).map((l) => (
               <ResultCard
                 key={l.listing_id}
                 l={l}

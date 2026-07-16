@@ -31,36 +31,35 @@ function estSold24(l) {
   return Math.max(0, Math.round(totalSold / ageDays));
 }
 
-// Rotating niche pool — a handful searched each day so the feed refreshes daily.
+// Rotating niche pool — several searched each day so the feed refreshes daily.
 const TREND_NICHES = [
   'custom name necklace', 'comfort colors tee', 'mama sweatshirt', 'retro groovy tee',
   'birth flower necklace', 'pet portrait sweatshirt', 'personalized gift', 'bachelorette shirt',
   'teacher gift', 'vintage aesthetic sweatshirt', 'embroidered crewneck', 'coquette',
   'minimalist jewelry', 'boho wall art', 'funny shirt', 'monogram tumbler',
+  'trendy sweatshirt', 'aesthetic wall art', 'custom pet', 'personalized jewelry',
 ];
 
-// Build (and cache daily) the trending feed: ~10 products est. >10 sold/24h + 10 keywords.
+// Build (and cache daily) the trending feed: 30 products est. high 24h sales + 30 keywords.
 async function buildTrending() {
   const dayIndex = Math.floor(Date.now() / 86400000);
-  // Pick 5 niches for today, rotating by day.
+  // Pick 8 niches for today, rotating by day, so we have enough hot listings for 30.
   const picks = [];
-  for (let i = 0; i < 5; i++) picks.push(TREND_NICHES[(dayIndex + i) % TREND_NICHES.length]);
-  const batches = await Promise.all(picks.map((qy) => searchListings(qy, { limit: 24, sort: 'score' }).then((r) => r.results).catch(() => [])));
-  // Merge + dedupe by listing_id.
+  for (let i = 0; i < 8; i++) picks.push(TREND_NICHES[(dayIndex + i) % TREND_NICHES.length]);
+  const batches = await Promise.all(picks.map((qy) => searchListings(qy, { limit: 48, sort: 'score' }).then((r) => r.results).catch(() => [])));
   const byId = new Map();
   for (const list of batches) for (const l of list) if (l.listing_id && !byId.has(l.listing_id)) byId.set(l.listing_id, l);
   const all = Array.from(byId.values()).map((l) => ({ ...l, _sold24: estSold24(l) }));
   all.sort((a, b) => b._sold24 - a._sold24);
-  // Prefer listings estimated at >10 sold/24h; fall back to the top by velocity.
   const hot = all.filter((l) => l._sold24 > 10);
-  const products = (hot.length >= 10 ? hot : all).slice(0, 10).map(({ _sold24, ...l }) => l);
-  // Top keywords from the hot set's tags.
+  const products = (hot.length >= 30 ? hot : all).slice(0, 30).map(({ _sold24, ...l }) => l);
+  // Top 30 keywords from the hot set's tags.
   const counts = {};
-  for (const l of (hot.length ? hot : all).slice(0, 30)) for (const t of (l.tags || [])) {
+  for (const l of (hot.length ? hot : all).slice(0, 80)) for (const t of (l.tags || [])) {
     const k = String(t).trim().toLowerCase();
     if (k) counts[k] = (counts[k] || 0) + 1;
   }
-  const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t]) => t);
+  const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t]) => t);
   return { date: new Date().toISOString().slice(0, 10), products, keywords };
 }
 

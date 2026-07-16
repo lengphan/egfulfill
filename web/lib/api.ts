@@ -458,11 +458,20 @@ export function unsaveSpydeckListing(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/saves/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }
 
-export function searchEtsy(q: string, opts?: { sort?: string; limit?: number }) {
+export type EtsySearchOpts = { sort?: string; sortOrder?: string; limit?: number; taxonomyId?: string | number; minPrice?: number; maxPrice?: number }
+export function searchEtsy(q: string, opts?: EtsySearchOpts) {
   const p = new URLSearchParams({ q })
   if (opts?.sort) p.set("sort", opts.sort)
+  if (opts?.sortOrder) p.set("sortOrder", opts.sortOrder)
   if (opts?.limit) p.set("limit", String(opts.limit))
+  if (opts?.taxonomyId) p.set("taxonomyId", String(opts.taxonomyId))
+  if (opts?.minPrice) p.set("minPrice", String(opts.minPrice))
+  if (opts?.maxPrice) p.set("maxPrice", String(opts.maxPrice))
   return api<{ count: number; query: string; results: EtsyListing[] }>(`/api/etsy/search?${p.toString()}`)
+}
+export type EtsyCategory = { id: number; name: string }
+export function getEtsyCategories() {
+  return api<{ categories: EtsyCategory[] }>(`/api/etsy/categories`)
 }
 
 export function syncEtsy() {
