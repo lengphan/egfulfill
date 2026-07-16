@@ -335,6 +335,21 @@ export function getDesignCards() {
   return api<DesignCard[]>(`/api/design_cards`)
 }
 
+// Seller design library ("my designs") — reusable artwork the seller creates/uploads.
+export type LibraryDesign = { id: number | string; name?: string | null; thumb?: string | null; created_at?: string }
+export function getDesignLibrary() {
+  return api<LibraryDesign[]>(`/api/design_library`)
+}
+export function getDesignLibraryItem(id: number | string) {
+  return api<{ data?: string }>(`/api/design_library/${encodeURIComponent(String(id))}`)
+}
+export function saveDesignLibrary(body: { name?: string; data: string; thumb?: string }) {
+  return api<LibraryDesign & { error?: string }>(`/api/design_library`, { method: "POST", body: JSON.stringify(body) })
+}
+export function deleteDesignLibrary(id: number | string) {
+  return api<{ ok?: boolean }>(`/api/design_library/${encodeURIComponent(String(id))}`, { method: "DELETE" })
+}
+
 export function createOrder(order: {
   id: string
   seq?: number
