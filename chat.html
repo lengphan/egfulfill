@@ -37,8 +37,8 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .chat-tab{padding:5px 14px;border-radius:7px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;border:1px solid transparent;background:transparent;color:#6b7280;transition:all .15s}
 .chat-tab.on{background:#fff;color:#191918;box-shadow:0 1px 3px rgba(0,0,0,.09)}
 .conv-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid #f3f0eb;transition:background .12s}
-.conv-item:hover{background:#f6f5f4}
-.conv-item.active{background:#f6f5f4}
+.conv-item:hover{background:#f4f4f5}
+.conv-item.active{background:#f4f4f5}
 .chat-bubble{max-width:72%;padding:9px 13px;border-radius:12px;font-size:14px;line-height:1.5;position:relative}
 .chat-bubble.them{background:#f3f3f1;color:#374151;border-bottom-left-radius:3px}
 .chat-bubble.me{background:#111827;color:#fff;border-bottom-right-radius:3px}
@@ -47,198 +47,6 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .chat-msg.them{justify-content:flex-start}
 .hist-row{padding:12px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .12s;display:flex;gap:12px;align-items:flex-start}
 .hist-row:hover{background:#fafaf9}
-
-
-
-
-/* ── Dark mode ── */
-html[data-theme=dark]{color-scheme:dark}
-html[data-theme=dark] body{background:#1a1917!important}
-html[data-theme=dark] .sidebar{background:#1f1d1b!important;border-right-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] header{background:#1a1917!important;border-bottom-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] .card{background:#252220!important;border-color:#302e2c!important}
-html[data-theme=dark] .ni{color:#7a7874!important}
-html[data-theme=dark] .ni.on{background:#2a2826!important;color:#e8e4e0!important;border:none!important}
-html[data-theme=dark] .ni:hover:not(.on){background:#252220!important}
-html[data-theme=dark] .ibtn{color:#7a7874!important}
-html[data-theme=dark] .ibtn:hover{background:#302e2c!important;color:#d8d4d0!important}
-html[data-theme=dark] .dtable th{background:#1f1d1b!important;color:#4a4846!important;border-color:#302e2c!important}
-html[data-theme=dark] .dtable td{border-color:#282624!important;color:#a8a29e!important}
-html[data-theme=dark] .dtable tbody tr:hover td{background:#252220!important}
-html[data-theme=dark] input:not([type=checkbox]):not([type=radio]),html[data-theme=dark] select,html[data-theme=dark] textarea{background:#252220!important;border-color:#302e2c!important;color:#d8d4d0!important}
-html[data-theme=dark] #pref-panel,html[data-theme=dark] #new-menu-dd{background:#252220!important;border-color:#302e2c!important;box-shadow:0 8px 28px rgba(0,0,0,.5)!important}
-html[data-theme=dark] [style*="background:#fff;"]{background:#252220!important}
-html[data-theme=dark] [style*="background: #fff"]{background:#252220!important}
-html[data-theme=dark] [style*="background:#f4f2ef"]{background:#1a1917!important}
-html[data-theme=dark] [style*="background:#f6f5f4"]{background:#211f1d!important}
-html[data-theme=dark] [style*="background:#f9f8f7"]{background:#211f1d!important}
-html[data-theme=dark] [style*="background:#f3f3f1"]{background:#211f1d!important}
-html[data-theme=dark] [style*="background:#f0ede9"]{background:#211f1d!important}
-html[data-theme=dark] [style*="background:#fafaf9"]{background:#1f1d1b!important}
-html[data-theme=dark] [style*="background:#e5e4e0"]{background:#302e2c!important}
-html[data-theme=dark] [style*="background:#f0ede9"]{background:#211900!important}
-html[data-theme=dark] [style*="background:#fff5f5"]{background:#251210!important}
-html[data-theme=dark] [style*="background:#fee2e2"]{background:#2a0e0c!important}
-html[data-theme=dark] [style*="color:#191918"]{color:#d8d4d0!important}
-html[data-theme=dark] [style*="color:#111827"]{color:#e0deda!important}
-html[data-theme=dark] [style*="color:#374151"]{color:#a8a29e!important}
-html[data-theme=dark] [style*="color:#1f2937"]{color:#bcb8b4!important}
-html[data-theme=dark] [style*="color:#9ca3af"]{color:#565452!important}
-html[data-theme=dark] [style*="border-bottom:1px solid #f0ede9"]{border-bottom-color:#282624!important}
-html[data-theme=dark] [style*="border-top:1px solid #f0ede9"]{border-top-color:#282624!important}
-html[data-theme=dark] [style*="border:1px solid #e5e4e0"]{border-color:#302e2c!important}
-html[data-theme=dark] [style*="border:1.5px solid #e5e4e0"]{border-color:#302e2c!important}
-html[data-theme=dark] [style*="border-bottom:1px solid #e5e4e0"]{border-bottom-color:#302e2c!important}
-html[data-theme=dark] [style*="border-top:1px solid #e5e4e0"]{border-top-color:#302e2c!important}
-html[data-theme=dark] [style*="border-right:1px solid #e5e4e0"]{border-right-color:#302e2c!important}
-html[data-theme=dark] .modal-overlay{background:rgba(0,0,0,.72)!important}
-html[data-theme=dark] .stat-card{background:#252220!important;border-color:#302e2c!important}
-html[data-theme=dark] .prog-bar{background:#302e2c!important}
-html[data-theme=dark] #_qtm>div{background:#252220!important;border:1.5px solid #302e2c}
-html[data-theme=dark] .seg{color:#7a7874!important}
-html[data-theme=dark] .seg.on{background:#302e2c!important;color:#e0deda!important}
-/* ── Dark mode filter pills ── */
-html[data-theme=dark] .tab-btn{color:#7a7874!important}
-html[data-theme=dark] .tab-btn.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
-html[data-theme=dark] .tab-btn:hover:not(.on){background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
-/* "via API" source badge */
-html[data-theme=dark] [style*="background:#eef1fe"]{background:rgba(47,75,240,0.2)!important;color:#6d8cff!important;border:none!important}
-/* Action buttons: Resolve / Escalate */
-html[data-theme=dark] [style*="background:#ecfdf5"]{background:rgba(46,238,202,0.12)!important;color:#2eeeca!important;border-color:rgba(46,238,202,0.28)!important}
-html[data-theme=dark] [style*="color:#15803d"]{color:#2eeeca!important}
-html[data-theme=dark] [style*="background:#fff5f5;color:#dc2626"]{background:rgba(230,53,97,0.12)!important;color:#e63561!important;border-color:rgba(230,53,97,0.28)!important}
-html[data-theme=dark] [style*="color:#dc2626"]{color:#e63561!important}
-/* Start / action dark buttons — add visible border in dark mode */
-html[data-theme=dark] [style*="background:#111827;color:#fff"]{background:#36332d!important;border:1px solid rgba(201,195,186,.32)!important;color:#e8e4dd!important}
-/* ── Dark mode pills: palette #4e65ce/#2dcaf0/#2f4bf0/#2eeeca/#e63561 ── */
-/* Blue family → incoming, transit, ready, queue */
-html[data-theme=dark] .b-new{background:#4e65ce!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-queue{background:#6a99d6!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-lowstock{background:#4e65ce!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-disc{background:#6a99d6!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-incoming{background:#6a99d6!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-transit{background:#4e65ce!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-ready{background:#4e65ce!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-pendingpo{background:#6a99d6!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-cancel{background:#6a99d6!important;color:#fff!important;border:none!important}
-/* Cyan family → working, qc, labelled */
-html[data-theme=dark] .b-qc{background:#2dcaf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-working{background:#2dcaf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-labelled{background:#4ed2f2!important;color:#fff!important;border:none!important}
-/* Purple family → design, pre-scan, outdeliv, prod */
-html[data-theme=dark] .b-prod{background:#2f4bf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-outdeliv{background:#a866db!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-prescan{background:#2f4bf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-design{background:#2f4bf0!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-approved{background:#a866db!important;color:#fff!important;border:none!important}
-/* Mint family → shipped, finished, delivered, ok, packed */
-html[data-theme=dark] .b-packed{background:#41f1d3!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-shipped{background:#2eeeca!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-ok{background:#2eeeca!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-finished{background:#41f1d3!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-delivered{background:#2eeeca!important;color:#fff!important;border:none!important}
-/* Pink/Red family → exception, backorder, flagged */
-html[data-theme=dark] .b-flagged{background:#e63561!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-exception{background:#e63561!important;color:#fff!important;border:none!important}
-html[data-theme=dark] .b-wh-backorder{background:#ec557a!important;color:#fff!important;border:none!important}
-/* Type badge classes (ds-type-*) */
-html[data-theme=dark] .ds-type-dtg{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
-html[data-theme=dark] .ds-type-sub{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
-html[data-theme=dark] .ds-type-emb{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
-html[data-theme=dark] .ds-type-oth{background:#6a99d6!important;color:#fff!important;border-color:#4e65ce!important}
-/* Inline inv/dsn pills — attribute overrides */
-html[data-theme=dark] [style*="color:#286038;background:#e4f4ea"]{color:#fff!important;background:#2eeeca!important;border-color:#1ab8a0!important}
-html[data-theme=dark] [style*="color:#7a5018;background:#f8f4e0"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important;cursor:pointer}
-html[data-theme=dark] [style*="color:#3a5a96;background:#edf2f8"]{color:#fff!important;background:#4e65ce!important;border-color:#3a52b8!important}
-html[data-theme=dark] [style*="color:#5f52b0;background:#eeecf8"]{color:#fff!important;background:#2f4bf0!important;border-color:#2439c8!important}
-html[data-theme=dark] [style*="color:#904a18;background:#f8f0e4"]{color:#fff!important;background:#ec557a!important;border-color:#c93060!important}
-html[data-theme=dark] [style*="background:#f3f4f6;border:1px solid #e5e4e0"]{background:#2a2826!important;border-color:#3a3835!important}
-html[data-theme=dark] [style*="color:#6b7280;background:#f3f4f6"]{color:#9ca3af!important;background:#2a2826!important;border-color:#3a3835!important}
-html[data-theme=dark] [style*="background:#eeecf8;color:#5f52b0"]{background:#2f4bf0!important;color:#fff!important;border-color:#2439c8!important}
-html[data-theme=dark] [style*="background:#f8f0e4;color:#904a18"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
-html[data-theme=dark] [style*="background:#e4f4ea;color:#286038"]{background:#2eeeca!important;color:#fff!important;border-color:#1ab8a0!important}
-html[data-theme=dark] [style*="background:#edf2f8;color:#3a5a96"]{background:#4e65ce!important;color:#fff!important;border-color:#3a52b8!important}
-html[data-theme=dark] [style*="background:#f8f4e0;color:#7a5018"]{background:#ec557a!important;color:#fff!important;border-color:#c93060!important}
-html[data-theme=dark] [style*="background:#e4f6f2;color:#1a7060"]{background:#2dcaf0!important;color:#fff!important;border-color:#18a8cc!important}
-/* ── Dark mode: pill-btn (dashboard / wallet store filter) ── */
-html[data-theme=dark] .pill-btn{background:rgba(255,255,255,0.04)!important;color:#7a7874!important;border-color:#302e2c!important}
-html[data-theme=dark] .pill-btn:hover{border-color:#4a4846!important;color:#a8a29e!important}
-html[data-theme=dark] .pill-btn.active{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important}
-/* ── Dark mode: cat-pill (products category filter) ── */
-html[data-theme=dark] .cat-pill{color:#7a7874!important}
-html[data-theme=dark] .cat-pill:hover{background:rgba(255,255,255,0.04)!important;color:#a8a29e!important}
-html[data-theme=dark] .cat-pill.on{background:rgba(255,255,255,0.07)!important;color:#c8c4c0!important;border-color:rgba(255,255,255,0.1)!important;box-shadow:none!important}
-/* ── Dark mode: fb / filter-btn (orders filter row) ── */
-html[data-theme=dark] .fb{background:rgba(255,255,255,0.04)!important;border-color:#302e2c!important;color:#a8a29e!important}
-html[data-theme=dark] .fb:hover{border-color:#4a4846!important;color:#c8c4c0!important}
-
-/* ── EG uniform dark separators + readable accent numbers (auto) ── */
-html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="dashed #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #eee"],html[data-theme=dark] [style*="solid #ececec"],html[data-theme=dark] [style*="solid #fafaf9"],html[data-theme=dark] [style*="solid #f3f4f6"],html[data-theme=dark] [style*="solid #d1d5db"]{border-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] .dtable th,html[data-theme=dark] .dtable td,html[data-theme=dark] .dtable tr.exp-row td{border-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.07)!important}
-html[data-theme=dark] [style*="color:#191918"],html[data-theme=dark] [style*="color:#374151"],html[data-theme=dark] [style*="color:#191918"]{color:#c9c3ba!important}
-html[data-theme=dark] [style*="background:#f7f5f0"],html[data-theme=dark] [style*="background:#f7f6f4"]{background:#1a1917!important}
-
-/* ── EG dark readability: lighter text + softer light-grey separators ── */
-html[data-theme=dark] .dtable th{color:#9c968e!important;border-color:rgba(255,255,255,.1)!important}
-html[data-theme=dark] .dtable td{border-color:rgba(255,255,255,.08)!important;color:#bdb8b1!important}
-html[data-theme=dark] [style*="color:#9ca3af"]{color:#9c968e!important}
-html[data-theme=dark] [style*="color:#6b7280"]{color:#a8a29b!important}
-html[data-theme=dark] [style*="color:#c4c3be"],html[data-theme=dark] [style*="color:#c4c2be"],html[data-theme=dark] [style*="color:#d1d5db"]{color:#8f8a83!important}
-html[data-theme=dark] [style*="color:#b0aaa4"],html[data-theme=dark] [style*="color:#b8b3ad"]{color:#a39d96!important}
-html[data-theme=dark] .tab-btn{color:#9c968e!important}
-html[data-theme=dark] .ni{color:#9c968e!important}
-html[data-theme=dark] .seg{color:#9c968e!important}
-html[data-theme=dark] .sidebar{border-right-color:rgba(255,255,255,.1)!important}
-html[data-theme=dark] header{border-bottom-color:rgba(255,255,255,.1)!important}
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{border-color:rgba(255,255,255,.1)!important}
-html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="solid #f0ede9"],html[data-theme=dark] [style*="solid #e5e4e0"],html[data-theme=dark] [style*="solid #f6f5f4"],html[data-theme=dark] [style*="solid #e8e7e4"],html[data-theme=dark] [style*="solid #f3f4f6"]{border-color:rgba(255,255,255,.1)!important}
-
-/* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
-html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
-
-/* eg-navsel-light */
-/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
-html:not([data-theme=dark]) .ni{border:1px solid transparent}
-html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
-
-/* === Topbar header polish (ported from dashboard) === */
-/* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
-   with a press animation: on :active the chip slides into its shadow so the
-   shadow collapses to zero, mimicking a physical button being pushed. */
-.bal-chip{background:#fdfcfa;color:#191918;border:1px solid #40403d;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .08s ease,box-shadow .08s ease,background .15s ease,color .15s ease}
-html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
-html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
-html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
-html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:2px 2px 0 #c9c3ba!important}
-html[data-theme=dark] .bal-chip:hover{background:rgba(201,195,186,.10)!important;color:#f3eee2!important}
-html[data-theme=dark] .bal-chip:hover #balance-val{color:#f3eee2!important}
-html[data-theme=dark] .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #c9c3ba!important}
-html[data-theme=dark] .bal-chip #balance-val{color:#d8d4cc!important}
-#hdr-theme-knob{transform:translateX(0);transition:transform .25s}
-html[data-theme=dark] #hdr-theme-knob{transform:translateX(16px)}
-#hdr-theme-track{background:#e5e4e0}
-html[data-theme=dark] #hdr-theme-track{background:#374151}
-header [style*="width:1px"][style*="background:#e5e4e0"]{background:#f0ede9!important}
-html[data-theme=dark] header [style*="width:1px"][style*="background:#e5e4e0"]{background:rgba(201,195,186,.14)!important}
-</style>
-<style id="eg-outline-btns">
-/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
-.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
-.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
-.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
-.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
-.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
-.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
-.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
-html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
-html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
-html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
-/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
-
-.ni:focus{box-shadow:none!important;outline:none!important}
 </style>
 <style id="eg-input-focus">
 /* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
@@ -246,115 +54,15 @@ input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:fo
 .btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
 .ni:focus{outline:none!important;box-shadow:none!important}
 </style>
-<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
-<style id="eg-dark-polish">
-/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
-   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
-html[data-theme=dark] .card,
-html[data-theme=dark] .wcard,
-html[data-theme=dark] .stat-card,
-html[data-theme=dark] #section-overview .card,
-html[data-theme=dark] #section-overview .wcard{
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
-}
-html[data-theme=dark] #section-overview .card,
-html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
-html[data-theme=dark] .card:hover,
-html[data-theme=dark] .wcard:hover{
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
-}
-/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
-html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
-  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
-}
-html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
-  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
-}
-html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
-/* Active selections: faint fill + beige outline, beige text */
-html[data-theme=dark] .ni.on,
-html[data-theme=dark] .stab.on,
-html[data-theme=dark] .seg.on,
-html[data-theme=dark] .tab-btn.active,
-html[data-theme=dark] .pill-btn.active{
-  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
-}
-/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
-html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
-html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
-html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
-/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
-body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
-/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
-html[data-theme=dark] .fb{color:#9c968e!important}
-html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
-html[data-theme=dark] .filter-btn.active,
-html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
-/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
+<style id="eg-dark-polish">/* notification slide-in panel — FUNCTIONAL (positioning + rows only); theme is handled by eg-board.css */
 .notif-panel{position:fixed;top:0;right:-400px;width:380px;height:100vh;background:#fff;border-left:1px solid #e5e4e0;z-index:210;transition:right .3s cubic-bezier(.22,1,.36,1);box-shadow:-4px 0 20px rgba(0,0,0,.08);display:flex;flex-direction:column}
 .notif-panel.open{right:0}
 .notif-row{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-bottom:1px solid #f3f3f1;cursor:pointer;transition:background .15s}
 .notif-row:hover,.notif-row.unread{background:#fafaf9}
-html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
-html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
-html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
-html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
 </style>
-<style id="eg-dark-chat">
-/* Chat bubbles — contrasting pair: incoming = beige + slate text, outgoing = slate + beige text */
-html[data-theme=dark] .chat-bubble.them{background:#c9c3ba!important;color:#26303f!important}
-html[data-theme=dark] .chat-bubble.me{background:transparent!important;border:1px solid rgba(201,195,186,.4)!important;color:#d8d4cc!important}
-/* Conversation list: faint beige separators, faint beige active/hover (was bright) */
-html[data-theme=dark] .conv-item{border-bottom-color:rgba(201,195,186,.09)!important}
-html[data-theme=dark] .conv-item:hover,
-html[data-theme=dark] .conv-item.active{background:rgba(201,195,186,.05)!important}
-/* Team/Support/History tabs: beige-outline active instead of bright white pill */
-html[data-theme=dark] .chat-tab.on{background:rgba(201,195,186,.08)!important;color:#d8d4cc!important;box-shadow:none!important;border:1px solid rgba(201,195,186,.24)!important}
-/* Day divider chip: faint beige */
-html[data-theme=dark] [style*="background:#f6f5f4"][style*="border-radius:999px"]{background:rgba(201,195,186,.08)!important;color:#a8a29b!important}
-</style>
-<style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fff!important;border:1px solid #e4e4e7!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important}
-</style>
-<style id="eg-card-dark-retro">/* eg-card-dark-retro */
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
-</style>
-<style id="eg-sel-outline">/* eg-sel-outline */
-html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
-</style>
-<style id="eg-chat-bubble">/* eg-chat-bubble */
-html:not([data-theme=dark]) .chat-bubble{background:transparent!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-html:not([data-theme=dark]) .chat-bubble.me{color:#191918!important}
-html[data-theme=dark] .chat-bubble.them,html[data-theme=dark] .chat-bubble.me{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important;color:#d8d4cc!important}
-</style>
-<style id="eg-chat-twotone">/* Chat = ONE light-beige card. Only the bubbles use opposite colours per side,
-   and that colour scheme switches in dark mode. */
-/* Window = general bg; left list panel = the lighter card shade. Dark mode mirrors this. */
-html[data-theme=dark] #chat-card{background:transparent!important}
-html[data-theme=dark] #conv-pane{background:transparent!important;border-right-color:#c9c3ba!important}
-/* Online/presence status → small outlined pill */
+<style id="eg-chat-twotone">/* online/presence status → small outlined pill (token-coherent supplement; eg-board.css themes the bubbles/tabs/panes) */
 #chat-status{display:inline-flex!important;align-items:center;gap:5px;font-size:11px!important;font-weight:600!important;color:#191918!important;border:1px solid #e4e4e7;border-radius:999px;padding:1px 9px;width:fit-content;margin-top:3px}
 html[data-theme=dark] #chat-status{color:#c9c3ba!important;border-color:#c9c3ba!important}
-/* Bubbles — LIGHT mode: incoming (left) = beige box, outgoing (right) = dark box */
-#msg-pane .chat-bubble.them{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important;color:#191918!important}
-#msg-pane .chat-bubble.me{background:#2b2926!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important;color:#f0ece5!important}
-/* Bubbles — DARK mode: the two sides switch colours (incoming dark, outgoing beige) */
-html[data-theme=dark] #msg-pane .chat-bubble.them{background:#2b2926!important;border-color:#c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important;color:#f0ece5!important}
-html[data-theme=dark] #msg-pane .chat-bubble.me{background:#fdfcfa!important;border-color:#c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important;color:#191918!important}
-/* Active tab — dark outline */
-.chat-tab.on{background:transparent!important;color:#191918!important;box-shadow:none!important;border:1px solid #191918!important}
-</style>
-<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
-<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
-.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
-.eg-sel-btn svg{color:#191918!important}
-.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
-.eg-sel.open{z-index:6000!important}
-.eg-sel-menu{z-index:6001!important}
-.fb:not(.filter-btn){color:#191918!important}
-.fb:not(.filter-btn) svg{color:#191918!important}
-html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
-html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
 </style>
 <style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
 .stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
@@ -434,7 +142,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <div id="chat-card" class="card" style="display:grid;grid-template-columns:260px 1fr;gap:0;flex:1;overflow:hidden;min-height:0;height:calc(100vh - 130px);max-height:760px;border-radius:14px">
 
       <!-- LEFT: Conversation list -->
-      <div id="conv-pane" style="border-right:1px solid #40403d;background:transparent;display:flex;flex-direction:column;min-height:0">
+      <div id="conv-pane" style="border-right:1px solid #e5e4e0;background:transparent;display:flex;flex-direction:column;min-height:0">
         <!-- Search lives inside the conv pane (matches operator/warehouse). -->
         <div style="padding:10px 12px;border-bottom:1px solid #f3f0eb;flex-shrink:0">
           <div style="position:relative">
@@ -1112,7 +820,7 @@ document.addEventListener('click',function(e){
       div.className = 'chat-msg them';
       div.innerHTML =
         '<div style="display:flex;flex-direction:column;gap:6px;max-width:78%">' +
-          '<div style="background:#fdfcfa;border:1px solid #40403d;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);padding:12px 14px">' +
+          '<div style="background:#fdfcfa;border:1px solid #e5e4e0;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);padding:12px 14px">' +
             '<div style="font-size:14.5px;font-weight:700;color:#191918;margin-bottom:4px;line-height:1.35">' + (n.title || '').replace(/</g,'&lt;') + '</div>' +
             '<div style="font-size:13.5px;color:#374151;line-height:1.5">' + (n.sub || '').replace(/</g,'&lt;') + '</div>' +
           '</div>' +

@@ -226,127 +226,17 @@ html[data-theme=dark] #hdr-theme-track{background:#374151}
 header [style*="width:1px"][style*="background:#e5e4e0"]{background:#f0ede9!important}
 html[data-theme=dark] header [style*="width:1px"][style*="background:#e5e4e0"]{background:rgba(201,195,186,.14)!important}
 </style>
-<style id="eg-outline-btns">
-/* ── EG button scheme (seller side): dark main CTAs (beige text) + outline secondary (darker grey, slightly bold) ── */
-.btn-dk,.btn-green,.btn-gold,.btn-amber,.btn-blue{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;font-weight:600!important;box-shadow:none!important}
-.btn-dk:hover,.btn-green:hover,.btn-gold:hover,.btn-amber:hover,.btn-blue:hover{background:#2c2a27!important;border-color:#2c2a27!important;color:#f8f4ec!important;opacity:1!important}
-.btn-dk svg [stroke="white"],.btn-dk svg [stroke="#fff"],.btn-dk svg [stroke="#ffffff"],.btn-green svg [stroke="white"],.btn-gold svg [stroke="white"],.btn-amber svg [stroke="white"],.btn-blue svg [stroke="white"]{stroke:#f3eee2!important}
-.btn-dk svg [fill="white"],.btn-dk svg [fill="#fff"],.btn-dk svg [fill="#ffffff"]{fill:#f3eee2!important}
-.btn-out{background:transparent!important;border:1.5px solid #c9c4bc!important;color:#374151!important;font-weight:500!important;box-shadow:none!important}
-.btn-out:hover{border-color:#a8a39b!important;background:rgba(0,0,0,.045)!important;color:#191918!important}
-.pill-btn.active{background:#191918!important;border:1.5px solid #191918!important;color:#f3eee2!important;box-shadow:none!important}
-html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{background:#e8e4dd!important;border-color:#e8e4dd!important;color:#1a1917!important}
-html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"]{stroke:#1a1917!important}
-html[data-theme=dark] .btn-out{border-color:#4a4846!important;color:#d8d4d0!important}
-/* Slate-blue selection ring on any button (excludes left sidebar nav .ni) */
-
-.ni:focus{box-shadow:none!important;outline:none!important}
-</style>
 <style id="eg-input-focus">
 /* Subtle slate-blue focus across EGFULFILL — single thin 1px line, no shadow (sidebar nav excluded) */
 input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:focus,select:focus{border-color:#374151!important;outline:none!important;box-shadow:none!important}
 .btn:focus,.fb:focus,.pill-btn:focus,.tab-btn:focus,.seg:focus,.ibtn:focus,.tab-sm:focus,.lang-opt:focus,.eg-sel-btn:focus{outline:none!important;box-shadow:none!important;border-color:#374151!important}
 .ni:focus{outline:none!important;box-shadow:none!important}
 </style>
-<style id="eg-card-hover">.card,.wcard{transition:box-shadow .15s}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}</style>
-<style id="eg-dark-polish">
-/* Unified dark-mode polish — cards lift off the page with a soft glow; softer
-   (non-glaring) primary buttons + active selections. Applied across all dashboards. */
-html[data-theme=dark] .card,
-html[data-theme=dark] .wcard,
-html[data-theme=dark] .stat-card,
-html[data-theme=dark] #section-overview .card,
-html[data-theme=dark] #section-overview .wcard{
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 0 0 1px rgba(255,255,255,.045), 0 8px 26px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.45)!important;
-}
-html[data-theme=dark] #section-overview .card,
-html[data-theme=dark] #section-overview .wcard{ background:#252220!important; border-color:rgba(255,255,255,.07)!important; }
-html[data-theme=dark] .card:hover,
-html[data-theme=dark] .wcard:hover{
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5)!important;
-}
-/* Primary CTAs: dark/vintage-black with a beige OUTLINE (not a beige fill) */
-html[data-theme=dark] .btn-dk,html[data-theme=dark] .btn-green,html[data-theme=dark] .btn-gold,html[data-theme=dark] .btn-amber,html[data-theme=dark] .btn-blue{
-  background:#2c2a27!important;border:1.5px solid rgba(201,195,186,.42)!important;color:#d8d4cc!important;
-}
-html[data-theme=dark] .btn-dk:hover,html[data-theme=dark] .btn-green:hover,html[data-theme=dark] .btn-gold:hover,html[data-theme=dark] .btn-amber:hover,html[data-theme=dark] .btn-blue:hover{
-  background:#36332d!important;border-color:rgba(201,195,186,.68)!important;
-}
-html[data-theme=dark] .btn-dk svg [stroke="white"],html[data-theme=dark] .btn-dk svg [fill="white"],html[data-theme=dark] .btn-green svg [stroke="white"],html[data-theme=dark] .btn-blue svg [stroke="white"]{stroke:#d8d4cc!important}
-/* Active selections: faint fill + beige outline, beige text */
-html[data-theme=dark] .ni.on,
-html[data-theme=dark] .stab.on,
-html[data-theme=dark] .seg.on,
-html[data-theme=dark] .tab-btn.active,
-html[data-theme=dark] .pill-btn.active{
-  background:rgba(201,195,186,.06)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.26)!important;
-}
-/* Beige separators: sidebar edge, header rule, and the logo↔panel divider */
-html[data-theme=dark] .sidebar{border-right-color:rgba(201,195,186,.13)!important}
-html[data-theme=dark] header{border-bottom-color:rgba(201,195,186,.15)!important}
-html[data-theme=dark] [style*="border-bottom:1px solid rgba(0,0,0,.14)"]{border-bottom-color:rgba(201,195,186,.16)!important}
-/* Smooth light↔dark toggle (head pre-paint script prevents the load flash) */
-body,.sidebar,header,.card,.wcard,.stat-card,.ni,.input,.select,.btn,.btn-dk,.btn-out{transition:background-color .28s ease,border-color .28s ease,color .28s ease}
-/* Filter-bar buttons (.fb / .filter-btn): beige text, active = shaded bg + beige outline */
-html[data-theme=dark] .fb{color:#9c968e!important}
-html[data-theme=dark] .fb:hover{background:rgba(201,195,186,.05)!important;color:#d8d4cc!important}
-html[data-theme=dark] .filter-btn.active,
-html[data-theme=dark] .fb.active{background:rgba(201,195,186,.07)!important;color:#d8d4cc!important;border:1px solid rgba(201,195,186,.28)!important;box-shadow:none!important}
-/* Notification panel: dark surface, beige text, lighter shade on hover/unread */
-html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-color:rgba(201,195,186,.14)!important}
-html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
-html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
-html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
-</style>
-<style id="eg-dark-dl">
-/* Design Lab path cards: darker beige border idle → brighter beige on hover/click */
-.dl-path-card{border:1px solid rgba(25,25,24,.16)!important}
-.dl-path-card:hover{border-color:rgba(25,25,24,.42)!important;box-shadow:0 4px 16px rgba(0,0,0,.07)!important}
-html[data-theme=dark] .dl-path-card{background:#252220!important;border-color:rgba(201,195,186,.28)!important}
-html[data-theme=dark] .dl-path-card:hover{border-color:rgba(201,195,186,.62)!important;box-shadow:0 6px 20px rgba(0,0,0,.45)!important}
-</style>
-<style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-</style>
-<style id="eg-card-dark-retro">/* eg-card-dark-retro */
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
-/* Path-card icons → beige (match lettering) in dark mode */
-html[data-theme=dark] .dl-path-card svg [stroke]:not([stroke="none"]){stroke:#c9c3ba!important}
-html[data-theme=dark] .dl-path-card svg [fill]:not([fill="none"]){fill:#c9c3ba!important}
-html:not([data-theme=dark]) .dl-path-card{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-html[data-theme=dark] .dl-path-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
-</style>
-<style id="eg-sel-outline">/* eg-sel-outline */
-html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
-</style>
-<style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
-<style id="eg-filter-uniform">/* Uniform filter dropdowns: borderless, #191918 lettering + arrow, menu on top */
-.eg-sel-btn{border:none!important;background:transparent!important;color:#191918!important}
-.eg-sel-btn svg{color:#191918!important}
-.eg-sel-btn:hover{background:rgba(0,0,0,.05)!important;border:none!important}
-.eg-sel.open{z-index:6000!important}
-.eg-sel-menu{z-index:6001!important}
-.fb:not(.filter-btn){color:#191918!important}
-.fb:not(.filter-btn) svg{color:#191918!important}
-html[data-theme=dark] .eg-sel-btn,html[data-theme=dark] .eg-sel-btn svg{color:#c9c3ba!important}
-html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter-btn) svg{color:#c9c3ba!important}
-</style>
-<style id="eg-tab-snap">/* Tab/filter/nav lettering snaps gray->dark instantly (no colour fade); bg/border/transform still ease */
-.stab,.tab-btn,.tab-sm,.seg,.pill-btn,.fb,.filter-btn,.lang-opt,.chat-tab,.ni,.eg-sel-btn{transition-property:background-color,border-color,box-shadow,opacity,outline-color,transform!important}
-</style>  <script src="eg-dither.js"></script>
+  <script src="eg-dither.js"></script>
 
   <script src="eg-theme.js"></script>
 <link rel="stylesheet" href="eg-board.css">
 <script src="eg-board.js" defer></script>
-<style id="eg-board-cards-fix">
-/* Unify the Design Lab family cards with the board look (shadcn/ui zinc: white, hairline, soft-shadow, rounded). Loaded LAST so it wins over the local soft-card styles. */
-html.eg-board-on .card,html.eg-board-on .dcard,html.eg-board-on .tcard,html.eg-board-on .stat-card,html.eg-board-on .ccard{background:#fff!important;border:1px solid #e4e4e7!important;border-radius:12px!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important}
-html.eg-board-on .dcard,html.eg-board-on .tcard{transition:box-shadow .12s,transform .12s!important}
-html.eg-board-on .dcard:hover,html.eg-board-on .tcard:hover{box-shadow:0 8px 24px -4px rgba(0,0,0,.12)!important;transform:translate(-1px,-1px)!important;border-color:#e4e4e7!important}
-html.eg-board-on .stat-card::before{display:none!important}
-html[data-theme=dark].eg-board-on .card,html[data-theme=dark].eg-board-on .dcard,html[data-theme=dark].eg-board-on .tcard,html[data-theme=dark].eg-board-on .stat-card,html[data-theme=dark].eg-board-on .ccard{background:#151419!important;border-color:#6d6a78!important;box-shadow:none!important}
-html[data-theme=dark].eg-board-on .dcard:hover,html[data-theme=dark].eg-board-on .tcard:hover{box-shadow:0 6px 18px rgba(0,0,0,.42)!important;border-color:#6d6a78!important}
-</style>
 </head>
 <body>
 

@@ -345,10 +345,8 @@ html:not([data-theme=dark]) .kb-col-header,html:not([data-theme=dark]) .kb-col-h
 html[data-theme=dark] .kb-col-header{background:#c9c3ba!important}
 html[data-theme=dark] .kb-col-header,html[data-theme=dark] .kb-col-header span,html[data-theme=dark] .kb-col-header button,html[data-theme=dark] .kb-col-header svg{color:#191918!important}
 
-/* eg-navsel-light */
-/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
-html:not([data-theme=dark]) .ni{border:1px solid transparent}
-html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
+/* eg-navsel-light REMOVED — active sidebar nav is owned by the shared eg-board.css
+   (.ni.on = violet-soft fill + violet text, no border); the old #191918 outline fought it. */
 
 /* eg-balpane-card */
 #section-balance .bal-pane .card{background:transparent!important;border:none!important;box-shadow:none!important;padding-left:0!important;padding-right:0!important}
@@ -2044,31 +2042,31 @@ document.addEventListener('DOMContentLoaded', function(){
     html.eg-board-on[data-theme=dark] #section-sellers .sd-tabstrip{border-bottom-color:#5a5660!important}
     html.eg-board-on[data-theme=dark] #section-sellers .sd-txtable{border-top-color:#5a5660!important}
 
-    /* ── Seller CARD grid (replaces the old left list). Board-OS chip:
-         square corners, 1.5px ink border, 4px hard offset shadow, cream
-         ground. Hover presses in (translate toward the shadow) so the click
-         reads as tactile. Cursor pointer everywhere. ────────────────────── */
+    /* ── Seller CARD grid (replaces the old left list). Aligned to the shared
+         eg-board card system: white paper fill, --bos-cardline hairline,
+         --bos-radius corners, soft --bos-shadow. Hover lifts (soft shadow
+         grows + 3px up); active settles back. Cursor pointer everywhere. ── */
     #section-sellers .seller-card-item{
-      background:var(--bos-paper,#fdfcfa);
-      border:1.5px solid var(--bos-ink,#191918);
-      border-radius:0;
-      box-shadow:4px 4px 0 var(--bos-ink,#191918);
+      background:var(--bos-paper,#fff);
+      border:1px solid var(--bos-cardline);
+      border-radius:var(--bos-radius);
+      box-shadow:var(--bos-shadow);
       cursor:pointer;
-      transition:transform .11s ease, box-shadow .11s ease;
+      transition:transform .16s var(--bos-ease), box-shadow .16s var(--bos-ease);
     }
     #section-sellers .seller-card-item:hover{
-      transform:translate(2px,2px);
-      box-shadow:2px 2px 0 var(--bos-ink,#191918);
+      transform:translateY(-3px);
+      box-shadow:var(--bos-shadow-hover);
     }
     #section-sellers .seller-card-item:active{
-      transform:translate(4px,4px);
-      box-shadow:0 0 0 var(--bos-ink,#191918);
+      transform:translateY(0);
+      box-shadow:var(--bos-shadow);
     }
     html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item{
-      background:#2c2a31;border-color:#5a5660;box-shadow:4px 4px 0 #14131a;
+      background:#151419;border-color:#6d6a78;box-shadow:0 1px 3px rgba(0,0,0,.35);
     }
-    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:hover{box-shadow:2px 2px 0 #14131a}
-    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:active{box-shadow:0 0 0 #14131a}
+    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:hover{box-shadow:0 6px 18px rgba(0,0,0,.42)}
+    html.eg-board-on[data-theme=dark] #section-sellers .seller-card-item:active{box-shadow:0 1px 3px rgba(0,0,0,.35)}
   </style>
   <div id="section-sellers" class="section fi">
 
@@ -2128,11 +2126,11 @@ document.addEventListener('DOMContentLoaded', function(){
          existing detail markup/ids/handlers are REUSED unchanged. ═════════ -->
     <div id="seller-detail-view" style="display:none;max-width:1180px">
       <button onclick="backToSellers()" style="display:inline-flex;align-items:center;gap:7px;margin-bottom:16px;background:none;border:none;padding:6px 2px;cursor:pointer;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;font-size:11px;font-weight:400;color:#191918;text-transform:uppercase;letter-spacing:.06em" onmouseover="this.style.opacity='.6'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Back to sellers</button>
-      <!-- Detail. Identity band + tabs share a single sticker-shadow
-           card; the dark #191918 header sits flush against the tabs strip
-           so the whole header reads as one unit. -->
+      <!-- Detail. Identity band + tabs share a single card; the dark #191918
+           header sits flush against the tabs strip so the whole header reads
+           as one unit. Card frame (soft shadow + radius) comes from eg-board. -->
       <div>
-        <div class="card" style="overflow:hidden;margin-bottom:18px;box-shadow:4px 4px 0 var(--bos-ink,#191918)!important;border-radius:0!important">
+        <div class="card" style="overflow:hidden;margin-bottom:18px">
           <!-- Dark identity band -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:#191918">
             <div style="display:flex;align-items:center;gap:13px;min-width:0">

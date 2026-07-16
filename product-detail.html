@@ -7,15 +7,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-/* Retro/Tavus product face (ported from product-detail-public.html) — uses Board OS
-   tokens (cobalt #2f4bf0, ink #191918, Fraunces display, DepartureMono micro-labels,
-   hard black offset shadows, square corners). Presentation-only; all ids/handlers kept. */
-@font-face{font-family:'DepartureMono';src:url(fonts/DepartureMono-Regular.woff2) format('woff2');font-weight:400;font-display:block}
+/* Product face — aligned to the shared Board OS system (eg-board.css). Uses the board
+   tokens: --bos-violet accent, Inter sans (no serif), soft --bos-shadow, rounded --bos-radius.
+   Page-specific .pd-* components only; card/nav/button/badge chrome comes from eg-board.css.
+   Presentation-only; all ids/handlers kept. */
 :root{
   --pd-ink:#191918; --pd-paper:#fff; --pd-panel:#f4f4f5; --pd-line:#e4e4e7;
-  --pd-violet:#2f4bf0; --pd-amber:#f8d264; --pd-indigo:#e9eefe;
+  --pd-violet:var(--bos-violet); --pd-amber:#f8d264; --pd-indigo:var(--bos-violet-soft);
   --pd-grey:#6b7280; --pd-grey2:#9ca3af;
-  --pd-disp:'Fraunces',Georgia,serif; --pd-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  --pd-disp:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; --pd-mono:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
 }
 body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#f7f5f0;margin:0}
 .sidebar{width:220px;min-height:100vh;background:#f7f5f0;border-right:1px solid rgba(0,0,0,.14);position:fixed;top:0;left:0;z-index:40;display:flex;flex-direction:column;overflow-y:auto}
@@ -27,10 +27,8 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .btn{padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;border:none;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
 .btn-dk{background:#111827;color:#fff}.btn-dk:hover{opacity:.85}
 .btn-out{background:#fff;border:1.5px solid #e5e4e0;color:#374151}.btn-out:hover{border-color:#9ca3af}
-.card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
-/* Match shared cards: white bg + hairline border + soft shadow */
-html:not([data-theme=dark]) .card{background:#fff!important;border:1px solid #e4e4e7!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important}
-/* ── RETRO micro-labels (DepartureMono uppercase) ── */
+/* .card is themed by the shared eg-board.css (white · --bos-cardline · soft --bos-shadow · 12px) — no local override */
+/* ── micro-labels (Inter, tracked uppercase) ── */
 .pd-eyebrow{font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-grey2);display:block;margin-bottom:10px}
 .pd-label{font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;color:var(--pd-ink)}
 .pd-link{font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--pd-violet);cursor:pointer;text-decoration:none;border-bottom:1.5px solid var(--pd-violet)}
@@ -40,18 +38,18 @@ html:not([data-theme=dark]) .card{background:#fff!important;border:1px solid #e4
 .tech-tab.on{background:var(--pd-paper);color:var(--pd-ink);box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)}
 .tech-tab:not(.on):hover{color:var(--pd-ink)}
 /* size buttons — segmented selector */
-.sz-btn{min-width:46px;padding:9px 12px;border:1.5px solid #e4e4e7;border-radius:0;font-family:var(--pd-mono);font-size:12px;font-weight:400;cursor:pointer;background:var(--pd-paper);color:var(--pd-ink);transition:background .1s,color .1s,box-shadow .1s;text-align:center;margin:0 -1.5px -1.5px 0}
+.sz-btn{min-width:46px;padding:9px 12px;border:1.5px solid #e4e4e7;border-radius:var(--bos-radius-sm);font-family:var(--pd-mono);font-size:12px;font-weight:400;cursor:pointer;background:var(--pd-paper);color:var(--pd-ink);transition:background .1s,color .1s,box-shadow .1s;text-align:center;margin:0}
 .sz-btn.on{background:var(--pd-ink);color:var(--pd-paper)}
 .sz-btn:not(.on):hover{background:#f4f4f5}
 /* color swatches — square, hard-shadow selected */
-.clr-swatch{width:28px;height:28px;border-radius:0;cursor:pointer;border:1.5px solid var(--pd-ink);transition:box-shadow .1s,transform .1s;flex-shrink:0;position:relative}
-.clr-swatch.on{border-color:var(--pd-ink)!important;box-shadow:0 0 0 2px rgba(47,75,240,.35)}
+.clr-swatch{width:28px;height:28px;border-radius:var(--bos-radius-sm);cursor:pointer;border:1.5px solid var(--pd-ink);transition:box-shadow .1s,transform .1s;flex-shrink:0;position:relative}
+.clr-swatch.on{border-color:var(--pd-ink)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--bos-violet) 35%,transparent)}
 .clr-swatch:hover{transform:translate(-1px,-1px)}
 /* thumbnail strip — square, ink border, hard-shadow selected */
-.thumb{width:84px;height:84px;border-radius:0;border:1px solid #e4e4e7;overflow:hidden;cursor:pointer;transition:box-shadow .1s,transform .1s;background:var(--pd-panel);flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.thumb.on{border-color:var(--pd-violet);box-shadow:0 0 0 2px rgba(47,75,240,.35)}
+.thumb{width:84px;height:84px;border-radius:var(--bos-radius-sm);border:1px solid #e4e4e7;overflow:hidden;cursor:pointer;transition:box-shadow .1s,transform .1s;background:var(--pd-panel);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.thumb.on{border-color:var(--pd-violet);box-shadow:0 0 0 2px color-mix(in srgb,var(--bos-violet) 35%,transparent)}
 .thumb:hover:not(.on){transform:translate(-1px,-1px);box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)}
-.thumb img{border-radius:0!important}
+.thumb img{border-radius:var(--bos-radius-sm)!important}
 /* star rating */
 .star{color:var(--pd-ink);font-size:15px;line-height:1;letter-spacing:1px}
 .star.off{color:var(--pd-line)}
@@ -98,12 +96,12 @@ html:not([data-theme=dark]) .card{background:#fff!important;border:1px solid #e4
 .pd-subhd{font-family:var(--pd-mono);font-size:10.5px;font-weight:400;text-transform:uppercase;letter-spacing:.04em;color:var(--pd-ink);margin:0 0 9px}
 .pd-panel-bd .pd-subhd:not(:first-child){margin-top:16px}
 .pd-bullet{display:flex;align-items:flex-start;gap:9px}
-.pd-bullet .dot{width:6px;height:6px;border-radius:0;background:var(--pd-violet);flex-shrink:0;margin-top:5px}
+.pd-bullet .dot{width:6px;height:6px;border-radius:50%;background:var(--pd-violet);flex-shrink:0;margin-top:5px}
 .pd-bullet span:last-child{font-size:13px;color:#374151;line-height:1.45}
 html[data-theme=dark] .pd-subhd{color:#e8e4dd}
 html[data-theme=dark] .pd-bullet span:last-child{color:#a8a39b}
 html[data-theme=dark] #pd-about{color:#a8a39b!important}
-/* ── BREADCRUMB (in-app header) — DepartureMono, muted ancestors + cobalt hover, solid-ink current, sharp ── */
+/* ── BREADCRUMB (in-app header) — Inter, muted ancestors + violet hover, solid-ink current ── */
 .pd-crumbs{display:flex;align-items:center;gap:8px;font-family:var(--pd-mono);font-size:11px;font-weight:400;text-transform:uppercase;letter-spacing:.05em;flex-wrap:wrap}
 .pd-crumbs a{color:var(--pd-grey2);text-decoration:none;border-bottom:1.5px solid transparent;transition:color .12s,border-color .12s}
 .pd-crumbs a:hover{color:var(--pd-violet);border-bottom-color:var(--pd-violet)}
@@ -113,10 +111,10 @@ html[data-theme=dark] .pd-crumbs a{color:#8b867d}
 html[data-theme=dark] .pd-crumbs a:hover{color:#6f8bff;border-bottom-color:#6f8bff}
 html[data-theme=dark] .pd-crumbs .pd-crumb-sep{color:#8b867d}
 html[data-theme=dark] .pd-crumbs #bc-name{color:#e8e4dd}
-/* big product name → Fraunces serif */
+/* big product name → Inter (board sans; serif is marketing-only) */
 #pd-name{font-family:var(--pd-disp)!important;font-optical-sizing:none;font-variation-settings:'opsz' 60,'wght' 560;font-size:clamp(28px,3.2vw,40px)!important;line-height:1.04!important;letter-spacing:-.015em!important;color:var(--pd-ink)}
 /* hero + thumb placeholder ground stays neutral paper */
-#pd-hero{border-radius:0!important;border:1px solid #e4e4e7!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important;background:var(--pd-panel)!important}
+#pd-hero{border-radius:var(--bos-radius)!important;border:1px solid #e4e4e7!important;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)!important;background:var(--pd-panel)!important}
 .pd-heronav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;background:var(--pd-paper);border:1px solid #e4e4e7;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .09s,box-shadow .09s}
 .pd-heronav:hover{transform:translateY(-50%) translate(1px,1px);box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05)}
 /* ── DARK MODE — retro face on the dark board ground ── */
@@ -130,9 +128,9 @@ html[data-theme=dark] .sz-btn{border-color:#5a5660;background:#201e24;color:#e8e
 html[data-theme=dark] .sz-btn.on{background:#e8e4dd;color:#1a1917}
 html[data-theme=dark] .sz-btn:not(.on):hover{background:#2c2a33}
 html[data-theme=dark] .clr-swatch{border-color:#5a5660}
-html[data-theme=dark] .clr-swatch.on{border-color:#e8e4dd!important;box-shadow:0 0 0 2px rgba(47,75,240,.45)}
+html[data-theme=dark] .clr-swatch.on{border-color:#e8e4dd!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--bos-violet) 45%,transparent)}
 html[data-theme=dark] .thumb{border-color:#5a5660;background:#26242b}
-html[data-theme=dark] .thumb.on{border-color:var(--pd-violet);box-shadow:0 0 0 2px rgba(47,75,240,.45)}
+html[data-theme=dark] .thumb.on{border-color:var(--pd-violet);box-shadow:0 0 0 2px color-mix(in srgb,var(--bos-violet) 45%,transparent)}
 html[data-theme=dark] .pd-facts{border-color:#5a5660;box-shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px -1px rgba(0,0,0,.05);background:#201e24}
 html[data-theme=dark] .pd-fact+.pd-fact{border-left-color:#5a5660}
 html[data-theme=dark] #pd-price,html[data-theme=dark] .pd-fact .days,html[data-theme=dark] .pd-fact .ship-row{color:#e8e4dd}
@@ -422,7 +420,7 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
               <span class="pd-label">Size</span>
               <span class="pd-link" onclick="if(window.EGGuides)EGGuides.openSize(_pid)">Size guide ↗</span>
             </div>
-            <div id="pd-sizes" style="display:flex;flex-wrap:wrap"></div>
+            <div id="pd-sizes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
           </div>
 
           <!-- Price + delivery (split card) -->

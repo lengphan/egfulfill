@@ -198,11 +198,6 @@ html[data-theme=dark] [style*="solid #f3f3f1"],html[data-theme=dark] [style*="so
 /* Dark mode: sidebar count badges → grey-beige fill, slate-black numerals (matches dashboard) */
 html[data-theme=dark] .ni > span{background:#c9c3ba!important;color:#191918!important;border-color:#c9c3ba!important}
 
-/* eg-navsel-light */
-/* Selected sidebar nav (light mode): no fill, thin #191918 borderline (mirrors dark beige outline) */
-html:not([data-theme=dark]) .ni{border:1px solid transparent}
-html:not([data-theme=dark]) .ni.on{background:transparent!important;border:1px solid #191918!important}
-
 /* === Topbar header polish (ported from dashboard) === */
 /* Wallet pill — matches the .card style (chunky offset shadow on a hard outline),
    with a press animation: on :active the chip slides into its shadow so the
@@ -294,12 +289,6 @@ html[data-theme=dark] .notif-panel{background:#1f1d1b!important;border-left-colo
 html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!important}
 html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
 html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
-</style>
-<style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-</style>
-<style id="eg-card-dark-retro">/* eg-card-dark-retro */
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
 </style>
 <style id="eg-sel-outline">/* eg-sel-outline */
 html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
@@ -407,22 +396,22 @@ html[data-theme=dark] .fb:not(.filter-btn),html[data-theme=dark] .fb:not(.filter
     <!-- KPI CARDS -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px" class="fi">
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Total Revenue</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total Revenue</div>
         <div id="an-revenue" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-revenue-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Total Orders</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Total Orders</div>
         <div id="an-orders" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-orders-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Avg Order Value</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Avg Order Value</div>
         <div id="an-aov" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-aov-trend" class="trend-up">0%</span> vs prev period</div>
       </div>
       <div class="card" style="padding:18px 20px">
-        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;font-family:'DepartureMono',ui-monospace,monospace">Net Profit</div>
+        <div style="font-size:12.5px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Net Profit</div>
         <div id="an-profit" style="font-size:27px;font-weight:800;color:#111827;letter-spacing:-0.02em;line-height:1">$0</div>
         <div style="font-size:13px;color:#6b7280;margin-top:6px;display:flex;align-items:center;gap:4px"><span id="an-profit-trend" class="trend-up">0%</span> vs prev period</div>
       </div>

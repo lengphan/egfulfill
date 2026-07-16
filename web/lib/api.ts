@@ -172,6 +172,10 @@ export type CatalogProduct = {
   price?: number | string
   basePrice?: number | string
   base_price?: number | string
+  shippingFee?: number | string
+  shipping_fee?: number | string
+  description?: string
+  supplier?: string // "S&S" | "Otto Cap" | "" — where the blank derives from
   mainColor?: string
   sizes?: string[]
   images?: string[]
@@ -189,6 +193,10 @@ export function getAiConfig() {
 }
 export function setAiConfig(body: { key?: string; model?: string; clearKey?: boolean }) {
   return api<AiConfig>(`/api/admin/ai-config`, { method: "PUT", body: JSON.stringify(body) })
+}
+// Live-test the saved key/model against Anthropic — returns the real error if it fails.
+export function testAiKey() {
+  return api<{ ok?: boolean; model?: string; status?: number; error?: string }>(`/api/admin/ai-test`, { method: "POST", body: "{}" })
 }
 
 // Google Sheets import — server reads the sheet and returns a 2D row array,

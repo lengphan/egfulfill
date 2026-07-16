@@ -306,14 +306,9 @@ input:focus:not([type=checkbox]):not([type=radio]):not([type=color]),textarea:fo
 .ni:focus{outline:none!important;box-shadow:none!important}
 </style>
 <style id="eg-card-hover">.card,.wcard,.stat-card{transition:box-shadow .16s ease,top .14s cubic-bezier(.4,0,.2,1)}.wcard:hover{background-image:linear-gradient(rgba(0,0,0,.025),rgba(0,0,0,.025))!important}
-/* Overview cards: the offset "sticker" shadow IS the height.
-   Hover = raised (shadow grows + 1px up); click/drag = pressed in (shadow shrinks + 3px down).
-   Uses top (not transform — the .fi fadeUp animation locks transform). */
 .wcard,.stat-card{position:relative}
-html:not([data-theme=dark]) .wcard:hover,html:not([data-theme=dark]) .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #40403d!important}
-html[data-theme=dark] .wcard:hover,html[data-theme=dark] .stat-card:hover{top:-1px;box-shadow:4px 4px 0 #c9c3ba!important}
-html:not([data-theme=dark]) .wcard:active,html:not([data-theme=dark]) .stat-card:active{top:3px;box-shadow:1px 1px 0 #40403d!important}
-html[data-theme=dark] .wcard:active,html[data-theme=dark] .stat-card:active{top:3px;box-shadow:1px 1px 0 #c9c3ba!important}</style>
+/* Card hover/press hard-offset "sticker" shadows removed — eg-board.css owns the soft-shadow card lift + press (superseded). */
+</style>
 <style id="eg-dark-polish">
 /* Unified dark-mode polish — cards lift off the page with a soft glow; softer
    (non-glaring) primary buttons + active selections. Applied across all dashboards. */
@@ -472,14 +467,8 @@ body,.sidebar,header,.card,.wcard,.stat-card,.bal-chip,.plan-box,.plan-upgrade,.
 html[data-theme=dark] #new-menu-btn{background:#c9c3ba!important;border-color:#c9c3ba!important;color:#191918!important}
 html[data-theme=dark] #new-menu-btn svg [stroke="white"],html[data-theme=dark] #new-menu-btn svg [stroke="#fff"]{stroke:#191918!important}
 </style>
-<style id="eg-card-outline">/* eg-card-outline */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard,html:not([data-theme=dark]) .stat-card{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-</style>
 <style id="eg-notif-iconbg">/* eg-notif-iconbg */
 html:not([data-theme=dark]) .notif-row [style*="background:#eeede9"]{background:transparent!important}
-</style>
-<style id="eg-card-dark-retro">/* eg-card-dark-retro */
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
 </style>
 <style id="eg-sel-outline">/* eg-sel-outline */
 html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}

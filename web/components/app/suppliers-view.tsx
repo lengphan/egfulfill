@@ -83,6 +83,7 @@ export function SuppliersView() {
         price: d.price ?? s.price ?? 0, basePrice: d.price ?? s.price ?? 0,
         sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: (d.colors ?? s.colors)?.[0],
         img: d.image ?? s.image ?? undefined, images: d.extraImages ?? [], sku: s.styleID,
+        description: d.description ?? undefined, supplier: "S&S",
       }
       const next = existing.some((p) => p.id === id) ? existing.map((p) => (p.id === id ? product : p)) : [...existing, product]
       const r = await saveCatalogProducts(next)

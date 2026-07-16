@@ -26,10 +26,6 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-
 .btn-dk{background:#1c1512;color:#fff}.btn-dk:hover{opacity:.85}
 .btn-out{background:#e8e2db;color:#4a3f38}.btn-out:hover{opacity:.85}
 .btn-ghost{background:transparent;color:#6b7280;border:1px solid rgba(0,0,0,.2)}.btn-ghost:hover{background:rgba(0,0,0,.04);color:#374151;border-color:rgba(0,0,0,.3)}
-.btn-clay{background:#b5654a;color:#fff}.btn-clay:hover{opacity:.9}
-.btn-olive{background:#5c6e4a;color:#fff}.btn-olive:hover{opacity:.9}
-.btn-sienna{background:#a0522d;color:#fff}.btn-sienna:hover{opacity:.9}
-.btn-danger{background:#b83c3c;color:#fff}.btn-danger:hover{opacity:.9}
 .card{background:#fff;border:1px solid transparent;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.07)}
 .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:12.5px;font-weight:600}
 /* Unified status palette — text-only, no pill background. Same hues as the factory dashboards. */
@@ -263,7 +259,7 @@ html[data-theme=dark] #orders-search::placeholder,html[data-theme=dark] #hdr-sea
 html:not([data-theme=dark]) .bal-chip:hover{background:#f0ede9!important;color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:hover #balance-val{color:#191918!important}
 html:not([data-theme=dark]) .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #40403d!important}
-html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:2px 2px 0 #c9c3ba!important}
+html[data-theme=dark] .bal-chip{background:transparent!important;border-color:#c9c3ba!important;color:#d8d4cc!important;box-shadow:none!important}
 html[data-theme=dark] .bal-chip:hover{background:rgba(201,195,186,.10)!important;color:#f3eee2!important}
 html[data-theme=dark] .bal-chip:hover #balance-val{color:#f3eee2!important}
 html[data-theme=dark] .bal-chip:active{transform:translate(2px,2px);box-shadow:0 0 0 #c9c3ba!important}
@@ -347,18 +343,8 @@ html[data-theme=dark] .notif-row{border-bottom-color:rgba(201,195,186,.08)!impor
 html[data-theme=dark] .notif-row:hover,html[data-theme=dark] .notif-row.unread{background:rgba(201,195,186,.06)!important}
 html[data-theme=dark] .notif-panel [style*="border-bottom:1px solid #f3f3f1"]{border-bottom-color:rgba(201,195,186,.1)!important}
 </style>
-<style id="eg-card-soft">/* eg-card-soft */
-html:not([data-theme=dark]) .card,html:not([data-theme=dark]) .wcard{background:#fdfcfa!important;border:1px solid #e6e4df!important;box-shadow:0 1px 2px rgba(0,0,0,.05)!important}
-</style>
-<style id="eg-card-dark-retro">/* eg-card-dark-retro */
-html[data-theme=dark] .card,html[data-theme=dark] .wcard,html[data-theme=dark] .stat-card{background:transparent!important;border:1px solid #c9c3ba!important;box-shadow:2px 2px 0 #c9c3ba!important}
-</style>
 <style id="eg-sel-outline">/* eg-sel-outline */
 html:not([data-theme=dark]) .tab-btn.on,html:not([data-theme=dark]) .tab-btn.active,html:not([data-theme=dark]) .tab-sm.on,html:not([data-theme=dark]) .pill-btn.active,html:not([data-theme=dark]) .seg.on{background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
-</style>
-<style id="eg-fb-outline">/* eg-fb-outline */
-html:not([data-theme=dark]) .filter-btn.active{background:transparent!important;border:none!important;border-bottom:2px solid #191918!important;color:#191918!important;box-shadow:none!important;border-radius:0!important}
-html:not([data-theme=dark]) .fb.active:not(.filter-btn){background:transparent!important;border:1px solid #191918!important;color:#191918!important;box-shadow:none!important}
 </style>
 <style id="eg-hdr-lang">.hdr-lang .lang-opt{color:#9ca3af;transition:color .15s;border:none;background:none;cursor:pointer;font-family:inherit}.hdr-lang .lang-opt.on{color:#191918}html[data-theme=dark] .hdr-lang .lang-opt{color:#7a746a!important}html[data-theme=dark] .hdr-lang .lang-opt.on{color:#c9c3ba!important}</style>
 <style id="eg-order-rows">

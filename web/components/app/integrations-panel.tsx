@@ -5,7 +5,7 @@ import { ArrowsClockwise, ShieldCheck, Sparkle, Check, PencilSimple, X, CircleNo
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, type SecretMeta, type AiConfig } from "@/lib/api"
+import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, testAiKey, type SecretMeta, type AiConfig } from "@/lib/api"
 
 // One integration credential row — read-only status, plus inline edit for whitelisted
 // secrets (saved to the DB; applied on the next server restart).
@@ -297,6 +297,8 @@ function AiAssistantCard() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const load = useCallback(() => {
     getAiConfig()
@@ -333,6 +335,19 @@ function AiAssistantCard() {
       setErr(e instanceof Error ? e.message : "Couldn't remove the key.")
     } finally {
       setSaving(false)
+    }
+  }
+  const test = async () => {
+    setTesting(true); setTestResult(null)
+    try {
+      const r = await testAiKey()
+      setTestResult(r.ok
+        ? { ok: true, msg: `Working — ${r.model} replied.` }
+        : { ok: false, msg: r.error || "Failed" })
+    } catch (e) {
+      setTestResult({ ok: false, msg: e instanceof Error ? e.message : "Test failed" })
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -381,13 +396,21 @@ function AiAssistantCard() {
       </div>
 
       {err && <div className="mt-2 text-sm text-destructive">{err}</div>}
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+        {cfg?.keySet && (
+          <Button size="sm" variant="outline" onClick={test} disabled={testing}>{testing ? "Testing…" : "Test key"}</Button>
+        )}
         {cfg?.keySet && !cfg.fromEnv && (
           <Button size="sm" variant="outline" onClick={removeKey} disabled={saving}>Remove key</Button>
         )}
         {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
       </div>
+      {testResult && (
+        <div className={"mt-2 text-sm " + (testResult.ok ? "text-emerald-600" : "text-destructive")}>
+          {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
+        </div>
+      )}
       <p className="mt-2 text-xs text-muted-foreground">A saved key overrides the server env. Haiku 4.5 runs about a fifth of a cent per question. Admin only.</p>
     </div>
   )

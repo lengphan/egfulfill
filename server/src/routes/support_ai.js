@@ -153,6 +153,26 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     }
   });
 
+  // ── Staff: live "does the key actually work?" test (pings Anthropic once) ─────
+  app.post('/api/admin/ai-test', { preHandler: requireStaff }, async () => {
+    const { key, model } = await aiConfig();
+    if (!key) return { ok: false, error: 'No API key is set.' };
+    try {
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: 'user', content: 'ping' }] }),
+      });
+      if (r.ok) return { ok: true, model };
+      const detail = await r.text().catch(() => '');
+      let reason = '';
+      try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
+      return { ok: false, model, status: r.status, error: reason || `HTTP ${r.status}` };
+    } catch (e) {
+      return { ok: false, model, error: (e && e.message) || 'Request failed' };
+    }
+  });
+
   // ── Admin config (Settings › Integrations): key status + model selector ──────
   app.get('/api/admin/ai-config', { preHandler: requireStaff }, async () => {
     const cfg = await aiConfig();

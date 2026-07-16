@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X } from "@phosphor-icons/react"
+import { useEffect, useMemo, useState } from "react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,11 +10,15 @@ import { type CatalogProduct } from "@/lib/api"
 
 const METHODS = ["DTG", "Embroidery", "Screen Print", "Sublimation", "Vinyl"]
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
+const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
+const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
+
 const imageOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
-
 const genId = (seed: number) => "PROD-" + seed.toString(36).toUpperCase()
+const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
 
-// Create/edit one catalog product, including its mockup image (feeds the Design Maker's blanks).
+// Create/edit one catalog product. Colors/sizes are chips (with supplier-suggested picks),
+// pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
   open, onOpenChange, product, onSave, newIdSeed,
 }: {
@@ -29,8 +33,11 @@ export function ProductEditorDialog({
   const [method, setMethod] = useState("DTG")
   const [price, setPrice] = useState("")
   const [basePrice, setBasePrice] = useState("")
-  const [sizes, setSizes] = useState("")
-  const [colors, setColors] = useState("")
+  const [shipping, setShipping] = useState("")
+  const [desc, setDesc] = useState("")
+  const [sizes, setSizes] = useState<string[]>([])
+  const [colors, setColors] = useState<string[]>([])
+  const [colorInput, setColorInput] = useState("")
   const [status, setStatus] = useState("Active")
   const [img, setImg] = useState("")
   const [err, setErr] = useState<string | null>(null)
@@ -44,21 +51,44 @@ export function ProductEditorDialog({
       setMethod(p?.method ?? "DTG")
       setPrice(p?.price != null ? String(p.price) : "")
       setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
-      setSizes((p?.sizes ?? []).join(", "))
-      setColors((p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : []).join(", "))
+      setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
+      setDesc(p?.description ?? "")
+      setSizes(p?.sizes ?? [])
+      setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
       setStatus(p?.status ?? "Active")
       setImg(p ? imageOf(p) : "")
+      setColorInput("")
       setErr(null)
     }, 0)
     return () => clearTimeout(id)
   }, [open, product])
 
+  // Suggestions = supplier's real options first (from the derived blank), then common picks.
+  const colorSuggestions = useMemo(() => {
+    const fromProduct = product?.colorImages ? Object.keys(product.colorImages) : []
+    return Array.from(new Set([...fromProduct, ...SUGGESTED_COLORS])).filter((c) => !colors.includes(c)).slice(0, 12)
+  }, [product, colors])
+  const sizeSuggestions = useMemo(() => {
+    const fromProduct = product?.sizes ?? []
+    return Array.from(new Set([...fromProduct, ...SUGGESTED_SIZES])).filter((s) => !sizes.includes(s))
+  }, [product, sizes])
+
+  const addColor = (c: string) => {
+    const v = c.trim()
+    if (v && !colors.some((x) => x.toLowerCase() === v.toLowerCase())) setColors((p) => [...p, v])
+    setColorInput("")
+  }
+  const supplier = product?.supplier
+
+  // Live margin readout.
+  const retail = num(price), cost = num(basePrice), ship = num(shipping)
+  const profit = !isNaN(retail) ? retail - (isNaN(cost) ? 0 : cost) - (isNaN(ship) ? 0 : ship) : NaN
+  const marginPct = !isNaN(profit) && retail > 0 ? Math.round((profit / retail) * 100) : NaN
+
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
-    const sizeArr = sizes.split(",").map((s) => s.trim()).filter(Boolean)
-    const colorArr = colors.split(",").map((s) => s.trim()).filter(Boolean)
     const colorImages: Record<string, string> = {}
-    for (const c of colorArr) colorImages[c] = (product?.colorImages?.[c] as string) || ""
+    for (const c of colors) colorImages[c] = (product?.colorImages?.[c] as string) || ""
     const next: CatalogProduct = {
       ...(product ?? {}),
       id: product?.id ?? genId(newIdSeed),
@@ -66,9 +96,11 @@ export function ProductEditorDialog({
       type, method, status,
       price: Number(price) || 0,
       basePrice: Number(basePrice) || Number(price) || 0,
-      sizes: sizeArr,
+      shippingFee: shipping.trim() === "" ? undefined : Number(shipping) || 0,
+      description: desc.trim() || undefined,
+      sizes,
       colorImages,
-      mainColor: colorArr[0] || product?.mainColor,
+      mainColor: colors[0] || product?.mainColor,
       img, // the mockup — read first by the maker's blank picker
     }
     onSave(next)
@@ -77,11 +109,17 @@ export function ProductEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>{product ? "Edit product" : "New product"}</DialogTitle></DialogHeader>
-        <div className="space-y-3">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b border-border px-6 py-4">
+          <DialogTitle className="flex items-center gap-2">
+            {product ? "Edit product" : "New product"}
+            {supplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"><Tag size={11} weight="fill" /> {supplier}</span>}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          {/* Mockup + name */}
           <div className="flex gap-4">
-            {/* Mockup image */}
             <label className="group relative flex size-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/40 hover:bg-accent">
               {img ? (
                 <>
@@ -96,34 +134,110 @@ export function ProductEditorDialog({
             </label>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <UploadSimple size={13} /> Click the box to upload a mockup image — it becomes the blank in the Design Maker.
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Type</span>
+                  <select value={type} onChange={(e) => setType(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+                </label>
+                <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Method</span>
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
+                </label>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <UploadSimple size={13} /> The mockup becomes the blank in the Design Maker.
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Type</span>
-              <select value={type} onChange={(e) => setType(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
-            </label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Method</span>
-              <select value={method} onChange={(e) => setMethod(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
-            </label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Sizes (comma-sep)</span><Input value={sizes} onChange={(e) => setSizes(e.target.value)} placeholder="S, M, L, XL, 2XL" className="h-9" /></label>
-            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Colors (comma-sep)</span><Input value={colors} onChange={(e) => setColors(e.target.value)} placeholder="Black, Navy, Sand" className="h-9" /></label>
+          {/* Pricing + live margin */}
+          <div className="rounded-xl border border-border p-4">
+            <div className="grid grid-cols-3 gap-3">
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="default" className="h-9" inputMode="decimal" /></label>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
+              <span className="text-muted-foreground">Margin per unit</span>
+              {isNaN(profit) ? (
+                <span className="text-muted-foreground">enter a retail price</span>
+              ) : (
+                <span className={"font-semibold tabular-nums " + (profit >= 0 ? "text-emerald-600" : "text-destructive")}>
+                  ${profit.toFixed(2)}{!isNaN(marginPct) ? ` · ${marginPct}%` : ""}
+                </span>
+              )}
+            </div>
+            {shipping.trim() === "" && <p className="mt-1 text-[11px] text-muted-foreground">Leave shipping blank to use the platform default at fulfillment.</p>}
           </div>
+
+          {/* Colors — chips + suggested */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Colors</span>
+              {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
+            </div>
+            {colors.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {colors.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
+                    {c}
+                    <button onClick={() => setColors((p) => p.filter((x) => x !== c))} className="flex size-4 items-center justify-center rounded-full hover:bg-primary/20"><X size={9} weight="bold" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-1.5">
+              <Input value={colorInput} onChange={(e) => setColorInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColor(colorInput) } }} placeholder="Add a color…" className="h-8 text-xs" />
+              <Button size="sm" variant="outline" className="h-8 shrink-0 px-2" onClick={() => addColor(colorInput)}><Plus size={13} weight="bold" /></Button>
+            </div>
+            {colorSuggestions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
+                {colorSuggestions.map((c) => (
+                  <button key={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {c}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Sizes — toggle chips + suggested */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Sizes</span>
+              {sizes.length > 0 && <button onClick={() => setSizes([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {sizes.map((s) => (
+                <span key={s} className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 py-1 pl-2.5 pr-1 text-xs font-medium text-primary">
+                  {s}
+                  <button onClick={() => setSizes((p) => p.filter((x) => x !== s))} className="flex size-4 items-center justify-center rounded hover:bg-primary/20"><X size={9} weight="bold" /></button>
+                </span>
+              ))}
+            </div>
+            {sizeSuggestions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
+                {sizeSuggestions.map((s) => (
+                  <button key={s} onClick={() => setSizes((p) => [...p, s])} className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {s}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Description */}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Description</span>
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder={supplier ? "Auto-filled from the supplier — edit as needed." : "Product description…"} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
+          </label>
 
           <label className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Status</span>
             <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"><option>Active</option><option>Draft</option><option>Archived</option></select>
           </label>
 
           {err && <div className="text-sm text-destructive">{err}</div>}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={save}>{product ? "Save changes" : "Add product"}</Button>
-          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save}>{product ? "Save changes" : "Add product"}</Button>
         </div>
       </DialogContent>
     </Dialog>

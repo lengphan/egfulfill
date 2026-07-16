@@ -118,7 +118,7 @@ html.eg-board-on .bos-controls > *:hover{background:var(--bos-hover)!important}
 html.eg-board-on body:has(.sidebar) header .bos-controls{height:44px!important;align-items:stretch!important}
 html.eg-board-on body:has(.sidebar) header .bos-controls > *{height:44px!important;min-height:0!important;align-self:stretch!important}
 /* kill the old thin grey vertical-divider spacers */
-html.eg-board-on .bos-controls > div[style*="width:1px"]{display:none!important}
+html.eg-board-on .bos-controls > div[style*="width:1px"]{display:block!important;align-self:center!important;width:1px!important;height:22px!important;background:var(--bos-cardline)!important;margin:0 8px!important}
 html.eg-board-on .bos-sq{display:none!important}   /* titles alone — no ■ marker */
 /* ONE uniform type for every control cell: same family, size, weight, tracking (kills the mismatched fonts) */
 html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(--bos-mono)!important;font-size:14px!important;
@@ -126,37 +126,43 @@ html.eg-board-on .bos-controls,html.eg-board-on .bos-controls *{font-family:var(
 /* ── FIRST-PAINT header labels — pure CSS (replaces the old eg-board.js relabel(), whose post-paint
    icon→label swap WAS the header FOUC). Icons hidden, UPPERCASE lettering via pseudo-elements; the live
    values (#balance-val / #notif-dot / #hdr-lang-code) stay as real children so they still update. ── */
-html.eg-board-on #hdr-search-btn > svg{display:none!important}
-html.eg-board-on #hdr-search-btn::before{content:'Search'}
+/* TOP-BAR v3 — real icon buttons (Search / Alerts / Theme) instead of the old text labels */
+html.eg-board-on #hdr-search-btn > svg{display:inline-flex!important;width:16px!important;height:16px!important}
+html.eg-board-on #hdr-search-btn::before{content:none!important}
 /* language cell already shows #hdr-lang-code "EN" natively */
-html.eg-board-on #hdr-theme-track{display:none!important}
-html.eg-board-on:not([data-theme=dark]) #pref-btn::before{content:'Night'}
-html.eg-board-on[data-theme=dark] #pref-btn::before{content:'Day'}
-html.eg-board-on .bos-controls button:has(#notif-dot) > svg{display:none!important}
-html.eg-board-on .bos-controls button:has(#notif-dot)::before{content:'Alerts'}
-html.eg-board-on .bos-controls .bal-chip::before{content:'Balance:\00a0'}
+html.eg-board-on #hdr-theme-track{display:inline-block!important}
+html.eg-board-on #pref-btn::before{content:none!important}
+html.eg-board-on .bos-controls button:has(#notif-dot) > svg{display:inline-flex!important;width:17px!important;height:17px!important}
+html.eg-board-on .bos-controls button:has(#notif-dot)::before{content:none!important}
+html.eg-board-on .bos-controls .bal-chip::before{content:'Balance'!important;color:var(--bos-grey)!important;font-weight:500!important;margin-right:7px!important;font-size:12px!important}
+/* Search + Alerts → square 36px icon buttons with hover; EN + theme keep auto width */
+html.eg-board-on #hdr-search-btn,html.eg-board-on .bos-controls button:has(#notif-dot){
+  width:36px!important;min-width:36px!important;height:36px!important;padding:0!important;border-radius:8px!important;justify-content:center!important;color:var(--bos-grey)!important}
+html.eg-board-on #hdr-lang-btn,html.eg-board-on #pref-btn{color:var(--bos-grey)!important;border-radius:8px!important;padding:0 10px!important}
+html.eg-board-on #hdr-search-btn:hover,html.eg-board-on .bos-controls button:has(#notif-dot):hover,html.eg-board-on #hdr-lang-btn:hover,html.eg-board-on #pref-btn:hover{background:var(--bos-hover)!important;color:var(--bos-ink)!important}
 /* user cell: keep only the first name (drop avatar block + email line) */
-html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:none!important}
+html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:first-child{display:flex!important}
 html.eg-board-on .bos-controls .ibtn[onclick*="settings"] > div:nth-child(2) > div:last-child{display:none!important}
 /* every pseudo label inherits the mono cell type */
 html.eg-board-on .bos-controls ::before,html.eg-board-on .bos-controls ::after{font-family:var(--bos-mono)!important;font-size:14px!important;letter-spacing:0!important;text-transform:none!important}
 /* alerts count sits inline after the label */
-html.eg-board-on #notif-dot{position:static!important;font-family:var(--bos-mono)!important;background:var(--bos-ink)!important;color:#fff!important;
-  border:none!important;border-radius:0!important;min-width:0!important;padding:0 4px!important;height:15px!important;font-size:9.5px!important}
+html.eg-board-on #notif-dot{position:absolute!important;top:4px!important;right:4px!important;font-family:var(--bos-sans)!important;background:var(--bos-violet)!important;color:#fff!important;
+  border:2px solid var(--bos-paper)!important;border-radius:999px!important;min-width:16px!important;padding:0 3px!important;height:16px!important;font-size:9px!important;font-weight:700!important;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important}
 /* balance is a plain connected cell now — kill the .bal-chip pill's OWN border/radius/shadow/fill (from eg-theme + page CSS)
    so it stops floating a nested box on top of the continuous tab block. High specificity beats eg-theme's body:has() rule. */
-html.eg-board-on body:has(.sidebar) .bos-controls .bal-chip{border:none!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;height:44px!important;padding:0 13px!important}
+html.eg-board-on body:has(.sidebar) .bos-controls .bal-chip{border:1px solid var(--bos-cardline)!important;border-radius:8px!important;box-shadow:none!important;background:var(--bos-paper)!important;height:34px!important;padding:0 12px!important;font-weight:600!important}
 html.eg-board-on[data-theme=dark] body:has(.sidebar) .bos-controls .bal-chip{background:transparent!important;border:none!important;box-shadow:none!important}
 /* + New = the single accent cell — the violet must BLEED to fill the whole cell (was sitting 2px short).
    Scope to the wrapper that actually holds #new-menu-btn (the SEARCH wrapper is also position:relative!) */
 html.eg-board-on .bos-controls > div[style*="position:relative"]{padding:0!important;align-items:stretch!important}
 /* +New: un-filled cell (the solid colour block read clunky in the connected bar) — cobalt lettering + icons instead */
-html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important}
+html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn){background:transparent!important;align-items:center!important;padding:0 4px!important}
 html.eg-board-on .bos-controls > div[style*="position:relative"]:has(#new-menu-btn):hover{background:var(--bos-hover)!important}
-html.eg-board-on .bos-controls #new-menu-btn{background:transparent!important;color:var(--bos-violet)!important;border:none!important;box-shadow:none!important;
-  border-radius:0!important;height:100%!important;width:100%!important;font-family:var(--bos-mono)!important;text-transform:none;letter-spacing:0;font-size:11px!important;
-  transform:none!important;padding:0 15px!important;justify-content:center!important}
-html.eg-board-on .bos-controls #new-menu-btn svg path{stroke:var(--bos-violet)!important}
+html.eg-board-on .bos-controls #new-menu-btn{background:var(--bos-violet)!important;color:#fff!important;border:none!important;box-shadow:none!important;
+  border-radius:8px!important;height:36px!important;width:auto!important;font-family:var(--bos-sans)!important;text-transform:none;letter-spacing:0;font-size:13px!important;font-weight:600!important;
+  transform:none!important;padding:0 14px!important;justify-content:center!important;gap:5px!important}
+html.eg-board-on .bos-controls #new-menu-btn:hover{background:var(--bos-violet-dk)!important}
+html.eg-board-on .bos-controls #new-menu-btn svg path{stroke:#fff!important}
 /* the account cell + logout cell keep the ■ + label shape (email already dropped by the relabel) */
 html.eg-board-on .bos-logout{color:var(--bos-grey)!important}
 html.eg-board-on .bos-logout svg{display:none!important}
