@@ -57,13 +57,13 @@ export default function LoginPage() {
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-6">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Email</span>
+            <span className="text-sm font-medium">Email or username</span>
             <Input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              autoComplete="email"
+              autoComplete="username"
               required
             />
           </label>
