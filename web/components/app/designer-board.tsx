@@ -146,25 +146,24 @@ export function DesignerBoard() {
                         onDragStart={() => setDragId(c.id)}
                         onDragEnd={() => setDragId(null)}
                         onClick={() => setOpenId(c.id)}
-                        className="group cursor-grab rounded-xl border border-border bg-background p-2.5 text-left shadow-sm transition-shadow hover:shadow active:cursor-grabbing"
+                        className="group cursor-grab overflow-hidden rounded-xl border border-border bg-background text-left shadow-sm transition-shadow hover:shadow active:cursor-grabbing"
                       >
-                        <div className="flex gap-2.5">
-                          <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                            {c.thumb ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={String(c.thumb)} alt="" className="size-full object-cover" />
-                            ) : (
-                              <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={16} weight="duotone" /></div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
-                            <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.product || c.type || "—"}</div>
-                            <div className="mt-1 flex items-center gap-1.5">
-                              {c.order_id && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{String(c.order_id).slice(0, 10)}</span>}
-                              {c.is_emb && <span className="inline-flex items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
-                              {amt(c.payment) > 0 && <span className="ml-auto text-xs font-semibold tabular-nums">{money(amt(c.payment))}</span>}
-                            </div>
+                        {/* Large preview so the design is actually visible on the card */}
+                        <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+                          {c.thumb ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={String(c.thumb)} alt="" className="size-full object-cover" />
+                          ) : (
+                            <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
+                          )}
+                          {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                        </div>
+                        <div className="p-2.5">
+                          <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
+                          <div className="mt-0.5 truncate text-xs text-muted-foreground">{c.product || c.type || "—"}</div>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            {c.order_id && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{String(c.order_id).slice(0, 12)}</span>}
+                            {amt(c.payment) > 0 && <span className="ml-auto text-xs font-semibold tabular-nums">{money(amt(c.payment))}</span>}
                           </div>
                         </div>
                       </button>
