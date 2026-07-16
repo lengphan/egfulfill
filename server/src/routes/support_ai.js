@@ -252,7 +252,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, meta, client_id)
        values ($1,$2,$3,$4,$5,$6) on conflict (client_id) where client_id is not null do nothing`,
-      [threadId, 'assistant', 'assistant', text, JSON.stringify(meta), clientId]);
+      // sender_id is uuid references users(id) — the assistant is not a user row, so NULL (role/meta carry identity).
+      [threadId, null, 'assistant', text, JSON.stringify(meta), clientId]);
     return { ok: true, reply: text };
   });
 }
