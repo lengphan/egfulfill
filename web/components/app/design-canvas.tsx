@@ -1,9 +1,10 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon } from "@phosphor-icons/react"
+import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, type DesignPos, type OrderItem } from "@/lib/api"
 
 export type Pos = { x: number; y: number; w: number; r: number }
@@ -120,6 +121,7 @@ export function DesignCanvasDialog({
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [libOpen, setLibOpen] = useState(false)
 
   const save = async () => {
     if (!designUrl || !item.sku) { setErr("Upload artwork first."); return }
@@ -141,10 +143,13 @@ export function DesignCanvasDialog({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">
-              <UploadSimple size={15} weight="bold" /> {designUrl ? "Replace artwork" : "Upload artwork"}
+              <UploadSimple size={15} weight="bold" /> {designUrl ? "Replace" : "Upload"}
               <input type="file" accept="image/*" className="hidden" onChange={(e) => readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)} />
             </label>
-            {designUrl && <span className="text-xs text-muted-foreground">Drag to move · corner to resize · top handle to rotate</span>}
+            <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>
+              <FolderOpen size={15} weight="bold" /> From library
+            </Button>
+            {designUrl && <span className="text-xs text-muted-foreground">Drag · corner resizes · top rotates</span>}
           </div>
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">
@@ -152,6 +157,7 @@ export function DesignCanvasDialog({
             <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>
           </div>
         </div>
+        <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }} />
       </DialogContent>
     </Dialog>
   )
