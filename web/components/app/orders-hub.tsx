@@ -229,7 +229,7 @@ export function OrdersHub() {
                       const key = `${o.id}:${it.sku}`
                       const img = itemImage(it)
                       return (
-                        <div key={it.sku ?? i} className="flex items-center gap-3 rounded-xl border border-border p-2.5">
+                        <div key={it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
                           <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
                             {img ? <Image src={img} alt="" fill unoptimized sizes="48px" className="object-cover" /> : <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={16} weight="duotone" /></div>}
                           </div>
@@ -237,6 +237,7 @@ export function OrdersHub() {
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                             <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
                           </div>
+                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                           {canDesign && (
                             <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-primary" title="Send to designer board" disabled={busy === `dsn:${key}` || sent.has(key)} onClick={() => sendToDesigner(o, it)}>
                               {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" /> : sent.has(key) ? <CheckCircle size={14} weight="fill" className="text-emerald-600" /> : <PenNib size={14} weight="bold" />}
@@ -260,6 +261,7 @@ export function OrdersHub() {
                           ) : (
                             <span className="inline-flex shrink-0 items-center gap-1 px-2 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {isException(it.factory_status) ? stageMeta(normalizeStage(it.factory_status))?.label : "Done"}</span>
                           )}
+                          </div>
                         </div>
                       )
                     })}
