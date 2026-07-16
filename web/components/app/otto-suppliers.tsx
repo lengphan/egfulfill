@@ -11,20 +11,24 @@ import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
 
-// Otto's Product Data export is a CSV; map its columns tolerantly (header names vary).
+// Map the Product Data export → normalized rows. Otto's real headers are known
+// (sku_no, sku_parent, name, description, 1+, image_main, color, size, type…); we match
+// those exactly, with tolerant fallbacks so a differently-shaped CSV still imports.
 function mapRows(rows: string[][]): OttoImportRow[] {
   if (rows.length < 2) return []
   const header = rows[0].map((h) => String(h || "").trim().toLowerCase())
+  const exact = (name: string) => header.indexOf(name)
   const find = (...keys: string[]) => header.findIndex((h) => keys.some((k) => h.includes(k)))
-  const iSku = find("sku", "item number", "item#", "item no", "itemnumber", "upc")
-  const iStyle = find("style")
-  const iName = find("name", "product", "title")
-  const iDesc = find("description", "desc")
-  const iColor = find("color", "colour")
-  const iSize = find("size")
-  const iPrice = find("price", "msrp", "wholesale", "net", "cost")
-  const iImage = find("image", "img", "photo", "picture")
-  const iCat = find("category", "cat")
+  const pick = (name: string, ...keys: string[]) => (exact(name) >= 0 ? exact(name) : find(...keys))
+  const iSku = pick("sku_no", "sku", "item number", "item#", "item no", "itemnumber")
+  const iStyle = pick("sku_parent", "style", "parent")
+  const iName = pick("name", "product", "title")
+  const iDesc = exact("description") >= 0 ? exact("description") : pick("description_short", "description", "desc")
+  const iColor = pick("color", "colour")
+  const iSize = pick("size")
+  const iPrice = pick("1+", "price", "msrp", "wholesale", "net", "cost") // Otto's 1+ = unit price at qty 1
+  const iImage = pick("image_main", "image_1", "image", "img", "photo")
+  const iCat = pick("type", "category", "cat")
   const out: OttoImportRow[] = []
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r]

@@ -108,6 +108,28 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
     catch { return { count: 0, last: null }; }
   });
 
+  // Favorites (shared shortlist across staff), mirroring the S&S favorites endpoints.
+  q(`create table if not exists otto_favorites (
+       style text primary key, name text, image text, price numeric(12,2),
+       created_by text, created_at timestamptz default now()
+     )`).catch(() => {});
+  app.get('/api/otto/favorites', { preHandler: requireStaff }, async () => {
+    try { const r = await q('select style, name, image, price from otto_favorites order by created_at desc'); return { favorites: r.rows }; }
+    catch { return { favorites: [] }; }
+  });
+  app.post('/api/otto/favorites', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const style = String(b.style || '').trim();
+    if (!style) { reply.code(400); return { error: 'style required' }; }
+    if (b.on === false) { await q('delete from otto_favorites where style=$1', [style]).catch(() => {}); return { ok: true, favorited: false }; }
+    await q(
+      `insert into otto_favorites (style, name, image, price, created_by) values ($1,$2,$3,$4,$5)
+       on conflict (style) do update set name=excluded.name, image=excluded.image, price=excluded.price`,
+      [style, b.name || null, b.image || null, (b.price != null && b.price !== '' && isFinite(Number(b.price))) ? Number(b.price) : null, (req.user && req.user.sub) || null]
+    ).catch(() => {});
+    return { ok: true, favorited: true };
+  });
+
   // Browse the imported catalog, grouped one card per style (fast — images included).
   app.get('/api/otto/products', { preHandler: requireStaff }, async (req, reply) => {
     const search = String(req.query?.search || '').trim().toLowerCase();
@@ -129,7 +151,9 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
           group by coalesce(style, sku)
           order by style
           limit ${limit} offset ${offset}`, params);
-      return { total: total.rows[0]?.n || 0, items: r.rows };
+      let favs = new Set();
+      try { const fr = await q('select style from otto_favorites'); favs = new Set(fr.rows.map((x) => String(x.style))); } catch { /* no favorites table yet */ }
+      return { total: total.rows[0]?.n || 0, items: r.rows.map((row) => ({ ...row, favorited: favs.has(String(row.style)) })) };
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e), total: 0, items: [] }; }
   });
 

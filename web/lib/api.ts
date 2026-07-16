@@ -236,6 +236,15 @@ export function getSsStyle(id: string) {
 export function ssSync() {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/ss/sync`, { method: "POST" })
 }
+// S&S favorites (shared staff shortlist).
+export function getSsFavorites() {
+  return api<{ favorites: SsStyle[] }>(`/api/ss/favorites`)
+}
+export function toggleSsFavorite(s: SsStyle, on: boolean) {
+  return on
+    ? api(`/api/ss/favorites`, { method: "POST", body: JSON.stringify({ styleID: s.styleID, brand: s.brand, title: s.title, category: s.category, image: s.image }) })
+    : api(`/api/ss/favorites/${encodeURIComponent(s.styleID)}`, { method: "DELETE" })
+}
 export function getOttoInventory(sku: string) {
   return api<unknown>(`/api/otto/inventory?sku=${encodeURIComponent(sku)}`)
 }
@@ -243,9 +252,16 @@ export function getOttoInventory(sku: string) {
 // Otto Cap has no live catalog API — we import their Product Data export into otto_products
 // and browse from there (live price/stock still per-SKU via getOttoInventory).
 export type OttoImportRow = { sku: string; style?: string; name?: string; description?: string; color?: string; size?: string; price?: string | number; image?: string; category?: string; data?: Record<string, unknown> }
-export type OttoStyle = { style: string; name: string | null; description: string | null; price: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; skus: string[]; category: string | null }
+export type OttoStyle = { style: string; name: string | null; description: string | null; price: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; skus: string[]; category: string | null; favorited?: boolean }
 export function getOttoStatus() {
   return api<{ count?: number; last?: string | null }>(`/api/otto/products/status`)
+}
+export type OttoFav = { style: string; name: string | null; image: string | null; price: number | string | null }
+export function getOttoFavorites() {
+  return api<{ favorites: OttoFav[] }>(`/api/otto/favorites`)
+}
+export function toggleOttoFavorite(s: { style: string; name?: string | null; image?: string | null; price?: number | string | null }, on: boolean) {
+  return api(`/api/otto/favorites`, { method: "POST", body: JSON.stringify({ style: s.style, name: s.name, image: s.image, price: s.price, on }) })
 }
 export function getOttoProducts(p: { search?: string; limit?: number; offset?: number }) {
   const s = new URLSearchParams()
