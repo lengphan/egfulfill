@@ -20,7 +20,7 @@ export type SupplierCardData = {
 }
 
 export function SupplierProductCard({
-  data, added, adding, onAdd, onFavorite, loadColors,
+  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel,
 }: {
   data: SupplierCardData
   added: boolean
@@ -28,6 +28,7 @@ export function SupplierProductCard({
   onAdd: () => void
   onFavorite?: (on: boolean) => void
   loadColors?: () => Promise<Record<string, string>> // color → photo (fetched on first chip click)
+  supplierLabel?: string // e.g. "S&S" / "Otto" — shown as a badge when browsing both at once
 }) {
   const [img, setImg] = useState<string | null>(data.image ?? null)
   const [activeColor, setActiveColor] = useState<string | null>(null)
@@ -67,6 +68,9 @@ export function SupplierProductCard({
             className={"absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border transition-colors " + (fav ? "border-rose-200 bg-rose-50 text-rose-500" : "border-border bg-background/80 text-muted-foreground hover:text-rose-500")}>
             <Heart size={14} weight={fav ? "fill" : "regular"} />
           </button>
+        )}
+        {supplierLabel && (
+          <span className="absolute left-2 top-2 rounded-full bg-foreground/80 px-2 py-0.5 text-[10px] font-semibold text-background backdrop-blur">{supplierLabel}</span>
         )}
         {loadingColor && <div className="absolute inset-0 flex items-center justify-center bg-background/40"><CircleNotch size={18} className="animate-spin text-muted-foreground" /></div>}
       </div>
