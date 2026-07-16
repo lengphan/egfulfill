@@ -1,5 +1,6 @@
-import { WarehouseBoard } from "@/components/app/warehouse-board"
+import { OrdersHub } from "@/components/app/orders-hub"
 
+// Legacy route — the warehouse board is now the unified Orders hub.
 export default function WarehousePage() {
-  return <WarehouseBoard />
+  return <OrdersHub />
 }

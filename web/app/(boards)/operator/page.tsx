@@ -1,5 +1,5 @@
-import { OperatorBoard } from "@/components/app/operator-board"
+import { OrdersHub } from "@/components/app/orders-hub"
 
-export default function OperatorPage() {
-  return <OperatorBoard />
+export default function OrdersPage() {
+  return <OrdersHub />
 }

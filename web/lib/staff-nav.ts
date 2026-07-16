@@ -1,13 +1,12 @@
-import { Printer, Package, ShieldCheck, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, type Icon } from "@phosphor-icons/react"
+import { Printer, ShieldCheck, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
 // Staff boards, gated by role. Admin sees everything.
 const STAFF_ITEMS: StaffNavItem[] = [
-  { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "admin"] },
+  { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer", "admin"] },
-  { label: "Warehouse", href: "/warehouse", icon: Package, roles: ["warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
   { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
 ]
@@ -19,7 +18,7 @@ export function landingFor(role?: string | null): string {
   switch (role) {
     case "admin": return "/admin"
     case "operator": return "/operator"
-    case "warehouse": return "/warehouse"
+    case "warehouse": return "/operator" // unified Orders hub
     case "designer": return "/designer"
     default: return "/dashboard" // sellers
   }
