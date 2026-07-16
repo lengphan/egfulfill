@@ -176,15 +176,16 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
   const [stock, setStock] = useState("")
   const [reorder, setReorder] = useState("25")
   const [category, setCategory] = useState("")
+  const [supplier, setSupplier] = useState("")
   const [err, setErr] = useState<string | null>(null)
 
-  useEffect(() => { if (open) { const id = setTimeout(() => { setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setErr(null) }, 0); return () => clearTimeout(id) } }, [open])
+  useEffect(() => { if (open) { const id = setTimeout(() => { setSku(""); setName(""); setVariant(""); setStock(""); setReorder("25"); setCategory(""); setSupplier(""); setErr(null) }, 0); return () => clearTimeout(id) } }, [open])
 
   const save = () => {
     const s = sku.trim()
     if (!s) { setErr("A SKU is required."); return }
     if (existing.includes(s)) { setErr("That SKU already exists."); return }
-    onAdd({ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined })
+    onAdd({ sku: s, name: name.trim() || undefined, variant: variant.trim() || undefined, in_stock: Number(stock) || 0, reorder_at: Number(reorder) || 25, category: category.trim() || undefined, supplier: supplier.trim() || undefined })
   }
 
   return (
@@ -200,6 +201,7 @@ function AddItemDialog({ open, onOpenChange, onAdd, existing }: { open: boolean;
             <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Reorder at</span><Input value={reorder} onChange={(e) => setReorder(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="h-9" /></label>
             <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Category</span><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Apparel" className="h-9" /></label>
           </div>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Supplier</span><Input value={supplier} onChange={(e) => setSupplier(e.target.value)} placeholder="S&S Activewear / Otto Cap" className="h-9" /></label>
           {sku.trim() && <div className="flex justify-center rounded-lg border border-border bg-muted/30 py-2"><Barcode value={sku.trim()} height={40} /></div>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           <div className="flex justify-end gap-2">

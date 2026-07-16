@@ -269,12 +269,32 @@ export function getOttoInventory(sku: string) {
 }
 
 // ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
-export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; updated_at?: string }
+export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; supplier?: string | null; updated_at?: string }
 export function getInventory() {
   return api<InventoryItem[]>(`/api/inventory`)
 }
 export function saveInventory(items: InventoryItem[]) {
   return api<{ ok?: boolean; count?: number }>(`/api/inventory`, { method: "POST", body: JSON.stringify(items) })
+}
+
+// ── Purchase orders (staff) — draft → placed → received ──
+export type POLine = { sku: string; name?: string; variant?: string; qty: number; price?: number }
+export type PurchaseOrder = { num: string; supplier?: string | null; items: POLine[]; status: string; total?: number; meta?: Record<string, unknown> | null; created_at?: string }
+export function getPurchaseOrders() {
+  return api<PurchaseOrder[]>(`/api/purchase`)
+}
+export function savePurchaseOrder(po: PurchaseOrder) {
+  return api<{ ok?: boolean; num?: string; error?: string }>(`/api/purchase`, { method: "POST", body: JSON.stringify(po) })
+}
+export function deletePurchaseOrder(num: string) {
+  return api<{ ok?: boolean }>(`/api/purchase/${encodeURIComponent(num)}`, { method: "DELETE" })
+}
+// Place a supplier order (safe/test mode server-side by default).
+export function ssOrder(lines: { sku: string; qty: number }[], live = false) {
+  return api<{ ok?: boolean; testOrder?: boolean; error?: string; detail?: unknown }>(`/api/ss/order`, { method: "POST", body: JSON.stringify({ lines, live }) })
+}
+export function ottoOrder(items: { sku: string; qty: number }[]) {
+  return api<{ ok?: boolean; dryRun?: boolean; error?: string; ottoResponse?: unknown }>(`/api/otto/order`, { method: "POST", body: JSON.stringify({ items }) })
 }
 
 // Otto Cap has no live catalog API — we import their Product Data export into otto_products

@@ -4,6 +4,8 @@
 import { q } from '../db.js';
 
 export function inventoryRoutes(app, requireStaff) {
+  q('alter table inventory add column if not exists supplier text').catch(() => {});
+
   app.get('/api/inventory', { preHandler: requireStaff }, async () => {
     const r = await q('select * from inventory order by name, sku');
     return r.rows;
@@ -14,13 +16,13 @@ export function inventoryRoutes(app, requireStaff) {
     for (const r of rows) {
       if (!r.sku) continue;
       await q(
-        `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category)
-         values ($1,$2,$3,$4,$5,$6,$7)
+        `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category, supplier)
+         values ($1,$2,$3,$4,$5,$6,$7,$8)
          on conflict (sku) do update set
            name=excluded.name, variant=excluded.variant, in_stock=excluded.in_stock,
-           reserved=excluded.reserved, reorder_at=excluded.reorder_at, category=excluded.category`,
+           reserved=excluded.reserved, reorder_at=excluded.reorder_at, category=excluded.category, supplier=excluded.supplier`,
         [r.sku, r.name || null, r.variant || null, r.in_stock || 0, r.reserved || 0,
-         (r.reorder_at == null ? 25 : r.reorder_at), r.category || null]
+         (r.reorder_at == null ? 25 : r.reorder_at), r.category || null, r.supplier || null]
       );
     }
     const skus = rows.map((r) => r.sku).filter(Boolean);
