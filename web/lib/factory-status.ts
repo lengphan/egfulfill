@@ -1,22 +1,23 @@
 // Factory production pipeline — the canonical item lifecycle the boards drive, matching
-// the old app's status vocabulary (egfulfill-store.js SELLER_STATUS + the board arrays):
+// the old app's CURRENT status vocabulary (egfulfill-store.js SELLER_STATUS factory keys):
 //
-//   (new) → In review → Queued → Printing → QC → Packed → Shipped
+//   (new) → In review → Awaiting scan → Scanned → Printing → Packing → Shipped
 //
-// plus off-pipeline EXCEPTION states an order can drop into: On hold, Flagged,
-// Backorder, Cancelled, Refunded. An order's overall stage = its least-advanced item
-// (only "Shipped" when every line is), unless any item is in an exception state.
+// (Queued / QC / Packed were the OLDER model — kept only as normalize() aliases.) Plus
+// off-pipeline EXCEPTION states an order can drop into: On hold, Flagged, Backorder,
+// Cancelled, Refunded. An order's overall stage = its least-advanced item (only "Shipped"
+// when every line is), unless any item is in an exception state.
 
 export type FactoryTone = "new" | "review" | "neutral" | "prod" | "qc" | "packed" | "shipped" | "hold" | "alert" | "backorder" | "closed"
 export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 
-// The linear production flow (in order).
+// The linear production flow (in order) — the warehouse scan flow.
 export const FACTORY_STAGES: FactoryStage[] = [
   { id: "in_review", label: "In review", tone: "review" },
-  { id: "queued", label: "Queued", tone: "neutral" },
+  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" },
+  { id: "scanned", label: "Scanned", tone: "qc" },
   { id: "printing", label: "Printing", tone: "prod" },
-  { id: "qc", label: "QC", tone: "qc" },
-  { id: "packed", label: "Packed", tone: "packed" },
+  { id: "packing", label: "Packing", tone: "packed" },
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
 const ORDER = FACTORY_STAGES.map((s) => s.id)
@@ -39,10 +40,10 @@ export function normalizeStage(s?: string | null): string {
   const v = String(s || "").toLowerCase().trim()
   if (v === "new" || v === "draft" || v === "none" || v === "pending") return ""
   if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
-  if (["approved", "ready_print", "in_queue", "prescan", "awaiting_scan"].includes(v)) return "queued"
-  if (["production", "in_production", "in-prod", "printed", "prepress", "working", "scanned"].includes(v)) return "printing"
-  if (["packing", "label", "labelled", "labeled", "ready", "finished"].includes(v)) return "packed"
-  if (["fulfilled", "delivered", "in_transit", "shipped"].includes(v)) return "shipped"
+  if (["approved", "ready_print", "in_queue", "queued", "prescan"].includes(v)) return "awaiting_scan"
+  if (["qc", "production", "in_production", "in-prod", "printed", "prepress", "working"].includes(v)) return "printing"
+  if (["packed", "label", "labelled", "labeled", "ready", "finished"].includes(v)) return "packing"
+  if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
   if (["escalated", "action"].includes(v)) return "flagged"
   if (["replacement"].includes(v)) return "backorder"
   return "" // unknown → treat as new

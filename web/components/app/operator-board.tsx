@@ -20,13 +20,17 @@ const fmtDate = (s?: string | null) => {
 const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
 const nowId = () => Date.now() // module scope keeps the render-purity lint off Date.now
 
-type Filter = "All" | "New" | "In review" | "Queued" | "Printing" | "QC" | "Packed" | "Shipped" | "Issues"
-const FILTERS: Filter[] = ["All", "New", "In review", "Queued", "Printing", "QC", "Packed", "Shipped", "Issues"]
-const filterId = (f: Filter) => (f === "New" ? "" : f === "In review" ? "in_review" : f.toLowerCase())
+// Filters derive from the canonical pipeline so they always match the status model.
+const FILTERS: { label: string; id: string }[] = [
+  { label: "All", id: "all" },
+  { label: "New", id: "" },
+  ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
+  { label: "Issues", id: "issues" },
+]
 
 export function OperatorBoard() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
-  const [filter, setFilter] = useState<Filter>("All")
+  const [filter, setFilter] = useState("all")
   const [busy, setBusy] = useState<string | null>(null) // `${id}:${sku}` in flight
   const [sent, setSent] = useState<Set<string>>(new Set()) // items sent to the designer board
 
@@ -91,19 +95,20 @@ export function OperatorBoard() {
   const stats = useMemo(() => {
     const list = orders ?? []
     const by = (id: string) => list.filter((o) => orderStage(o.items ?? []) === id).length
+    const inProd = ["awaiting_scan", "scanned", "printing", "packing"]
     return {
       newCount: by(""),
-      printing: list.filter((o) => ["queued", "printing"].includes(orderStage(o.items ?? []))).length,
-      qc: by("qc"),
+      review: by("in_review"),
+      production: list.filter((o) => inProd.includes(orderStage(o.items ?? []))).length,
       shipped: by("shipped"),
     }
   }, [orders])
 
   const filtered = useMemo(() => {
     const list = orders ?? []
-    if (filter === "All") return list
-    if (filter === "Issues") return list.filter((o) => isException(orderStage(o.items ?? [])))
-    return list.filter((o) => orderStage(o.items ?? []) === filterId(filter))
+    if (filter === "all") return list
+    if (filter === "issues") return list.filter((o) => isException(orderStage(o.items ?? [])))
+    return list.filter((o) => orderStage(o.items ?? []) === filter)
   }, [orders, filter])
 
   return (
@@ -118,8 +123,8 @@ export function OperatorBoard() {
 
       <StatGrid>
         <StatCard label="New" value={String(stats.newCount)} sub="awaiting start" tone={stats.newCount ? "neg" : undefined} />
-        <StatCard label="In production" value={String(stats.printing)} sub="queued / printing" />
-        <StatCard label="In QC" value={String(stats.qc)} sub="quality check" />
+        <StatCard label="In review" value={String(stats.review)} sub="artwork check" />
+        <StatCard label="In production" value={String(stats.production)} sub="scan → pack" />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="complete" tone="pos" />
       </StatGrid>
 
@@ -127,11 +132,11 @@ export function OperatorBoard() {
         <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
           {FILTERS.map((f) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={"rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={"rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              {f}
+              {f.label}
             </button>
           ))}
         </div>

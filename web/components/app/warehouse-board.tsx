@@ -27,8 +27,8 @@ const TABS: Tab[] = ["Intake", "Queue", "Ready to ship", "Shipped"]
 const inTab = (o: OrderRow, tab: Tab) => {
   const s = orderStage(o.items ?? [])
   if (tab === "Intake") return s === ""
-  if (tab === "Queue") return ["in_review", "queued", "printing", "qc"].includes(s)
-  if (tab === "Ready to ship") return s === "packed"
+  if (tab === "Queue") return ["in_review", "awaiting_scan", "scanned", "printing"].includes(s)
+  if (tab === "Ready to ship") return s === "packing"
   return s === "shipped"
 }
 
@@ -62,7 +62,7 @@ export function WarehouseBoard() {
 
   // Receive an intake order → move every item into the print queue.
   const receiveOrder = async (order: OrderRow) => {
-    for (const it of order.items ?? []) if (it.sku && !normalizeStage(it.factory_status)) await advanceItem(order, it, "queued")
+    for (const it of order.items ?? []) if (it.sku && !normalizeStage(it.factory_status)) await advanceItem(order, it, "awaiting_scan")
   }
   const advanceOrder = async (order: OrderRow) => {
     for (const it of order.items ?? []) {
@@ -106,8 +106,8 @@ export function WarehouseBoard() {
 
       <StatGrid>
         <StatCard label="To receive" value={String(stats.intake)} sub="new intake" tone={stats.intake ? "neg" : undefined} />
-        <StatCard label="In queue" value={String(stats.queue)} sub="printing / QC" />
-        <StatCard label="Ready to ship" value={String(stats.ship)} sub="packed" tone={stats.ship ? "pos" : undefined} />
+        <StatCard label="In queue" value={String(stats.queue)} sub="scan / print" />
+        <StatCard label="Ready to ship" value={String(stats.ship)} sub="packing" tone={stats.ship ? "pos" : undefined} />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="out the door" />
       </StatGrid>
 
