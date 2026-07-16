@@ -7,6 +7,7 @@ import { SignOut, ChatCircleDots, Gear } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { staffNav, staffTools, type StaffNavItem } from "@/lib/staff-nav"
 import { getUser, clearSession } from "@/lib/auth"
+import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 
 export function StaffSidebar() {
   const pathname = usePathname()
@@ -26,7 +27,15 @@ export function StaffSidebar() {
 
   const logout = () => { clearSession(); router.push("/login") }
 
+  const mobileSections: MobileNavSection[] = [
+    { items: items.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) },
+    ...(tools.length ? [{ heading: "Tools", items: tools.map((i) => ({ label: i.label, href: i.href, icon: i.icon })) }] : []),
+    { heading: "Account", items: [{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }] },
+  ]
+
   return (
+    <>
+    <MobileNav sections={mobileSections} onLogout={logout} role={role} />
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-card md:flex">
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-5">
         <span className="font-display text-2xl font-black tracking-tight">egfulfill</span>
@@ -90,5 +99,6 @@ export function StaffSidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }

@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { sellerNav } from "@/lib/nav"
 import { hasSpydeck } from "@/lib/plans"
 import { clearSession } from "@/lib/auth"
+import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -29,7 +30,14 @@ export function Sidebar() {
     }
   }, [])
 
+  const mobileSections: MobileNavSection[] = sellerNav.map((s) => ({
+    heading: s.heading,
+    items: s.items.map((it) => ({ label: it.label, href: it.href, icon: it.icon, locked: it.gate === "spydeck" && !spydeck })),
+  }))
+
   return (
+    <>
+    <MobileNav sections={mobileSections} onLogout={logout} />
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-border bg-card md:flex">
       {/* Wordmark — clean bold sans (retired the serif logo) */}
       <div className="flex h-16 shrink-0 items-center border-b border-border px-5">
@@ -85,5 +93,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 }

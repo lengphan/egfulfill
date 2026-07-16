@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-svh bg-background">
         <StaffSidebar />
         <div className="md:pl-60">
-          <main className="mx-auto max-w-[1600px] px-6 py-6 md:px-8">
+          <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">
             <PageTransition>{children}</PageTransition>
           </main>
         </div>
@@ -50,7 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="md:pl-60">
         <TopBar />
-        <main className="mx-auto max-w-[1600px] px-6 py-6 md:px-8">
+        <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>
