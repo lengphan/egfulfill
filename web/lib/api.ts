@@ -256,6 +256,10 @@ export type OttoStyle = { style: string; name: string | null; description: strin
 export function getOttoStatus() {
   return api<{ count?: number; last?: string | null }>(`/api/otto/products/status`)
 }
+export type OttoStyleDetail = { style: string; name: string; description: string | null; price: number | null; category: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; image: string | null; skus: string[]; error?: string }
+export function getOttoStyle(style: string) {
+  return api<OttoStyleDetail>(`/api/otto/style/${encodeURIComponent(style)}`)
+}
 export type OttoFav = { style: string; name: string | null; image: string | null; price: number | string | null }
 export function getOttoFavorites() {
   return api<{ favorites: OttoFav[] }>(`/api/otto/favorites`)

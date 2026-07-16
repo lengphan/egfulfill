@@ -6,7 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseCSV } from "@/lib/order-import"
-import { getOttoStatus, getOttoProducts, importOttoProducts, getCatalogProducts, saveCatalogProducts, type OttoStyle, type OttoImportRow, type CatalogProduct } from "@/lib/api"
+import { getOttoStatus, getOttoProducts, getOttoStyle, importOttoProducts, getCatalogProducts, saveCatalogProducts, type OttoStyle, type OttoImportRow, type CatalogProduct } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
@@ -116,14 +116,16 @@ export function OttoSuppliers() {
     setAddingId(s.style); setErr(null)
     try {
       const id = "OTTO-" + s.style
-      const colorImages: Record<string, string> = {}
-      for (const c of s.colors ?? []) colorImages[c] = s.image ?? ""
+      // Pull the full product detail so the catalog gets the photo matching each color.
+      const d = await getOttoStyle(s.style).catch(() => null)
+      const colorImages: Record<string, string> = (d && !d.error && d.colorImages) ? { ...d.colorImages } : {}
+      if (Object.keys(colorImages).length === 0) for (const c of s.colors ?? []) colorImages[c] = s.image ?? ""
       const product: CatalogProduct = {
-        id, name: s.name || s.style, type: "Headwear", method: "Embroidery", status: "Active",
-        price: Number(s.price) || 0, basePrice: Number(s.price) || 0,
-        sizes: s.sizes ?? [], colorImages, mainColor: (s.colors ?? [])[0],
-        img: s.image ?? undefined, sku: s.skus?.[0] || s.style,
-        description: s.description ?? undefined, supplier: "Otto Cap",
+        id, name: d?.name || s.name || s.style, type: "Headwear", method: "Embroidery", status: "Active",
+        price: Number(d?.price ?? s.price) || 0, basePrice: Number(d?.price ?? s.price) || 0,
+        sizes: d?.sizes ?? s.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (s.colors ?? [])[0],
+        img: d?.image ?? s.image ?? undefined, sku: s.skus?.[0] || s.style,
+        description: d?.description ?? s.description ?? undefined, supplier: "Otto Cap",
       }
       const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
       const next = existing.some((p) => p.id === id) ? existing.map((p) => (p.id === id ? product : p)) : [...existing, product]

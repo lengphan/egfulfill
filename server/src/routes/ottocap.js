@@ -157,6 +157,35 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e), total: 0, items: [] }; }
   });
 
+  // One product's full detail — all colors (with the photo matching each), sizes, price,
+  // every variant SKU. Powers the product view + add-to-catalog (mirrors /api/ss/style/:id).
+  app.get('/api/otto/style/:style', { preHandler: requireStaff }, async (req, reply) => {
+    const style = String(req.params.style || '').trim();
+    if (!style) { reply.code(400); return { error: 'style required' }; }
+    try {
+      const rows = (await q(
+        `select sku, color, size, price, image, name, description, category
+           from otto_products where coalesce(style, sku)=$1 order by color, size`, [style])).rows;
+      if (!rows.length) { reply.code(404); return { error: 'not found' }; }
+      const colorImages = {};
+      const colors = [], sizes = [];
+      let price = null, name = null, description = null, category = null;
+      for (const r of rows) {
+        if (r.color && !(r.color in colorImages)) colorImages[r.color] = r.image || '';
+        if (r.color && !colors.includes(r.color)) colors.push(r.color);
+        if (r.size && !sizes.includes(r.size)) sizes.push(r.size);
+        if (price == null && r.price != null) price = Number(r.price);
+        name = name || r.name; description = description || r.description; category = category || r.category;
+      }
+      return {
+        style, name: name || style, description, price, category,
+        colors, sizes, colorImages,
+        image: rows.find((r) => r.image)?.image || null,
+        skus: rows.map((r) => r.sku),
+      };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e) }; }
+  });
+
   // Inventory for one sku (Otto's supplier constant injected).
   app.get('/api/otto/inventory', { preHandler: requireStaff }, async (req, reply) => {
     const g = guard(reply); if (g) return g;
