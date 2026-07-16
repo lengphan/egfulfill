@@ -4,6 +4,7 @@ export type StaffNavItem = { label: string; href: string; icon: Icon; roles: str
 
 // Staff boards, gated by role. Admin sees everything.
 const STAFF_ITEMS: StaffNavItem[] = [
+  { label: "Dashboard", href: "/overview", icon: SquaresFour, roles: ["operator", "warehouse", "admin"] },
   { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer", "admin"] },
@@ -16,9 +17,9 @@ export const STAFF_ROLES = ["operator", "warehouse", "designer", "admin"]
 // Where a user should land after login / where staff get bounced if they hit a seller page.
 export function landingFor(role?: string | null): string {
   switch (role) {
-    case "admin": return "/admin"
-    case "operator": return "/operator"
-    case "warehouse": return "/operator" // unified Orders hub
+    case "admin": return "/overview"
+    case "operator": return "/overview"
+    case "warehouse": return "/overview" // staff dashboard is home for the team
     case "designer": return "/designer"
     default: return "/dashboard" // sellers
   }
@@ -34,8 +35,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access).
-  { label: "Dashboard", href: "/dashboard", icon: SquaresFour, roles: ["admin"] },
-  { label: "Orders", href: "/orders", icon: ShoppingBag, roles: ["admin"] },
+  { label: "Seller orders", href: "/orders", icon: ShoppingBag, roles: ["admin"] },
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
   { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin"] },
