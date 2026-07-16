@@ -340,9 +340,10 @@ function AiAssistantCard() {
   const test = async () => {
     setTesting(true); setTestResult(null)
     try {
-      const r = await testAiKey()
+      const typed = keyInput.trim()
+      const r = await testAiKey(typed || undefined)
       setTestResult(r.ok
-        ? { ok: true, msg: `Working — ${r.model} replied.` }
+        ? { ok: true, msg: `${typed ? "Pasted key works" : "Working"} — ${r.model} replied.` }
         : { ok: false, msg: r.error || "Failed" })
     } catch (e) {
       setTestResult({ ok: false, msg: e instanceof Error ? e.message : "Test failed" })

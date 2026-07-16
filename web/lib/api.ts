@@ -194,9 +194,10 @@ export function getAiConfig() {
 export function setAiConfig(body: { key?: string; model?: string; clearKey?: boolean }) {
   return api<AiConfig>(`/api/admin/ai-config`, { method: "PUT", body: JSON.stringify(body) })
 }
-// Live-test the saved key/model against Anthropic — returns the real error if it fails.
-export function testAiKey() {
-  return api<{ ok?: boolean; model?: string; status?: number; error?: string }>(`/api/admin/ai-test`, { method: "POST", body: "{}" })
+// Live-test a key/model against Anthropic — pass a key to test it BEFORE saving,
+// or omit to test the currently-saved key. Returns the real error if it fails.
+export function testAiKey(key?: string) {
+  return api<{ ok?: boolean; model?: string; status?: number; error?: string }>(`/api/admin/ai-test`, { method: "POST", body: JSON.stringify(key ? { key } : {}) })
 }
 
 // Google Sheets import — server reads the sheet and returns a 2D row array,

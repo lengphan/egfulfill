@@ -161,20 +161,33 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
   });
 
   // ── Staff: live "does the key actually work?" test (pings Anthropic once) ─────
-  app.post('/api/admin/ai-test', { preHandler: requireStaff }, async () => {
-    const { key, model } = await aiConfig();
-    if (!key) return { ok: false, error: 'No API key is set.' };
+  // Tests the key POSTed in the body (so you can verify BEFORE saving); if none is
+  // sent, tests the currently-saved key.
+  app.post('/api/admin/ai-test', { preHandler: requireStaff }, async (req) => {
+    const cfg = await aiConfig();
+    const typed = (req.body && typeof req.body.key === 'string') ? req.body.key.trim() : '';
+    const key = typed || cfg.key;
+    const model = cfg.model;
+    if (!key) return { ok: false, error: 'No API key to test — paste one or save it first.' };
+    const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+    const body = JSON.stringify({ model, max_tokens: 8, messages: [{ role: 'user', content: 'ping' }] });
     try {
-      const r = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: 'user', content: 'ping' }] }),
-      });
-      if (r.ok) return { ok: true, model };
-      const detail = await r.text().catch(() => '');
+      let r, detail = '';
+      // Retry transient overload/rate-limit so a capacity blip doesn't read as a key failure.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        r = await fetch(API_URL, { method: 'POST', headers, body });
+        if (r.ok) return { ok: true, model };
+        detail = await r.text().catch(() => '');
+        if ((r.status === 529 || r.status === 429) && attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
+        break;
+      }
       let reason = '';
       try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
-      return { ok: false, model, status: r.status, error: reason || `HTTP ${r.status}` };
+      const overloaded = r.status === 529 || /overloaded/i.test(reason);
+      return {
+        ok: false, model, status: r.status,
+        error: overloaded ? 'Anthropic is busy right now (overloaded) — your key is valid; try again in a moment.' : (reason || `HTTP ${r.status}`),
+      };
     } catch (e) {
       return { ok: false, model, error: (e && e.message) || 'Request failed' };
     }
