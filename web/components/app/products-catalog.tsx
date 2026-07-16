@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
+import { usePaged, Pagination } from "@/components/app/pagination"
 import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
@@ -113,6 +114,8 @@ export function ProductsCatalog() {
     })
   }, [products, cat, query])
 
+  const paged = usePaged(filtered, 24)
+
   const stats = useMemo(() => {
     const list = products ?? []
     const active = list.filter((p) => (p.status ?? "Active") === "Active").length
@@ -201,8 +204,8 @@ export function ProductsCatalog() {
           <div className="text-sm text-muted-foreground">Try a different search or category.</div>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((p, i) => {
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {paged.pageItems.map((p, i) => {
             const img = imageOf(p)
             const colors = colorsOf(p)
             const tint = TINTS[i % TINTS.length]
@@ -326,6 +329,11 @@ export function ProductsCatalog() {
               </motion.div>
             )
           })}
+        </div>
+      )}
+      {filtered.length > 0 && (
+        <div className="rounded-2xl border border-border">
+          <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[24, 48, 96]} className="border-t-0" />
         </div>
       )}
 

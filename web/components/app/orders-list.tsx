@@ -21,6 +21,7 @@ import { getOrders, type OrderRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
+import { usePaged, Pagination } from "@/components/app/pagination"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
@@ -103,6 +104,8 @@ export function OrdersList() {
       return hay.includes(query.toLowerCase())
     })
   }, [orders, filter, query])
+
+  const paged = usePaged(filtered, 25)
 
   return (
     <div className="space-y-4">
@@ -206,7 +209,7 @@ export function OrdersList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((o) => (
+              {paged.pageItems.map((o) => (
                 <TableRow
                   key={o.id}
                   {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), `Open order ${numOf(o)}`)}
@@ -223,6 +226,9 @@ export function OrdersList() {
               ))}
             </TableBody>
           </Table>
+        )}
+        {orders !== null && filtered.length > 0 && (
+          <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} />
         )}
       </SectionCard>
 

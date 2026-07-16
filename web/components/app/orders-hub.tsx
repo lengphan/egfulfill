@@ -12,6 +12,7 @@ import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards
 import { getToken, getUser } from "@/lib/auth"
 import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, stageMeta, orderStage, isException } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
+import { usePaged, Pagination } from "@/components/app/pagination"
 
 const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
 const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
@@ -127,6 +128,8 @@ export function OrdersHub() {
     return list.filter((o) => orderStage(o.items ?? []) === filter)
   }, [orders, filter])
 
+  const paged = usePaged(filtered, 25)
+
   const subtitle = isAdmin
     ? "Every order across the team — production to shipping."
     : canFulfill ? "Receive, pack, and ship orders out the door."
@@ -167,8 +170,9 @@ export function OrdersHub() {
             <div className="text-sm">{(orders.length ?? 0) === 0 ? "No orders are in production yet." : "No orders match this filter."}</div>
           </div>
         ) : (
+          <>
           <div className="divide-y divide-border">
-            {filtered.map((o) => {
+            {paged.pageItems.map((o) => {
               const items = o.items ?? []
               const stage = orderStage(items)
               const allShipped = items.length > 0 && items.every((it) => normalizeStage(it.factory_status) === "shipped")
@@ -264,6 +268,8 @@ export function OrdersHub() {
               )
             })}
           </div>
+          <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} />
+          </>
         )}
       </SectionCard>
 
