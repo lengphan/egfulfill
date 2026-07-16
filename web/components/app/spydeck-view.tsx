@@ -308,9 +308,10 @@ export function SpyDeckView() {
     }
   }
 
+  const hasFilter = !!(cat || minPrice || maxPrice)
   const run = async (term?: string) => {
     const q = (term ?? query).trim()
-    if (!q) return
+    if (!q && !hasFilter) return // need a keyword OR a category/price filter
     if (term != null && term !== query) setQuery(term)
     setView("search")
     setLoading(true)
@@ -338,21 +339,22 @@ export function SpyDeckView() {
     }
   }
 
+  // Stats reflect whatever's on screen — search results, or the trending feed when
+  // no search has run yet — so the cards fill in without a search.
   const stats = useMemo(() => {
-    const list = results ?? []
-    // Median, not mean — one mis-priced Etsy listing (a $4k custom order) blew the
-    // average up to five figures. Median is the "typical price" a seller cares about.
+    const list = (view === "saved" ? saved : view === "trending" || results === null ? (trending?.products ?? []) : results) ?? []
     const prices = list.map((l) => l.price).filter((p): p is number => p != null && p > 0).sort((a, b) => a - b)
     const median = prices.length ? prices[Math.floor((prices.length - 1) / 2)] : 0
     const views = list.map((l) => l.views).filter((v): v is number => v != null)
     const shops = new Set(list.map((l) => l.shop_name).filter(Boolean))
     return {
+      ready: list.length > 0,
       count: list.length,
       median,
       shops: shops.size,
       topViews: views.length ? Math.max(...views) : 0,
     }
-  }, [results])
+  }, [view, results, trending, saved])
 
   // Cloud: aggregate the actual tags across search results (real niche keywords);
   // before any search, fall back to the curated trending niches.
@@ -375,10 +377,10 @@ export function SpyDeckView() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="Results" value={results === null ? "—" : String(stats.count)} sub={searched ? `for "${searched}"` : "run a search"} />
-        <StatCard label="Median price" value={results === null ? "—" : money(stats.median)} sub="typical listing" />
-        <StatCard label="Shops" value={results === null ? "—" : String(stats.shops)} sub="unique sellers" />
-        <StatCard label="Most viewed" value={results === null ? "—" : stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
+        <StatCard label="Results" value={stats.ready ? String(stats.count) : "—"} sub={searched ? `for "${searched}"` : view === "trending" ? "trending today" : "run a search"} />
+        <StatCard label="Median price" value={stats.ready ? money(stats.median) : "—"} sub="typical listing" />
+        <StatCard label="Shops" value={stats.ready ? String(stats.shops) : "—"} sub="unique sellers" />
+        <StatCard label="Most viewed" value={stats.ready && stats.topViews ? stats.topViews.toLocaleString() : "—"} sub="views" tone={stats.topViews ? "pos" : undefined} />
       </StatGrid>
 
       {view === "search" && (
@@ -426,7 +428,7 @@ export function SpyDeckView() {
               <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
                 <SlidersHorizontal size={15} weight="bold" /> Filters
               </Button>
-              <Button onClick={() => run()} disabled={loading || !query.trim()}>
+              <Button onClick={() => run()} disabled={loading || (!query.trim() && !hasFilter)}>
                 {loading ? "Searching…" : "Search"}
               </Button>
             </div>
@@ -460,7 +462,7 @@ export function SpyDeckView() {
                   <Input value={minFav} onChange={(e) => setMinFav(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0" className="h-9" inputMode="numeric" />
                 </FilterField>
                 <div className="col-span-2 flex items-center gap-2 sm:col-span-3 lg:col-span-6">
-                  <Button size="sm" onClick={() => run()} disabled={!query.trim()}>Apply filters</Button>
+                  <Button size="sm" onClick={() => run()} disabled={!query.trim() && !hasFilter}>Apply filters</Button>
                   <button
                     onClick={() => { setCat(""); setSortSel("relevance"); setMinPrice(""); setMaxPrice(""); setMinSold(""); setMinFav("") }}
                     className="text-xs font-medium text-muted-foreground hover:text-foreground"

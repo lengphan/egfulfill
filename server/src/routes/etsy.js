@@ -312,7 +312,10 @@ export async function searchListings(query, opts = {}) {
   const offset = Math.max(0, parseInt(opts.offset, 10) || 0);
   const sort = ['created', 'price'].includes(opts.sort) ? opts.sort : 'score';
   const sortOrder = opts.sortOrder === 'asc' ? 'asc' : opts.sortOrder === 'desc' ? 'desc' : null;
-  const params = ['keywords=' + encodeURIComponent(query), 'limit=' + limit, 'offset=' + offset, 'sort_on=' + sort, 'includes=Images,Shop'];
+  // keywords is optional — you can browse a category / price range with no search term.
+  const params = ['limit=' + limit, 'offset=' + offset, 'sort_on=' + sort, 'includes=Images,Shop'];
+  const kw = String(query || '').trim();
+  if (kw) params.unshift('keywords=' + encodeURIComponent(kw));
   if (sortOrder) params.push('sort_order=' + sortOrder);
   if (opts.taxonomyId && /^\d+$/.test(String(opts.taxonomyId))) params.push('taxonomy_id=' + opts.taxonomyId);
   const minP = Number(opts.minPrice); if (minP > 0) params.push('min_price=' + minP);
@@ -405,7 +408,8 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   app.get('/api/etsy/search', { preHandler: requireAuth }, async (req, reply) => {
     const qy = req.query || {};
     const query = String((qy.q || qy.keywords) || '').trim();
-    if (!query) { reply.code(400); return { error: 'Missing search query (?q=)' }; }
+    const hasFilter = !!(qy.taxonomyId || qy.taxonomy_id || qy.minPrice || qy.maxPrice);
+    if (!query && !hasFilter) { reply.code(400); return { error: 'Enter a search term or pick a filter (category / price).' }; }
     try {
       return await searchListings(query, {
         limit: qy.limit, offset: qy.offset, sort: qy.sort, sortOrder: qy.sortOrder,
