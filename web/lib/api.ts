@@ -339,6 +339,14 @@ export function requestAiReply() {
     body: "{}",
   })
 }
+// Staff support inbox: every seller support thread + an AI-drafted reply (not posted).
+export type SupportThread = { order_id: string; seller_id: string; seller_name: string | null; last: string; last_at: number; n: number }
+export function getSupportThreads() {
+  return api<SupportThread[]>(`/api/support/threads`)
+}
+export function aiDraft(threadId: string) {
+  return api<{ ok?: boolean; draft?: string; disabled?: boolean; error?: string }>(`/api/support/ai-draft`, { method: "POST", body: JSON.stringify({ threadId }) })
+}
 // Update the signed-in user's profile (currently just the display name).
 export function updateProfile(patch: { name?: string }) {
   return api<{ id?: string; name?: string; email?: string; role?: string; error?: string }>(`/api/me`, {

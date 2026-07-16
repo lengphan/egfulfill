@@ -110,7 +110,41 @@ function toMessages(rows) {
   return out;
 }
 
+// Ask Claude for a reply given a seller's thread. Returns the text; throws with
+// .status on failure so the caller maps the HTTP code. Reused by auto-reply + draft.
+async function generateReply(key, model, sellerId, messages) {
+  const ctx = await accountContext(sellerId);
+  const r = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages }),
+  });
+  if (!r.ok) { const detail = await r.text().catch(() => ''); const e = new Error('AI service error'); e.status = 502; e.detail = detail; throw e; }
+  const data = await r.json();
+  return (Array.isArray(data.content) ? data.content : []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+}
+
 export function supportAiRoutes(app, requireAuth, requireStaff) {
+  // ── Staff: DRAFT a reply for a seller's support thread (does NOT post it) ─────
+  app.post('/api/support/ai-draft', { preHandler: requireStaff }, async (req, reply) => {
+    const { key, model } = await aiConfig();
+    if (!key) return { ok: false, disabled: true };
+    const threadId = String((req.body && req.body.threadId) || '');
+    if (threadId.indexOf('support-') !== 0) { reply.code(400); return { error: 'threadId must be a support-* thread' }; }
+    const sellerId = threadId.slice('support-'.length);
+    const hist = await q(`select sender_role, body from order_messages where order_id=$1 order by created_at asc, id asc limit 20`, [threadId]);
+    const messages = toMessages(hist.rows);
+    if (!messages.length) return { ok: false, empty: true };
+    try {
+      const draft = await generateReply(key, model, sellerId, messages);
+      if (!draft) return { ok: false, empty: true };
+      return { ok: true, draft };
+    } catch (e) {
+      req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai draft failed');
+      reply.code(e.status || 502); return { ok: false, error: e.message || 'AI unavailable' };
+    }
+  });
+
   // ── Admin config (Settings › Integrations): key status + model selector ──────
   app.get('/api/admin/ai-config', { preHandler: requireStaff }, async () => {
     const cfg = await aiConfig();
@@ -157,30 +191,11 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
 
     let text = '';
     try {
-      const ctx = await accountContext(sellerId);
-      const r = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({
-          model,
-          max_tokens: 600,
-          system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx,
-          messages,
-        }),
-      });
-      if (!r.ok) {
-        const detail = await r.text().catch(() => '');
-        req.log?.warn?.({ status: r.status, detail }, 'support-ai upstream error');
-        reply.code(502);
-        return { ok: false, error: 'AI service error' };
-      }
-      const data = await r.json();
-      text = (Array.isArray(data.content) ? data.content : [])
-        .filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+      text = await generateReply(key, model, sellerId, messages);
     } catch (e) {
-      req.log?.warn?.({ err: String(e) }, 'support-ai request failed');
-      reply.code(502);
-      return { ok: false, error: 'AI service unavailable' };
+      req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai request failed');
+      reply.code(e.status || 502);
+      return { ok: false, error: e.message || 'AI service unavailable' };
     }
     if (!text) return { ok: false, empty: true };
 

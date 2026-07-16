@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getOrders, type ChatEntry, type OrderRow } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getOrders, getSupportThreads, aiDraft, type ChatEntry, type OrderRow, type SupportThread } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 
 const nowMs = () => Date.now()
@@ -23,18 +23,21 @@ const SUGGESTIONS = [
 
 // A conversation in the left rail — Support (AI + team), a per-order thread, or the
 // internal staff-only Factory channel.
-type Convo = { id: string; kind: "support" | "order" | "staff"; title: string; sub: string }
+type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox"; title: string; sub: string }
 const STAFF_CHANNEL = "staff-general"
 
 export default function ChatPage() {
   const [supportId, setSupportId] = useState<string | null>(null)
   const [signedOut, setSignedOut] = useState(false)
   const [orders, setOrders] = useState<OrderRow[]>([])
+  const [inbox, setInbox] = useState<SupportThread[]>([]) // staff: seller support threads
+  const [drafting, setDrafting] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
+  const [aiNote, setAiNote] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const cidBase = useRef("")
   const cidSeq = useRef(0)
@@ -63,6 +66,7 @@ export default function ChatPage() {
         setSignedOut(true)
       }
       if (!isStaffUser) getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
+      if (isStaffUser) getSupportThreads().then((rows) => alive && setInbox(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [isStaffUser])
@@ -71,14 +75,19 @@ export default function ChatPage() {
     const list: Convo[] = []
     if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" })
     if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: isStaffUser ? "Ask EGFULFILL" : "Assistant + team" })
+    if (isStaffUser) for (const t of inbox) {
+      if (t.order_id === supportId) continue // don't list my own thread twice
+      list.push({ id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id, sub: t.last ? t.last.slice(0, 40) : "Support request" })
+    }
     if (!isStaffUser) for (const o of orders.slice(0, 30)) {
       list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
     }
     return list
-  }, [isStaffUser, supportId, orders])
+  }, [isStaffUser, supportId, orders, inbox])
 
   const active = useMemo(() => convos.find((c) => c.id === activeId) ?? null, [convos, activeId])
   const isSupport = active?.kind === "support" // AI auto-reply only on the seller support thread
+  const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
 
   const load = useCallback(async () => {
     if (!activeId) return
@@ -118,9 +127,12 @@ export default function ChatPage() {
         setAiTyping(true)
         try {
           const r = await requestAiReply()
-          if (r.ok || r.reply) await load()
+          if (r.ok && (r.reply || r.skipped)) { await load(); setAiNote(null) }
+          else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
+          else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
+          else setAiNote(null)
         } catch {
-          /* human follows up */
+          setAiNote("Assistant is unavailable right now — a teammate will follow up here.")
         } finally {
           setAiTyping(false)
         }
@@ -132,6 +144,28 @@ export default function ChatPage() {
     }
   }
   const send = () => submit(input)
+
+  // Seller escalation → post a request for a human (no AI); staff see it in the inbox.
+  const escalate = async () => {
+    if (!activeId) return
+    const clientId = `c-${cidBase.current}-${cidSeq.current++}`
+    const text = "🙋 I'd like to talk to a human — please have someone follow up."
+    setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
+    setAiNote("Flagged for a teammate — someone will reply here shortly.")
+    try { await postOrderMessage(activeId, text, { clientId, by: myName }); await load() } catch {}
+  }
+
+  // Staff: draft a reply with AI for the open seller thread → fill the composer to edit.
+  const draftWithAi = async () => {
+    if (!activeId) return
+    setDrafting(true)
+    try {
+      const r = await aiDraft(activeId)
+      if (r.draft) setInput(r.draft)
+      else if (r.disabled) setAiNote("AI is off — set the key in Settings → Integrations.")
+      else if (r.error) setAiNote(`Draft failed: ${r.error}`)
+    } catch { setAiNote("Draft failed — try again.") } finally { setDrafting(false) }
+  }
 
   return (
     <div className="flex h-[calc(100svh-7rem)] gap-4">
@@ -236,12 +270,33 @@ export default function ChatPage() {
                   </div>
                 </div>
               )}
+              {aiNote && (
+                <div className="mx-auto max-w-sm rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
+                  {aiNote}
+                </div>
+              )}
             </>
           )}
         </div>
 
+        {/* seller: escalate to a human on the support thread */}
+        {isSupport && !isStaffUser && !signedOut && (
+          <div className="flex items-center justify-center gap-2 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+            <span>Not what you needed?</span>
+            <button onClick={escalate} className="inline-flex items-center gap-1 font-medium text-foreground hover:underline">
+              <Headset size={14} /> Talk to a human
+            </button>
+          </div>
+        )}
+
         {/* composer */}
         <div className="flex items-center gap-2 border-t border-border p-3">
+          {isInbox && (
+            <Button variant="outline" size="sm" className="h-10 shrink-0 gap-1.5" onClick={draftWithAi} disabled={drafting}>
+              {drafting ? <CircleNotch size={14} className="animate-spin" /> : <Sparkle size={14} />}
+              Draft with AI
+            </Button>
+          )}
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
