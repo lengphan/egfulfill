@@ -1,12 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { UploadSimple, MagnifyingGlass, CircleNotch, CheckCircle, Plus, Info } from "@phosphor-icons/react"
+import { UploadSimple, MagnifyingGlass, CircleNotch, Info } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { SupplierProductCard } from "@/components/app/supplier-product-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { parseCSV } from "@/lib/order-import"
-import { getOttoStatus, getOttoProducts, getOttoStyle, importOttoProducts, getCatalogProducts, saveCatalogProducts, type OttoStyle, type OttoImportRow, type CatalogProduct } from "@/lib/api"
+import { getOttoStatus, getOttoProducts, getOttoStyle, importOttoProducts, toggleOttoFavorite, getCatalogProducts, saveCatalogProducts, type OttoStyle, type OttoImportRow, type CatalogProduct } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
@@ -27,14 +28,19 @@ function mapRows(rows: string[][]): OttoImportRow[] {
   const iColor = pick("color", "colour")
   const iSize = pick("size")
   const iPrice = pick("1+", "price", "msrp", "wholesale", "net", "cost") // Otto's 1+ = unit price at qty 1
-  const iImage = pick("image_main", "image_1", "image", "img", "photo")
   const iCat = pick("type", "category", "cat")
+  // Image can live in image_main OR image_1…image_10 — collect them all, prefer image_main.
+  const imgCols = header.map((h, idx) => ({ h, idx })).filter((x) => /image|img|photo/.test(x.h)).map((x) => x.idx)
+  const mainIdx = exact("image_main")
+  const imageOrder = mainIdx >= 0 ? [mainIdx, ...imgCols.filter((i) => i !== mainIdx)] : imgCols
   const out: OttoImportRow[] = []
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r]
     const g = (i: number) => (i >= 0 && i < row.length ? String(row[i] || "").trim() : "")
     const sku = g(iSku) || g(iStyle)
     if (!sku) continue
+    let image = ""
+    for (const i of imageOrder) { const v = g(i); if (v && /^https?:\/\//i.test(v)) { image = v; break } if (v && !image) image = v }
     out.push({
       sku,
       style: g(iStyle) || undefined,
@@ -43,7 +49,7 @@ function mapRows(rows: string[][]): OttoImportRow[] {
       color: g(iColor) || undefined,
       size: g(iSize) || undefined,
       price: g(iPrice) ? g(iPrice).replace(/[^0-9.]/g, "") : undefined,
-      image: g(iImage) || undefined,
+      image: image || undefined,
       category: g(iCat) || undefined,
     })
   }
@@ -172,33 +178,17 @@ export function OttoSuppliers() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
-            {items.map((s) => {
-              const isAdded = added.has(s.style)
-              return (
-                <div key={s.style} className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
-                  <div className="aspect-square bg-muted">
-                    {s.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={s.image} alt="" loading="lazy" className="size-full object-contain" />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground/50">No image</div>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col p-2.5">
-                    <div className="line-clamp-2 text-sm font-medium leading-snug">{s.name || s.style}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{s.style}{s.price ? ` · $${Number(s.price).toFixed(2)}` : ""}</div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">{(s.colors?.length ?? 0)} colors · {(s.sizes?.length ?? 0)} sizes</div>
-                    <button
-                      onClick={() => addToCatalog(s)}
-                      disabled={isAdded || addingId === s.style}
-                      className={"mt-auto flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (isAdded ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}
-                    >
-                      {addingId === s.style ? <CircleNotch size={13} className="animate-spin" /> : isAdded ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
+            {items.map((s) => (
+              <SupplierProductCard
+                key={s.style}
+                data={{ id: s.style, title: s.name || s.style, subtitle: s.category || s.style, image: s.image, price: s.price, priceMax: s.price_max, colors: s.colors, sizesCount: s.sizes?.length ?? 0, favorited: s.favorited }}
+                added={added.has(s.style)}
+                adding={addingId === s.style}
+                onAdd={() => addToCatalog(s)}
+                onFavorite={(on) => toggleOttoFavorite({ style: s.style, name: s.name, image: s.image, price: s.price }, on).catch(() => {})}
+                loadColors={() => getOttoStyle(s.style).then((d) => (d && !d.error ? d.colorImages ?? {} : {}))}
+              />
+            ))}
           </div>
           {items.length < total && (
             <div className="border-t border-border p-3 text-center">

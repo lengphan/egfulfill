@@ -9,7 +9,7 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
-  { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
+  { label: "Console", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
 ]
 
 export const STAFF_ROLES = ["operator", "warehouse", "designer", "admin"]

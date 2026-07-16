@@ -1,0 +1,104 @@
+"use client"
+
+import { useState } from "react"
+import { Heart, Plus, CheckCircle, CircleNotch } from "@phosphor-icons/react"
+
+// One product card for BOTH suppliers (S&S + Otto) so they look identical: image, brand,
+// title, price (range where applicable), clickable color chips that swap to that color's
+// photo (loaded lazily), a heart, and an Add-to-catalog button pinned to the bottom.
+export type SupplierCardData = {
+  id: string
+  title: string
+  brand?: string | null
+  subtitle?: string | null // category
+  image?: string | null
+  price?: number | string | null
+  priceMax?: number | string | null
+  colors?: string[] | null
+  sizesCount?: number
+  favorited?: boolean
+}
+
+export function SupplierProductCard({
+  data, added, adding, onAdd, onFavorite, loadColors,
+}: {
+  data: SupplierCardData
+  added: boolean
+  adding: boolean
+  onAdd: () => void
+  onFavorite?: (on: boolean) => void
+  loadColors?: () => Promise<Record<string, string>> // color → photo (fetched on first chip click)
+}) {
+  const [img, setImg] = useState<string | null>(data.image ?? null)
+  const [activeColor, setActiveColor] = useState<string | null>(null)
+  const [colorImages, setColorImages] = useState<Record<string, string> | null>(null)
+  const [loadingColor, setLoadingColor] = useState(false)
+  const [fav, setFav] = useState(!!data.favorited)
+
+  const price = data.price != null && data.price !== "" ? Number(data.price) : null
+  const priceMax = data.priceMax != null && data.priceMax !== "" ? Number(data.priceMax) : null
+  const priceLabel = price == null ? null
+    : (priceMax != null && priceMax > price ? `$${price.toFixed(2)}–$${priceMax.toFixed(2)}` : `$${price.toFixed(2)}`)
+
+  const pickColor = async (c: string) => {
+    setActiveColor(c)
+    let map = colorImages
+    if (!map && loadColors) {
+      setLoadingColor(true)
+      try { map = await loadColors(); setColorImages(map) } catch { /* keep current image */ } finally { setLoadingColor(false) }
+    }
+    if (map?.[c]) setImg(map[c])
+  }
+
+  const toggleFav = () => { const next = !fav; setFav(next); onFavorite?.(next) }
+  const colors = data.colors ?? []
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <div className="relative aspect-square bg-muted">
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={img} alt="" loading="lazy" className="size-full object-contain" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-xs text-muted-foreground/50">No image</div>
+        )}
+        {onFavorite && (
+          <button onClick={toggleFav} title={fav ? "Unfavorite" : "Favorite"}
+            className={"absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border transition-colors " + (fav ? "border-rose-200 bg-rose-50 text-rose-500" : "border-border bg-background/80 text-muted-foreground hover:text-rose-500")}>
+            <Heart size={14} weight={fav ? "fill" : "regular"} />
+          </button>
+        )}
+        {loadingColor && <div className="absolute inset-0 flex items-center justify-center bg-background/40"><CircleNotch size={18} className="animate-spin text-muted-foreground" /></div>}
+      </div>
+
+      <div className="flex flex-1 flex-col p-2.5">
+        {data.brand && <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{data.brand}</div>}
+        <div className="line-clamp-2 text-sm font-medium leading-snug">{data.title}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {data.subtitle && <span className="truncate">{data.subtitle}</span>}
+          {priceLabel && <span className="ml-auto shrink-0 font-semibold text-foreground">{priceLabel}</span>}
+        </div>
+
+        {colors.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {colors.slice(0, 8).map((c) => (
+              <button key={c} onClick={() => pickColor(c)} title={c}
+                className={"rounded-full border px-1.5 py-0.5 text-[10px] leading-tight transition-colors " + (activeColor === c ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50")}>
+                {c}
+              </button>
+            ))}
+            {colors.length > 8 && <span className="self-center px-0.5 text-[10px] text-muted-foreground">+{colors.length - 8}</span>}
+          </div>
+        )}
+        {(data.sizesCount ?? 0) > 0 && <div className="mt-1 text-[10px] text-muted-foreground">{data.sizesCount} sizes</div>}
+
+        <div className="mt-auto pt-3">
+          <button onClick={onAdd} disabled={added || adding}
+            className={"flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (added ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}>
+            {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

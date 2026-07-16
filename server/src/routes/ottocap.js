@@ -141,7 +141,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
       const total = await q(`select count(*)::int as n from (select coalesce(style, sku) g from otto_products ${where} group by coalesce(style, sku)) t`, params);
       const r = await q(
         `select coalesce(style, sku) as style,
-                min(name) as name, min(description) as description, min(price) as price,
+                min(name) as name, min(description) as description, min(price) as price, max(price) as price_max,
                 (array_agg(image) filter (where image is not null))[1] as image,
                 array_agg(distinct color) filter (where color is not null) as colors,
                 array_agg(distinct size) filter (where size is not null) as sizes,

@@ -1,19 +1,19 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { MagnifyingGlass, Package, CircleNotch, ArrowsClockwise, Plus, Check, Warning } from "@phosphor-icons/react"
+import { MagnifyingGlass, Package, CircleNotch, ArrowsClockwise, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  getSsStatus, getSsStylesAll, getSsStyleImgs, getSsStyle, ssWarm, getCatalogProducts, saveCatalogProducts,
+  getSsStatus, getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm, getCatalogProducts, saveCatalogProducts,
   type SsStyle, type CatalogProduct,
 } from "@/lib/api"
 import { OttoSuppliers } from "@/components/app/otto-suppliers"
+import { SupplierProductCard } from "@/components/app/supplier-product-card"
 import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
-const usd = (n: number | null) => (n == null ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 
 export function SuppliersView() {
   const isAdmin = getUser()?.role === "admin"
@@ -120,7 +120,7 @@ export function SuppliersView() {
         </div>
         {isAdmin && supplier === "ss" && (
           <Button variant="outline" size="sm" className="ml-auto" onClick={sync} disabled={syncing}>
-            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Warming…" : "Warm images"}
+            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Refreshing…" : "Refresh images"}
           </Button>
         )}
       </div>
@@ -157,33 +157,18 @@ export function SuppliersView() {
           <div className="py-16 text-center text-sm text-muted-foreground">No styles match “{debounced}”.</div>
         ) : (
           <>
-            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {styles.map((s) => {
-                const isAdded = added.has(s.styleID)
-                return (
-                  <div key={s.styleID} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <div className="relative flex aspect-square items-center justify-center bg-muted/40">
-                      {s.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={s.image} alt="" loading="lazy" className="size-full object-contain" />
-                      ) : (
-                        <Package size={24} weight="duotone" className="text-muted-foreground/40" />
-                      )}
-                    </div>
-                    <div className="flex flex-1 flex-col p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.brand}</div>
-                      <div className="line-clamp-2 text-sm font-medium leading-snug">{s.title}</div>
-                      <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{s.colors?.length ? `${s.colors.length} colors` : s.category || ""}</span>
-                        <span className="font-semibold text-foreground tabular-nums">{usd(s.price)}</span>
-                      </div>
-                      <Button size="sm" variant={isAdded ? "outline" : "default"} className="mt-2.5" disabled={addingId === s.styleID || isAdded} onClick={() => addToCatalog(s)}>
-                        {addingId === s.styleID ? <CircleNotch size={13} className="animate-spin" /> : isAdded ? <><Check size={13} weight="bold" /> In catalog</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {styles.map((s) => (
+                <SupplierProductCard
+                  key={s.styleID}
+                  data={{ id: s.styleID, title: s.title, brand: s.brand, subtitle: s.category, image: s.image, price: s.price, colors: s.colors, favorited: s.favorited }}
+                  added={added.has(s.styleID)}
+                  adding={addingId === s.styleID}
+                  onAdd={() => addToCatalog(s)}
+                  onFavorite={(on) => toggleSsFavorite(s, on).catch(() => {})}
+                  loadColors={() => getSsStyle(s.styleID).then((d) => (d && !d.error ? d.colorImages ?? {} : {}))}
+                />
+              ))}
             </div>
             {canLoadMore && (
               <div className="flex justify-center border-t border-border p-4">
