@@ -133,6 +133,14 @@
     }
 }
 
+/* Print — show only the label sheet (used by Inventory → Print labels). */
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; inset: 0; margin: 0; padding: 0; }
+  .no-print { display: none !important; }
+}
+
 /* Marketing motion — soft drifting aura (respect reduced-motion). */
 @keyframes eg-drift-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }

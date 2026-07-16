@@ -268,6 +268,15 @@ export function getOttoInventory(sku: string) {
   return api<unknown>(`/api/otto/inventory?sku=${encodeURIComponent(sku)}`)
 }
 
+// ── Inventory (staff) — whole-array upsert: send the full list, missing SKUs are dropped ──
+export type InventoryItem = { sku: string; name?: string | null; variant?: string | null; in_stock?: number; reserved?: number; reorder_at?: number; category?: string | null; updated_at?: string }
+export function getInventory() {
+  return api<InventoryItem[]>(`/api/inventory`)
+}
+export function saveInventory(items: InventoryItem[]) {
+  return api<{ ok?: boolean; count?: number }>(`/api/inventory`, { method: "POST", body: JSON.stringify(items) })
+}
+
 // Otto Cap has no live catalog API — we import their Product Data export into otto_products
 // and browse from there (live price/stock still per-SKU via getOttoInventory).
 export type OttoImportRow = { sku: string; style?: string; name?: string; description?: string; color?: string; size?: string; price?: string | number; image?: string; category?: string; brand?: string; data?: Record<string, unknown> }
