@@ -119,6 +119,38 @@ export function getMyTopups() {
   return api<TopupRequest[]>(`/api/topups`)
 }
 
+// ── Admin ──────────────────────────────────────────────────────────────────
+export type AdminUser = { id: string; email: string; name?: string | null; role: string; store_name?: string | null; active?: boolean; created_at?: string }
+export function getUsers() {
+  return api<AdminUser[]>(`/api/users`)
+}
+export function createUserAdmin(body: { email: string; password: string; role?: string; name?: string }) {
+  return api<AdminUser & { error?: string }>(`/api/users`, { method: "POST", body: JSON.stringify(body) })
+}
+export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
+}
+
+export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null }
+export function getAudit(params?: { limit?: number; action?: string }) {
+  const p = new URLSearchParams()
+  if (params?.limit) p.set("limit", String(params.limit))
+  if (params?.action) p.set("action", params.action)
+  const qs = p.toString()
+  return api<AuditRow[]>(`/api/audit${qs ? `?${qs}` : ""}`)
+}
+
+// Staff top-up review (pending → credit or reject the seller's wallet).
+export function getTopups(status?: string) {
+  return api<TopupRequest[]>(`/api/topups${status ? `?status=${encodeURIComponent(status)}` : ""}`)
+}
+export function confirmTopup(id: string) {
+  return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/confirm`, { method: "POST" })
+}
+export function rejectTopup(id: string) {
+  return api<{ error?: string }>(`/api/topups/${encodeURIComponent(id)}/reject`, { method: "POST" })
+}
+
 export function createTopupRequest(body: { amount: number; method: string; note?: string; ref?: string; name?: string; attachment?: string }) {
   return api<{ id?: number | string; status?: string; error?: string }>(`/api/topups`, {
     method: "POST",
