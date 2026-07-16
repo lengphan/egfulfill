@@ -208,6 +208,29 @@ export function saveCatalogProducts(products: CatalogProduct[]) {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/catalog_products`, { method: "POST", body: JSON.stringify(products) })
 }
 
+// ── Suppliers: S&S Activewear (browse from the synced DB — fast) + Otto Cap (stock) ──
+export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; colors: string[]; favorited?: boolean }
+export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string }
+export function getSsStatus() {
+  return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
+}
+export function getSsStyles(p: { search?: string; limit?: number; offset?: number }) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit) s.set("limit", String(p.limit))
+  if (p.offset) s.set("offset", String(p.offset))
+  return api<{ synced: boolean; total: number; styles: SsStyle[] }>(`/api/ss/styles-synced?${s.toString()}`)
+}
+export function getSsStyle(id: string) {
+  return api<SsStyleDetail>(`/api/ss/style/${encodeURIComponent(id)}`)
+}
+export function ssSync() {
+  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/ss/sync`, { method: "POST" })
+}
+export function getOttoInventory(sku: string) {
+  return api<unknown>(`/api/otto/inventory?sku=${encodeURIComponent(sku)}`)
+}
+
 // ─────────────────────────── Orders ───────────────────────────
 // GET /api/orders → order rows (orders table) each with an aggregated items[].
 export type OrderItem = {
