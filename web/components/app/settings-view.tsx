@@ -366,13 +366,13 @@ function TeamPanel() {
 
 // ─────────────────────────── Page ───────────────────────────
 export function SettingsView() {
-  // Integrations is a platform/admin concern (Stripe secret, supplier creds, etc.) —
-  // sellers never see it. Reveal only for staff (any non-seller role) after mount.
-  const [isStaff, setIsStaff] = useState(false)
+  // Integrations is a platform/admin concern (Stripe secret, supplier creds, AI key,
+  // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
+  const [isAdmin, setIsAdmin] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
-      setIsStaff(!!(u?.role && u.role !== "seller"))
+      setIsAdmin(u?.role === "admin")
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -382,7 +382,7 @@ export function SettingsView() {
       <TabsList>
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="keys">API keys</TabsTrigger>
-        {isStaff && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
         <TabsTrigger value="plan">Plan</TabsTrigger>
       </TabsList>
@@ -393,7 +393,7 @@ export function SettingsView() {
       <TabsContent value="keys">
         <ApiKeysPanel />
       </TabsContent>
-      {isStaff && (
+      {isAdmin && (
         <TabsContent value="integrations">
           <IntegrationsPanel />
         </TabsContent>
