@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, UserCircle } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, UserCircle, CurrencyDollar, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,8 +18,11 @@ import {
   inviteMember,
   removeMember,
   updateProfile,
+  getFactorySettings,
+  setFactorySettings,
   type ApiKey,
   type TeamMember,
+  type FactorySettings,
 } from "@/lib/api"
 
 const fmtDate = (s: string | null) => {
@@ -365,14 +368,86 @@ function TeamPanel() {
 }
 
 // ─────────────────────────── Page ───────────────────────────
+// ─────────────────────────── Platform (warehouse/admin) ───────────────────────────
+function MoneyField({ label, hint, value, onChange }: { label: string; hint?: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="relative">
+        <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input value={value} onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" inputMode="decimal" className="h-9 pl-7" />
+      </div>
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+    </label>
+  )
+}
+
+function PlatformPanel() {
+  const [loaded, setLoaded] = useState<FactorySettings | null>(null)
+  const [designFee, setDesignFee] = useState("")
+  const [shipFirst, setShipFirst] = useState("")
+  const [shipExtra, setShipExtra] = useState("")
+  const [embPrice, setEmbPrice] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    getFactorySettings().then((r) => {
+      setLoaded(r)
+      setDesignFee(r.design_fee != null ? String(r.design_fee) : "")
+      setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
+      setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
+      setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
+    }).catch(() => setLoaded({}))
+  }, [])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+
+  const save = async () => {
+    setSaving(true); setErr(null); setSaved(false)
+    try {
+      const r = await setFactorySettings({
+        design_fee: designFee === "" ? undefined : Number(designFee),
+        ship_first: shipFirst === "" ? undefined : Number(shipFirst),
+        ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
+        emb_price: embPrice === "" ? undefined : Number(embPrice),
+      })
+      if (r.error) throw new Error(r.error)
+      setSaved(true); setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't save — warehouse/admin only.")
+    } finally { setSaving(false) }
+  }
+
+  if (loaded === null) return <SectionCard title="Platform"><div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div></SectionCard>
+
+  return (
+    <SectionCard title="Platform" description="Factory-wide defaults (warehouse & admin)">
+      <div className="grid gap-4 p-5 sm:grid-cols-2">
+        <MoneyField label="Design fee" hint="Default payout credited to a designer per approved design" value={designFee} onChange={setDesignFee} />
+        <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
+        <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
+        <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+      </div>
+      <div className="flex items-center gap-3 border-t border-border px-5 py-3">
+        <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}
+        {err && <span className="text-sm text-destructive">{err}</span>}
+      </div>
+    </SectionCard>
+  )
+}
+
 export function SettingsView() {
   // Integrations is a platform/admin concern (Stripe secret, supplier creds, AI key,
   // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
   const [isAdmin, setIsAdmin] = useState(false)
+  const [canPlatform, setCanPlatform] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
       setIsAdmin(u?.role === "admin")
+      setCanPlatform(u?.role === "admin" || u?.role === "warehouse")
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -382,6 +457,7 @@ export function SettingsView() {
       <TabsList>
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="keys">API keys</TabsTrigger>
+        {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
         <TabsTrigger value="plan">Plan</TabsTrigger>
@@ -393,6 +469,11 @@ export function SettingsView() {
       <TabsContent value="keys">
         <ApiKeysPanel />
       </TabsContent>
+      {canPlatform && (
+        <TabsContent value="platform">
+          <PlatformPanel />
+        </TabsContent>
+      )}
       {isAdmin && (
         <TabsContent value="integrations">
           <IntegrationsPanel />

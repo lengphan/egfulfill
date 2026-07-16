@@ -31,6 +31,7 @@ import { sandboxRoutes } from './routes/sandbox.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { auditRoutes } from './audit.js';
 import { supportAiRoutes } from './routes/support_ai.js';
+import { factorySettingsRoutes } from './routes/factory_settings.js';
 import { spydeckRoutes } from './routes/spydeck.js';
 import { addClient } from './events.js';
 
@@ -155,6 +156,7 @@ sandboxRoutes(app, requireAuth);                       // seller API keys (/api/
 adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
 auditRoutes(app, requireAdmin);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
+factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 
 const port = Number(process.env.PORT) || 3000;

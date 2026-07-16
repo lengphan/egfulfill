@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, walletTransfer, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
@@ -31,12 +31,14 @@ export function DesignerBoard() {
   const [overCol, setOverCol] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
   const [view, setView] = useState<"board" | "list">("board")
+  const [designFee, setDesignFee] = useState(0) // platform default payout per design
   const me = getUser()?.name || "Designer"
 
   useEffect(() => {
     const id = setTimeout(() => {
       if (!getToken()) { setCards([]); return }
       getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
+      getFactorySettings().then((s) => setDesignFee(Number(s.design_fee) || 0)).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -71,12 +73,14 @@ export function DesignerBoard() {
   // the card's `credited` flag), so re-dragging it never double-pays.
   const moveCard = useCallback((card: DesignCard, to: string, extra?: Partial<DesignCard>) => {
     patch(card.id, { col: to, ...extra })
-    if (to === "approved" && !card.credited && amt(card.payment) > 0) {
-      walletTransfer({ fromAccount: "factory", toAccount: "designer", amount: amt(card.payment), ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
-        .then((r) => { if (!r.error) patch(card.id, { credited: true, pay_status: "paid" }) })
+    // Credit on approval — use the card's payout, or the platform Design fee as the default.
+    const amount = amt(card.payment) || designFee
+    if (to === "approved" && !card.credited && amount > 0) {
+      walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
+        .then((r) => { if (!r.error) patch(card.id, { credited: true, pay_status: "paid", payment: amount }) })
         .catch(() => {})
     }
-  }, [patch])
+  }, [patch, designFee])
 
   const drop = (col: string) => {
     setOverCol(null)
@@ -173,7 +177,7 @@ export function DesignerBoard() {
         </div>
       )}
 
-      {openCard && <CardDialog card={openCard} me={me} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => persist((cards ?? []).filter((c) => c.id !== id))} />}
+      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => persist((cards ?? []).filter((c) => c.id !== id))} />}
     </div>
   )
 }
@@ -230,8 +234,9 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
 }
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
-function CardDialog({ card, me, onClose, patch, onMove, remove }: { card: DesignCard; me: string; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void }) {
-  const [pay, setPay] = useState(String(amt(card.payment) || ""))
+function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { card: DesignCard; me: string; designFee: number; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void }) {
+  // Default the payout to the platform Design fee when the card hasn't set one.
+  const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const col = colOf(card)

@@ -413,6 +413,16 @@ export function getSupportThreads() {
 export function aiDraft(threadId: string) {
   return api<{ ok?: boolean; draft?: string; disabled?: boolean; error?: string }>(`/api/support/ai-draft`, { method: "POST", body: JSON.stringify({ threadId }) })
 }
+// Platform factory settings (design fee, default shipping, emb file price). Any staff can
+// read; warehouse/admin write.
+export type FactorySettings = { design_fee?: number; ship_first?: number; ship_extra?: number; emb_price?: number }
+export function getFactorySettings() {
+  return api<FactorySettings>(`/api/factory/settings`)
+}
+export function setFactorySettings(body: FactorySettings) {
+  return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
+}
+
 // Update the signed-in user's profile (currently just the display name).
 export function updateProfile(patch: { name?: string }) {
   return api<{ id?: string; name?: string; email?: string; role?: string; error?: string }>(`/api/me`, {
