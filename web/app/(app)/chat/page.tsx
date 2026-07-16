@@ -45,35 +45,33 @@ export default function ChatPage() {
     cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
   }, [])
 
-  // Staff chat the shared internal Factory channel; sellers get support + their orders.
+  // Everyone gets an EGFULFILL Support thread (support-<uid>); staff ALSO get the shared
+  // internal Factory channel and default to it. Sellers additionally see their orders.
   useEffect(() => {
     let alive = true
     const id = setTimeout(async () => {
       if (!getToken()) { setSignedOut(true); return }
-      if (isStaffUser) {
-        setActiveId((cur) => cur ?? STAFF_CHANNEL)
-        return
-      }
       let uid = getUser()?.id
       if (!uid) { try { uid = (await getMe()).sub } catch {} }
       if (!alive) return
       if (uid) {
-        const sid = `support-${uid}`
-        setSupportId(sid)
-        setActiveId((cur) => cur ?? sid)
+        setSupportId(`support-${uid}`)
+        setActiveId((cur) => cur ?? (isStaffUser ? STAFF_CHANNEL : `support-${uid}`))
+      } else if (isStaffUser) {
+        setActiveId((cur) => cur ?? STAFF_CHANNEL)
       } else {
         setSignedOut(true)
       }
-      getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
+      if (!isStaffUser) getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [isStaffUser])
 
   const convos = useMemo<Convo[]>(() => {
-    if (isStaffUser) return [{ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" }]
     const list: Convo[] = []
-    if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: "Assistant + team" })
-    for (const o of orders.slice(0, 30)) {
+    if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" })
+    if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: isStaffUser ? "Ask EGFULFILL" : "Assistant + team" })
+    if (!isStaffUser) for (const o of orders.slice(0, 30)) {
       list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
     }
     return list

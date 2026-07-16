@@ -251,6 +251,10 @@ export function ordersRoutes(app, requireAuth) {
   q(`alter table order_messages add column if not exists meta jsonb`).catch(() => {});
   q(`alter table order_messages add column if not exists client_id text`).catch(() => {});
   q(`create unique index if not exists order_messages_client on order_messages (client_id) where client_id is not null`).catch(() => {});
+  // order_id also holds SYNTHETIC channel ids (support-<seller>, staff-general) that
+  // aren't real orders — the FK to orders(id) rejected those inserts, so support/staff
+  // chat messages silently failed (the bubble "flashed and reverted"). Drop the FK.
+  q(`alter table order_messages drop constraint if exists order_messages_order_id_fkey`).catch(() => {});
 
   // A seller who is an ACTIVE team member of an owner acts on the OWNER's board. Returns the effective
   // seller id (owner for a member, else self) + the member's permission surfaces (perms=null means a
