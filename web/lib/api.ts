@@ -240,6 +240,24 @@ export function getOttoInventory(sku: string) {
   return api<unknown>(`/api/otto/inventory?sku=${encodeURIComponent(sku)}`)
 }
 
+// Otto Cap has no live catalog API — we import their Product Data export into otto_products
+// and browse from there (live price/stock still per-SKU via getOttoInventory).
+export type OttoImportRow = { sku: string; style?: string; name?: string; description?: string; color?: string; size?: string; price?: string | number; image?: string; category?: string; data?: Record<string, unknown> }
+export type OttoStyle = { style: string; name: string | null; description: string | null; price: number | string | null; image: string | null; colors: string[] | null; sizes: string[] | null; skus: string[]; category: string | null }
+export function getOttoStatus() {
+  return api<{ count?: number; last?: string | null }>(`/api/otto/products/status`)
+}
+export function getOttoProducts(p: { search?: string; limit?: number; offset?: number }) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit) s.set("limit", String(p.limit))
+  if (p.offset) s.set("offset", String(p.offset))
+  return api<{ total: number; items: OttoStyle[]; error?: string }>(`/api/otto/products?${s.toString()}`)
+}
+export function importOttoProducts(products: OttoImportRow[]) {
+  return api<{ ok?: boolean; imported?: number; total?: number; error?: string }>(`/api/otto/import`, { method: "POST", body: JSON.stringify({ products }) })
+}
+
 // ─────────────────────────── Orders ───────────────────────────
 // GET /api/orders → order rows (orders table) each with an aggregated items[].
 export type OrderItem = {

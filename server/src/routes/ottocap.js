@@ -9,6 +9,8 @@
 // Env (see .env.example): OTTOCAP_USERNAME, OTTOCAP_PASSWORD, OTTOCAP_CLIENT_ID,
 //   OTTOCAP_CLIENT_SECRET, OTTOCAP_API_BASE (sandbox default), OTTOCAP_ORDER_LIVE (gate).
 
+import { q } from '../db.js';
+
 const OC_USER = (process.env.OTTOCAP_USERNAME || '').trim();
 const OC_PASS = (process.env.OTTOCAP_PASSWORD || '').trim();
 const OC_CID  = (process.env.OTTOCAP_CLIENT_ID || '').trim();
@@ -62,6 +64,73 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const out = { configured: ocConfigured(), base: OC_BASE, sandbox: isSandbox(), supplier: OC_SUPPLIER };
     if (ocConfigured()) { try { await ocToken(); out.auth = 'ok'; } catch (e) { out.auth = 'failed'; out.error = String((e && e.message) || e); } }
     return out;
+  });
+
+  // ── Catalog (import-based) ───────────────────────────────────────────────────
+  // Otto has NO master product API (confirmed by Otto support): customers download the
+  // Product Data export from the dashboard and import it. We store it here and browse
+  // from it; live price/stock still comes from the Inventory API per SKU.
+  q(`create table if not exists otto_products (
+       sku text primary key,
+       style text, name text, description text,
+       color text, size text, price numeric(12,2),
+       image text, category text, data jsonb,
+       synced_at timestamptz default now()
+     )`).catch(() => {});
+
+  // Import a parsed catalog (array of normalized rows). Admin-only, whole-batch upsert by sku.
+  app.post('/api/otto/import', { preHandler: requireAdmin }, async (req, reply) => {
+    const rows = Array.isArray(req.body?.products) ? req.body.products : [];
+    if (!rows.length) { reply.code(400); return { error: 'No products in the payload.' }; }
+    let n = 0;
+    for (const r of rows) {
+      const sku = String(r.sku || '').trim();
+      if (!sku) continue;
+      await q(
+        `insert into otto_products (sku, style, name, description, color, size, price, image, category, data, synced_at)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+         on conflict (sku) do update set style=excluded.style, name=excluded.name, description=excluded.description,
+           color=excluded.color, size=excluded.size, price=excluded.price, image=excluded.image,
+           category=excluded.category, data=excluded.data, synced_at=now()`,
+        [sku, r.style || null, r.name || null, r.description || null, r.color || null, r.size || null,
+         (r.price != null && r.price !== '' && isFinite(Number(r.price))) ? Number(r.price) : null,
+         r.image || null, r.category || null, JSON.stringify(r.data || {})]
+      ).catch(() => {});
+      n++;
+    }
+    const c = await q('select count(*)::int as n from otto_products').catch(() => ({ rows: [{ n: 0 }] }));
+    return { ok: true, imported: n, total: c.rows[0]?.n || 0 };
+  });
+
+  // Catalog status — count + last import time (drives the "import needed" empty state).
+  app.get('/api/otto/products/status', { preHandler: requireStaff }, async () => {
+    try { const r = await q('select count(*)::int as n, max(synced_at) as last from otto_products'); return { count: r.rows[0]?.n || 0, last: r.rows[0]?.last || null }; }
+    catch { return { count: 0, last: null }; }
+  });
+
+  // Browse the imported catalog, grouped one card per style (fast — images included).
+  app.get('/api/otto/products', { preHandler: requireStaff }, async (req, reply) => {
+    const search = String(req.query?.search || '').trim().toLowerCase();
+    const limit = Math.min(120, Math.max(1, parseInt(req.query?.limit, 10) || 60));
+    const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
+    const where = search ? `where lower(coalesce(style,'') || ' ' || coalesce(name,'') || ' ' || coalesce(description,'') || ' ' || sku) like $1` : '';
+    const params = search ? ['%' + search + '%'] : [];
+    try {
+      const total = await q(`select count(*)::int as n from (select coalesce(style, sku) g from otto_products ${where} group by coalesce(style, sku)) t`, params);
+      const r = await q(
+        `select coalesce(style, sku) as style,
+                min(name) as name, min(description) as description, min(price) as price,
+                (array_agg(image) filter (where image is not null))[1] as image,
+                array_agg(distinct color) filter (where color is not null) as colors,
+                array_agg(distinct size) filter (where size is not null) as sizes,
+                array_agg(distinct sku) as skus,
+                min(category) as category
+           from otto_products ${where}
+          group by coalesce(style, sku)
+          order by style
+          limit ${limit} offset ${offset}`, params);
+      return { total: total.rows[0]?.n || 0, items: r.rows };
+    } catch (e) { reply.code(500); return { error: String((e && e.message) || e), total: 0, items: [] }; }
   });
 
   // Inventory for one sku (Otto's supplier constant injected).

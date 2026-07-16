@@ -9,6 +9,7 @@ import {
   getSsStatus, getSsStyles, getSsStyle, ssSync, getCatalogProducts, saveCatalogProducts,
   type SsStyle, type CatalogProduct,
 } from "@/lib/api"
+import { OttoSuppliers } from "@/components/app/otto-suppliers"
 import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
@@ -28,6 +29,7 @@ export function SuppliersView() {
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [supplier, setSupplier] = useState<"ss" | "otto">("ss")
 
   useEffect(() => {
     const id = setTimeout(() => { if (getToken()) getSsStatus().then(setStatus).catch(() => setStatus({ configured: false })) }, 0)
@@ -104,15 +106,23 @@ export function SuppliersView() {
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Suppliers</h1>
-          <p className="truncate text-sm text-muted-foreground">Browse S&amp;S Activewear blanks and add them to your catalog.{status?.synced_count ? ` ${status.synced_count.toLocaleString()} styles synced.` : ""}</p>
+          <p className="truncate text-sm text-muted-foreground">Browse blanks from your suppliers and add them to your catalog.{supplier === "ss" && status?.synced_count ? ` ${status.synced_count.toLocaleString()} S&S styles synced.` : ""}</p>
         </div>
-        {isAdmin && (
+        {isAdmin && supplier === "ss" && (
           <Button variant="outline" size="sm" className="ml-auto" onClick={sync} disabled={syncing}>
             <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing…" : "Sync catalog"}
           </Button>
         )}
       </div>
 
+      {/* Supplier tabs */}
+      <div className="flex w-fit rounded-lg border border-border p-0.5">
+        {([{ id: "ss", label: "S&S Activewear" }, { id: "otto", label: "Otto Cap" }] as const).map((t) => (
+          <button key={t.id} onClick={() => setSupplier(t.id)} className={"rounded-md px-3 py-1.5 text-sm font-medium transition-colors " + (supplier === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{t.label}</button>
+        ))}
+      </div>
+
+      {supplier === "otto" ? <OttoSuppliers /> : (
       <SectionCard title="S&S Activewear" description="Served from your synced catalog — fast, no live-API wait">
         <div className="flex items-center gap-2 border-b border-border p-4">
           <div className="relative max-w-md flex-1">
@@ -175,6 +185,7 @@ export function SuppliersView() {
           </>
         )}
       </SectionCard>
+      )}
     </div>
   )
 }
