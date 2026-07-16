@@ -1,12 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, UserCircle, CurrencyDollar, CircleNotch } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, UserCircle, CurrencyDollar, CircleNotch, UserPlus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { getUser, updateUser } from "@/lib/auth"
@@ -20,12 +21,18 @@ import {
   updateProfile,
   getFactorySettings,
   setFactorySettings,
+  getUsers,
+  updateUserAdmin,
+  createUserAdmin,
+  getAudit,
   type ApiKey,
   type TeamMember,
   type FactorySettings,
+  type AdminUser,
+  type AuditRow,
 } from "@/lib/api"
 
-const fmtDate = (s: string | null) => {
+const fmtDate = (s?: string | null) => {
   if (!s) return "—"
   const d = new Date(s)
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -438,6 +445,95 @@ function PlatformPanel() {
   )
 }
 
+// ─────────────────────────── Users (admin) ───────────────────────────
+const ROLES = ["seller", "operator", "warehouse", "designer", "admin"]
+function UsersPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [nu, setNu] = useState({ email: "", password: "", role: "operator" })
+  const [nuErr, setNuErr] = useState<string | null>(null)
+
+  const loadUsers = useCallback(() => { getUsers().then((r) => { setUsers(r ?? []); setLoaded(true) }).catch(() => setLoaded(true)) }, [])
+  useEffect(() => { const id = setTimeout(loadUsers, 0); return () => clearTimeout(id) }, [loadUsers])
+
+  const changeRole = async (u: AdminUser, role: string) => {
+    setBusy(u.id); setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)))
+    try { await updateUserAdmin(u.id, { role }) } catch { loadUsers() } finally { setBusy(null) }
+  }
+  const addUser = async () => {
+    if (!nu.email.trim() || nu.password.length < 8) { setNuErr("Email/username and a password of 8+ characters are required."); return }
+    setBusy("new"); setNuErr(null)
+    try {
+      const r = await createUserAdmin({ email: nu.email.trim(), password: nu.password, role: nu.role })
+      if (r.error) throw new Error(r.error)
+      setNu({ email: "", password: "", role: "operator" }); loadUsers()
+    } catch (e) { setNuErr(e instanceof Error ? e.message : "Couldn't create the user.") } finally { setBusy(null) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <SectionCard title="New staff / user" description="Create an account with a role (username or email login)">
+        <div className="flex flex-wrap items-end gap-2 p-5">
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email / username</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
+          <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
+            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm capitalize">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+          </label>
+          <Button size="sm" onClick={addUser} disabled={busy === "new"}>{busy === "new" ? <CircleNotch size={14} className="animate-spin" /> : <><UserPlus size={14} weight="bold" /> Create</>}</Button>
+          {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}
+        </div>
+      </SectionCard>
+      <SectionCard title="Users" description="Change a role inline">
+        {!loaded ? <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div> : (
+          <Table>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Joined</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {users.length === 0 ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No users</TableCell></TableRow>
+                : users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.name || u.store_name || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                    <TableCell><select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm capitalize">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select></TableCell>
+                    <TableCell className="text-right text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        )}
+      </SectionCard>
+    </div>
+  )
+}
+
+// ─────────────────────────── Activity (admin) ───────────────────────────
+function ActivityPanel() {
+  const [audit, setAudit] = useState<AuditRow[] | null>(null)
+  useEffect(() => { const id = setTimeout(() => { getAudit({ limit: 200 }).then((r) => setAudit(r ?? [])).catch(() => setAudit([])) }, 0); return () => clearTimeout(id) }, [])
+  const fmtDT = (s?: string | null) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
+  return (
+    <SectionCard title="Activity log" description="Audited actions across the platform">
+      {audit === null ? <div className="flex items-center justify-center py-14 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
+        : audit.length === 0 ? <div className="py-14 text-center text-sm text-muted-foreground">No activity recorded yet.</div>
+          : (
+            <Table>
+              <TableHeader><TableRow><TableHead>When</TableHead><TableHead>Actor</TableHead><TableHead>Action</TableHead><TableHead>Entity</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {audit.map((a) => (
+                  <TableRow key={String(a.id)}>
+                    <TableCell className="text-muted-foreground">{fmtDT(a.ts)}</TableCell>
+                    <TableCell>{a.actor || "—"}{a.actor_role ? <span className="text-xs text-muted-foreground"> · {a.actor_role}</span> : null}</TableCell>
+                    <TableCell className="font-mono text-xs">{a.action}</TableCell>
+                    <TableCell className="text-muted-foreground">{a.entity_type ? `${a.entity_type} ${a.entity_id ?? ""}` : "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+    </SectionCard>
+  )
+}
+
 export function SettingsView() {
   // Integrations is a platform/admin concern (Stripe secret, supplier creds, AI key,
   // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
@@ -458,7 +554,9 @@ export function SettingsView() {
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="keys">API keys</TabsTrigger>
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
+        {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
         <TabsTrigger value="plan">Plan</TabsTrigger>
       </TabsList>
@@ -472,6 +570,16 @@ export function SettingsView() {
       {canPlatform && (
         <TabsContent value="platform">
           <PlatformPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="users">
+          <UsersPanel />
+        </TabsContent>
+      )}
+      {isAdmin && (
+        <TabsContent value="activity">
+          <ActivityPanel />
         </TabsContent>
       )}
       {isAdmin && (

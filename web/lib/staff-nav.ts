@@ -1,4 +1,4 @@
-import { Printer, ShieldCheck, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -11,7 +11,7 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
-  { label: "Console", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
+  // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
 export const STAFF_ROLES = ["operator", "warehouse", "designer", "admin"]

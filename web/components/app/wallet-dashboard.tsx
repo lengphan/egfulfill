@@ -15,8 +15,45 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getWallet, getMyTopups, type LedgerRow, type TopupRequest } from "@/lib/api"
-import { getToken } from "@/lib/auth"
+import { SectionCard } from "@/components/app/section-card"
+import { CircleNotch, CheckCircle, XCircle } from "@phosphor-icons/react"
+import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, type LedgerRow, type TopupRequest } from "@/lib/api"
+import { getToken, getUser } from "@/lib/auth"
+
+const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date(s); return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) }
+
+// Admin review of pending seller top-ups (moved here from the old Console).
+function AdminTopups() {
+  const isAdmin = getUser()?.role === "admin"
+  const [topups, setTopups] = useState<TopupRequest[] | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const load = useCallback(() => { if (isAdmin) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [isAdmin])
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  const review = async (t: TopupRequest, action: "confirm" | "reject") => {
+    setBusy(t.id); setTopups((prev) => (prev ?? []).filter((x) => x.id !== t.id))
+    try { await (action === "confirm" ? confirmTopup(t.id) : rejectTopup(t.id)) } catch { load() } finally { setBusy(null) }
+  }
+  if (!isAdmin || topups === null || topups.length === 0) return null
+  return (
+    <SectionCard title={`Pending top-ups (${topups.length})`} description="Confirm to credit the seller's wallet; reject leaves it untouched">
+      <div className="divide-y divide-border">
+        {topups.map((t) => (
+          <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div>
+              <div className="font-semibold tabular-nums">{usd2(Number(t.amount_usd) || 0)} <span className="text-sm font-normal text-muted-foreground">· {t.method || "transfer"}</span></div>
+              <div className="text-xs text-muted-foreground">{t.ref ? `Ref ${t.ref} · ` : ""}{fmtDT2(t.created_at)}</div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => review(t, "reject")} disabled={busy === t.id} className="text-red-600 hover:text-red-700"><XCircle size={14} weight="bold" /> Reject</Button>
+              <Button size="sm" onClick={() => review(t, "confirm")} disabled={busy === t.id}>{busy === t.id ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Confirm &amp; credit</>}</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionCard>
+  )
+}
 
 type TxType = "Deposit" | "Charge" | "Refund" | "Payout"
 type Row = {
@@ -140,6 +177,7 @@ export function WalletDashboard() {
 
   return (
     <div className="space-y-4">
+      <AdminTopups />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline">
           <Bank size={16} /> Manage Linked Accounts
