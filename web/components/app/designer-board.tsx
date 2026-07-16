@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand } from "@phosphor-icons/react"
+import { PenNib, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -182,52 +182,104 @@ export function DesignerBoard() {
   )
 }
 
-// List view — dense, scannable, sorted by lane. Same click-to-open detail.
+// Every column the list CAN show. `design` is locked on (the thumb + title).
+type ListCol = { id: string; label: string; align?: "right"; locked?: boolean; cell: (c: DesignCard) => React.ReactNode }
+const LIST_COLS: ListCol[] = [
+  { id: "design", label: "Design", locked: true, cell: (c) => (
+    <div className="flex items-center gap-3">
+      <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+        {c.thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={String(c.thumb)} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={18} weight="duotone" /></div>
+        )}
+      </div>
+      <span className="max-w-[220px] truncate font-medium">{c.title || "Design"}</span>
+      {c.is_emb && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+    </div>
+  ) },
+  { id: "order", label: "Order", cell: (c) => <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</span> },
+  { id: "customer", label: "Customer", cell: (c) => <span className="text-muted-foreground">{c.customer ? String(c.customer) : "—"}</span> },
+  { id: "product", label: "Product", cell: (c) => <div className="max-w-[220px] truncate text-muted-foreground">{c.product || c.type || "—"}</div> },
+  { id: "method", label: "Method", cell: (c) => <span className="text-muted-foreground">{c.type ? String(c.type) : (c.is_emb ? "Embroidery" : "—")}</span> },
+  { id: "claimed", label: "Claimed by", cell: (c) => <span className="text-muted-foreground">{c.claimed_by ? String(c.claimed_by) : "—"}</span> },
+  { id: "priority", label: "Priority", cell: (c) => (c.priority && c.priority !== "normal" ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(c.priority)}</span> : <span className="text-muted-foreground">—</span>) },
+  { id: "lane", label: "Lane", cell: (c) => { const col = COLS.find((x) => x.id === colOf(c)); return <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span> } },
+  { id: "status", label: "Status", cell: (c) => (c.credited ? <span className="font-medium text-emerald-600">Credited</span> : <span className="text-muted-foreground">—</span>) },
+  { id: "payout", label: "Payout", align: "right", cell: (c) => <span className="font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</span> },
+]
+const DEFAULT_LIST_COLS = ["design", "order", "product", "lane", "payout"]
+
+// List view — columns are add/remove + renameable (admin/warehouse/operator), persisted.
 function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: string | number) => void }) {
   const order: string[] = COLS.map((c) => c.id)
   const rows = [...cards].sort((a, b) => order.indexOf(colOf(a)) - order.indexOf(colOf(b)))
+  const canEdit = (() => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" })()
+
+  const [visible, setVisible] = useState<string[]>(DEFAULT_LIST_COLS)
+  const [labels, setLabels] = useState<Record<string, string>>({})
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => {
+      try { const v = JSON.parse(localStorage.getItem("eg_dsn_cols") || "null"); if (Array.isArray(v) && v.length) setVisible(v) } catch { /* default */ }
+      try { const l = JSON.parse(localStorage.getItem("eg_dsn_labels") || "null"); if (l && typeof l === "object") setLabels(l) } catch { /* default */ }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  const save = (v: string[], l: Record<string, string>) => { try { localStorage.setItem("eg_dsn_cols", JSON.stringify(v)); localStorage.setItem("eg_dsn_labels", JSON.stringify(l)) } catch { /* ignore */ } }
+  const toggle = (id: string) => { const next = visible.includes(id) ? visible.filter((x) => x !== id) : [...visible, id]; setVisible(next); save(next, labels) }
+  const rename = (id: string, label: string) => { const next = { ...labels, [id]: label }; setLabels(next); save(visible, next) }
+  const reset = () => { setVisible(DEFAULT_LIST_COLS); setLabels({}); save(DEFAULT_LIST_COLS, {}) }
+  const labelOf = (col: ListCol) => labels[col.id] || col.label
+  const shown = LIST_COLS.filter((c) => visible.includes(c.id))
+
   if (rows.length === 0) return <div className="rounded-2xl border border-border py-16 text-center text-sm text-muted-foreground">No design cards yet — send one from the Operator board.</div>
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-border">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5 font-medium">Design</th>
-              <th className="px-4 py-2.5 font-medium">Order</th>
-              <th className="px-4 py-2.5 font-medium">Product</th>
-              <th className="px-4 py-2.5 font-medium">Lane</th>
-              <th className="px-4 py-2.5 text-right font-medium">Payout</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => {
-              const col = COLS.find((x) => x.id === colOf(c))
-              return (
-                <tr key={String(c.id)} onClick={() => onOpen(c.id)} className="cursor-pointer border-t border-border transition-colors hover:bg-accent">
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="relative size-9 shrink-0 overflow-hidden rounded-md bg-muted">
-                        {c.thumb ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={String(c.thumb)} alt="" className="size-full object-cover" />
-                        ) : (
-                          <div className="flex size-full items-center justify-center text-muted-foreground/40"><PenNib size={13} weight="duotone" /></div>
-                        )}
-                      </div>
-                      <span className="max-w-[200px] truncate font-medium">{c.title || "Design"}</span>
-                      {c.is_emb && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700"><Needle size={9} weight="bold" /> EMB</span>}
+    <div className="space-y-2">
+      {canEdit && (
+        <div className="flex justify-end">
+          <div className="relative">
+            <Button variant="outline" size="sm" onClick={() => setMenuOpen((o) => !o)}><Columns size={14} weight="bold" /> Columns</Button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 z-50 mt-1 w-72 rounded-xl border border-border bg-card p-2 shadow-xl">
+                  <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Columns — toggle & rename</div>
+                  {LIST_COLS.map((col) => (
+                    <div key={col.id} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent">
+                      <button onClick={() => !col.locked && toggle(col.id)} disabled={col.locked} title={col.locked ? "Always shown" : "Toggle"} className="flex size-5 shrink-0 items-center justify-center disabled:opacity-40">
+                        {visible.includes(col.id) ? <CheckSquare size={16} weight="fill" className="text-primary" /> : <Square size={16} className="text-muted-foreground" />}
+                      </button>
+                      <Input value={labelOf(col)} onChange={(e) => rename(col.id, e.target.value)} className="h-7 flex-1 text-xs" />
                     </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-muted-foreground">{c.order_id ? String(c.order_id) : "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground"><div className="max-w-[220px] truncate">{c.product || c.type || "—"}</div></td>
-                  <td className="px-4 py-2"><span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs"><span className={"size-1.5 rounded-full " + (col?.accent ?? "bg-muted-foreground")} /> {col?.label}</span></td>
-                  <td className="px-4 py-2 text-right font-semibold tabular-nums">{amt(c.payment) > 0 ? money(amt(c.payment)) : "—"}</td>
+                  ))}
+                  <button onClick={reset} className="mt-1 w-full rounded-md px-2 py-1 text-left text-xs font-medium text-primary hover:bg-accent">Reset to default</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-border">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+              <tr>
+                {shown.map((c) => <th key={c.id} className={"px-4 py-2.5 font-medium " + (c.align === "right" ? "text-right" : "")}>{labelOf(c)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={String(c.id)} onClick={() => onOpen(c.id)} className="cursor-pointer border-t border-border transition-colors hover:bg-accent">
+                  {shown.map((col) => <td key={col.id} className={"px-4 py-2 " + (col.align === "right" ? "text-right" : "")}>{col.cell(c)}</td>)}
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
