@@ -38,8 +38,9 @@ async function aiConfig() {
     await ensureSettings();
     const r = await q("select key, value from settings where key in ('support_ai_key','support_ai_model')");
     for (const row of r.rows) {
-      if (row.key === 'support_ai_key') key = (row.value || '').trim();
-      if (row.key === 'support_ai_model') model = (row.value || '').trim();
+      // settings.value is jsonb (schema.sql) — pg returns a JS string for a JSON string.
+      if (row.key === 'support_ai_key') key = String(row.value ?? '').trim();
+      if (row.key === 'support_ai_model') model = String(row.value ?? '').trim();
     }
   } catch { /* settings unavailable → env fallback */ }
   key = key || (process.env.ANTHROPIC_API_KEY || '').trim();
@@ -129,12 +130,12 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     if (b.clearKey) {
       await q("delete from settings where key='support_ai_key'");
     } else if (typeof b.key === 'string' && b.key.trim()) {
-      await q("insert into settings (key,value,updated_at) values ('support_ai_key',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.key.trim()]);
+      await q("insert into settings (key,value,updated_at) values ('support_ai_key', to_jsonb($1::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.key.trim()]);
     }
     if (typeof b.model === 'string' && b.model.trim()) {
       const valid = AI_MODELS.some((m) => m.id === b.model.trim());
       if (!valid) { reply.code(400); return { error: 'Unknown model' }; }
-      await q("insert into settings (key,value,updated_at) values ('support_ai_model',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.model.trim()]);
+      await q("insert into settings (key,value,updated_at) values ('support_ai_model', to_jsonb($1::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [b.model.trim()]);
     }
     const cfg = await aiConfig();
     return { ok: true, keySet: !!cfg.key, last4: cfg.key ? cfg.key.slice(-4) : null, fromEnv: cfg.fromEnv, model: cfg.model };
