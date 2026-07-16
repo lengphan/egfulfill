@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { navTitle } from "@/lib/nav"
+import { staffNavTitle } from "@/lib/staff-nav"
 import { getWallet } from "@/lib/api"
 import { getUser, clearSession } from "@/lib/auth"
 
@@ -55,10 +56,12 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   // topbar disagree with the Wallet page).
   const [balance, setBalance] = useState<number | null>(initialBalance ?? null)
   const [name, setName] = useState("Account")
+  const [role, setRole] = useState<string | undefined>(undefined)
   useEffect(() => {
     const sync = () => {
       const u = getUser()
       if (u?.name) setName(u.name)
+      setRole(u?.role)
     }
     const id = setTimeout(() => {
       setMounted(true)
@@ -90,7 +93,10 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
     }
   }, [])
 
-  const title = navTitle(pathname)
+  const isStaff = !!role && role !== "seller"
+  const title = isStaff ? staffNavTitle(pathname) : navTitle(pathname)
+  // Balance only for accounts with a selling wallet — sellers, admin, warehouse. Not operator/designer.
+  const showBalance = !isStaff || role === "admin" || role === "warehouse"
   const money = balance == null ? "—" : balance.toLocaleString("en-US", { style: "currency", currency: "USD" })
 
   return (
@@ -116,25 +122,29 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
 
         <Separator orientation="vertical" className="mx-2 !h-6" />
 
-        <button
-          onClick={() => router.push("/wallet")}
-          className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-accent"
-        >
-          <span className="text-muted-foreground">Balance</span>
-          <span className="font-semibold tabular-nums">{money}</span>
-        </button>
+        {showBalance && (
+          <button
+            onClick={() => router.push("/wallet")}
+            className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm transition-colors hover:bg-accent"
+          >
+            <span className="text-muted-foreground">Balance</span>
+            <span className="font-semibold tabular-nums">{money}</span>
+          </button>
+        )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
-            <Plus size={16} weight="bold" />
-            New
-            <CaretDown size={12} className="opacity-80" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem onClick={() => router.push("/orders/new")}>Manual order</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push("/stores")}>Sync from platforms</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!isStaff && (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="ml-1 inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+              <Plus size={16} weight="bold" />
+              New
+              <CaretDown size={12} className="opacity-80" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => router.push("/orders/new")}>Manual order</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/stores")}>Sync from platforms</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <Separator orientation="vertical" className="mx-2 !h-6" />
 

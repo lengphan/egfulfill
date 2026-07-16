@@ -127,6 +127,9 @@
     }
   html {
     @apply font-sans;
+    /* Always reserve the scrollbar gutter so switching between a tall page (has a
+       scrollbar) and a short one (doesn't) never shifts the content horizontally. */
+    scrollbar-gutter: stable;
     }
 }
 
