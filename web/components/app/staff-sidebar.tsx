@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { SignOut, Factory } from "@phosphor-icons/react"
+import { SignOut, Factory, ChatCircleDots, Gear } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { staffNav, type StaffNavItem } from "@/lib/staff-nav"
 import { getUser, clearSession } from "@/lib/auth"
@@ -47,6 +47,19 @@ export function StaffSidebar() {
                 active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground"
               )}
             >
+              <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+              {item.label}
+            </Link>
+          )
+        })}
+
+        {/* Common to every staff member — profile + factory chat. No seller pages. */}
+        <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Account</div>
+        {[{ label: "Chat", href: "/chat", icon: ChatCircleDots }, { label: "Settings", href: "/settings", icon: Gear }].map((item) => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/")
+          const Icon = item.icon
+          return (
+            <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors", active ? "bg-primary/10 text-primary" : "text-foreground/70 hover:bg-accent hover:text-foreground")}>
               <Icon size={19} weight={active ? "fill" : "regular"} className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")} />
               {item.label}
             </Link>
