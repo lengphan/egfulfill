@@ -87,6 +87,26 @@ export function ApiPlayground() {
 
   return (
     <div className="space-y-4">
+      {/* Getting started — the test-key → sandbox → live path */}
+      <SectionCard title="Getting started" description="Build your integration safely, then flip one key to go live.">
+        <div className="grid gap-4 p-5 sm:grid-cols-3">
+          {[
+            { n: "1", h: "Get your keys", b: "In Settings → API keys, grab a test key (egk_test_…) and a live key (egk_live_…). Send it on every request as the X-API-Key header." },
+            { n: "2", h: "Build in the sandbox", b: "Use the test key here. Every call hits /api/test/* — it validates auth and returns realistic responses but creates NO real orders, labels, or charges. Try the endpoints below." },
+            { n: "3", h: "Go live", b: "When it works in the sandbox, swap egk_test_ for egk_live_ — same code, and real orders now flow into fulfillment. Nothing else changes." },
+          ].map((s) => (
+            <div key={s.n} className="rounded-xl border border-border p-4">
+              <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{s.n}</span>
+              <div className="mt-2.5 font-semibold">{s.h}</div>
+              <p className="mt-1 text-sm text-muted-foreground">{s.b}</p>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+          Two directions: pull orders <span className="font-medium text-foreground">from</span> a sales channel (Etsy/Shopify — Stores page), or let another system push orders <span className="font-medium text-foreground">to</span> EGFULFILL via this API. The sandbox is for the second.
+        </div>
+      </SectionCard>
+
       {/* Key bar */}
       <SectionCard title="Your test key" description="Sandbox calls authenticate with a test API key (egk_test_…). It's sent as X-API-Key.">
         <div className="space-y-3 p-5">
