@@ -1,10 +1,11 @@
-import { Printer, Package, ShieldCheck, type Icon } from "@phosphor-icons/react"
+import { Printer, Package, ShieldCheck, PenNib, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
 // Staff boards, gated by role. Admin sees everything.
 const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Operator", href: "/operator", icon: Printer, roles: ["operator", "admin"] },
+  { label: "Designer", href: "/designer", icon: PenNib, roles: ["designer", "admin"] },
   { label: "Warehouse", href: "/warehouse", icon: Package, roles: ["warehouse", "admin"] },
   { label: "Admin", href: "/admin", icon: ShieldCheck, roles: ["admin"] },
 ]

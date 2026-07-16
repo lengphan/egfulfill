@@ -320,19 +320,36 @@ export function updateProfile(patch: { name?: string }) {
   })
 }
 
-// Seller design cards (their own orders' cards; staff see all). Powers the Design Lab.
+// Design cards — the Designer board (kanban). Staff see all; sellers see their own.
+// The POST is a WHOLE-BOARD replace (upsert all + delete the rest), so always send the
+// full array of the raw rows (with your edits) to avoid wiping other cards/fields.
 export type DesignCard = {
   id: number | string
   title?: string
   product?: string
   type?: string
   sku?: string
-  thumb?: string
-  order_id?: string
-  pay_status?: string
+  thumb?: string | null
+  order_id?: string | null
+  col?: string | null
+  claimed_by?: string | null
+  payment?: number | string | null
+  pay_status?: string | null
+  priority?: string | null
+  is_emb?: boolean
+  customer?: string | null
+  [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }
 export function getDesignCards() {
   return api<DesignCard[]>(`/api/design_cards`)
+}
+export function saveDesignCards(cards: DesignCard[]) {
+  return api<{ ok?: boolean; count?: number; error?: string }>(`/api/design_cards`, { method: "POST", body: JSON.stringify(cards) })
+}
+
+// Staff wallet transfer (factory ↔ seller/designer). Idempotent by ref.
+export function walletTransfer(body: { fromAccount?: string; toAccount?: string; toOrderId?: string; toEmail?: string; amount: number; ref?: string; type?: string; note?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/wallet/transfer`, { method: "POST", body: JSON.stringify(body) })
 }
 
 // Seller design library ("my designs") — reusable artwork the seller creates/uploads.
