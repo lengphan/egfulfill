@@ -119,7 +119,14 @@ async function generateReply(key, model, sellerId, messages) {
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages }),
   });
-  if (!r.ok) { const detail = await r.text().catch(() => ''); const e = new Error('AI service error'); e.status = 502; e.detail = detail; throw e; }
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    // Surface the real Anthropic reason (authentication_error, credit balance, model not_found…).
+    let reason = '';
+    try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
+    const e = new Error(reason ? `AI: ${reason}` : `AI service error (HTTP ${r.status})`);
+    e.status = 502; e.detail = detail; throw e;
+  }
   const data = await r.json();
   return (Array.isArray(data.content) ? data.content : []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
 }
@@ -140,8 +147,9 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
       if (!draft) return { ok: false, empty: true };
       return { ok: true, draft };
     } catch (e) {
+      // Return 200 with the reason so the UI can show it (a failed AI call isn't an API error).
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai draft failed');
-      reply.code(e.status || 502); return { ok: false, error: e.message || 'AI unavailable' };
+      return { ok: false, error: e.message || 'AI unavailable' };
     }
   });
 
@@ -193,8 +201,8 @@ export function supportAiRoutes(app, requireAuth, requireStaff) {
     try {
       text = await generateReply(key, model, sellerId, messages);
     } catch (e) {
+      // Return 200 with the reason (not a 5xx) so the client shows WHY instead of throwing.
       req.log?.warn?.({ err: String(e), detail: e.detail }, 'support-ai request failed');
-      reply.code(e.status || 502);
       return { ok: false, error: e.message || 'AI service unavailable' };
     }
     if (!text) return { ok: false, empty: true };
