@@ -35,6 +35,9 @@ export function ordersRoutes(app, requireAuth) {
        order_id text not null, sku text not null, kind text not null default 'raster',
        data text, name text, updated_at timestamptz default now(),
        primary key (order_id, sku, kind))`).catch(() => {});
+  // Placement (%-coords {x,y,w,h,r}) saved by the seller's order customizer — kept
+  // here (seller-writable via canSeeOrder) because order_items.design_pos is staff-only.
+  q('alter table order_designs add column if not exists pos jsonb').catch(() => {});
 
   // List
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
@@ -197,13 +200,14 @@ export function ordersRoutes(app, requireAuth) {
   // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
   app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    const { sku, data, name, kind } = req.body || {};
+    const { sku, data, name, kind, pos } = req.body || {};
     if (!sku || !data) return { error: 'sku and data required' };
+    const posJson = (pos && typeof pos === 'object') ? JSON.stringify(pos) : null;
     await q(
-      `insert into order_designs (order_id, sku, kind, data, name, updated_at)
-       values ($1,$2,$3,$4,$5, now())
-       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', data, name || null]
+      `insert into order_designs (order_id, sku, kind, data, name, pos, updated_at)
+       values ($1,$2,$3,$4,$5,$6, now())
+       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, pos=excluded.pos, updated_at=now()`,
+      [req.params.id, sku, kind || 'raster', data, name || null, posJson]
     );
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };
@@ -212,7 +216,7 @@ export function ordersRoutes(app, requireAuth) {
   // big base64 payload never rides along on the main /api/orders list.
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    const r = await q(`select sku, kind, data, name from order_designs where order_id=$1`, [req.params.id]);
+    const r = await q(`select sku, kind, data, name, pos from order_designs where order_id=$1`, [req.params.id]);
     return r.rows;
   });
 

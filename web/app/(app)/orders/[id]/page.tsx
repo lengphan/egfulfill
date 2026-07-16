@@ -6,6 +6,7 @@ import Image from "next/image"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
+import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -46,6 +47,18 @@ export default function OrderDetailPage() {
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
+  const [customize, setCustomize] = useState<OrderItem | null>(null)
+
+  const reloadDesigns = () => {
+    getOrderDesigns(id)
+      .then((r) => {
+        const list = Array.isArray(r) ? r : (r?.designs ?? [])
+        const by: Record<string, OrderDesign> = {}
+        for (const d of list) if (d.sku && d.data && !by[d.sku]) by[d.sku] = d
+        setDesigns(by)
+      })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     let alive = true
@@ -177,11 +190,14 @@ export default function OrderDetailPage() {
                           {it.sku && <span className="font-mono">{it.sku}</span>}
                         </div>
                       </div>
-                      <div className="text-right text-sm">
+                      <div className="flex flex-col items-end gap-1.5 text-right text-sm">
                         <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {qty} × {usd(unit)}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{qty} × {usd(unit)}</div>
+                        {it.sku && (
+                          <Button size="sm" variant="outline" onClick={() => setCustomize(it)}>
+                            <PenNib size={13} weight="bold" /> {artwork ? "Edit design" : "Customize"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )
@@ -300,6 +316,18 @@ export default function OrderDetailPage() {
           </SectionCard>
         </div>
       </div>
+
+      {customize && (
+        <DesignCanvasDialog
+          open={!!customize}
+          onOpenChange={(v) => !v && setCustomize(null)}
+          orderId={id}
+          item={customize}
+          initialDesign={designSrc(designs[customize.sku ?? ""]?.data)}
+          initialPos={designs[customize.sku ?? ""]?.pos}
+          onSaved={reloadDesigns}
+        />
+      )}
     </div>
   )
 }

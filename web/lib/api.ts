@@ -264,9 +264,17 @@ export type NewOrderItem = {
   size?: string
   printType?: string
 }
-export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: string }
+// %-coords for placing artwork on a mockup: center x/y, width w, rotation r (degrees).
+export type DesignPos = { x: number; y: number; w: number; h?: number; r: number }
+export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: string; pos?: DesignPos | null }
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
+}
+export function postOrderDesign(id: string, body: { sku: string; data: string; name?: string; pos?: DesignPos; kind?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
 }
 // The messages endpoint returns reconstructed chat entries (NOT raw rows):
 // { id, by, role, text, ts, system?, attachment? }. Order chat AND support chat
