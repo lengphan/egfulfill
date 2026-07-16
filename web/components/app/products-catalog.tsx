@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { MagnifyingGlass, Plus, Package, Sparkle } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
-import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
+import { getCatalogProducts, saveCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 
 // ── helpers ───────────────────────────────────────────────────
@@ -57,6 +59,22 @@ export function ProductsCatalog() {
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
   const [cat, setCat] = useState<string>("All")
+  const [isStaff, setIsStaff] = useState(false)
+  const [editing, setEditing] = useState<CatalogProduct | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+
+  useEffect(() => {
+    const id = setTimeout(() => { const r = getUser()?.role; setIsStaff(!!r && r !== "seller") }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  // Whole-catalog persist on any staff add/edit/delete.
+  const persist = (next: CatalogProduct[]) => { setProducts(next); saveCatalogProducts(next).catch(() => {}) }
+  const saveProduct = (p: CatalogProduct) => {
+    const list = products ?? []
+    persist(list.some((x) => x.id === p.id) ? list.map((x) => (x.id === p.id ? p : x)) : [p, ...list])
+  }
+  const deleteProduct = (id: CatalogProduct["id"]) => persist((products ?? []).filter((x) => x.id !== id))
 
   useEffect(() => {
     let alive = true
@@ -158,9 +176,11 @@ export function ProductsCatalog() {
               className="w-52 pl-9"
             />
           </div>
-          <Button size="sm">
-            <Plus size={14} weight="bold" /> Add product
-          </Button>
+          {isStaff && (
+            <Button size="sm" onClick={() => { setEditing(null); setEditorOpen(true) }}>
+              <Plus size={14} weight="bold" /> Add product
+            </Button>
+          )}
         </div>
       </div>
 
@@ -202,6 +222,22 @@ export function ProductsCatalog() {
               >
                 {/* image / placeholder */}
                 <div className="relative aspect-square overflow-hidden bg-muted/40">
+                  {/* Card actions — Design (everyone) + Edit/Delete (staff). */}
+                  <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); router.push(`/design/maker?product=${encodeURIComponent(String(p.id ?? p.sku ?? ""))}`) }}
+                      title="Design this product"
+                      className="flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                    >
+                      <PenNib size={13} weight="bold" />
+                    </button>
+                    {isStaff && (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEditing(p); setEditorOpen(true) }} title="Edit" className="flex size-7 items-center justify-center rounded-full bg-background text-foreground shadow hover:bg-accent"><PencilSimple size={13} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); deleteProduct(p.id) }} title="Delete" className="flex size-7 items-center justify-center rounded-full bg-background text-muted-foreground shadow hover:text-red-600"><Trash size={13} /></button>
+                      </>
+                    )}
+                  </div>
                   {img ? (
                     <Image
                       src={img}
@@ -291,6 +327,10 @@ export function ProductsCatalog() {
             )
           })}
         </div>
+      )}
+
+      {isStaff && (
+        <ProductEditorDialog open={editorOpen} onOpenChange={setEditorOpen} product={editing} onSave={saveProduct} newIdSeed={(products?.length ?? 0) + 1000} />
       )}
     </div>
   )

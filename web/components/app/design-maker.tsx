@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { saveDesignLibrary, publishEtsy, getSpydeckTrending } from "@/lib/api"
+import { saveDesignLibrary, publishEtsy, getSpydeckTrending, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+
+const mockupOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
 
 // Composite the artwork + text layers onto a transparent square canvas → PNG data URL.
 // (Only data-URL sources are drawn, so the canvas never taints.)
@@ -53,6 +55,7 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 
 export function DesignMaker() {
   const router = useRouter()
+  const productParam = useSearchParams().get("product")
   const [mockup, setMockup] = useState("")
   const [designUrl, setDesignUrl] = useState("")
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
@@ -64,6 +67,20 @@ export function DesignMaker() {
   const [pubOpen, setPubOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
+
+  // Opened from a product ("Design this") → preload that product's mockup as the blank.
+  useEffect(() => {
+    if (!productParam) return
+    const id = setTimeout(() => {
+      getCatalogProducts()
+        .then((rows) => {
+          const p = (rows ?? []).find((x) => String(x.id) === productParam || String(x.sku) === productParam)
+          if (p) setMockup(mockupOf(p))
+        })
+        .catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [productParam])
 
   const updateText = (id: string, patch: Partial<TextLayer>) =>
     setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
