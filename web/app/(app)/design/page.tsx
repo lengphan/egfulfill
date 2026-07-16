@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Plus, PenNib, Trash } from "@phosphor-icons/react"
+import { useRouter } from "next/navigation"
+import { Plus, PenNib, Trash, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -16,6 +17,7 @@ const fmtDate = (s?: string) => {
 }
 
 export default function DesignPage() {
+  const router = useRouter()
   const [designs, setDesigns] = useState<LibraryDesign[] | null>(null)
   const [signedOut, setSignedOut] = useState(false)
   const [studioOpen, setStudioOpen] = useState(false)
@@ -42,9 +44,14 @@ export default function DesignPage() {
         title="Design Lab"
         description="Create and store reusable designs, then drop them onto orders"
         actions={
-          <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-            <Plus size={14} weight="bold" /> New design
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => router.push("/design/maker")} disabled={signedOut}>
+              <Sparkle size={14} weight="fill" /> Open maker
+            </Button>
+            <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
+              <Plus size={14} weight="bold" /> Quick design
+            </Button>
+          </div>
         }
       >
         {designs === null ? (

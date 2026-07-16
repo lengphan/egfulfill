@@ -8,18 +8,15 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, type DesignPos, type OrderItem } from "@/lib/api"
 
 export type Pos = { x: number; y: number; w: number; r: number }
+export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
 export const DEFAULT_POS: Pos = { x: 50, y: 50, w: 45, r: 0 }
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
-// Reusable place/size/rotate surface — used by the order customizer and the Design Lab
-// studio. Renders a mockup with a draggable/resizable/rotatable artwork layer.
+// Reusable place/size/rotate surface — used by the order customizer, the studio, and the
+// full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
 export function DesignStage({
-  mockup,
-  designUrl,
-  pos,
-  setPos,
-  onRemove,
-  className,
+  mockup, designUrl, pos, setPos, onRemove, className,
+  texts, updateText, selected, onSelect,
 }: {
   mockup?: string
   designUrl: string
@@ -27,71 +24,91 @@ export function DesignStage({
   setPos: (fn: (p: Pos) => Pos) => void
   onRemove?: () => void
   className?: string
+  texts?: TextLayer[]
+  updateText?: (id: string, patch: Partial<TextLayer>) => void
+  selected?: string | null
+  onSelect?: (sel: string | null) => void
 }) {
   const stageRef = useRef<HTMLDivElement>(null)
 
-  const startDrag = (mode: "move" | "resize" | "rotate") => (e: React.PointerEvent) => {
+  // target: "image" or a text-layer id. mode: move | resize | rotate.
+  const startDrag = (target: string, mode: "move" | "resize" | "rotate") => (e: React.PointerEvent) => {
     if (!stageRef.current) return
     e.preventDefault(); e.stopPropagation()
+    onSelect?.(target)
     const rect = stageRef.current.getBoundingClientRect()
-    const start = { ...pos }
+    const isText = target !== "image"
+    const layer = isText ? texts?.find((t) => t.id === target) : null
+    const startX = isText ? (layer?.x ?? 50) : pos.x
+    const startY = isText ? (layer?.y ?? 50) : pos.y
+    const startR = isText ? (layer?.r ?? 0) : pos.r
     const px = e.clientX, py = e.clientY
-    const cx = rect.left + (start.x / 100) * rect.width
-    const cy = rect.top + (start.y / 100) * rect.height
+    const cx = rect.left + (startX / 100) * rect.width
+    const cy = rect.top + (startY / 100) * rect.height
+    function apply(patch: { x?: number; y?: number; w?: number; size?: number; r?: number }) {
+      if (isText && layer) updateText?.(target, { x: patch.x, y: patch.y, size: patch.w ?? patch.size, r: patch.r } as Partial<TextLayer>)
+      else setPos((p) => ({ ...p, ...(patch.x != null ? { x: patch.x } : {}), ...(patch.y != null ? { y: patch.y } : {}), ...(patch.w != null ? { w: patch.w } : {}), ...(patch.r != null ? { r: patch.r } : {}) }))
+    }
     function move(ev: PointerEvent) {
       if (mode === "move") {
         const dx = ((ev.clientX - px) / rect.width) * 100
         const dy = ((ev.clientY - py) / rect.height) * 100
-        setPos((p) => ({ ...p, x: clamp(start.x + dx, 0, 100), y: clamp(start.y + dy, 0, 100) }))
+        apply({ x: clamp(startX + dx, 0, 100), y: clamp(startY + dy, 0, 100) })
       } else if (mode === "resize") {
         const vx = ev.clientX - cx, vy = ev.clientY - cy
-        const rad = (-start.r * Math.PI) / 180
+        const rad = (-startR * Math.PI) / 180
         const localX = vx * Math.cos(rad) - vy * Math.sin(rad)
-        setPos((p) => ({ ...p, w: clamp((2 * Math.abs(localX) / rect.width) * 100, 8, 100) }))
+        const wPct = (2 * Math.abs(localX) / rect.width) * 100
+        apply(isText ? { size: clamp(wPct / 3, 2, 40) } : { w: clamp(wPct, 8, 100) })
       } else {
         const ang = (Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180) / Math.PI + 90
-        setPos((p) => ({ ...p, r: Math.round(ang) }))
+        apply({ r: Math.round(ang) })
       }
     }
-    function up() {
-      window.removeEventListener("pointermove", move)
-      window.removeEventListener("pointerup", up)
-    }
+    function up() { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up) }
     window.addEventListener("pointermove", move)
     window.addEventListener("pointerup", up)
   }
 
+  const handles = (target: string) => (
+    <>
+      <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
+      <button onPointerDown={startDrag(target, "rotate")} className="absolute -top-7 left-1/2 flex size-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Rotate"><ArrowClockwise size={13} weight="bold" /></button>
+      <button onPointerDown={startDrag(target, "resize")} className="absolute -bottom-2.5 -right-2.5 flex size-6 cursor-nwse-resize items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Resize"><ArrowsOutCardinal size={12} weight="bold" /></button>
+    </>
+  )
+
   return (
-    <div ref={stageRef} className={"relative aspect-square w-full select-none overflow-hidden rounded-xl border border-border bg-muted/40 " + (className ?? "")}>
+    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square w-full select-none overflow-hidden rounded-xl border border-border bg-muted/40 " + (className ?? "")}>
       {mockup ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain" />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/40"><ImageIcon size={40} weight="duotone" /></div>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground/40"><ImageIcon size={40} weight="duotone" /></div>
       )}
 
       {designUrl && (
-        <div
-          onPointerDown={startDrag("move")}
-          style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
-          className="group absolute cursor-move touch-none"
-        >
+        <div onPointerDown={startDrag("image", "move")} style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }} className="absolute cursor-move touch-none">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={designUrl} alt="" className="pointer-events-none block w-full select-none" draggable={false} />
-          <div className="pointer-events-none absolute inset-0 rounded-sm outline outline-2 -outline-offset-1 outline-primary/70" />
-          <button onPointerDown={startDrag("rotate")} className="absolute -top-7 left-1/2 flex size-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Rotate">
-            <ArrowClockwise size={13} weight="bold" />
-          </button>
-          <button onPointerDown={startDrag("resize")} className="absolute -bottom-2.5 -right-2.5 flex size-6 cursor-nwse-resize items-center justify-center rounded-full bg-primary text-primary-foreground shadow touch-none" aria-label="Resize">
-            <ArrowsOutCardinal size={12} weight="bold" />
-          </button>
-          {onRemove && (
-            <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork">
-              <X size={12} weight="bold" />
-            </button>
+          {(selected == null || selected === "image") && handles("image")}
+          {onRemove && (selected == null || selected === "image") && (
+            <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
           )}
         </div>
       )}
+
+      {(texts ?? []).map((t) => (
+        <div
+          key={t.id}
+          onPointerDown={startDrag(t.id, "move")}
+          style={{ left: `${t.x}%`, top: `${t.y}%`, transform: `translate(-50%,-50%) rotate(${t.r}deg)`, color: t.color, fontSize: `${t.size}cqw`, fontWeight: t.bold ? 800 : 600, whiteSpace: "nowrap", lineHeight: 1.1 }}
+          className="absolute cursor-move touch-none"
+        >
+          {t.text || "Text"}
+          {selected === t.id && handles(t.id)}
+        </div>
+      ))}
     </div>
   )
 }
