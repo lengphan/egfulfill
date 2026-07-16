@@ -2,14 +2,20 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav } from "@/lib/nav"
 import { hasSpydeck } from "@/lib/plans"
+import { clearSession } from "@/lib/auth"
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const logout = () => {
+    clearSession()
+    router.push("/login")
+  }
   // Plan-gated items (SpyDeck) — read entitlement after mount and re-check when the
   // plan/add-on changes (setPlan/setSpydeckAddon fire "eg-plan-changed").
   const [spydeck, setSpydeck] = useState(true)
@@ -70,7 +76,10 @@ export function Sidebar() {
       </nav>
 
       <div className="shrink-0 border-t border-border p-3">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-accent hover:text-foreground">
+        <button
+          onClick={logout}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+        >
           <SignOut size={19} className="text-muted-foreground" />
           Log out
         </button>
