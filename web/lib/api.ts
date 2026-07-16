@@ -230,6 +230,25 @@ export function getSsStyles(p: { search?: string; limit?: number; offset?: numbe
   if (p.offset) s.set("offset", String(p.offset))
   return api<{ synced: boolean; total: number; styles: SsStyle[] }>(`/api/ss/styles-synced?${s.toString()}`)
 }
+// The FULL live S&S catalog (all styles, cached server-side — "fetch them all"). Cards
+// come without thumbnails on this account, so resolve a page's images via getSsStyleImgs.
+export function getSsStylesAll(p: { search?: string; limit?: number; offset?: number }) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit) s.set("limit", String(p.limit))
+  if (p.offset) s.set("offset", String(p.offset))
+  return api<{ total: number; styles: SsStyle[] }>(`/api/ss/styles?${s.toString()}`)
+}
+export function getSsStyleImgs(ids: string[]) {
+  return api<Record<string, { image: string | null; colors: string[] }>>(`/api/ss/style-imgs?ids=${encodeURIComponent(ids.join(","))}`)
+}
+// Pre-warm ALL style thumbnails into the DB (background) so browsing is instant.
+export function ssWarm() {
+  return api<{ ok?: boolean; total?: number; error?: string }>(`/api/ss/warm`, { method: "POST" })
+}
+export function getSsWarmStatus() {
+  return api<{ running?: boolean; total?: number; done?: number }>(`/api/ss/warm/status`)
+}
 export function getSsStyle(id: string) {
   return api<SsStyleDetail>(`/api/ss/style/${encodeURIComponent(id)}`)
 }

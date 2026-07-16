@@ -6,7 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  getSsStatus, getSsStyles, getSsStyle, ssSync, getCatalogProducts, saveCatalogProducts,
+  getSsStatus, getSsStylesAll, getSsStyleImgs, getSsStyle, ssWarm, getCatalogProducts, saveCatalogProducts,
   type SsStyle, type CatalogProduct,
 } from "@/lib/api"
 import { OttoSuppliers } from "@/components/app/otto-suppliers"
@@ -44,13 +44,25 @@ export function SuppliersView() {
 
   const load = useCallback((search: string, off: number) => {
     setLoading(true)
-    getSsStyles({ search, limit: PAGE, offset: off })
-      .then((r) => {
-        setSynced(r.synced)
+    // The FULL live catalog (all products). Cards may come without images on this account,
+    // so resolve this page's thumbnails/colors in one batched call (cached server-side).
+    getSsStylesAll({ search, limit: PAGE, offset: off })
+      .then(async (r) => {
+        setSynced(true)
         setTotal(r.total ?? 0)
-        setStyles((prev) => (off === 0 ? r.styles ?? [] : [...prev, ...(r.styles ?? [])]))
+        const page = r.styles ?? []
+        setStyles((prev) => (off === 0 ? page : [...prev, ...page]))
+        const ids = page.filter((s) => !s.image).map((s) => s.styleID)
+        if (ids.length) {
+          const imgs = await getSsStyleImgs(ids).catch(() => ({} as Record<string, { image: string | null; colors: string[] }>))
+          setStyles((prev) => prev.map((s) => {
+            const hit = imgs[s.styleID]
+            if (!hit) return s
+            return { ...s, image: s.image ?? hit.image, colors: s.colors?.length ? s.colors : (hit.colors ?? []) }
+          }))
+        }
       })
-      .catch(() => setSynced(false))
+      .catch(() => setSynced(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -60,16 +72,14 @@ export function SuppliersView() {
     return () => clearTimeout(id)
   }, [debounced, load])
 
+  // Pre-warm every style's thumbnail into the DB (background) so browsing is instant.
   const sync = async () => {
     setSyncing(true); setErr(null)
     try {
-      const r = await ssSync()
+      const r = await ssWarm()
       if (r.error) throw new Error(r.error)
-      const s = await getSsStatus().catch(() => null)
-      if (s) setStatus(s)
-      setOffset(0); load(debounced, 0)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Sync failed.")
+      setErr(e instanceof Error ? e.message : "Couldn't start warming.")
     } finally { setSyncing(false) }
   }
 
@@ -106,11 +116,11 @@ export function SuppliersView() {
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div className="min-w-0">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Suppliers</h1>
-          <p className="truncate text-sm text-muted-foreground">Browse blanks from your suppliers and add them to your catalog.{supplier === "ss" && status?.synced_count ? ` ${status.synced_count.toLocaleString()} S&S styles synced.` : ""}</p>
+          <p className="truncate text-sm text-muted-foreground">Browse blanks from your suppliers and add them to your catalog.{supplier === "ss" && total ? ` ${total.toLocaleString()} S&S styles.` : ""}</p>
         </div>
         {isAdmin && supplier === "ss" && (
           <Button variant="outline" size="sm" className="ml-auto" onClick={sync} disabled={syncing}>
-            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing…" : "Sync catalog"}
+            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Warming…" : "Warm images"}
           </Button>
         )}
       </div>
@@ -123,7 +133,7 @@ export function SuppliersView() {
       </div>
 
       {supplier === "otto" ? <OttoSuppliers /> : (
-      <SectionCard title="S&S Activewear" description="Served from your synced catalog — fast, no live-API wait">
+      <SectionCard title="S&S Activewear" description="The full S&S catalog — every style; thumbnails resolve as you browse">
         <div className="flex items-center gap-2 border-b border-border p-4">
           <div className="relative max-w-md flex-1">
             <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
