@@ -112,23 +112,30 @@ function toMessages(rows) {
 
 // Ask Claude for a reply given a seller's thread. Returns the text; throws with
 // .status on failure so the caller maps the HTTP code. Reused by auto-reply + draft.
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
 async function generateReply(key, model, sellerId, messages) {
   const ctx = await accountContext(sellerId);
-  const r = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages }),
-  });
-  if (!r.ok) {
-    const detail = await r.text().catch(() => '');
-    // Surface the real Anthropic reason (authentication_error, credit balance, model not_found…).
-    let reason = '';
-    try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
-    const e = new Error(reason ? `AI: ${reason}` : `AI service error (HTTP ${r.status})`);
-    e.status = 502; e.detail = detail; throw e;
+  const body = JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages });
+  const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
+
+  let r, detail = '';
+  // Anthropic 529 (overloaded) / 429 (rate limit) are transient — retry a few times with backoff.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r = await fetch(API_URL, { method: 'POST', headers, body });
+    if (r.ok) {
+      const data = await r.json();
+      return (Array.isArray(data.content) ? data.content : []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    }
+    detail = await r.text().catch(() => '');
+    if ((r.status === 529 || r.status === 429) && attempt < 2) { await sleep(700 * (attempt + 1)); continue; }
+    break;
   }
-  const data = await r.json();
-  return (Array.isArray(data.content) ? data.content : []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  // Surface the real Anthropic reason (authentication_error, credit balance, model not_found, overloaded…).
+  let reason = '';
+  try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
+  const e = new Error(reason ? `AI: ${reason}` : `AI service error (HTTP ${r.status})`);
+  e.status = 502; e.detail = detail; throw e;
 }
 
 export function supportAiRoutes(app, requireAuth, requireStaff) {
