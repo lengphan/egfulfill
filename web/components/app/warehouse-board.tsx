@@ -27,7 +27,7 @@ const TABS: Tab[] = ["Intake", "Queue", "Ready to ship", "Shipped"]
 const inTab = (o: OrderRow, tab: Tab) => {
   const s = orderStage(o.items ?? [])
   if (tab === "Intake") return s === ""
-  if (tab === "Queue") return ["queued", "printing", "qc"].includes(s)
+  if (tab === "Queue") return ["in_review", "queued", "printing", "qc"].includes(s)
   if (tab === "Ready to ship") return s === "packed"
   return s === "shipped"
 }

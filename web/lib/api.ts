@@ -438,6 +438,9 @@ export type EtsyConfig = {
   configured: boolean
 }
 
+export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; tags?: string[]; taxonomy_id?: number | string }) {
+  return api<{ listing_id?: number; url?: string; error?: string }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
+}
 export function getEtsyConnections() {
   return api<EtsyConnection[]>(`/api/etsy/connections`)
 }

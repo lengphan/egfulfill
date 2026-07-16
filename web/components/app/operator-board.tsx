@@ -8,7 +8,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { getOrders, postItemStatus, type OrderRow, type OrderItem } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { FACTORY_STAGES, normalizeStage, nextStage, stageMeta, orderStage } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, stageMeta, orderStage, isException } from "@/lib/factory-status"
 import { StageBadge } from "@/components/app/stage-badge"
 
 const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
@@ -19,9 +19,9 @@ const fmtDate = (s?: string | null) => {
 }
 const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
 
-type Filter = "All" | "New" | "Queued" | "Printing" | "QC" | "Packed" | "Shipped"
-const FILTERS: Filter[] = ["All", "New", "Queued", "Printing", "QC", "Packed", "Shipped"]
-const filterId = (f: Filter) => (f === "New" ? "" : f.toLowerCase())
+type Filter = "All" | "New" | "In review" | "Queued" | "Printing" | "QC" | "Packed" | "Shipped" | "Issues"
+const FILTERS: Filter[] = ["All", "New", "In review", "Queued", "Printing", "QC", "Packed", "Shipped", "Issues"]
+const filterId = (f: Filter) => (f === "New" ? "" : f === "In review" ? "in_review" : f.toLowerCase())
 
 export function OperatorBoard() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
@@ -78,6 +78,7 @@ export function OperatorBoard() {
   const filtered = useMemo(() => {
     const list = orders ?? []
     if (filter === "All") return list
+    if (filter === "Issues") return list.filter((o) => isException(orderStage(o.items ?? [])))
     return list.filter((o) => orderStage(o.items ?? []) === filterId(filter))
   }, [orders, filter])
 
@@ -161,12 +162,30 @@ export function OperatorBoard() {
                             <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
                           </div>
                           <StageBadge status={it.factory_status} />
+                          {/* Set any status directly (incl. exceptions). */}
+                          <select
+                            value={normalizeStage(it.factory_status)}
+                            onChange={(e) => advanceItem(o, it, e.target.value)}
+                            disabled={busy === key}
+                            className="h-8 shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs"
+                            aria-label="Set status"
+                            title="Set status"
+                          >
+                            <optgroup label="Production">
+                              {ALL_STATUSES.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id)).map((s) => (
+                                <option key={s.id || "new"} value={s.id}>{s.label}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Exceptions">
+                              {EXCEPTION_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                            </optgroup>
+                          </select>
                           {to ? (
                             <Button size="sm" disabled={busy === key} onClick={() => advanceItem(o, it, to)} className="shrink-0">
                               {busy === key ? <CircleNotch size={13} className="animate-spin" /> : <>→ {toMeta?.label}</>}
                             </Button>
                           ) : (
-                            <span className="inline-flex shrink-0 items-center gap-1 px-2 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Done</span>
+                            <span className="inline-flex shrink-0 items-center gap-1 px-2 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {isException(it.factory_status) ? stageMeta(normalizeStage(it.factory_status))?.label : "Done"}</span>
                           )}
                         </div>
                       )
