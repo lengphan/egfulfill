@@ -12,6 +12,20 @@ import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
 
+// Otto's Product Data stores images as Google Drive links, which don't render in an <img>
+// (Drive blocks hotlinking). Rewrite them to Drive's embeddable thumbnail URL, which does.
+function driveImg(url?: string | null): string {
+  if (!url) return ""
+  const s = String(url)
+  const m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/) || s.match(/\/d\/([a-zA-Z0-9_-]+)/)
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800` : s
+}
+const driveMap = (m?: Record<string, string>): Record<string, string> => {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(m ?? {})) out[k] = driveImg(v)
+  return out
+}
+
 // Map the Product Data export → normalized rows. Otto's real headers are known
 // (sku_no, sku_parent, name, description, 1+, image_main, color, size, type…); we match
 // those exactly, with tolerant fallbacks so a differently-shaped CSV still imports.
@@ -49,7 +63,7 @@ function mapRows(rows: string[][]): OttoImportRow[] {
       color: g(iColor) || undefined,
       size: g(iSize) || undefined,
       price: g(iPrice) ? g(iPrice).replace(/[^0-9.]/g, "") : undefined,
-      image: image || undefined,
+      image: driveImg(image) || undefined,
       category: g(iCat) || undefined,
     })
   }
@@ -124,13 +138,13 @@ export function OttoSuppliers() {
       const id = "OTTO-" + s.style
       // Pull the full product detail so the catalog gets the photo matching each color.
       const d = await getOttoStyle(s.style).catch(() => null)
-      const colorImages: Record<string, string> = (d && !d.error && d.colorImages) ? { ...d.colorImages } : {}
-      if (Object.keys(colorImages).length === 0) for (const c of s.colors ?? []) colorImages[c] = s.image ?? ""
+      const colorImages: Record<string, string> = (d && !d.error && d.colorImages) ? driveMap(d.colorImages) : {}
+      if (Object.keys(colorImages).length === 0) for (const c of s.colors ?? []) colorImages[c] = driveImg(s.image)
       const product: CatalogProduct = {
         id, name: d?.name || s.name || s.style, type: "Headwear", method: "Embroidery", status: "Active",
         price: Number(d?.price ?? s.price) || 0, basePrice: Number(d?.price ?? s.price) || 0,
         sizes: d?.sizes ?? s.sizes ?? [], colorImages, mainColor: Object.keys(colorImages)[0] || (s.colors ?? [])[0],
-        img: d?.image ?? s.image ?? undefined, sku: s.skus?.[0] || s.style,
+        img: driveImg(d?.image ?? s.image) || undefined, sku: s.skus?.[0] || s.style,
         description: d?.description ?? s.description ?? undefined, supplier: "Otto Cap",
       }
       const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
@@ -181,12 +195,12 @@ export function OttoSuppliers() {
             {items.map((s) => (
               <SupplierProductCard
                 key={s.style}
-                data={{ id: s.style, title: s.name || s.style, subtitle: s.category || s.style, image: s.image, price: s.price, priceMax: s.price_max, colors: s.colors, sizesCount: s.sizes?.length ?? 0, favorited: s.favorited }}
+                data={{ id: s.style, title: s.name || s.style, subtitle: s.category || s.style, image: driveImg(s.image), price: s.price, priceMax: s.price_max, colors: s.colors, sizesCount: s.sizes?.length ?? 0, favorited: s.favorited }}
                 added={added.has(s.style)}
                 adding={addingId === s.style}
                 onAdd={() => addToCatalog(s)}
                 onFavorite={(on) => toggleOttoFavorite({ style: s.style, name: s.name, image: s.image, price: s.price }, on).catch(() => {})}
-                loadColors={() => getOttoStyle(s.style).then((d) => (d && !d.error ? d.colorImages ?? {} : {}))}
+                loadColors={() => getOttoStyle(s.style).then((d) => (d && !d.error ? driveMap(d.colorImages) : {}))}
               />
             ))}
           </div>

@@ -11,6 +11,7 @@ import {
 } from "@/lib/api"
 import { OttoSuppliers } from "@/components/app/otto-suppliers"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
+import { Loading } from "@/components/app/loading"
 import { getToken, getUser } from "@/lib/auth"
 
 const PAGE = 60
@@ -120,7 +121,7 @@ export function SuppliersView() {
         </div>
         {isAdmin && supplier === "ss" && (
           <Button variant="outline" size="sm" className="ml-auto" onClick={sync} disabled={syncing}>
-            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Refreshing…" : "Refresh images"}
+            <ArrowsClockwise size={14} weight="bold" className={syncing ? "animate-spin" : ""} /> {syncing ? "Refreshing…" : "Refresh"}
           </Button>
         )}
       </div>
@@ -153,7 +154,9 @@ export function SuppliersView() {
             <div className="max-w-sm text-sm text-muted-foreground">The S&amp;S catalog is huge, so we sync it into the database once for instant browsing.{isAdmin ? "" : " Ask an admin to run a sync."}</div>
             {isAdmin && <Button size="sm" onClick={sync} disabled={syncing}>{syncing ? <CircleNotch size={14} className="animate-spin" /> : <><ArrowsClockwise size={14} weight="bold" /> Sync now</>}</Button>}
           </div>
-        ) : styles.length === 0 && !loading ? (
+        ) : styles.length === 0 && loading ? (
+          <Loading label="Loading catalog…" />
+        ) : styles.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">No styles match “{debounced}”.</div>
         ) : (
           <>
