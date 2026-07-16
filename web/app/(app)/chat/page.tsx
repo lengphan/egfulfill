@@ -38,6 +38,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [aiTyping, setAiTyping] = useState(false)
   const [aiNote, setAiNote] = useState<string | null>(null)
+  const [streaming, setStreaming] = useState("") // assistant reply revealed word-by-word
   const scrollRef = useRef<HTMLDivElement>(null)
   const cidBase = useRef("")
   const cidSeq = useRef(0)
@@ -110,7 +111,21 @@ export default function ChatPage() {
   useEffect(() => {
     const el = scrollRef.current
     if (el) el.scrollTop = el.scrollHeight
-  }, [messages?.length, aiTyping])
+  }, [messages?.length, aiTyping, streaming])
+
+  // Reveal the assistant reply word-by-word for a live "typing" feel (we already have
+  // the full text — this is a client-side effect, not model streaming).
+  const revealReply = (full: string) => new Promise<void>((resolve) => {
+    const parts = full.split(/(\s+)/)
+    let i = 0
+    const tick = () => {
+      i += 1
+      setStreaming(parts.slice(0, i).join(""))
+      if (i >= parts.length) { resolve(); return }
+      window.setTimeout(tick, 22)
+    }
+    tick()
+  })
 
   const submit = async (raw: string) => {
     const text = raw.trim()
@@ -127,7 +142,14 @@ export default function ChatPage() {
         setAiTyping(true)
         try {
           const r = await requestAiReply()
-          if (r.ok && (r.reply || r.skipped)) { await load(); setAiNote(null) }
+          if (r.ok && r.reply) {
+            setAiTyping(false)
+            await revealReply(r.reply)   // typewriter the reply in
+            setStreaming("")
+            await load()                 // reconcile with the persisted message
+            setAiNote(null)
+          }
+          else if (r.ok && r.skipped) { await load(); setAiNote(null) }
           else if (r.disabled) setAiNote("The assistant is off — an admin can add the AI key in Settings → Integrations. A teammate will follow up.")
           else if (r.error) setAiNote(`Assistant couldn't reply (${r.error}). A teammate will follow up.`)
           else setAiNote(null)
@@ -135,6 +157,7 @@ export default function ChatPage() {
           setAiNote("Assistant is unavailable right now — a teammate will follow up here.")
         } finally {
           setAiTyping(false)
+          setStreaming("")
         }
       }
     } catch {
@@ -261,12 +284,20 @@ export default function ChatPage() {
                   </div>
                 )
               })}
-              {aiTyping && (
+              {aiTyping && !streaming && (
                 <div className="flex items-start">
                   <div className="flex items-center gap-1 rounded-2xl bg-muted px-3.5 py-2.5">
                     <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.2s]" />
                     <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.1s]" />
                     <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+                  </div>
+                </div>
+              )}
+              {streaming && (
+                <div className="flex items-start">
+                  <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-muted px-3.5 py-2.5 text-sm">
+                    {streaming}
+                    <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-foreground/60 align-middle" />
                   </div>
                 </div>
               )}
