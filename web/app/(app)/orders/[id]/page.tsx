@@ -7,6 +7,7 @@ import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
+import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -204,6 +205,13 @@ export default function OrderDetailPage() {
                 })}
               </div>
             )}
+          </SectionCard>
+
+          {/* Design deliverables — the seller's .pes files. Factory .emb/mockups are
+              filtered out server-side and the bytes are paywalled there too, so this
+              renders nothing when there's nothing they can buy. */}
+          <SectionCard title="Design files" description="Machine files for this order — download once purchased">
+            <div className="p-5"><SellerDesignFiles orderId={String(id)} /></div>
           </SectionCard>
 
           {timeline.length > 0 && (

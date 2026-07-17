@@ -339,6 +339,28 @@ export function setAdCampaignStatus(channel: string, id: string, status: "ACTIVE
   return api<{ ok?: boolean; error?: string }>(`/api/ads/campaigns/${channel}/${encodeURIComponent(id)}/status`, { method: "POST", body: JSON.stringify({ status }) })
 }
 
+// ── Design files (drag-drop onto a board card → linked to the order/item) ──
+// Every type is stored; the SERVER routes by `kind`: .pes = the seller's paid
+// deliverable, .emb = factory working file, image/* = artwork. Price is admin+
+// warehouse only, and that's enforced server-side — not just hidden in the UI.
+export type DesignFileRow = { designId: string; sku?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string }
+export function getDesignFiles(orderId: string) {
+  return api<DesignFileRow[]>(`/api/design_files?orderId=${encodeURIComponent(orderId)}`)
+}
+export function uploadDesignFile(body: { designId: string; orderId?: string; sku?: string; name?: string; mime?: string; data: string; price?: number }) {
+  return api<{ ok?: boolean; stored?: string; error?: string }>(`/api/design_files`, { method: "POST", body: JSON.stringify(body) })
+}
+export function setDesignFilePrice(designId: string, price: number) {
+  return api<{ ok?: boolean; price?: number; error?: string }>(`/api/design_files/${encodeURIComponent(designId)}/price`, { method: "PATCH", body: JSON.stringify({ price }) })
+}
+export function purchaseDesignFile(designId: string) {
+  return api<{ ok?: boolean; paid?: boolean; balance?: number; error?: string; needsTopup?: boolean }>(`/api/design_files/${encodeURIComponent(designId)}/purchase`, { method: "POST" })
+}
+/** Returns the bytes as a data-URL / object-storage URL — 402 if not purchased. */
+export function downloadDesignFile(designId: string) {
+  return api<{ designId: string; name?: string; mime?: string; data?: string; url?: string }>(`/api/design_files/${encodeURIComponent(designId)}`)
+}
+
 // ── Notifications ──
 export type Notification = { id: number | string; type: string; title: string; body?: string | null; href?: string | null; entity_id?: string | null; read_at?: string | null; created_at: string }
 export function getNotifications(limit = 20) {

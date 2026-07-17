@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { getDesignCards, saveDesignCards, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
+import { DesignFilesPanel } from "@/components/app/design-files-panel"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
@@ -347,6 +348,16 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
           </label>
         ) : (
           amt(card.payment) > 0 && <div className="text-sm text-muted-foreground">Payout <span className="font-medium text-foreground">{money(amt(card.payment))}</span></div>
+        )}
+
+        {/* Files for this card's order — drop the .emb/.pes/mockup right here. The
+            card already knows its order_id + sku, so a dropped file is LINKED to the
+            order item with no extra step. */}
+        {card.order_id && (
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium">Files</span>
+            <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} />
+          </div>
         )}
 
         {err && <div className="text-sm text-destructive">{err}</div>}
