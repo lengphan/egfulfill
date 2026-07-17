@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
+import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -304,7 +304,9 @@ export function OrdersHub() {
                         </div>
                       )}
                       {canFulfill && stage === "" && (
-                        <Button size="sm" onClick={() => receiveOrder(o)} disabled={busy?.startsWith(o.id)}>Receive <ArrowRight size={13} weight="bold" /></Button>
+                        <Button size="sm" onClick={() => receiveOrder(o)} disabled={busy?.startsWith(o.id)} title="Intake: move every item into Awaiting scan. Done once, when the order arrives.">
+                          <TrayArrowDown size={13} weight="bold" /> Start order
+                        </Button>
                       )}
                       {allShipped ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
@@ -314,7 +316,9 @@ export function OrdersHub() {
                           {canFulfill && shipOpen !== o.id && (
                             <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => advanceOrder(o)}>Advance all <ArrowRight size={13} weight="bold" /></Button>
+                          <Button size="sm" variant="outline" onClick={() => advanceOrder(o)} title="Move every item one step further along the pipeline. Stops before Shipped — shipping needs a label.">
+                            <SkipForward size={13} weight="fill" /> Next stage
+                          </Button>
                         </>
                       )}
                     </div>
@@ -426,9 +430,14 @@ export function OrdersHub() {
                             <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
                           </div>
                           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                          {/* Own icon + a visible word. The pen-nib is the sidebar's
+                              Board/Design Lab glyph — reusing it here made one symbol
+                              mean three different things. */}
                           {canDesign && (
-                            <Button size="sm" variant="ghost" className="shrink-0 text-muted-foreground hover:text-primary" title="Send to designer board" disabled={busy === `dsn:${key}` || sent.has(key)} onClick={() => sendToDesigner(o, it)}>
-                              {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" /> : sent.has(key) ? <CheckCircle size={14} weight="fill" className="text-emerald-600" /> : <PenNib size={14} weight="bold" />}
+                            <Button size="sm" variant="outline" className="shrink-0" title="Create a card for this item on the Designer board" disabled={busy === `dsn:${key}` || sent.has(key)} onClick={() => sendToDesigner(o, it)}>
+                              {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
+                                : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> Sent</>
+                                : <><PaperPlaneTilt size={13} weight="bold" /> Designer</>}
                             </Button>
                           )}
                           <StageBadge status={it.factory_status} />
