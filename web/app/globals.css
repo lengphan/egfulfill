@@ -133,12 +133,22 @@
     }
 }
 
-/* Print — show only the label sheet (used by Inventory → Print labels). */
+/* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
+   The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can
+   display:none its siblings. The previous rule used `visibility:hidden`, which hides
+   an element but KEEPS its layout box — the whole app still occupied its full height,
+   so one label printed across 4 near-blank pages. */
 @media print {
-  body * { visibility: hidden; }
-  .print-area, .print-area * { visibility: visible; }
-  .print-area { position: absolute; inset: 0; margin: 0; padding: 0; }
+  @page { margin: 10mm; }
+  html, body { height: auto !important; background: #fff !important; }
+  /* Remove everything that isn't the sheet — space and all. */
+  body > *:not(.eg-print-root) { display: none !important; }
+  /* Let the sheet flow as normal page content instead of a fixed overlay. */
+  .eg-print-root { position: static !important; overflow: visible !important; background: #fff !important; }
+  .print-area { position: static !important; margin: 0; padding: 0; }
   .no-print { display: none !important; }
+  /* Never split a label across a page break. */
+  .print-area > * { break-inside: avoid; page-break-inside: avoid; }
 }
 
 /* Marketing motion — soft drifting aura (respect reduced-motion). */

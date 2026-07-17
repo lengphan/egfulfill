@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Printer, Minus, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Barcode } from "@/components/app/barcode"
@@ -29,7 +30,14 @@ export function LabelSheet({
   // Global multiplier on top of each label's own `copies` — for "print the whole
   // sheet twice" without editing every row.
   const [multiplier, setMultiplier] = useState(1)
-  if (!open) return null
+  // Portalled to <body> so print CSS can display:none every OTHER body child. The
+  // old rule used `visibility:hidden`, which hides but still RESERVES layout space —
+  // the whole app (sidebar, table, stat cards) kept its full height, so a single
+  // label printed across 4 mostly-blank pages. display:none is the only way to
+  // actually remove it, and that needs the sheet to be a top-level body child.
+  const [host, setHost] = useState<HTMLElement | null>(null)
+  useEffect(() => { const id = setTimeout(() => setHost(document.body), 0); return () => clearTimeout(id) }, [])
+  if (!open || !host) return null
 
   // Expand into one entry per physical sticker.
   const sheet: { key: string; l: LabelSpec }[] = []
@@ -38,8 +46,8 @@ export function LabelSheet({
     for (let c = 0; c < n; c++) sheet.push({ key: `${l.sku}-${i}-${c}`, l })
   })
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-auto bg-background">
+  return createPortal(
+    <div className="eg-print-root fixed inset-0 z-50 overflow-auto bg-background">
       <div className="no-print sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-border bg-card px-4 py-3">
         <span className="font-medium">{sheet.length} {title}</span>
         <span className="text-xs text-muted-foreground">{labels.length} variant{labels.length === 1 ? "" : "s"}</span>
@@ -74,6 +82,7 @@ export function LabelSheet({
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    host
   )
 }
