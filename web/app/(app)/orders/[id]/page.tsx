@@ -354,8 +354,10 @@ function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
   const [err, setErr] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
 
+  // Mirrors the SERVER rule: in_review is still cancellable (submitted + charged,
+  // but the floor hasn't started). Past that it's a refund request.
   const fs = String(order.factory_status || "")
-  const started = !["", "new", "draft"].includes(fs)
+  const started = !["", "new", "draft", "in_review"].includes(fs)
   const done = fs === "cancelled" || fs === "refunded"
   if (done) return <span className="text-xs font-medium text-muted-foreground">Order {fs}</span>
 

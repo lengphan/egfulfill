@@ -195,14 +195,24 @@ export function ordersRoutes(app, requireAuth) {
     if (sel) {
       const cur = (await q('select factory_status from orders where id=$1 and seller_id=$2', [req.params.id, sel.id])).rows[0];
       if (!cur) { reply.code(404); return { error: 'Order not found' }; }
-      const started = !['', 'new', 'draft'].includes(String(cur.factory_status || ''));
+      const fs = String(cur.factory_status || '');
+      // The seller's own zone. 'in_review' is theirs too: they've submitted (and been
+      // charged) but nobody has picked the order up, so cancelling is still safe and
+      // fully refundable. Once it's awaiting_scan or beyond, the floor owns it and the
+      // only route back is a refund REQUEST the factory approves.
+      const SELLER_ZONE = ['', 'new', 'draft', 'in_review'];
+      const started = !SELLER_ZONE.includes(fs);
       if (body.tracking !== undefined || body.carrier !== undefined) {
         reply.code(403); return { error: 'Tracking is set by the factory.' };
       }
       if (body.factoryStatus !== undefined || body.status !== undefined) {
         const want = String(body.factoryStatus ?? body.status ?? '');
-        if (want !== 'cancelled') { reply.code(403); return { error: 'Only the factory can change production status.' }; }
-        if (started) { reply.code(403); return { error: 'This order is already in production — message support to cancel or refund it.', locked: true }; }
+        // 'in_review' = submit to production (the charge point). 'cancelled' = pull it
+        // back. Everything else on the pipeline belongs to the factory.
+        const sellerMay = ['cancelled', 'in_review'];
+        if (!sellerMay.includes(want)) { reply.code(403); return { error: 'Only the factory can change production status.' }; }
+        if (want === 'cancelled' && started) { reply.code(403); return { error: 'This order is already in production — request a refund instead.', locked: true }; }
+        if (want === 'in_review' && fs && !['', 'new', 'draft'].includes(fs)) { reply.code(403); return { error: 'This order has already been submitted.' }; }
       }
       if (started && (body.address !== undefined || body.customer !== undefined)) {
         reply.code(403); return { error: 'This order is already in production — its address can no longer be edited here.', locked: true };
