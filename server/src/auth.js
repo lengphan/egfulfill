@@ -23,7 +23,7 @@ export async function signup({ email, password, role = 'seller', name = '', stor
   try {
     const r = await q(
       `insert into users (email, password_hash, role, name, store_name)
-       values ($1,$2,$3,$4,$5) returning id, email, role, name`,
+       values ($1,$2,$3,$4,$5) returning id, email, role, name, avatar_emoji, avatar_color`,
       [email.toLowerCase(), hash, safeRole, name, store_name]
     );
     const u = r.rows[0];
@@ -41,7 +41,7 @@ export async function login({ email, password }) {
     throw new Error('Invalid email or password');
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
-  const safe = { id: u.id, email: u.email, role: u.role, name: u.name };
+  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null };
   return { user: safe, token: sign(safe) };
 }
 
@@ -61,12 +61,12 @@ export async function googleAuth({ email, name = '' }) {
   if (!u) {
     const hash = await bcrypt.hash(crypto.randomUUID(), 10);   // random; Google users sign in via Google
     const ins = await q(
-      'insert into users (email, password_hash, role, name) values ($1,$2,$3,$4) returning id, email, role, name, active',
+      'insert into users (email, password_hash, role, name) values ($1,$2,$3,$4) returning id, email, role, name, active, avatar_emoji, avatar_color',
       [lc, hash, 'seller', name]
     );
     u = ins.rows[0];
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
-  const safe = { id: u.id, email: u.email, role: u.role, name: u.name };
+  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null };
   return { user: safe, token: sign(safe) };
 }

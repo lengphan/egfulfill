@@ -23,7 +23,8 @@ import {
 import { navTitle } from "@/lib/nav"
 import { staffNavTitle } from "@/lib/staff-nav"
 import { getWallet } from "@/lib/api"
-import { getUser, clearSession } from "@/lib/auth"
+import { getUser, clearSession, type User } from "@/lib/auth"
+import { UserAvatar } from "@/components/app/user-avatar"
 
 function IconButton({
   label,
@@ -57,11 +58,13 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   const [balance, setBalance] = useState<number | null>(initialBalance ?? null)
   const [name, setName] = useState("Account")
   const [role, setRole] = useState<string | undefined>(undefined)
+  const [user, setUser] = useState<User | null>(null) // carries the avatar emoji/colour
   useEffect(() => {
     const sync = () => {
       const u = getUser()
       if (u?.name) setName(u.name)
       setRole(u?.role)
+      setUser(u)
     }
     const id = setTimeout(() => {
       setMounted(true)
@@ -148,23 +151,35 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
 
         <Separator orientation="vertical" className="mx-2 !h-6" />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-accent focus-visible:outline-none">
-            <span className="flex size-8 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background">
-              {name.charAt(0).toUpperCase()}
-            </span>
+        {/* Split control: the name itself is a shortcut straight to the profile, and
+            the caret opens the menu — clicking your own name to go anywhere but your
+            profile is a surprise. */}
+        <div className="flex items-center">
+          <button
+            onClick={() => router.push("/settings")}
+            title="Your profile"
+            className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-1.5 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            <UserAvatar user={user ?? { name }} size={32} />
             <span className="text-sm font-semibold">{name.split(" ")[0]}</span>
-            <CaretDown size={12} className="text-muted-foreground" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>{name}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/settings")}>Settings</DropdownMenuItem>
-            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
-              Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Account menu"
+              className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <CaretDown size={12} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>{name}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push("/settings")}>Profile &amp; settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   )

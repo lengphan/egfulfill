@@ -6,6 +6,12 @@ import { hashPassword, isStaff } from '../auth.js';
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
 
 export function usersRoutes(app, requireAdmin, requireAuth) {
+  // Cosmetic profile avatar (emoji + colour). Added at route-load, not just in
+  // schema.sql, because that file only runs on FIRST db init — an existing
+  // deployment would never get the columns. Both nullable: no avatar set → the
+  // UI falls back to the name's initial, exactly as before.
+  q('alter table users add column if not exists avatar_emoji text').catch(() => {});
+  q('alter table users add column if not exists avatar_color text').catch(() => {});
   // Lighter, STAFF-readable seller directory (any non-seller role). Backs the
   // seller-adjust panel on the factory boards (warehouse/admin) so a balance
   // adjustment resolves to a real account. Minimal fields only — no password,

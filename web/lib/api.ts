@@ -494,8 +494,8 @@ export function setFactorySettings(body: FactorySettings) {
 }
 
 // Update the signed-in user's profile (currently just the display name).
-export function updateProfile(patch: { name?: string }) {
-  return api<{ id?: string; name?: string; email?: string; role?: string; error?: string }>(`/api/me`, {
+export function updateProfile(patch: { name?: string; avatar_emoji?: string | null; avatar_color?: string | null }) {
+  return api<{ id?: string; name?: string; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; error?: string }>(`/api/me`, {
     method: "PATCH",
     body: JSON.stringify(patch),
   })

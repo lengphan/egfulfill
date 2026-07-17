@@ -79,9 +79,31 @@ app.get('/api/me', { preHandler: requireAuth }, async (req) => req.user);
 // carries sub/role/email (not name), so a name change needs no re-issue — the client
 // just refreshes its cached user.
 app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
-  const name = (req.body && typeof req.body.name === 'string') ? req.body.name.trim().slice(0, 120) : undefined;
-  if (name === undefined) { reply.code(400); return { error: 'Nothing to update' }; }
-  const r = await q('update users set name=$1 where id=$2 returning id, email, role, name', [name, req.user.sub]);
+  const b = req.body || {};
+  const sets = [], vals = [];
+  const put = (col, val) => { vals.push(val); sets.push(col + '=$' + vals.length); };
+
+  if (typeof b.name === 'string') put('name', b.name.trim().slice(0, 120));
+  // Avatar is cosmetic: an emoji + a hex colour, or null to clear back to the
+  // name's initial. Both are validated — this string is rendered on every page,
+  // so only ever store an actual emoji / #rrggbb, never arbitrary user text.
+  if (b.avatar_emoji !== undefined) {
+    const e = b.avatar_emoji === null ? null : String(b.avatar_emoji).trim();
+    if (e && [...e].length > 2) { reply.code(400); return { error: 'Avatar must be a single emoji' }; }
+    put('avatar_emoji', e || null);
+  }
+  if (b.avatar_color !== undefined) {
+    const c = b.avatar_color === null ? null : String(b.avatar_color).trim();
+    if (c && !/^#[0-9a-f]{6}$/i.test(c)) { reply.code(400); return { error: 'Avatar colour must be a #rrggbb hex' }; }
+    put('avatar_color', c || null);
+  }
+  if (!sets.length) { reply.code(400); return { error: 'Nothing to update' }; }
+
+  vals.push(req.user.sub);
+  const r = await q(
+    'update users set ' + sets.join(', ') + ' where id=$' + vals.length + ' returning id, email, role, name, avatar_emoji, avatar_color',
+    vals
+  );
   if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
   return r.rows[0];
 });

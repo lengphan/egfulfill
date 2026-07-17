@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, UserCircle, CurrencyDollar, CircleNotch, UserPlus } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
 import { SubscriptionPanel } from "@/components/app/subscription-panel"
 import { getUser, updateUser } from "@/lib/auth"
+import { UserAvatar, AVATAR_COLORS, AVATAR_EMOJIS } from "@/components/app/user-avatar"
 import {
   getApiKeys,
   createApiKey,
@@ -42,6 +43,8 @@ const fmtDate = (s?: string | null) => {
 function ProfilePanel() {
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null)
   const [name, setName] = useState("")
+  const [emoji, setEmoji] = useState<string>("")
+  const [color, setColor] = useState<string>(AVATAR_COLORS[0])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -50,27 +53,36 @@ function ProfilePanel() {
       const u = getUser()
       setUser(u)
       setName(u?.name ?? "")
+      setEmoji(u?.avatar_emoji ?? "")
+      setColor(u?.avatar_color ?? AVATAR_COLORS[0])
     }, 0)
     return () => clearTimeout(id)
   }, [])
 
-  const dirty = !!user && name.trim() !== (user.name ?? "") && !!name.trim()
+  const nameDirty = !!name.trim() && name.trim() !== (user?.name ?? "")
+  const avatarDirty = emoji !== (user?.avatar_emoji ?? "") || color !== (user?.avatar_color ?? AVATAR_COLORS[0])
+  const dirty = !!user && (nameDirty || avatarDirty)
 
   const save = async () => {
     if (!dirty) return
     setSaving(true); setErr(null); setSaved(false)
     try {
-      const r = await updateProfile({ name: name.trim() })
+      // Send null (not "") to clear — the server treats null as "back to the initial".
+      const r = await updateProfile({
+        name: name.trim(),
+        avatar_emoji: emoji || null,
+        avatar_color: color || null,
+      })
       if (r.error) throw new Error(r.error)
-      const nextName = r.name ?? name.trim()
-      updateUser({ name: nextName })
-      setUser((u) => (u ? { ...u, name: nextName } : u))
+      const next = { name: r.name ?? name.trim(), avatar_emoji: emoji || null, avatar_color: color || null }
+      updateUser(next)
+      setUser((u) => (u ? { ...u, ...next } : u))
       setSaved(true)
-      // Let the topbar/sidebar pick up the new name.
+      // Let the topbar/sidebar pick up the new name + avatar.
       window.dispatchEvent(new CustomEvent("eg-user-changed"))
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Couldn't save your name.")
+      setErr(e instanceof Error ? e.message : "Couldn't save your profile.")
     } finally {
       setSaving(false)
     }
@@ -84,9 +96,8 @@ function ProfilePanel() {
         </div>
       )}
       <div className="flex items-center gap-4 border-b border-border px-5 py-5">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <UserCircle size={30} weight="duotone" />
-        </span>
+        {/* Live preview — this is exactly what the topbar will show. */}
+        <UserAvatar user={{ name: name || user?.name, avatar_emoji: emoji, avatar_color: color }} size={56} className="rounded-2xl" />
         <div>
           <div className="text-lg font-semibold">{user?.name || "Your account"}</div>
           <div className="text-sm text-muted-foreground">{user?.email || "Not signed in"}</div>
@@ -104,6 +115,47 @@ function ProfilePanel() {
             className="max-w-sm"
           />
         </label>
+
+        {/* Avatar — an emoji + a colour. Deliberately not an image upload: no file
+            storage, no extra request per page, nothing to slow the app down. */}
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">Avatar</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => { setEmoji(""); setSaved(false) }}
+              disabled={!user}
+              title="Use your initial"
+              className={"flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition-colors " + (emoji === "" ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent")}
+            >
+              {(name || user?.name || "?").charAt(0).toUpperCase()}
+            </button>
+            {AVATAR_EMOJIS.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => { setEmoji(e); setSaved(false) }}
+                disabled={!user}
+                className={"flex size-8 items-center justify-center rounded-lg border text-base transition-colors " + (emoji === e ? "border-primary bg-primary/10" : "border-border hover:bg-accent")}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {AVATAR_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { setColor(c); setSaved(false) }}
+                disabled={!user}
+                aria-label={`Avatar colour ${c}`}
+                style={{ background: c }}
+                className={"size-7 rounded-full transition-transform hover:scale-110 " + (color === c ? "ring-2 ring-foreground ring-offset-2 ring-offset-card" : "")}
+              />
+            ))}
+          </div>
+        </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-muted-foreground">Email</span>
           <div className="text-sm">{user?.email || "—"}</div>
