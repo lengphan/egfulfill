@@ -1,12 +1,13 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { postOrderDesign, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
+import { matchThreadColors, type Thread } from "@/lib/thread-match"
 
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
@@ -157,6 +158,17 @@ export function DesignCanvasDialog({
   }, [item, catalog])
   const [side, setSide] = useState(0)
   const activeMockup = faces[side]?.url || item.img || ""
+
+  // Thread match (EMB only): sample the artwork's dominant colours → nearest in-stock
+  // threads, so the factory knows which cones to load. Re-runs when the design changes.
+  const isEmb = /emb/i.test(String(item.print_type || ""))
+  const [threads, setThreads] = useState<Thread[]>([])
+  useEffect(() => {
+    if (!isEmb || !designUrl) { setThreads([]); return }
+    let live = true
+    matchThreadColors(designUrl).then((t) => { if (live) setThreads(t) })
+    return () => { live = false }
+  }, [designUrl, isEmb])
   const [err, setErr] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
 
@@ -166,6 +178,9 @@ export function DesignCanvasDialog({
     try {
       const r = await postOrderDesign(orderId, { sku: item.sku, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r } })
       if (r.error) throw new Error(r.error)
+      // Persist the matched threads alongside the design so the factory loads the right
+      // cones. Best-effort — a design still saves even if the thread write hiccups.
+      if (isEmb && threads.length) await postOrderThreads(orderId, item.sku, threads).catch(() => {})
       onSaved?.(); onOpenChange(false)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save the design.")
@@ -188,6 +203,28 @@ export function DesignCanvasDialog({
           </div>
         )}
         <div className="mx-auto w-full"><DesignStage mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} /></div>
+        {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
+            nearest in-stock cone; saved with the design so the floor loads the right threads. */}
+        {isEmb && (
+          <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+            <div className="mb-1.5 text-xs font-medium text-muted-foreground">
+              Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}
+            </div>
+            {threads.length === 0 ? (
+              <div className="text-xs text-muted-foreground/70">{designUrl ? "Reading colours…" : "Upload artwork to match embroidery threads."}</div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {threads.map((t) => (
+                  <span key={t.code} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-0.5 pl-1 pr-2 text-xs">
+                    <span className="size-4 shrink-0 rounded-full border border-black/15" style={{ background: t.hex }} />
+                    <span className="font-medium">{t.name}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">{t.code}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">

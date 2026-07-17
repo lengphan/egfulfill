@@ -608,6 +608,17 @@ export function postItemSetup(id: string, body: { line_id?: string; sku?: string
   })
 }
 
+// Matched embroidery threads per line item, so the factory knows which cones to load.
+export type OrderThreadRow = { sku: string; threads: { code: string; name: string; hex: string }[] }
+export function getOrderThreads(id: string) {
+  return api<OrderThreadRow[]>(`/api/orders/${encodeURIComponent(id)}/threads`)
+}
+export function postOrderThreads(id: string, sku: string, threads: { code: string; name: string; hex: string }[]) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/threads`, {
+    method: "POST", body: JSON.stringify({ sku, threads }),
+  })
+}
+
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }
