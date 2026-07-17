@@ -85,17 +85,30 @@ async function buildTrending() {
   return { date: new Date().toISOString().slice(0, 10), products, keywords };
 }
 
-// Slice the shared pool for who's asking.
-//  - Sellers: listings estimated >5 sold/24h come FIRST, then everything else, so the
-//    hot ones lead but browsing keeps going instead of hitting a wall.
-//  - Staff (admin/warehouse): only listings that earned the TRENDING badge — they're
-//    scouting what's actually climbing, across every niche in the pool.
+// Slice the shared pool for who's asking. Same data, different priority — staff
+// boards are the higher tier and get the winners handed to them; sellers browse.
+//  - Staff (admin/warehouse): ALL trending first, then everything else. Nothing is
+//    hidden, it's ordered — they still page on into the rest.
+//  - Sellers: a MIX. The hot ones are interleaved 1-in-3 rather than front-loaded,
+//    so a seller browses the feed instead of skimming the top and leaving.
 function sliceFor(pool, staff) {
   const rows = Array.isArray(pool) ? pool : [];
-  if (staff) return rows.filter((l) => l._trending);
-  const hot = rows.filter((l) => (l._sold24 || 0) > 5);
-  const rest = rows.filter((l) => (l._sold24 || 0) <= 5);
-  return [...hot, ...rest];
+  const isHot = (l) => l._trending || (l._sold24 || 0) > 5;
+  const hot = rows.filter(isHot);
+  const rest = rows.filter((l) => !isHot(l));
+
+  if (staff) return [...hot, ...rest];
+
+  // Interleave 1 hot : 2 rest. Whichever list runs out first, the other simply
+  // continues — so the feed is never truncated to the shorter one.
+  const out = [];
+  let i = 0, j = 0;
+  while (i < hot.length || j < rest.length) {
+    if (i < hot.length) out.push(hot[i++]);
+    if (j < rest.length) out.push(rest[j++]);
+    if (j < rest.length) out.push(rest[j++]);
+  }
+  return out;
 }
 
 // Shop analysis for the Account Analyzer. The NUMBERS are computed here and are

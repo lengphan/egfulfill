@@ -27,6 +27,12 @@ const SECRET_DEFS = [
   { name: 'OTTOCAP_CLIENT_ID',     label: 'Client ID',        integration: 'otto' },
   { name: 'OTTOCAP_CLIENT_SECRET', label: 'Client secret',    integration: 'otto' },
   { name: 'GOOGLE_SHEETS_API_KEY', label: 'API key',          integration: 'sheets' },
+  { name: 'META_APP_ID',           label: 'App ID',           integration: 'meta_ads' },
+  { name: 'META_APP_SECRET',       label: 'App secret',       integration: 'meta_ads' },
+  { name: 'GOOGLE_ADS_CLIENT_ID',     label: 'Client ID',        integration: 'google_ads' },
+  { name: 'GOOGLE_ADS_CLIENT_SECRET', label: 'Client secret',    integration: 'google_ads' },
+  { name: 'GOOGLE_ADS_DEVELOPER_TOKEN', label: 'Developer token', integration: 'google_ads' },
+  { name: 'GOOGLE_ADS_LOGIN_CUSTOMER_ID', label: 'Manager (MCC) ID', integration: 'google_ads' },
 ];
 
 export function adminSecretsRoutes(app, requireStaff) {

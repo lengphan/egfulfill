@@ -100,11 +100,24 @@ const configThenTest = (
   return { level: "error", detail: String(t.body.error ?? "test failed") }
 }
 
+// /api/ads/config reports both channels at once; pick the one this card is for.
+const adsCheck = (channel: "meta" | "google") => async (): Promise<Result> => {
+  const r = await raw("/api/ads/config")
+  if (r.status === 401 || r.status === 403) return { level: "restricted" }
+  if (!r.ok) return { level: "error", detail: `HTTP ${r.status || "—"}` }
+  const b = r.body as { meta?: { enabled?: boolean }; google?: { enabled?: boolean } } | null
+  return b?.[channel]?.enabled ? { level: "configured" } : { level: "off" }
+}
+
 const INTEGRATIONS: Integration[] = [
   // Channels
   { key: "etsy", name: "Etsy", blurb: "Order sync + tracking", group: "Channels", check: configOnly("/api/etsy/config") },
   { key: "shopify", name: "Shopify", blurb: "Storefront orders", group: "Channels", check: configOnly("/api/shopify/config") },
   { key: "tiktok", name: "TikTok Shop", blurb: "Marketplace orders", group: "Channels", check: configOnly("/api/tiktok/config") },
+  // Ads — key must match the server's SECRET_DEFS `integration` value, which is what
+  // joins the secret rows onto the card.
+  { key: "meta_ads", name: "Meta Ads", blurb: "Facebook + Instagram campaigns", group: "Ads", check: adsCheck("meta") },
+  { key: "google_ads", name: "Google Ads", blurb: "Search + Shopping campaigns", group: "Ads", check: adsCheck("google") },
   // Payments
   { key: "stripe", name: "Stripe", blurb: "Card top-ups", group: "Payments", check: configThenTest("/api/stripe/config", "/api/stripe/test", "enabled") },
   { key: "paypal", name: "PayPal", blurb: "Top-ups + payouts", group: "Payments", check: configThenTest("/api/paypal/config", "/api/paypal/test", "enabled") },
@@ -174,7 +187,7 @@ const INTEGRATIONS: Integration[] = [
   },
 ]
 
-const GROUPS = ["Channels", "Payments", "Shipping", "Suppliers", "Other"]
+const GROUPS = ["Channels", "Ads", "Payments", "Shipping", "Suppliers", "Other"]
 
 export function IntegrationsPanel() {
   const [results, setResults] = useState<Record<string, Result>>(
