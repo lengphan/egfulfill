@@ -339,26 +339,79 @@ export async function searchListings(query, opts = {}) {
       }
     } catch (e) { /* image enrich is best-effort */ }
   }
-  const results = base.map((l) => {
-    const inlineImgs = (l.images || []).map(pickImg).filter(Boolean);
-    const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
-    return {
-      listing_id: l.listing_id,
-      title: l.title || '',
-      description: l.description || '',
-      price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
-      currency: (l.price && l.price.currency_code) || 'USD',
-      url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
-      tags: Array.isArray(l.tags) ? l.tags : [],
-      image: images[0] || null,
-      images: images,
-      created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
-      views: (typeof l.views === 'number' ? l.views : null),
-      shop_name: (l.shop && l.shop.shop_name) || null,
-      num_favorers: l.num_favorers || 0,
-    };
-  });
+  const results = base.map((l) => mapListing(l, imgsById));
   return { count: d.count || results.length, query, offset, limit, results };
+}
+
+// The ONE Etsy listing → app shape mapper. Search AND the shop analyzer both use it,
+// so a listing has identical fields wherever SpyDeck renders it.
+export function mapListing(l, imgsById = {}) {
+  const pick = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
+  const inlineImgs = (l.images || []).map(pick).filter(Boolean);
+  const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
+  return {
+    listing_id: l.listing_id,
+    title: l.title || '',
+    description: l.description || '',
+    price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
+    currency: (l.price && l.price.currency_code) || 'USD',
+    url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
+    tags: Array.isArray(l.tags) ? l.tags : [],
+    image: images[0] || null,
+    images: images,
+    created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
+    views: (typeof l.views === 'number' ? l.views : null),
+    shop_name: (l.shop && l.shop.shop_name) || null,
+    num_favorers: l.num_favorers || 0,
+  };
+}
+
+/** The Etsy connection to act as: a seller's own, or (for staff, who have no shop
+ *  of their own) the first connected shop — matching /api/etsy/connected. */
+export async function connectionFor(user) {
+  const staff = !!(user && user.role && user.role !== 'seller');
+  const r = await q(
+    staff ? `select * from platform_connections where platform='etsy' order by created_at limit 1`
+          : `select * from platform_connections where platform='etsy' and connected_by=$1 order by created_at limit 1`,
+    staff ? [] : [user.sub]
+  );
+  return r.rows[0] || null;
+}
+
+/** A connected shop + its active listings, normalized through mapListing so they
+ *  score identically to search results. */
+export async function shopListings(conn) {
+  if (!conn.shop_id) { const e = new Error('Connected shop has no shop_id — reconnect the shop'); e.status = 400; throw e; }
+  const shop = await etsyGet(conn, `/shops/${conn.shop_id}`).catch(() => null);
+  // Etsy caps this at 100/page; one page is plenty to characterise a shop.
+  const r = await etsyGet(conn, `/shops/${conn.shop_id}/listings/active?limit=100&includes=Images`);
+  const base = Array.isArray(r.results) ? r.results : [];
+
+  // Same image-enrich fallback as search: the list endpoint often drops Images.
+  const imgsById = {};
+  const ids = base.map((l) => l.listing_id).filter(Boolean);
+  if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
+    try {
+      const bd = await etsyGet(conn, `/listings/batch?listing_ids=${ids.slice(0, 100).join(',')}&includes=Images`);
+      (bd.results || []).forEach((l) => {
+        const arr = (l.images || []).map((im) => (im && (im.url_570xN || im.url_fullxfull || im.url_300x300)) || null).filter(Boolean);
+        if (arr.length) imgsById[l.listing_id] = arr;
+      });
+    } catch (e) { /* best-effort */ }
+  }
+  return {
+    shop: {
+      shop_id: conn.shop_id,
+      shop_name: (shop && shop.shop_name) || conn.shop_name || null,
+      url: (shop && shop.url) || null,
+      num_favorers: (shop && shop.num_favorers) || 0,
+      listing_active_count: (shop && shop.listing_active_count) || base.length,
+      review_count: (shop && shop.review_count) || null,
+      review_average: (shop && shop.review_average) || null,
+    },
+    count: (typeof r.count === 'number') ? r.count : base.length,
+    listings: base.map((l) => mapListing(l, imgsById)),
+  };
 }
 
 // ── routes ───────────────────────────────────────────────────────────────--
@@ -460,6 +513,23 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // Connection check + shop names, gated by role. A SELLER sees only the shop(s) THEY connected.
   // FACTORY/staff share ONE pool of factory-connected shops (any non-seller connector) — gated
   // against seller shops, so a seller's shop never shows on a factory board and vice-versa.
+  // The signed-in seller's OWN shop + its active listings, for the SpyDeck Account
+  // Analyzer. Returns listings in the same shape as /api/etsy/search (mapListing), so
+  // the client scores them with the very same estimate logic it uses on everyone
+  // else's — an analyzer that measured your shop differently would be worthless.
+  // Staff (no shop of their own) fall back to the first connection, matching how
+  // /api/etsy/connected already behaves for them.
+  app.get('/api/etsy/my-shop', { preHandler: requireAuth }, async (req, reply) => {
+    const conn = await connectionFor(req.user);
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    try {
+      return await shopListings(conn);
+    } catch (e) {
+      reply.code(e.status || 502);
+      return { error: e.message || 'Etsy request failed' };
+    }
+  });
+
   app.get('/api/etsy/connected', { preHandler: requireAuth }, async (req) => {
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
     const r = await q(staff

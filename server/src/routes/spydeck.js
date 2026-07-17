@@ -3,7 +3,8 @@
 // is stored as jsonb so the Saved view renders without re-hitting Etsy. Table is
 // created idempotently at route-load (same pattern as order_designs / wallet_ledger).
 import { q } from '../db.js';
-import { searchListings } from './etsy.js';
+import { searchListings, connectionFor, shopListings } from './etsy.js';
+import { aiComplete } from './support_ai.js';
 
 let _ready = null;
 function ensure() {
@@ -16,6 +17,12 @@ function ensure() {
     primary key (seller_id, listing_id)
   )`)
     .then(() => q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`))
+    .then(() => q(`create table if not exists spydeck_analysis (
+      seller_id  text primary key,
+      shop_id    text,
+      data       jsonb,
+      created_at timestamptz not null default now()
+    )`))
     .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
@@ -63,6 +70,87 @@ async function buildTrending() {
   return { date: new Date().toISOString().slice(0, 10), products, keywords };
 }
 
+// Shop analysis for the Account Analyzer. The NUMBERS are computed here and are
+// deterministic (same favorites+age estimate model SpyDeck uses everywhere else);
+// only the WRITE-UP is asked of the model. An LLM inventing metrics would be a
+// recommendation engine you couldn't trust.
+function analyzeShop(listings) {
+  const nowS = Date.now() / 1000;
+  const est = (l) => {
+    const fav = l.num_favorers || 0;
+    const created = l.created || 0;
+    const ageDays = created ? Math.max(1, (nowS - created) / 86400) : 45;
+    const totalSold = Math.round(fav * 3.5) || fav;
+    return { totalSold, perDay: totalSold / ageDays, revenue: Math.round(totalSold * (Number(l.price) || 0)), ageDays, fav };
+  };
+  const rows = listings.map((l) => ({ l, e: est(l) }));
+  const prices = listings.map((l) => Number(l.price) || 0).filter((p) => p > 0).sort((a, b) => a - b);
+  const median = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+
+  // Tag frequency — thin tag usage is the most common fixable Etsy SEO miss.
+  const tagCounts = {};
+  let tagTotal = 0, noTag = 0, thinTags = 0, shortTitle = 0, oneImage = 0;
+  for (const l of listings) {
+    const tags = Array.isArray(l.tags) ? l.tags : [];
+    tagTotal += tags.length;
+    if (!tags.length) noTag++;
+    if (tags.length < 13) thinTags++;               // Etsy allows 13; fewer = wasted slots
+    if ((l.title || '').length < 40) shortTitle++;  // short titles rank on fewer queries
+    if ((l.images || []).length < 2) oneImage++;
+    for (const t of tags) { const k = String(t).toLowerCase().trim(); if (k) tagCounts[k] = (tagCounts[k] || 0) + 1; }
+  }
+  const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([tag, n]) => ({ tag, n }));
+  const byPerf = [...rows].sort((a, b) => b.e.perDay - a.e.perDay);
+
+  return {
+    listingCount: listings.length,
+    medianPrice: Math.round(median * 100) / 100,
+    priceRange: prices.length ? { min: prices[0], max: prices[prices.length - 1] } : null,
+    totalFavorites: listings.reduce((n, l) => n + (l.num_favorers || 0), 0),
+    estRevenue: rows.reduce((n, r) => n + r.e.revenue, 0),
+    avgTags: listings.length ? Math.round((tagTotal / listings.length) * 10) / 10 : 0,
+    issues: { noTags: noTag, thinTags, shortTitles: shortTitle, singleImage: oneImage },
+    topTags,
+    best: byPerf.slice(0, 5).map((r) => ({ title: r.l.title, price: r.l.price, favorites: r.e.fav, estSoldPerDay: Math.round(r.e.perDay * 10) / 10, tags: (r.l.tags || []).length })),
+    worst: byPerf.slice(-5).reverse().map((r) => ({ title: r.l.title, price: r.l.price, favorites: r.e.fav, ageDays: Math.round(r.e.ageDays), tags: (r.l.tags || []).length })),
+  };
+}
+
+// REAL sales for the seller's own shop, from receipts we've already synced.
+// Etsy's API exposes no shop stats (no views/visits/conversion) and no ads data, so
+// everywhere else SpyDeck must ESTIMATE from favorites+age. But for your own shop the
+// truth is already in our orders table — estimating it here would be daft.
+async function realSales(sellerId) {
+  try {
+    const r = await q(
+      `select count(*)::int as orders,
+              coalesce(sum(total),0)::float as revenue,
+              coalesce(avg(total),0)::float as aov
+         from orders
+        where seller_id=$1 and source='etsy' and created_at > now() - interval '90 days'`,
+      [sellerId]
+    );
+    const top = await q(
+      `select oi.name, sum(oi.qty)::int as units, coalesce(sum(oi.qty * oi.unit_price),0)::float as revenue
+         from order_items oi join orders o on o.id = oi.order_id
+        where o.seller_id=$1 and o.source='etsy' and o.created_at > now() - interval '90 days'
+        group by oi.name order by units desc limit 8`,
+      [sellerId]
+    );
+    const s = r.rows[0] || {};
+    if (!s.orders) return null; // no synced Etsy orders — fall back to estimates only
+    return {
+      windowDays: 90,
+      orders: s.orders,
+      revenue: Math.round((s.revenue || 0) * 100) / 100,
+      avgOrderValue: Math.round((s.aov || 0) * 100) / 100,
+      topSellers: top.rows.map((t) => ({ name: t.name, units: t.units, revenue: Math.round((t.revenue || 0) * 100) / 100 })),
+    };
+  } catch {
+    return null; // never block the analysis on this
+  }
+}
+
 export function spydeckRoutes(app, requireAuth) {
   // Daily trending feed — 10 products (est. >10 sold/24h) + 10 keywords. Cached in
   // `settings` for the day so we hit Etsy a few times per DAY, not per visitor. Shared
@@ -87,6 +175,83 @@ export function spydeckRoutes(app, requireAuth) {
   });
 
   // List the seller's saved listings (newest first).
+  // Account Analyzer — score the caller's own connected Etsy shop and write it up.
+  //
+  // COST CONTROL (we pay for every call on our own key):
+  //  1. The model is sent COMPUTED stats (~500 tokens), never the raw listings
+  //     (~50-100k tokens for 100 of them). Two orders of magnitude cheaper, and the
+  //     numbers stay deterministic.
+  //  2. The result is CACHED per seller for 24h — a shop doesn't change hour to hour,
+  //     so re-opening the tab costs nothing. `refresh: true` forces a re-run.
+  //  3. POST + explicit button: it never fires just because a tab was opened.
+  //  4. Output capped (max_tokens) and the model defaults to Haiku.
+  app.get('/api/spydeck/analysis', { preHandler: requireAuth }, async (req) => {
+    await ensure();
+    const r = await q('select data, created_at from spydeck_analysis where seller_id=$1', [String(req.user.sub)]);
+    if (!r.rows[0]) return { cached: false };
+    return { cached: true, at: r.rows[0].created_at, ...r.rows[0].data };
+  });
+
+  app.post('/api/spydeck/analyze', { preHandler: requireAuth }, async (req, reply) => {
+    await ensure();
+    const sellerId = String(req.user.sub);
+    const refresh = !!(req.body && req.body.refresh);
+
+    // Serve a fresh-enough cached run rather than paying for an identical one.
+    if (!refresh) {
+      const c = await q("select data, created_at from spydeck_analysis where seller_id=$1 and created_at > now() - interval '24 hours'", [sellerId]);
+      if (c.rows[0]) return { cached: true, at: c.rows[0].created_at, ...c.rows[0].data };
+    }
+
+    const conn = await connectionFor(req.user);
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected', needsConnect: true }; }
+
+    let shop, listings;
+    try {
+      const r = await shopListings(conn);
+      shop = r.shop; listings = r.listings;
+    } catch (e) {
+      reply.code(e.status || 502);
+      return { error: e.message || 'Could not read your Etsy shop' };
+    }
+    if (!listings.length) return { shop, stats: analyzeShop([]), advice: null, empty: true };
+
+    const stats = analyzeShop(listings);
+    const sales = await realSales(sellerId);   // real receipts beat estimates for your OWN shop
+
+    // The model gets the COMPUTED stats, never raw listings — it writes the advice,
+    // it doesn't invent the numbers.
+    let advice = null, aiError = null;
+    try {
+      advice = await aiComplete({
+        maxTokens: 900,
+        system: [
+          'You are an Etsy shop consultant for print-on-demand sellers.',
+          'You are given COMPUTED statistics about one shop. Never invent numbers — cite only what you are given.',
+          'SALES (if present) are REAL synced order data — state them as fact.',
+          'STATS figures like estRevenue are ESTIMATES from favorites and listing age; call those estimates.',
+          'Etsy publishes no views/visits/conversion data, so never refer to traffic, impressions or conversion rate.',
+          'Reply in GitHub-flavored markdown. Be specific and concrete, no filler, no preamble.',
+          'Use exactly these sections: "## What is working", "## What to fix", "## Do this next".',
+          '"Do this next" must be 3-5 numbered actions the seller can do this week, most valuable first.',
+        ].join(' '),
+        messages: [{ role: 'user', content: `Analyze this Etsy shop and advise.\n\nSHOP: ${JSON.stringify({ name: shop.shop_name, favorites: shop.num_favorers, activeListings: shop.listing_active_count, reviews: shop.review_count, rating: shop.review_average })}\n\nSTATS: ${JSON.stringify(stats)}\n\nSALES (real, last 90d): ${sales ? JSON.stringify(sales) : 'none synced yet — rely on the estimates above'}` }],
+      });
+    } catch (e) {
+      aiError = e.disabled ? e.message : (e.message || 'The assistant could not analyze the shop.');
+    }
+    const payload = { shop, stats, sales, advice, aiError, listings };
+    // Only cache a run that actually produced advice — caching an AI failure for 24h
+    // would lock the seller out of the feature until tomorrow.
+    if (advice) {
+      await q(`insert into spydeck_analysis (seller_id, shop_id, data, created_at)
+               values ($1,$2,$3,now())
+               on conflict (seller_id) do update set shop_id=excluded.shop_id, data=excluded.data, created_at=now()`,
+        [sellerId, String(shop.shop_id || ''), JSON.stringify({ shop, stats, sales, advice })]).catch(() => {});
+    }
+    return { cached: false, ...payload };
+  });
+
   app.get('/api/spydeck/saves', { preHandler: requireAuth }, async (req) => {
     await ensure();
     const r = await q(

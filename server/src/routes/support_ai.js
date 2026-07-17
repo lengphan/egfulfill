@@ -114,13 +114,11 @@ function toMessages(rows) {
 // .status on failure so the caller maps the HTTP code. Reused by auto-reply + draft.
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-async function generateReply(key, model, sellerId, messages) {
-  const ctx = await accountContext(sellerId);
-  const body = JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages });
+// ONE Anthropic call path: retry/backoff + error surfacing live here so every AI
+// feature behaves the same. 529 (overloaded) / 429 (rate limit) are transient.
+async function postAnthropic(key, body) {
   const headers = { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' };
-
   let r, detail = '';
-  // Anthropic 529 (overloaded) / 429 (rate limit) are transient — retry a few times with backoff.
   for (let attempt = 0; attempt < 3; attempt++) {
     r = await fetch(API_URL, { method: 'POST', headers, body });
     if (r.ok) {
@@ -136,6 +134,23 @@ async function generateReply(key, model, sellerId, messages) {
   try { const j = JSON.parse(detail); reason = (j && j.error && (j.error.message || j.error.type)) || ''; } catch { /* non-JSON */ }
   const e = new Error(reason ? `AI: ${reason}` : `AI service error (HTTP ${r.status})`);
   e.status = 502; e.detail = detail; throw e;
+}
+
+/**
+ * Run a one-shot prompt through the admin-configured key + model.
+ * Throws { disabled: true } when no key is set, so callers can say so precisely
+ * instead of reporting a generic failure.
+ */
+export async function aiComplete({ system, messages, maxTokens = 900 }) {
+  const { key, model } = await aiConfig();
+  if (!key) { const e = new Error('The assistant is off — an admin can add the AI key in Settings › Integrations.'); e.disabled = true; e.status = 503; throw e; }
+  return postAnthropic(key, JSON.stringify({ model, max_tokens: maxTokens, system, messages }));
+}
+
+async function generateReply(key, model, sellerId, messages) {
+  const ctx = await accountContext(sellerId);
+  const body = JSON.stringify({ model, max_tokens: 600, system: SYSTEM + '\n\nACCOUNT DATA (for this seller only):\n' + ctx, messages });
+  return postAnthropic(key, body);
 }
 
 export function supportAiRoutes(app, requireAuth, requireStaff) {

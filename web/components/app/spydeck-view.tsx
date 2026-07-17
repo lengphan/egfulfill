@@ -13,6 +13,7 @@ import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, 
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
 import { MakeProductDialog } from "@/components/app/make-product-dialog"
+import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 
 const money = (n: number | null, cur = "USD") =>
   n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -240,7 +241,7 @@ export function SpyDeckView() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState("")
-  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded">("trending")
+  const [view, setView] = useState<"trending" | "search" | "saved" | "uploaded" | "account">("trending")
   const [saved, setSaved] = useState<SavedListing[]>([])
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
@@ -420,7 +421,7 @@ export function SpyDeckView() {
         description="Spy live Etsy listings and save the winners"
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
-            {(["trending", "search", "saved", "uploaded"] as const).map((v) => (
+            {(["trending", "search", "saved", "uploaded", "account"] as const).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -429,7 +430,7 @@ export function SpyDeckView() {
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
-                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : "Search"}
+                {v === "saved" ? `Saved${saved.length ? ` (${saved.length})` : ""}` : v === "uploaded" ? `Uploaded${uploaded.length ? ` (${uploaded.length})` : ""}` : v === "trending" ? "Trending" : v === "account" ? "My shop" : "Search"}
               </button>
             ))}
           </div>
@@ -509,7 +510,9 @@ export function SpyDeckView() {
           </div>
         )}
 
-        {view === "trending" ? (
+        {view === "account" ? (
+          <ShopAnalyzer />
+        ) : view === "trending" ? (
           trending === null ? (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}

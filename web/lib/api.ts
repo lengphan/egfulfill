@@ -293,6 +293,53 @@ export function deleteInventoryItem(sku: string) {
   return api<{ ok?: boolean }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "DELETE" })
 }
 
+// ── SpyDeck Account Analyzer ──
+// The server computes every number (deterministic, same estimate model as the rest of
+// SpyDeck) and only the write-up comes from the model. Results cache for 24h per
+// seller — pass refresh to force a re-run and a new AI call.
+export type ShopSummary = { shop_id?: string; shop_name?: string | null; url?: string | null; num_favorers?: number; listing_active_count?: number; review_count?: number | null; review_average?: number | null }
+export type ShopStats = {
+  listingCount: number
+  medianPrice: number
+  priceRange?: { min: number; max: number } | null
+  totalFavorites: number
+  estRevenue: number
+  avgTags: number
+  issues: { noTags: number; thinTags: number; shortTitles: number; singleImage: number }
+  topTags: { tag: string; n: number }[]
+  best: { title: string; price: number | null; favorites: number; estSoldPerDay: number; tags: number }[]
+  worst: { title: string; price: number | null; favorites: number; ageDays: number; tags: number }[]
+}
+/** REAL sales from synced Etsy receipts — present only once the seller's orders sync.
+ *  Etsy exposes no shop stats, so without this everything is an estimate. */
+export type ShopSales = {
+  windowDays: number
+  orders: number
+  revenue: number
+  avgOrderValue: number
+  topSellers: { name: string | null; units: number; revenue: number }[]
+}
+export type ShopAnalysis = {
+  cached?: boolean
+  at?: string
+  shop?: ShopSummary
+  stats?: ShopStats
+  sales?: ShopSales | null
+  advice?: string | null
+  aiError?: string | null
+  listings?: EtsyListing[]
+  empty?: boolean
+  error?: string
+  needsConnect?: boolean
+}
+/** Cached run only — never triggers an AI call, so opening the tab is free. */
+export function getShopAnalysis() {
+  return api<ShopAnalysis>(`/api/spydeck/analysis`)
+}
+export function analyzeShop(refresh = false) {
+  return api<ShopAnalysis>(`/api/spydeck/analyze`, { method: "POST", body: JSON.stringify({ refresh }) })
+}
+
 // ── Inventory scan in/out ──
 // A scan is an ATOMIC DELTA server-side (in_stock = in_stock + n), NOT the whole-list
 // upsert saveInventory() uses — so two people scanning at once can't clobber each other.
