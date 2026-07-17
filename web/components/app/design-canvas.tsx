@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
-import { matchThreadColors, type Thread } from "@/lib/thread-match"
+import { matchThreadColors, nearestThread, hexToRgb, type Thread } from "@/lib/thread-match"
+import { Eyedropper } from "@phosphor-icons/react"
 
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
@@ -18,7 +19,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 // full maker. Renders a mockup + a draggable image layer + optional draggable text layers.
 export function DesignStage({
   mockup, designUrl, pos, setPos, onRemove, className,
-  texts, updateText, selected, onSelect,
+  texts, updateText, selected, onSelect, picking, onPickColor,
 }: {
   mockup?: string
   designUrl: string
@@ -30,8 +31,53 @@ export function DesignStage({
   updateText?: (id: string, patch: Partial<TextLayer>) => void
   selected?: string | null
   onSelect?: (sel: string | null) => void
+  picking?: boolean // eyedropper active — clicking the design samples a pixel colour
+  onPickColor?: (hex: string) => void
 }) {
   const stageRef = useRef<HTMLDivElement>(null)
+  // Hidden canvas holding the design at natural resolution, so the eyedropper can read a
+  // pixel. Redrawn whenever the artwork changes.
+  const sampleRef = useRef<{ canvas: HTMLCanvasElement; w: number; h: number } | null>(null)
+  useEffect(() => {
+    if (!designUrl) { sampleRef.current = null; return }
+    let live = true
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      if (!live) return
+      const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight
+      const ctx = c.getContext("2d", { willReadFrequently: true })
+      if (!ctx) return
+      try { ctx.drawImage(img, 0, 0); sampleRef.current = { canvas: c, w: img.naturalWidth, h: img.naturalHeight } } catch { sampleRef.current = null }
+    }
+    img.src = designUrl
+    return () => { live = false }
+  }, [designUrl])
+
+  // Sample the pixel under a click on the placed design. The design is scaled + ROTATED,
+  // so we map the click into the design's own unrotated frame (inverse-rotate around its
+  // centre) before reading natural coords — otherwise a rotated design samples the wrong
+  // pixel. Off-image clicks are ignored.
+  const sampleAt = (e: React.MouseEvent, imgEl: HTMLElement) => {
+    const s = sampleRef.current, stage = stageRef.current
+    if (!s || !stage) return
+    const box = imgEl.getBoundingClientRect()             // centre is rotation-invariant
+    const cx = box.left + box.width / 2, cy = box.top + box.height / 2
+    const stageW = stage.getBoundingClientRect().width
+    const renderedW = (pos.w / 100) * stageW
+    const renderedH = renderedW * (s.h / s.w)
+    const rad = (-(pos.r || 0) * Math.PI) / 180
+    const dx = e.clientX - cx, dy = e.clientY - cy
+    const ux = dx * Math.cos(rad) - dy * Math.sin(rad)    // into the unrotated frame
+    const uy = dx * Math.sin(rad) + dy * Math.cos(rad)
+    const fx = ux / renderedW + 0.5, fy = uy / renderedH + 0.5
+    if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return
+    const ctx = s.canvas.getContext("2d", { willReadFrequently: true })
+    if (!ctx) return
+    const px = ctx.getImageData(Math.floor(fx * s.w), Math.floor(fy * s.h), 1, 1).data
+    const hx = (v: number) => ("0" + v.toString(16)).slice(-2)
+    onPickColor?.(("#" + hx(px[0]) + hx(px[1]) + hx(px[2])).toUpperCase())
+  }
 
   // target: "image" or a text-layer id. mode: move | resize | rotate.
   const startDrag = (target: string, mode: "move" | "resize" | "rotate") => (e: React.PointerEvent) => {
@@ -98,10 +144,15 @@ export function DesignStage({
       )}
 
       {designUrl && (
-        <div onPointerDown={startDrag("image", "move")} style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }} className="absolute cursor-move touch-none">
+        <div
+          onPointerDown={picking ? undefined : startDrag("image", "move")}
+          onClick={picking ? (e) => sampleAt(e, e.currentTarget) : undefined}
+          style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
+          className={"absolute touch-none " + (picking ? "cursor-crosshair" : "cursor-move")}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={designUrl} alt="" className="pointer-events-none block w-full select-none" draggable={false} />
-          {(selected == null || selected === "image") && handles("image")}
+          {!picking && (selected == null || selected === "image") && handles("image")}
           {onRemove && (selected == null || selected === "image") && (
             <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
           )}
@@ -163,12 +214,21 @@ export function DesignCanvasDialog({
   // threads, so the factory knows which cones to load. Re-runs when the design changes.
   const isEmb = /emb/i.test(String(item.print_type || ""))
   const [threads, setThreads] = useState<Thread[]>([])
+  const [picking, setPicking] = useState(false)
   useEffect(() => {
     if (!isEmb || !designUrl) { setThreads([]); return }
     let live = true
     matchThreadColors(designUrl).then((t) => { if (live) setThreads(t) })
     return () => { live = false }
   }, [designUrl, isEmb])
+  // Eyedropper: a sampled pixel → its nearest in-stock thread, appended (deduped) so the
+  // operator can add a colour the auto-match missed. One pick, then the tool turns off.
+  const onPickColor = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex)
+    const t = nearestThread(r, g, b)
+    if (t) setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
+    setPicking(false)
+  }
   const [err, setErr] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
 
@@ -202,13 +262,25 @@ export function DesignCanvasDialog({
             ))}
           </div>
         )}
-        <div className="mx-auto w-full"><DesignStage mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} /></div>
+        <div className="mx-auto w-full"><DesignStage mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor} /></div>
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads. */}
         {isEmb && (
           <div className="rounded-lg border border-border bg-muted/30 p-2.5">
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}
+              </span>
+              {designUrl && (
+                <button
+                  type="button"
+                  onClick={() => setPicking((v) => !v)}
+                  title="Eyedropper — then click the design to sample a colour and add its nearest thread"
+                  className={"inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (picking ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
+                >
+                  <Eyedropper size={13} weight="bold" /> {picking ? "Click the design…" : "Pick"}
+                </button>
+              )}
             </div>
             {threads.length === 0 ? (
               <div className="text-xs text-muted-foreground/70">{designUrl ? "Reading colours…" : "Upload artwork to match embroidery threads."}</div>
