@@ -57,7 +57,7 @@ export function SupplierProductCard({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="relative aspect-square bg-muted">
+      <div className="relative aspect-square shrink-0 bg-muted">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={img} alt="" loading="lazy" className="size-full object-contain" />

@@ -27,7 +27,28 @@ export function designFilesRoutes(app, requireAuth) {
     // bare q() calls can hit different pool connections and run out of order, and the
     // swallowed error would leave the column silently missing.
     .then(() => q('alter table design_file_data add column if not exists price numeric(12,2) default 0'))
+    // 'pes' = the seller's paid deliverable | 'emb' = factory working file | 'image'
+    // = artwork/mockup | 'other' = anything else. Every type is stored; `kind` only
+    // decides who SEES it.
+    .then(() => q("alter table design_file_data add column if not exists kind text default 'other'"))
+    .then(() => q('create index if not exists design_file_data_order on design_file_data (order_id)'))
     .catch(() => {});
+
+  // What a file IS, from its name/mime. Drives visibility, not storage — we record
+  // every type either way.
+  //   .pes                    → the seller's deliverable (paywalled)
+  //   .emb/.dst/.exp/.jef/... → factory working files (staff only)
+  //   image/*                 → artwork + mockups (staff; free)
+  function kindOf(name, mime) {
+    const n = String(name || '').toLowerCase();
+    if (/\.pes$/.test(n)) return 'pes';
+    if (/\.(emb|dst|exp|jef|vp3|xxx|hus)$/.test(n)) return 'emb';
+    if (/^image\//.test(String(mime || '')) || /\.(png|jpe?g|webp|gif|svg|tiff?|bmp)$/.test(n)) return 'image';
+    return 'other';
+  }
+  // Only admin + warehouse may set what a seller pays. Operators and designers are
+  // staff but must NOT be able to price a deliverable.
+  const canPrice = (u) => !!u && (u.role === 'admin' || u.role === 'warehouse');
 
   // Effective owner for a request (a team member acts as the owner; a plain seller is themselves).
   async function effectiveSeller(user) {
@@ -64,19 +85,21 @@ export function designFilesRoutes(app, requireAuth) {
       } catch (e) { /* storage failed → keep inline */ }
     }
     await q(
-      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, content_hash, price, created_at, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce($10, 0), now(), now())
+      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9, coalesce($10, 0), $11, now(), now())
        on conflict (design_id) do update set
          order_id=coalesce(excluded.order_id, design_file_data.order_id),
          sku=coalesce(excluded.sku, design_file_data.sku),
          seller_id=coalesce(excluded.seller_id, design_file_data.seller_id),
          file_name=excluded.file_name, mime=excluded.mime, data=excluded.data, url=excluded.url,
          content_hash=excluded.content_hash,
-         price=coalesce($10, design_file_data.price), updated_at=now()`,
+         price=coalesce($10, design_file_data.price), kind=excluded.kind, updated_at=now()`,
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
-       (isStaff(req.user) && b.price != null) ? Math.max(0, Number(b.price) || 0) : null]);
-    // Tell the seller their file is ready — this used to land silently.
-    if (isStaff(req.user) && seller && b.orderId) {
+       (canPrice(req.user) && b.price != null) ? Math.max(0, Number(b.price) || 0) : null,
+       kindOf(b.name, b.mime)]);
+    // Only ping the seller about a file that is THEIRS — a factory .emb or a mockup
+    // is not something they can see, so telling them about it would be noise.
+    if (isStaff(req.user) && seller && b.orderId && kindOf(b.name, b.mime) === 'pes') {
       notify({
         userIds: [seller], type: 'design-file',
         title: 'Your design file is ready',
@@ -151,37 +174,52 @@ export function designFilesRoutes(app, requireAuth) {
     return { ok: true, paid: true, balance: Number(b2.rows[0]?.bal || 0) };
   });
 
+  // Re-price a deliverable. Admin + warehouse only — an operator or designer is
+  // staff but has no business setting what a seller pays.
+  app.patch('/api/design_files/:designId/price', { preHandler: requireAuth }, async (req, reply) => {
+    if (!canPrice(req.user)) { reply.code(403); return { error: 'Only admin or warehouse can set a file price' }; }
+    const price = Math.max(0, Number(req.body && req.body.price) || 0);
+    const r = await q('update design_file_data set price=$1, updated_at=now() where design_id=$2 returning design_id, price', [price, String(req.params.designId)]);
+    if (!r.rows.length) { reply.code(404); return { error: 'not found' }; }
+    return { ok: true, designId: r.rows[0].design_id, price: Number(r.rows[0].price) || 0 };
+  });
+
   // Every file attached to an order — drives the board card + the seller's order page.
   // Never returns bytes; download goes through the paywalled route below.
   app.get('/api/design_files', { preHandler: requireAuth }, async (req, reply) => {
     const orderId = String(req.query?.orderId || '');
     if (!orderId) { reply.code(400); return { error: 'orderId is required' }; }
     const r = await q(
-      'select design_id, order_id, sku, seller_id, file_name, mime, price, created_at from design_file_data where order_id=$1 order by created_at',
+      'select design_id, order_id, sku, seller_id, file_name, mime, price, kind, created_at from design_file_data where order_id=$1 order by created_at',
       [orderId]
     );
     if (!isStaff(req.user)) {
       const eff = await effectiveSeller(req.user);
-      const mine = r.rows.filter((x) => !x.seller_id || x.seller_id === eff);
+      // Sellers get their .pes deliverable only. Factory working files (.emb) and
+      // internal mockups stay on the factory boards.
+      const mine = r.rows.filter((x) => (!x.seller_id || x.seller_id === eff) && x.kind === 'pes');
       if (r.rows.length && !mine.length) { reply.code(403); return { error: 'forbidden' }; }
       // Tell the seller what's unlocked without handing over any bytes.
       return Promise.all(mine.map(async (x) => ({
-        designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime,
+        designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime, kind: x.kind,
         price: Number(x.price) || 0, created_at: x.created_at,
         paid: (Number(x.price) || 0) <= 0 || (await isPaid(x, eff)),
       })));
     }
-    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime, price: Number(x.price) || 0, created_at: x.created_at, paid: true }));
+    // Staff (every factory board) see every file on the order.
+    return r.rows.map((x) => ({ designId: x.design_id, sku: x.sku, name: x.file_name, mime: x.mime, kind: x.kind, price: Number(x.price) || 0, created_at: x.created_at, paid: true, canPrice: canPrice(req.user) }));
   });
 
   // Download a machine file. Staff any; a seller only their own AND only once paid.
   app.get('/api/design_files/:designId', { preHandler: requireAuth }, async (req, reply) => {
-    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, price from design_file_data where design_id=$1', [String(req.params.designId)]);
+    const r = await q('select design_id, order_id, sku, seller_id, file_name, mime, data, url, price, kind from design_file_data where design_id=$1', [String(req.params.designId)]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'not found' }; }
     if (!isStaff(req.user)) {
       const eff = await effectiveSeller(req.user);
       if (row.seller_id && row.seller_id !== eff) { reply.code(403); return { error: 'forbidden' }; }
+      // Factory working files are not seller deliverables, whatever the price says.
+      if (row.kind && row.kind !== 'pes') { reply.code(403); return { error: 'forbidden' }; }
       // The paywall. Without this the bytes were one direct GET away, whatever the
       // client-side flag said.
       const price = Number(row.price) || 0;
