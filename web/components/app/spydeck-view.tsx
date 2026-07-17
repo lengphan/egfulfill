@@ -13,10 +13,23 @@ import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, 
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
 import { MakeProductDialog } from "@/components/app/make-product-dialog"
+import { usePaged, Pagination } from "@/components/app/pagination"
 import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 
-const money = (n: number | null, cur = "USD") =>
-  n == null ? "—" : `${cur === "USD" ? "$" : ""}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// Etsy prices come in the LISTING's own currency, not ours. The old version printed
+// "$" only when the code was literally USD and nothing at all otherwise — so a
+// non-USD listing rendered a bare "29,999.00" that read as a broken number.
+// Intl gives the right symbol per currency; an unknown/blank code falls back to
+// showing the code rather than pretending it's dollars.
+const money = (n: number | null, cur = "USD") => {
+  if (n == null) return "—"
+  const code = (cur || "USD").toUpperCase()
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  } catch {
+    return `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${code}`
+  }
+}
 
 // Compact number/money (1,240 → 1.2K) — ported from eg-scout.js (_fmt / _money).
 const fmtK = (n: number) => {
@@ -281,6 +294,15 @@ export function SpyDeckView() {
     return list.filter((l) => (!ms || estFor(l).sold24 >= ms) && (!mf || (l.num_favorers ?? 0) >= mf))
   }, [minSold, minFav])
 
+  // Paging for every grid. Hooks can't be conditional, so all four are declared up
+  // front; only the active tab's is rendered.
+  const trendingList = useMemo(() => applyClientFilters(trending?.products ?? []), [applyClientFilters, trending])
+  const resultsList = useMemo(() => applyClientFilters(results ?? []), [applyClientFilters, results])
+  const trendingPaged = usePaged(trendingList, 24)
+  const resultsPaged = usePaged(resultsList, 24)
+  const savedPaged = usePaged(saved, 24)
+  const uploadedPaged = usePaged(uploaded, 24)
+
   // Auto-load the daily trending feed (server-cached) so SpyDeck opens populated.
   useEffect(() => {
     if (!entitled) return
@@ -519,10 +541,11 @@ export function SpyDeckView() {
               {/* No keyword chips or methodology note here — the keyword cloud lives on
                   the Search tab, and repeating it above the feed was redundant. */}
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {applyClientFilters(trending.products).map((l) => (
+                {trendingPaged.pageItems.map((l) => (
                   <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
                 ))}
               </div>
+              <Pagination page={trendingPaged.page} pageCount={trendingPaged.pageCount} perPage={trendingPaged.perPage} total={trendingPaged.total} start={trendingPaged.start} onPage={trendingPaged.setPage} onPerPage={trendingPaged.setPerPage} perPageOptions={[24, 48, 96]} />
             </>
           )
         ) : view === "uploaded" ? (
@@ -535,11 +558,14 @@ export function SpyDeckView() {
               <div className="max-w-xs text-sm text-muted-foreground">Hit &ldquo;Make product&rdquo; on any card to publish it as an Etsy draft — it&apos;ll show here.</div>
             </div>
           ) : (
+            <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {uploaded.map((l) => (
+              {uploadedPaged.pageItems.map((l) => (
                 <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
               ))}
             </div>
+            <Pagination page={uploadedPaged.page} pageCount={uploadedPaged.pageCount} perPage={uploadedPaged.perPage} total={uploadedPaged.total} start={uploadedPaged.start} onPage={uploadedPaged.setPage} onPerPage={uploadedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
+            </>
           )
         ) : view === "saved" ? (
           saved.length === 0 ? (
@@ -551,11 +577,14 @@ export function SpyDeckView() {
               <div className="max-w-xs text-sm text-muted-foreground">Tap the heart on any research card to save it here for later.</div>
             </div>
           ) : (
+            <>
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {saved.map((l) => (
+              {savedPaged.pageItems.map((l) => (
                 <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
               ))}
             </div>
+            <Pagination page={savedPaged.page} pageCount={savedPaged.pageCount} perPage={savedPaged.perPage} total={savedPaged.total} start={savedPaged.start} onPage={savedPaged.setPage} onPerPage={savedPaged.setPerPage} perPageOptions={[24, 48, 96]} />
+            </>
           )
         ) : results === null ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
@@ -574,8 +603,9 @@ export function SpyDeckView() {
         ) : results.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">No listings found. Try another keyword.</div>
         ) : (
+          <>
           <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {applyClientFilters(results).map((l) => (
+            {resultsPaged.pageItems.map((l) => (
               <ResultCard
                 key={l.listing_id}
                 l={l}
@@ -587,6 +617,8 @@ export function SpyDeckView() {
               />
             ))}
           </div>
+          <Pagination page={resultsPaged.page} pageCount={resultsPaged.pageCount} perPage={resultsPaged.perPage} total={resultsPaged.total} start={resultsPaged.start} onPage={resultsPaged.setPage} onPerPage={resultsPaged.setPerPage} perPageOptions={[24, 48, 96]} />
+          </>
         )}
       </SectionCard>
 
