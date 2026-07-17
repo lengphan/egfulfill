@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode } from "@phosphor-icons/react"
+import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree } from "@phosphor-icons/react"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -228,7 +229,9 @@ export function OrdersHub() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      {/* Mobile-only: the top bar names the page on desktop, so the hero would just
+          duplicate it there. On mobile the top bar is hidden, so the hero IS the title. */}
+      <div className="flex items-center gap-3 md:hidden">
         <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">Orders</h1>
@@ -296,70 +299,62 @@ export function OrdersHub() {
                         )}
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Order-level status / flag — applies to every line at once */}
-                      {/* Gated against the ORDER's stage — this sets every line at once,
-                          so an operator loses it as soon as the order reaches the floor,
-                          keeping only the stop options. */}
-                      {!allShipped && (() => {
-                        const opts = stageOptionsFor(role, stage)
-                        const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
-                        const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
-                        if (!opts.length) return null
-                        return (
-                          <div className="relative">
-                            <select
-                              value=""
-                              onChange={(e) => { if (e.target.value) setOrderStatus(o, e.target.value) }}
+                    {/* One PRIMARY action for the current stage/role; everything rarer
+                        (flag/status, labels, the non-primary of ship/advance) tucks into a
+                        ⋯ menu so the row isn't a wall of buttons. */}
+                    {allShipped ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
+                    ) : (() => {
+                      const opts = stageOptionsFor(role, stage)
+                      const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
+                      const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
+                      const canShip = canFulfill && shipOpen !== o.id
+                      const canAdvance = canSetStage(role, stage, nextStage(stage) ?? "")
+                      const canStart = canFulfill && stage === ""
+                      const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
+                      // Primary = the one obvious next move. Intake → Start; ready → ship;
+                      // otherwise advance a stage.
+                      const primary: "start" | "ship" | "advance" | null =
+                        canStart ? "start" : canShip ? "ship" : canAdvance ? "advance" : null
+                      const busyO = busy?.startsWith(o.id)
+                      return (
+                        <div className="flex items-center gap-2">
+                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}><TrayArrowDown size={13} weight="bold" /> Start order</Button>}
+                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>}
+                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further."><SkipForward size={13} weight="fill" /> Next stage</Button>}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              aria-label="More actions"
                               disabled={busy === `ord:${o.id}`}
-                              className="h-8 rounded-md border border-input bg-transparent pl-7 pr-2 text-xs font-medium"
-                              aria-label="Flag or set order status"
-                              title="Flag or set order status"
+                              className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-transparent px-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
                             >
-                              <option value="">{prod.length ? "Flag / status…" : "Flag…"}</option>
+                              <DotsThree size={18} weight="bold" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              {/* the non-primary pipeline actions */}
+                              {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
+                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</DropdownMenuItem>}
+                              {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> Reopen label</DropdownMenuItem>}
+                              {canLabels && <DropdownMenuItem onClick={() => setBarcodeOrder(o)}><Barcode size={14} weight="bold" /> Print blank labels</DropdownMenuItem>}
                               {prod.length > 0 && (
-                                <optgroup label="Set all items to">
-                                  {prod.map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
-                                </optgroup>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
+                                  {prod.map((s) => <DropdownMenuItem key={s.id || "new"} onClick={() => setOrderStatus(o, s.id)}>{s.label}</DropdownMenuItem>)}
+                                </>
                               )}
                               {exc.length > 0 && (
-                                <optgroup label="Exceptions">
-                                  {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                                </optgroup>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
+                                  {exc.map((s) => <DropdownMenuItem key={s.id} onClick={() => setOrderStatus(o, s.id)}><Flag size={13} weight="fill" /> {s.label}</DropdownMenuItem>)}
+                                </>
                               )}
-                            </select>
-                            <Flag size={13} weight="fill" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                          </div>
-                        )
-                      })()}
-                      {canFulfill && items.some((it) => it.sku && variantOf(it)) && (
-                        <Button size="sm" variant="ghost" onClick={() => setBarcodeOrder(o)} title="Print barcode labels for this order's blanks">
-                          <Barcode size={14} weight="bold" /> Labels
-                        </Button>
-                      )}
-                      {canFulfill && stage === "" && (
-                        <Button size="sm" onClick={() => receiveOrder(o)} disabled={busy?.startsWith(o.id)} title="Intake: move every item into Awaiting scan. Done once, when the order arrives.">
-                          <TrayArrowDown size={13} weight="bold" /> Start order
-                        </Button>
-                      )}
-                      {allShipped ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
-                      ) : (
-                        <>
-                          {label && <Button size="sm" variant="ghost" onClick={() => openLabel(label)} title="Reopen label"><Printer size={14} weight="bold" /> Label</Button>}
-                          {canFulfill && shipOpen !== o.id && (
-                            <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>
-                          )}
-                          {/* Hidden once the next step is out of this role's reach —
-                              an operator at Awaiting scan would only get a 403. */}
-                          {canSetStage(role, stage, nextStage(stage) ?? "") && (
-                            <Button size="sm" variant="outline" onClick={() => advanceOrder(o)} title="Move every item one step further along the pipeline. Stops before Shipped — shipping needs a label.">
-                              <SkipForward size={13} weight="fill" /> Next stage
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </div>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Fulfill panel (warehouse/admin): buy a USPS-direct label, or record tracking manually */}
