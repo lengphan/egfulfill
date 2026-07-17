@@ -35,11 +35,38 @@ export function GoogleSignIn({
   const btnRef = useRef<HTMLDivElement>(null)
   const [clientId, setClientId] = useState<string | null>(null)
   const [scriptReady, setScriptReady] = useState(false)
+  const rendered = useRef(false)
 
   useEffect(() => {
-    getGoogleClientId()
-      .then((r) => setClientId(r.clientId || ""))
-      .catch(() => setClientId(""))
+    let alive = true
+    // Retry once: a transient network blip must not be mistaken for "Google isn't
+    // configured" and hide the button for the whole session.
+    const fetchId = (attempt = 0): void => {
+      getGoogleClientId()
+        .then((r) => { if (alive) setClientId(r.clientId || "") })
+        .catch(() => {
+          if (!alive) return
+          if (attempt < 1) setTimeout(() => fetchId(attempt + 1), 1200)
+          else setClientId("")
+        })
+    }
+    fetchId()
+    return () => { alive = false }
+  }, [])
+
+  // Don't rely on <Script onLoad> alone: it only fires for the injection that
+  // actually loads the script. Navigate away from /login and back and the GIS script
+  // is already in the DOM, so onLoad never fires again and the button silently never
+  // renders — which is why it appeared only after a hard refresh. Poll for the real
+  // global instead, and treat onLoad as a fast path.
+  useEffect(() => {
+    let tries = 0
+    // Fires immediately on the first tick when the script is already present.
+    const id = setInterval(() => {
+      if (window.google?.accounts?.id) { setScriptReady(true); clearInterval(id) }
+      else if (++tries > 40) clearInterval(id)   // give up after ~8s
+    }, 100)
+    return () => clearInterval(id)
   }, [])
 
   const handleCredential = useCallback(
@@ -62,6 +89,8 @@ export function GoogleSignIn({
 
   useEffect(() => {
     if (!scriptReady || !clientId || !btnRef.current || !window.google) return
+    if (rendered.current) return   // GIS re-render duplicates the button
+    rendered.current = true
     window.google.accounts.id.initialize({ client_id: clientId, callback: handleCredential })
     window.google.accounts.id.renderButton(btnRef.current, {
       type: "standard",
