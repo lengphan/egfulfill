@@ -15,7 +15,9 @@ export type SupplierCardData = {
   image?: string | null
   price?: number | string | null
   priceMax?: number | string | null
-  colors?: string[] | null
+  // A colour is a bare name OR {name, swatch-image-url}. The card renders the real swatch
+  // image when present, else falls back to the name→hex guess.
+  colors?: (string | { name: string; swatch?: string | null })[] | null
   sizesCount?: number
   favorited?: boolean
 }
@@ -53,11 +55,14 @@ export function SupplierProductCard({
   }
 
   const toggleFav = () => { const next = !fav; setFav(next); onFavorite?.(next) }
-  const colors = data.colors ?? []
+  // Normalise both colour shapes (bare name | {name, swatch}) to one form the row renders.
+  const colors = (data.colors ?? []).map((c) => (typeof c === "string" ? { name: c, swatch: null } : { name: c.name, swatch: c.swatch ?? null }))
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="relative aspect-square shrink-0 overflow-hidden bg-muted">
+      {/* White image bed so S&S lifestyle shots sit on the same background as Otto's
+          white product shots — product photography reads as white regardless of UI theme. */}
+      <div className="relative aspect-square shrink-0 overflow-hidden bg-white">
         {img ? (
           // absolute inset-0 is load-bearing. As an in-flow child, `size-full` means
           // height:100% against a parent whose height comes from aspect-ratio — an
@@ -102,10 +107,19 @@ export function SupplierProductCard({
           ) : (
             <>
               {colors.slice(0, 7).map((c) => {
-                const bg = swatchBg(c)
+                const bg = swatchBg(c.name)
+                const ring = activeColor === c.name ? "ring-2 ring-primary ring-offset-1 " : ""
+                // Real supplier swatch image wins; then a name→hex guess; then a "?" chip.
+                if (c.swatch) {
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={c.name} src={c.swatch} alt={c.name} title={c.name} loading="lazy" onClick={() => pickColor(c.name)}
+                      className={"size-5 shrink-0 cursor-pointer rounded-full border border-black/15 object-cover transition-transform hover:scale-110 " + ring} />
+                  )
+                }
                 return (
-                  <button key={c} onClick={() => pickColor(c)} title={c} style={bg ? { background: bg } : undefined}
-                    className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 " + (activeColor === c ? "ring-2 ring-primary ring-offset-1 " : "") + (bg ? "border-black/15" : "flex items-center justify-center border-dashed border-border bg-muted text-[8px] text-muted-foreground")}>
+                  <button key={c.name} onClick={() => pickColor(c.name)} title={c.name} style={bg ? { background: bg } : undefined}
+                    className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 " + ring + (bg ? "border-black/15" : "flex items-center justify-center border-dashed border-border bg-muted text-[8px] text-muted-foreground")}>
                     {!bg && "?"}
                   </button>
                 )

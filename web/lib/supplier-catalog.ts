@@ -1,4 +1,4 @@
-import { getSsStyle, getOttoStyle, type CatalogProduct } from "@/lib/api"
+import { getSsStyle, getOttoStyle, colorNames, type CatalogProduct } from "@/lib/api"
 
 // Otto's Product Data stores images as Google Drive links, which don't render in an <img>
 // (Drive blocks hotlinking). Rewrite to Drive's embeddable thumbnail URL.
@@ -22,7 +22,7 @@ export async function ssCatalogProduct(styleID: string, fb: SsFb): Promise<Catal
   return {
     id: "SS-" + styleID, name: d.title || fb.title || styleID, type: "Apparel", method: "DTG", status: "Active",
     price: d.price ?? fb.price ?? 0, basePrice: d.price ?? fb.price ?? 0,
-    sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: (d.colors ?? fb.colors ?? [])[0],
+    sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0] ?? fb.colors?.[0],
     img: d.image ?? fb.image ?? undefined, images: d.extraImages ?? [], sku: styleID,
     description: d.description ?? undefined, supplier: "S&S",
   }

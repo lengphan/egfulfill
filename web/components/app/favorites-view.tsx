@@ -7,7 +7,7 @@ import { Loading } from "@/components/app/loading"
 import {
   getSsFavorites, toggleSsFavorite, getSsStyle,
   getOttoFavorites, toggleOttoFavorite, getOttoStyle,
-  getCatalogProducts, saveCatalogProducts,
+  getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoFav, type CatalogProduct,
 } from "@/lib/api"
 import { getToken } from "@/lib/auth"
@@ -37,7 +37,7 @@ export function FavoritesView() {
       getOttoFavorites().catch(() => ({ favorites: [] as OttoFav[] })),
     ]).then(([ss, otto]) => {
       setItems([
-        ...(ss.favorites ?? []).map((s): FavItem => ({ supplier: "ss", id: s.styleID, title: s.title, brand: s.brand, subtitle: s.category, image: s.image, price: s.price, colors: s.colors, raw: s })),
+        ...(ss.favorites ?? []).map((s): FavItem => ({ supplier: "ss", id: s.styleID, title: s.title, brand: s.brand, subtitle: s.category, image: s.image, price: s.price, colors: colorNames(s.colors), raw: s })),
         ...(otto.favorites ?? []).map((o): FavItem => ({ supplier: "otto", id: o.style, title: o.name || o.style, image: driveImg(o.image), price: o.price, raw: o })),
       ])
     })
@@ -56,7 +56,7 @@ export function FavoritesView() {
         product = {
           id: "SS-" + f.id, name: d.title || f.title, type: "Apparel", method: "DTG", status: "Active",
           price: d.price ?? f.price ?? 0, basePrice: d.price ?? f.price ?? 0,
-          sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: d.colors?.[0],
+          sizes: d.sizes ?? [], colorImages: d.colorImages ?? {}, mainColor: colorNames(d.colors)[0],
           img: d.image ?? f.image ?? undefined, sku: f.id, description: d.description ?? undefined, supplier: "S&S",
         }
       } else {

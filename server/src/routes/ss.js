@@ -174,6 +174,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
        at timestamptz default now()
      )`).catch(() => {});
   q(`alter table ss_style_images add column if not exists colors jsonb`).catch(() => {});
+  // Style-level price RANGE (min/max piecePrice across the style's SKUs). S&S has no
+  // price on the /styles list — only per-SKU on /products — so the New In grid showed no
+  // price at all next to Otto's. Resolved lazily in the SAME products call that fetches
+  // the thumbnail (no extra API traffic). null until first resolved.
+  q(`alter table ss_style_images add column if not exists price_min numeric`).catch(() => {});
+  q(`alter table ss_style_images add column if not exists price_max numeric`).catch(() => {});
   // Persisted copy of the live styles LIST, so a cold server / S&S outage still has a fallback
   // (New In never dies with "couldn't reach the S&S catalog").
   q(`create table if not exists ss_styles_cache (id int primary key, data jsonb, at timestamptz default now())`).catch(() => {});
@@ -355,25 +361,36 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const id = String(req.params.id || '').trim();
     if (!id) { reply.code(400); return { error: 'styleID required' }; }
     try {
-      const hit = (await q('select image, colors from ss_style_images where style_id=$1', [id])).rows[0];
-      if (hit && hit.image) return { styleID: id, image: hit.image, colors: hit.colors || [] };   // cached → instant
+      const hit = (await q('select image, colors, price_min, price_max from ss_style_images where style_id=$1', [id])).rows[0];
+      // Require price too, so rows cached by the OLD image-only resolver re-run once and
+      // backfill price + real swatches instead of staying priceless forever.
+      if (hit && hit.image && hit.price_min != null) return { styleID: id, image: hit.image, colors: hit.colors || [], price: num(hit.price_min), priceMax: num(hit.price_max) };
     } catch (e) {}
     let image = '';
     const colors = [], seen = new Set();
+    let priceMin = null, priceMax = null;
     try {
-      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
+      // colorSwatchImage → a real supplier swatch (beats guessing a hex from a name like
+      // "Dk.Grn/Kha/Brn"). piecePrice → the style's price range.
+      const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName,piecePrice,customerPrice,salePrice');
       if (pr.ok && Array.isArray(pr.data)) {
         for (const p of pr.data) {
           if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
           const c = String(p.colorName || '').trim();
-          if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+          if (c && !seen.has(c.toLowerCase()) && colors.length < 16) {
+            seen.add(c.toLowerCase());
+            colors.push({ name: c, swatch: ssImg(p.colorSwatchImage) || null });   // {name, swatch}
+          }
+          const pp = num(p.customerPrice ?? p.piecePrice ?? p.salePrice);
+          if (pp != null && pp > 0) { priceMin = priceMin == null ? pp : Math.min(priceMin, pp); priceMax = priceMax == null ? pp : Math.max(priceMax, pp); }
         }
       }
     } catch (e) {}
     // Only persist a real hit, so a transient failure retries next time instead of caching a blank.
-    if (image) { try { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
-                                on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); } catch (e) {} }
-    return { styleID: id, image, colors };
+    if (image) { try { await q(`insert into ss_style_images (style_id, image, colors, price_min, price_max, at) values ($1,$2,$3,$4,$5,now())
+                                on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, price_min=excluded.price_min, price_max=excluded.price_max, at=now()`,
+                                [id, image, JSON.stringify(colors), priceMin, priceMax]); } catch (e) {} }
+    return { styleID: id, image, colors, price: priceMin, priceMax };
   });
 
   // ── BATCH thumbnail resolver — resolve a whole page of styles in ONE request ──
@@ -386,28 +403,34 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
     const ids = [...new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 120);
     const out = {};
     try {
-      const rows = (await q('select style_id, image, colors from ss_style_images where style_id = any($1)', [ids])).rows;
-      for (const r of rows) { if (r.image) out[String(r.style_id)] = { image: r.image, colors: r.colors || [] }; }
+      const rows = (await q('select style_id, image, colors, price_min, price_max from ss_style_images where style_id = any($1)', [ids])).rows;
+      // price_min present ⇒ resolved by the NEW path; rows without it fall to `misses` so
+      // they re-resolve once and pick up price + real swatches.
+      for (const r of rows) { if (r.image && r.price_min != null) out[String(r.style_id)] = { image: r.image, colors: r.colors || [], price: num(r.price_min), priceMax: num(r.price_max) }; }
     } catch (e) {}
     const misses = ids.filter((id) => !out[id]);
     const CONC = 10;   // parallel S&S calls per wave — well under the 150/sec limit
     for (let i = 0; i < misses.length; i += CONC) {
       await Promise.all(misses.slice(i, i + CONC).map(async (id) => {
         let image = ''; const colors = [], seen = new Set();
+        let priceMin = null, priceMax = null;
         try {
-          const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName');
+          const pr = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=colorFrontImage,colorSwatchImage,colorName,piecePrice,customerPrice,salePrice');
           if (pr.ok && Array.isArray(pr.data)) {
             for (const p of pr.data) {
               if (!image) { const im = ssImg(p.colorFrontImage || p.colorSwatchImage); if (im) image = im; }
               const c = String(p.colorName || '').trim();
-              if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push(c); }
+              if (c && !seen.has(c.toLowerCase()) && colors.length < 16) { seen.add(c.toLowerCase()); colors.push({ name: c, swatch: ssImg(p.colorSwatchImage) || null }); }
+              const pp = num(p.customerPrice ?? p.piecePrice ?? p.salePrice);
+              if (pp != null && pp > 0) { priceMin = priceMin == null ? pp : Math.min(priceMin, pp); priceMax = priceMax == null ? pp : Math.max(priceMax, pp); }
             }
           }
         } catch (e) {}
         if (image) {
-          out[id] = { image, colors };
-          try { await q(`insert into ss_style_images (style_id, image, colors, at) values ($1,$2,$3,now())
-                         on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, at=now()`, [id, image, JSON.stringify(colors)]); } catch (e) {}
+          out[id] = { image, colors, price: priceMin, priceMax };
+          try { await q(`insert into ss_style_images (style_id, image, colors, price_min, price_max, at) values ($1,$2,$3,$4,$5,now())
+                         on conflict (style_id) do update set image=excluded.image, colors=excluded.colors, price_min=excluded.price_min, price_max=excluded.price_max, at=now()`,
+                         [id, image, JSON.stringify(colors), priceMin, priceMax]); } catch (e) {}
         }
       }));
     }

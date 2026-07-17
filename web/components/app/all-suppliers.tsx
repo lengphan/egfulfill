@@ -11,7 +11,7 @@ import { parseCSV } from "@/lib/order-import"
 import {
   getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm,
   getOttoProducts, getOttoStyle, toggleOttoFavorite, importOttoProducts,
-  getCatalogProducts, saveCatalogProducts,
+  getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoStyle, type OttoImportRow, type CatalogProduct,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
@@ -83,12 +83,19 @@ export function AllSuppliers() {
     ])
     setSsTotal(ss.total ?? 0); setOttoTotal(otto.total ?? 0)
     const ssStyles = ss.styles ?? []
-    // Resolve S&S thumbnails + colors for this page (batched, cached). Resolve when EITHER
-    // the image OR the colors are missing (a style can have a thumbnail but no colors yet).
-    const need = ssStyles.filter((s) => !s.image || !s.colors?.length).map((s) => s.styleID)
+    // Resolve S&S thumbnails + colors + PRICE for this page (batched, cached). Resolve when
+    // the image, the colors, OR the price is missing — the price comes from the same call.
+    const need = ssStyles.filter((s) => !s.image || !s.colors?.length || s.price == null).map((s) => s.styleID)
     if (need.length) {
-      const imgs = await getSsStyleImgs(need).catch(() => ({} as Record<string, { image: string | null; colors: string[] }>))
-      for (const s of ssStyles) { const hit = imgs[s.styleID]; if (hit) { s.image = s.image ?? hit.image; s.colors = s.colors?.length ? s.colors : (hit.colors ?? []) } }
+      const imgs = await getSsStyleImgs(need).catch((): Awaited<ReturnType<typeof getSsStyleImgs>> => ({}))
+      for (const s of ssStyles) {
+        const hit = imgs[s.styleID]
+        if (!hit) continue
+        s.image = s.image ?? hit.image
+        s.colors = s.colors?.length ? s.colors : (hit.colors ?? [])
+        if (s.price == null) s.price = hit.price ?? null
+        if (s.priceMax == null) s.priceMax = hit.priceMax ?? null
+      }
     }
     const ssItems: Item[] = ssStyles.map((s) => ({ supplier: "ss", id: s.styleID, ss: s }))
     const ottoItems: Item[] = (otto.items ?? []).map((o) => ({ supplier: "otto", id: o.style, otto: o }))
@@ -115,7 +122,7 @@ export function AllSuppliers() {
   }
 
   const cardData = (it: Item) => it.supplier === "ss"
-    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, colors: it.ss.colors, favorited: it.ss.favorited }
+    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, favorited: it.ss.favorited }
     : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
@@ -125,7 +132,7 @@ export function AllSuppliers() {
     try {
       const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
       const product = it.supplier === "ss"
-        ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: it.ss.colors })
+        ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors) })
         : await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
       const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
       await saveCatalogProducts(next)

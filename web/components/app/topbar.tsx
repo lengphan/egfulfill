@@ -25,6 +25,7 @@ import { getWallet } from "@/lib/api"
 import { getUser, clearSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
 import { NotificationBell } from "@/components/app/notification-bell"
+import { OrderSearch } from "@/components/app/order-search"
 
 function IconButton({
   label,
@@ -83,6 +84,16 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
     router.push("/login")
   }
 
+  // ⌘K / Ctrl-K opens order search from anywhere.
+  const [searchOpen, setSearchOpen] = useState(false)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearchOpen(true) }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+
   // Real balance (server-authoritative); silently keeps the fallback if no session/API.
   useEffect(() => {
     let cancelled = false
@@ -107,9 +118,10 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
       <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
 
       <div className="ml-auto flex items-center gap-1">
-        <IconButton label="Search">
+        <IconButton label="Search orders (⌘K)" onClick={() => setSearchOpen(true)}>
           <MagnifyingGlass size={18} />
         </IconButton>
+        <OrderSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
         <NotificationBell />
         <IconButton
           label="Toggle theme"

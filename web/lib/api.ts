@@ -227,7 +227,14 @@ export function saveCatalogProducts(products: CatalogProduct[]) {
 }
 
 // ── Suppliers: S&S Activewear (browse from the synced DB — fast) + Otto Cap (stock) ──
-export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; colors: string[]; favorited?: boolean }
+// A colour is either a bare name (older cache rows) or {name, swatch} where swatch is the
+// supplier's real swatch image URL — beats guessing a hex from a name like "Dk.Grn/Kha".
+export type SsColor = string | { name: string; swatch: string | null }
+// Flatten either colour shape to bare names — for the catalog/favorite paths that only
+// store names, and anywhere a string[] is still expected.
+export const colorNames = (colors?: SsColor[] | null): string[] =>
+  (colors ?? []).map((c) => (typeof c === "string" ? c : c.name)).filter(Boolean)
+export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; priceMax?: number | null; colors: SsColor[]; favorited?: boolean }
 export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string }
 export function getSsStatus() {
   return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
@@ -249,7 +256,7 @@ export function getSsStylesAll(p: { search?: string; limit?: number; offset?: nu
   return api<{ total: number; styles: SsStyle[] }>(`/api/ss/styles?${s.toString()}`)
 }
 export function getSsStyleImgs(ids: string[]) {
-  return api<Record<string, { image: string | null; colors: string[] }>>(`/api/ss/style-imgs?ids=${encodeURIComponent(ids.join(","))}`)
+  return api<Record<string, { image: string | null; colors: SsColor[]; price?: number | null; priceMax?: number | null }>>(`/api/ss/style-imgs?ids=${encodeURIComponent(ids.join(","))}`)
 }
 // Pre-warm ALL style thumbnails into the DB (background) so browsing is instant.
 export function ssWarm() {
