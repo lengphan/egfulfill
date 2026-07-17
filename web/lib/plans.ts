@@ -100,8 +100,12 @@ export function setSpydeckAddon(on: boolean) {
   window.dispatchEvent(new CustomEvent(PLAN_EVENT, { detail: { plan: getPlan() } }))
 }
 
-// True if SpyDeck is available to this seller (bundled OR purchased as an add-on).
+// True if SpyDeck is available. STAFF (admin/warehouse/etc.) always have it — the plan
+// paywall is a SELLER concern only, matching entitlements.js on the server (which grants
+// any non-seller role unconditionally). A seller needs the bundle or the add-on.
 /** Presentation gate only — the server is what actually enforces this. */
 export function hasSpydeck(): boolean {
+  const role = getUser()?.role
+  if (role && role !== "seller") return true
   return spydeckIncluded() || getSpydeckAddon()
 }
