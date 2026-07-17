@@ -293,6 +293,52 @@ export function deleteInventoryItem(sku: string) {
   return api<{ ok?: boolean }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "DELETE" })
 }
 
+// ── Ads (Meta + Google) ──
+// Spend/budget are already normalised to whole currency server-side (Meta reports
+// cents, Google micros) — never re-scale them here.
+export type AdCampaign = {
+  channel: "meta" | "google"
+  account: string
+  id: string
+  name: string
+  status: string
+  objective?: string | null
+  dailyBudget?: number | null
+  spend: number
+  impressions: number
+  clicks: number
+  conversions: number
+  revenue: number
+  roas?: number | null
+}
+export type AdsResponse = {
+  days: number
+  since: string
+  until: string
+  campaigns: AdCampaign[]
+  totals: { spend: number; impressions: number; clicks: number; conversions: number; revenue: number; roas?: number | null }
+  errors: { channel: string; account: string; error: string }[]
+}
+export type AdsConfig = {
+  meta: { enabled: boolean; appId?: string | null; scopes: string }
+  google: { enabled: boolean; clientId?: string | null; scopes: string }
+}
+export type AdConnection = { id: string; platform: string; account_id: string; shop_name?: string | null; created_at?: string }
+
+export function getAdsConfig() { return api<AdsConfig>(`/api/ads/config`) }
+export function getAdConnections() { return api<AdConnection[]>(`/api/ads/connections`) }
+export function deleteAdConnection(id: string) { return api<{ ok: boolean }>(`/api/ads/connections/${encodeURIComponent(id)}`, { method: "DELETE" }) }
+export function getAdCampaigns(days = 7) { return api<AdsResponse>(`/api/ads/campaigns?days=${days}`) }
+export function exchangeAds(channel: "meta" | "google", code: string, redirectUri: string) {
+  return api<{ ok?: boolean; accounts?: unknown[]; error?: string }>(`/api/ads/${channel}/exchange`, { method: "POST", body: JSON.stringify({ code, redirectUri }) })
+}
+export function createAdCampaign(body: { channel: "meta" | "google"; name: string; dailyBudget: number; objective?: string; accountId?: string }) {
+  return api<{ ok?: boolean; id?: string; status?: string; error?: string }>(`/api/ads/campaigns`, { method: "POST", body: JSON.stringify(body) })
+}
+export function setAdCampaignStatus(channel: string, id: string, status: "ACTIVE" | "PAUSED") {
+  return api<{ ok?: boolean; error?: string }>(`/api/ads/campaigns/${channel}/${encodeURIComponent(id)}/status`, { method: "POST", body: JSON.stringify({ status }) })
+}
+
 // ── Notifications ──
 export type Notification = { id: number | string; type: string; title: string; body?: string | null; href?: string | null; entity_id?: string | null; read_at?: string | null; created_at: string }
 export function getNotifications(limit = 20) {
