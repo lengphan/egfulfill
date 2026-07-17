@@ -411,6 +411,41 @@ export function ordersRoutes(app, requireAuth) {
     return { ok: true };
   });
 
+  // ── Variant setup — the blank/colour/size/method for a line item ────────────
+  // Marketplace orders (Etsy/Shopify) arrive with UNSET variants, so they can't be
+  // priced or submitted until someone picks them; a listing published FROM our catalog
+  // arrives already resolvable by SKU. Either way this is where the picks are saved.
+  // Keyed by line_id when present (identical-SKU siblings), else sku. Seller-owner OR
+  // staff may set them (canSeeOrder), but ONLY before the price is locked: once the
+  // seller has submitted (and been charged), the frozen cost must not silently drift
+  // from the variants it was based on.
+  app.post('/api/orders/:id/item-setup', { preHandler: requireAuth }, async (req, reply) => {
+    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const b = req.body || {};
+    const lineId = b.line_id ? String(b.line_id) : null;
+    const sku = b.sku != null ? String(b.sku) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
+    // Editable only before production. A charged order's variants are settled — changing
+    // them would desync order_items.unit_cost/ship_fee (frozen at submit). Cheapest guard:
+    // block once anything on the order has been charged.
+    const charged = await chargedAmount(req.params.id);
+    if (charged > 0) { reply.code(409); return { error: 'This order is already submitted — its items are locked. Cancel it first to change variants.' }; }
+    // Only the fields the picker owns; undefined = leave as-is.
+    const sets = [], vals = []; let n = 1;
+    for (const [key, col] of [['blank', 'blank'], ['color', 'color'], ['size', 'size'], ['printType', 'print_type'], ['variant', 'variant']]) {
+      if (b[key] !== undefined) { sets.push(`${col}=$${n++}`); vals.push(b[key] === '' ? null : String(b[key])); }
+    }
+    if (!sets.length) { reply.code(400); return { error: 'nothing to set' }; }
+    let where = `order_id=$${n++}`; vals.push(req.params.id);
+    if (lineId) { where += ` and line_id=$${n++}`; vals.push(lineId); }
+    else { where += ` and sku=$${n++}`; vals.push(sku); }
+    const r = await q(`update order_items set ${sets.join(',')} where ${where}`, vals);
+    if (!r.rowCount) { reply.code(404); return { error: 'item not found' }; }
+    audit(req, 'item.setup', { entityType: 'order', entityId: req.params.id, after: { line_id: lineId, sku, ...b } });
+    egBroadcast({ type: 'orders' });
+    return { ok: true };
+  });
+
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
   // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
   app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {

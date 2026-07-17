@@ -15,6 +15,7 @@ import {
   getOrderDesigns,
   getOrderMessages,
   getOrderQuote,
+  getCatalogProducts,
   postOrderMessage,
   updateOrder,
   ApiError,
@@ -23,7 +24,9 @@ import {
   type OrderDesign,
   type ChatEntry,
   type OrderQuote,
+  type CatalogProduct,
 } from "@/lib/api"
+import { VariantPicker } from "@/components/app/variant-picker"
 import { designSrc, itemImage } from "@/lib/order-image"
 
 const fmtMsgTime = (ts?: number) => {
@@ -53,6 +56,7 @@ export default function OrderDetailPage() {
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
 
   // Re-pull orders after an action that changes this one (submit, cancel) so the badge
   // and the action bar reflect the new status without a manual refresh.
@@ -74,6 +78,8 @@ export default function OrderDetailPage() {
     getOrders()
       .then((rows) => alive && setOrders(rows ?? []))
       .catch(() => alive && setOrders([]))
+    // Catalog powers the variant picker's blank/colour/size/method options.
+    getCatalogProducts().then((c) => alive && setCatalog(c ?? [])).catch(() => {})
     if (id) {
       getOrderDesigns(id)
         .then((r) => {
@@ -134,6 +140,9 @@ export default function OrderDetailPage() {
   }
 
   const items = order.items ?? []
+  // Variants are editable only before submit — after that the cost is frozen and the
+  // server rejects changes. new/draft/"" = not yet submitted.
+  const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
   const num = order.seq ? `#${order.seq}` : order.id
   const store = (order.store || order.source || "manual").toString()
   const addr = (order.address ?? {}) as Addr
@@ -196,12 +205,19 @@ export default function OrderDetailPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
-                        <div className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                          {it.color && <span className="rounded bg-muted px-1.5 py-0.5">{it.color}</span>}
-                          {it.size && <span className="rounded bg-muted px-1.5 py-0.5">{it.size}</span>}
-                          {it.print_type && <span className="rounded bg-muted px-1.5 py-0.5">{it.print_type}</span>}
-                          {it.sku && <span className="font-mono">{it.sku}</span>}
-                        </div>
+                        {preSubmit ? (
+                          // Before submit: pick the blank + variants (marketplace orders
+                          // arrive unset). Saving updates the quote the Submit button shows.
+                          <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reload} />
+                        ) : (
+                          <div className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                            {it.blank && <span className="rounded bg-muted px-1.5 py-0.5">{it.blank}</span>}
+                            {it.color && <span className="rounded bg-muted px-1.5 py-0.5">{it.color}</span>}
+                            {it.size && <span className="rounded bg-muted px-1.5 py-0.5">{it.size}</span>}
+                            {it.print_type && <span className="rounded bg-muted px-1.5 py-0.5">{it.print_type}</span>}
+                            {it.sku && <span className="font-mono">{it.sku}</span>}
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col items-end gap-1.5 text-right text-sm">
                         <div className="font-medium tabular-nums">{usd(unit * qty)}</div>

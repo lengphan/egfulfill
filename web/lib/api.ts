@@ -192,6 +192,9 @@ export type CatalogProduct = {
   image?: string
   hero?: string
   colorImages?: Record<string, string>
+  // Explicit per-variant SKUs ([{sku,color,size}] | string[]) — how a marketplace
+  // listing's SKU resolves back to this product. Matched by pricing.js + the variant picker.
+  variantSkus?: (string | { sku?: string; SKU?: string; color?: string; size?: string })[]
 }
 
 // AI assistant config (admin) — key status + model, editable in Settings › Integrations.
@@ -515,6 +518,9 @@ export type OrderItem = {
   qty?: number
   color?: string
   size?: string
+  variant?: string
+  blank?: string // the catalog product this line resolves to (name/sku/id)
+  line_id?: string // stable per-line id — keys identical-SKU siblings apart
   img?: string
   unit_price?: number | string
   print_type?: string
@@ -587,6 +593,14 @@ export type OrderQuote = {
 }
 export function getOrderQuote(id: string) {
   return api<OrderQuote>(`/api/orders/${encodeURIComponent(id)}/quote`)
+}
+
+// Set a line item's variant picks (blank/colour/size/method). Keyed by line_id when
+// available, else sku. Rejected (409) once the order is submitted — its cost is frozen.
+export function postItemSetup(id: string, body: { line_id?: string; sku?: string; blank?: string; color?: string; size?: string; printType?: string; variant?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/item-setup`, {
+    method: "POST", body: JSON.stringify(body),
+  })
 }
 
 export function getOrderDesigns(id: string) {

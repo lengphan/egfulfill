@@ -37,7 +37,7 @@ function findProduct(item: PricingItem, catalog: PricedProduct[]): PricedProduct
   const base = String(item.sku || "").split("-")[0]
   return catalog.find(
     (p) =>
-      (Array.isArray(p.variantSkus) && p.variantSkus.some((v) => v && v.sku === item.sku)) ||
+      (Array.isArray(p.variantSkus) && p.variantSkus.some((v) => v && (typeof v === "string" ? v : v.sku) === item.sku)) ||
       (p.sku && base && String(p.sku).toUpperCase() === base.toUpperCase()) ||
       (p.name && item.blank && p.name === item.blank)
   )
