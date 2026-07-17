@@ -20,11 +20,13 @@ const P = (label: string, tone: string, group: SellerGroup): SellerStatusInfo =>
 
 // Keys mirror SELLER_STATUS (+ its legacy aliases) exactly.
 const MAP: Record<string, SellerStatusInfo> = {
-  // Same label whatever the origin (synced or manual): the seller's next action is
-  // identical either way — submit it. "Order Received" implied we already had it and
-  // were acting on it, when in fact nothing is charged or started until they submit.
-  new: P("Not submitted", TONE.neutral, "received"),
-  draft: P("Not submitted", TONE.neutral, "received"),
+  // "Pending" = not sent to the factory yet. Same label whatever the origin (synced
+  // or manual): the seller's next action is identical either way — submit it.
+  // Deliberately NOT "New": the factory's first stage (in_review) is labelled New, and
+  // one word meaning "not submitted" to a seller but "submitted, ours now" to the floor
+  // would bite the moment the two talk about the same order.
+  new: P("Pending", TONE.neutral, "received"),
+  draft: P("Pending", TONE.neutral, "received"),
   // Submitted = "In Production" to the seller. Every internal stage (in_review /
   // awaiting_scan / printed / working) collapses to this one label — the factory's
   // steps are not the seller's business. NB: still cancellable at in_review, so the
@@ -64,13 +66,13 @@ export function sellerStatus(o: { factory_status?: string | null; status?: strin
 }
 
 // Seller-facing filter tabs (grouped, not the granular factory stages).
-export const SELLER_FILTERS = ["All", "New", "In Production", "Shipped", "Needs attention"] as const
+export const SELLER_FILTERS = ["All", "Pending", "In Production", "Shipped", "Needs attention"] as const
 export type SellerFilter = (typeof SELLER_FILTERS)[number]
 
 export function matchesFilter(o: { factory_status?: string | null; status?: string | null }, f: SellerFilter): boolean {
   if (f === "All") return true
   const g = sellerStatus(o).group
-  if (f === "New") return g === "received"   // group id kept: not submitted + in review
+  if (f === "Pending") return g === "received"   // group id kept for compatibility
   if (f === "In Production") return g === "production"
   if (f === "Shipped") return g === "shipped"
   if (f === "Needs attention") return g === "attention"
