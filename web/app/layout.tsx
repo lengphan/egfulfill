@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Inter, Fraunces } from "next/font/google"
 
 import "./globals.css"
@@ -17,6 +18,19 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-display",
 })
+
+export const metadata: Metadata = {
+  title: { default: "EGFULFILL", template: "%s · EGFULFILL" },
+  // Lets iOS run the installed app full-screen (Android reads the manifest).
+  appleWebApp: { capable: true, title: "EGFULFILL Staff", statusBarStyle: "black-translucent" },
+}
+// viewport-fit=cover so the scanner overlay reaches under the iPhone notch.
+export const viewport: Viewport = {
+  themeColor: "#1a1a18",
+  viewportFit: "cover",
+  width: "device-width",
+  initialScale: 1,
+}
 
 export default function RootLayout({
   children,

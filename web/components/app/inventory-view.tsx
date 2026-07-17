@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Barcode } from "@/components/app/barcode"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, saveInventory, type InventoryItem } from "@/lib/api"
+import { getInventory, saveInventory, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -25,6 +25,7 @@ export function InventoryView() {
   const [saved, setSaved] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
+  const [histSku, setHistSku] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(() => {
@@ -132,7 +133,12 @@ export function InventoryView() {
                           : isLow(it) ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Low</span>
                             : <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">In stock</span>}
                       </td>
-                      <td className="px-4 py-2 text-right"><button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button></td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setHistSku(it.sku)} title="Scan history" className="text-muted-foreground hover:text-foreground"><ClockCounterClockwise size={15} /></button>
+                          <button onClick={() => remove(it.sku)} title="Remove" className="text-muted-foreground hover:text-red-600"><Trash size={15} /></button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -144,6 +150,7 @@ export function InventoryView() {
       </SectionCard>
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} />
+      <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
 
       {printOpen && (
         <div className="fixed inset-0 z-50 overflow-auto bg-background">
@@ -166,6 +173,65 @@ export function InventoryView() {
         </div>
       )}
     </div>
+  )
+}
+
+// Every stock movement for one SKU — who scanned it, which way, and when. This is
+// how an admin audits a count that looks wrong without digging through the DB.
+function ScanHistoryDialog({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+  const [rows, setRows] = useState<ScanRow[] | null>(null)
+
+  useEffect(() => {
+    let live = true
+    const id = setTimeout(() => {
+      if (!sku) { setRows(null); return }
+      getScanHistory(sku, 100).then((r) => { if (live) setRows(r ?? []) }).catch(() => { if (live) setRows([]) })
+    }, 0)
+    return () => { live = false; clearTimeout(id) }
+  }, [sku])
+
+  const net = (rows ?? []).reduce((n, r) => n + (r.direction === "in" ? r.qty : -r.qty), 0)
+  const when = (s?: string) => {
+    if (!s) return "—"
+    const d = new Date(s)
+    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+  }
+
+  return (
+    <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ClockCounterClockwise size={17} weight="duotone" /> Scan history</DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-between border-b border-border pb-2 text-sm">
+          <span className="font-mono text-xs font-medium">{sku}</span>
+          {rows && rows.length > 0 && <span className="text-xs text-muted-foreground">Net <b className={net >= 0 ? "text-emerald-600" : "text-red-600"}>{net >= 0 ? "+" : ""}{net}</b> over {rows.length} scan{rows.length === 1 ? "" : "s"}</span>}
+        </div>
+        {rows === null ? (
+          <div className="flex justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
+        ) : rows.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">No scans recorded for this SKU yet.</div>
+        ) : (
+          <div className="max-h-80 divide-y divide-border overflow-auto">
+            {rows.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 py-2">
+                <span className={"flex size-6 shrink-0 items-center justify-center rounded-md " + (r.direction === "in" ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700")}>
+                  {r.direction === "in" ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
+                </span>
+                <span className={"w-10 shrink-0 text-sm font-semibold tabular-nums " + (r.direction === "in" ? "text-emerald-600" : "text-red-600")}>
+                  {r.direction === "in" ? "+" : "−"}{r.qty}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm">{r.by_name || "Unknown user"}</div>
+                  {r.order_ref && <div className="truncate font-mono text-xs text-muted-foreground">order {r.order_ref}</div>}
+                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">{when(r.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 

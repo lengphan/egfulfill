@@ -277,6 +277,23 @@ export function saveInventory(items: InventoryItem[]) {
   return api<{ ok?: boolean; count?: number }>(`/api/inventory`, { method: "POST", body: JSON.stringify(items) })
 }
 
+// ── Inventory scan in/out ──
+// A scan is an ATOMIC DELTA server-side (in_stock = in_stock + n), NOT the whole-list
+// upsert saveInventory() uses — so two people scanning at once can't clobber each other.
+export type ScanRow = { id: string; sku: string; direction: "in" | "out"; qty: number; order_ref?: string | null; created_at?: string; by_name?: string | null; item_name?: string | null }
+export function scanInventory(body: { sku: string; direction: "in" | "out"; qty?: number; order_ref?: string | null }) {
+  return api<{ ok: boolean; item: InventoryItem; scan: ScanRow }>(`/api/inventory/scan`, { method: "POST", body: JSON.stringify(body) })
+}
+export function getScanHistory(sku?: string, limit = 100) {
+  const qs = new URLSearchParams()
+  if (sku) qs.set("sku", sku)
+  qs.set("limit", String(limit))
+  return api<ScanRow[]>(`/api/inventory/scan?${qs}`)
+}
+export function undoScan(id: string) {
+  return api<{ ok: boolean; item: InventoryItem | null }>(`/api/inventory/scan/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+
 // ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
 export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }

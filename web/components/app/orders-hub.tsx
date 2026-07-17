@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, DownloadSimple, Warning, Flag, MapPin } from "@phosphor-icons/react"
+import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, Warning, Flag, MapPin } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
