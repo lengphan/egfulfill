@@ -10,7 +10,7 @@
 //  - notify() is fire-and-forget by contract: a notification must NEVER fail the
 //    business action that triggered it (shipping an order, sending a message).
 import { q } from '../db.js';
-import { egBroadcast } from '../events.js';
+import { egSendTo } from '../events.js';
 
 let _ready = null;
 export function ensureNotifications() {
@@ -60,9 +60,11 @@ export async function notify({ userIds, roles, type, title, body, href, entityId
        select unnest($1::uuid[]), $2, $3, $4, $5, $6`,
       [ids, type, String(title).slice(0, 200), body ? String(body).slice(0, 500) : null, href || null, entityId ? String(entityId) : null]
     );
-    // The SSE hub is a broadcast bus with no per-user routing, so carry the intended
-    // recipients and let each client ignore what isn't theirs.
-    egBroadcast({ type: 'notification', users: ids, kind: type, title });
+    // Push ONLY to the recipients' own sockets. This used to broadcast the title +
+    // the recipient list to every connected client and rely on each one to ignore
+    // what wasn't theirs — which meant anyone with devtools could read notifications
+    // meant for other people.
+    egSendTo(ids, { type: 'notification', kind: type });
   } catch (e) {
     // Swallow: a missed bell must never break the action that caused it.
   }

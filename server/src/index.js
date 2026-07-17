@@ -128,7 +128,7 @@ app.get('/api/events', (req, reply) => {
     'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*'
   });
   res.write('retry: 3000\n\n:ok\n\n');
-  const remove = addClient(res);
+  const remove = addClient(res, user);   // bind the socket to WHO it belongs to
   const hb = setInterval(() => { try { res.write(':hb\n\n'); } catch (e) {} }, 25000);
   req.raw.on('close', () => { clearInterval(hb); remove(); });
 });

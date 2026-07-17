@@ -114,7 +114,11 @@ export function ordersRoutes(app, requireAuth) {
     const isNew = !!(up.rows[0] && up.rows[0].inserted);
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
     audit(req, 'order.saved', { entityType: 'order', entityId: o.id, after: { status: o.status, total: o.total, customer: (o.customer && o.customer.name) || null } });
-    egBroadcast({ type: 'orders', id: o.id });
+    // Cache-invalidation ping only — NO id/sku in the payload. Broadcasts reach every
+    // connected client, so anything identifying here would disclose one seller's order
+    // ids + SKUs to every other seller. Receivers re-fetch through their own
+    // access-controlled endpoint, which is where scoping belongs.
+    egBroadcast({ type: 'orders' });
     // A NEW order is the thing the floor most needs to hear about — and only a new
     // one, so re-saving an order doesn't re-alert everyone.
     if (isNew) {
@@ -193,7 +197,7 @@ export function ordersRoutes(app, requireAuth) {
     if (Object.keys(after).length || wantsItems) {
       audit(req, 'order.updated', { entityType: 'order', entityId: req.params.id, before, after: Object.keys(after).length ? after : { items: 'replaced' } });
     }
-    egBroadcast({ type: 'orders', id: req.params.id });
+    egBroadcast({ type: 'orders' });
     return { ok: true };
   });
 
@@ -210,7 +214,7 @@ export function ordersRoutes(app, requireAuth) {
       [status || '', req.params.id, sku]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
       before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
-    egBroadcast({ type: 'item-status', id: req.params.id, sku: sku, status: status || '' });
+    egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
     return { ok: true };
   });
 
@@ -337,7 +341,7 @@ export function ordersRoutes(app, requireAuth) {
       [req.params.id, req.user.sub, b.role || 'seller', b.text || '',
        (b.attachment && typeof b.attachment === 'object') ? b.attachment : null,
        JSON.stringify(meta), b.clientId || null]);
-    egBroadcast({ type: 'order-message', id: req.params.id });
+    egBroadcast({ type: 'order-message' });
 
     // Tell somebody. A message that only lands in a table nobody is watching is how
     // "Talk to a human" used to disappear silently.

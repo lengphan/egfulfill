@@ -88,8 +88,9 @@ export function NotificationBell() {
     return () => window.removeEventListener("eg-user-changed", sync)
   }, [])
 
-  // Live push over the SSE hub that already exists. The bus is a broadcast with no
-  // per-user routing, so each event carries its recipients and we ignore the rest.
+  // Live push over the SSE hub. Notification events are now addressed server-side to
+  // the recipients' own sockets, so simply receiving one means it's ours — the old
+  // client-side recipient filter was never a security boundary anyway.
   useEffect(() => {
     const token = getToken()
     if (!token || typeof EventSource === "undefined") return
@@ -101,8 +102,6 @@ export function NotificationBell() {
         try {
           const d = JSON.parse(ev.data || "{}")
           if (d.type !== "notification") return
-          const me = getUser()?.id
-          if (me && Array.isArray(d.users) && !d.users.includes(me)) return
           load(true)
         } catch {}
       }
