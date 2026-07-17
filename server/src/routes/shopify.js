@@ -33,6 +33,135 @@ function verifyHmac(params) {
   catch (e) { return false; }
 }
 
+// Webhook HMAC — DIFFERENT from verifyHmac above. Webhooks sign the raw request BYTES
+// and base64-encode the digest; the OAuth callback signs sorted query params as hex. Mixing
+// the two silently rejects every webhook, so they stay separate on purpose.
+function verifyWebhookHmac(rawBody, header) {
+  if (!rawBody || !header || !API_SECRET) return false;
+  const digest = crypto.createHmac('sha256', API_SECRET).update(rawBody).digest('base64');
+  try { return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(String(header))); }
+  catch { return false; }
+}
+
+const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const genLineId = () => 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+
+// A Shopify line item's custom properties ([{name,value}]) carry the buyer's uploaded
+// file + personalization, exactly like Etsy variations. Same split rule as importReceipt.
+function parseLineProps(line) {
+  let uploadUrl = null, personalization = null; const vparts = [];
+  for (const p of (line.properties || [])) {
+    const val = String(p.value == null ? '' : p.value);
+    const nm = String(p.name || '').toLowerCase();
+    if (!val || nm.startsWith('_')) continue;   // _-prefixed props are Shopify-internal
+    if (/^https?:\/\//i.test(val) && (/upload|logo|file|image|photo|art|design/.test(nm) || /\.(png|jpe?g|gif|webp|svg|pdf|ai|eps|psd|tiff?)(\?|$)/i.test(val))) uploadUrl = val;
+    else if (nm.indexOf('personaliz') !== -1 || nm.indexOf('monogram') !== -1) personalization = val;
+    else vparts.push(val);
+  }
+  return { uploadUrl, personalization, extra: vparts.join(', ') || null };
+}
+
+// Upsert one Shopify order into `orders`. Mirrors etsy.js importReceipt: re-syncs and
+// orders/updated webhooks only refresh money + address, NEVER the internal pipeline
+// (status/factory_status) or items — otherwise a seller's in-progress order would reset
+// every time the buyer's shop pinged an update.
+async function importShopifyOrder(conn, order, isFactory) {
+  const id = 'shopify-' + order.id;
+  const cancelled = !!order.cancelled_at;
+  const shipped = String(order.fulfillment_status || '').toLowerCase() === 'fulfilled';
+  const status = cancelled ? 'cancelled' : (shipped ? 'shipped' : 'new');
+  const createdIso = order.created_at || null;
+  const cust = order.customer || {};
+  const custName = [cust.first_name, cust.last_name].filter(Boolean).join(' ').trim()
+    || `${order.name || ''}`.trim() || 'Shopify customer';
+  const a = order.shipping_address || order.billing_address || {};
+  const address = {
+    line1: a.address1 || '', line2: a.address2 || '', city: a.city || '',
+    state: a.province_code || a.province || '', zip: a.zip || '',
+    country: a.country_code || a.country || '',
+    formatted: [a.address1, a.address2, a.city, a.province_code || a.province, a.zip].filter(Boolean).join(', '),
+  };
+  const track = (order.fulfillments || []).map((f) => f.tracking_number).filter(Boolean)[0] || null;
+  // Shopify's own order number (#1001) is what the seller recognises — keep it for
+  // display. note = buyer note. Set on INSERT only (out of the conflict update) so a
+  // seller's later edits survive a re-sync, same as the Etsy importer.
+  const meta = { source: 'shopify', shopify_name: order.name || null,
+                 isGift: /gift/i.test(order.note || ''), note: order.note || '' };
+  await q(
+    `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta)
+     values ($1,$2,$3,'shopify',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12)
+     on conflict (id) do update set total=excluded.total,
+       customer=excluded.customer, address=excluded.address, tracking=coalesce(excluded.tracking, orders.tracking),
+       created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
+    [id, conn.connected_by, conn.shop_name || conn.shop_id,
+     { name: custName, email: cust.email || order.email || null }, address,
+     status, status, num(order.total_price), track, createdIso, !!isFactory, meta]
+  );
+  // Items only on first import — like Etsy, a re-sync must not wipe factory picks.
+  const hasItems = await q('select 1 from order_items where order_id=$1 limit 1', [id]);
+  if (!hasItems.rowCount) {
+    for (const line of (order.line_items || [])) {
+      const { uploadUrl, personalization, extra } = parseLineProps(line);
+      const variant = [line.variant_title, extra].filter((s) => s && s !== 'Default Title').join(', ') || null;
+      const method = /embroider|embroidered|embroidery|monogram/i.test(`${line.title || ''} ${variant || ''}`) ? 'EMB' : null;
+      await q(
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, design_src, personalization, print_type, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [id, line.sku || null, line.title || null, line.quantity || 1, variant, num(line.price), uploadUrl, personalization, method, genLineId()]
+      );
+    }
+  }
+  return cancelled ? 'cancelled' : 'imported';
+}
+
+// Is this connection's owner staff (factory-owned orders) or a seller (seller-owned)?
+// Same rule as Etsy: factory_order = the connector is not a seller.
+async function connIsFactory(conn) {
+  if (!conn.connected_by) return false;
+  const r = await q('select role from users where id=$1', [conn.connected_by]);
+  return !!(r.rows[0] && r.rows[0].role && r.rows[0].role !== 'seller');
+}
+
+// Pull recent orders for one connection (backfill / manual sync). Webhooks handle
+// real-time; this covers the just-connected backlog and any missed events. `status=any`
+// so we see unfulfilled + fulfilled; Shopify caps page size at 250.
+async function syncShopifyConnection(conn) {
+  const isFactory = await connIsFactory(conn);
+  let imported = 0, cancelled = 0;
+  const url = `https://${conn.shop_id}/admin/api/${API_VERSION}/orders.json?status=any&limit=250`;
+  const r = await fetch(url, { headers: { 'X-Shopify-Access-Token': conn.access_token } });
+  if (!r.ok) throw new Error(`Shopify orders fetch failed (${r.status})`);
+  const data = await r.json().catch(() => ({}));
+  for (const order of (data.orders || [])) {
+    const res = await importShopifyOrder(conn, order, isFactory);
+    if (res === 'cancelled') cancelled++; else imported++;
+  }
+  await q('update platform_connections set last_sync_at=now() where id=$1', [conn.id]).catch(() => {});
+  return { shop: conn.shop_id, imported, cancelled };
+}
+
+// Register the order webhooks on the store right after connect, so we don't depend on
+// anyone wiring them by hand. Idempotent: Shopify dedupes by (topic,address), returning
+// 422 for an existing one — which we treat as success. Compliance webhooks
+// (customers/data_request, customers/redact, shop/redact) are configured in the Partner
+// Dashboard app settings, not here; they hit the same /api/webhooks/shopify endpoint.
+async function registerWebhooks(shop, token) {
+  const address = (process.env.SHOPIFY_WEBHOOK_URL || 'https://egful.store/api/webhooks/shopify');
+  const topics = ['orders/create', 'orders/updated', 'orders/cancelled'];
+  const results = [];
+  for (const topic of topics) {
+    try {
+      const r = await fetch(`https://${shop}/admin/api/${API_VERSION}/webhooks.json`, {
+        method: 'POST',
+        headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhook: { topic, address, format: 'json' } }),
+      });
+      results.push({ topic, ok: r.ok || r.status === 422 });   // 422 = already registered
+    } catch (e) { results.push({ topic, ok: false, error: e.message }); }
+  }
+  return results;
+}
+
 export function shopifyRoutes(app, requireAuth, requireStaff) {
   // Shared connections table (created by etsy.js too) — idempotent.
   q(`create table if not exists platform_connections (
@@ -107,10 +236,106 @@ export function shopifyRoutes(app, requireAuth, requireStaff) {
            scopes=excluded.scopes, connected_by=excluded.connected_by, updated_at=now()`,
         [shop, shopName, t.access_token, t.scope || SCOPES, req.user.sub]
       );
-      return { ok: true, shop_id: shop, shop_name: shopName, scopes: t.scope || SCOPES };
+      // Register order webhooks now, so real-time sync works without manual setup.
+      // Best-effort: a failure here doesn't block the connection (the backfill sync
+      // still works), it just means no live updates until re-registered.
+      let webhooks = [];
+      try { webhooks = await registerWebhooks(shop, t.access_token); } catch (e) { /* non-fatal */ }
+      // Backfill the existing order backlog immediately, so a freshly-connected store
+      // isn't empty until the first new webhook fires.
+      let backfill = null;
+      try {
+        const conn = (await q(`select * from platform_connections where platform='shopify' and shop_id=$1`, [shop])).rows[0];
+        if (conn) backfill = await syncShopifyConnection(conn);
+      } catch (e) { backfill = { error: e.message }; }
+      return { ok: true, shop_id: shop, shop_name: shopName, scopes: t.scope || SCOPES, webhooks, backfill };
     } catch (e) {
       reply.code(400); return { error: e.message };
     }
+  });
+
+  // Manual/backfill sync — a seller syncs their own store, staff sync all. Mirrors
+  // /api/etsy/sync. Webhooks keep things current; this is the "pull now" button and the
+  // recovery path if a webhook was ever missed.
+  app.post('/api/shopify/sync', { preHandler: requireAuth }, async (req, reply) => {
+    if (!API_KEY || !API_SECRET) { reply.code(400); return { error: 'Server missing SHOPIFY_API_KEY / SHOPIFY_API_SECRET' }; }
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const conns = (await q(
+      staff ? `select * from platform_connections where platform='shopify'`
+            : `select * from platform_connections where platform='shopify' and connected_by=$1`,
+      staff ? [] : [req.user.sub])).rows;
+    if (!conns.length) { reply.code(400); return { error: staff ? 'No Shopify store connected' : 'No Shopify shop connected to your account' }; }
+    const synced = [];
+    for (const conn of conns) {
+      try { synced.push(await syncShopifyConnection(conn)); }
+      catch (e) { synced.push({ shop: conn.shop_id, error: e.message }); }
+    }
+    return { ok: true, synced };
+  });
+
+  // ── Webhook receiver. ONE public endpoint for every Shopify topic (order events +
+  // the mandatory GDPR compliance webhooks). Shopify signs the raw body; we verify with
+  // the app secret before trusting anything, so being public + unauthenticated is safe.
+  // Routed by the X-Shopify-Topic header. Configure this URL as BOTH the app's webhook
+  // endpoint and its compliance-webhook endpoint in the Partner Dashboard.
+  app.post('/api/webhooks/shopify', async (req, reply) => {
+    const hmac = req.headers['x-shopify-hmac-sha256'];
+    if (!verifyWebhookHmac(req.rawBody, hmac)) { reply.code(401); return { error: 'HMAC verification failed' }; }
+    const topic = String(req.headers['x-shopify-topic'] || '');
+    const shopDomain = String(req.headers['x-shopify-shop-domain'] || '').toLowerCase();
+    const payload = req.body || {};
+
+    // Compliance webhooks are MANDATORY for public apps — Shopify rejects the app if the
+    // endpoint doesn't 200 to a signed request. We hold very little PII (buyer name +
+    // shipping address on synced orders), and honour redaction by scrubbing it.
+    if (topic === 'customers/data_request') {
+      // A merchant asked what customer data we hold. Nothing to return synchronously;
+      // acknowledged. (If we ever store more, respond out-of-band per Shopify's SLA.)
+      return { ok: true };
+    }
+    if (topic === 'customers/redact') {
+      // Erase a specific customer's PII from that shop's orders.
+      const ids = (payload.orders_to_redact || []).map((n) => 'shopify-' + n);
+      if (ids.length) {
+        await q(`update orders set customer='{}'::jsonb, address='{}'::jsonb, updated_at=now()
+                 where id = any($1)`, [ids]).catch(() => {});
+      }
+      return { ok: true };
+    }
+    if (topic === 'shop/redact') {
+      // 48h after uninstall: erase the shop's data. Drop the connection and scrub PII
+      // from its orders (the order shells stay for the factory's own fulfilment record,
+      // but nothing personally identifying remains).
+      const dom = shopDomain || String(payload.shop_domain || '').toLowerCase();
+      if (dom) {
+        // Read the connection BEFORE deleting it — we need its owner + display name to
+        // find the orders (orders store the shop's NAME, not its domain).
+        const conn = (await q(`select connected_by, shop_name from platform_connections where platform='shopify' and shop_id=$1`, [dom])).rows[0];
+        if (conn) {
+          await q(`update orders set customer='{}'::jsonb, address='{}'::jsonb, updated_at=now()
+                   where source='shopify' and seller_id=$1 and store=$2`, [conn.connected_by, conn.shop_name || dom]).catch(() => {});
+        }
+        await q(`delete from platform_connections where platform='shopify' and shop_id=$1`, [dom]).catch(() => {});
+      }
+      return { ok: true };
+    }
+
+    // Order events — find the connection this shop belongs to, then import.
+    const conn = (await q(`select * from platform_connections where platform='shopify' and shop_id=$1`, [shopDomain])).rows[0];
+    if (!conn) { reply.code(202); return { ok: false, reason: 'shop not connected' }; }   // 202: accepted, nothing to do
+    try {
+      if (topic === 'orders/create' || topic === 'orders/updated') {
+        const isFactory = await connIsFactory(conn);
+        await importShopifyOrder(conn, payload, isFactory);
+      } else if (topic === 'orders/cancelled') {
+        await q(`update orders set status='cancelled', factory_status='cancelled', updated_at=now() where id=$1`,
+          ['shopify-' + payload.id]).catch(() => {});
+      }
+    } catch (e) {
+      req.log.error({ err: e, topic }, 'shopify webhook import failed');
+      // Still 200 — a 500 makes Shopify retry for hours over a bad single payload.
+    }
+    return { ok: true };
   });
 
   app.delete('/api/shopify/connections/:shop_id', { preHandler: requireAuth }, async (req) => {

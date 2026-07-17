@@ -46,6 +46,18 @@ import { addClient } from './events.js';
 const app = Fastify({ logger: true, bodyLimit: 60 * 1024 * 1024 });
 await app.register(cors, { origin: process.env.CORS_ORIGIN || '*' });
 
+// Shopify webhooks HMAC-sign the EXACT request bytes, so those routes need the raw
+// body — but Fastify's JSON parser discards it. Override the parser to stash the raw
+// buffer ONLY when Shopify's signature header is present, so we don't hold a second
+// copy of every 60MB design upload. Everything else parses exactly as before.
+app.removeContentTypeParser('application/json');
+app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
+  if (req.headers['x-shopify-hmac-sha256']) req.rawBody = body;
+  if (!body || body.length === 0) { done(null, {}); return; }
+  try { done(null, JSON.parse(body.toString('utf8'))); }
+  catch (e) { e.statusCode = 400; done(e, undefined); }
+});
+
 // Attach req.user from the Bearer token on every request (null if not signed in).
 app.addHook('onRequest', async (req) => {
   const m = (req.headers.authorization || '').match(/^Bearer (.+)$/);

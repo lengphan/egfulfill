@@ -59,9 +59,14 @@ const openLabel = (r: UspsLabelResult) => {
 }
 
 // Filters derive from the canonical pipeline so they always match the status model.
+// NB: id "" and the first pipeline stage (in_review) are DIFFERENT states that both used
+// to read "New" — a duplicate tab. "" = arrived but nobody has started it (where
+// factory-synced orders land); in_review = submitted into the queue, the first
+// production step. Labelled "Received" vs "New" so they're distinguishable. "Received"
+// matches ALL_STATUSES's own label for "" ("New (received)").
 const FILTERS: { label: string; id: string }[] = [
   { label: "All", id: "all" },
-  { label: "New", id: "" },
+  { label: "Received", id: "" },
   ...FACTORY_STAGES.map((s) => ({ label: s.label, id: s.id })),
   { label: "Issues", id: "issues" },
 ]

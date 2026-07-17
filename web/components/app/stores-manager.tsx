@@ -25,6 +25,7 @@ import {
 } from "@/lib/api"
 import { startEtsyConnect } from "@/lib/etsy-oauth"
 import { startShopifyConnect } from "@/lib/shopify-oauth"
+import { getUser } from "@/lib/auth"
 
 const fmtDate = (s: string | null) => {
   if (!s) return "never"
@@ -46,6 +47,10 @@ export function StoresManager() {
   const [isDemo, setIsDemo] = useState(false)
   const [busy, setBusy] = useState<string | null>(null) // shop_id or "connect"
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; msg: string } | null>(null)
+  // Admins get the full scope list per shop (the exact grants that shop authorised),
+  // not just the count — useful for diagnosing "why can't we read X". Expanded per shop.
+  const isAdmin = getUser()?.role === "admin"
+  const [openScopes, setOpenScopes] = useState<Set<string>>(new Set())
 
   const [shopDomain, setShopDomain] = useState("")
 
@@ -209,8 +214,26 @@ export function StoresManager() {
                       </span>
                     </div>
                     <div className="mt-0.5 text-xs text-muted-foreground">
-                      {scopeCount(c.scopes)} scopes · last sync {fmtDate(c.last_sync_at)}
+                      {isAdmin && c.scopes ? (
+                        <button
+                          type="button"
+                          className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                          onClick={() => setOpenScopes((prev) => { const n = new Set(prev); n.has(c.shop_id) ? n.delete(c.shop_id) : n.add(c.shop_id); return n })}
+                        >
+                          {scopeCount(c.scopes)} scopes
+                        </button>
+                      ) : (
+                        <>{scopeCount(c.scopes)} scopes</>
+                      )}
+                      {" · last sync "}{fmtDate(c.last_sync_at)}
                     </div>
+                    {isAdmin && openScopes.has(c.shop_id) && c.scopes && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {c.scopes.split(/[\s,]+/).filter(Boolean).map((s) => (
+                          <span key={s} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{s}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <Button
