@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, Warning, Flag, MapPin } from "@phosphor-icons/react"
+import { Package, CircleNotch, ArrowRight, CheckCircle, PenNib, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -12,19 +12,9 @@ import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards
 import { getToken, getUser } from "@/lib/auth"
 import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, stageMeta, orderStage, isException } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
+import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 
-const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
-const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
-const addrLine = (o: OrderRow) => {
-  const a = (o.address ?? {}) as Record<string, string>
-  return [a.city, a.state, a.zip].filter(Boolean).join(", ")
-}
-const fmtDate = (s?: string | null) => {
-  if (!s) return "—"
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
 
@@ -278,7 +268,16 @@ export function OrdersHub() {
                         <span>{fmtDate(o.created_at)}</span>
                         <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
                         {addrLine(o) && <span className="inline-flex items-center gap-0.5"><MapPin size={11} weight="fill" /> {addrLine(o)}</span>}
-                        {track && <span className="inline-flex items-center gap-0.5 font-medium text-emerald-600"><Truck size={11} weight="fill" /> {o.carrier || label?.carrier || "USPS"} {track}</span>}
+                        {track && (
+                          <a
+                            href={trackUrl(o.carrier || label?.carrier, track)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 font-medium text-emerald-600 hover:underline"
+                          >
+                            <Truck size={11} weight="fill" /> {o.carrier || label?.carrier || "USPS"} {track} <ArrowSquareOut size={9} weight="bold" />
+                          </a>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

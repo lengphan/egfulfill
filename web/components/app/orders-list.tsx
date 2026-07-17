@@ -23,46 +23,9 @@ import { getOrders, type OrderRow, type OrderItem } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { itemImage } from "@/lib/order-image"
+import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, variantOf, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
-
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
-const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
-const storeOf = (o: OrderRow) => {
-  const s = (o.store || o.source || "manual").toString()
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-const customerOf = (o: OrderRow) => o.customer?.name || "—"
-const itemsLabel = (o: OrderRow) => {
-  const items = o.items ?? []
-  if (!items.length) return "—"
-  const first = items[0]?.name || items[0]?.sku || "Item"
-  return items.length > 1 ? `${first} +${items.length - 1}` : first
-}
-const fmtDate = (s?: string | null) => {
-  if (!s) return "—"
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-}
-const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
-const unitsOf = (o: OrderRow) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
-const lineTotal = (it: OrderItem) => (Number(it.unit_price) || 0) * (Number(it.qty) || 1)
-const shipTo = (o: OrderRow) => {
-  const a = (o.address ?? {}) as Record<string, string>
-  const line = [a.street || a.first_line || a.line1 || a.address1, a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")
-  return line || ""
-}
-// USPS/UPS/FedEx public tracking, so a seller can check a number without leaving.
-const trackUrl = (carrier?: string | null, tracking?: string | null) => {
-  if (!tracking) return ""
-  const t = encodeURIComponent(tracking.replace(/\s+/g, ""))
-  const c = (carrier || "").toLowerCase()
-  if (c.includes("ups")) return `https://www.ups.com/track?tracknum=${t}`
-  if (c.includes("fedex")) return `https://www.fedex.com/fedextrack/?trknbr=${t}`
-  if (c.includes("dhl")) return `https://www.dhl.com/en/express/tracking.html?AWB=${t}`
-  return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`
-}
 
 /** Overlapping thumbnails of an order's items — the photos the flat table was missing. */
 function PhotoStack({ items }: { items: OrderItem[] }) {
