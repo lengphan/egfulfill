@@ -16,6 +16,44 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 
+// Balance of one account = SUM(delta) over the append-only ledger. Exported so every
+// caller reads money the same way (never a cached column that can drift).
+export async function balanceOf(account) {
+  const r = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1', [String(account)]);
+  return parseFloat(r.rows[0].bal) || 0;
+}
+
+// The atomic two-sided move behind EVERY money movement: an order charge, a refund,
+// an admin adjustment. Extracted from the /transfer route so orders.js charges through
+// this same path — one mechanism, one idempotency rule. The HTTP route is staff-only,
+// but an order charge is seller-initiated, so the authorisation check belongs to the
+// CALLER; this helper only moves money.
+//
+// Two rows share one `ref` under distinct types ('<type>-out' debits from, '<type>-in'
+// credits to) so each side de-dupes independently against the (account,type,ref) unique
+// index. Re-charging the same order id is therefore a no-op, not a double charge.
+export async function moveFunds({ from, to, amount, type = 'transfer', ref = null, note = null, by = null }) {
+  const amt = parseFloat(amount);
+  if (!isFinite(amt) || amt === 0) throw new Error('amount must be a non-zero number');
+  if (String(from) === String(to)) throw new Error('source and destination are the same wallet');
+  const r = ref != null && ref !== '' ? String(ref) : null;
+  const rows = [
+    { account: String(from), delta: -amt, type: type + '-out' },
+    { account: String(to), delta: amt, type: type + '-in' },
+  ];
+  for (const row of rows) {
+    if (r) {
+      const dup = await q('select 1 from wallet_ledger where account=$1 and type=$2 and ref=$3', [row.account, row.type, r]);
+      if (dup.rowCount) continue;
+    }
+    await q(
+      `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+       values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
+      [row.account, row.delta, row.type, r, note, by]);
+  }
+  return { fromBalance: await balanceOf(from), toBalance: await balanceOf(to) };
+}
+
 export function walletRoutes(app, requireAuth) {
   q(`create table if not exists wallet_ledger (
        id bigserial primary key,
@@ -62,10 +100,6 @@ export function walletRoutes(app, requireAuth) {
     return account === user.sub;
   }
 
-  async function balanceOf(account) {
-    const r = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1', [account]);
-    return parseFloat(r.rows[0].bal) || 0;
-  }
 
   // GET balance + recent ledger. Seller → own; staff may pass ?account=.
   app.get('/api/wallet', { preHandler: requireAuth }, async (req, reply) => {
@@ -132,24 +166,10 @@ export function walletRoutes(app, requireAuth) {
     if (to === from) { reply.code(400); return { error: 'source and destination are the same wallet' }; }
     const ref = (b.ref != null && b.ref !== '') ? String(b.ref) : null;
     const type = b.type || 'transfer';
-    // Two idempotent rows tagged with the SAME ref but distinct types so the pair
-    // is independently de-duped: '<type>-out' debits `from`, '<type>-in' credits `to`.
-    const rows = [
-      { account: from, delta: -amount, type: type + '-out' },
-      { account: to,   delta:  amount, type: type + '-in'  },
-    ];
-    for (const row of rows) {
-      if (ref) {
-        const dup = await q('select 1 from wallet_ledger where account=$1 and type=$2 and ref=$3', [row.account, row.type, ref]);
-        if (dup.rowCount) continue;
-      }
-      await q(
-        `insert into wallet_ledger (account, delta, type, ref, note, created_by)
-         values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
-        [row.account, row.delta, row.type, ref, b.note || null, req.user.sub]);
-    }
+    const { fromBalance, toBalance } = await moveFunds({
+      from, to, amount, type, ref, note: b.note || null, by: req.user.sub });
     audit(req, 'wallet.transfer', { entityType: 'wallet', entityId: to, after: { from, to, amount, type, ref, note: b.note || null } });
-    return { ok: true, fromBalance: await balanceOf(from), toBalance: await balanceOf(to), toAccount: to };
+    return { ok: true, fromBalance, toBalance, toAccount: to };
   });
 
   // ── Withdrawals ────────────────────────────────────────────────────────────

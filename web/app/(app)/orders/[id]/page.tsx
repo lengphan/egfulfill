@@ -14,12 +14,15 @@ import {
   getOrders,
   getOrderDesigns,
   getOrderMessages,
+  getOrderQuote,
   postOrderMessage,
   updateOrder,
+  ApiError,
   type OrderRow,
   type OrderItem,
   type OrderDesign,
   type ChatEntry,
+  type OrderQuote,
 } from "@/lib/api"
 import { designSrc, itemImage } from "@/lib/order-image"
 
@@ -50,6 +53,10 @@ export default function OrderDetailPage() {
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
+
+  // Re-pull orders after an action that changes this one (submit, cancel) so the badge
+  // and the action bar reflect the new status without a manual refresh.
+  const reload = () => { getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {}) }
 
   const reloadDesigns = () => {
     getOrderDesigns(id)
@@ -152,7 +159,8 @@ export default function OrderDetailPage() {
           <div className="text-sm text-muted-foreground">
             {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
           </div>
-          <CancelOrderButton order={order} onDone={() => getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {})} />
+          <SubmitOrderButton order={order} onDone={reload} />
+          <CancelOrderButton order={order} onDone={reload} />
         </div>
       </div>
 
@@ -349,6 +357,86 @@ export default function OrderDetailPage() {
  * (factory_status not in new/draft/''), which is what actually enforces this: hiding
  * the button is courtesy, the 403 is the gate.
  */
+// Submit to production — the CHARGE point. Nothing in the app pushed an order to the
+// factory before this, so a seller could never actually buy production; the server rule
+// existed with no caller. Shows the real quote first: people should see the price before
+// the button that takes the money, not after.
+function SubmitOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
+  const router = useRouter()
+  const [quote, setQuote] = useState<OrderQuote | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [short, setShort] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+
+  const fs = String(order.factory_status || "")
+  const submittable = ["", "new", "draft"].includes(fs)
+
+  useEffect(() => {
+    if (!submittable) return
+    let live = true
+    getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
+    return () => { live = false }
+  }, [order.id, submittable])
+
+  if (!submittable) return null
+
+  const submit = async () => {
+    setBusy(true); setErr(null); setShort(false)
+    try {
+      await updateOrder(order.id, { factoryStatus: "in_review", status: "in_review" })
+      setConfirm(false)
+      onDone()
+    } catch (e) {
+      // 402 = the server refused on money grounds (short balance, or a line it can't
+      // price). Its message already names the amounts, so show it verbatim.
+      if (e instanceof ApiError && e.status === 402) setShort(true)
+      setErr(e instanceof Error ? e.message : "Could not submit this order")
+    } finally { setBusy(false) }
+  }
+
+  const money = (n: number) => `$${n.toFixed(2)}`
+  const blocked = !!quote?.unpriced.length
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      {quote && !blocked && (
+        <div className="text-right text-xs text-muted-foreground">
+          <span className="tabular-nums">
+            {money(quote.subtotal)} production + {money(quote.shipping)} shipping
+          </span>
+          <span className="mx-1.5 text-border">·</span>
+          <span className="font-semibold tabular-nums text-foreground">{money(quote.total)}</span>
+        </div>
+      )}
+      {blocked && (
+        <span className="text-right text-xs text-destructive">
+          Not priced yet: {quote!.unpriced.map((u) => u.sku).join(", ")} — pick a catalog product first.
+        </span>
+      )}
+      {err && <span className="max-w-xs text-right text-xs text-destructive">{err}</span>}
+      <span className="flex items-center gap-2">
+        {short && (
+          <Button size="sm" variant="outline" onClick={() => router.push("/wallet")}>Top up</Button>
+        )}
+        {confirm ? (
+          <>
+            <span className="text-xs text-muted-foreground">
+              Charge {quote ? money(quote.total) : "your wallet"}?
+            </span>
+            <Button size="sm" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Yes, submit"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Not yet</Button>
+          </>
+        ) : (
+          <Button size="sm" onClick={() => setConfirm(true)} disabled={busy || blocked}>
+            <PaperPlaneTilt size={14} weight="bold" /> Submit to production
+          </Button>
+        )}
+      </span>
+    </div>
+  )
+}
+
 function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)

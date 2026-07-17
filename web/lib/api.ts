@@ -174,6 +174,14 @@ export type CatalogProduct = {
   base_price?: number | string
   shippingFee?: number | string
   shipping_fee?: number | string
+  // Per-SIZE overrides of base cost / shipping, keyed by the size label ({"2XL": 12.5}).
+  // A 3XL blank costs more to buy and to ship; colour doesn't change either. Absent key
+  // = use basePrice/shippingFee. Priced server-side by src/pricing.js — keep the key
+  // names in step with it. Snake variants exist because older rows round-tripped jsonb.
+  sizePrices?: Record<string, number>
+  size_prices?: Record<string, number>
+  shipFees?: Record<string, number>
+  ship_fees?: Record<string, number>
   description?: string
   supplier?: string // "S&S" | "Otto Cap" | "" — where the blank derives from
   mainColor?: string
@@ -554,6 +562,25 @@ export type NewOrderItem = {
 // %-coords for placing artwork on a mockup: center x/y, width w, rotation r (degrees).
 export type DesignPos = { x: number; y: number; w: number; h?: number; r: number }
 export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: string; pos?: DesignPos | null }
+// What this order costs the seller to produce: Σ(base cost × qty) + first item's
+// shipping + ship_extra per additional unit. Priced by server/src/pricing.js — the SAME
+// quote the charge uses, so what the seller is shown is what they're billed.
+// `unpriced` lists items with no catalog match; those block submit (no cost = no price).
+export type OrderQuote = {
+  lines: { id: string; sku: string; name: string; qty: number; size: string | null; unitCost: number; shipFee: number }[]
+  unpriced: { sku: string; name: string }[]
+  fees: { ship_first: number; ship_extra: number }
+  subtotal: number
+  shipping: number
+  units: number
+  total: number
+  charged: number
+  balance: number
+}
+export function getOrderQuote(id: string) {
+  return api<OrderQuote>(`/api/orders/${encodeURIComponent(id)}/quote`)
+}
+
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }

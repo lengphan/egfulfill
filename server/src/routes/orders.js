@@ -6,6 +6,8 @@ import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
+import { quoteOrder, freezeQuote } from '../pricing.js';
+import { moveFunds, balanceOf } from './wallet.js';
 
 // ── Stage vocabulary ───────────────────────────────────────────────────────────
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
@@ -64,6 +66,66 @@ export function stageDenial(role, current, target) {
   return 'Your role cannot change production status.';        // designer, and anything new
 }
 
+// ── The order money loop ───────────────────────────────────────────────────────
+// Submitting to production is the charge point: the seller pays the factory to make
+// the thing. Cancelling before anyone picks it up reverses that charge in full.
+//
+// Both sides move through wallet.js's moveFunds (one money mechanism for the whole
+// app) and are idempotent on the order id, so a double-click, a retry, or two tabs
+// submitting at once can only ever produce ONE charge and ONE refund.
+const CHARGE_TYPE = 'order-charge';
+const REFUND_TYPE = 'order-refund';
+
+// Has this order already been charged? Reads the ledger rather than a flag on the
+// order — the ledger is the source of truth for money, and a flag could drift from it.
+async function chargedAmount(orderId) {
+  const r = await q(
+    `select coalesce(sum(delta),0) as amt from wallet_ledger where ref=$1 and type=$2`,
+    [String(orderId), CHARGE_TYPE + '-in']);      // the factory's credit leg
+  return parseFloat(r.rows[0].amt) || 0;
+}
+async function refundedAmount(orderId) {
+  const r = await q(
+    `select coalesce(sum(delta),0) as amt from wallet_ledger where ref=$1 and type=$2`,
+    [String(orderId), REFUND_TYPE + '-in']);      // the seller's credit leg
+  return parseFloat(r.rows[0].amt) || 0;
+}
+
+// Charge the seller for an order. Returns {ok} or {error, ...} — never throws for an
+// expected refusal (short balance, unpriceable line), so the caller can pass the
+// message straight to the seller.
+async function chargeForSubmit(orderId, sellerId, by) {
+  if (await chargedAmount(orderId) > 0) return { ok: true, already: true };
+  const quote = await quoteOrder(orderId);
+  if (quote.unpriced.length) {
+    // No catalog match = no cost. Charging 0 would fulfil it free, forever, silently.
+    const names = quote.unpriced.map((u) => u.sku).join(', ');
+    return { error: `These items aren't in the catalog yet, so they can't be priced: ${names}. Pick a catalog product for them first.`, unpriced: quote.unpriced };
+  }
+  if (!quote.lines.length) return { error: 'This order has no items to produce.' };
+  if (quote.total <= 0) return { error: 'This order prices out at $0 — check the catalog base cost.' };
+  const balance = await balanceOf(sellerId);
+  if (balance < quote.total) {
+    return { error: `Not enough balance. This order costs $${quote.total.toFixed(2)} and your wallet has $${balance.toFixed(2)}.`,
+             shortfall: Math.round((quote.total - balance) * 100) / 100, required: quote.total, balance, quote };
+  }
+  await freezeQuote(orderId, quote);
+  await moveFunds({ from: sellerId, to: 'factory', amount: quote.total, type: CHARGE_TYPE,
+                    ref: String(orderId), note: `Order ${orderId} pushed to production`, by });
+  return { ok: true, charged: quote.total, quote };
+}
+
+// Reverse the charge when a seller cancels inside their zone. Idempotent: refunding
+// twice is a no-op, and an order that was never charged has nothing to give back.
+async function refundForCancel(orderId, sellerId, by) {
+  const charged = await chargedAmount(orderId);
+  if (charged <= 0) return { ok: true, nothingToRefund: true };
+  if (await refundedAmount(orderId) > 0) return { ok: true, already: true };
+  await moveFunds({ from: 'factory', to: sellerId, amount: charged, type: REFUND_TYPE,
+                    ref: String(orderId), note: `Order ${orderId} cancelled — refund`, by });
+  return { ok: true, refunded: charged };
+}
+
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
@@ -96,6 +158,11 @@ export function ordersRoutes(app, requireAuth) {
   // Placement (%-coords {x,y,w,h,r}) saved by the seller's order customizer — kept
   // here (seller-writable via canSeeOrder) because order_items.design_pos is staff-only.
   q('alter table order_designs add column if not exists pos jsonb').catch(() => {});
+  // What the seller was CHARGED per unit, frozen at submit (see pricing.js). Distinct
+  // from unit_price, which is what the BUYER paid. Without freezing, editing a catalog
+  // base price would silently rewrite the cost of orders already billed.
+  q('alter table order_items add column if not exists unit_cost numeric').catch(() => {});
+  q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
   // List
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
@@ -249,6 +316,7 @@ export function ordersRoutes(app, requireAuth) {
     // factory_status='shipped' — or edit the address after the floor had started.
     // Production belongs to the factory; the seller's only status move is cancelling,
     // and only while nobody has picked it up yet.
+    let _charged = 0, _refunded = 0;   // reported back so the UI can show the wallet moving
     if (sel) {
       const cur = (await q('select factory_status from orders where id=$1 and seller_id=$2', [req.params.id, sel.id])).rows[0];
       if (!cur) { reply.code(404); return { error: 'Order not found' }; }
@@ -274,6 +342,18 @@ export function ordersRoutes(app, requireAuth) {
       if (started && (body.address !== undefined || body.customer !== undefined)) {
         reply.code(403); return { error: 'This order is already in production — its address can no longer be edited here.', locked: true };
       }
+      // ── Money. Do this BEFORE the status write, so a refused charge leaves the order
+      // exactly where it was. The reverse order would push unfunded work to the floor.
+      const want = String(body.factoryStatus ?? body.status ?? '');
+      if (want === 'in_review' && ['', 'new', 'draft'].includes(fs)) {
+        const paid = await chargeForSubmit(req.params.id, sel.id, req.user.sub);
+        if (paid.error) { reply.code(402); return paid; }        // 402 Payment Required
+        _charged = paid.charged || 0;
+      }
+      if (want === 'cancelled' && !started) {
+        const back = await refundForCancel(req.params.id, sel.id, req.user.sub);
+        _refunded = back.refunded || 0;
+      }
     }
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
@@ -286,8 +366,27 @@ export function ordersRoutes(app, requireAuth) {
     if (Object.keys(after).length || wantsItems) {
       audit(req, 'order.updated', { entityType: 'order', entityId: req.params.id, before, after: Object.keys(after).length ? after : { items: 'replaced' } });
     }
+    if (_charged) audit(req, 'order.charged', { entityType: 'order', entityId: req.params.id, after: { amount: _charged } });
+    if (_refunded) audit(req, 'order.refunded', { entityType: 'order', entityId: req.params.id, after: { amount: _refunded } });
     egBroadcast({ type: 'orders' });
-    return { ok: true };
+    if (_charged || _refunded) egBroadcast({ type: 'wallet' });
+    return { ok: true, charged: _charged || undefined, refunded: _refunded || undefined };
+  });
+
+  // What would this order cost to produce? The seller's Submit button reads this to show
+  // the price BEFORE they commit, and to tell them the shortfall if they can't cover it.
+  // Same quote the charge uses, so the number they see is the number they pay.
+  app.get('/api/orders/:id/quote', { preHandler: requireAuth }, async (req, reply) => {
+    const own = await q('select seller_id, factory_status from orders where id=$1', [req.params.id]);
+    const row = own.rows[0];
+    if (!row) { reply.code(404); return { error: 'Order not found' }; }
+    if (!isStaff(req.user)) {
+      const sel = await resolveSeller(req.user);
+      if (!sel || row.seller_id !== sel.id) { reply.code(403); return { error: 'forbidden' }; }
+    }
+    const quote = await quoteOrder(req.params.id);
+    const paid = await chargedAmount(req.params.id);
+    return { ...quote, charged: paid > 0 ? paid : 0, balance: await balanceOf(row.seller_id) };
   });
 
   // Per-item production status — the warehouse "Working" flag. Staff-only. Keyed
