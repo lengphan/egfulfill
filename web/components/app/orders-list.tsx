@@ -167,7 +167,7 @@ export function OrdersList() {
   return (
     <div className="space-y-4">
       <StatGrid>
-        <StatCard label="Received" value={String(stats.received)} sub="new orders" />
+        <StatCard label="New" value={String(stats.received)} sub="not yet in production" />
         <StatCard label="In production" value={String(stats.prod)} sub="being fulfilled" />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="fulfilled" tone="pos" />
         <StatCard label="Needs attention" value={String(stats.attention)} sub="action needed" tone={stats.attention ? "neg" : undefined} />

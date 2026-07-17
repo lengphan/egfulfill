@@ -17,7 +17,6 @@ export const FACTORY_STAGES: FactoryStage[] = [
   { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" },
   { id: "scanned", label: "Scanned", tone: "qc" },
   { id: "printing", label: "Printing", tone: "prod" },
-  { id: "packing", label: "Packing", tone: "packed" },
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
 const ORDER = FACTORY_STAGES.map((s) => s.id)
@@ -42,7 +41,10 @@ export function normalizeStage(s?: string | null): string {
   if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
   if (["approved", "ready_print", "in_queue", "queued", "prescan"].includes(v)) return "awaiting_scan"
   if (["qc", "production", "in_production", "in-prod", "printed", "prepress", "working"].includes(v)) return "printing"
-  if (["packed", "label", "labelled", "labeled", "ready", "finished"].includes(v)) return "packing"
+  // `packing` was removed from the pipeline, but rows in the DB still carry it —
+  // fold it (and its old aliases) onto printing. Without this it would fall through
+  // to "" and every in-flight packing order would read as NEW.
+  if (["packing", "packed", "label", "labelled", "labeled", "ready", "finished"].includes(v)) return "printing"
   if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
   if (["escalated", "action"].includes(v)) return "flagged"
   if (["replacement"].includes(v)) return "backorder"
