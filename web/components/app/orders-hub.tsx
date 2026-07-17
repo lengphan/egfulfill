@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, orderStage, isException } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -73,7 +73,9 @@ export function OrdersHub() {
   const role = getUser()?.role || ""
   const isAdmin = role === "admin"
   const canFulfill = role === "warehouse" || isAdmin // receive (intake) + ship
-  const canDesign = role === "operator" || isAdmin // send to designer + set arbitrary status
+  // Artwork review. NB: this no longer implies "set any status" — stage changes are
+  // gated per-role by stageOptionsFor/canSetStage, and the server enforces it.
+  const canDesign = role === "operator" || isAdmin // send to designer
 
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [filter, setFilter] = useState("all")
@@ -286,27 +288,40 @@ export function OrdersHub() {
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Order-level status / flag — applies to every line at once */}
-                      {(canDesign || canFulfill) && !allShipped && (
-                        <div className="relative">
-                          <select
-                            value=""
-                            onChange={(e) => { if (e.target.value) setOrderStatus(o, e.target.value) }}
-                            disabled={busy === `ord:${o.id}`}
-                            className="h-8 rounded-md border border-input bg-transparent pl-7 pr-2 text-xs font-medium"
-                            aria-label="Flag or set order status"
-                            title="Flag or set order status"
-                          >
-                            <option value="">Flag / status…</option>
-                            <optgroup label="Set all items to">
-                              {ALL_STATUSES.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id)).map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
-                            </optgroup>
-                            <optgroup label="Exceptions">
-                              {EXCEPTION_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                            </optgroup>
-                          </select>
-                          <Flag size={13} weight="fill" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        </div>
-                      )}
+                      {/* Gated against the ORDER's stage — this sets every line at once,
+                          so an operator loses it as soon as the order reaches the floor,
+                          keeping only the stop options. */}
+                      {!allShipped && (() => {
+                        const opts = stageOptionsFor(role, stage)
+                        const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
+                        const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
+                        if (!opts.length) return null
+                        return (
+                          <div className="relative">
+                            <select
+                              value=""
+                              onChange={(e) => { if (e.target.value) setOrderStatus(o, e.target.value) }}
+                              disabled={busy === `ord:${o.id}`}
+                              className="h-8 rounded-md border border-input bg-transparent pl-7 pr-2 text-xs font-medium"
+                              aria-label="Flag or set order status"
+                              title="Flag or set order status"
+                            >
+                              <option value="">{prod.length ? "Flag / status…" : "Flag…"}</option>
+                              {prod.length > 0 && (
+                                <optgroup label="Set all items to">
+                                  {prod.map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
+                                </optgroup>
+                              )}
+                              {exc.length > 0 && (
+                                <optgroup label="Exceptions">
+                                  {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                </optgroup>
+                              )}
+                            </select>
+                            <Flag size={13} weight="fill" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          </div>
+                        )
+                      })()}
                       {canFulfill && items.some((it) => it.sku && variantOf(it)) && (
                         <Button size="sm" variant="ghost" onClick={() => setBarcodeOrder(o)} title="Print barcode labels for this order's blanks">
                           <Barcode size={14} weight="bold" /> Labels
@@ -325,9 +340,13 @@ export function OrdersHub() {
                           {canFulfill && shipOpen !== o.id && (
                             <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => advanceOrder(o)} title="Move every item one step further along the pipeline. Stops before Shipped — shipping needs a label.">
-                            <SkipForward size={13} weight="fill" /> Next stage
-                          </Button>
+                          {/* Hidden once the next step is out of this role's reach —
+                              an operator at Awaiting scan would only get a 403. */}
+                          {canSetStage(role, stage, nextStage(stage) ?? "") && (
+                            <Button size="sm" variant="outline" onClick={() => advanceOrder(o)} title="Move every item one step further along the pipeline. Stops before Shipped — shipping needs a label.">
+                              <SkipForward size={13} weight="fill" /> Next stage
+                            </Button>
+                          )}
                         </>
                       )}
                     </div>
@@ -452,25 +471,51 @@ export function OrdersHub() {
                               and a next-stage button. The select already shows the
                               current status and can move it forward OR back, which is
                               what "fix this line" actually needs. */}
-                          {canFulfill || canDesign ? (
-                            <select
-                              value={normalizeStage(it.factory_status)}
-                              onChange={(e) => advanceItem(o, it, e.target.value)}
-                              disabled={busy === key}
-                              className={"h-8 shrink-0 rounded-md border px-1.5 text-xs font-medium " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-input bg-transparent")}
-                              aria-label={`Status for ${it.name || it.sku}`}
-                              title="Set this item's status — forward or back"
-                            >
-                              <optgroup label="Production">
-                                {ALL_STATUSES.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id)).map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
-                              </optgroup>
-                              <optgroup label="Exceptions">
-                                {EXCEPTION_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                              </optgroup>
-                            </select>
-                          ) : (
-                            <StageBadge status={it.factory_status} />
-                          )}
+                          {(() => {
+                            // Options are role-gated (see stageOptionsFor). An operator
+                            // past Awaiting scan keeps NO pipeline options — the stage is
+                            // the warehouse's to report — but still gets the stop options,
+                            // so they read as a badge + a Flag control rather than a select.
+                            const opts = stageOptionsFor(role, it.factory_status)
+                            const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
+                            const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
+                            if (!opts.length) return <StageBadge status={it.factory_status} />
+                            if (!prod.length) return (
+                              <>
+                                <StageBadge status={it.factory_status} />
+                                <select
+                                  value=""
+                                  onChange={(e) => { if (e.target.value) advanceItem(o, it, e.target.value) }}
+                                  disabled={busy === key}
+                                  className="h-8 shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs font-medium"
+                                  aria-label={`Flag ${it.name || it.sku}`}
+                                  title="The warehouse has this item. You can still stop it if the artwork is wrong."
+                                >
+                                  <option value="">Flag…</option>
+                                  {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                </select>
+                              </>
+                            )
+                            return (
+                              <select
+                                value={normalizeStage(it.factory_status)}
+                                onChange={(e) => advanceItem(o, it, e.target.value)}
+                                disabled={busy === key}
+                                className={"h-8 shrink-0 rounded-md border px-1.5 text-xs font-medium " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-input bg-transparent")}
+                                aria-label={`Status for ${it.name || it.sku}`}
+                                title="Set this item's status — forward or back"
+                              >
+                                <optgroup label="Production">
+                                  {prod.map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
+                                </optgroup>
+                                {exc.length > 0 && (
+                                  <optgroup label="Exceptions">
+                                    {exc.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                                  </optgroup>
+                                )}
+                              </select>
+                            )
+                          })()}
                           {busy === key && <CircleNotch size={13} className="shrink-0 animate-spin text-muted-foreground" />}
                           </div>
                         </div>

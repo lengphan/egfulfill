@@ -7,6 +7,63 @@ import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 
+// ── Stage vocabulary ───────────────────────────────────────────────────────────
+// Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
+// client filters the dropdown so operators aren't shown options that would 403;
+// THIS is what actually enforces it.
+const PIPELINE = ['in_review', 'awaiting_scan', 'printed', 'working', 'shipped'];
+const EXCEPTIONS = ['on_hold', 'flagged', 'backorder', 'cancelled', 'refunded'];
+function normalizeStage(s) {
+  const v = String(s || '').toLowerCase().trim();
+  if (['new', 'draft', 'none', 'pending'].includes(v)) return '';
+  if (PIPELINE.includes(v) || EXCEPTIONS.includes(v)) return v;
+  if (['approved', 'ready_print', 'in_queue', 'queued', 'prescan'].includes(v)) return 'awaiting_scan';
+  if (['scanned', 'label', 'labelled', 'labeled'].includes(v)) return 'printed';
+  if (['printing', 'qc', 'production', 'in_production', 'in-prod', 'prepress',
+       'packing', 'packed', 'ready', 'finished'].includes(v)) return 'working';
+  if (['fulfilled', 'delivered', 'in_transit'].includes(v)) return 'shipped';
+  if (['escalated', 'action'].includes(v)) return 'flagged';
+  if (['replacement'].includes(v)) return 'backorder';
+  return '';
+}
+
+// Who may set which stage. The operator's zone ends at the scan, because a stage is a
+// claim about PHYSICAL CUSTODY: once the warehouse holds the goods, only they (or
+// admin) can report where it is — an operator setting 'working' asserts a fact they
+// cannot observe. Two deliberate carve-outs from that rule:
+//   • flagged/on_hold are a STOP signal, not a custody claim, so artwork review can
+//     pull the andon cord at ANY stage. A design defect often only shows on the
+//     printed garment — the blank is sunk by then, but the reprint and reship aren't.
+//     A stop neither advances nor rewinds; it parks the item for warehouse/admin.
+//   • cancelled/refunded are money calls (admin), backorder is a stock call
+//     (warehouse/admin). The operator flags; whoever has the authority resolves.
+const OP_ZONE = new Set(['', 'in_review', 'awaiting_scan']);   // normalized
+const OP_STOPS = new Set(['flagged', 'on_hold']);
+const MONEY_STAGES = new Set(['cancelled', 'refunded']);
+
+// null = allowed; a string = the refusal shown to the user.
+export function stageDenial(role, current, target) {
+  if (role === 'admin') return null;
+  const at = normalizeStage(current), to = normalizeStage(target);
+  if (role === 'warehouse') {
+    return MONEY_STAGES.has(to) ? 'Cancelling or refunding is an admin decision.' : null;
+  }
+  if (role === 'operator') {
+    if (MONEY_STAGES.has(to)) return 'Cancelling or refunding is an admin decision — flag the order instead.';
+    if (to === 'backorder') return 'Backorder is a stock call — warehouse or admin.';
+    if (OP_STOPS.has(to)) return null;                        // andon cord: any stage
+    // Raising a stop is the operator's; CLEARING one is not — that's the whole point of
+    // handing the decision over. (An operator who mis-flags needs warehouse/admin to
+    // resume it. Accepted: factory_status is one field, so a stop overwrites the stage
+    // it interrupted and there's nothing to resume TO without a human deciding.)
+    if (EXCEPTIONS.includes(at)) return 'This item is stopped — warehouse or admin decides what happens next.';
+    if (!OP_ZONE.has(at)) return 'The warehouse has this item — only warehouse or admin can change its status now.';
+    if (!OP_ZONE.has(to)) return 'Operators can move an item as far as Awaiting scan.';
+    return null;
+  }
+  return 'Your role cannot change production status.';        // designer, and anything new
+}
+
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
@@ -242,6 +299,11 @@ export function ordersRoutes(app, requireAuth) {
     const { sku, status } = req.body || {};
     if (!sku) { reply.code(400); return { error: 'sku required' }; }
     const pre = await q('select factory_status from order_items where order_id=$1 and sku=$2 limit 1', [req.params.id, sku]);
+    if (!pre.rows[0]) { reply.code(404); return { error: 'item not found' }; }
+    // Role gate — see stageDenial. Read the CURRENT stage first: an operator's reach
+    // depends on where the item already is, not just where they're sending it.
+    const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status);
+    if (denial) { reply.code(403); return { error: denial }; }
     await q('update order_items set factory_status=$1 where order_id=$2 and sku=$3',
       [status || '', req.params.id, sku]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,

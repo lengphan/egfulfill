@@ -93,6 +93,39 @@ export function orderStage(items: { factory_status?: string | null }[]): string 
   return minIdx < ORDER.length ? ORDER[minIdx] : ""
 }
 
+// ── Who may set which stage ────────────────────────────────────────────────────
+// MIRRORS stageDenial() in server/src/routes/orders.js — keep the two in sync. The
+// server is what enforces this; these helpers exist only so a user isn't offered an
+// option that would come back 403.
+//
+// The operator's zone ends at the scan: a stage is a claim about PHYSICAL CUSTODY, and
+// once the warehouse holds the goods only they (or admin) can report where it is.
+// Carve-outs: flagged/on_hold are a STOP signal rather than a custody claim, so artwork
+// review can pull the andon cord at any stage; cancelled/refunded are admin money calls
+// and backorder is a warehouse/admin stock call.
+const OP_ZONE = new Set(["", "in_review", "awaiting_scan"])
+const OP_STOPS = new Set(["flagged", "on_hold"])
+const MONEY_STAGES = new Set(["cancelled", "refunded"])
+
+export function canSetStage(role: string, current: string | null | undefined, target: string): boolean {
+  if (role === "admin") return true
+  const at = normalizeStage(current)
+  const to = normalizeStage(target)
+  if (role === "warehouse") return !MONEY_STAGES.has(to)
+  if (role === "operator") {
+    if (MONEY_STAGES.has(to) || to === "backorder") return false
+    if (OP_STOPS.has(to)) return true
+    return OP_ZONE.has(at) && OP_ZONE.has(to)
+  }
+  return false
+}
+
+// Does this role get a status CONTROL for an item at this stage, or a read-only badge?
+// An operator past Awaiting scan keeps only the stop options, never the pipeline.
+export function stageOptionsFor(role: string, current: string | null | undefined): FactoryStage[] {
+  return ALL_STATUSES.filter((s) => canSetStage(role, current, s.id))
+}
+
 export const TONE_CLASS: Record<FactoryTone, string> = {
   new: "bg-muted text-muted-foreground",
   review: "bg-indigo-100 text-indigo-700",
