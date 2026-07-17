@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Info, Warning, SlidersHorizontal, CheckCircle, Storefront } from "@phosphor-icons/react"
+import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -504,11 +504,6 @@ export function SpyDeckView() {
           <div className="border-b border-border bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700">{error}</div>
         )}
 
-        {view === "search" && results && results.length > 0 && (
-          <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-5 py-2 text-xs text-muted-foreground">
-            <Info size={13} /> Sold, revenue &amp; 24h numbers are <span className="font-medium">estimates</span> from favorites &amp; listing age (Etsy doesn&apos;t publish them) — use as a signal, not exact figures.
-          </div>
-        )}
 
         {view === "account" ? (
           <ShopAnalyzer />
