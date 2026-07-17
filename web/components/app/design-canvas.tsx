@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen } from "@phosphor-icons/react"
+import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen, ArrowSquareOut } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
@@ -295,6 +295,33 @@ export function DesignCanvasDialog({
                 ))}
               </div>
             )}
+          </div>
+        )}
+        {/* The BUYER's uploaded file (marketplace orders). Was invisible in React — the
+            floor couldn't see what the customer actually sent. Shows the file + their
+            personalization note, with one click to adopt it as the design to place. */}
+        {(item.design_src || item.personalization) && (
+          <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+            {item.design_src && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.design_src} alt="Customer file" className="size-14 shrink-0 rounded-md border border-border object-cover" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>
+              {item.personalization && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{item.personalization}”</div>}
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {item.design_src && (
+                  <button onClick={() => { setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS) }}
+                    className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:opacity-90">Use this</button>
+                )}
+                {item.design_src && (
+                  <a href={item.design_src} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-accent">
+                    Open <ArrowSquareOut size={11} weight="bold" />
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
         )}
         <div className="space-y-3">

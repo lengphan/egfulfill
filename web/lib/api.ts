@@ -527,6 +527,11 @@ export type OrderItem = {
   blank?: string // the catalog product this line resolves to (name/sku/id)
   line_id?: string // stable per-line id — keys identical-SKU siblings apart
   img?: string
+  // The BUYER's uploaded artwork from a marketplace order (Etsy/Shopify), + any
+  // personalization text they entered. Distinct from the factory-placed design in
+  // order_designs — this is what the customer sent, to adopt or reference.
+  design_src?: string
+  personalization?: string
   unit_price?: number | string
   print_type?: string
   factory_status?: string | null
