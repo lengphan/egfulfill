@@ -28,6 +28,33 @@ function galleryOf(p: CatalogProduct): string[] {
   return Array.from(set)
 }
 
+// Normalise a raw technique label to a stable {key,label} — ported from product-detail.html
+// pdNormTech, so the React page names print methods the same way the old one did.
+function normTech(raw: string): { key: string; label: string } | null {
+  const s = String(raw || "").trim().toLowerCase()
+  if (!s) return null
+  if (/dtf/.test(s)) return { key: "dtf", label: "DTF printing" }
+  if (/dtg|direct to garment/.test(s)) return { key: "dtg", label: "DTG printing" }
+  if (/emb|embroid/.test(s)) return { key: "emb", label: "Embroidery" }
+  if (/appliqu|\bapl\b/.test(s)) return { key: "apl", label: "Appliqué" }
+  if (/laser|\blsr\b|engrav/.test(s)) return { key: "lsr", label: "Laser" }
+  if (/screen/.test(s)) return { key: "scr", label: "Screen print" }
+  if (/sublim|\bdye\b/.test(s)) return { key: "sub", label: "Sublimation" }
+  if (/vinyl|htv/.test(s)) return { key: "vnl", label: "Vinyl" }
+  if (/\buv\b/.test(s)) return { key: "uv", label: "UV print" }
+  return { key: s.replace(/[^a-z0-9]+/g, "").slice(0, 6) || "t", label: raw.charAt(0).toUpperCase() + raw.slice(1) }
+}
+
+// Every technique this product supports, de-duped in order: the methods it was set up with
+// (methodPrices keys) plus its primary `method`. Falls back to DTG when nothing is set.
+function techsOf(p: CatalogProduct): { key: string; label: string }[] {
+  const raw = [...Object.keys(p.methodPrices ?? {}), ...String(p.method || "").split(/[/,·|]+/)]
+  const out: { key: string; label: string }[] = []
+  const seen = new Set<string>()
+  for (const r of raw) { const t = normTech(r); if (t && !seen.has(t.key)) { seen.add(t.key); out.push(t) } }
+  return out.length ? out : [{ key: "dtg", label: "DTG printing" }]
+}
+
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
@@ -80,6 +107,9 @@ export default function ProductDetailPage() {
   const colors = product.colorImages ? Object.keys(product.colorImages) : []
   const sizes = product.sizes ?? []
   const status = product.status ?? "Active"
+  const techs = techsOf(product)
+  const hasEmb = techs.some((t) => t.key === "emb")
+  const hasPrint = techs.some((t) => t.key !== "emb")
 
   return (
     <div className="space-y-5">
@@ -181,14 +211,54 @@ export default function ProductDetailPage() {
             </div>
           </SectionCard>
 
-          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-            {product.method && (
-              <span className="inline-flex items-center gap-1.5">
-                <Tag size={14} weight="bold" /> {product.method}
-              </span>
-            )}
-            {product.material && <span>· {product.material}</span>}
-          </div>
+          {/* Print methods available — chips per technique, with the per-unit surcharge
+              when the product carries one (methodPrices). */}
+          <SectionCard title="Printing methods">
+            <div className="flex flex-wrap gap-2 p-5">
+              {techs.map((t) => {
+                const fee = product.methodPrices?.[t.key.toUpperCase()] ?? product.methodPrices?.[t.label.split(" ")[0]]
+                return (
+                  <span key={t.key} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-sm font-medium">
+                    <Tag size={13} weight="bold" className="text-muted-foreground" /> {t.label}
+                    {typeof fee === "number" && fee > 0 && <span className="text-xs text-muted-foreground">+{usd(fee)}</span>}
+                  </span>
+                )
+              })}
+            </div>
+          </SectionCard>
+
+          {/* File guidelines — the artwork requirements from the old HTML PDP, shown per
+              method the product actually supports. */}
+          <SectionCard title="File guidelines" description="Min resolution 150 DPI · 300 DPI preferred">
+            <div className="space-y-4 p-5">
+              {hasPrint && (
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Print · DTG / DTF</div>
+                  <ul className="space-y-1.5 text-sm">
+                    {["PNG or PDF, 150 DPI minimum (300 preferred)", "Transparent background", "Design true-to-size to the print area"].map((g) => (
+                      <li key={g} className="flex items-start gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><span>{g}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {hasEmb && (
+                <div>
+                  <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Embroidery</div>
+                  <ul className="space-y-1.5 text-sm">
+                    {["Vector PDF, or PNG at 150 DPI+", "Solid shapes & colors only — no gradients", "Max 15K stitches (25K for large designs)"].map((g) => (
+                      <li key={g} className="flex items-start gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><span>{g}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </SectionCard>
+
+          {product.material && (
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <span>{product.material}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
