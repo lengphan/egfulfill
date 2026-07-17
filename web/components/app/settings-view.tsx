@@ -181,6 +181,7 @@ function ApiKeysPanel() {
   const [keys, setKeys] = useState<ApiKey[] | null>(null)
   const [label, setLabel] = useState("")
   const [creating, setCreating] = useState(false)
+  const [mode, setMode] = useState<"test" | "live">("test")
   const [fresh, setFresh] = useState<{ key: string; label: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -198,7 +199,7 @@ function ApiKeysPanel() {
     setCreating(true)
     setErr(null)
     try {
-      const r = await createApiKey(label.trim() || "Test key")
+      const r = await createApiKey(label.trim() || (mode === "live" ? "Live key" : "Test key"), mode)
       setFresh({ key: r.key, label: r.label })
       setLabel("")
       setCopied(false)
@@ -234,19 +235,42 @@ function ApiKeysPanel() {
   return (
     <SectionCard
       title="API keys"
-      description="Test keys for the sandbox (/api/test/*) and the API Playground"
+      description={mode === "live"
+        ? "Live keys hit the real API (/api/v1/*) — calls create real orders"
+        : "Test keys hit the sandbox (/api/test/*) — no real orders, labels or charges"}
+      actions={
+        // Same test/live switch as the API Playground — the two must agree, or you
+        // generate a key in one place that the other can't use.
+        <div className="flex rounded-lg border border-border p-0.5">
+          {(["test", "live"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={"rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (mode === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      }
     >
+      {mode === "live" && (
+        <div className="flex items-start gap-2 border-b border-border bg-red-50 px-5 py-2.5 text-xs text-red-700">
+          <Warning size={14} weight="fill" className="mt-px shrink-0" />
+          <span><b>Live mode</b> — a live key (egk_live_…) makes calls create <b>real</b> orders. Use a test key while building.</span>
+        </div>
+      )}
       {/* create row */}
       <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
         <Input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="Key label (e.g. Local testing)"
+          placeholder={mode === "live" ? "Key label (e.g. Production)" : "Key label (e.g. Local testing)"}
           className="sm:max-w-xs"
           onKeyDown={(e) => e.key === "Enter" && onCreate()}
         />
         <Button size="sm" onClick={onCreate} disabled={creating}>
-          <Plus size={14} weight="bold" /> {creating ? "Generating…" : "Generate test key"}
+          <Plus size={14} weight="bold" /> {creating ? "Generating…" : `Generate ${mode} key`}
         </Button>
         {err && <span className="text-xs font-medium text-red-600">{err}</span>}
       </div>
