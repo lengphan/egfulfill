@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt } from "@phosphor-icons/react"
+import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -14,6 +14,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextSta
 import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
+import { LabelSheet } from "@/components/app/label-sheet"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
@@ -88,6 +89,9 @@ export function OrdersHub() {
   const [pkg, setPkg] = useState({ weightOz: 6, length: 10, width: 8, height: 1, mailClass: "USPS_GROUND_ADVANTAGE" })
   const [labelErr, setLabelErr] = useState<string | null>(null)
   const [labels, setLabels] = useState<Record<string, UspsLabelResult>>({})
+  // Barcode labels for an order's blanks — only lines whose variant is actually
+  // defined, since a label for an unchosen blank is a mislabelled box.
+  const [barcodeOrder, setBarcodeOrder] = useState<OrderRow | null>(null)
 
   const load = useCallback(() => {
     if (!getToken()) { setOrders([]); return }
@@ -303,6 +307,11 @@ export function OrdersHub() {
                           <Flag size={13} weight="fill" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
                         </div>
                       )}
+                      {canFulfill && items.some((it) => it.sku && variantOf(it)) && (
+                        <Button size="sm" variant="ghost" onClick={() => setBarcodeOrder(o)} title="Print barcode labels for this order's blanks">
+                          <Barcode size={14} weight="bold" /> Labels
+                        </Button>
+                      )}
                       {canFulfill && stage === "" && (
                         <Button size="sm" onClick={() => receiveOrder(o)} disabled={busy?.startsWith(o.id)} title="Intake: move every item into Awaiting scan. Done once, when the order arrives.">
                           <TrayArrowDown size={13} weight="bold" /> Start order
@@ -471,6 +480,18 @@ export function OrdersHub() {
           </>
         )}
       </SectionCard>
+
+      {/* One sticker per UNIT (qty), so a x3 line prints 3 — that's what goes on the
+          boxes. Lines with no chosen variant are skipped: labelling an undecided
+          blank is worse than not labelling it. */}
+      <LabelSheet
+        open={!!barcodeOrder}
+        onClose={() => setBarcodeOrder(null)}
+        title={barcodeOrder ? `labels · ${numOf(barcodeOrder)}` : "labels"}
+        labels={(barcodeOrder?.items ?? [])
+          .filter((it) => it.sku && variantOf(it))
+          .map((it) => ({ sku: it.sku as string, name: it.name || it.sku, variant: variantOf(it), copies: Number(it.qty) || 1 }))}
+      />
 
       <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>
     </div>

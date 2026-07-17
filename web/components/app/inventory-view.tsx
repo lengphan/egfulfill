@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Barcode } from "@/components/app/barcode"
+import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
@@ -26,6 +27,10 @@ export function InventoryView() {
   const [addOpen, setAddOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
   const [histSku, setHistSku] = useState<string | null>(null)
+  // Label printing: pick the variants you actually need, and how many of each.
+  // Printing the whole filtered list one-each wasted a roll every time.
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [copies, setCopies] = useState<Record<string, number>>({})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const load = useCallback(() => {
@@ -111,7 +116,12 @@ export function InventoryView() {
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
-          <Button size="sm" variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}><Printer size={14} weight="bold" /> Print labels</Button>
+          {sel.size > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setSel(new Set())}>Clear ({sel.size})</Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setPrintOpen(true)} disabled={filtered.length === 0}>
+            <Printer size={14} weight="bold" /> {sel.size ? `Print ${sel.size} selected` : "Print labels"}
+          </Button>
           <Button size="sm" onClick={() => setAddOpen(true)}><Plus size={14} weight="bold" /> Add item</Button>
         </div>
 
@@ -125,8 +135,23 @@ export function InventoryView() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                   <tr>
+                    <th className="px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all on this page"
+                        checked={paged.pageItems.length > 0 && paged.pageItems.every((i) => sel.has(i.sku))}
+                        onChange={(e) => {
+                          const next = new Set(sel)
+                          // Only this page — ticking a header shouldn't silently select
+                          // hundreds of rows the user can't see.
+                          paged.pageItems.forEach((i) => (e.target.checked ? next.add(i.sku) : next.delete(i.sku)))
+                          setSel(next)
+                        }}
+                      />
+                    </th>
                     <th className="px-4 py-2.5 font-medium">SKU</th>
                     <th className="px-4 py-2.5 font-medium">Item</th>
+                    <th className="px-2 py-2.5 text-center font-medium">Labels</th>
                     <th className="px-4 py-2.5 text-center font-medium">In stock</th>
                     <th className="px-4 py-2.5 text-center font-medium">Reserved</th>
                     <th className="px-4 py-2.5 text-center font-medium">Available</th>
@@ -137,9 +162,33 @@ export function InventoryView() {
                 </thead>
                 <tbody>
                   {paged.pageItems.map((it) => (
-                    <tr key={it.sku} className="border-t border-border">
+                    <tr key={it.sku} className={"border-t border-border " + (sel.has(it.sku) ? "bg-primary/[0.04]" : "")}>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${it.sku}`}
+                          checked={sel.has(it.sku)}
+                          onChange={(e) => {
+                            const next = new Set(sel)
+                            if (e.target.checked) next.add(it.sku); else next.delete(it.sku)
+                            setSel(next)
+                          }}
+                        />
+                      </td>
                       <td className="px-4 py-2"><div className="flex flex-col gap-0.5"><span className="font-mono text-xs font-medium">{it.sku}</span><Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} className="max-w-[120px]" /></div></td>
                       <td className="px-4 py-2"><div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>{it.variant && <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant}</div>}</td>
+                      <td className="px-2 py-2 text-center">
+                        {/* How many stickers for THIS variant. Only meaningful once it's
+                            ticked, so it's disabled until then. */}
+                        <Input
+                          value={String(copies[it.sku] ?? 1)}
+                          onChange={(e) => setCopies({ ...copies, [it.sku]: Math.max(1, Number(e.target.value.replace(/[^0-9]/g, "")) || 1) })}
+                          disabled={!sel.has(it.sku)}
+                          inputMode="numeric"
+                          aria-label={`Label copies for ${it.sku}`}
+                          className="mx-auto h-8 w-14 text-center"
+                        />
+                      </td>
                       <td className="px-2 py-2 text-center"><Input value={String(num(it.in_stock))} onChange={(e) => edit(it.sku, "in_stock", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
                       <td className="px-2 py-2 text-center"><Input value={String(num(it.reserved))} onChange={(e) => edit(it.sku, "reserved", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="mx-auto h-8 w-16 text-center" /></td>
                       <td className="px-4 py-2 text-center font-semibold tabular-nums">{avail(it)}</td>
@@ -168,26 +217,15 @@ export function InventoryView() {
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} />
       <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
 
-      {printOpen && (
-        <div className="fixed inset-0 z-50 overflow-auto bg-background">
-          <div className="no-print sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-card px-4 py-3">
-            <span className="font-medium">{filtered.length} labels</span>
-            <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setPrintOpen(false)}>Close</Button>
-              <Button size="sm" onClick={() => window.print()}><Printer size={14} weight="bold" /> Print</Button>
-            </div>
-          </div>
-          <div className="print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4">
-            {filtered.map((it) => (
-              <div key={it.sku} className="flex flex-col items-center gap-1 rounded border border-border p-2 text-center">
-                <div className="w-full truncate text-xs font-medium">{it.name || it.sku}</div>
-                {it.variant && <div className="w-full truncate text-[10px] text-muted-foreground">{it.variant}</div>}
-                <Barcode value={it.sku} height={46} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Selected variants only — or the whole filtered list if nothing is ticked,
+          which keeps the old one-click behaviour for "print everything". */}
+      <LabelSheet
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        labels={(sel.size ? filtered.filter((i) => sel.has(i.sku)) : filtered).map((i) => ({
+          sku: i.sku, name: i.name, variant: i.variant, copies: copies[i.sku] ?? 1,
+        }))}
+      />
     </div>
   )
 }
