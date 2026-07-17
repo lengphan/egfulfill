@@ -12,11 +12,17 @@ export type FactoryTone = "new" | "review" | "neutral" | "prod" | "qc" | "packed
 export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 
 // The linear production flow (in order) — the warehouse scan flow.
+// The pipeline every submitted order follows.
+//
+// NB on ids vs labels: the submitted-but-untouched stage is LABELLED "New" but its id
+// stays `in_review`. The id `new` already means "not started / draft" in
+// normalizeStage — reusing it would make a seller's unsubmitted draft and a submitted
+// order indistinguishable in the DB. Labels are what people read; ids are data.
 export const FACTORY_STAGES: FactoryStage[] = [
-  { id: "in_review", label: "In review", tone: "review" },
-  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" },
-  { id: "scanned", label: "Scanned", tone: "qc" },
-  { id: "printing", label: "Printing", tone: "prod" },
+  { id: "in_review", label: "New", tone: "review" },        // submitted; cancellable by the seller
+  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // design sent to the board
+  { id: "printed", label: "Printed", tone: "qc" },          // shipping/barcode label printed
+  { id: "working", label: "Working", tone: "prod" },        // warehouse is making the item
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
 const ORDER = FACTORY_STAGES.map((s) => s.id)
@@ -40,11 +46,14 @@ export function normalizeStage(s?: string | null): string {
   if (v === "new" || v === "draft" || v === "none" || v === "pending") return ""
   if (ORDER.includes(v) || EXCEPTIONS.has(v)) return v
   if (["approved", "ready_print", "in_queue", "queued", "prescan"].includes(v)) return "awaiting_scan"
-  if (["qc", "production", "in_production", "in-prod", "printed", "prepress", "working"].includes(v)) return "printing"
-  // `packing` was removed from the pipeline, but rows in the DB still carry it —
-  // fold it (and its old aliases) onto printing. Without this it would fall through
-  // to "" and every in-flight packing order would read as NEW.
-  if (["packing", "packed", "label", "labelled", "labeled", "ready", "finished"].includes(v)) return "printing"
+  // Retired ids still living in the DB. Without these they'd fall through to "" and
+  // every in-flight order would read as not-started.
+  //   scanned  -> printed  (the label step)
+  //   printing -> working  (the make step)
+  //   packing/packed/... -> working (packing was removed earlier)
+  if (["scanned", "label", "labelled", "labeled"].includes(v)) return "printed"
+  if (["printing", "qc", "production", "in_production", "in-prod", "prepress",
+       "packing", "packed", "ready", "finished"].includes(v)) return "working"
   if (["fulfilled", "delivered", "in_transit"].includes(v)) return "shipped"
   if (["escalated", "action"].includes(v)) return "flagged"
   if (["replacement"].includes(v)) return "backorder"

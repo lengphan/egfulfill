@@ -25,10 +25,12 @@ const MAP: Record<string, SellerStatusInfo> = {
   // were acting on it, when in fact nothing is charged or started until they submit.
   new: P("Not submitted", TONE.neutral, "received"),
   draft: P("Not submitted", TONE.neutral, "received"),
-  in_review: P("In Review", TONE.neutral, "received"),
+  in_review: P("New", TONE.neutral, "received"),   // submitted + charged; still cancellable
   awaiting_scan: P("In Production", TONE.prod, "production"),
-  scanned: P("In Production", TONE.prod, "production"),
-  printing: P("In Production", TONE.prod, "production"),
+  printed: P("In Production", TONE.prod, "production"),
+  working: P("In Production", TONE.prod, "production"),
+  scanned: P("In Production", TONE.prod, "production"),   // retired id; legacy rows
+  printing: P("In Production", TONE.prod, "production"),  // retired id; legacy rows
   packing: P("In Production", TONE.prod, "production"),   // retired stage; legacy rows still carry it
   shipped: P("Shipped", TONE.shipped, "shipped"),
   flagged: P("Action Needed", TONE.alert, "attention"),

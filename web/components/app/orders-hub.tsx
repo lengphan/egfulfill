@@ -191,11 +191,11 @@ export function OrdersHub() {
   const stats = useMemo(() => {
     const list = orders ?? []
     const by = (id: string) => list.filter((o) => orderStage(o.items ?? []) === id).length
-    const inProd = ["awaiting_scan", "scanned", "printing"]
+    const inProd = ["awaiting_scan", "printed", "working"]
     return {
       newCount: by(""),
       production: list.filter((o) => inProd.includes(orderStage(o.items ?? []))).length,
-      ready: by("printing"),
+      ready: by("working"),
       shipped: by("shipped"),
     }
   }, [orders])
@@ -227,7 +227,7 @@ export function OrdersHub() {
       <StatGrid>
         <StatCard label="New" value={String(stats.newCount)} sub="awaiting start" tone={stats.newCount ? "neg" : undefined} />
         <StatCard label="In production" value={String(stats.production)} sub="scan → pack" />
-        <StatCard label="Printing" value={String(stats.ready)} sub="last stage before ship" tone={stats.ready ? "pos" : undefined} />
+        <StatCard label="Working" value={String(stats.ready)} sub="being made" tone={stats.ready ? "pos" : undefined} />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="complete" tone="pos" />
       </StatGrid>
 

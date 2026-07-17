@@ -37,13 +37,13 @@ export function StaffDashboard() {
   const stats = useMemo(() => {
     const list = orders ?? []
     const by = (id: string) => list.filter((o) => orderStage(o.items ?? []) === id).length
-    const inProd = ["awaiting_scan", "scanned", "printing"]
+    const inProd = ["awaiting_scan", "printed", "working"]
     return {
       total: list.length,
       newCount: by(""),
       review: by("in_review"),
       production: list.filter((o) => inProd.includes(orderStage(o.items ?? []))).length,
-      ready: by("printing"),
+      ready: by("working"),
       shipped: by("shipped"),
     }
   }, [orders])
@@ -55,14 +55,14 @@ export function StaffDashboard() {
     ? [
       { label: "Orders", value: stats.total, sub: "all time" },
       { label: "In production", value: stats.production, sub: "scan → pack" },
-      { label: "Printing", value: stats.ready, sub: "last stage before ship", pos: true },
+      { label: "Working", value: stats.ready, sub: "being made", pos: true },
       { label: "Shipped", value: stats.shipped, sub: "complete", pos: true },
     ]
     : isWarehouse
       ? [
         { label: "To receive", value: stats.newCount, sub: "new intake", neg: true },
         { label: "In production", value: stats.production, sub: "scan → pack" },
-        { label: "Printing", value: stats.ready, sub: "last stage before ship", pos: true },
+        { label: "Working", value: stats.ready, sub: "being made", pos: true },
         { label: "Shipped", value: stats.shipped, sub: "out the door" },
       ]
       : [
