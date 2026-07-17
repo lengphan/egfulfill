@@ -7,7 +7,8 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Dashboard", href: "/overview", icon: SquaresFour, roles: ["operator", "warehouse", "admin"] },
   { label: "Orders", href: "/operator", icon: Printer, roles: ["operator", "warehouse", "admin"] },
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
-  { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer", "admin"] },
+  // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
+  { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
   { label: "Scan", href: "/scan", icon: Barcode, roles: ["warehouse", "admin"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },

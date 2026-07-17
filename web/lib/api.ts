@@ -120,14 +120,14 @@ export function getMyTopups() {
 }
 
 // ── Admin ──────────────────────────────────────────────────────────────────
-export type AdminUser = { id: string; email: string; name?: string | null; role: string; store_name?: string | null; active?: boolean; created_at?: string }
+export type AdminUser = { id: string; email: string; name?: string | null; role: string; store_name?: string | null; active?: boolean; plan?: string; spydeck_addon?: boolean; created_at?: string }
 export function getUsers() {
   return api<AdminUser[]>(`/api/users`)
 }
 export function createUserAdmin(body: { email: string; password: string; role?: string; name?: string }) {
   return api<AdminUser & { error?: string }>(`/api/users`, { method: "POST", body: JSON.stringify(body) })
 }
-export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean }) {
+export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean }) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 

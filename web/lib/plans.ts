@@ -3,6 +3,8 @@
 // keep the SAME keys here — a seller who set a plan in the old HTML sees it in React too.
 // SpyDeck is a research add-on: bundled-free on Pro/Enterprise, else a standalone $/mo line.
 
+import { getUser } from "./auth"
+
 export type PlanId = "starter" | "pro" | "enterprise"
 
 export type PlanTier = {
@@ -49,21 +51,22 @@ export const PLAN_TIERS: PlanTier[] = [
   },
 ]
 
-const PLAN_KEY = "eg_seller_plan"
 const SPYDECK_ADDON_KEY = "eg_spydeck_addon"
 const SPYDECK_CFG_KEY = "eg_spydeck_config"
 const PLAN_EVENT = "eg-plan-changed"
 
+/**
+ * The signed-in user's plan, read from the SESSION (server truth, set at login).
+ *
+ * This used to read localStorage `eg_seller_plan`, which the client also WROTE — so
+ * "Upgrade to Pro" granted itself for free and a console one-liner unlocked
+ * Enterprise. The plan now lives on users.plan, and the server enforces entitlement
+ * inside /api/spydeck/* and /api/etsy/search. Anything here is presentation only:
+ * faking it locally changes what you see, never what you can actually call.
+ */
 export function getPlan(): PlanId {
-  if (typeof localStorage === "undefined") return "starter"
-  const v = localStorage.getItem(PLAN_KEY)
-  return v === "pro" || v === "enterprise" ? v : "starter"
-}
-
-export function setPlan(id: PlanId) {
-  if (typeof localStorage === "undefined") return
-  localStorage.setItem(PLAN_KEY, id)
-  window.dispatchEvent(new CustomEvent(PLAN_EVENT, { detail: { plan: id } }))
+  const p = getUser()?.plan
+  return p === "pro" || p === "enterprise" ? p : "starter"
 }
 
 export function planMeta(id: PlanId): PlanTier {
@@ -86,9 +89,9 @@ export function spydeckIncluded(plan: PlanId = getPlan()): boolean {
   return cfg.bundled && (plan === "pro" || plan === "enterprise")
 }
 
+/** Server truth (users.spydeck_addon), same reasoning as getPlan. */
 export function getSpydeckAddon(): boolean {
-  if (typeof localStorage === "undefined") return false
-  return localStorage.getItem(SPYDECK_ADDON_KEY) === "1"
+  return getUser()?.spydeck_addon === true
 }
 
 export function setSpydeckAddon(on: boolean) {
@@ -98,6 +101,7 @@ export function setSpydeckAddon(on: boolean) {
 }
 
 // True if SpyDeck is available to this seller (bundled OR purchased as an add-on).
+/** Presentation gate only — the server is what actually enforces this. */
 export function hasSpydeck(): boolean {
   return spydeckIncluded() || getSpydeckAddon()
 }

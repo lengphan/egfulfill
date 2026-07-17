@@ -41,7 +41,7 @@ export async function login({ email, password }) {
     throw new Error('Invalid email or password');
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
-  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false };
+  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false, plan: u.plan || 'starter', spydeck_addon: u.spydeck_addon === true };
   return { user: safe, token: sign(safe) };
 }
 
@@ -67,6 +67,6 @@ export async function googleAuth({ email, name = '' }) {
     u = ins.rows[0];
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
-  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false };
+  const safe = { id: u.id, email: u.email, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false, plan: u.plan || 'starter', spydeck_addon: u.spydeck_addon === true };
   return { user: safe, token: sign(safe) };
 }

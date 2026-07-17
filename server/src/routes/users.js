@@ -4,6 +4,7 @@ import { q } from '../db.js';
 import { hashPassword, isStaff } from '../auth.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
+const PLANS = ['starter', 'pro', 'enterprise'];
 
 export function usersRoutes(app, requireAdmin, requireAuth) {
   // Cosmetic profile avatar (emoji + colour). Added at route-load, not just in
@@ -14,6 +15,11 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   q('alter table users add column if not exists avatar_color text').catch(() => {});
   // Per-user notification sound toggle (default on).
   q('alter table users add column if not exists notify_sound boolean default true').catch(() => {});
+  // Subscription plan — SERVER truth. It used to live only in the browser
+  // (localStorage eg_seller_plan), so 'Upgrade to Pro' granted itself for free and
+  // any console could set 'enterprise'. Admin-set for now; billing can drive it later.
+  q("alter table users add column if not exists plan text not null default 'starter'").catch(() => {});
+  q('alter table users add column if not exists spydeck_addon boolean not null default false').catch(() => {});
   // Lighter, STAFF-readable seller directory (any non-seller role). Backs the
   // seller-adjust panel on the factory boards (warehouse/admin) so a balance
   // adjustment resolves to a real account. Minimal fields only — no password,
@@ -34,7 +40,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   q('alter table users add column if not exists active boolean not null default true').catch(() => {});
 
   app.get('/api/users', { preHandler: requireAdmin }, async () => {
-    const r = await q('select id, email, name, role, store_name, active, created_at from users order by created_at desc');
+    const r = await q('select id, email, name, role, store_name, active, plan, spydeck_addon, created_at from users order by created_at desc');
     return r.rows;   // never returns password_hash
   });
 
@@ -57,8 +63,13 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   });
 
   app.patch('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
-    const { role, password, name, active } = req.body || {};
+    const { role, password, name, active, plan, spydeck_addon } = req.body || {};
     const sets = [], vals = []; let n = 1;
+    if (plan != null) {
+      if (!PLANS.includes(plan)) { reply.code(400); return { error: 'Invalid plan' }; }
+      sets.push(`plan=$${n++}`); vals.push(plan);
+    }
+    if (typeof spydeck_addon === 'boolean') { sets.push(`spydeck_addon=$${n++}`); vals.push(spydeck_addon); }
     if (role) { if (!ROLES.includes(role)) { reply.code(400); return { error: 'Invalid role' }; } sets.push(`role=$${n++}`); vals.push(role); }
     if (name != null) { sets.push(`name=$${n++}`); vals.push(name); }
     if (typeof active === 'boolean') {

@@ -5,6 +5,7 @@
 import { q } from '../db.js';
 import { searchListings, connectionFor, shopListings } from './etsy.js';
 import { aiComplete } from './support_ai.js';
+import { requireSpydeck } from '../entitlements.js';
 
 let _ready = null;
 function ensure() {
@@ -196,7 +197,7 @@ export function spydeckRoutes(app, requireAuth) {
   // Daily trending feed — 10 products (est. >10 sold/24h) + 10 keywords. Cached in
   // `settings` for the day so we hit Etsy a few times per DAY, not per visitor. Shared
   // by every SpyDeck (seller + factory). Signed-in users only.
-  app.get('/api/spydeck/trending', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/api/spydeck/trending', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
     await ensure();
     const today = new Date().toISOString().slice(0, 10);
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
@@ -233,14 +234,14 @@ export function spydeckRoutes(app, requireAuth) {
   //     so re-opening the tab costs nothing. `refresh: true` forces a re-run.
   //  3. POST + explicit button: it never fires just because a tab was opened.
   //  4. Output capped (max_tokens) and the model defaults to Haiku.
-  app.get('/api/spydeck/analysis', { preHandler: requireAuth }, async (req) => {
+  app.get('/api/spydeck/analysis', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
     const r = await q('select data, created_at from spydeck_analysis where seller_id=$1', [String(req.user.sub)]);
     if (!r.rows[0]) return { cached: false };
     return { cached: true, at: r.rows[0].created_at, ...r.rows[0].data };
   });
 
-  app.post('/api/spydeck/analyze', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/api/spydeck/analyze', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
     await ensure();
     const sellerId = String(req.user.sub);
     const refresh = !!(req.body && req.body.refresh);
@@ -300,7 +301,7 @@ export function spydeckRoutes(app, requireAuth) {
     return { cached: false, ...payload };
   });
 
-  app.get('/api/spydeck/saves', { preHandler: requireAuth }, async (req) => {
+  app.get('/api/spydeck/saves', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
     const r = await q(
       'select listing_id, data, created_at from spydeck_saves where seller_id=$1 order by created_at desc limit 500',
@@ -310,7 +311,7 @@ export function spydeckRoutes(app, requireAuth) {
   });
 
   // Save/favorite a listing (idempotent by seller+listing).
-  app.post('/api/spydeck/saves', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/api/spydeck/saves', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
     await ensure();
     const b = req.body || {};
     const listingId = String(b.listing_id ?? b.listingId ?? '').trim();
@@ -324,7 +325,7 @@ export function spydeckRoutes(app, requireAuth) {
   });
 
   // Remove a saved listing.
-  app.delete('/api/spydeck/saves/:listingId', { preHandler: requireAuth }, async (req) => {
+  app.delete('/api/spydeck/saves/:listingId', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
     await q('delete from spydeck_saves where seller_id=$1 and listing_id=$2', [String(req.user.sub), String(req.params.listingId)]);
     return { ok: true };

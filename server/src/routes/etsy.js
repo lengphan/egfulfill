@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { requireSpydeck } from '../entitlements.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
@@ -458,7 +459,10 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // ── Product Scout: public Etsy listing search (product research). No seller OAuth —
   // the app keystring alone can query public active listings. requireAuth so only signed-in
   // users hit it (plan-gating layers on top later). Shared by the seller + admin Scout modal.
-  app.get('/api/etsy/search', { preHandler: requireAuth }, async (req, reply) => {
+  // SpyDeck-only surfaces: the research data IS the paid feature, so gate them with
+  // the same entitlement as /api/spydeck/*. Left on requireAuth these were a back
+  // door straight around the paywall.
+  app.get('/api/etsy/search', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
     const qy = req.query || {};
     const query = String((qy.q || qy.keywords) || '').trim();
     const hasFilter = !!(qy.taxonomyId || qy.taxonomy_id || qy.minPrice || qy.maxPrice);
@@ -474,7 +478,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // Etsy's real top-level categories (buyer taxonomy) for the SpyDeck filter. Public
   // (keystring), rarely changes → cached in memory for the process lifetime.
   let _taxCache = null;
-  app.get('/api/etsy/categories', { preHandler: requireAuth }, async () => {
+  app.get('/api/etsy/categories', { preHandler: [requireAuth, requireSpydeck] }, async () => {
     if (_taxCache) return { categories: _taxCache };
     try {
       const r = await fetch(API + '/buyer-taxonomy/nodes', { headers: { 'x-api-key': API_KEY_HEADER } });

@@ -7,19 +7,21 @@ import { Button } from "@/components/ui/button"
 import {
   PLAN_TIERS,
   getPlan,
-  setPlan,
   planMeta,
   getSpydeckConfig,
   getSpydeckAddon,
-  setSpydeckAddon,
   spydeckIncluded,
   type PlanId,
 } from "@/lib/plans"
 
 const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
 
+// Read-only. Plans are SERVER state (users.plan) — this panel used to write
+// localStorage, which meant "Upgrade to Pro" granted itself for free and the paid
+// feature was one console line away. Changing a plan is now an admin action
+// (Settings › Users) and the server enforces it inside /api/spydeck/*.
 export function SubscriptionPanel() {
-  // localStorage-backed; read after mount to avoid hydration mismatch.
+  // Session-backed; read after mount to avoid hydration mismatch.
   const [plan, setPlanState] = useState<PlanId>("starter")
   const [spydeckAddon, setAddonState] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -33,14 +35,7 @@ export function SubscriptionPanel() {
     return () => clearTimeout(id)
   }, [])
 
-  const choose = (id: PlanId) => {
-    setPlan(id)
-    setPlanState(id)
-  }
-  const toggleAddon = (on: boolean) => {
-    setSpydeckAddon(on)
-    setAddonState(on)
-  }
+
 
   const current = planMeta(plan)
   const cfg = getSpydeckConfig()
@@ -49,7 +44,7 @@ export function SubscriptionPanel() {
   return (
     <div className="space-y-4">
       {/* Current plan */}
-      <SectionCard title="Your plan" description="Upgrade, downgrade, or add research tools anytime.">
+      <SectionCard title="Your plan" description="Contact us to change your plan or add research tools.">
         <div className="p-5">
           <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-muted/40 p-5">
             <div>
@@ -106,14 +101,15 @@ export function SubscriptionPanel() {
                     Current plan
                   </Button>
                 ) : t.id === "enterprise" ? (
-                  <Button variant="outline" className="w-full" onClick={() => choose(t.id)}>
+                  <Button variant="outline" className="w-full" disabled title="Contact us to change your plan">
                     Contact sales
                   </Button>
                 ) : (
                   <Button
                     className="w-full"
                     variant={isUpgrade ? "default" : "outline"}
-                    onClick={() => choose(t.id)}
+                    disabled
+                    title="Contact us to change your plan"
                   >
                     {isUpgrade ? `Upgrade to ${t.shortName}` : `Switch to ${t.shortName}`}
                   </Button>
@@ -151,7 +147,7 @@ export function SubscriptionPanel() {
                 <div className="text-sm text-muted-foreground">
                   ${cfg.price}/mo · <span className="font-semibold text-emerald-600">Active</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => toggleAddon(false)}>
+                <Button variant="outline" size="sm" disabled title="Contact us to change your add-ons">
                   Remove
                 </Button>
               </div>
@@ -161,7 +157,7 @@ export function SubscriptionPanel() {
                   ${cfg.price}
                   <span className="text-xs font-normal text-muted-foreground">/mo</span>
                 </div>
-                <Button size="sm" onClick={() => toggleAddon(true)}>
+                <Button size="sm" disabled title="Contact us to add SpyDeck">
                   Add SpyDeck
                 </Button>
               </div>

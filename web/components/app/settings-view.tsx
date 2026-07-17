@@ -543,6 +543,8 @@ function PlatformPanel() {
 
 // ─────────────────────────── Users (admin) ───────────────────────────
 const ROLES = ["seller", "operator", "warehouse", "designer", "admin"]
+// Plans are SERVER state now; this dropdown is the ONLY way to change one.
+const PLANS = ["starter", "pro", "enterprise"]
 function UsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -556,6 +558,11 @@ function UsersPanel() {
   const changeRole = async (u: AdminUser, role: string) => {
     setBusy(u.id); setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, role } : x)))
     try { await updateUserAdmin(u.id, { role }) } catch { loadUsers() } finally { setBusy(null) }
+  }
+  const changePlan = async (u: AdminUser, plan: string) => {
+    setBusy(u.id)
+    setUsers((prev) => (prev ?? []).map((x) => (x.id === u.id ? { ...x, plan } : x)))
+    try { await updateUserAdmin(u.id, { plan }) } catch { loadUsers() } finally { setBusy(null) }
   }
   const addUser = async () => {
     if (!nu.email.trim() || nu.password.length < 8) { setNuErr("Email/username and a password of 8+ characters are required."); return }
@@ -583,7 +590,7 @@ function UsersPanel() {
       <SectionCard title="Users" description="Change a role inline">
         {!loaded ? <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div> : (
           <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Joined</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Plan</TableHead><TableHead className="text-right">Joined</TableHead></TableRow></TableHeader>
             <TableBody>
               {users.length === 0 ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No users</TableCell></TableRow>
                 : users.map((u) => (
@@ -591,6 +598,14 @@ function UsersPanel() {
                     <TableCell className="font-medium">{u.name || u.store_name || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
                     <TableCell><select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm capitalize">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select></TableCell>
+                    <TableCell>
+                      {/* Only meaningful for sellers — staff have no subscription. */}
+                      {u.role === "seller" ? (
+                        <select value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm capitalize">
+                          {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
                   </TableRow>
                 ))}
@@ -635,11 +650,14 @@ export function SettingsView() {
   // etc.) — ADMIN only. Operator/warehouse/designer + sellers never see it.
   const [isAdmin, setIsAdmin] = useState(false)
   const [canPlatform, setCanPlatform] = useState(false)
+  const [isSeller, setIsSeller] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
       setIsAdmin(u?.role === "admin")
       setCanPlatform(u?.role === "admin" || u?.role === "warehouse")
+      // A plan is a seller subscription; staff roles don't have one.
+      setIsSeller(!u?.role || u.role === "seller")
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -654,7 +672,8 @@ export function SettingsView() {
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
-        <TabsTrigger value="plan">Plan</TabsTrigger>
+        {/* Plan is a SELLER subscription — operator/warehouse/admin have no plan. */}
+        {isSeller && <TabsTrigger value="plan">Plan</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="profile">
@@ -686,9 +705,11 @@ export function SettingsView() {
       <TabsContent value="team">
         <TeamPanel />
       </TabsContent>
-      <TabsContent value="plan">
-        <SubscriptionPanel />
-      </TabsContent>
+      {isSeller && (
+        <TabsContent value="plan">
+          <SubscriptionPanel />
+        </TabsContent>
+      )}
     </Tabs>
   )
 }
