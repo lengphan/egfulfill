@@ -362,6 +362,7 @@ export default function OrderDetailPage() {
           initialDesign={designSrc(designs[customize.sku ?? ""]?.data)}
           initialPos={designs[customize.sku ?? ""]?.pos}
           onSaved={reloadDesigns}
+          catalog={catalog}
         />
       )}
     </div>

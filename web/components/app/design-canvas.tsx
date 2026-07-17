@@ -1,11 +1,12 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { postOrderDesign, type DesignPos, type OrderItem } from "@/lib/api"
+import { postOrderDesign, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
@@ -79,10 +80,18 @@ export function DesignStage({
   )
 
   return (
-    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square w-full select-none overflow-hidden rounded-xl border border-border bg-muted/40 " + (className ?? "")}>
+    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square w-full select-none overflow-hidden rounded-xl border border-border bg-[#e8e4db] dark:bg-[#221f1c] " + (className ?? "")}>
+      {/* Studio backdrop: a warm-neutral bed (so a WHITE garment reads instead of
+          vanishing into a white box), a soft top-centre spotlight the garment sits in,
+          and a faint dot grid for the dithered texture the design system leans on. All
+          behind the mockup + pointer-transparent. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.6),transparent_62%)] dark:bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.07),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.5] bg-[radial-gradient(rgba(0,0,0,0.07)_1px,transparent_1.4px)] [background-size:15px_15px] dark:bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1.4px)]" />
       {mockup ? (
+        // p-[6%] lets the garment fill more of the bed than a raw object-contain, which
+        // left wide dead margins around a portrait mockup.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain" />
+        <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain p-[6%] drop-shadow-[0_8px_24px_rgba(0,0,0,0.12)]" />
       ) : (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground/40"><ImageIcon size={40} weight="duotone" /></div>
       )}
@@ -124,7 +133,7 @@ export function readImageFile(file: File | null | undefined, onData: (url: strin
 
 // ─────────────────── Order customizer (place artwork on an order item) ───────────────────
 export function DesignCanvasDialog({
-  open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved,
+  open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -133,10 +142,21 @@ export function DesignCanvasDialog({
   initialDesign?: string
   initialPos?: DesignPos | null
   onSaved?: () => void
+  catalog?: CatalogProduct[]
 }) {
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
   const [saving, setSaving] = useState(false)
+  // Resolve the REAL blank mockup from the catalog (per the chosen colour + its side
+  // faces), not the raw order-line thumbnail. Falls back to item.img when the product
+  // can't be resolved (e.g. an unmatched marketplace SKU).
+  const faces = useMemo(() => {
+    const product = resolveProduct(item, catalog ?? [])
+    const f = mockupFaces(product, item.color)
+    return f.length ? f : (item.img ? [{ side: "front", url: item.img }] : [])
+  }, [item, catalog])
+  const [side, setSide] = useState(0)
+  const activeMockup = faces[side]?.url || item.img || ""
   const [err, setErr] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
 
@@ -154,9 +174,20 @@ export function DesignCanvasDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader><DialogTitle>Customize · {item.name || item.sku}</DialogTitle></DialogHeader>
-        <div className="mx-auto w-full max-w-sm"><DesignStage mockup={item.img || ""} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} /></div>
+        {/* Side tabs — only when the blank has more than one face to place art on. */}
+        {faces.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {faces.map((f, i) => (
+              <button key={f.side} onClick={() => setSide(i)}
+                className={"rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " + (i === side ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-accent")}>
+                {f.side}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="mx-auto w-full"><DesignStage mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} /></div>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">

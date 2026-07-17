@@ -47,3 +47,38 @@ export function methodsOf(p: CatalogProduct | null): string[] {
   if (p.method) set.add(p.method)
   return [...set]
 }
+
+// The mockup faces to place artwork on. Prefers the per-COLOUR image for the front (so a
+// navy tee shows the navy blank, not the default), then the product's side_mockups for
+// the other faces. Returns [{side, url}] in a stable front-first order; empty urls dropped.
+// This is what "recognize the mockup image I uploaded" resolves to — the real blank
+// graphic from the catalog, not the raw order-line thumbnail.
+export type MockupFace = { side: string; url: string }
+const SIDE_ORDER = ["front", "back", "left", "right", "sleeve", "hood", "inside"]
+
+export function mockupFaces(p: CatalogProduct | null, color?: string | null): MockupFace[] {
+  if (!p) return []
+  const sides = { ...(p.side_mockups ?? {}), ...(p.sideMockups ?? {}) } as Record<string, string>
+  // Front: the chosen colour's image wins, else the product's main mockup/hero/first image.
+  const byColor = color && p.colorImages ? p.colorImages[color] : ""
+  const front = byColor || sides.front || p.mockup || p.img || p.image || p.hero
+    || p.images?.[0] || Object.values(p.colorImages ?? {}).find(Boolean) || ""
+  const faces: MockupFace[] = []
+  if (front) faces.push({ side: "front", url: front })
+  for (const side of SIDE_ORDER) {
+    if (side === "front") continue
+    const u = sides[side]
+    if (u) faces.push({ side, url: u })
+  }
+  // Any non-standard side keys, appended in insertion order.
+  for (const [side, u] of Object.entries(sides)) {
+    if (u && !SIDE_ORDER.includes(side) && !faces.some((f) => f.side === side)) faces.push({ side, url: u })
+  }
+  return faces
+}
+
+// The single best mockup image for a resolved product + colour (front face). Falls back
+// to the order line's own image when the product can't be resolved.
+export function bestMockup(p: CatalogProduct | null, color?: string | null, fallback?: string): string {
+  return mockupFaces(p, color)[0]?.url || fallback || ""
+}

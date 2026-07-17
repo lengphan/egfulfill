@@ -192,6 +192,11 @@ export type CatalogProduct = {
   image?: string
   hero?: string
   colorImages?: Record<string, string>
+  // The uploaded blank mockup graphic (the 2D garment image), + per-side variants
+  // ({front, back, left, right, ...}) for placing artwork on more than one face.
+  mockup?: string
+  sideMockups?: Record<string, string>
+  side_mockups?: Record<string, string>
   // Explicit per-variant SKUs ([{sku,color,size}] | string[]) — how a marketplace
   // listing's SKU resolves back to this product. Matched by pricing.js + the variant picker.
   variantSkus?: (string | { sku?: string; SKU?: string; color?: string; size?: string })[]
