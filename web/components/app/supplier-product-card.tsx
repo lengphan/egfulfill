@@ -57,12 +57,22 @@ export function SupplierProductCard({
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="relative aspect-square shrink-0 bg-muted">
+      <div className="relative aspect-square shrink-0 overflow-hidden bg-muted">
         {img ? (
+          // absolute inset-0 is load-bearing. As an in-flow child, `size-full` means
+          // height:100% against a parent whose height comes from aspect-ratio — an
+          // INDEFINITE height — so the percentage resolved to auto and the img fell
+          // back to its INTRINSIC height. A portrait blank then stretched the square
+          // box (measured: 190px tall in a 152px-wide box, +38px) and pushed the whole
+          // card 38px taller, so titles/prices/swatches sat lower than the card beside
+          // it. It looked per-supplier because S&S art is often portrait and Otto's is
+          // square — but a square S&S image aligned fine, which is the tell.
+          // Absolutely-positioned children don't contribute to the parent's height, so
+          // the box is now exactly square regardless of the image's shape.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" loading="lazy" className="size-full object-contain" />
+          <img src={img} alt="" loading="lazy" className="absolute inset-0 size-full object-contain" />
         ) : (
-          <div className="flex size-full items-center justify-center text-xs text-muted-foreground/50">No image</div>
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50">No image</div>
         )}
         {onFavorite && (
           <button onClick={toggleFav} title={fav ? "Unfavorite" : "Favorite"}
