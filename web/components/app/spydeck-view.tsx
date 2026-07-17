@@ -252,6 +252,8 @@ export function SpyDeckView() {
     setUploadedIds((prev) => new Set(prev).add(k))
     setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l }, ...prev]))
   }
+  // `keywords` still comes back from the trending endpoint; it's just not rendered
+  // here any more (the Search tab's keyword cloud covers it).
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
   // Filters — server-side (category/price/sort re-run the search) + client-side
   // (min sold-per-day / min favorites filter the shown cards live).
@@ -516,21 +518,8 @@ export function SpyDeckView() {
             <div className="py-16 text-center text-sm text-muted-foreground">Today&apos;s trending feed isn&apos;t available yet — try a search, or check back shortly.</div>
           ) : (
             <>
-              {trending.keywords.length > 0 && (
-                <div className="border-b border-border p-4">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trending keywords today</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {trending.keywords.map((k) => (
-                      <button key={k} onClick={() => run(k)} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
-                        {k}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-5 py-2 text-xs text-muted-foreground">
-                <TrendUp size={13} /> Auto-refreshed daily — top listings by estimated 24h sales. Estimates, not exact figures.
-              </div>
+              {/* No keyword chips or methodology note here — the keyword cloud lives on
+                  the Search tab, and repeating it above the feed was redundant. */}
               <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {applyClientFilters(trending.products).map((l) => (
                   <ResultCard key={l.listing_id} l={l} saved={savedIds.has(String(l.listing_id))} uploaded={uploadedIds.has(String(l.listing_id))} onToggleSave={toggleSave} onSearchTag={(t) => run(t)} onMakeProduct={setMakeListing} />
