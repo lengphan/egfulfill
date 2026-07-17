@@ -87,8 +87,10 @@ export function InventoryView() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Package size={18} weight="fill" /></span>
-        <div className="min-w-0">
+        {/* Icon+title hidden on desktop (the top bar names the page); the Saving
+            indicator on the right stays. On mobile the hero is the title. */}
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><Package size={18} weight="fill" /></span>
+        <div className="min-w-0 md:hidden">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Inventory</h1>
           <p className="truncate text-sm text-muted-foreground">Track stock per variant, flag low/out, and print SKU barcodes.</p>
         </div>

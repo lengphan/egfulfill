@@ -96,8 +96,10 @@ export function DesignerBoard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><PenNib size={18} weight="fill" /></span>
-        <div className="min-w-0">
+        {/* Icon+title hidden on desktop (top bar names the page); the board/list toggle
+            on the right stays. On mobile the hero is the title. */}
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary md:hidden"><PenNib size={18} weight="fill" /></span>
+        <div className="min-w-0 md:hidden">
           <h1 className="font-display text-2xl font-semibold tracking-tight">Designer</h1>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>

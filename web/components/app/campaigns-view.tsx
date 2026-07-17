@@ -63,7 +63,7 @@ export function CampaignsView() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 md:hidden">
           <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Megaphone size={18} weight="fill" /></span>
           <div>
             <h1 className="font-display text-2xl font-semibold tracking-tight">Campaigns</h1>
