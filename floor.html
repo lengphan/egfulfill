@@ -913,11 +913,13 @@ function setScanMode(m){
 }
 function adjustStock(sku, delta){
   var r = INV.find(function(x){ return String(x.sku)===String(sku); });
+  var isNew = false;
   if(!r){
     if(delta<0){ toast('“'+sku+'” isn’t in inventory yet'); return; }
     // Stock In on an unknown SKU → receive it as a brand-new inventory item.
     r = { sku: sku, name: sku, variant:'', in_stock:0, reserved:0, reorder_at:25, category:null };
     INV.push(r);
+    isNew = true;
     toast('New item received: '+sku);
   }
   var cur=Number(r.in_stock)||0;
@@ -931,8 +933,21 @@ function adjustStock(sku, delta){
     '<div class="sub"><span class="sku">'+esc(r.sku)+'</span> · now '+next+' on hand</div></div>'+
     '<span class="badge '+(delta>0?'b-packed':'b-low')+'">'+(delta>0?'IN':'OUT')+'</span></div>';
   var log=$('scanlog'); log.innerHTML = html + log.innerHTML;
-  api('/inventory', { method:'POST', body: INV }).then(function(res){
-    if(!res || !res.ok){ toast('Couldn’t save — will sync on refresh'); }
+  // Atomic delta on the server (in_stock = in_stock + n) + a scan_history row.
+  // Was POSTing the WHOLE inventory list, which meant two people scanning at once
+  // overwrote each other's counts with their own stale snapshot.
+  // A brand-new SKU must be created first — /inventory/scan 404s on unknown SKUs.
+  var ready = isNew
+    ? api('/inventory/item', { method:'POST', body:{ sku:r.sku, name:r.name, in_stock:0, reserved:0, reorder_at:25 } })
+    : Promise.resolve({ ok:true });
+  ready.then(function(created){
+    if(!created || !created.ok) throw new Error('create failed');
+    return api('/inventory/scan', { method:'POST', body:{ sku: r.sku, direction: delta>0?'in':'out', qty: Math.abs(delta) } });
+  }).then(function(res){
+    if(!res || !res.ok){ toast('Couldn’t save — will sync on refresh'); return; }
+    // api() resolves { ok, status, data } — the row is on .data, not the top level.
+    var item = res.data && res.data.item;
+    if(item){ r.in_stock = Number(item.in_stock)||0; renderInv(); renderLow(); }  // trust the server count
   }).catch(function(){ toast('Offline — change not saved yet'); });
 }
 

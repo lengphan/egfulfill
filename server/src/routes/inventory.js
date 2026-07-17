@@ -44,6 +44,46 @@ export function inventoryRoutes(app, requireStaff) {
     return { ok: true, count: rows.length };
   });
 
+  // Partial update of ONE sku. Prefer this over the whole-list POST above: that
+  // one re-sends every row from the client's snapshot, so editing an unrelated
+  // field (say reorder_at) writes back a stale in_stock and silently erases any
+  // stock scanned in since the page loaded. Here only the named fields move.
+  const PATCHABLE = ['name', 'variant', 'in_stock', 'reserved', 'reorder_at', 'category', 'supplier'];
+  app.patch('/api/inventory/:sku', { preHandler: requireStaff }, async (req, reply) => {
+    const sku = String(req.params.sku || '');
+    const b = req.body || {};
+    const sets = [], vals = [];
+    for (const f of PATCHABLE) {           // whitelist — field names are never taken from input
+      if (b[f] !== undefined) { vals.push(b[f]); sets.push(f + '=$' + vals.length); }
+    }
+    if (!sets.length) { reply.code(400); return { error: 'No updatable fields supplied' }; }
+    vals.push(sku);
+    const r = await q(
+      'update inventory set ' + sets.join(', ') + ', updated_at = now() where sku = $' + vals.length + ' returning *',
+      vals
+    );
+    if (!r.rows.length) { reply.code(404); return { error: 'Unknown SKU: ' + sku }; }
+    return { ok: true, item: r.rows[0] };
+  });
+
+  // Create/upsert a SINGLE item (the Add-item dialog) — again, no whole-list write.
+  app.post('/api/inventory/item', { preHandler: requireStaff }, async (req, reply) => {
+    const r = req.body || {};
+    if (!r.sku) { reply.code(400); return { error: 'sku is required' }; }
+    const out = await q(
+      `insert into inventory (sku, name, variant, in_stock, reserved, reorder_at, category, supplier)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)
+       on conflict (sku) do update set
+         name=excluded.name, variant=excluded.variant, in_stock=excluded.in_stock,
+         reserved=excluded.reserved, reorder_at=excluded.reorder_at,
+         category=excluded.category, supplier=excluded.supplier, updated_at=now()
+       returning *`,
+      [r.sku, r.name || null, r.variant || null, r.in_stock || 0, r.reserved || 0,
+       (r.reorder_at == null ? 25 : r.reorder_at), r.category || null, r.supplier || null]
+    );
+    return { ok: true, item: out.rows[0] };
+  });
+
   // ── Scan in/out ────────────────────────────────────────────────────────────
   // NB: deliberately NOT the whole-list upsert above. A scan is an ATOMIC DELTA
   // (`in_stock = in_stock + $delta` in one statement) so two people scanning at

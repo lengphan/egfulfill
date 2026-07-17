@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Barcode } from "@/components/app/barcode"
 import { usePaged, Pagination } from "@/components/app/pagination"
-import { getInventory, saveInventory, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
+import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -34,20 +34,36 @@ export function InventoryView() {
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
-  // Edits update immediately; the whole array saves (debounced) — matches the server upsert.
-  const commit = useCallback((next: InventoryItem[]) => {
-    setItems(next)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => {
-      setSaving(true)
-      saveInventory(next).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500) }).catch(() => {}).finally(() => setSaving(false))
-    }, 600)
+  // Edits are optimistic locally, then flushed as PER-FIELD PATCHes (debounced).
+  // Never save the whole array: that would re-send this page's snapshot of every
+  // row and wipe out stock the warehouse scanned in while the page sat open.
+  const pending = useRef<Map<string, Partial<InventoryItem>>>(new Map())
+  const flush = useCallback(() => {
+    const batch = Array.from(pending.current.entries())
+    pending.current.clear()
+    if (!batch.length) return
+    setSaving(true)
+    Promise.all(batch.map(([sku, fields]) => patchInventoryItem(sku, fields).catch(() => {})))
+      .then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500) })
+      .finally(() => setSaving(false))
   }, [])
 
-  const edit = (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) =>
-    commit((items ?? []).map((it) => (it.sku === sku ? { ...it, [field]: value } : it)))
-  const remove = (sku: string) => commit((items ?? []).filter((it) => it.sku !== sku))
-  const add = (it: InventoryItem) => { commit([it, ...(items ?? []).filter((x) => x.sku !== it.sku)]); setAddOpen(false) }
+  const edit = (sku: string, field: "in_stock" | "reserved" | "reorder_at", value: number) => {
+    setItems((prev) => (prev ?? []).map((it) => (it.sku === sku ? { ...it, [field]: value } : it)))
+    pending.current.set(sku, { ...(pending.current.get(sku) ?? {}), [field]: value })
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(flush, 600)
+  }
+  const remove = (sku: string) => {
+    setItems((prev) => (prev ?? []).filter((it) => it.sku !== sku))
+    pending.current.delete(sku)
+    deleteInventoryItem(sku).catch(() => load())
+  }
+  const add = (it: InventoryItem) => {
+    setItems((prev) => [it, ...(prev ?? []).filter((x) => x.sku !== it.sku)])
+    setAddOpen(false)
+    addInventoryItem(it).catch(() => load())
+  }
 
   const cats = useMemo(() => Array.from(new Set((items ?? []).map((i) => i.category).filter(Boolean))).sort() as string[], [items])
   const filtered = useMemo(() => (items ?? []).filter((it) => {

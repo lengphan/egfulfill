@@ -273,8 +273,24 @@ export type InventoryItem = { sku: string; name?: string | null; variant?: strin
 export function getInventory() {
   return api<InventoryItem[]>(`/api/inventory`)
 }
+/**
+ * Whole-list upsert: every SKU missing from `items` is DELETED server-side, and every
+ * row's values are written from this snapshot. That makes it a clobber risk — if stock
+ * was scanned since the list was fetched, saving here erases it. Prefer patchInventoryItem
+ * / addInventoryItem / deleteInventoryItem for edits. Kept for the legacy floor.html path.
+ */
 export function saveInventory(items: InventoryItem[]) {
   return api<{ ok?: boolean; count?: number }>(`/api/inventory`, { method: "POST", body: JSON.stringify(items) })
+}
+// Partial write — only the supplied fields move, so a concurrent scan survives.
+export function patchInventoryItem(sku: string, fields: Partial<InventoryItem>) {
+  return api<{ ok: boolean; item: InventoryItem }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "PATCH", body: JSON.stringify(fields) })
+}
+export function addInventoryItem(item: InventoryItem) {
+  return api<{ ok: boolean; item: InventoryItem }>(`/api/inventory/item`, { method: "POST", body: JSON.stringify(item) })
+}
+export function deleteInventoryItem(sku: string) {
+  return api<{ ok?: boolean }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "DELETE" })
 }
 
 // ── Inventory scan in/out ──
