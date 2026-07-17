@@ -117,7 +117,9 @@ export default function ProductDetailPage() {
         <ArrowLeft size={16} weight="bold" /> Products
       </Button>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Image column is capped (not a full 50/50 split) so the mockup doesn't blow up to
+          ~half the viewport on wide screens; the info column takes the rest. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start">
         {/* gallery */}
         <div className="space-y-3">
           <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/40">
@@ -138,7 +140,7 @@ export default function ProductDetailPage() {
                   key={src}
                   onClick={() => setActive(i)}
                   className={
-                    "relative size-16 overflow-hidden rounded-lg border-2 " +
+                    "relative size-12 overflow-hidden rounded-lg border-2 " +
                     (i === active ? "border-primary" : "border-border")
                   }
                 >
