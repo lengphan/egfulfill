@@ -27,18 +27,28 @@ function ensure() {
   return _ready;
 }
 
-// Estimated units sold in the last 24h — same heuristic as the client (eg-scout _est):
-// favorites × 3.5 = lifetime sales, ÷ listing age in days.
-function estSold24(l) {
+// Estimate model — ported VERBATIM from the client (eg-scout _est) so a listing
+// scores identically on the server and on the card. NO AI involved: this is
+// arithmetic over favorites + listing age, the only signals Etsy exposes.
+//   favorites × 3.5 ≈ lifetime sales, ÷ age in days ≈ per-day rate.
+function estOf(l) {
   const fav = l.num_favorers || 0;
   const created = l.created || 0;
   const nowS = Date.now() / 1000;
   const ageDays = created ? Math.max(1, (nowS - created) / 86400) : 45;
   const totalSold = Math.round(fav * 3.5) || fav;
-  return Math.max(0, Math.round(totalSold / ageDays));
+  const vel = fav / ageDays;                       // favorites per day
+  return {
+    sold24: Math.max(0, Math.round(totalSold / ageDays)),
+    // Identical rule to the TRENDING badge on the card: newly climbing, or hot
+    // outright. Keep these two in step or the feed and the badge disagree.
+    trending: (ageDays <= 30 && vel >= 1.2) || vel >= 6,
+  };
 }
+function estSold24(l) { return estOf(l).sold24; }
 
 // Rotating niche pool — several searched each day so the feed refreshes daily.
+// Widened: the old feed searched 8 and kept 30, which ran out after a short scroll.
 const TREND_NICHES = [
   'custom name necklace', 'comfort colors tee', 'mama sweatshirt', 'retro groovy tee',
   'birth flower necklace', 'pet portrait sweatshirt', 'personalized gift', 'bachelorette shirt',
@@ -47,27 +57,45 @@ const TREND_NICHES = [
   'trendy sweatshirt', 'aesthetic wall art', 'custom pet', 'personalized jewelry',
 ];
 
-// Build (and cache daily) the trending feed: 30 products est. high 24h sales + 30 keywords.
+// Build (and cache daily) the trending POOL. One pool is cached for everyone and
+// then sliced per role at request time (see the route) — a seller and an admin want
+// different cuts of the same day's data, and re-searching Etsy per role would burn
+// the rate limit for no reason.
+const POOL_SIZE = 120;      // was 30 — the feed ran dry after one screen
+const NICHES_PER_DAY = 16;  // was 8 — a wider net across the rotating niche list
 async function buildTrending() {
   const dayIndex = Math.floor(Date.now() / 86400000);
-  // Pick 8 niches for today, rotating by day, so we have enough hot listings for 30.
   const picks = [];
-  for (let i = 0; i < 8; i++) picks.push(TREND_NICHES[(dayIndex + i) % TREND_NICHES.length]);
+  for (let i = 0; i < NICHES_PER_DAY; i++) picks.push(TREND_NICHES[(dayIndex + i) % TREND_NICHES.length]);
   const batches = await Promise.all(picks.map((qy) => searchListings(qy, { limit: 48, sort: 'score' }).then((r) => r.results).catch(() => [])));
   const byId = new Map();
   for (const list of batches) for (const l of list) if (l.listing_id && !byId.has(l.listing_id)) byId.set(l.listing_id, l);
-  const all = Array.from(byId.values()).map((l) => ({ ...l, _sold24: estSold24(l) }));
+  // Carry the computed estimate on each row so the per-role slice is a plain filter,
+  // not a recompute on every request.
+  const all = Array.from(byId.values()).map((l) => { const e = estOf(l); return { ...l, _sold24: e.sold24, _trending: e.trending }; });
   all.sort((a, b) => b._sold24 - a._sold24);
-  const hot = all.filter((l) => l._sold24 > 10);
-  const products = (hot.length >= 30 ? hot : all).slice(0, 30).map(({ _sold24, ...l }) => l);
-  // Top 30 keywords from the hot set's tags.
+  const products = all.slice(0, POOL_SIZE);
+  // Keywords from the hot end of the pool.
   const counts = {};
-  for (const l of (hot.length ? hot : all).slice(0, 80)) for (const t of (l.tags || [])) {
+  for (const l of products.slice(0, 80)) for (const t of (l.tags || [])) {
     const k = String(t).trim().toLowerCase();
     if (k) counts[k] = (counts[k] || 0) + 1;
   }
   const keywords = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 30).map(([t]) => t);
   return { date: new Date().toISOString().slice(0, 10), products, keywords };
+}
+
+// Slice the shared pool for who's asking.
+//  - Sellers: listings estimated >5 sold/24h come FIRST, then everything else, so the
+//    hot ones lead but browsing keeps going instead of hitting a wall.
+//  - Staff (admin/warehouse): only listings that earned the TRENDING badge — they're
+//    scouting what's actually climbing, across every niche in the pool.
+function sliceFor(pool, staff) {
+  const rows = Array.isArray(pool) ? pool : [];
+  if (staff) return rows.filter((l) => l._trending);
+  const hot = rows.filter((l) => (l._sold24 || 0) > 5);
+  const rest = rows.filter((l) => (l._sold24 || 0) <= 5);
+  return [...hot, ...rest];
 }
 
 // Shop analysis for the Account Analyzer. The NUMBERS are computed here and are
@@ -158,17 +186,24 @@ export function spydeckRoutes(app, requireAuth) {
   app.get('/api/spydeck/trending', { preHandler: requireAuth }, async (req, reply) => {
     await ensure();
     const today = new Date().toISOString().slice(0, 10);
+    const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
+    const serve = (feed) => ({ date: feed.date, keywords: feed.keywords || [], products: sliceFor(feed.products, staff) });
+
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
       if (cached.rows[0]) {
         const v = JSON.parse(cached.rows[0].value || '{}');
-        if (v && v.date === today && Array.isArray(v.products) && v.products.length) return v;
+        // `_sold24` guards against a cache written by the OLD builder, which stripped
+        // the computed fields — without them every row would look un-trending and
+        // staff would get an empty feed until tomorrow.
+        const usable = v && v.date === today && Array.isArray(v.products) && v.products.length && v.products[0]._sold24 !== undefined;
+        if (usable) return serve(v);
       }
     } catch { /* rebuild below */ }
     try {
       const feed = await buildTrending();
       await q("insert into settings (key,value,updated_at) values ('spydeck_trending',$1,now()) on conflict (key) do update set value=excluded.value, updated_at=now()", [JSON.stringify(feed)]).catch(() => {});
-      return feed;
+      return serve(feed);
     } catch (e) {
       reply.code(502); return { error: e.message || 'Could not build the trending feed', products: [], keywords: [] };
     }
