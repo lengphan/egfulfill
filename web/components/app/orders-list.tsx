@@ -1,12 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple } from "@phosphor-icons/react"
+import Image from "next/image"
+import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { ColumnsMenu } from "@/components/app/columns-menu"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -17,11 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, type OrderRow } from "@/lib/api"
+import { getOrders, type OrderRow, type OrderItem } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { clickableProps } from "@/lib/a11y"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
+import { itemImage } from "@/lib/order-image"
 import { usePaged, Pagination } from "@/components/app/pagination"
+import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
@@ -42,6 +45,55 @@ const fmtDate = (s?: string | null) => {
   const d = new Date(s)
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
+const variantOf = (it: OrderItem) => [it.color, it.size, it.print_type].filter(Boolean).join(" · ")
+const unitsOf = (o: OrderRow) => (o.items ?? []).reduce((n, it) => n + (Number(it.qty) || 1), 0)
+const lineTotal = (it: OrderItem) => (Number(it.unit_price) || 0) * (Number(it.qty) || 1)
+const shipTo = (o: OrderRow) => {
+  const a = (o.address ?? {}) as Record<string, string>
+  const line = [a.street || a.first_line || a.line1 || a.address1, a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")
+  return line || ""
+}
+// USPS/UPS/FedEx public tracking, so a seller can check a number without leaving.
+const trackUrl = (carrier?: string | null, tracking?: string | null) => {
+  if (!tracking) return ""
+  const t = encodeURIComponent(tracking.replace(/\s+/g, ""))
+  const c = (carrier || "").toLowerCase()
+  if (c.includes("ups")) return `https://www.ups.com/track?tracknum=${t}`
+  if (c.includes("fedex")) return `https://www.fedex.com/fedextrack/?trknbr=${t}`
+  if (c.includes("dhl")) return `https://www.dhl.com/en/express/tracking.html?AWB=${t}`
+  return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`
+}
+
+/** Overlapping thumbnails of an order's items — the photos the flat table was missing. */
+function PhotoStack({ items }: { items: OrderItem[] }) {
+  const shown = items.slice(0, 3)
+  const extra = items.length - shown.length
+  return (
+    <div className="flex shrink-0 items-center">
+      {shown.map((it, i) => {
+        const img = itemImage(it)
+        return (
+          <div
+            key={it.sku ?? i}
+            className={"relative size-8 overflow-hidden rounded-md border border-background bg-muted ring-1 ring-border " + (i ? "-ml-2.5" : "")}
+            style={{ zIndex: shown.length - i }}
+          >
+            {img ? (
+              <Image src={img} alt="" fill unoptimized sizes="32px" className="object-cover" />
+            ) : (
+              <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={12} weight="duotone" /></div>
+            )}
+          </div>
+        )
+      })}
+      {extra > 0 && (
+        <span className="-ml-2.5 flex size-8 items-center justify-center rounded-md border border-background bg-muted text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
+          +{extra}
+        </span>
+      )}
+    </div>
+  )
+}
 
 // Demo fallback (no session / standalone dev).
 const DEMO: OrderRow[] = [
@@ -53,6 +105,37 @@ const DEMO: OrderRow[] = [
   { id: "etsy-4110", seq: 4110, source: "etsy", customer: { name: "H. Dang" }, factory_status: "queued", total: 38.4, created_at: "2026-04-08", items: [{ name: "Mug · 15oz", qty: 3 }] },
 ]
 
+// ONE renderer per column id, so the header, the cells and the Columns menu all
+// stay in step off the same array — the old app's bug was adding a column in the
+// markup but forgetting COL_ORDER, which silently jumped it to the front.
+const cellClass = (id: OrderColId) => {
+  const c = ORDER_COLS[id]
+  const base = id === "items" ? "" : "truncate"
+  return [base, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")
+}
+function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
+  switch (id) {
+    case "order": return <span className="font-mono text-xs font-medium">{numOf(o)}</span>
+    case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
+    case "customer": return <span className="font-medium">{customerOf(o)}</span>
+    case "items": return (
+      <div className="flex min-w-0 items-center gap-2.5">
+        <PhotoStack items={o.items ?? []} />
+        <div className="min-w-0">
+          <div className="truncate text-sm">{itemsLabel(o)}</div>
+          <div className="truncate text-xs text-muted-foreground">{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</div>
+        </div>
+      </div>
+    )
+    case "status": return <SellerStatusBadge order={o} />
+    case "tracking": return o.tracking
+      ? <span className="truncate font-mono text-xs text-muted-foreground">{o.tracking}</span>
+      : <span className="text-xs text-muted-foreground/60">—</span>
+    case "total": return <span className="font-medium tabular-nums">{usd(totalOf(o))}</span>
+    case "date": return <span className="text-muted-foreground">{fmtDate(o.created_at)}</span>
+  }
+}
+
 export function OrdersList() {
   const router = useRouter()
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
@@ -60,6 +143,17 @@ export function OrdersList() {
   const [query, setQuery] = useState("")
   const [filter, setFilter] = useState<SellerFilter>("All")
   const [importOpen, setImportOpen] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  // Column layout is per-device; read after mount so prerender and hydration agree.
+  const [colOrder, setColOrder] = useState<OrderColId[]>(DEFAULT_ORDER_COLS)
+  const [hidden, setHidden] = useState<OrderColId[]>([])
+  useEffect(() => {
+    const id = setTimeout(() => { setColOrder(loadColOrder()); setHidden(loadHiddenCols()) }, 0)
+    return () => clearTimeout(id)
+  }, [])
+  const setOrderCols = (ids: OrderColId[]) => { setColOrder(ids); saveColOrder(ids) }
+  const setHiddenCols = (ids: OrderColId[]) => { setHidden(ids); saveHiddenCols(ids) }
+  const visibleCols = useMemo(() => colOrder.filter((id) => !hidden.includes(id)), [colOrder, hidden])
 
   const load = useCallback(() => {
     // Signed in → show real data (empty state if none). Only fall back to samples
@@ -120,6 +214,7 @@ export function OrdersList() {
         title="Orders"
         actions={
           <div className="flex items-center gap-2">
+            <ColumnsMenu order={colOrder} hidden={hidden} onOrder={setOrderCols} onHidden={setHiddenCols} />
             <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
               <UploadSimple size={14} weight="bold" /> Import
             </Button>
@@ -196,36 +291,100 @@ export function OrdersList() {
             )}
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[88px]">Order</TableHead>
-                <TableHead className="w-[104px]">Store</TableHead>
-                <TableHead className="w-[168px]">Customer</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead className="w-[120px]">Status</TableHead>
-                <TableHead className="w-[104px] text-right">Total</TableHead>
-                <TableHead className="w-[84px] text-right">Date</TableHead>
+                <TableHead className="w-[36px]" />
+                {visibleCols.map((id) => {
+                  const c = ORDER_COLS[id]
+                  return <TableHead key={id} className={[c.width, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")}>{c.label}</TableHead>
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paged.pageItems.map((o) => (
-                <TableRow
-                  key={o.id}
-                  {...clickableProps(() => router.push(`/orders/${encodeURIComponent(o.id)}`), `Open order ${numOf(o)}`)}
-                  className="cursor-pointer focus-visible:bg-accent focus-visible:outline-none"
-                >
-                  <TableCell className="truncate font-mono text-xs font-medium">{numOf(o)}</TableCell>
-                  <TableCell className="truncate text-muted-foreground">{storeOf(o)}</TableCell>
-                  <TableCell className="truncate font-medium">{customerOf(o)}</TableCell>
-                  <TableCell className="truncate text-muted-foreground">{itemsLabel(o)}</TableCell>
-                  <TableCell><SellerStatusBadge order={o} /></TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">{usd(totalOf(o))}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{fmtDate(o.created_at)}</TableCell>
-                </TableRow>
-              ))}
+              {paged.pageItems.map((o) => {
+                const items = o.items ?? []
+                const open = expanded === o.id
+                return (
+                  <Fragment key={o.id}>
+                    <TableRow
+                      onClick={() => setExpanded(open ? null : o.id)}
+                      className={"cursor-pointer focus-visible:bg-accent focus-visible:outline-none " + (open ? "bg-accent/40" : "")}
+                    >
+                      <TableCell className="pr-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpanded(open ? null : o.id) }}
+                          aria-label={open ? `Collapse order ${numOf(o)}` : `Expand order ${numOf(o)}`}
+                          aria-expanded={open}
+                          className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          <CaretRight size={12} weight="bold" className={"transition-transform " + (open ? "rotate-90" : "")} />
+                        </button>
+                      </TableCell>
+                      {visibleCols.map((id) => (
+                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o)}</TableCell>
+                      ))}
+                    </TableRow>
+
+                    {/* Expanded detail — the photos, variants, destination and tracking
+                        the flat row can't hold, without leaving the list. */}
+                    {open && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={visibleCols.length + 1} className="bg-muted/30 p-0">
+                          <div className="space-y-3 px-5 py-4">
+                            <div className="space-y-2">
+                              {items.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">No line items on this order.</div>
+                              ) : items.map((it, i) => {
+                                const img = itemImage(it)
+                                return (
+                                  <div key={it.sku ?? i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
+                                    <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                                      {img ? <Image src={img} alt="" fill unoptimized sizes="48px" className="object-cover" />
+                                        : <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={16} weight="duotone" /></div>}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
+                                      <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}</div>
+                                    </div>
+                                    <span className="shrink-0 text-xs text-muted-foreground">×{Number(it.qty) || 1}</span>
+                                    <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums">{lineTotal(it) ? usd(lineTotal(it)) : "—"}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
+                              {shipTo(o) && <span className="inline-flex items-center gap-1"><MapPin size={12} weight="fill" /> {shipTo(o)}</span>}
+                              {o.tracking ? (
+                                <a
+                                  href={trackUrl(o.carrier, o.tracking)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 font-medium text-emerald-600 hover:underline"
+                                >
+                                  <Truck size={12} weight="fill" /> {o.carrier || "USPS"} {o.tracking} <ArrowSquareOut size={10} weight="bold" />
+                                </a>
+                              ) : (
+                                <span className="inline-flex items-center gap-1"><Truck size={12} weight="fill" /> No tracking yet</span>
+                              )}
+                              <span className="ml-auto">
+                                <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
+                                  Open order <CaretRight size={12} weight="bold" />
+                                </Button>
+                              </span>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })}
             </TableBody>
           </Table>
+          </div>
         )}
         {orders !== null && filtered.length > 0 && (
           <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} />
