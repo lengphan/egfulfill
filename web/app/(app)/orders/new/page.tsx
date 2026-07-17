@@ -47,8 +47,29 @@ function friendlyValidationError(raw?: string): string {
 
 type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: ValidatedAddress } | { kind: "bad"; msg: string }
 
-type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string }
-const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "" })
+// colors/sizes are the OPTIONS the picked catalog product offers. Empty (a blank
+// item, or a product that defines no variants) → the field stays free text, so you
+// can still type anything; populated → it becomes a dropdown of real variants.
+type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string; colors: string[]; sizes: string[] }
+const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "", colors: [], sizes: [] })
+
+/** A variant dropdown for a picked catalog product. If the current value isn't one
+ *  of the product's options (an older line, or a value typed before the product was
+ *  picked) it's kept as an extra option rather than silently snapping to something
+ *  else — losing a chosen variant is worse than showing an odd one. */
+function VariantSelect({ value, options, onChange, placeholder }: { value: string; options: string[]; onChange: (v: string) => void; placeholder: string }) {
+  const opts = value && !options.includes(value) ? [value, ...options] : options
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+    >
+      <option value="">{placeholder}…</option>
+      {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  )
+}
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -127,6 +148,8 @@ export default function NewOrderPage() {
       price: p.price ? String(p.price) : "",
       color: p.color,
       size: p.sizes[0] ?? "",
+      colors: p.colors,
+      sizes: p.sizes,
     }
     if (pickerTarget == null) setLines((prev) => [...prev, { ...emptyLine(), ...patch }])
     else setLine(pickerTarget, patch)
@@ -316,11 +339,19 @@ export default function NewOrderPage() {
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Color</span>
-                <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" />
+                {l.colors.length > 0 ? (
+                  <VariantSelect value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder="Color" />
+                ) : (
+                  <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" />
+                )}
               </label>
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Size</span>
-                <Input value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} className="h-9" />
+                {l.sizes.length > 0 ? (
+                  <VariantSelect value={l.size} options={l.sizes} onChange={(v) => setLine(i, { size: v })} placeholder="Size" />
+                ) : (
+                  <Input value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} className="h-9" />
+                )}
               </label>
               <Button
                 variant="ghost"

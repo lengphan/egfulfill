@@ -19,6 +19,9 @@ export type PickedProduct = {
   img: string
   price: number
   color: string
+  /** Every colour the blank comes in (colorImages keys) — drives the line's colour
+   *  dropdown. Empty for a product that defines none. */
+  colors: string[]
   sizes: string[]
 }
 
@@ -69,6 +72,8 @@ export function ProductPickerDialog({
       img: imageOf(p),
       price: priceOf(p),
       color: p.mainColor || (p.colorImages ? Object.keys(p.colorImages)[0] || "" : ""),
+      // mainColor may not be a colorImages key, so union them and drop blanks.
+      colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
       sizes: p.sizes ?? [],
     })
     onOpenChange(false)
