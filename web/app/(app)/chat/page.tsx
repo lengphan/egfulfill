@@ -91,17 +91,26 @@ export default function ChatPage() {
   const isSupport = active?.kind === "support" // AI auto-reply only on the seller support thread
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
 
+  // Fetch WITHOUT touching state, so a caller can decide when to commit. The reveal
+  // path needs that: it has to swap the typewriter bubble for the persisted message
+  // in one render (see submit) rather than clearing one and then setting the other.
+  const fetchMessages = useCallback(async (): Promise<ChatEntry[] | null> => {
+    if (!activeId) return null
+    try {
+      const r = await getOrderMessages(activeId)
+      return Array.isArray(r) ? r : []
+    } catch {
+      return null
+    }
+  }, [activeId])
+
   const load = useCallback(async () => {
     // While the typewriter is revealing, don't let a poll pull in the already-persisted
     // assistant message — that would show a duplicate bubble next to the streaming one.
     if (!activeId || revealingRef.current) return
-    try {
-      const r = await getOrderMessages(activeId)
-      setMessages(Array.isArray(r) ? r : [])
-    } catch {
-      setMessages((prev) => prev ?? [])
-    }
-  }, [activeId])
+    const rows = await fetchMessages()
+    setMessages((prev) => rows ?? prev ?? [])
+  }, [activeId, fetchMessages])
 
   // Load + poll the active thread; reset messages when switching.
   useEffect(() => {
@@ -149,9 +158,19 @@ export default function ChatPage() {
             setAiTyping(false)
             revealingRef.current = true  // pause polling so no duplicate bubble appears
             await revealReply(r.reply)   // typewriter the reply in
-            setStreaming("")
+
+            // Hand off from the typewriter bubble to the persisted one in a SINGLE
+            // commit. Clearing `streaming` before the fetch resolved left a render
+            // where the reply was in neither — that was the flash. Fetch first, then
+            // set both states in one synchronous block so React batches them.
+            const rows = await fetchMessages()
             revealingRef.current = false
-            await load()                 // reconcile with the persisted message
+            setMessages((prev) =>
+              // If the reload failed, keep the reply on screen rather than losing it
+              // to the cleared typewriter.
+              rows ?? [...(prev ?? []), { id: `ai-${nowMs()}`, role: "assistant", text: r.reply as string, ts: nowMs() }]
+            )
+            setStreaming("")
             setAiNote(null)
           }
           else if (r.ok && r.skipped) { await load(); setAiNote(null) }
