@@ -25,7 +25,12 @@ const MAP: Record<string, SellerStatusInfo> = {
   // were acting on it, when in fact nothing is charged or started until they submit.
   new: P("Not submitted", TONE.neutral, "received"),
   draft: P("Not submitted", TONE.neutral, "received"),
-  in_review: P("New", TONE.neutral, "received"),   // submitted + charged; still cancellable
+  // Submitted = "In Production" to the seller. Every internal stage (in_review /
+  // awaiting_scan / printed / working) collapses to this one label — the factory's
+  // steps are not the seller's business. NB: still cancellable at in_review, so the
+  // Cancel button can appear alongside this label; that's driven by factory_status,
+  // not by what the badge says.
+  in_review: P("In Production", TONE.prod, "production"),
   awaiting_scan: P("In Production", TONE.prod, "production"),
   printed: P("In Production", TONE.prod, "production"),
   working: P("In Production", TONE.prod, "production"),
