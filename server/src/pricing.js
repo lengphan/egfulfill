@@ -51,11 +51,28 @@ export async function catalogIndex() {
   return { exact, rows };
 }
 
-function matchProduct(idx, sku) {
-  const s = String(sku || '').toUpperCase().trim();
+// Resolve an item to its catalog product, mirroring chosenProduct() in
+// eg-design-tools.js — the chain that decides what the boards SHOW, so pricing and
+// display can never disagree about which blank an item is:
+//   1. the blank someone explicitly picked (it.blank), matched by name/sku/id
+//   2. the item's SKU, matched against the product's base + variant SKUs
+// (1) is what makes a marketplace order priceable once its variants are chosen; (2) is
+// what makes a listing published FROM our catalog price itself with no picking at all,
+// because its variant SKU is already ours.
+function matchProduct(idx, item) {
+  const blank = String(item.blank || '').trim();
+  if (blank) {
+    const want = blank.toLowerCase();
+    const hit = idx.rows.find((r) => {
+      const d = r.data || {};
+      return [d.name, r.sku, d.sku, r.id, d.id].some((v) => v != null && String(v).trim().toLowerCase() === want);
+    });
+    if (hit) return hit;
+  }
+  const s = String(item.sku || '').toUpperCase().trim();
   if (!s) return null;
-  const hit = idx.exact.get(s);
-  if (hit) return hit;
+  const exact = idx.exact.get(s);
+  if (exact) return exact;
   // base ↔ variant prefix (TEE-WHT ↔ TEE-WHT-L), same rule as the image resolver.
   for (const row of idx.rows) {
     for (const c of candidateSkus(row)) {
@@ -65,31 +82,55 @@ function matchProduct(idx, sku) {
   return null;
 }
 
-// Per-unit cost. A size can override the base (`sizePrices` / `size_prices`:
-// {"2XL": 12.5}) — a 3XL blank genuinely costs more than an S.
-function unitCostOf(row, size) {
-  const d = row.data || {};
-  const table = d.sizePrices || d.size_prices || null;
-  if (table && size) {
-    const key = Object.keys(table).find((k) => k.toLowerCase() === String(size).toLowerCase());
-    const n = key != null ? num(table[key]) : null;
-    if (n != null) return n;
-  }
-  return num(d.basePrice ?? d.base_price ?? row.base_price) ?? null;
+// The canonical price tier for a size. Shape comes from npmCollectPriceTiers in
+// eg-products.js: sizePrices is an ARRAY of {size, price, shipping} — NOT a keyed map.
+// `shipping` may be null, meaning "no per-size override, use the product's fee".
+function tierFor(d, size) {
+  if (!Array.isArray(d.sizePrices) || !size) return null;
+  const want = String(size).trim().toLowerCase();
+  return d.sizePrices.find((t) => t && t.size != null && String(t.size).trim().toLowerCase() === want) || null;
 }
 
-// Per-unit shipping for this variant, most specific first: a per-size fee, then the
-// product's own fee, then the platform default.
+// Per-unit cost = the size's base price (else the product's base) + the print method's
+// add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
+// the seller — if these two disagree, the quote lies about the price on screen.
+function unitCostOf(row, item) {
+  const d = row.data || {};
+  let base = null;
+  const tier = tierFor(d, item.size);
+  if (tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
+  if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
+  if (base == null) return null;
+  return base + methodAddOn(d, item.print_type);
+}
+
+// Print-method surcharge (EMB stitches cost more than DTG ink). Method aliases are
+// normalised exactly as eg-design-tools.js does it.
+function methodAddOn(d, printType) {
+  const tech = String(printType || '').toUpperCase();
+  if (!tech || !d.methodPrices) return 0;
+  const k = /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL'
+          : /LSR|LASER/.test(tech) ? 'LSR' : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
+  const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);
+  return mp != null && mp > 0 ? mp : 0;
+}
+
+// Per-unit shipping, most specific first: the size's own fee, then the product's fee,
+// then the platform default.
 function shipFeeOf(row, size, fees) {
   const d = row.data || {};
-  const table = d.shipFees || d.ship_fees || null;
-  if (table && size) {
-    const key = Object.keys(table).find((k) => k.toLowerCase() === String(size).toLowerCase());
-    const n = key != null ? num(table[key]) : null;
-    if (n != null) return n;
-  }
+  const tier = tierFor(d, size);
+  if (tier && tier.shipping != null) { const s = num(tier.shipping); if (s != null) return s; }
   const own = num(d.shippingFee ?? d.shipping_fee);
   return own != null ? own : fees.ship_first;
+}
+
+// The extra-item fee for additional units. A product may set its own
+// (additionalItemShipping) — a second hoodie adds more weight than a second sticker —
+// otherwise the platform's ship_extra applies.
+function extraFeeOf(row, fees) {
+  const own = num((row.data || {}).additionalItemShipping);
+  return own != null ? own : fees.ship_extra;
 }
 
 // Quote one order. Returns every line priced, the totals, and anything unpriceable.
@@ -97,7 +138,7 @@ function shipFeeOf(row, size, fees) {
 // and charging 0 for it would fulfil it for free — silently, forever.
 export async function quoteOrder(orderId) {
   const [items, fees, idx] = await Promise.all([
-    q('select id, sku, name, qty, size, unit_cost, ship_fee from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
+    q('select id, sku, name, qty, size, blank, print_type, unit_cost, ship_fee from order_items where order_id=$1 order by id', [orderId]).then((r) => r.rows),
     feeSettings(),
     catalogIndex(),
   ]);
@@ -107,31 +148,38 @@ export async function quoteOrder(orderId) {
     const qty = Math.max(1, parseInt(it.qty, 10) || 1);
     // A frozen cost wins: once charged, an order's price is history and must not move
     // when someone edits the catalog.
-    const frozen = num(it.unit_cost);
-    const frozenShip = num(it.ship_fee);
-    let cost = frozen, ship = frozenShip;
+    let cost = num(it.unit_cost), ship = num(it.ship_fee);
+    let extra = fees.ship_extra;
     if (cost == null || ship == null) {
-      const row = matchProduct(idx, it.sku);
-      if (!row) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '' }); continue; }
-      if (cost == null) cost = unitCostOf(row, it.size);
+      const row = matchProduct(idx, it);
+      // No product = no cost. The variants haven't been chosen yet (a marketplace order
+      // arrives with none), so the caller must ask for them rather than invent a price.
+      if (!row) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-product' }); continue; }
+      if (cost == null) cost = unitCostOf(row, it);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
-      if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '' }); continue; }
+      extra = extraFeeOf(row, fees);
+      if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-cost' }); continue; }
     }
-    lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, unitCost: money(cost), shipFee: money(ship ?? fees.ship_first) });
+    lines.push({ id: it.id, sku: it.sku, name: it.name, qty, size: it.size, blank: it.blank,
+                 unitCost: money(cost), shipFee: money(ship ?? fees.ship_first), extraFee: money(extra) });
   }
   return { lines, unpriced, fees, ...computeTotals(lines, fees) };
 }
 
 // The money formula, kept pure and exported so it can be tested without a database:
-//   subtotal = Σ(unit cost × qty)
-//   shipping = the FIRST unit's variant fee + ship_extra for every other UNIT
+//   subtotal = Σ((base for its size + print-method add-on) × qty)
+//   shipping = the FIRST unit's fee + that product's extra-item fee for every other UNIT
 //   total    = subtotal + shipping
 // Note "unit", not "line": 3× of one tee is 3 units in one parcel, so it pays one
 // shipping fee and two extra-item fees — not one extra fee for being a single line.
+// The first line sets both rates because it's one parcel and something has to define it.
 export function computeTotals(lines, fees) {
   const subtotal = money(lines.reduce((s, l) => s + l.unitCost * l.qty, 0));
   const units = lines.reduce((s, l) => s + l.qty, 0);
-  const shipping = units > 0 ? money(lines[0].shipFee + (fees.ship_extra || 0) * (units - 1)) : 0;
+  if (!units) return { subtotal, shipping: 0, units: 0, total: subtotal };
+  const first = lines[0];
+  const extra = first.extraFee != null ? first.extraFee : (fees.ship_extra || 0);
+  const shipping = money(first.shipFee + extra * (units - 1));
   return { subtotal, shipping, units, total: money(subtotal + shipping) };
 }
 

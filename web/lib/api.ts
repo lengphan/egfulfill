@@ -174,14 +174,15 @@ export type CatalogProduct = {
   base_price?: number | string
   shippingFee?: number | string
   shipping_fee?: number | string
-  // Per-SIZE overrides of base cost / shipping, keyed by the size label ({"2XL": 12.5}).
-  // A 3XL blank costs more to buy and to ship; colour doesn't change either. Absent key
-  // = use basePrice/shippingFee. Priced server-side by src/pricing.js — keep the key
-  // names in step with it. Snake variants exist because older rows round-tripped jsonb.
-  sizePrices?: Record<string, number>
-  size_prices?: Record<string, number>
-  shipFees?: Record<string, number>
-  ship_fees?: Record<string, number>
+  // Per-SIZE price tiers. Canonical shape from npmCollectPriceTiers (eg-products.js):
+  // an ARRAY of {size, price, shipping}, not a keyed map. `shipping: null` means "no
+  // override — use shippingFee". A 3XL costs more to buy AND to ship; colour changes
+  // neither, which is why tiers key on size alone. Priced by server/src/pricing.js.
+  sizePrices?: { size: string; price: number; shipping: number | null }[]
+  // Print-method surcharge, e.g. { DTG: 3, EMB: 5 } — EMB stitches cost more than ink.
+  methodPrices?: Record<string, number>
+  // This product's own extra-item shipping, overriding the platform's ship_extra.
+  additionalItemShipping?: number | null
   description?: string
   supplier?: string // "S&S" | "Otto Cap" | "" — where the blank derives from
   mainColor?: string

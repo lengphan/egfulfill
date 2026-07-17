@@ -17,29 +17,36 @@ const imageOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[
 const genId = (seed: number) => "PROD-" + seed.toString(36).toUpperCase()
 const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
 
-// A stored {size: number} map → editable strings. Tolerates both camel and snake keys,
-// since catalog rows round-trip through a jsonb blob written by several older writers.
-function toStrMap(v: unknown): Record<string, string> {
-  if (!v || typeof v !== "object") return {}
-  const out: Record<string, string> = {}
-  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-    const n = Number(val)
-    if (val !== "" && val != null && isFinite(n)) out[k] = String(n)
+// The stored sizePrices ARRAY ([{size, price, shipping}] — the canonical shape from
+// eg-products.js) → editable strings keyed by size, for the inputs below.
+type Tier = { price: string; shipping: string }
+function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
+  const out: Record<string, Tier> = {}
+  if (!Array.isArray(v)) return out
+  for (const t of v) {
+    if (!t || t.size == null) continue
+    out[String(t.size)] = {
+      price: t.price != null && isFinite(Number(t.price)) ? String(Number(t.price)) : "",
+      shipping: t.shipping != null && isFinite(Number(t.shipping)) ? String(Number(t.shipping)) : "",
+    }
   }
   return out
 }
 
-// Editable strings → the {size: number} map the server prices from. Drops blanks and
-// sizes the product no longer offers.
-function pickNums(map: Record<string, string>, keep: string[]): Record<string, number> | undefined {
-  const out: Record<string, number> = {}
-  for (const k of keep) {
-    const raw = map[k]
-    if (raw == null || raw.trim() === "") continue
-    const n = Number(raw)
-    if (isFinite(n) && n >= 0) out[k] = n
+// Editable strings → the canonical array. Mirrors npmCollectPriceTiers: a tier needs a
+// size AND a price > 0 to exist at all; shipping is optional and stays null when blank.
+// Drops sizes the product no longer offers — a stale 3XL tier is just a trap.
+function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["sizePrices"] {
+  const out: NonNullable<CatalogProduct["sizePrices"]> = []
+  for (const size of keep) {
+    const t = map[size]
+    if (!t) continue
+    const price = Number(t.price)
+    if (t.price.trim() === "" || !isFinite(price) || price <= 0) continue
+    const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
+    out.push({ size, price, shipping: ship != null && isFinite(ship) && ship >= 0 ? ship : null })
   }
-  return Object.keys(out).length ? out : undefined
+  return out.length ? out : undefined
 }
 
 // Create/edit one catalog product. Colors/sizes are chips (with supplier-suggested picks),
@@ -62,10 +69,9 @@ export function ProductEditorDialog({
   const [desc, setDesc] = useState("")
   const [sizes, setSizes] = useState<string[]>([])
   const [colors, setColors] = useState<string[]>([])
-  // Per-size cost/shipping overrides, held as strings so a half-typed "12." doesn't
-  // round-trip through Number and fight the input. Empty string = no override.
-  const [sizePrices, setSizePrices] = useState<Record<string, string>>({})
-  const [shipFees, setShipFees] = useState<Record<string, string>>({})
+  // Per-size price tiers, held as strings so a half-typed "12." doesn't round-trip
+  // through Number and fight the input. Empty = no override for that size.
+  const [tiers, setTiers] = useState<Record<string, Tier>>({})
   const [colorInput, setColorInput] = useState("")
   const [status, setStatus] = useState("Active")
   const [img, setImg] = useState("")
@@ -83,8 +89,7 @@ export function ProductEditorDialog({
       setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
       setDesc(p?.description ?? "")
       setSizes(p?.sizes ?? [])
-      setSizePrices(toStrMap(p?.sizePrices ?? p?.size_prices))
-      setShipFees(toStrMap(p?.shipFees ?? p?.ship_fees))
+      setTiers(tiersToStr(p?.sizePrices))
       setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
       setStatus(p?.status ?? "Active")
       setImg(p ? imageOf(p) : "")
@@ -128,10 +133,7 @@ export function ProductEditorDialog({
       price: Number(price) || 0,
       basePrice: Number(basePrice) || Number(price) || 0,
       shippingFee: shipping.trim() === "" ? undefined : Number(shipping) || 0,
-      // Only keep overrides for sizes that still exist and actually carry a number —
-      // a stale "3XL" fee on a product that no longer offers 3XL is just a trap.
-      sizePrices: pickNums(sizePrices, sizes),
-      shipFees: pickNums(shipFees, sizes),
+      sizePrices: strToTiers(tiers, sizes),
       description: desc.trim() || undefined,
       sizes,
       colorImages,
@@ -202,32 +204,36 @@ export function ProductEditorDialog({
             </div>
             {shipping.trim() === "" && <p className="mt-1 text-[11px] text-muted-foreground">Leave shipping blank to use the platform default at fulfillment.</p>}
 
-            {/* Per-size overrides. Keyed by SIZE, not colour: a 3XL blank costs more to
-                buy and more to ship, while Navy vs White is the same parcel. Blank = use
-                the product-level numbers above. Read by server/src/pricing.js. */}
+            {/* Per-size price tiers — the canonical sizePrices [{size, price, shipping}].
+                Keyed by SIZE, not colour: a 3XL costs more to buy and to ship, while Navy
+                vs White is the same parcel. Blank = use the numbers above. A tier needs a
+                cost to exist (matching npmCollectPriceTiers), so shipping alone is ignored. */}
             {sizes.length > 0 && (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">Per-size overrides</span>
-                  {(Object.keys(sizePrices).length > 0 || Object.keys(shipFees).length > 0) && (
-                    <button onClick={() => { setSizePrices({}); setShipFees({}) }} className="text-xs font-medium text-primary hover:underline">Clear</button>
+                  <span className="text-xs font-medium">Per-size pricing</span>
+                  {Object.keys(tiers).length > 0 && (
+                    <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear</button>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Leave blank to use the base cost and shipping fee above.</p>
-                <div className="mt-2 space-y-1.5">
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Leave a size blank to use the base cost and shipping fee above.</p>
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr] gap-2 text-[11px] text-muted-foreground">
+                  <span /><span>Base cost ($)</span><span>Shipping ($)</span>
+                </div>
+                <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => (
                     <div key={s} className="grid grid-cols-[3rem_1fr_1fr] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
-                        value={sizePrices[s] ?? ""}
-                        onChange={(e) => setSizePrices((p) => ({ ...p, [s]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                        placeholder={basePrice.trim() === "" ? "cost" : `cost ${basePrice}`}
+                        value={tiers[s]?.price ?? ""}
+                        onChange={(e) => setTiers((p) => ({ ...p, [s]: { shipping: p[s]?.shipping ?? "", price: e.target.value.replace(/[^0-9.]/g, "") } }))}
+                        placeholder={basePrice.trim() === "" ? "cost" : basePrice}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
                       />
                       <Input
-                        value={shipFees[s] ?? ""}
-                        onChange={(e) => setShipFees((p) => ({ ...p, [s]: e.target.value.replace(/[^0-9.]/g, "") }))}
-                        placeholder={shipping.trim() === "" ? "shipping" : `ship ${shipping}`}
+                        value={tiers[s]?.shipping ?? ""}
+                        onChange={(e) => setTiers((p) => ({ ...p, [s]: { price: p[s]?.price ?? "", shipping: e.target.value.replace(/[^0-9.]/g, "") } }))}
+                        placeholder={shipping.trim() === "" ? "default" : shipping}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
                     </div>

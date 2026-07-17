@@ -34,6 +34,15 @@ check('size-priced 2XL (cost 12.50)', [{ unitCost: 12.5, qty: 2, shipFee: 5 }], 
 check('empty order', [], 0);
 check('rounding: 3x $8.33', [{ unitCost: 8.33, qty: 3, shipFee: 5 }], 33.99);
 check('free blank still pays shipping', [{ unitCost: 0, qty: 1, shipFee: 5 }], 5);
+// unitCost already includes the print-method add-on (base 8 + EMB 5 = 13/unit).
+check('EMB add-on folded into unit cost', [{ unitCost: 13, qty: 2, shipFee: 5 }], 26 + 5 + 2);
+// A product's own additionalItemShipping overrides the platform's ship_extra ($2).
+check('product extra fee $3 beats platform $2', [{ unitCost: 10, qty: 3, shipFee: 5, extraFee: 3 }], 30 + 5 + 6);
+check('extraFee 0 = free additional units', [{ unitCost: 10, qty: 4, shipFee: 5, extraFee: 0 }], 40 + 5);
+// The first LINE sets both rates for the parcel, even when later lines differ.
+check('first line sets the parcel rates', [
+  { unitCost: 20, qty: 1, shipFee: 9, extraFee: 4 }, { unitCost: 5, qty: 2, shipFee: 1, extraFee: 1 },
+], 30 + 9 + 8);
 
 console.log(failed ? `\n${failed} FAILED` : '\nAll pricing checks passed.');
 process.exit(failed ? 1 : 0);
