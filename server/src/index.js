@@ -34,6 +34,7 @@ import { supportAiRoutes } from './routes/support_ai.js';
 import { factorySettingsRoutes } from './routes/factory_settings.js';
 import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { addClient } from './events.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -97,11 +98,12 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     if (c && !/^#[0-9a-f]{6}$/i.test(c)) { reply.code(400); return { error: 'Avatar colour must be a #rrggbb hex' }; }
     put('avatar_color', c || null);
   }
+  if (b.notify_sound !== undefined) put('notify_sound', !!b.notify_sound);
   if (!sets.length) { reply.code(400); return { error: 'Nothing to update' }; }
 
   vals.push(req.user.sub);
   const r = await q(
-    'update users set ' + sets.join(', ') + ' where id=$' + vals.length + ' returning id, email, role, name, avatar_emoji, avatar_color',
+    'update users set ' + sets.join(', ') + ' where id=$' + vals.length + ' returning id, email, role, name, avatar_emoji, avatar_color, notify_sound',
     vals
   );
   if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
@@ -182,6 +184,7 @@ supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-
 factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
 purchaseRoutes(app, requireAuth, requireStaff);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
+notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

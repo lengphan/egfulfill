@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   MagnifyingGlass,
-  Bell,
   Moon,
   Sun,
   Plus,
@@ -25,6 +24,7 @@ import { staffNavTitle } from "@/lib/staff-nav"
 import { getWallet } from "@/lib/api"
 import { getUser, clearSession, type User } from "@/lib/auth"
 import { UserAvatar } from "@/components/app/user-avatar"
+import { NotificationBell } from "@/components/app/notification-bell"
 
 function IconButton({
   label,
@@ -110,12 +110,7 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
         <IconButton label="Search">
           <MagnifyingGlass size={18} />
         </IconButton>
-        <IconButton label="Notifications">
-          <Bell size={18} />
-          <span className="absolute right-1.5 top-1.5 flex min-w-4 items-center justify-center rounded-full border-2 border-card bg-primary px-1 text-[9px] font-bold leading-none text-primary-foreground">
-            8
-          </span>
-        </IconButton>
+        <NotificationBell />
         <IconButton
           label="Toggle theme"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}

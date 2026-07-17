@@ -12,6 +12,8 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   // UI falls back to the name's initial, exactly as before.
   q('alter table users add column if not exists avatar_emoji text').catch(() => {});
   q('alter table users add column if not exists avatar_color text').catch(() => {});
+  // Per-user notification sound toggle (default on).
+  q('alter table users add column if not exists notify_sound boolean default true').catch(() => {});
   // Lighter, STAFF-readable seller directory (any non-seller role). Backs the
   // seller-adjust panel on the factory boards (warehouse/admin) so a balance
   // adjustment resolves to a real account. Minimal fields only — no password,

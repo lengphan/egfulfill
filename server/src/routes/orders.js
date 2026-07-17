@@ -4,6 +4,7 @@
 import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
+import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 
 export function ordersRoutes(app, requireAuth) {
@@ -91,7 +92,9 @@ export function ordersRoutes(app, requireAuth) {
     // importReceipt(). So factory_order is always false here (insert AND on
     // conflict), guaranteeing manual orders stay visible to the seller even if a
     // prior run mis-flagged them.
-    await q(
+    // `(xmax = 0) as inserted` distinguishes a fresh INSERT from an ON CONFLICT
+    // UPDATE — needed so editing an order doesn't re-alert the floor as if it were new.
+    const up = await q(
       `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, profit, delivery, carrier, tracking, seq, meta, factory_order)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, false)
        on conflict (id) do update set
@@ -100,16 +103,31 @@ export function ordersRoutes(app, requireAuth) {
          total=excluded.total, profit=excluded.profit, delivery=excluded.delivery,
          carrier=excluded.carrier, tracking=excluded.tracking,
          seq=coalesce(orders.seq, excluded.seq),
-         meta=coalesce(excluded.meta, orders.meta), factory_order=false`,
+         meta=coalesce(excluded.meta, orders.meta), factory_order=false
+       returning (xmax = 0) as inserted`,
       [o.id, ownerId, o.store || null, o.source || 'manual', o.customer || {}, o.address || {},
        o.status || 'new', o.factoryStatus || o.status || 'new', o.total || 0, o.profit || 0,
        o.delivery || null, o.carrier || null, o.tracking || null,
        (o.seq != null && o.seq !== '') ? parseInt(o.seq, 10) : null,
        (o.meta && typeof o.meta === 'object') ? o.meta : {}]
     );
+    const isNew = !!(up.rows[0] && up.rows[0].inserted);
     if (Array.isArray(o.items)) await replaceItems(o.id, o.items);
     audit(req, 'order.saved', { entityType: 'order', entityId: o.id, after: { status: o.status, total: o.total, customer: (o.customer && o.customer.name) || null } });
     egBroadcast({ type: 'orders', id: o.id });
+    // A NEW order is the thing the floor most needs to hear about — and only a new
+    // one, so re-saving an order doesn't re-alert everyone.
+    if (isNew) {
+      const num = o.seq ? `#${o.seq}` : o.id;
+      notify({
+        roles: ['admin', 'operator', 'warehouse'],
+        type: 'order-new',
+        title: `New order ${num}`,
+        body: [(o.customer && o.customer.name) || null, o.store || o.source || 'manual'].filter(Boolean).join(' · '),
+        href: '/operator',
+        entityId: o.id,
+      });
+    }
     return { ok: true, id: o.id };
   });
 
@@ -320,6 +338,30 @@ export function ordersRoutes(app, requireAuth) {
        (b.attachment && typeof b.attachment === 'object') ? b.attachment : null,
        JSON.stringify(meta), b.clientId || null]);
     egBroadcast({ type: 'order-message', id: req.params.id });
+
+    // Tell somebody. A message that only lands in a table nobody is watching is how
+    // "Talk to a human" used to disappear silently.
+    const isSupport = String(req.params.id).startsWith('support-');
+    const fromSeller = !isStaff(req.user);
+    if (isSupport && fromSeller) {
+      // Seller wrote in their support thread → alert the staff who answer it.
+      notify({
+        roles: ['admin', 'operator', 'warehouse'],
+        type: 'support-message',
+        title: `${b.by || 'A seller'} needs help`,
+        body: String(b.text || '').slice(0, 140),
+        href: '/chat',
+        entityId: req.params.id,
+      });
+    } else if (!isSupport) {
+      // Order thread: notify the other side (seller ↔ factory).
+      const o = (await q('select seller_id, seq from orders where id=$1', [req.params.id])).rows[0];
+      if (o) {
+        const num = o.seq ? `#${o.seq}` : req.params.id;
+        if (fromSeller) notify({ roles: ['admin', 'operator', 'warehouse'], type: 'order-message', title: `New message on ${num}`, body: String(b.text || '').slice(0, 140), href: '/operator', entityId: req.params.id });
+        else if (o.seller_id) notify({ userIds: [o.seller_id], type: 'order-message', title: `Reply on ${num}`, body: String(b.text || '').slice(0, 140), href: `/orders/${req.params.id}`, entityId: req.params.id });
+      }
+    }
     return { ok: true };
   });
 

@@ -1,11 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { IntegrationsPanel } from "@/components/app/integrations-panel"
@@ -45,6 +46,7 @@ function ProfilePanel() {
   const [name, setName] = useState("")
   const [emoji, setEmoji] = useState<string>("")
   const [color, setColor] = useState<string>(AVATAR_COLORS[0])
+  const [sound, setSound] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -55,13 +57,15 @@ function ProfilePanel() {
       setName(u?.name ?? "")
       setEmoji(u?.avatar_emoji ?? "")
       setColor(u?.avatar_color ?? AVATAR_COLORS[0])
+      setSound(u?.notify_sound !== false)
     }, 0)
     return () => clearTimeout(id)
   }, [])
 
   const nameDirty = !!name.trim() && name.trim() !== (user?.name ?? "")
   const avatarDirty = emoji !== (user?.avatar_emoji ?? "") || color !== (user?.avatar_color ?? AVATAR_COLORS[0])
-  const dirty = !!user && (nameDirty || avatarDirty)
+  const soundDirty = sound !== (user?.notify_sound !== false)
+  const dirty = !!user && (nameDirty || avatarDirty || soundDirty)
 
   const save = async () => {
     if (!dirty) return
@@ -72,9 +76,10 @@ function ProfilePanel() {
         name: name.trim(),
         avatar_emoji: emoji || null,
         avatar_color: color || null,
+        notify_sound: sound,
       })
       if (r.error) throw new Error(r.error)
-      const next = { name: r.name ?? name.trim(), avatar_emoji: emoji || null, avatar_color: color || null }
+      const next = { name: r.name ?? name.trim(), avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
       updateUser(next)
       setUser((u) => (u ? { ...u, ...next } : u))
       setSaved(true)
@@ -156,6 +161,21 @@ function ProfilePanel() {
             ))}
           </div>
         </div>
+        {/* Notification sound — per user, so a quiet floor can mute without
+            affecting anyone else's board. */}
+        <label className="flex max-w-md cursor-pointer items-center justify-between gap-4 rounded-xl border border-border p-3">
+          <span className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              {sound ? <SpeakerHigh size={15} weight="fill" /> : <SpeakerSlash size={15} weight="fill" />}
+            </span>
+            <span>
+              <span className="block text-sm font-medium">Notification sound</span>
+              <span className="block text-xs text-muted-foreground">Play a chime when something needs you</span>
+            </span>
+          </span>
+          <Switch checked={sound} onCheckedChange={(v) => { setSound(v); setSaved(false) }} disabled={!user} />
+        </label>
+
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-muted-foreground">Email</span>
           <div className="text-sm">{user?.email || "—"}</div>

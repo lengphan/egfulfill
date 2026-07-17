@@ -293,6 +293,15 @@ export function deleteInventoryItem(sku: string) {
   return api<{ ok?: boolean }>(`/api/inventory/${encodeURIComponent(sku)}`, { method: "DELETE" })
 }
 
+// ── Notifications ──
+export type Notification = { id: number | string; type: string; title: string; body?: string | null; href?: string | null; entity_id?: string | null; read_at?: string | null; created_at: string }
+export function getNotifications(limit = 20) {
+  return api<{ unread: number; notifications: Notification[] }>(`/api/notifications?limit=${limit}`)
+}
+export function markNotificationsRead(id?: number | string) {
+  return api<{ ok: boolean; unread: number }>(`/api/notifications/read`, { method: "POST", body: JSON.stringify(id ? { id } : {}) })
+}
+
 // ── SpyDeck Account Analyzer ──
 // The server computes every number (deterministic, same estimate model as the rest of
 // SpyDeck) and only the write-up comes from the model. Results cache for 24h per
@@ -541,7 +550,7 @@ export function setFactorySettings(body: FactorySettings) {
 }
 
 // Update the signed-in user's profile (currently just the display name).
-export function updateProfile(patch: { name?: string; avatar_emoji?: string | null; avatar_color?: string | null }) {
+export function updateProfile(patch: { name?: string; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean }) {
   return api<{ id?: string; name?: string; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; error?: string }>(`/api/me`, {
     method: "PATCH",
     body: JSON.stringify(patch),
