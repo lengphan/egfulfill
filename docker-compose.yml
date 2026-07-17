@@ -59,6 +59,15 @@ services:
       USPS_MOCK: ${USPS_MOCK:-}
       # Third-party shipping aggregators (discounted USPS + UPS labels via API,
       # no USPS EPS/scope approval needed). Set either or both; rates merge.
+      # Ads — Meta (Facebook/Instagram) + Google Ads. Both also settable in
+      # Settings › Integrations (app_secrets). Google Ads additionally needs a
+      # developer token from a Google Ads Manager (MCC) account.
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      GOOGLE_ADS_CLIENT_ID: ${GOOGLE_ADS_CLIENT_ID:-}
+      GOOGLE_ADS_CLIENT_SECRET: ${GOOGLE_ADS_CLIENT_SECRET:-}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      GOOGLE_ADS_LOGIN_CUSTOMER_ID: ${GOOGLE_ADS_LOGIN_CUSTOMER_ID:-}
       EASYPOST_API_KEY: ${EASYPOST_API_KEY:-}
       SHIPPO_API_TOKEN: ${SHIPPO_API_TOKEN:-}
       # VietQR auto-reconciliation — the Username/Password you enter on the VietQR

@@ -35,6 +35,7 @@ import { factorySettingsRoutes } from './routes/factory_settings.js';
 import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
+import { adsRoutes } from './routes/ads.js';
 import { addClient } from './events.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
@@ -185,6 +186,7 @@ factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory setti
 purchaseRoutes(app, requireAuth, requireStaff);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
+adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })
