@@ -186,6 +186,28 @@ export function ordersRoutes(app, requireAuth) {
     // sellers may only patch their own orders; staff any; a team member patches the OWNER's.
     const sel = isStaff(req.user) ? null : await resolveSeller(req.user);
     if (sel && !_canSurface(sel, 'orders')) { reply.code(403); return { error: 'No access to orders' }; }
+
+    // What a SELLER may change on their own order. Ownership was already scoped, but
+    // that alone let a seller set ANY production status on their own order — including
+    // factory_status='shipped' — or edit the address after the floor had started.
+    // Production belongs to the factory; the seller's only status move is cancelling,
+    // and only while nobody has picked it up yet.
+    if (sel) {
+      const cur = (await q('select factory_status from orders where id=$1 and seller_id=$2', [req.params.id, sel.id])).rows[0];
+      if (!cur) { reply.code(404); return { error: 'Order not found' }; }
+      const started = !['', 'new', 'draft'].includes(String(cur.factory_status || ''));
+      if (body.tracking !== undefined || body.carrier !== undefined) {
+        reply.code(403); return { error: 'Tracking is set by the factory.' };
+      }
+      if (body.factoryStatus !== undefined || body.status !== undefined) {
+        const want = String(body.factoryStatus ?? body.status ?? '');
+        if (want !== 'cancelled') { reply.code(403); return { error: 'Only the factory can change production status.' }; }
+        if (started) { reply.code(403); return { error: 'This order is already in production — message support to cancel or refund it.', locked: true }; }
+      }
+      if (started && (body.address !== undefined || body.customer !== undefined)) {
+        reply.code(403); return { error: 'This order is already in production — its address can no longer be edited here.', locked: true };
+      }
+    }
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
       if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(sel.id); }

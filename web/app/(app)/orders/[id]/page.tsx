@@ -15,6 +15,7 @@ import {
   getOrderDesigns,
   getOrderMessages,
   postOrderMessage,
+  updateOrder,
   type OrderRow,
   type OrderItem,
   type OrderDesign,
@@ -147,8 +148,11 @@ export default function OrderDetailPage() {
             <SellerStatusBadge order={order} />
           </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted-foreground">
+            {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
+          </div>
+          <CancelOrderButton order={order} onDone={() => getOrders().then((rows) => setOrders(rows ?? [])).catch(() => {})} />
         </div>
       </div>
 
@@ -337,5 +341,54 @@ export default function OrderDetailPage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Cancel — only while the factory hasn't started. `started` mirrors the SERVER rule
+ * (factory_status not in new/draft/''), which is what actually enforces this: hiding
+ * the button is courtesy, the 403 is the gate.
+ */
+function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState(false)
+
+  const fs = String(order.factory_status || "")
+  const started = !["", "new", "draft"].includes(fs)
+  const done = fs === "cancelled" || fs === "refunded"
+  if (done) return <span className="text-xs font-medium text-muted-foreground">Order {fs}</span>
+
+  const cancel = async () => {
+    setBusy(true); setErr(null)
+    try {
+      await updateOrder(order.id, { factoryStatus: "cancelled", status: "cancelled" })
+      setConfirm(false)
+      onDone()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not cancel this order")
+    } finally { setBusy(false) }
+  }
+
+  if (started) {
+    return (
+      <span className="text-xs text-muted-foreground" title="Cancelling is only possible before the factory starts">
+        In production — message support to cancel
+      </span>
+    )
+  }
+  return (
+    <span className="flex items-center gap-2">
+      {err && <span className="text-xs text-destructive">{err}</span>}
+      {confirm ? (
+        <>
+          <span className="text-xs text-muted-foreground">Cancel this order?</span>
+          <Button size="sm" variant="destructive" onClick={cancel} disabled={busy}>{busy ? "Cancelling…" : "Yes, cancel"}</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Keep</Button>
+        </>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setConfirm(true)}>Cancel order</Button>
+      )}
+    </span>
   )
 }

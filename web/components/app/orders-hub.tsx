@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, stageMeta, orderStage, isException } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, ALL_STATUSES, normalizeStage, nextStage, orderStage, isException } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -425,8 +425,6 @@ export function OrdersHub() {
 
                   <div className="space-y-2">
                     {items.map((it, i) => {
-                      const to = nextStage(it.factory_status)
-                      const toMeta = to ? stageMeta(to) : null
                       const key = `${o.id}:${it.sku}`
                       const img = itemImage(it)
                       return (
@@ -449,9 +447,20 @@ export function OrdersHub() {
                                 : <><PaperPlaneTilt size={13} weight="bold" /> Designer</>}
                             </Button>
                           )}
-                          <StageBadge status={it.factory_status} />
-                          {canDesign && (
-                            <select value={normalizeStage(it.factory_status)} onChange={(e) => advanceItem(o, it, e.target.value)} disabled={busy === key} className="h-8 shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs" aria-label="Set status" title="Set status">
+                          {/* ONE control per item. This row used to carry THREE things
+                              that all showed/set the same field — a badge, this select,
+                              and a next-stage button. The select already shows the
+                              current status and can move it forward OR back, which is
+                              what "fix this line" actually needs. */}
+                          {canFulfill || canDesign ? (
+                            <select
+                              value={normalizeStage(it.factory_status)}
+                              onChange={(e) => advanceItem(o, it, e.target.value)}
+                              disabled={busy === key}
+                              className={"h-8 shrink-0 rounded-md border px-1.5 text-xs font-medium " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-input bg-transparent")}
+                              aria-label={`Status for ${it.name || it.sku}`}
+                              title="Set this item's status — forward or back"
+                            >
                               <optgroup label="Production">
                                 {ALL_STATUSES.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id)).map((s) => <option key={s.id || "new"} value={s.id}>{s.label}</option>)}
                               </optgroup>
@@ -459,14 +468,10 @@ export function OrdersHub() {
                                 {EXCEPTION_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
                               </optgroup>
                             </select>
-                          )}
-                          {to ? (
-                            <Button size="sm" disabled={busy === key} onClick={() => advanceItem(o, it, to)} className="shrink-0">
-                              {busy === key ? <CircleNotch size={13} className="animate-spin" /> : <>{toMeta?.label}</>}
-                            </Button>
                           ) : (
-                            <span className="inline-flex shrink-0 items-center gap-1 px-2 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> {isException(it.factory_status) ? stageMeta(normalizeStage(it.factory_status))?.label : "Done"}</span>
+                            <StageBadge status={it.factory_status} />
                           )}
+                          {busy === key && <CircleNotch size={13} className="shrink-0 animate-spin text-muted-foreground" />}
                           </div>
                         </div>
                       )
