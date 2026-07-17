@@ -8,8 +8,9 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getCatalogProducts, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
+import { VariantPicker } from "@/components/app/variant-picker"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
@@ -105,6 +106,10 @@ export function OrdersHub() {
     getOrders().then((rows) => setOrders(rows ?? [])).catch(() => setOrders([]))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  // Catalog powers the variant picker on factory-owned marketplace orders (which arrive
+  // with no blank chosen). Loaded once.
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+  useEffect(() => { getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => {}) }, [])
   // Restore the saved warehouse "from" address.
   useEffect(() => {
     const id = setTimeout(() => {
@@ -458,7 +463,16 @@ export function OrdersHub() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
-                            <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
+                            {/* Factory-owned marketplace orders arrive with no blank chosen;
+                                artwork review (canDesign) picks it here while the order is
+                                still unstarted. A pushed seller order is past "" (already
+                                charged) so it shows the read-only variant instead — and the
+                                server 409s any stray write to a charged order regardless. */}
+                            {canDesign && stage === "" ? (
+                              <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
+                            ) : (
+                              <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
+                            )}
                           </div>
                           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                           {/* Own icon + a visible word. The pen-nib is the sidebar's
