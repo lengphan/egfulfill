@@ -1,9 +1,19 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Check, MagnifyingGlass, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { ApiError, getBillingPlan, subscribePlan, type BillingPlan } from "@/lib/api"
 import {
   PLAN_TIERS,
   getPlan,
@@ -16,24 +26,73 @@ import {
 
 const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
 
-// Read-only. Plans are SERVER state (users.plan) — this panel used to write
-// localStorage, which meant "Upgrade to Pro" granted itself for free and the paid
-// feature was one console line away. Changing a plan is now an admin action
-// (Settings › Users) and the server enforces it inside /api/spydeck/*.
+// Plans are SERVER state (users.plan). This panel used to WRITE localStorage, which
+// meant "Upgrade to Pro" granted itself for free; then it was disabled outright. Now it
+// charges for real through /api/billing/subscribe — the price is decided server-side, so
+// the client can't name its own amount.
 export function SubscriptionPanel() {
   // Session-backed; read after mount to avoid hydration mismatch.
   const [plan, setPlanState] = useState<PlanId>("starter")
   const [spydeckAddon, setAddonState] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [billing, setBilling] = useState<BillingPlan | null>(null)
+  const [pending, setPending] = useState<{ plan?: PlanId; addon?: boolean; label: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [short, setShort] = useState<{ amount: number; balance: number; shortfall: number } | null>(null)
+  const router = useRouter()
+
+  const refresh = () =>
+    getBillingPlan()
+      .then((b) => {
+        setBilling(b)
+        setPlanState((b.plan as PlanId) ?? "starter")
+        setAddonState(b.spydeck_addon === true)
+      })
+      .catch(() => {})
 
   useEffect(() => {
     const id = setTimeout(() => {
+      // Fall back to the session copy if the billing endpoint isn't reachable, so the
+      // panel still renders the right current plan.
       setPlanState(getPlan())
       setAddonState(getSpydeckAddon())
       setMounted(true)
+      refresh()
     }, 0)
     return () => clearTimeout(id)
   }, [])
+
+  // Price the pending change the same way the server does, so the confirm dialog can
+  // state the real amount before anything is charged.
+  const priceOf = (target: { plan?: PlanId; addon?: boolean }) => {
+    const p = billing?.prices
+    if (!p) return null
+    const nextPlan = target.plan ?? (plan as PlanId)
+    const nextAddon = target.addon ?? spydeckAddon
+    const planDelta = (p.plans[nextPlan] ?? 0) > (p.plans[plan] ?? 0) ? (p.plans[nextPlan] ?? 0) - (p.plans[plan] ?? 0) : 0
+    const addonDelta = nextAddon && !spydeckAddon ? p.spydeck_addon : 0
+    return planDelta + addonDelta
+  }
+
+  const commit = async () => {
+    if (!pending) return
+    setBusy(true); setErr(null); setShort(null)
+    try {
+      await subscribePlan({ plan: pending.plan, spydeckAddon: pending.addon })
+      setPending(null)
+      await refresh()
+    } catch (e) {
+      // 402 = the wallet can't cover it. Not a dead end — offer the top-up.
+      if (e instanceof ApiError && e.status === 402) {
+        const m = /balance is \$([0-9.]+) — this costs \$([0-9.]+)/.exec(e.message)
+        const balance = m ? Number(m[1]) : (billing?.balance ?? 0)
+        const amount = m ? Number(m[2]) : (priceOf(pending) ?? 0)
+        setShort({ amount, balance, shortfall: Number((amount - balance).toFixed(2)) })
+      }
+      setErr(e instanceof Error ? e.message : "Could not change your plan")
+    } finally { setBusy(false) }
+  }
 
 
 
@@ -101,15 +160,16 @@ export function SubscriptionPanel() {
                     Current plan
                   </Button>
                 ) : t.id === "enterprise" ? (
-                  <Button variant="outline" className="w-full" disabled title="Contact us to change your plan">
+                  // Enterprise is negotiated, not self-serve — the server rejects it too.
+                  <Button variant="outline" className="w-full" disabled title="Enterprise is set up with our team">
                     Contact sales
                   </Button>
                 ) : (
                   <Button
                     className="w-full"
                     variant={isUpgrade ? "default" : "outline"}
-                    disabled
-                    title="Contact us to change your plan"
+                    disabled={!mounted}
+                    onClick={() => { setErr(null); setShort(null); setPending({ plan: t.id as PlanId, label: `${isUpgrade ? "Upgrade" : "Switch"} to ${t.shortName}` }) }}
                   >
                     {isUpgrade ? `Upgrade to ${t.shortName}` : `Switch to ${t.shortName}`}
                   </Button>
@@ -147,7 +207,8 @@ export function SubscriptionPanel() {
                 <div className="text-sm text-muted-foreground">
                   ${cfg.price}/mo · <span className="font-semibold text-emerald-600">Active</span>
                 </div>
-                <Button variant="outline" size="sm" disabled title="Contact us to change your add-ons">
+                <Button variant="outline" size="sm" disabled={!mounted}
+                  onClick={() => { setErr(null); setShort(null); setPending({ addon: false, label: "Remove SpyDeck" }) }}>
                   Remove
                 </Button>
               </div>
@@ -157,7 +218,8 @@ export function SubscriptionPanel() {
                   ${cfg.price}
                   <span className="text-xs font-normal text-muted-foreground">/mo</span>
                 </div>
-                <Button size="sm" disabled title="Contact us to add SpyDeck">
+                <Button size="sm" disabled={!mounted}
+                  onClick={() => { setErr(null); setShort(null); setPending({ addon: true, label: "Add SpyDeck" }) }}>
                   Add SpyDeck
                 </Button>
               </div>
@@ -165,6 +227,49 @@ export function SubscriptionPanel() {
           </div>
         </div>
       </SectionCard>
+
+      {/* Confirm + charge. The amount shown is computed from the SERVER's price list, so
+          it matches what actually gets debited. */}
+      <Dialog open={!!pending} onOpenChange={(v) => { if (busy) return; if (!v) { setPending(null); setErr(null); setShort(null) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{pending?.label}</DialogTitle>
+            <DialogDescription>
+              {(priceOf(pending ?? {}) ?? 0) > 0
+                ? "This charges your wallet now and bills monthly from today."
+                : "This takes effect now. Nothing is charged, and the current month isn't refunded."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {billing && (
+            <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Due now</dt>
+                <dd className="font-semibold tabular-nums">{usd(priceOf(pending ?? {}) ?? 0)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Wallet balance</dt>
+                <dd className="tabular-nums">{usd(billing.balance)}</dd>
+              </div>
+            </dl>
+          )}
+
+          {short && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              You need {usd(short.shortfall)} more. Top up your wallet, then come back and finish.
+            </div>
+          )}
+          {err && !short && <p className="text-sm text-destructive">{err}</p>}
+
+          <DialogFooter>
+            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
+            <Button variant="ghost" onClick={() => setPending(null)} disabled={busy}>Cancel</Button>
+            <Button onClick={commit} disabled={busy}>
+              {busy ? "Working…" : (priceOf(pending ?? {}) ?? 0) > 0 ? `Pay ${usd(priceOf(pending ?? {}) ?? 0)}` : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

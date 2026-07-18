@@ -39,6 +39,7 @@ export function ProductCombobox({
   const [open, setOpen] = useState(false)
   const [cursor, setCursor] = useState(0)
   const boxRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (cache) return
@@ -61,15 +62,19 @@ export function ProductCombobox({
     return () => document.removeEventListener("mousedown", onDown)
   }, [open])
 
+  // Every match, not a top-N slice — the list scrolls, so capping it just hid products
+  // and forced a trip through the browse dialog to find them.
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase()
-    // No query yet (the field was just clicked) → show the catalog so it reads as a
-    // dropdown, not a dead text box.
-    if (!q) return products.slice(0, 8)
-    return products
-      .filter((p) => `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase().includes(q))
-      .slice(0, 8)
+    if (!q) return products
+    return products.filter((p) => `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase().includes(q))
   }, [products, value])
+
+  // The list is unbounded now, so the highlighted row can sit outside the scroll window.
+  useEffect(() => {
+    if (!open) return
+    listRef.current?.querySelector<HTMLElement>(`[data-i="${cursor}"]`)?.scrollIntoView({ block: "nearest" })
+  }, [cursor, open])
 
   const choose = (p: CatalogProduct) => {
     onPick(toPickedProduct(p))
@@ -110,7 +115,7 @@ export function ProductCombobox({
           overrun a phone. */}
       {open && (
         <div className="absolute left-0 top-[calc(100%+4px)] z-30 w-[320px] max-w-[80vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg">
-          <div className="max-h-60 overflow-y-auto py-1">
+          <div ref={listRef} className="max-h-64 overflow-y-auto py-1">
             {matches.length === 0 ? (
               <div className="px-3 py-2.5 text-xs text-muted-foreground">
                 {value.trim() ? `No catalog match — "${value.trim()}" stays a custom item.` : "No catalog products yet."}
@@ -122,6 +127,7 @@ export function ProductCombobox({
                 return (
                   <button
                     key={String(p.id ?? p.sku ?? p.name)}
+                    data-i={i}
                     type="button"
                     onMouseEnter={() => setCursor(i)}
                     onClick={() => choose(p)}

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
-import { resolveProduct, colorsOf, methodsOf } from "@/lib/variant-resolve"
+import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
 
 // The per-line variant picker: Blank · Colour · Size · Method. Marketplace orders arrive
 // with these UNSET (nothing to price), so this is what makes them submittable — and a
@@ -24,7 +24,7 @@ export function VariantPicker({
   const product = useMemo(() => resolveProduct(item, catalog), [item, catalog])
   const blankLabel = product?.name || item.blank || ""
   const colorOpts = colorsOf(product)
-  const sizeOpts = product?.sizes ?? []
+  const sizeOpts = sizesOf(product)
   const methodOpts = methodsOf(product)
 
   const key = item.line_id ? { line_id: item.line_id } : { sku: item.sku }
@@ -44,7 +44,7 @@ export function VariantPicker({
     save({
       blank: name,
       color: keep(item.color, colorsOf(p ?? null)),
-      size: keep(item.size, p?.sizes ?? []),
+      size: keep(item.size, sizesOf(p ?? null)),
       printType: keep(item.print_type, methodsOf(p ?? null)),
     }, "blank")
   }

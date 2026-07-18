@@ -82,3 +82,14 @@ export function mockupFaces(p: CatalogProduct | null, color?: string | null): Mo
 export function bestMockup(p: CatalogProduct | null, color?: string | null, fallback?: string): string {
   return mockupFaces(p, color)[0]?.url || fallback || ""
 }
+
+/** Sizes a product offers. Many catalog rows carry no `sizes` array and define their
+ *  sizes only as per-size price tiers (sizePrices), which is why a picked product could
+ *  fill Colour but leave Size empty. Union both, preserving sizes[] order. */
+export function sizesOf(p: CatalogProduct | null): string[] {
+  if (!p) return []
+  const out = new Set<string>()
+  for (const s of p.sizes ?? []) if (s) out.add(String(s))
+  for (const t of p.sizePrices ?? []) if (t?.size) out.add(String(t.size))
+  return [...out]
+}

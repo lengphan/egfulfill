@@ -6,6 +6,7 @@ import { MagnifyingGlass, Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { sizesOf } from "@/lib/variant-resolve"
 
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 const imageOf = (p: CatalogProduct) =>
@@ -37,7 +38,7 @@ export function toPickedProduct(p: CatalogProduct): PickedProduct {
     color: p.mainColor || (p.colorImages ? Object.keys(p.colorImages)[0] || "" : ""),
     // mainColor may not be a colorImages key, so union them and drop blanks.
     colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
-    sizes: p.sizes ?? [],
+    sizes: sizesOf(p),
   }
 }
 

@@ -982,3 +982,26 @@ export function inviteMember(body: { email: string; role?: string; permissions?:
 export function removeMember(id: number | string) {
   return api<{ ok: boolean }>(`/api/team/members/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
+
+// ── Subscription billing ──────────────────────────────────────────────────────
+// Plans are server truth (users.plan). Prices come from the server too — the client
+// copy in lib/plans.ts is for display only, so a caller can never set its own price.
+export type BillingPlan = {
+  plan: string
+  spydeck_addon: boolean
+  renews_at: string | null
+  balance: number
+  prices: { plans: Record<string, number>; spydeck_addon: number }
+}
+export function getBillingPlan() {
+  return api<BillingPlan>(`/api/billing/plan`)
+}
+export type SubscribeResult = {
+  ok?: boolean; plan?: string; spydeck_addon?: boolean; charged?: number
+  renews_at?: string | null; balance?: number
+}
+/** 402 (ApiError) means the wallet can't cover it — the body carries the shortfall and
+ *  the top-up methods that can fund it, so the caller offers a top-up rather than a dead end. */
+export function subscribePlan(body: { plan?: string; spydeckAddon?: boolean; method?: string }) {
+  return api<SubscribeResult>(`/api/billing/subscribe`, { method: "POST", body: JSON.stringify(body) })
+}
