@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ApiError, getBillingPlan, subscribePlan, type BillingPlan } from "@/lib/api"
+import { ApiError, getBillingPlan, subscribePlan, setAutoRenew, type BillingPlan } from "@/lib/api"
 import {
   PLAN_TIERS,
   getPlan,
@@ -25,6 +25,11 @@ import {
 } from "@/lib/plans"
 
 const usd = (n: number) => (n === 0 ? "Free" : `$${n}`)
+const fmtDate = (s?: string | null) => {
+  if (!s) return "—"
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
 
 // Plans are SERVER state (users.plan). This panel used to WRITE localStorage, which
 // meant "Upgrade to Pro" granted itself for free; then it was disabled outright. Now it
@@ -38,6 +43,7 @@ export function SubscriptionPanel() {
   const [billing, setBilling] = useState<BillingPlan | null>(null)
   const [pending, setPending] = useState<{ plan?: PlanId; addon?: boolean; label: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [renewBusy, setRenewBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [short, setShort] = useState<{ amount: number; balance: number; shortfall: number } | null>(null)
   const router = useRouter()
@@ -75,6 +81,13 @@ export function SubscriptionPanel() {
     return planDelta + addonDelta
   }
 
+  const toggleRenew = async (on: boolean) => {
+    setRenewBusy(true)
+    try { await setAutoRenew(on); await refresh() }
+    catch (e) { setErr(e instanceof Error ? e.message : "Could not change auto-renew") }
+    finally { setRenewBusy(false) }
+  }
+
   const commit = async () => {
     if (!pending) return
     setBusy(true); setErr(null); setShort(null)
@@ -103,7 +116,7 @@ export function SubscriptionPanel() {
   return (
     <div className="space-y-4">
       {/* Current plan */}
-      <SectionCard title="Your plan" description="Contact us to change your plan or add research tools.">
+      <SectionCard title="Your plan" description="Plan changes are charged to your wallet balance.">
         <div className="p-5">
           <div className="flex items-end justify-between gap-4 rounded-xl border border-border bg-muted/40 p-5">
             <div>
@@ -118,6 +131,34 @@ export function SubscriptionPanel() {
               {current.shortName}
             </span>
           </div>
+
+          {/* Renewal state + the opt-out. Only meaningful on a paid plan — Starter has
+              nothing to renew. */}
+          {billing?.renews_at && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              {billing.auto_renew ? (
+                <>
+                  <span>Renews monthly on {fmtDate(billing.renews_at)}.</span>
+                  <button onClick={() => toggleRenew(false)} disabled={renewBusy} className="font-medium text-foreground underline underline-offset-2 hover:no-underline disabled:opacity-50">
+                    Turn off auto-renew
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span>Auto-renew is off — your plan ends {fmtDate(billing.renews_at)}.</span>
+                  <button onClick={() => toggleRenew(true)} disabled={renewBusy} className="font-medium text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50">
+                    Turn it back on
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {billing?.past_due_since && (
+            <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+              We couldn&apos;t renew your plan — your wallet is short. Top up within {billing.grace_days} days of{" "}
+              {fmtDate(billing.past_due_since)} to keep it.
+            </div>
+          )}
         </div>
       </SectionCard>
 

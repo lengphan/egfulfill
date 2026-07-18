@@ -990,6 +990,9 @@ export type BillingPlan = {
   plan: string
   spydeck_addon: boolean
   renews_at: string | null
+  auto_renew: boolean
+  past_due_since: string | null
+  grace_days: number
   balance: number
   prices: { plans: Record<string, number>; spydeck_addon: number }
 }
@@ -1004,4 +1007,13 @@ export type SubscribeResult = {
  *  the top-up methods that can fund it, so the caller offers a top-up rather than a dead end. */
 export function subscribePlan(body: { plan?: string; spydeckAddon?: boolean; method?: string }) {
   return api<SubscribeResult>(`/api/billing/subscribe`, { method: "POST", body: JSON.stringify(body) })
+}
+
+/** Turn monthly renewal on/off. Off doesn't cancel now — the paid month runs out, then
+ *  the plan lapses to Starter instead of charging again. */
+export function setAutoRenew(on: boolean) {
+  return api<{ ok?: boolean; auto_renew?: boolean; renews_at?: string | null }>(`/api/billing/auto-renew`, {
+    method: "POST",
+    body: JSON.stringify({ on }),
+  })
 }
