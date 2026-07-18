@@ -1022,3 +1022,66 @@ export function setAutoRenew(on: boolean) {
     body: JSON.stringify({ on }),
   })
 }
+
+// ── Inventory services (seller-owned stock in our warehouse) ──────────────────
+// Kept separate from /api/inventory, which models stock WE own and has no owner column.
+export type ConsignmentLine = {
+  id: number
+  shipment_id: string
+  seller_sku: string | null
+  internal_sku: string | null
+  name: string | null
+  variant: string | null
+  qty_declared: number
+  qty_received: number
+  qty_reserved: number
+  location: string | null
+}
+export type ConsignmentShipment = {
+  id: string
+  seller_id: string
+  seller_name?: string | null
+  status: string
+  carrier: string | null
+  tracking: string | null
+  expected_at: string | null
+  note: string | null
+  received_at: string | null
+  created_at: string
+  lines: ConsignmentLine[]
+}
+export type WarehouseBin = { code: string; zone: string | null; capacity: number; note: string | null; used: number }
+export type ConsignmentStock = {
+  internal_sku: string | null; seller_sku: string | null; name: string | null; variant: string | null
+  location: string | null; on_hand: number; reserved: number; seller_id: string; seller_name: string | null
+}
+
+export function getConsignmentShipments() {
+  return api<ConsignmentShipment[]>(`/api/consignment/shipments`)
+}
+export function createConsignmentShipment(body: {
+  carrier?: string; tracking?: string; expected_at?: string; note?: string; seller_id?: string
+  lines: { seller_sku?: string; name?: string; variant?: string; qty_declared: number }[]
+}) {
+  return api<{ ok?: boolean; id?: string; error?: string }>(`/api/consignment/shipments`, { method: "POST", body: JSON.stringify(body) })
+}
+/** Count a shipment in: per-line received qty + bin. Mints the internal SKU server-side. */
+export function receiveConsignment(id: string, lines: { id: number; qty_received: number; location?: string }[]) {
+  return api<{ ok?: boolean; discrepancy?: boolean; lines?: ConsignmentLine[]; error?: string }>(
+    `/api/consignment/shipments/${encodeURIComponent(id)}/receive`, { method: "POST", body: JSON.stringify({ lines }) })
+}
+export function getWarehouseBins() {
+  return api<WarehouseBin[]>(`/api/consignment/locations`)
+}
+export function createWarehouseBin(body: { code: string; zone?: string; capacity?: number; note?: string }) {
+  return api<{ ok?: boolean; code?: string; error?: string }>(`/api/consignment/locations`, { method: "POST", body: JSON.stringify(body) })
+}
+export function getConsignmentStock() {
+  return api<ConsignmentStock[]>(`/api/consignment/stock`)
+}
+export function suggestBin(internalSku?: string | null, qty?: number) {
+  const p = new URLSearchParams()
+  if (internalSku) p.set("internal_sku", internalSku)
+  if (qty) p.set("qty", String(qty))
+  return api<{ location: string | null }>(`/api/consignment/suggest-bin?${p.toString()}`)
+}

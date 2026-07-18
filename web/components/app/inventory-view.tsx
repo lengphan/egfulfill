@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -215,6 +216,11 @@ export function InventoryView() {
           </>
         )}
       </SectionCard>
+
+      {/* Inventory services — stock sellers send US. Kept below our own stock because it
+          is a separate pool: consigned units belong to a seller and can only fulfil that
+          seller's orders. */}
+      <ConsignmentPanel />
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} />
       <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
