@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk } from "@phosphor-icons/react"
+import { ArrowLeft, Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { saveDesignLibrary, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
@@ -56,7 +56,9 @@ const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 
 export function DesignMaker() {
   const router = useRouter()
-  const productParam = useSearchParams().get("product")
+  const search = useSearchParams()
+  const productParam = search.get("product")
+  const templateParam = search.get("template")
   const [mockup, setMockup] = useState("")
   // Kept alongside the mockup so the printable zone can be resolved from the product's
   // own printAreas (falling back to its garment type).
@@ -70,6 +72,10 @@ export function DesignMaker() {
   // The full catalog, so a product picked from the dialog (which hands back a flattened
   // shape) can be resolved to its catalog row for the print zone.
   const catalogRef = useRef<CatalogProduct[]>([])
+  // Minted on FIRST save, not during render (an impure call there is unstable across
+  // re-renders). Held so re-saving UPDATES the same template rather than piling up
+  // duplicates, and set to the source id when a template is reopened.
+  const templateId = useRef<string | null>(null)
   const [designUrl, setDesignUrl] = useState("")
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
   const [texts, setTexts] = useState<TextLayer[]>([])
@@ -102,6 +108,32 @@ export function DesignMaker() {
   const catalogFor = (sku: string): CatalogProduct | null =>
     catalogRef.current.find((x) => String(x.sku ?? "") === sku) ?? null
 
+  // Reopening a template restores the PIECES (artwork, position, text, blank, print
+  // area) — that's the whole point of a template over a library image, which is flat.
+  useEffect(() => {
+    if (!templateParam) return
+    const id = setTimeout(() => {
+      getTemplates()
+        .then((rows) => {
+          const t = (rows ?? []).find((x) => String(x.id) === templateParam)
+          if (!t) return
+          const l = (t.layers ?? {}) as { designUrl?: string; pos?: Pos; texts?: TextLayer[] }
+          const d = (t.data ?? {}) as { blank?: string | null; printArea?: { w?: number; h?: number } }
+          templateId.current = String(t.id)
+          if (t.name) setName(t.name)
+          if (l.designUrl) setDesignUrl(l.designUrl)
+          if (l.pos) setPos(l.pos)
+          if (Array.isArray(l.texts)) setTexts(l.texts)
+          if (d.printArea?.w) setPaW(String(d.printArea.w))
+          if (d.printArea?.h) setPaH(String(d.printArea.h))
+          const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
+          if (p) { setProduct(p); setMockup(mockupOf(p)) }
+        })
+        .catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [templateParam])
+
   const updateText = (id: string, patch: Partial<TextLayer>) =>
     setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
   const addText = () => {
@@ -110,6 +142,28 @@ export function DesignMaker() {
   }
   const removeText = (id: string) => { setTexts((prev) => prev.filter((t) => t.id !== id)); setSelected(null) }
   const selText = texts.find((t) => t.id === selected)
+
+  const saveAsTemplate = async () => {
+    if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
+    setSaving(true); setMsg(null)
+    try {
+      const composed = await composeDesign(designUrl, pos, texts, 640)
+      // `layers` is what makes this REOPENABLE — the library stores a flattened image,
+      // a template stores the pieces plus which blank they were placed on.
+      templateId.current ??= `TPL-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+      const r = await saveTemplate({
+        id: templateId.current,
+        name: name.trim() || "Untitled template",
+        composite: composed,
+        data: { blank: product?.name ?? null, blankSku: product?.sku ?? null, printArea: { w: Number(paW), h: Number(paH) } },
+        layers: { designUrl, pos, texts },
+      })
+      if (r.error) throw new Error(r.error)
+      setMsg({ tone: "ok", text: "Saved as a template." })
+    } catch (e) {
+      setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't save the template." })
+    } finally { setSaving(false) }
+  }
 
   const saveToLibrary = async () => {
     if (!designUrl && texts.length === 0) { setMsg({ tone: "err", text: "Add artwork or text first." }); return }
@@ -229,6 +283,9 @@ export function DesignMaker() {
 
           <div className="mt-auto space-y-2 border-t border-border pt-3">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Design name" />
+            <Button variant="outline" className="w-full" onClick={saveAsTemplate} disabled={saving}>
+              {saving ? <CircleNotch size={15} className="animate-spin" /> : <><Stack size={15} weight="bold" /> Save as template</>}
+            </Button>
             <Button variant="outline" className="w-full" onClick={saveToLibrary} disabled={saving}>
               {saving ? <CircleNotch size={15} className="animate-spin" /> : <><FloppyDisk size={15} weight="bold" /> Save to library</>}
             </Button>

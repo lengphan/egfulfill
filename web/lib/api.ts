@@ -1106,3 +1106,24 @@ export function getSpecQuote(spec: { blank?: string; sku?: string; size?: string
   if (spec.printType) p.set("printType", spec.printType)
   return api<SpecQuote>(`/api/pricing/spec?${p.toString()}`)
 }
+
+// ── Product templates ─────────────────────────────────────────────────────────
+// Server-stored so the heavy composite previews don't fill localStorage. The list/delete
+// queries were broken until recently (they filtered on a column that never existed), so
+// nothing had ever read these back — this is the first client to.
+export type ProductTemplate = {
+  id: string
+  name: string | null
+  data: Record<string, unknown> | null
+  composite: string | null
+  layers: unknown[] | null
+}
+export function getTemplates() {
+  return api<ProductTemplate[]>(`/api/templates`)
+}
+export function saveTemplate(body: { id: string; name?: string; data?: unknown; composite?: string; layers?: unknown }) {
+  return api<{ ok?: boolean; id?: string; error?: string }>(`/api/templates`, { method: "POST", body: JSON.stringify(body) })
+}
+export function deleteTemplate(id: string) {
+  return api<{ ok?: boolean }>(`/api/templates/${encodeURIComponent(id)}`, { method: "DELETE" })
+}

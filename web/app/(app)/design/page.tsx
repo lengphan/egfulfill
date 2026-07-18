@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Plus, PenNib, Trash, Sparkle } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { TemplatesPanel } from "@/components/app/templates-panel"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { DesignStudioDialog } from "@/components/app/design-studio"
@@ -101,6 +102,8 @@ export default function DesignPage() {
           </div>
         )}
       </SectionCard>
+
+      <TemplatesPanel />
 
       <DesignStudioDialog open={studioOpen} onOpenChange={setStudioOpen} onSaved={load} />
     </div>
