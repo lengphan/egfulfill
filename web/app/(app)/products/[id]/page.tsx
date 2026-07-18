@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { sizesOf } from "@/lib/variant-resolve"
+import { normalizeMethods } from "@/lib/print-method"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -29,30 +30,11 @@ function galleryOf(p: CatalogProduct): string[] {
   return Array.from(set)
 }
 
-// Normalise a raw technique label to a stable {key,label} — ported from product-detail.html
-// pdNormTech, so the React page names print methods the same way the old one did.
-function normTech(raw: string): { key: string; label: string } | null {
-  const s = String(raw || "").trim().toLowerCase()
-  if (!s) return null
-  if (/dtf/.test(s)) return { key: "dtf", label: "DTF printing" }
-  if (/dtg|direct to garment/.test(s)) return { key: "dtg", label: "DTG printing" }
-  if (/emb|embroid/.test(s)) return { key: "emb", label: "Embroidery" }
-  if (/appliqu|\bapl\b/.test(s)) return { key: "apl", label: "Appliqué" }
-  if (/laser|\blsr\b|engrav/.test(s)) return { key: "lsr", label: "Laser" }
-  if (/screen/.test(s)) return { key: "scr", label: "Screen print" }
-  if (/sublim|\bdye\b/.test(s)) return { key: "sub", label: "Sublimation" }
-  if (/vinyl|htv/.test(s)) return { key: "vnl", label: "Vinyl" }
-  if (/\buv\b/.test(s)) return { key: "uv", label: "UV print" }
-  return { key: s.replace(/[^a-z0-9]+/g, "").slice(0, 6) || "t", label: raw.charAt(0).toUpperCase() + raw.slice(1) }
-}
-
-// Every technique this product supports, de-duped in order: the methods it was set up with
-// (methodPrices keys) plus its primary `method`. Falls back to DTG when nothing is set.
+// Every technique this product supports, split out of its (often combined) method
+// string and de-duped. Shared with the variant pickers via lib/print-method so a method
+// is named identically everywhere.
 function techsOf(p: CatalogProduct): { key: string; label: string }[] {
-  const raw = [...Object.keys(p.methodPrices ?? {}), ...String(p.method || "").split(/[/,·|]+/)]
-  const out: { key: string; label: string }[] = []
-  const seen = new Set<string>()
-  for (const r of raw) { const t = normTech(r); if (t && !seen.has(t.key)) { seen.add(t.key); out.push(t) } }
+  const out = normalizeMethods([...Object.keys(p.methodPrices ?? {}), p.method])
   return out.length ? out : [{ key: "dtg", label: "DTG printing" }]
 }
 

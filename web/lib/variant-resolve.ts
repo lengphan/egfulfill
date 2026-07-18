@@ -1,4 +1,5 @@
 import type { CatalogProduct, OrderItem } from "@/lib/api"
+import { normalizeMethods } from "@/lib/print-method"
 
 // Client mirror of pricing.js matchProduct / eg-design-tools.js chosenProduct: resolve an
 // order line to its catalog product. Picked blank (it.blank) wins; then the SKU matched
@@ -42,10 +43,10 @@ export function colorsOf(p: CatalogProduct | null): string[] {
 
 export function methodsOf(p: CatalogProduct | null): string[] {
   if (!p) return []
-  const set = new Set<string>()
-  for (const m of Object.keys(p.methodPrices ?? {})) if (m) set.add(m)
-  if (p.method) set.add(p.method)
-  return [...set]
+  // SPLIT the method string. A product's `method` commonly lists several techniques in
+  // one field ("DTG Print / DTF Print / Embroidery / Appliqué"); adding it whole offered
+  // that entire run-on string as a single un-pickable option.
+  return normalizeMethods([...Object.keys(p.methodPrices ?? {}), p.method]).map((m) => m.label)
 }
 
 // The mockup faces to place artwork on. Prefers the per-COLOUR image for the front (so a

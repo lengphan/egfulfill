@@ -19,11 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, type OrderRow, type OrderItem } from "@/lib/api"
+import { getOrders, getCatalogProducts, type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { itemImage } from "@/lib/order-image"
 import { VariantStrip } from "@/components/app/variant-field"
+import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
@@ -109,10 +110,16 @@ export function OrdersList() {
   const [importOpen, setImportOpen] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   // Column layout is per-device; read after mount so prerender and hydration agree.
+  // Powers the inline variant pickers below — an unsubmitted line can be set up right in
+  // the row instead of opening the order first.
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [colOrder, setColOrder] = useState<OrderColId[]>(DEFAULT_ORDER_COLS)
   const [hidden, setHidden] = useState<OrderColId[]>([])
   useEffect(() => {
-    const id = setTimeout(() => { setColOrder(loadColOrder()); setHidden(loadHiddenCols()) }, 0)
+    const id = setTimeout(() => {
+      setColOrder(loadColOrder()); setHidden(loadHiddenCols())
+      getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => {})
+    }, 0)
     return () => clearTimeout(id)
   }, [])
   const setOrderCols = (ids: OrderColId[]) => { setColOrder(ids); saveColOrder(ids) }
@@ -310,7 +317,11 @@ export function OrdersList() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
-                                      <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked={!["", "new", "draft"].includes(String(o.factory_status || ""))} className="mt-1" />
+                                      {["", "new", "draft"].includes(String(o.factory_status || "")) ? (
+                                        <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
+                                      ) : (
+                                        <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} locked className="mt-1" />
+                                      )}
                                     </div>
                                     <span className="shrink-0 text-xs text-muted-foreground">×{Number(it.qty) || 1}</span>
                                     <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums">{lineTotal(it) ? usd(lineTotal(it)) : "—"}</span>
