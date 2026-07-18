@@ -133,6 +133,31 @@ function extraFeeOf(row, fees) {
   return own != null ? own : fees.ship_extra;
 }
 
+/**
+ * Price a product SPEC (not an order) — what one unit of {blank, size, printType} costs
+ * us to make and ship. This is what lets the publish dialog show a real margin before a
+ * listing exists.
+ *
+ * Deliberately routed through the SAME matchProduct/unitCostOf/shipFeeOf helpers the
+ * order quote uses. A second cost formula for "what shall I charge" would drift from the
+ * one that actually bills, and the seller would price against a number we never charge.
+ */
+export async function quoteSpec({ blank, sku, size, printType }) {
+  const [fees, idx] = await Promise.all([feeSettings(), catalogIndex()]);
+  const item = { blank: blank || '', sku: sku || '', size: size || '', print_type: printType || '' };
+  const row = matchProduct(idx, item);
+  if (!row) return { matched: null, unitCost: null, shipping: null, total: null };
+  const cost = unitCostOf(row, item);
+  const ship = shipFeeOf(row, item.size, fees);
+  const d = row.data || {};
+  return {
+    matched: { id: row.id, sku: row.sku, name: d.name ?? null },
+    unitCost: cost == null ? null : money(cost),
+    shipping: money(ship ?? fees.ship_first),
+    total: cost == null ? null : money(cost + (ship ?? fees.ship_first)),
+  };
+}
+
 // Quote one order. Returns every line priced, the totals, and anything unpriceable.
 // `unpriced` is the caller's cue to refuse: an item with no catalog match has no cost,
 // and charging 0 for it would fulfil it for free — silently, forever.

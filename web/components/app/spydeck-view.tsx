@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { detectTrademarks } from "@/lib/trademarks"
-import { MakeProductDialog } from "@/components/app/make-product-dialog"
+import { PublishProductDialog } from "@/components/app/publish-product-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 
@@ -629,7 +629,23 @@ export function SpyDeckView() {
         )}
       </SectionCard>
 
-      <MakeProductDialog open={!!makeListing} onOpenChange={(v) => !v && setMakeListing(null)} listing={makeListing} onPublished={onPublished} />
+      {/* Same dialog the design maker uses — only the prefill source differs. A spy'd
+          listing supplies title/description/tags/images; the blank is chosen in the
+          dialog, which is what makes cost and margin computable. */}
+      <PublishProductDialog
+        open={!!makeListing}
+        onOpenChange={(v) => !v && setMakeListing(null)}
+        prefill={makeListing ? {
+          title: makeListing.title,
+          description: makeListing.description,
+          // Prefer the USD-converted price so the seller starts from a comparable number.
+          price: makeListing.price_usd ?? makeListing.price,
+          tags: makeListing.tags ?? [],
+          images: (makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []).filter(Boolean) as string[],
+        } : null}
+        onPublished={() => { if (makeListing) onPublished(makeListing) }}
+        title="Make product"
+      />
     </div>
   )
 }

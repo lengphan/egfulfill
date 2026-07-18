@@ -3,10 +3,18 @@
 // Products carry image data URLs, so we store the whole product object in a
 // `data` jsonb column (lossless round-trip) plus a few typed columns for TablePlus.
 import { q } from '../db.js';
+import { quoteSpec } from '../pricing.js';
 
 export function catalogRoutes(app, requireAuth, requireStaff) {
   // Add the lossless `data` column if an older schema doesn't have it (idempotent).
   q('alter table catalog_products add column if not exists data jsonb').catch(() => {});
+
+  // What one unit of a spec costs us to make + ship. Powers the margin readout in the
+  // publish dialog, using the SAME pricing path that bills an order.
+  app.get('/api/pricing/spec', { preHandler: requireAuth }, async (req) => {
+    const qy = req.query || {};
+    return quoteSpec({ blank: qy.blank, sku: qy.sku, size: qy.size, printType: qy.printType });
+  });
 
   app.get('/api/catalog_products', { preHandler: requireAuth }, async () => {
     const r = await q('select data from catalog_products order by created_at desc');

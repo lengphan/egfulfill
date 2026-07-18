@@ -5,12 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { saveDesignLibrary, publishEtsy, getSpydeckTrending, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { saveDesignLibrary, getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
+import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
 const mockupOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
 
@@ -64,6 +64,9 @@ export function DesignMaker() {
   const [paW, setPaW] = useState(String(BASE_PRINT_IN.w))
   const [paH, setPaH] = useState(String(BASE_PRINT_IN.h))
   const [dragOver, setDragOver] = useState(false)
+  // Built when Publish opens: the composed design becomes the primary photo and the
+  // blank already picked here carries over, so the dialog opens ready rather than blank.
+  const [pubPrefill, setPubPrefill] = useState<PublishPrefill | null>(null)
   // The full catalog, so a product picked from the dialog (which hands back a flattened
   // shape) can be resolved to its catalog row for the print zone.
   const catalogRef = useRef<CatalogProduct[]>([])
@@ -229,8 +232,16 @@ export function DesignMaker() {
             <Button variant="outline" className="w-full" onClick={saveToLibrary} disabled={saving}>
               {saving ? <CircleNotch size={15} className="animate-spin" /> : <><FloppyDisk size={15} weight="bold" /> Save to library</>}
             </Button>
-            <Button className="w-full" onClick={() => setPubOpen(true)} disabled={!designUrl && texts.length === 0}>
-              <Export size={15} weight="bold" /> Publish to Etsy
+            <Button
+              className="w-full"
+              onClick={async () => {
+                const composed = await composeDesign(designUrl, pos, texts, 1200)
+                setPubPrefill({ title: name, images: composed ? [composed] : [], blank: product })
+                setPubOpen(true)
+              }}
+              disabled={!designUrl && texts.length === 0}
+            >
+              <Export size={15} weight="bold" /> Publish product
             </Button>
           </div>
         </aside>
@@ -238,218 +249,12 @@ export function DesignMaker() {
 
       <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => { setMockup(p.img || ""); setProduct(catalogFor(p.sku)) }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
-      <PublishDialog open={pubOpen} onOpenChange={setPubOpen} getImage={() => composeDesign(designUrl, pos, texts, 1200)} defaultTitle={name} />
+      <PublishProductDialog
+        open={pubOpen}
+        onOpenChange={setPubOpen}
+        prefill={pubPrefill}
+        title="Publish product"
+      />
     </div>
-  )
-}
-
-// Channels that can accept a NEW product. Etsy is the only one today — Shopify has
-// connect + order sync but no product-create route, and TikTok is connect-only. Keep the
-// list here so adding a channel is a one-line change plus its publish fn, and so the UI
-// never offers a destination that can't actually receive a product.
-const PUBLISH_CHANNELS = [{ id: "etsy", label: "Etsy", blurb: "Creates a draft listing you review before going live." }] as const
-
-const MAX_TAGS = 13
-// Mirrors the server's sanitizer (etsy.js): Etsy rejects the whole listing over a bad
-// tag, so keep both ends in step.
-const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().slice(0, 20)
-
-// Publish dialog: destination · images · details · tags. Built channel-shaped rather than
-// Etsy-hardcoded so a second channel slots in without a rewrite.
-function PublishDialog({ open, onOpenChange, getImage, defaultTitle }: { open: boolean; onOpenChange: (v: boolean) => void; getImage: () => Promise<string>; defaultTitle?: string }) {
-  const [channel, setChannel] = useState<string>(PUBLISH_CHANNELS[0].id)
-  const [title, setTitle] = useState(defaultTitle ?? "")
-  const [desc, setDesc] = useState("")
-  const [price, setPrice] = useState("")
-  const [qty, setQty] = useState("999")
-  const [tags, setTags] = useState<string[]>([])
-  const [tagDraft, setTagDraft] = useState("")
-  const [suggested, setSuggested] = useState<string[]>([])
-  // images[0] is the listing's primary photo. Seeded with the composed mockup, but the
-  // seller can add more (the API has always accepted an images[] array — the old dialog
-  // just never sent one) and promote any of them.
-  const [images, setImages] = useState<string[]>([])
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
-  const didLoad = useRef(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (!open || didLoad.current) return
-    const id = setTimeout(() => {
-      didLoad.current = true
-      // Suggestions are a bonus, not the only way in — SpyDeck is plan-gated, so this
-      // returns nothing for Starter sellers. The free-text input below is the real path.
-      getSpydeckTrending().then((r) => setSuggested((r.keywords ?? []).slice(0, 12))).catch(() => {})
-      getImage().then((img) => img && setImages((prev) => (prev.length ? prev : [img]))).catch(() => {})
-    }, 0)
-    return () => clearTimeout(id)
-  }, [open, getImage])
-
-  const addTag = (raw: string) => {
-    const t = cleanTag(raw)
-    if (!t) return
-    setTags((prev) => (prev.some((x) => x.toLowerCase() === t.toLowerCase()) || prev.length >= MAX_TAGS ? prev : [...prev, t]))
-    setTagDraft("")
-  }
-  const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t))
-  const toggleTag = (t: string) =>
-    tags.some((x) => x.toLowerCase() === t.toLowerCase()) ? removeTag(t) : addTag(t)
-
-  const addImages = (files: FileList | null) => {
-    for (const f of Array.from(files ?? []).slice(0, 10)) {
-      readImageFile(f, (url) => setImages((prev) => (prev.length >= 10 ? prev : [...prev, url])), (m) => setResult({ ok: false, text: m }))
-    }
-  }
-  const makePrimary = (i: number) => setImages((prev) => [prev[i], ...prev.filter((_, x) => x !== i)])
-  const removeImage = (i: number) => setImages((prev) => prev.filter((_, x) => x !== i))
-
-  const publish = async () => {
-    if (!title.trim() || !(Number(price) > 0)) { setResult({ ok: false, text: "A title and a price are required." }); return }
-    setBusy(true); setResult(null)
-    try {
-      const imgs = images.length ? images : [await getImage()]
-      const r = await publishEtsy({
-        title: title.trim(), description: desc.trim() || title.trim(),
-        price: Number(price), quantity: Number(qty) || 999,
-        image: imgs[0], images: imgs, tags,
-      })
-      if (r.error) throw new Error(r.error)
-      setResult({ ok: true, text: "Published as a draft listing", url: r.url })
-    } catch (e) {
-      setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })
-    } finally { setBusy(false) }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Publish product</DialogTitle></DialogHeader>
-        {result?.ok ? (
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="font-semibold text-emerald-600">{result.text}</div>
-            {result.url && <a href={result.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">View the listing →</a>}
-            <Button onClick={() => onOpenChange(false)}>Done</Button>
-          </div>
-        ) : (
-          <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
-            {/* Destination */}
-            <div className="space-y-1.5">
-              <div className="text-sm font-medium">Publish to</div>
-              <div className="flex flex-wrap gap-2">
-                {PUBLISH_CHANNELS.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setChannel(c.id)}
-                    className={
-                      "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors " +
-                      (channel === c.id ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40")
-                    }
-                  >
-                    <Storefront size={15} weight="bold" /> {c.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {PUBLISH_CHANNELS.find((c) => c.id === channel)?.blurb}
-              </p>
-            </div>
-
-            {/* Photos — first one is the listing's primary image. */}
-            <div className="space-y-1.5">
-              <div className="text-sm font-medium">
-                Photos <span className="text-muted-foreground">({images.length}/10)</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-                {images.map((src, i) => (
-                  <div key={i} className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-muted/40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                    {i === 0 && (
-                      <span className="absolute inset-x-0 bottom-0 bg-primary/90 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-primary-foreground">
-                        Primary
-                      </span>
-                    )}
-                    <div className="absolute inset-0 flex items-center justify-center gap-1 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                      {i !== 0 && (
-                        <button onClick={() => makePrimary(i)} title="Make primary" className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-black">
-                          Primary
-                        </button>
-                      )}
-                      <button onClick={() => removeImage(i)} title="Remove" className="rounded bg-white/90 p-1 text-black">
-                        <Trash size={11} weight="bold" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {images.length < 10 && (
-                  <button
-                    onClick={() => fileRef.current?.click()}
-                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                  >
-                    <UploadSimple size={16} weight="bold" />
-                    <span className="text-[10px] font-medium">Add</span>
-                  </button>
-                )}
-              </div>
-              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addImages(e.target.files); e.target.value = "" }} />
-            </div>
-
-            <label className="flex flex-col gap-1"><span className="text-sm font-medium">Title</span><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Retro Sunset Comfort Colors Tee" /></label>
-            <label className="flex flex-col gap-1"><span className="text-sm font-medium">Description</span>
-              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} placeholder="Describe the product…" className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40" />
-            </label>
-            <div className="flex gap-3">
-              <label className="flex flex-1 flex-col gap-1"><span className="text-sm font-medium">Price ($)</span><Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="24.00" inputMode="decimal" /></label>
-              <label className="flex flex-1 flex-col gap-1"><span className="text-sm font-medium">Quantity</span><Input value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" /></label>
-            </div>
-
-            {/* Tags. Free text is the primary path — suggestions only appear for plans
-                that include SpyDeck, and this section used to render as a bare label
-                with no way to type one. */}
-            <div className="space-y-1.5">
-              <div className="text-sm font-medium">Tags <span className="text-muted-foreground">({tags.length}/{MAX_TAGS})</span></div>
-              <Input
-                value={tagDraft}
-                onChange={(e) => setTagDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagDraft) }
-                  else if (e.key === "Backspace" && !tagDraft && tags.length) removeTag(tags[tags.length - 1])
-                }}
-                onBlur={() => addTag(tagDraft)}
-                disabled={tags.length >= MAX_TAGS}
-                placeholder={tags.length >= MAX_TAGS ? "13 tags is Etsy's maximum" : "Type a tag, press Enter"}
-              />
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {tags.map((t) => (
-                    <button key={t} onClick={() => removeTag(t)} title="Remove tag" className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
-                      {t} ✕
-                    </button>
-                  ))}
-                </div>
-              )}
-              {suggested.length > 0 && (
-                <div>
-                  <div className="mb-1 text-[11px] text-muted-foreground">Trending suggestions — tap to add</div>
-                  <div className="flex flex-wrap gap-1">
-                    {suggested.filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase())).map((s) => (
-                      <button key={s} onClick={() => toggleTag(s)} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">{s}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {result && !result.ok && <div className="text-sm text-destructive">{result.text}</div>}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={publish} disabled={busy}>{busy ? <CircleNotch size={15} className="animate-spin" /> : "Publish"}</Button>
-            </div>
-            <p className="text-xs text-muted-foreground">Creates a draft in your connected Etsy shop, reusing an existing listing&apos;s category &amp; shipping profile. Connect a shop in Stores first.</p>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   )
 }

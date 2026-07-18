@@ -1085,3 +1085,20 @@ export function suggestBin(internalSku?: string | null, qty?: number) {
   if (qty) p.set("qty", String(qty))
   return api<{ location: string | null }>(`/api/consignment/suggest-bin?${p.toString()}`)
 }
+
+/** What one unit of a spec costs US to make + ship (same path that bills an order).
+ *  Powers the margin readout when a seller sets a retail price. */
+export type SpecQuote = {
+  matched: { id: string; sku: string | null; name: string | null } | null
+  unitCost: number | null
+  shipping: number | null
+  total: number | null
+}
+export function getSpecQuote(spec: { blank?: string; sku?: string; size?: string; printType?: string }) {
+  const p = new URLSearchParams()
+  if (spec.blank) p.set("blank", spec.blank)
+  if (spec.sku) p.set("sku", spec.sku)
+  if (spec.size) p.set("size", spec.size)
+  if (spec.printType) p.set("printType", spec.printType)
+  return api<SpecQuote>(`/api/pricing/spec?${p.toString()}`)
+}
