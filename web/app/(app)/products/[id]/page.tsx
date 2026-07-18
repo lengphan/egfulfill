@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Package, Tag } from "@phosphor-icons/react"
+import { ArrowLeft, Package, PenNib, Tag } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
@@ -108,6 +108,7 @@ export default function ProductDetailPage() {
   const sizes = product.sizes ?? []
   const status = product.status ?? "Active"
   const techs = techsOf(product)
+  const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
   const hasEmb = techs.some((t) => t.key === "emb")
   const hasPrint = techs.some((t) => t.key !== "emb")
 
@@ -120,8 +121,9 @@ export default function ProductDetailPage() {
       {/* Image column is capped (not a full 50/50 split) so the mockup doesn't blow up to
           ~half the viewport on wide screens; the info column takes the rest. */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start">
-        {/* gallery */}
-        <div className="space-y-3">
+        {/* Gallery sticks while the (much taller) info column scrolls — otherwise the
+            left column dead-ends under the thumbnails and leaves a tall empty well. */}
+        <div className="space-y-3 lg:sticky lg:top-6">
           <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-muted/40">
             {gallery.length ? (
               <Image src={gallery[active] ?? gallery[0]} alt={product.name ?? "Product"} fill unoptimized className="object-cover" />
@@ -175,7 +177,21 @@ export default function ProductDetailPage() {
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-semibold tabular-nums">{usd(priceOf(product))}</span>
             <span className="text-sm text-muted-foreground">base price</span>
+            {shipFee > 0 && (
+              <span className="text-sm text-muted-foreground">+ shipping from {usd(shipFee)}</span>
+            )}
           </div>
+
+          {/* The primary action the old PDP had and this port dropped — nothing on the
+              page let you actually do anything with the product. Carries id/colour/size
+              through to the maker the way the old startDesigning() did. */}
+          <Button
+            size="lg"
+            className="w-full sm:w-auto"
+            onClick={() => router.push(`/design/maker?product=${encodeURIComponent(String(product.id ?? product.sku ?? ""))}`)}
+          >
+            <PenNib size={16} weight="bold" /> Start designing
+          </Button>
 
           <SectionCard title="Variants">
             <div className="space-y-4 p-5">
@@ -185,12 +201,28 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {colors.length ? (
-                    colors.map((c) => (
-                      <span key={c} className="flex items-center gap-1.5 rounded-full border border-border py-1 pl-1.5 pr-2.5 text-sm">
-                        <span className="size-4 rounded-full border border-black/10" style={{ background: swatchHex(c) }} />
-                        {c}
-                      </span>
-                    ))
+                    colors.map((c) => {
+                      // Prefer a micro-crop of the REAL garment photo for this colour, so
+                      // weave, heather and micro-patterns show. A flat hex can't represent
+                      // "Micro Print" or a heather at all, and any colour missing from the
+                      // 18-entry SWATCH map (e.g. "Crystal Sky") fell back to a generic
+                      // grey that was simply the wrong colour. Hex stays as the fallback.
+                      const img = product.colorImages?.[c]
+                      return (
+                        <span key={c} className="flex items-center gap-1.5 rounded-full border border-border py-1 pl-1.5 pr-2.5 text-sm">
+                          <span
+                            className="size-5 shrink-0 rounded-full border border-black/10 bg-muted"
+                            title={c}
+                            style={
+                              img
+                                ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
+                                : { background: swatchHex(c) }
+                            }
+                          />
+                          {c}
+                        </span>
+                      )
+                    })
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
                   )}

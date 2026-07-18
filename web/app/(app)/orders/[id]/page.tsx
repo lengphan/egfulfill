@@ -11,6 +11,14 @@ import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   getOrders,
   getOrderDesigns,
   getOrderMessages,
@@ -57,6 +65,7 @@ export default function OrderDetailPage() {
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
+  const [quote, setQuote] = useState<OrderQuote | null>(null)
 
   // Re-pull orders after an action that changes this one (submit, cancel) so the badge
   // and the action bar reflect the new status without a manual refresh.
@@ -115,6 +124,17 @@ export default function OrderDetailPage() {
 
   const order = useMemo(() => (orders ?? []).find((o) => o.id === id) ?? null, [orders, id])
 
+  // The quote is fetched HERE rather than inside the submit button because two places
+  // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
+  // It used to live in the button, which is why the price floated loose in the header.
+  const submittable = !!order && ["", "new", "draft"].includes(String(order.factory_status || ""))
+  useEffect(() => {
+    if (!order || !submittable) { setQuote(null); return }
+    let live = true
+    getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
+    return () => { live = false }
+  }, [order, submittable])
+
   if (orders === null) {
     return (
       <div className="space-y-4">
@@ -153,23 +173,28 @@ export default function OrderDetailPage() {
 
   return (
     <div className="space-y-5">
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="text-muted-foreground">
-            <ArrowLeft size={16} weight="bold" /> Orders
-          </Button>
-          <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">{num}</h1>
-            <SellerStatusBadge order={order} />
+      {/* Header. Identity + metadata on the left, actions on the right — one baseline
+          each. The quote breakdown that used to float here now lives in Summary, next
+          to the Total it was duplicating. */}
+      <div>
+        <Button variant="ghost" size="sm" onClick={() => router.push("/orders")} className="-ml-2 mb-1 h-7 text-muted-foreground">
+          <ArrowLeft size={16} weight="bold" /> Orders
+        </Button>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-display text-2xl font-semibold tracking-tight">{num}</h1>
+              <SellerStatusBadge order={order} />
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-muted-foreground">
-            {store.charAt(0).toUpperCase() + store.slice(1)} · {fmtDateTime(order.created_at)}
+          {/* Secondary first, primary last — the destructive action shouldn't lead. */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <CancelOrderButton order={order} onDone={reload} />
+            <SubmitOrderButton order={order} quote={quote} onDone={reload} />
           </div>
-          <SubmitOrderButton order={order} onDone={reload} />
-          <CancelOrderButton order={order} onDone={reload} />
         </div>
       </div>
 
@@ -188,7 +213,7 @@ export default function OrderDetailPage() {
                   const qty = Number(it.qty) || 1
                   const unit = Number(it.unit_price) || 0
                   return (
-                    <div key={i} className="flex items-center gap-4 px-5 py-4">
+                    <div key={i} className="flex items-start gap-4 px-5 py-4">
                       <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
                         {img ? (
                           <Image src={img} alt={it.name ?? "Item"} fill unoptimized className="object-cover" />
@@ -203,29 +228,41 @@ export default function OrderDetailPage() {
                           </span>
                         )}
                       </div>
+                      {/* One column holding three stacked zones — identity+price, then
+                          the variant fields, then the design action. Previously the
+                          action shared a cramped right rail with the price, which buried
+                          the item's primary control under secondary text. */}
                       <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-medium">{it.name || it.sku || "Item"}</div>
+                            {it.sku && <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{it.sku}</div>}
+                          </div>
+                          <div className="shrink-0 text-right text-sm">
+                            <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
+                            <div className="text-xs tabular-nums text-muted-foreground">{qty} × {usd(unit)}</div>
+                          </div>
+                        </div>
+
                         {preSubmit ? (
                           // Before submit: pick the blank + variants (marketplace orders
-                          // arrive unset). Saving updates the quote the Submit button shows.
+                          // arrive unset). Saving updates the quote in Summary.
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reload} />
                         ) : (
-                          <div className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+                          <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
                             {it.blank && <span className="rounded bg-muted px-1.5 py-0.5">{it.blank}</span>}
                             {it.color && <span className="rounded bg-muted px-1.5 py-0.5">{it.color}</span>}
                             {it.size && <span className="rounded bg-muted px-1.5 py-0.5">{it.size}</span>}
                             {it.print_type && <span className="rounded bg-muted px-1.5 py-0.5">{it.print_type}</span>}
-                            {it.sku && <span className="font-mono">{it.sku}</span>}
                           </div>
                         )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5 text-right text-sm">
-                        <div className="font-medium tabular-nums">{usd(unit * qty)}</div>
-                        <div className="text-xs text-muted-foreground">{qty} × {usd(unit)}</div>
+
                         {it.sku && (
-                          <Button size="sm" variant="outline" onClick={() => setCustomize(it)}>
-                            <PenNib size={13} weight="bold" /> {artwork ? "Edit design" : "Customize"}
-                          </Button>
+                          <div className="mt-3 flex justify-end">
+                            <Button size="sm" variant="outline" onClick={() => setCustomize(it)}>
+                              <PenNib size={13} weight="bold" /> {artwork ? "Edit design" : "Customize"}
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -338,16 +375,44 @@ export default function OrderDetailPage() {
             </SectionCard>
           )}
 
+          {/* Summary owns every number on this page. Pre-submit it shows the QUOTE (what
+              we'll charge to produce this); once submitted the price is frozen and it
+              falls back to the order's own totals. */}
           <SectionCard title="Summary">
             <dl className="space-y-2 p-5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Items</dt>
-                <dd className="tabular-nums">{usd(itemsTotal)}</dd>
-              </div>
-              <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <dt>Total</dt>
-                <dd className="tabular-nums">{usd(total)}</dd>
-              </div>
+              {quote && !quote.unpriced.length ? (
+                <>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Production</dt>
+                    <dd className="tabular-nums">{usd(quote.subtotal)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Shipping</dt>
+                    <dd className="tabular-nums">{usd(quote.shipping)}</dd>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                    <dt>Total</dt>
+                    <dd className="tabular-nums">{usd(quote.total)}</dd>
+                  </div>
+                  <p className="pt-1 text-xs text-muted-foreground">Charged when you submit to production.</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Items</dt>
+                    <dd className="tabular-nums">{usd(itemsTotal)}</dd>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                    <dt>Total</dt>
+                    <dd className="tabular-nums">{usd(total)}</dd>
+                  </div>
+                </>
+              )}
+              {quote?.unpriced.length ? (
+                <p className="border-t border-border pt-2 text-xs text-destructive">
+                  Not priced yet: {quote.unpriced.map((u) => u.sku).join(", ")} — pick a blank on those lines first.
+                </p>
+              ) : null}
             </dl>
           </SectionCard>
         </div>
@@ -378,31 +443,22 @@ export default function OrderDetailPage() {
 // factory before this, so a seller could never actually buy production; the server rule
 // existed with no caller. Shows the real quote first: people should see the price before
 // the button that takes the money, not after.
-function SubmitOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
+function SubmitOrderButton({ order, quote, onDone }: { order: OrderRow; quote: OrderQuote | null; onDone: () => void }) {
   const router = useRouter()
-  const [quote, setQuote] = useState<OrderQuote | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [short, setShort] = useState(false)
-  const [confirm, setConfirm] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const fs = String(order.factory_status || "")
   const submittable = ["", "new", "draft"].includes(fs)
-
-  useEffect(() => {
-    if (!submittable) return
-    let live = true
-    getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
-    return () => { live = false }
-  }, [order.id, submittable])
-
   if (!submittable) return null
 
   const submit = async () => {
     setBusy(true); setErr(null); setShort(false)
     try {
       await updateOrder(order.id, { factoryStatus: "in_review", status: "in_review" })
-      setConfirm(false)
+      setOpen(false)
       onDone()
     } catch (e) {
       // 402 = the server refused on money grounds (short balance, or a line it can't
@@ -416,41 +472,56 @@ function SubmitOrderButton({ order, onDone }: { order: OrderRow; onDone: () => v
   const blocked = !!quote?.unpriced.length
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      {quote && !blocked && (
-        <div className="text-right text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            {money(quote.subtotal)} production + {money(quote.shipping)} shipping
-          </span>
-          <span className="mx-1.5 text-border">·</span>
-          <span className="font-semibold tabular-nums text-foreground">{money(quote.total)}</span>
-        </div>
-      )}
-      {blocked && (
-        <span className="text-right text-xs text-destructive">
-          Not priced yet: {quote!.unpriced.map((u) => u.sku).join(", ")} — pick a catalog product first.
-        </span>
-      )}
-      {err && <span className="max-w-xs text-right text-xs text-destructive">{err}</span>}
-      <span className="flex items-center gap-2">
-        {short && (
-          <Button size="sm" variant="outline" onClick={() => router.push("/wallet")}>Top up</Button>
-        )}
-        {confirm ? (
-          <>
-            <span className="text-xs text-muted-foreground">
-              Charge {quote ? money(quote.total) : "your wallet"}?
-            </span>
-            <Button size="sm" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Yes, submit"}</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>Not yet</Button>
-          </>
-        ) : (
-          <Button size="sm" onClick={() => setConfirm(true)} disabled={busy || blocked}>
-            <PaperPlaneTilt size={14} weight="bold" /> Submit to production
-          </Button>
-        )}
-      </span>
-    </div>
+    <>
+      <Button
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={busy || blocked}
+        title={blocked ? "Some lines have no price yet — pick a blank on them first" : undefined}
+      >
+        <PaperPlaneTilt size={14} weight="bold" /> Submit to production
+      </Button>
+
+      {/* A dialog, not inline confirm text — confirming used to swap two extra buttons
+          into the header and reflow the whole row. */}
+      <Dialog open={open} onOpenChange={(v) => { if (busy) return; setOpen(v); if (!v) { setErr(null); setShort(false) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit to production?</DialogTitle>
+            <DialogDescription>
+              This sends the order to the factory and charges your wallet. You can still cancel until the floor starts work.
+            </DialogDescription>
+          </DialogHeader>
+
+          {quote && (
+            <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Production</dt>
+                <dd className="tabular-nums">{money(quote.subtotal)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Shipping</dt>
+                <dd className="tabular-nums">{money(quote.shipping)}</dd>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                <dt>Total</dt>
+                <dd className="tabular-nums">{money(quote.total)}</dd>
+              </div>
+            </dl>
+          )}
+
+          {err && <p className="text-sm text-destructive">{err}</p>}
+
+          <DialogFooter>
+            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
+            <Button onClick={submit} disabled={busy}>
+              {busy ? "Submitting…" : quote ? `Charge ${money(quote.total)}` : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
