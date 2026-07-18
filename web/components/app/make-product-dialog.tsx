@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
 import { publishEtsy, type EtsyListing } from "@/lib/api"
+import { prettyColorName } from "@/lib/color-name"
 
 // Etsy CDN images taint the canvas cross-origin, but our img-proxy re-serves them
 // same-origin so we can read them into a data URL for re-upload to a new listing.
@@ -177,8 +178,8 @@ export function MakeProductDialog({ open, onOpenChange, listing, onPublished }: 
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {colors.map((c) => (
-                      <span key={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
-                        {c}
+                      <span key={c} title={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
+                        {prettyColorName(c)}
                         <button onClick={() => removeColor(c)} className="flex size-4 items-center justify-center rounded-full hover:bg-primary/20"><X size={9} weight="bold" /></button>
                       </span>
                     ))}

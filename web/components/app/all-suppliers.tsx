@@ -75,6 +75,9 @@ export function AllSuppliers() {
   // product is now staged here and shown in the normal product editor for review.
   const [preview, setPreview] = useState<CatalogProduct | null>(null)
   const [previewKey, setPreviewKey] = useState<string | null>(null)
+  // S&S only returns sizes on the STYLE DETAIL, which is the same request the colour
+  // swatches already make — so cache both from that one call rather than fetching twice.
+  const [detailSizes, setDetailSizes] = useState<Record<string, string[]>>({})
   const [importing, setImporting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -128,8 +131,8 @@ export function AllSuppliers() {
   }
 
   const cardData = (it: Item) => it.supplier === "ss"
-    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, favorited: it.ss.favorited }
-    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
+    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: detailSizes[`ss:${it.ss.styleID}`] ?? [], favorited: it.ss.favorited }
+    : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 
@@ -165,7 +168,11 @@ export function AllSuppliers() {
   }
 
   const loadColors = (it: Item) => it.supplier === "ss"
-    ? () => getSsStyle(it.id).then((d) => (d && !d.error ? d.colorImages ?? {} : {}))
+    ? () => getSsStyle(it.id).then((d) => {
+        if (!d || d.error) return {}
+        if (d.sizes?.length) setDetailSizes((p) => ({ ...p, [`ss:${it.id}`]: d.sizes! }))
+        return d.colorImages ?? {}
+      })
     : () => getOttoStyle(it.id).then((d) => (d && !d.error ? driveMap(d.colorImages) : {}))
 
   const onImport = async (file?: File) => {
@@ -273,6 +280,7 @@ export function AllSuppliers() {
                   added={added.has(keyOf(it))}
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
+                  onEditVariants={() => addToCatalog(it)}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}
                 />

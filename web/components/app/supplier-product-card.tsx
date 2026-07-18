@@ -4,6 +4,7 @@ import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
 import { Heart, Plus, CheckCircle, CircleNotch } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
+import { prettyColorName } from "@/lib/color-name"
 
 // One product card for BOTH suppliers (S&S + Otto) so they look identical: image, brand,
 // title, price (range where applicable), clickable color chips that swap to that color's
@@ -20,11 +21,14 @@ export type SupplierCardData = {
   // image when present, else falls back to the name→hex guess.
   colors?: (string | { name: string; swatch?: string | null })[] | null
   sizesCount?: number
+  /** Actual size names (S, M, L…). Otto ships these on the list; S&S only on the style
+   *  detail, so they arrive once loadDetail resolves. */
+  sizes?: string[] | null
   favorited?: boolean
 }
 
 export function SupplierProductCard({
-  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel,
+  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onEditVariants,
 }: {
   data: SupplierCardData
   added: boolean
@@ -33,6 +37,8 @@ export function SupplierProductCard({
   onFavorite?: (on: boolean) => void
   loadColors?: () => Promise<Record<string, string>> // color → photo (fetched on first chip click)
   supplierLabel?: string // e.g. "S&S" / "Otto" — shown as a badge when browsing both at once
+  /** Click the colour/size rows to edit the variant set before importing. */
+  onEditVariants?: () => void
 }) {
   const [img, setImg] = useState<string | null>(data.image ?? null)
   const [activeColor, setActiveColor] = useState<string | null>(null)
@@ -58,6 +64,7 @@ export function SupplierProductCard({
   const toggleFav = () => { const next = !fav; setFav(next); onFavorite?.(next) }
   // Normalise both colour shapes (bare name | {name, swatch}) to one form the row renders.
   const colors = (data.colors ?? []).map((c) => (typeof c === "string" ? { name: c, swatch: null } : { name: c.name, swatch: c.swatch ?? null }))
+  const sizeNames = (data.sizes ?? []).filter(Boolean)
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
@@ -112,12 +119,12 @@ export function SupplierProductCard({
                 if (c.swatch) {
                   return (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={c.name} src={c.swatch} alt={c.name} title={c.name} loading="lazy" onClick={() => pickColor(c.name)}
+                    <img key={c.name} src={c.swatch} alt={prettyColorName(c.name)} title={prettyColorName(c.name)} loading="lazy" onClick={() => pickColor(c.name)}
                       className={"size-5 shrink-0 cursor-pointer rounded-full border border-black/15 object-cover transition-transform hover:scale-110 " + ring} />
                   )
                 }
                 return (
-                  <button key={c.name} onClick={() => pickColor(c.name)} title={c.name} style={bg ? { background: bg } : undefined}
+                  <button key={c.name} onClick={() => pickColor(c.name)} title={prettyColorName(c.name)} style={bg ? { background: bg } : undefined}
                     className={"size-5 shrink-0 rounded-full border transition-transform hover:scale-110 " + ring + (bg ? "border-black/15" : "flex items-center justify-center border-dashed border-border bg-muted text-[8px] text-muted-foreground")}>
                     {!bg && "?"}
                   </button>
@@ -127,7 +134,29 @@ export function SupplierProductCard({
             </>
           )}
         </div>
-        <div className="mt-1 h-3.5 truncate text-[10px] text-muted-foreground">{activeColor || ((data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "")}</div>
+        {/* The picked colour's real name (codes stripped), or nothing. */}
+        <div className="mt-1 h-3.5 truncate text-[10px] text-muted-foreground">{activeColor ? prettyColorName(activeColor) : ""}</div>
+
+        {/* Sizes by NAME, not a count — "2 sizes" doesn't tell you whether it's S/M or
+            3XL/4XL. Fixed-height row so cards still align. */}
+        <div className="mt-1 flex h-5 items-center gap-1 overflow-hidden">
+          {sizeNames.length === 0 ? (
+            <span className="text-[10px] text-muted-foreground/60">{(data.sizesCount ?? 0) > 0 ? `${data.sizesCount} sizes` : "—"}</span>
+          ) : (
+            <>
+              {sizeNames.slice(0, 6).map((sz) => (
+                <span key={sz} className="shrink-0 rounded border border-border px-1 py-0.5 text-[9px] font-medium text-muted-foreground">{sz}</span>
+              ))}
+              {sizeNames.length > 6 && <span className="shrink-0 text-[10px] text-muted-foreground">+{sizeNames.length - 6}</span>}
+            </>
+          )}
+        </div>
+
+        {onEditVariants && (
+          <button onClick={onEditVariants} className="mt-1 self-start text-[10px] font-medium text-primary hover:underline">
+            Edit colours &amp; sizes
+          </button>
+        )}
 
         <div className="mt-auto pt-3">
           <button onClick={onAdd} disabled={added || adding}

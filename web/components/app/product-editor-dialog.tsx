@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
 import { type CatalogProduct } from "@/lib/api"
+import { prettyColorName } from "@/lib/color-name"
 
 const METHODS = ["DTG", "Embroidery", "Screen Print", "Sublimation", "Vinyl"]
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
@@ -256,8 +257,8 @@ export function ProductEditorDialog({
             {colors.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {colors.map((c) => (
-                  <span key={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
-                    {c}
+                  <span key={c} title={c} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 py-0.5 pl-2.5 pr-1 text-xs font-medium text-primary">
+                    {prettyColorName(c)}
                     <button onClick={() => setColors((p) => p.filter((x) => x !== c))} className="flex size-4 items-center justify-center rounded-full hover:bg-primary/20"><X size={9} weight="bold" /></button>
                   </span>
                 ))}
@@ -271,7 +272,7 @@ export function ProductEditorDialog({
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
                 {colorSuggestions.map((c) => (
-                  <button key={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {c}</button>
+                  <button key={c} title={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
                 ))}
               </div>
             )}
