@@ -924,6 +924,16 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       });
       if (readinessId) form.append('readiness_state_id', String(readinessId));
       if (returnPolicyId) form.append('return_policy_id', String(returnPolicyId));
+      // Tags. The client has always SENT these; this route used to ignore them, so every
+      // tag a seller picked was silently dropped. Etsy's rules are strict and it rejects
+      // the whole listing on a bad one, so sanitize rather than pass through: max 13, max
+      // 20 chars each, letters/numbers/space/hyphen only (Etsy also allows a few accents,
+      // but stripping is safer than a 400 that loses the draft).
+      const tags = (Array.isArray(b.tags) ? b.tags : String(b.tags || '').split(','))
+        .map((t) => String(t).replace(/[^\p{L}\p{N} '\-]/gu, '').trim().slice(0, 20))
+        .filter(Boolean);
+      const uniqueTags = [...new Set(tags.map((t) => t.toLowerCase()))].slice(0, 13);
+      if (uniqueTags.length) form.append('tags', uniqueTags.join(','));
       const listing = await etsyFetch(conn, `/shops/${conn.shop_id}/listings`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString()
       });
@@ -947,6 +957,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
 
       return {
         ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
+        tags_applied: uniqueTags.length,
         url: listing.url || `https://www.etsy.com/listing/${listingId}`
       };
     } catch (e) { reply.code(400); return { error: e.message }; }
