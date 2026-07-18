@@ -45,6 +45,8 @@ export function SupplierProductCard({
   const [colorImages, setColorImages] = useState<Record<string, string> | null>(null)
   const [loadingColor, setLoadingColor] = useState(false)
   const [fav, setFav] = useState(!!data.favorited)
+  // "+9" used to be dead text. Clicking it now reveals every colour the product comes in.
+  const [showAllColors, setShowAllColors] = useState(false)
 
   const price = data.price != null && data.price !== "" ? Number(data.price) : null
   const priceMax = data.priceMax != null && data.priceMax !== "" ? Number(data.priceMax) : null
@@ -107,12 +109,12 @@ export function SupplierProductCard({
         </div>
 
         {/* Colors — round swatches (split for two-tone), fixed-height row so cards align */}
-        <div className="mt-2 flex h-6 items-center gap-1.5 overflow-hidden">
+        <div className={"mt-2 flex items-center gap-1.5 " + (showAllColors ? "flex-wrap" : "h-6 overflow-hidden")}>
           {colors.length === 0 ? (
             <span className="text-[10px] text-muted-foreground/60">—</span>
           ) : (
             <>
-              {colors.slice(0, 7).map((c) => {
+              {(showAllColors ? colors : colors.slice(0, 7)).map((c) => {
                 const bg = swatchBg(c.name)
                 const ring = activeColor === c.name ? "ring-2 ring-primary ring-offset-1 " : ""
                 // Real supplier swatch image wins; then a name→hex guess; then a "?" chip.
@@ -130,7 +132,15 @@ export function SupplierProductCard({
                   </button>
                 )
               })}
-              {colors.length > 7 && <span className="shrink-0 text-[10px] font-medium text-muted-foreground">+{colors.length - 7}</span>}
+              {colors.length > 7 && (
+                <button
+                  onClick={() => setShowAllColors((v) => !v)}
+                  title={showAllColors ? "Show fewer colours" : `Show all ${colors.length} colours`}
+                  className="shrink-0 rounded px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {showAllColors ? "Show less" : `+${colors.length - 7}`}
+                </button>
+              )}
             </>
           )}
         </div>

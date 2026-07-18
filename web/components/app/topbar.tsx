@@ -96,15 +96,21 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
   }, [])
 
   // Real balance (server-authoritative); silently keeps the fallback if no session/API.
+  // Re-reads on "eg-wallet-changed" — anything that moves money (a plan purchase, a
+  // top-up) fires it. Without that this ran once on mount, so the header still showed
+  // the pre-purchase balance until a full reload.
   useEffect(() => {
     let cancelled = false
-    getWallet()
-      .then((w) => {
-        if (!cancelled) setBalance(w.balance)
-      })
-      .catch(() => {})
+    const load = () => {
+      getWallet()
+        .then((w) => { if (!cancelled) setBalance(w.balance) })
+        .catch(() => {})
+    }
+    load()
+    window.addEventListener("eg-wallet-changed", load)
     return () => {
       cancelled = true
+      window.removeEventListener("eg-wallet-changed", load)
     }
   }, [])
 

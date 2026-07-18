@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ApiError, getBillingPlan, subscribePlan, setAutoRenew, type BillingPlan } from "@/lib/api"
+import { updateUser } from "@/lib/auth"
 import {
   PLAN_TIERS,
   getPlan,
@@ -92,7 +93,15 @@ export function SubscriptionPanel() {
     if (!pending) return
     setBusy(true); setErr(null); setShort(null)
     try {
-      await subscribePlan({ plan: pending.plan, spydeckAddon: pending.addon })
+      const r = await subscribePlan({ plan: pending.plan, spydeckAddon: pending.addon })
+      // The paywall reads the CACHED SESSION (getPlan/getSpydeckAddon -> getUser()), not
+      // the server, so without this the plan stayed locked until the next login even
+      // though it was paid for. Update the session, then tell the app: "eg-plan-changed"
+      // unlocks the nav + SpyDeck, "eg-wallet-changed" refreshes the header balance.
+      updateUser({ plan: r.plan ?? pending.plan, spydeck_addon: r.spydeck_addon ?? pending.addon })
+      window.dispatchEvent(new CustomEvent("eg-plan-changed", { detail: { plan: r.plan } }))
+      window.dispatchEvent(new CustomEvent("eg-user-changed"))
+      window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
       setPending(null)
       await refresh()
     } catch (e) {
