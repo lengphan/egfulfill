@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree } from "@phosphor-icons/react"
+import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -90,6 +90,11 @@ export function OrdersHub() {
   const [busy, setBusy] = useState<string | null>(null)
   const [sent, setSent] = useState<Set<string>>(new Set())
   const [shipOpen, setShipOpen] = useState<string | null>(null)
+  // Collapsed order ids. Default expanded — a board that opens fully collapsed hides the
+  // work. Collapsing is for getting long boards under control, same as the seller list.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [carrier, setCarrier] = useState("USPS")
   const [tracking, setTracking] = useState("")
 
@@ -274,11 +279,20 @@ export function OrdersHub() {
               const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
               const label = labels[o.id]
               const track = label?.trackingNumber || o.tracking
+              const isCollapsed = collapsed.has(o.id)
               return (
                 <div key={o.id} className="p-5">
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => toggleCollapse(o.id)}
+                          aria-expanded={!isCollapsed}
+                          aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
+                          className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
+                        </button>
                         <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
                         <StageBadge status={stage} />
                         <span className="truncate text-sm font-medium">{o.customer?.name || "—"}</span>
@@ -455,7 +469,7 @@ export function OrdersHub() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
+                  <div className={"space-y-2 " + (isCollapsed ? "hidden" : "")}>
                     {items.map((it, i) => {
                       const key = `${o.id}:${it.sku}`
                       const img = itemImage(it)
