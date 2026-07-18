@@ -23,7 +23,7 @@ const SUGGESTIONS = [
 
 // A conversation in the left rail — Support (AI + team), a per-order thread, or the
 // internal staff-only Factory channel.
-type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox"; title: string; sub: string }
+type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox"; title: string; sub: string; escalated?: boolean }
 const STAFF_CHANNEL = "staff-general"
 
 export default function ChatPage() {
@@ -77,9 +77,14 @@ export default function ChatPage() {
     const list: Convo[] = []
     if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" })
     if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: isStaffUser ? "Ask EGFULFILL" : "Assistant + team" })
-    if (isStaffUser) for (const t of inbox) {
+    // Threads with an unanswered "talk to a human" sort above the rest — an explicit
+    // request for help shouldn't be buried under newer small talk.
+    if (isStaffUser) for (const t of [...inbox].sort((a, b) => Number(!!b.escalated) - Number(!!a.escalated))) {
       if (t.order_id === supportId) continue // don't list my own thread twice
-      list.push({ id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id, sub: t.last ? t.last.slice(0, 40) : "Support request" })
+      list.push({
+        id: t.order_id, kind: "inbox", title: t.seller_name || t.seller_id,
+        sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated,
+      })
     }
     if (!isStaffUser) for (const o of orders.slice(0, 30)) {
       list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
@@ -199,7 +204,10 @@ export default function ChatPage() {
     const text = "I'd like to talk to a human — please have someone follow up."
     setMessages((prev) => [...(prev ?? []), { id: clientId, role: "seller", by: myName, text, ts: nowMs() }])
     setAiNote("Flagged for a teammate — someone will reply here shortly.")
-    try { await postOrderMessage(activeId, text, { clientId, by: myName }); await load() } catch {}
+    // escalated:true is what actually raises the flag — it writes meta.escalated, sends
+    // staff a distinct notification, and pins the thread to the top of their inbox until
+    // one of them replies. Without it this was just another message.
+    try { await postOrderMessage(activeId, text, { clientId, by: myName, escalated: true }); await load() } catch {}
   }
 
   // Staff: draft a reply with AI for the open seller thread → fill the composer to edit.
@@ -235,7 +243,14 @@ export default function ChatPage() {
                   {c.kind === "support" ? <Headset size={17} weight="duotone" /> : <Package size={16} weight="duotone" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{c.title}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold">{c.title}</span>
+                    {c.escalated && (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                        Needs a human
+                      </span>
+                    )}
+                  </span>
                   <span className="block truncate text-xs text-muted-foreground">{c.sub}</span>
                 </span>
               </button>

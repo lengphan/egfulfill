@@ -650,10 +650,12 @@ export function getOrderMessages(id: string) {
 }
 // POST reads b.text / b.role / b.by / b.clientId (idempotent by clientId). Sending
 // `{body}` posts an EMPTY message — the server keys off `text`.
-export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string }) {
+// `escalated` marks an explicit "talk to a human" request so staff can tell it apart
+// from ordinary chat; the server ignores the flag from staff senders.
+export function postOrderMessage(id: string, text: string, opts?: { by?: string; role?: string; clientId?: string; escalated?: boolean }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId }),
+    body: JSON.stringify({ text, role: opts?.role ?? "seller", by: opts?.by, clientId: opts?.clientId, escalated: opts?.escalated }),
   })
 }
 
@@ -670,7 +672,8 @@ export function requestAiReply() {
   })
 }
 // Staff support inbox: every seller support thread + an AI-drafted reply (not posted).
-export type SupportThread = { order_id: string; seller_id: string; seller_name: string | null; last: string; last_at: number; n: number }
+// `escalated` = the seller asked for a human and no staffer has replied since.
+export type SupportThread = { order_id: string; seller_id: string; seller_name: string | null; last: string; last_at: number; n: number; escalated?: boolean }
 export function getSupportThreads() {
   return api<SupportThread[]>(`/api/support/threads`)
 }

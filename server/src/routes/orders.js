@@ -523,6 +523,26 @@ export function ordersRoutes(app, requireAuth) {
   // A team member is limited to their granted surfaces (hide/unhide). A full owner (perms=null) passes.
   function _canSurface(sel, surface) { return !(sel && sel.member && sel.perms && sel.perms.indexOf(surface) < 0); }
 
+  // Chat-channel access. Deliberately SEPARATE from canSeeOrder: that one also gates
+  // design uploads/threads the designer board needs, so narrowing it would break the
+  // designer's own work. This governs who may read/write a CONVERSATION.
+  //
+  // Designers don't deal with sellers — they work artwork for the factory. So they are
+  // out of both seller-facing channels (the seller's support thread and the seller↔
+  // factory order thread) and get `design-<orderId>` instead, which the seller can't see.
+  function canSeeThread(user, channelId) {
+    const id = String(channelId);
+    const role = user?.role;
+    if (id.indexOf('design-') === 0) return isStaff(user);          // staff-only, never the seller
+    if (id === 'staff-general') return isStaff(user);               // internal room — designers included
+    if (id.indexOf('support-') === 0) {
+      if (isStaff(user)) return role !== 'designer';
+      return id === ('support-' + user.sub);
+    }
+    if (role === 'designer') return false;                          // seller↔factory order thread
+    return canSeeOrder(user, channelId);
+  }
+
   async function canSeeOrder(user, orderId) {
     if (isStaff(user)) return true;
     // Support conversations ride on order_messages under a synthetic id `support-<sellerId>`.
@@ -538,13 +558,24 @@ export function ordersRoutes(app, requireAuth) {
   // Staff-only: list every seller support thread (one row per seller) with its last message, so the
   // staff chat can show "EGFULFILL Support" conversations that sellers started. Sellers never hit this.
   app.get('/api/support/threads', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'forbidden' }; }
+    // Designers excluded: they don't answer sellers, so seller conversations aren't theirs
+    // to read. See canSeeThread.
+    if (!isStaff(req.user) || req.user.role === 'designer') { reply.code(403); return { error: 'forbidden' }; }
     const r = await q(`
       select m.order_id,
              max(m.created_at) as last_at,
              count(*)::int as n,
              (select body from order_messages x where x.order_id = m.order_id order by created_at desc, id desc limit 1) as last_body,
-             (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')) as seller_name
+             (select coalesce(nullif(u.name,''), u.email) from users u where u.id::text = replace(m.order_id, 'support-', '')) as seller_name,
+             -- Open escalation = the seller asked for a human and no staffer has replied
+             -- since. That's what sorts a thread to the top of the inbox.
+             (select count(*) from order_messages e
+               where e.order_id = m.order_id
+                 and coalesce((e.meta->>'escalated')::boolean, false)
+                 and e.created_at > coalesce((select max(s.created_at) from order_messages s
+                                               where s.order_id = m.order_id
+                                                 and s.sender_role <> 'seller'), '-infinity'::timestamptz)
+             )::int as open_escalations
         from order_messages m
        where m.order_id like 'support-%'
        group by m.order_id
@@ -555,14 +586,19 @@ export function ordersRoutes(app, requireAuth) {
       seller_name: x.seller_name || null,
       last: x.last_body || '',
       last_at: x.last_at ? new Date(x.last_at).getTime() : 0,
-      n: x.n
+      n: x.n,
+      escalated: x.open_escalations > 0,
     }));
   });
 
   app.post('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    if (!(await canSeeThread(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const b = req.body || {};
-    const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null };
+    // `escalated` is what makes "Talk to a human" mean something. Without it every
+    // support message looked identical to staff, so an explicit request for help was
+    // indistinguishable from small talk. Only a SELLER can raise one.
+    const escalated = !!b.escalated && !isStaff(req.user);
+    const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null, escalated };
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
        values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
@@ -574,13 +610,25 @@ export function ordersRoutes(app, requireAuth) {
     // Tell somebody. A message that only lands in a table nobody is watching is how
     // "Talk to a human" used to disappear silently.
     const isSupport = String(req.params.id).startsWith('support-');
+    const isDesign = String(req.params.id).startsWith('design-');
     const fromSeller = !isStaff(req.user);
-    if (isSupport && fromSeller) {
-      // Seller wrote in their support thread → alert the staff who answer it.
+    if (isDesign) {
+      // Artwork thread — designer ↔ factory. The seller is not part of this channel.
+      notify({
+        roles: ['admin', 'operator', 'warehouse', 'designer'],
+        type: 'design-message',
+        title: `Artwork note on ${String(req.params.id).replace('design-', '')}`,
+        body: String(b.text || '').slice(0, 140),
+        href: '/designer',
+        entityId: req.params.id,
+      });
+    } else if (isSupport && fromSeller) {
+      // Seller wrote in their support thread → alert the staff who answer it. An
+      // escalation gets its own type + wording so it stands out from ordinary chatter.
       notify({
         roles: ['admin', 'operator', 'warehouse'],
-        type: 'support-message',
-        title: `${b.by || 'A seller'} needs help`,
+        type: escalated ? 'support-escalation' : 'support-message',
+        title: escalated ? `${b.by || 'A seller'} asked for a human` : `${b.by || 'A seller'} sent a message`,
         body: String(b.text || '').slice(0, 140),
         href: '/chat',
         entityId: req.params.id,
@@ -598,7 +646,7 @@ export function ordersRoutes(app, requireAuth) {
   });
 
   app.get('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    if (!(await canSeeThread(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const r = await q(
       `select id, sender_role, body, attachment, meta, client_id, created_at
          from order_messages where order_id=$1 order by created_at asc, id asc`, [req.params.id]);
