@@ -18,7 +18,9 @@ export function SuppliersView() {
         </div>
       </div>
 
-      <div className="flex w-fit rounded-lg border border-border p-0.5">
+      {/* rounded-full, not rounded-lg — the active tab inside is a pill, so a
+          rectangular border around it left visible corner gaps. */}
+      <div className="flex w-fit rounded-full border border-border p-0.5">
         {([{ id: "all", label: "All suppliers" }, { id: "favorites", label: "Favorites" }] as const).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} className={"rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{t.label}</button>
         ))}

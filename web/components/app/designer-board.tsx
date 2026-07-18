@@ -103,7 +103,8 @@ export function DesignerBoard() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">Designer</h1>
           <p className="truncate text-sm text-muted-foreground">{view === "board" ? "Drag cards between lanes." : "Scan every card in one list."} Claim work, send for review, get credited on approval.</p>
         </div>
-        <div className="ml-auto flex rounded-lg border border-border p-0.5">
+        {/* rounded-full to match the pill buttons inside — see suppliers-view. */}
+        <div className="ml-auto flex rounded-full border border-border p-0.5">
           {([{ id: "board", label: "Board" }, { id: "list", label: "List" }] as const).map((v) => (
             <button key={v.id} onClick={() => setView(v.id)} className={"rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
           ))}

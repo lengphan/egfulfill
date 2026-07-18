@@ -190,7 +190,16 @@ export function WalletDashboard() {
         </Button>
       </div>
 
-      <TopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} onFunded={refresh} />
+      <TopUpDialog
+        open={topUpOpen}
+        onOpenChange={setTopUpOpen}
+        onFunded={() => {
+          refresh()
+          // The topbar reads the wallet once on mount, so without this the header kept
+          // the pre-top-up balance until a reload — same staleness a plan purchase hit.
+          window.dispatchEvent(new CustomEvent("eg-wallet-changed"))
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
