@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree } from "@phosphor-icons/react"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -340,15 +340,22 @@ export function OrdersHub() {
                               {prod.length > 0 && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
-                                  {prod.map((s) => <DropdownMenuItem key={s.id || "new"} onClick={() => setOrderStatus(o, s.id)}>{s.label}</DropdownMenuItem>)}
+                                  {/* Base UI requires a GroupLabel to sit inside a Group —
+                                      a bare label throws "MenuGroupContext is missing" as
+                                      the popup mounts, which killed the whole menu. */}
+                                  <DropdownMenuGroup>
+                                    <DropdownMenuLabel>Set all items to</DropdownMenuLabel>
+                                    {prod.map((s) => <DropdownMenuItem key={s.id || "new"} onClick={() => setOrderStatus(o, s.id)}>{s.label}</DropdownMenuItem>)}
+                                  </DropdownMenuGroup>
                                 </>
                               )}
                               {exc.length > 0 && (
                                 <>
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
-                                  {exc.map((s) => <DropdownMenuItem key={s.id} onClick={() => setOrderStatus(o, s.id)}><Flag size={13} weight="fill" /> {s.label}</DropdownMenuItem>)}
+                                  <DropdownMenuGroup>
+                                    <DropdownMenuLabel>Flag / hold</DropdownMenuLabel>
+                                    {exc.map((s) => <DropdownMenuItem key={s.id} onClick={() => setOrderStatus(o, s.id)}><Flag size={13} weight="fill" /> {s.label}</DropdownMenuItem>)}
+                                  </DropdownMenuGroup>
                                 </>
                               )}
                             </DropdownMenuContent>

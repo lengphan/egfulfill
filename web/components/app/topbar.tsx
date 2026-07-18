@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -178,7 +179,11 @@ export function TopBar({ balance: initialBalance }: { balance?: number }) {
               <CaretDown size={12} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel>{name}</DropdownMenuLabel>
+              {/* Grouped: Base UI's GroupLabel throws outside a Group, taking the whole
+                  menu down with it. */}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{name}</DropdownMenuLabel>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/settings")}>Profile &amp; settings</DropdownMenuItem>
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
