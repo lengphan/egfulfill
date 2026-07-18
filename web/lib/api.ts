@@ -682,7 +682,16 @@ export function aiDraft(threadId: string) {
 }
 // Platform factory settings (design fee, default shipping, emb file price). Any staff can
 // read; warehouse/admin write.
-export type FactorySettings = { design_fee?: number; ship_first?: number; ship_extra?: number; emb_price?: number }
+/** Platform-wide factory settings. The flat shipping bands (ship_cap / ship_heavy /
+ *  ship_garment) and per-method surcharges (method_dtg / _dtf / _emb / _apl / _lsr) are
+ *  admin-editable, so pricing policy changes without a deploy. The index signature keeps
+ *  the method_* keys addressable by name from the settings form. */
+export type FactorySettings = {
+  design_fee?: number; ship_first?: number; ship_extra?: number; emb_price?: number
+  ship_cap?: number; ship_heavy?: number; ship_garment?: number
+  method_dtg?: number; method_dtf?: number; method_emb?: number; method_apl?: number; method_lsr?: number
+  [key: string]: number | undefined
+}
 export function getFactorySettings() {
   return api<FactorySettings>(`/api/factory/settings`)
 }

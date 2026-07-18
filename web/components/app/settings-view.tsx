@@ -494,6 +494,10 @@ function PlatformPanel() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // Flat shipping bands + per-method surcharges. Held as strings so a half-typed "5." is
+  // not fought by Number() on every keystroke.
+  const [bands, setBands] = useState<Record<string, string>>({})
+  const setBand = (k: string, v: string) => setBands((p) => ({ ...p, [k]: v.replace(/[^0-9.]/g, "") }))
 
   const load = useCallback(() => {
     getFactorySettings().then((r) => {
@@ -502,6 +506,10 @@ function PlatformPanel() {
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
+      setBands(Object.fromEntries(
+        ["ship_cap", "ship_heavy", "ship_garment", "method_dtg", "method_dtf", "method_emb", "method_apl", "method_lsr"]
+          .map((k) => [k, r[k] != null ? String(r[k]) : ""])
+      ))
     }).catch(() => setLoaded({}))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
@@ -514,6 +522,7 @@ function PlatformPanel() {
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
+        ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
       })
       if (r.error) throw new Error(r.error)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
@@ -531,6 +540,31 @@ function PlatformPanel() {
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+      </div>
+
+      {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
+          what a product WITHOUT one falls back to, instead of one flat platform number. */}
+      <div className="border-t border-border p-5">
+        <div className="text-sm font-medium">Shipping by product type</div>
+        <p className="mb-3 text-xs text-muted-foreground">Used when a product has no shipping fee of its own.</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <MoneyField label="Caps & hats" value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
+          <MoneyField label="Sweatshirts, hoodies, jackets" value={bands.ship_heavy ?? ""} onChange={(v) => setBand("ship_heavy", v)} />
+          <MoneyField label="All other garments" value={bands.ship_garment ?? ""} onChange={(v) => setBand("ship_garment", v)} />
+        </div>
+      </div>
+
+      {/* Per-method surcharge on top of the blank's base cost. */}
+      <div className="border-t border-border p-5">
+        <div className="text-sm font-medium">Print method surcharge</div>
+        <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <MoneyField label="DTG printing" value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
+          <MoneyField label="DTF printing" value={bands.method_dtf ?? ""} onChange={(v) => setBand("method_dtf", v)} />
+          <MoneyField label="Embroidery" value={bands.method_emb ?? ""} onChange={(v) => setBand("method_emb", v)} />
+          <MoneyField label="Appliqué" value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
+          <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
+        </div>
       </div>
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
         <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>

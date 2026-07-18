@@ -5,7 +5,40 @@
 
 import { q } from '../db.js';
 
-const KEYS = ['design_fee', 'ship_first', 'ship_extra', 'emb_price'];
+// Per-category flat shipping and per-method surcharges. Admin-editable so pricing policy
+// is a settings change, not a deploy. `emb_price` is NOT the embroidery surcharge — it's
+// the price of the embroidery FILE — hence the separate method_emb.
+const KEYS = [
+  'design_fee', 'ship_first', 'ship_extra', 'emb_price',
+  // Flat shipping by garment class.
+  'ship_cap', 'ship_heavy', 'ship_garment',
+  // Print-method surcharge, keyed by the same codes pricing.js normalises to.
+  'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
+];
+
+// Defaults applied when a key has never been set. Exported so the pricing path and the
+// product editor agree on the starting numbers instead of each hardcoding its own.
+export const SETTING_DEFAULTS = {
+  ship_cap: 5.99,      // caps / hats
+  ship_heavy: 9.99,    // sweatshirts / hoodies / jackets
+  ship_garment: 6.99,  // everything else
+  method_dtg: 0,       // plain printing carries no surcharge
+  method_dtf: 0,
+  method_emb: 5,       // stitches cost more than ink
+  method_apl: 2,
+  method_lsr: 2,
+};
+
+/**
+ * Which flat shipping band a product falls in. Substring matching because supplier
+ * type/name strings are loose ("Apparel", "Headwear", "Pullover Hoodie").
+ */
+export function shippingBandOf(typeOrName) {
+  const s = String(typeOrName || '').toLowerCase();
+  if (/cap|hat|beanie|visor|headwear|trucker/.test(s)) return 'ship_cap';
+  if (/hoodie|hooded|sweatshirt|sweater|crewneck|jacket|coat|pullover|fleece/.test(s)) return 'ship_heavy';
+  return 'ship_garment';
+}
 
 let _ready = null;
 function ensure() {
@@ -15,7 +48,7 @@ function ensure() {
 }
 
 async function readAll() {
-  const out = {};
+  const out = { ...SETTING_DEFAULTS };
   try {
     const r = await q('select key, value from settings where key = any($1)', [KEYS]);
     for (const row of r.rows) { const n = Number(row.value); if (isFinite(n)) out[row.key] = n; }

@@ -11,6 +11,7 @@
 // (orders.html), which would have billed a seller their own gross on every synced
 // order. Cost comes from the catalog's base_price, never from the order's revenue.
 import { q } from './db.js';
+import { shippingBandOf, SETTING_DEFAULTS } from './routes/factory_settings.js';
 
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -19,10 +20,18 @@ const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // reads and the Settings UI writes. (schema.sql also seeds eg_default_shipping_fee /
 // eg_default_addl_item_fee, but nothing has ever read those; they're old-app orphans.)
 const FALLBACK = { ship_first: 5, ship_extra: 2 };
+// The per-band shipping and per-method surcharge keys, so a settings change is a pricing
+// change without a deploy. Defaults come from factory_settings so the admin screen and
+// the billing path can't disagree about what "unset" means.
+const FEE_KEYS = [
+  'ship_first', 'ship_extra',
+  'ship_cap', 'ship_heavy', 'ship_garment',
+  'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
+];
 export async function feeSettings() {
-  const out = { ...FALLBACK };
+  const out = { ...FALLBACK, ...SETTING_DEFAULTS };
   try {
-    const r = await q(`select key, value from settings where key = any($1)`, [['ship_first', 'ship_extra']]);
+    const r = await q(`select key, value from settings where key = any($1)`, [FEE_KEYS]);
     for (const row of r.rows) { const n = num(row.value); if (n != null && n >= 0) out[row.key] = n; }
   } catch { /* table not ready → fall back */ }
   return out;
@@ -94,25 +103,31 @@ function tierFor(d, size) {
 // Per-unit cost = the size's base price (else the product's base) + the print method's
 // add-on. Mirrors productUnitPrice in eg-design-tools.js, which is what the boards show
 // the seller — if these two disagree, the quote lies about the price on screen.
-function unitCostOf(row, item) {
+function unitCostOf(row, item, fees) {
   const d = row.data || {};
   let base = null;
   const tier = tierFor(d, item.size);
   if (tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
   if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
   if (base == null) return null;
-  return base + methodAddOn(d, item.print_type);
+  return base + methodAddOn(d, item.print_type, fees);
 }
 
 // Print-method surcharge (EMB stitches cost more than DTG ink). Method aliases are
 // normalised exactly as eg-design-tools.js does it.
-function methodAddOn(d, printType) {
+function methodAddOn(d, printType, fees) {
   const tech = String(printType || '').toUpperCase();
-  if (!tech || !d.methodPrices) return 0;
+  if (!tech) return 0;
   const k = /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL'
           : /LSR|LASER/.test(tech) ? 'LSR' : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
-  const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);
-  return mp != null && mp > 0 ? mp : 0;
+  // A product may override the surcharge for its own method mix.
+  if (d.methodPrices) {
+    const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);
+    if (mp != null && mp > 0) return mp;
+  }
+  // Otherwise the platform default (embroidery costs more than ink; plain print is free).
+  const plat = fees ? num(fees[`method_${k.toLowerCase()}`]) : null;
+  return plat != null && plat > 0 ? plat : 0;
 }
 
 // Per-unit shipping, most specific first: the size's own fee, then the product's fee,
@@ -122,7 +137,11 @@ function shipFeeOf(row, size, fees) {
   const tier = tierFor(d, size);
   if (tier && tier.shipping != null) { const s = num(tier.shipping); if (s != null) return s; }
   const own = num(d.shippingFee ?? d.shipping_fee);
-  return own != null ? own : fees.ship_first;
+  if (own != null) return own;
+  // No per-size and no per-product fee → the flat band for this garment class (caps ship
+  // cheaper than hoodies), falling back to the platform's single default if unset.
+  const band = num(fees[shippingBandOf(`${d.type || ''} ${d.name || ''}`)]);
+  return band != null ? band : fees.ship_first;
 }
 
 // The extra-item fee for additional units. A product may set its own
@@ -147,7 +166,7 @@ export async function quoteSpec({ blank, sku, size, printType }) {
   const item = { blank: blank || '', sku: sku || '', size: size || '', print_type: printType || '' };
   const row = matchProduct(idx, item);
   if (!row) return { matched: null, unitCost: null, shipping: null, total: null };
-  const cost = unitCostOf(row, item);
+  const cost = unitCostOf(row, item, fees);
   const ship = shipFeeOf(row, item.size, fees);
   const d = row.data || {};
   return {
@@ -180,7 +199,7 @@ export async function quoteOrder(orderId) {
       // No product = no cost. The variants haven't been chosen yet (a marketplace order
       // arrives with none), so the caller must ask for them rather than invent a price.
       if (!row) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-product' }); continue; }
-      if (cost == null) cost = unitCostOf(row, it);
+      if (cost == null) cost = unitCostOf(row, it, fees);
       if (ship == null) ship = shipFeeOf(row, it.size, fees);
       extra = extraFeeOf(row, fees);
       if (cost == null) { unpriced.push({ sku: it.sku || '(no sku)', name: it.name || '', reason: 'no-cost' }); continue; }
