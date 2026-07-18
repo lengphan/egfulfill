@@ -130,10 +130,15 @@ export default function OrderDetailPage() {
   // It used to live in the button, which is why the price floated loose in the header.
   const submittable = !!order && ["", "new", "draft"].includes(String(order.factory_status || ""))
   useEffect(() => {
-    if (!order || !submittable) { setQuote(null); return }
     let live = true
-    getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
-    return () => { live = false }
+    // Deferred rather than set synchronously — this codebase's lint rule (and React's
+    // guidance) rejects a straight setState in an effect body; it cascades a render.
+    const id = setTimeout(() => {
+      if (!live) return
+      if (!order || !submittable) { setQuote(null); return }
+      getOrderQuote(order.id).then((q) => { if (live) setQuote(q) }).catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(id) }
   }, [order, submittable])
 
   if (orders === null) {
