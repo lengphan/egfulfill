@@ -164,7 +164,19 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
     `insert into orders (id, seller_id, store, source, customer, address, status, factory_status, total, tracking, created_at, factory_order, meta)
      values ($1,$2,$3,'etsy',$4,$5,$6,$7,$8,$9, coalesce($10::timestamptz, now()), $11, $12)
      on conflict (id) do update set total=excluded.total,
-       customer=excluded.customer, address=excluded.address,
+       customer=excluded.customer,
+       -- NEVER overwrite a real address with Etsy's redacted nulls. Etsy withholds the
+       -- buyer address from unapproved apps, so a re-sync used to blank whatever was
+       -- there — wiping a CSV-imported or hand-typed address within minutes, since the
+       -- auto-sync runs every 5 minutes. Adopt the incoming address only when it
+       -- actually carries a street; otherwise keep what we have.
+       -- This also self-heals: the moment Etsy grants the entitlement and starts
+       -- returning real values, the next sync adopts them automatically.
+       address = case
+         when coalesce(nullif(excluded.address->>'line1', ''), null) is not null
+           then excluded.address
+         else orders.address
+       end,
        created_at=coalesce($10::timestamptz, orders.created_at), updated_at=now()`,
     [id, conn.connected_by, conn.shop_name,
      { name: rc.name, email: rc.buyer_email || null },
@@ -474,6 +486,59 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   if (KEYSTRING && SHARED_SECRET && !globalThis.__egEtsyAutoSync) {
     globalThis.__egEtsyAutoSync = setInterval(() => { syncAllEtsy({ full: false }).catch(() => {}); }, 5 * 60 * 1000);
     if (globalThis.__egEtsyAutoSync.unref) globalThis.__egEtsyAutoSync.unref();
+  }
+
+  /**
+   * Address backfill sweep.
+   *
+   * Etsy currently redacts buyer addresses for apps not mapped to an approved category.
+   * When that entitlement is granted there is no notification — the fields simply start
+   * populating. This re-fetches receipts for orders that are STILL missing an address and
+   * re-imports them; the upsert above adopts an address only when it carries a street, so
+   * this is a no-op while redaction continues and self-heals the moment it lifts.
+   *
+   * Note this cannot fetch Etsy's CSV export — that lives behind the seller's Shop Manager
+   * web session, not the API. Automating it would mean storing seller credentials and
+   * scripting their UI, which breaks Etsy's terms and risks the seller's account. The CSV
+   * path stays a deliberate manual upload; this covers the API side.
+   */
+  async function backfillMissingAddresses(limit = 40) {
+    const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+    if (!conn) return { skipped: 'no-connection' };
+    // Same ownership flag the sync computes. Passing undefined would rewrite
+    // factory_order to false and hand a factory-owned order back to the seller.
+    const isFactory = await ownerIsStaff(conn.connected_by);
+    // Only orders we could still act on — a shipped order needs no address now.
+    const rows = (await q(`
+      select id from orders
+       where source='etsy'
+         and coalesce(factory_status,'') not in ('shipped','cancelled','refunded')
+         and coalesce(address->>'line1', '') = ''
+         and coalesce(address->>'street', '') = ''
+       order by created_at desc limit $1`, [limit])).rows;
+    let filled = 0;
+    for (const r of rows) {
+      const receiptId = String(r.id).replace(/^etsy-/, '');
+      if (!/^\d+$/.test(receiptId)) continue;
+      try {
+        const rc = await etsyGet(conn, `/shops/${conn.shop_id}/receipts/${receiptId}?includes=Transactions`);
+        if (!rc || !rc.receipt_id) continue;
+        if (!rc.first_line) continue;                 // still redacted — nothing to adopt
+        await importReceipt(conn, rc, null, {}, isFactory);
+        filled++;
+      } catch (e) { /* one bad receipt must not stop the sweep */ }
+    }
+    return { checked: rows.length, filled };
+  }
+
+  // Staff can run it on demand; it also runs on a timer below.
+  app.post('/api/etsy/backfill-addresses', { preHandler: requireStaff }, async () => backfillMissingAddresses(200));
+
+  // Hourly — far rarer than the 5-minute order sync, because this only matters on the
+  // day Etsy flips the entitlement. Same single-instance guard + unref as the sync.
+  if (KEYSTRING && SHARED_SECRET && !globalThis.__egEtsyAddrBackfill) {
+    globalThis.__egEtsyAddrBackfill = setInterval(() => { backfillMissingAddresses().catch(() => {}); }, 60 * 60 * 1000);
+    if (globalThis.__egEtsyAddrBackfill.unref) globalThis.__egEtsyAddrBackfill.unref();
   }
 
   // Frontend reads this to build the Etsy authorize URL (keystring is public).
