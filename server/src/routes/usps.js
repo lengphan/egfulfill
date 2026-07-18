@@ -13,7 +13,7 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
-import { shippingEnabled, aggregatorBuyCheapest } from './shipping.js';
+import { shippingEnabled, aggregatorBuyCheapest, aggregatorVerifyAddress } from './shipping.js';
 
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
 function _svcPref(mc) {
@@ -192,9 +192,31 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
   // requireAuth (not requireStaff): sellers validate recipient addresses in the
   // manual-order modal. Read-only USPS lookup, no payment scope.
   app.get('/api/usps/validate-address', { preHandler: requireAuth }, async (req, reply) => {
+    const qy = req.query || {};
+    // Falls back to EasyPost/Shippo when USPS can't answer. USPS gates its Addresses API
+    // behind a separate approval from Labels, so while that application is pending this
+    // is what keeps validation working — and the moment USPS approves, the primary path
+    // below succeeds and takes over with no code or client change. The response shape is
+    // identical either way, so callers never learn which provider replied.
+    const viaAggregator = async (uspsError) => {
+      if (!shippingEnabled()) return null;
+      try {
+        const r = await aggregatorVerifyAddress({
+          street: qy.streetAddress, street2: qy.secondaryAddress,
+          city: qy.city, state: qy.state, zip: qy.ZIPCode,
+        });
+        if (!r) return null;
+        return { ok: true, address: r.address, provider: r.provider, raw: r.raw };
+      } catch (e) {
+        // A provider saying "this address isn't deliverable" is a REAL answer about the
+        // address — surface it rather than the USPS entitlement noise behind it.
+        reply.code(400);
+        return { error: e.message || uspsError };
+      }
+    };
+
     try {
       const oauth = await addressToken();
-      const qy = req.query || {};
       const p = new URLSearchParams();
       ['streetAddress', 'secondaryAddress', 'city', 'state', 'ZIPCode'].forEach((k) => { if (qy[k]) p.set(k, qy[k]); });
       const res = await fetch(`${BASE}/addresses/v3/address?` + p.toString(), { headers: { Authorization: 'Bearer ' + oauth } });
@@ -202,13 +224,20 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       if (!res.ok) {
         let msg = (data.error && (data.error.message || data.error)) || data.message || ('HTTP ' + res.status);
         if (/not authorized|access control|addresses api/i.test(String(msg))) {
+          const alt = await viaAggregator(msg);
+          if (alt) return alt;
           msg = 'USPS hasn\'t granted this app access to the Addresses API. In the USPS Developer Portal, add the "Addresses" API to your app (separate from Labels), then retry — the server already requests the addresses OAuth scope.';
         }
         reply.code(400); return { error: msg };
       }
       const a = data.address || data;
-      return { ok: true, address: { street: a.streetAddress || '', street2: a.secondaryAddress || '', city: a.city || '', state: a.state || '', zip: a.ZIPCode || '', zip4: a.ZIPPlus4 || '' }, raw: data };
-    } catch (e) { reply.code(400); return { error: e.message }; }
+      return { ok: true, address: { street: a.streetAddress || '', street2: a.secondaryAddress || '', city: a.city || '', state: a.state || '', zip: a.ZIPCode || '', zip4: a.ZIPPlus4 || '' }, provider: 'usps', raw: data };
+    } catch (e) {
+      // No USPS credentials / OAuth failure — try the aggregator before giving up.
+      const alt = await viaAggregator(e.message);
+      if (alt) return alt;
+      reply.code(400); return { error: e.message };
+    }
   });
 
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},

@@ -115,6 +115,56 @@ async function shBuy(rateObjectId) {
 // Is any aggregator configured?
 export function shippingEnabled() { return !!(EP_KEY || SH_TOKEN); }
 
+/**
+ * Verify + standardize a US address through whichever aggregator is configured.
+ * Returns the SAME shape as the USPS Addresses API path in usps.js so the caller (and
+ * the client) can't tell which provider answered — USPS gates its Addresses API behind
+ * a separate approval, so this is what keeps validation working while that's pending.
+ * Returns null when no provider is configured; throws on a provider error.
+ */
+export async function aggregatorVerifyAddress(a) {
+  const s = addr(a, false);
+  if (EP_KEY) {
+    // verify[]=delivery asks EasyPost to confirm it's actually deliverable, not just
+    // parseable — a well-formed address that doesn't exist is the case worth catching.
+    const r = await fetch(EP_BASE + '/addresses', {
+      method: 'POST', headers: { Authorization: epAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: { street1: s.street1, street2: s.street2, city: s.city, state: s.state, zip: s.zip, country: s.country, verify: ['delivery'] } })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((d.error && (d.error.message || JSON.stringify(d.error))) || ('EasyPost HTTP ' + r.status));
+    const v = (d.verifications && d.verifications.delivery) || {};
+    if (v.success === false) {
+      const msg = (v.errors || []).map((e) => e.message || e.code).filter(Boolean).join('; ');
+      throw new Error(msg || 'That address could not be verified as deliverable.');
+    }
+    return {
+      provider: 'easypost',
+      address: { street: d.street1 || '', street2: d.street2 || '', city: d.city || '', state: d.state || '', zip: (d.zip || '').split('-')[0], zip4: (d.zip || '').includes('-') ? d.zip.split('-')[1] : '' },
+      raw: d,
+    };
+  }
+  if (SH_TOKEN) {
+    const r = await fetch(SH_BASE + '/addresses/', {
+      method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: s.name || 'Recipient', street1: s.street1, street2: s.street2, city: s.city, state: s.state, zip: s.zip, country: s.country, validate: true })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || ('Shippo HTTP ' + r.status));
+    const vr = d.validation_results || {};
+    if (vr.is_valid === false) {
+      const msg = (vr.messages || []).map((m) => m.text).filter(Boolean).join('; ');
+      throw new Error(msg || 'That address could not be verified as deliverable.');
+    }
+    return {
+      provider: 'shippo',
+      address: { street: d.street1 || '', street2: d.street2 || '', city: d.city || '', state: d.state || '', zip: (d.zip || '').split('-')[0], zip4: (d.zip || '').includes('-') ? d.zip.split('-')[1] : '' },
+      raw: d,
+    };
+  }
+  return null;
+}
+
 // Rate-shop and buy the cheapest label — reused by /api/usps/label so EVERY label
 // path produces a real label. opts: { carrierPref, servicePref } (substring filters).
 export async function aggregatorBuyCheapest(to, from, pc, opts) {
