@@ -1138,3 +1138,10 @@ export function saveTemplate(body: { id: string; name?: string; data?: unknown; 
 export function deleteTemplate(id: string) {
   return api<{ ok?: boolean }>(`/api/templates/${encodeURIComponent(id)}`, { method: "DELETE" })
 }
+
+/** Backfill buyer addresses from the seller's Etsy CSV export — Etsy redacts them from
+ *  the API but their own Shop Manager export still contains them. Matched by receipt id. */
+export function importEtsyAddresses(rows: { order_id: string; name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string }[]) {
+  return api<{ ok?: boolean; updated: number; skipped: number; notFound: number; alreadyHad: number; missing?: string[]; error?: string }>(
+    `/api/etsy/import-addresses`, { method: "POST", body: JSON.stringify({ rows }) })
+}

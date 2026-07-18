@@ -2,6 +2,8 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { isStaff } from '../auth.js';
+import { audit } from '../audit.js';
 import { usdRates } from '../fx.js';
 import { requireSpydeck } from '../entitlements.js';
 
@@ -892,6 +894,56 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const res = await syncAllEtsy({});   // incremental — picks up the event's order
     const imported = Array.isArray(res.synced) ? res.synced.reduce((n, s) => n + (s.orders || 0), 0) : 0;
     return { ok: true, imported };
+  });
+
+  /**
+   * Backfill buyer addresses from the seller's own Etsy CSV export.
+   *
+   * Etsy redacts the address from the API for apps not mapped to an approved category,
+   * but the seller's own "Download Data" export in Shop Manager still contains it. This
+   * takes those rows and fills the gap for orders we've already synced, so parcels can
+   * actually be labelled while the API entitlement is pending.
+   *
+   * Matched on RECEIPT ID (the Etsy "Order ID" column) against our `etsy-<id>` ids —
+   * never on buyer name, which is neither unique nor stable.
+   *
+   * body: { rows: [{ order_id, name, street, street2, city, state, zip, country }] }
+   */
+  app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {
+    const rows = Array.isArray((req.body || {}).rows) ? req.body.rows : [];
+    if (!rows.length) { reply.code(400); return { error: 'No rows to import.' }; }
+    let updated = 0, skipped = 0, notFound = 0, alreadyHad = 0;
+    const missing = [];
+    for (const r of rows) {
+      const rid = String(r.order_id || '').replace(/[^0-9]/g, '');
+      if (!rid) { skipped++; continue; }
+      const id = 'etsy-' + rid;
+      // Staff may fill any order; a seller only their own.
+      const own = isStaff(req.user) ? '' : ' and seller_id=$2';
+      const params = isStaff(req.user) ? [id] : [id, req.user.sub];
+      const cur = (await q(`select id, address from orders where id=$1${own}`, params)).rows[0];
+      if (!cur) { notFound++; missing.push(rid); continue; }
+      const existing = cur.address || {};
+      // Don't overwrite an address that's already there — a re-import shouldn't clobber
+      // a correction someone made by hand.
+      if (existing.street || existing.first_line || existing.line1) { alreadyHad++; continue; }
+      const street = String(r.street || '').trim();
+      if (!street) { skipped++; continue; }
+      const addr = {
+        ...existing,
+        name: String(r.name || existing.name || '').trim() || null,
+        street, street2: String(r.street2 || '').trim() || null,
+        city: String(r.city || '').trim() || null,
+        state: String(r.state || '').trim() || null,
+        zip: String(r.zip || '').trim() || null,
+        country: String(r.country || '').trim() || null,
+        source: 'etsy-csv',
+      };
+      await q('update orders set address=$1 where id=$2', [JSON.stringify(addr), id]);
+      updated++;
+    }
+    audit(req, 'etsy.import_addresses', { entityType: 'order', after: { updated, skipped, notFound, alreadyHad } });
+    return { ok: true, updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20) };
   });
 
   // ── Publish a design to Etsy as a DRAFT listing, then upload the design image.
