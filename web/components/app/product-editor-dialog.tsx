@@ -52,13 +52,17 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
 // Create/edit one catalog product. Colors/sizes are chips (with supplier-suggested picks),
 // pricing shows the live margin, and supplier-derived blanks pre-fill description + cost.
 export function ProductEditorDialog({
-  open, onOpenChange, product, onSave, newIdSeed,
+  open, onOpenChange, product, onSave, newIdSeed, title, ctaLabel,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
   product: CatalogProduct | null
   onSave: (p: CatalogProduct) => void
   newIdSeed: number
+  /** Override the heading/CTA. A supplier import passes a product that does NOT exist
+   *  yet, so the defaults ("Edit product" / "Save changes") would misdescribe it. */
+  title?: string
+  ctaLabel?: string
 }) {
   const [name, setName] = useState("")
   const [type, setType] = useState("Apparel")
@@ -149,7 +153,7 @@ export function ProductEditorDialog({
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
-            {product ? "Edit product" : "New product"}
+            {title ?? (product ? "Edit product" : "New product")}
             {supplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"><Tag size={11} weight="fill" /> {supplier}</span>}
           </DialogTitle>
         </DialogHeader>
@@ -312,7 +316,7 @@ export function ProductEditorDialog({
 
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save}>{product ? "Save changes" : "Add product"}</Button>
+          <Button onClick={save}>{ctaLabel ?? (product ? "Save changes" : "Add product")}</Button>
         </div>
       </DialogContent>
     </Dialog>

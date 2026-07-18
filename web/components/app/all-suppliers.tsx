@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
+import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { Loading } from "@/components/app/loading"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,6 +70,11 @@ export function AllSuppliers() {
   const [loading, setLoading] = useState(false)
   const [added, setAdded] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
+  // Supplier products used to land in the catalog the instant you clicked Add — no look
+  // at what was imported, no chance to fix a title/price/sizes first. The resolved
+  // product is now staged here and shown in the normal product editor for review.
+  const [preview, setPreview] = useState<CatalogProduct | null>(null)
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -127,17 +133,30 @@ export function AllSuppliers() {
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
 
+  // Step 1 — resolve the supplier style into our catalog shape and STAGE it. Nothing is
+  // written yet; the editor below is the confirm step.
   const addToCatalog = async (it: Item) => {
     setAddingId(keyOf(it)); setMsg(null)
     try {
-      const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
       const product = it.supplier === "ss"
         ? await ssCatalogProduct(it.id, { title: it.ss.title, price: it.ss.price, image: it.ss.image, colors: colorNames(it.ss.colors) })
         : await ottoCatalogProduct(it.id, { name: it.otto.name, price: it.otto.price, image: it.otto.image, colors: it.otto.colors })
+      setPreview(product); setPreviewKey(keyOf(it))
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't load that product.") } finally { setAddingId(null) }
+  }
+
+  // Step 2 — the reviewed (possibly edited) product is what gets saved. Re-reads the
+  // catalog at save time so a product added in another tab isn't clobbered.
+  const confirmAdd = async (product: CatalogProduct) => {
+    setMsg(null)
+    try {
+      const existing = await getCatalogProducts().catch(() => [] as CatalogProduct[])
       const next = existing.some((p) => p.id === product.id) ? existing.map((p) => (p.id === product.id ? product : p)) : [...existing, product]
       await saveCatalogProducts(next)
-      setAdded((prev) => new Set(prev).add(keyOf(it)))
-    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't add to catalog.") } finally { setAddingId(null) }
+      if (previewKey) setAdded((prev) => new Set(prev).add(previewKey))
+      setPreview(null); setPreviewKey(null)
+      setMsg(`Added "${product.name ?? "product"}" to your catalog.`)
+    } catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't add to catalog.") }
   }
 
   const favorite = (it: Item, on: boolean) => {
@@ -269,6 +288,20 @@ export function AllSuppliers() {
           )}
         </>
       )}
+
+      {/* Review step. Reuses the catalog's own product editor, so an imported product is
+          checked and corrected through exactly the same form used to edit one later.
+          newIdSeed is 0 because the staged product already carries its supplier-derived
+          id — the seed only mints one for a brand-new product. */}
+      <ProductEditorDialog
+        open={!!preview}
+        onOpenChange={(v) => { if (!v) { setPreview(null); setPreviewKey(null) } }}
+        product={preview}
+        onSave={confirmAdd}
+        newIdSeed={0}
+        title="Review before adding"
+        ctaLabel="Add to catalog"
+      />
     </SectionCard>
   )
 }
