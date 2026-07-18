@@ -255,7 +255,7 @@ export function OrdersHub() {
       <SectionCard title="Production queue">
         <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
           {FILTERS.map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className={"rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+            <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
               {f.label}
             </button>
           ))}

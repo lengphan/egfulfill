@@ -73,7 +73,7 @@ export function CampaignsView() {
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg border border-border p-0.5">
             {DAYS.map((d) => (
-              <button key={d} onClick={() => setDays(d)} className={"rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + (days === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{d}d</button>
+              <button key={d} onClick={() => setDays(d)} className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + (days === d ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{d}d</button>
             ))}
           </div>
           {connected && <Button size="sm" onClick={() => setNewOpen(true)}><Plus size={14} weight="bold" /> New campaign</Button>}

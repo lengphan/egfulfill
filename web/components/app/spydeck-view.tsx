@@ -455,7 +455,7 @@ export function SpyDeckView() {
                 key={v}
                 onClick={() => setView(v)}
                 className={
-                  "rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " +
+                  "eg-tap rounded-md px-3 py-1 text-sm font-medium capitalize transition-colors " +
                   (view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >

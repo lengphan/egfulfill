@@ -170,3 +170,34 @@
 @media (prefers-reduced-motion: reduce) {
   .eg-drift-1, .eg-drift-2, .eg-drift-3 { animation: none; }
 }
+/* ── Touch targets ────────────────────────────────────────────────────────────
+   On a touch screen the boards' small controls (filter pills, tab toggles, sm
+   buttons) are 24–28px tall against ~44px guidance. Rather than resize them —
+   which would wreck the density these dense tables are designed around, and
+   change desktop too — expand the HIT AREA with a centred transparent
+   pseudo-element. Layout and visual size are untouched; only what a finger can
+   land on grows.
+
+   Capped at 40px, not 44: at 44 the areas of adjacent controls in a tight action
+   row overlap enough that the later one in DOM order steals taps from its
+   neighbour, which is a worse bug than a slightly small target. */
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="dropdown-menu-trigger"],
+  .eg-tap {
+    position: relative;
+  }
+  [data-slot="button"]::after,
+  [data-slot="dropdown-menu-trigger"]::after,
+  .eg-tap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: max(100%, 40px);
+    height: max(100%, 40px);
+    /* Purely a target — never paints, never intercepts hover styling. */
+    pointer-events: auto;
+  }
+}

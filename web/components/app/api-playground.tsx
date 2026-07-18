@@ -126,7 +126,7 @@ export function ApiPlayground() {
         actions={
           <div className="flex rounded-lg border border-border p-0.5">
             {(["test", "live"] as const).map((m) => (
-              <button key={m} onClick={() => setEnv(m)} className={"rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m}</button>
+              <button key={m} onClick={() => setEnv(m)} className={"eg-tap rounded-md px-3 py-1 text-xs font-semibold uppercase transition-colors " + (env === m ? (m === "live" ? "bg-red-500 text-white" : "bg-primary text-primary-foreground") : "text-muted-foreground hover:text-foreground")}>{m}</button>
             ))}
           </div>
         }

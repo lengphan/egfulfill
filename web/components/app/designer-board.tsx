@@ -106,7 +106,7 @@ export function DesignerBoard() {
         {/* rounded-full to match the pill buttons inside — see suppliers-view. */}
         <div className="ml-auto flex rounded-full border border-border p-0.5">
           {([{ id: "board", label: "Board" }, { id: "list", label: "List" }] as const).map((v) => (
-            <button key={v.id} onClick={() => setView(v.id)} className={"rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
+            <button key={v.id} onClick={() => setView(v.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{v.label}</button>
           ))}
         </div>
       </div>
