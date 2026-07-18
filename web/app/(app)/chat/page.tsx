@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getOrders, getSupportThreads, aiDraft, type ChatEntry, type OrderRow, type SupportThread } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
+import { Markdown } from "@/components/app/markdown"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -327,8 +328,11 @@ export default function ChatPage() {
                 const mine = (m.role ?? "seller") === "seller"
                 return (
                   <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
-                    <div className={"max-w-[75%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                      {m.text}
+                    <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted")}>
+                      {/* The assistant answers in markdown, so rendering it as plain text
+                          showed literal ** around every bold phrase. Own messages stay
+                          verbatim — a seller typing *asterisks* meant them. */}
+                      {mine ? m.text : <Markdown>{m.text ?? ""}</Markdown>}
                     </div>
                     <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
                       {!mine ? `${m.by || (isSupport ? "Support" : "Factory")} · ` : ""}
@@ -348,8 +352,8 @@ export default function ChatPage() {
               )}
               {streaming && (
                 <div className="flex items-start">
-                  <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-muted px-3.5 py-2.5 text-sm">
-                    {streaming}
+                  <div className="max-w-[80%] rounded-2xl bg-muted px-3.5 py-2.5 text-sm">
+                    <Markdown>{streaming}</Markdown>
                     <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-foreground/60 align-middle" />
                   </div>
                 </div>
