@@ -66,6 +66,38 @@ export function stageDenial(role, current, target) {
   return 'Your role cannot change production status.';        // designer, and anything new
 }
 
+/**
+ * Can this order be reported SHIPPED?
+ *
+ * Ported from warehouse.html's canFinishOrder + the "all items packed" print-queue rule.
+ * The old floor worked item-by-item but gated the ORDER on two whole-order facts, and
+ * that split is deliberate: production is per item (one line can be printed while another
+ * waits), but a parcel is indivisible — you cannot ship half an order.
+ *
+ *   1. every decorated item has artwork  (order_designs row for its sku)
+ *   2. a label exists                    (tracking on the order)
+ *
+ * An item is "decorated" if it carries a print method. A plain blank with no method needs
+ * no artwork, so requiring one would deadlock those orders.
+ */
+async function shipBlockers(orderId) {
+  const [items, order] = await Promise.all([
+    q('select sku, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows),
+    q('select tracking from orders where id=$1', [orderId]).then((r) => r.rows[0] || {}),
+  ]);
+  const designs = await q('select distinct sku from order_designs where order_id=$1', [orderId])
+    .then((r) => new Set(r.rows.map((x) => String(x.sku))))
+    .catch(() => new Set());
+  const missing = items
+    .filter((it) => String(it.print_type || '').trim())          // decorated lines only
+    .filter((it) => !designs.has(String(it.sku || '')))
+    .map((it) => it.name || it.sku || 'an item');
+  const blockers = [];
+  if (missing.length) blockers.push(`${missing.length} item${missing.length === 1 ? '' : 's'} still ${missing.length === 1 ? 'has' : 'have'} no artwork: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`);
+  if (!order.tracking) blockers.push('no shipping label has been bought for this order yet');
+  return blockers;
+}
+
 // ── The order money loop ───────────────────────────────────────────────────────
 // Submitting to production is the charge point: the seller pays the factory to make
 // the thing. Cancelling before anyone picks it up reverses that charge in full.
@@ -355,6 +387,17 @@ export function ordersRoutes(app, requireAuth) {
         _refunded = back.refunded || 0;
       }
     }
+    // Same ship gate as the per-item route. Staff-initiated too: a warehouse marking the
+    // whole order shipped is making the identical claim, so it answers to the identical
+    // facts. Skipped when tracking arrives in the same patch — that IS the label being
+    // recorded (a label purchase writes tracking and 'shipped' together).
+    if (isStaff(req.user) && body.tracking === undefined) {
+      const want = normalizeStage(String(body.factoryStatus ?? body.status ?? ''));
+      if (want === 'shipped') {
+        const blockers = await shipBlockers(req.params.id);
+        if (blockers.length) { reply.code(409); return { error: `Can't mark shipped — ${blockers.join('; and ')}.`, blockers }; }
+      }
+    }
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
       if (!isStaff(req.user)) { where += ` and seller_id=$${n + 1}`; vals.push(sel.id); }
@@ -411,6 +454,12 @@ export function ordersRoutes(app, requireAuth) {
     // depends on where the item already is, not just where they're sending it.
     const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status);
     if (denial) { reply.code(403); return { error: denial }; }
+    // Shipping is an ORDER-level claim even when set per item: a parcel can't go out
+    // half-made. Everything before shipped stays per-item and unrestricted.
+    if (normalizeStage(status) === 'shipped') {
+      const blockers = await shipBlockers(req.params.id);
+      if (blockers.length) { reply.code(409); return { error: `Can't mark shipped — ${blockers.join('; and ')}.`, blockers }; }
+    }
     await q(`update order_items set factory_status=$1 where order_id=$2 and ${key}=$3`,
       [status || '', req.params.id, val]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,

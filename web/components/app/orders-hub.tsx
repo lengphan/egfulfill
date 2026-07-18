@@ -92,6 +92,7 @@ export function OrdersHub() {
   const [shipOpen, setShipOpen] = useState<string | null>(null)
   // Collapsed order ids. Default expanded — a board that opens fully collapsed hides the
   // work. Collapsing is for getting long boards under control, same as the seller list.
+  const [actionErr, setActionErr] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -133,7 +134,15 @@ export function OrdersHub() {
     const key = `${order.id}:${item.sku}`
     setBusy(key)
     patchItem(order.id, item.sku, to)
-    try { await postItemStatus(order.id, item.sku, to, item.line_id) } catch { load() } finally { setBusy(null) }
+    try {
+      await postItemStatus(order.id, item.sku, to, item.line_id)
+      setActionErr(null)
+    } catch (e) {
+      // A 409 here is the ship gate explaining itself (missing artwork / no label).
+      // Swallowing it made the status silently snap back with no reason shown.
+      setActionErr(e instanceof Error ? e.message : "Couldn't change that item's status.")
+      load()
+    } finally { setBusy(null) }
   }
   const advanceOrder = async (order: OrderRow) => {
     for (const it of order.items ?? []) {
@@ -183,8 +192,12 @@ export function OrdersHub() {
     setBusy(`ord:${o.id}`)
     try {
       for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
-      await updateOrder(o.id, { factoryStatus: to }).catch(() => {})
-    } catch { load() } finally { setBusy(null) }
+      await updateOrder(o.id, { factoryStatus: to })
+      setActionErr(null)
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "Couldn't change that order's status.")
+      load()
+    } finally { setBusy(null) }
   }
   // Send a line item to the Designer board as a new card (whole-board upsert).
   const sendToDesigner = async (o: OrderRow, it: OrderItem) => {
@@ -251,6 +264,16 @@ export function OrdersHub() {
         <StatCard label="Working" value={String(stats.ready)} sub="being made" tone={stats.ready ? "pos" : undefined} />
         <StatCard label="Shipped" value={String(stats.shipped)} sub="complete" tone="pos" />
       </StatGrid>
+
+      {/* Why an action was refused — the ship gate's reasons land here rather than the
+          status silently snapping back. */}
+      {actionErr && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
+          <span className="flex-1">{actionErr}</span>
+          <button onClick={() => setActionErr(null)} className="shrink-0 font-medium underline underline-offset-2">Dismiss</button>
+        </div>
+      )}
 
       <SectionCard title="Production queue">
         <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
