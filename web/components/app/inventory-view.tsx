@@ -24,6 +24,7 @@ export function InventoryView() {
   const [search, setSearch] = useState("")
   const [cat, setCat] = useState("")
   const [saving, setSaving] = useState(false)
+  const [tab, setTab] = useState<"own" | "consigned">("own")
   const [saved, setSaved] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [printOpen, setPrintOpen] = useState(false)
@@ -100,6 +101,24 @@ export function InventoryView() {
         </div>
       </div>
 
+      {/* Two distinct pools, so they get distinct tabs rather than one long scroll:
+          stock WE own, and stock sellers have consigned to us. */}
+      <div className="flex w-fit rounded-full border border-border p-0.5">
+        {([{ id: "own", label: "Our stock" }, { id: "consigned", label: "Seller stock" }] as const).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={"eg-tap rounded-full px-3 py-1.5 text-sm font-medium transition-colors " + (tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "consigned" ? (
+        <ConsignmentPanel />
+      ) : (
+      <>
       <StatGrid>
         <StatCard label="SKUs" value={String(stats.total)} sub="variants tracked" />
         <StatCard label="Low stock" value={String(stats.low)} sub="at/below reorder" tone={stats.low ? "neg" : undefined} />
@@ -217,10 +236,8 @@ export function InventoryView() {
         )}
       </SectionCard>
 
-      {/* Inventory services — stock sellers send US. Kept below our own stock because it
-          is a separate pool: consigned units belong to a seller and can only fulfil that
-          seller's orders. */}
-      <ConsignmentPanel />
+      </>
+      )}
 
       <AddItemDialog open={addOpen} onOpenChange={setAddOpen} onAdd={add} existing={(items ?? []).map((i) => i.sku)} />
       <ScanHistoryDialog sku={histSku} onClose={() => setHistSku(null)} />
