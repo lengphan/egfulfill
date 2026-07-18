@@ -23,7 +23,8 @@ import { getOrders, type OrderRow, type OrderItem } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { itemImage } from "@/lib/order-image"
-import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, variantOf, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
+import { VariantStrip } from "@/components/app/variant-field"
+import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 
@@ -309,7 +310,7 @@ export function OrdersList() {
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
-                                      <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}</div>
+                                      <VariantStrip color={it.color} size={it.size} method={it.print_type} className="mt-1" />
                                     </div>
                                     <span className="shrink-0 text-xs text-muted-foreground">×{Number(it.qty) || 1}</span>
                                     <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums">{lineTotal(it) ? usd(lineTotal(it)) : "—"}</span>

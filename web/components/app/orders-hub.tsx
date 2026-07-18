@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getCatalogProducts, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
+import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
@@ -466,7 +467,10 @@ export function OrdersHub() {
                             {canDesign && stage === "" ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
-                              <div className="truncate text-xs text-muted-foreground">{variantOf(it) || "—"}{it.qty ? ` · ×${it.qty}` : ""}</div>
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <VariantStrip color={it.color} size={it.size} method={it.print_type} />
+                                {it.qty ? <span className="text-[11px] text-muted-foreground">×{it.qty}</span> : null}
+                              </div>
                             )}
                           </div>
                           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">

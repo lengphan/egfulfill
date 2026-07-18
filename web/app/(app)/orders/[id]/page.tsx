@@ -35,6 +35,7 @@ import {
   type CatalogProduct,
 } from "@/lib/api"
 import { VariantPicker } from "@/components/app/variant-picker"
+import { VariantStrip } from "@/components/app/variant-field"
 import { designSrc, itemImage } from "@/lib/order-image"
 
 const fmtMsgTime = (ts?: number) => {
@@ -249,12 +250,7 @@ export default function OrderDetailPage() {
                           // arrive unset). Saving updates the quote in Summary.
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reload} />
                         ) : (
-                          <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                            {it.blank && <span className="rounded bg-muted px-1.5 py-0.5">{it.blank}</span>}
-                            {it.color && <span className="rounded bg-muted px-1.5 py-0.5">{it.color}</span>}
-                            {it.size && <span className="rounded bg-muted px-1.5 py-0.5">{it.size}</span>}
-                            {it.print_type && <span className="rounded bg-muted px-1.5 py-0.5">{it.print_type}</span>}
-                          </div>
+                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} className="mt-2" />
                         )}
 
                         {it.sku && (
