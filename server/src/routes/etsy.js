@@ -979,9 +979,62 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         } catch (e) { /* keep going; the draft still exists without the image */ }
       }
 
+      // ── Variants ─────────────────────────────────────────────────────────────
+      // Publish OUR sku on every offering. This is what makes a variant round-trip: the
+      // buyer's order line comes back carrying it, so we resolve the exact variant by sku
+      // instead of matching the marketplace's display name — which the seller is free to
+      // rename at any time, and which breaks silently when they do.
+      //
+      // Custom properties (513/514) rather than the taxonomy's Colour/Size ids: those are
+      // per-category and 400 the whole request when the taxonomy doesn't carry them,
+      // whereas custom properties work for any physical listing.
+      const vColors = (Array.isArray(b.colors) ? b.colors : []).map(String).filter(Boolean);
+      const vSizes = (Array.isArray(b.sizes) ? b.sizes : []).map(String).filter(Boolean);
+      const skuBase = String(b.sku_base || b.sku || '').toUpperCase().replace(/[^A-Z0-9-]/g, '') || 'EG';
+      const variantSkus = [];
+      let variants_applied = 0;
+      let variants_error = null;
+      if (vColors.length || vSizes.length) {
+        const slug = (v) => String(v).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 6);
+        const products = [];
+        for (const c of (vColors.length ? vColors : [null])) {
+          for (const z of (vSizes.length ? vSizes : [null])) {
+            const sku = [skuBase, c && slug(c), z && slug(z)].filter(Boolean).join('-');
+            variantSkus.push(sku);
+            const property_values = [];
+            if (c) property_values.push({ property_id: 513, property_name: 'Color', values: [String(c).slice(0, 45)] });
+            if (z) property_values.push({ property_id: 514, property_name: 'Size', values: [String(z).slice(0, 45)] });
+            products.push({
+              sku,
+              property_values,
+              offerings: [{ price, quantity: Number(b.quantity) || 999, is_enabled: true }],
+            });
+          }
+        }
+        try {
+          await etsyFetch(conn, `/listings/${listingId}/inventory`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              products,
+              // Price/quantity stay uniform across variants; only the sku varies, which is
+              // all we need for resolution. Per-variant pricing can be layered on later.
+              price_on_property: [], quantity_on_property: [],
+              // The sku varies on whichever properties we actually sent.
+              sku_on_property: [vColors.length ? 513 : null, vSizes.length ? 514 : null].filter((n) => n != null),
+            }),
+          });
+          variants_applied = products.length;
+        } catch (e) {
+          // The draft still exists as a flat listing — better a listing without variants
+          // than a failed publish, but say so rather than reporting success.
+          variants_error = e && e.message ? String(e.message).slice(0, 300) : 'inventory update failed';
+        }
+      }
+
       return {
         ok: true, listing_id: listingId, state: listing.state || 'draft', images_uploaded: uploaded,
         tags_applied: uniqueTags.length,
+        variants_applied, variant_skus: variantSkus, variants_error,
         url: listing.url || `https://www.etsy.com/listing/${listingId}`
       };
     } catch (e) { reply.code(400); return { error: e.message }; }

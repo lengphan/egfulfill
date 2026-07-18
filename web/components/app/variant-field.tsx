@@ -118,7 +118,7 @@ export function VariantField({
  * dot-joined string in one place and labelled controls in another.
  */
 export function VariantStrip({
-  color, size, method, blank, className, locked,
+  color, size, method, blank, className, locked, marketplace,
 }: {
   color?: string | null
   size?: string | null
@@ -128,6 +128,10 @@ export function VariantStrip({
   /** Submitted order — variants are frozen (the server rejects changes once the cost is
    *  locked). Shown greyed with a lock so it reads as "settled", not "broken". */
   locked?: boolean
+  /** The marketplace's own variant text, verbatim. What the BUYER chose and what support
+   *  will quote back — a different thing from the production spec beside it, which is
+   *  what the floor makes. Shown when it exists and differs. */
+  marketplace?: string | null
 }) {
   const chips = [
     blank ? { key: "blank", label: blank } : null,
@@ -137,7 +141,18 @@ export function VariantStrip({
   ].filter(Boolean) as { key: string; label: string; swatch?: boolean }[]
 
   // Nothing chosen yet is worth saying plainly — a blank row reads as a rendering bug.
-  if (!chips.length) return <span className={cn("text-xs text-muted-foreground", className)}>No variant set</span>
+  const buyerText = (marketplace || "").trim()
+  // Only worth showing when it adds something the chips don't already say.
+  const showBuyer = !!buyerText && !chips.some((c) => c.label.toLowerCase() === buyerText.toLowerCase())
+
+  if (!chips.length) {
+    return (
+      <div className={cn("flex flex-wrap items-center gap-1", className)}>
+        {showBuyer && <BuyerChip text={buyerText} />}
+        <span className="text-xs text-muted-foreground">{showBuyer ? "Not set up for production yet" : "No variant set"}</span>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)} title={locked ? "Locked — variants can't change after an order is submitted" : undefined}>
@@ -160,7 +175,22 @@ export function VariantStrip({
           <span className="truncate">{c.label}</span>
         </span>
       ))}
+      {showBuyer && <BuyerChip text={buyerText} />}
       {locked && <LockSimple size={11} weight="fill" className="shrink-0 text-muted-foreground/70" />}
     </div>
+  )
+}
+
+/** What the buyer picked on the marketplace, verbatim. Visually distinct from the
+ *  production chips so nobody mistakes a listing label for a blank spec. */
+function BuyerChip({ text }: { text: string }) {
+  return (
+    <span
+      title={`Buyer chose "${text}" on the marketplace`}
+      className="inline-flex max-w-[14rem] items-center gap-1 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
+    >
+      <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">Buyer</span>
+      <span className="truncate">{text}</span>
+    </span>
   )
 }

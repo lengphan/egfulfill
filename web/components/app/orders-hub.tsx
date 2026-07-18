@@ -489,7 +489,7 @@ export function OrdersHub() {
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                <VariantStrip color={it.color} size={it.size} method={it.print_type} />
+                                <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
                                 {it.qty ? <span className="text-[11px] text-muted-foreground">×{it.qty}</span> : null}
                               </div>
                             )}

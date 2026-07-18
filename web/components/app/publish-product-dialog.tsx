@@ -9,7 +9,7 @@ import { ProductCombobox } from "@/components/app/product-combobox"
 import { readImageFile } from "@/components/app/design-canvas"
 import { prettyColorName } from "@/lib/color-name"
 import { sizesOf, colorsOf, methodsOf } from "@/lib/variant-resolve"
-import { getSpecQuote, publishEtsy, getSpydeckTrending, getCatalogProducts, type CatalogProduct, type SpecQuote } from "@/lib/api"
+import { getSpecQuote, publishEtsy, getSpydeckTrending, getCatalogProducts, saveCatalogProducts, type CatalogProduct, type SpecQuote } from "@/lib/api"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -146,9 +146,38 @@ export function PublishProductDialog({
         title: title.trim(), description: desc.trim() || title.trim(),
         price: retailN, quantity: Number(qty) || 999,
         image: images[0], images, tags,
+        // Real Etsy variants, each stamped with OUR sku so the buyer's order line
+        // resolves back to this exact blank+colour+size no matter how the seller renames
+        // the variant on the marketplace.
+        colors: blank ? colorOpts : [],
+        sizes: blank ? sizeOpts : [],
+        sku_base: blank?.sku ?? undefined,
       })
       if (r.error) throw new Error(r.error)
-      setResult({ ok: true, text: "Published as a draft listing", url: r.url })
+
+      // Register the generated skus on the catalog product. Without this the order comes
+      // back carrying a sku we don't recognise and prices as "no product".
+      if (blank && r.variant_skus?.length) {
+        try {
+          const existing = await getCatalogProducts()
+          const next = (existing ?? []).map((p) =>
+            String(p.id) === String(blank.id)
+              ? { ...p, variantSkus: Array.from(new Set([...(p.variantSkus ?? []).map((v) => (typeof v === "string" ? v : v.sku ?? "")), ...r.variant_skus!])).filter(Boolean) }
+              : p
+          )
+          await saveCatalogProducts(next)
+        } catch { /* the listing is live; a failed sku write is recoverable by republishing */ }
+      }
+
+      setResult({
+        ok: true,
+        text: r.variants_error
+          ? `Published as a draft — but variants failed (${r.variants_error}). It's a flat listing.`
+          : r.variants_applied
+            ? `Published as a draft with ${r.variants_applied} variants`
+            : "Published as a draft listing",
+        url: r.url,
+      })
       onPublished?.(r.url)
     } catch (e) {
       setResult({ ok: false, text: e instanceof Error ? e.message : "Publish failed." })

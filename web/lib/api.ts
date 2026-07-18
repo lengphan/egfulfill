@@ -837,8 +837,12 @@ export type EtsyConfig = {
   configured: boolean
 }
 
-export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string }) {
-  return api<{ listing_id?: number; url?: string; error?: string }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
+/** `colors`/`sizes` publish real Etsy variants, each carrying OUR sku — that sku comes
+ *  back on the buyer's order line, which is how a variant resolves after the seller
+ *  renames it on the marketplace. `variant_skus` must be saved onto the catalog product
+ *  so the returned sku matches something. */
+export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string }) {
+  return api<{ listing_id?: number; url?: string; error?: string; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {
   return api<EtsyConnection[]>(`/api/etsy/connections`)
