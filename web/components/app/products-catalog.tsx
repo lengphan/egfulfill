@@ -18,6 +18,8 @@ import { clickableProps } from "@/lib/a11y"
 const priceOf = (p: CatalogProduct) =>
   Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 
+import { sizesOf } from "@/lib/variant-resolve"
+
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const imageOf = (p: CatalogProduct) =>
@@ -208,6 +210,7 @@ export function ProductsCatalog() {
           {paged.pageItems.map((p, i) => {
             const img = imageOf(p)
             const colors = colorsOf(p)
+            const sizes = sizesOf(p)
             const tint = TINTS[i % TINTS.length]
             const status = p.status ?? "Active"
             return (
@@ -286,45 +289,60 @@ export function ProductsCatalog() {
                     <div className="shrink-0 font-semibold tabular-nums">{usd(priceOf(p))}</div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between">
-                    {/* color swatches */}
-                    <div className="flex items-center gap-1.5">
-                      {colors.slice(0, 5).map((c) => (
-                        <span
-                          key={c}
-                          title={c}
-                          className="size-4 rounded-full border border-black/10"
-                          style={{ background: swatchHex(c) }}
-                        />
-                      ))}
-                      {colors.length > 5 && (
-                        <span className="text-[11px] text-muted-foreground">+{colors.length - 5}</span>
+                  {/* Colours + type share one fixed-height row. Both slots always render
+                      (with a muted placeholder when empty) so cards line up instead of
+                      each being as tall as whatever data it happens to carry. */}
+                  <div className="mt-3 flex min-h-6 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      {colors.slice(0, 8).map((c) => {
+                        const img = p.colorImages?.[c]
+                        return (
+                          <span
+                            key={c}
+                            title={c}
+                            className="size-4 shrink-0 rounded-full border border-black/10 bg-muted"
+                            style={
+                              img
+                                ? { backgroundImage: `url("${img}")`, backgroundSize: "260%", backgroundPosition: "center 42%" }
+                                : { background: swatchHex(c) }
+                            }
+                          />
+                        )
+                      })}
+                      {colors.length > 8 && (
+                        <span className="shrink-0 text-[11px] text-muted-foreground">+{colors.length - 8}</span>
                       )}
-                      {colors.length === 0 && <span className="text-[11px] text-muted-foreground">—</span>}
+                      {colors.length === 0 && <span className="text-[11px] text-muted-foreground">No colours set</span>}
                     </div>
-                    {/* type + method */}
-                    <div className="flex items-center gap-1.5">
-                      {p.type && (
-                        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {p.type}
-                        </span>
-                      )}
-                    </div>
+                    <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {p.type || "Uncategorised"}
+                    </span>
                   </div>
 
-                  {/* sizes */}
-                  {p.sizes && p.sizes.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1">
-                      {p.sizes.slice(0, 6).map((s) => (
-                        <span
-                          key={s}
-                          className="rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Sizes — ALWAYS rendered, on one non-wrapping line. Two bugs lived
+                      here: the row was conditional, so a product without sizes was a
+                      shorter card than its neighbours; and it read p.sizes directly,
+                      which is empty on the many catalog rows that carry sizes only as
+                      per-size price tiers (sizesOf unions both). */}
+                  <div className="mt-3 flex min-h-6 items-center gap-1 overflow-hidden">
+                    {sizes.length === 0 ? (
+                      <span className="text-[11px] text-muted-foreground">No sizes set</span>
+                    ) : (
+                      <>
+                        {sizes.slice(0, 7).map((s) => (
+                          <span
+                            key={s}
+                            className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                        {sizes.length > 7 && (
+                          <span className="shrink-0 text-[11px] text-muted-foreground">+{sizes.length - 7}</span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             )

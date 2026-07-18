@@ -7,6 +7,7 @@ import { ArrowLeft, Package, PenNib, Tag } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { sizesOf } from "@/lib/variant-resolve"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -105,7 +106,9 @@ export default function ProductDetailPage() {
 
   const gallery = galleryOf(product)
   const colors = product.colorImages ? Object.keys(product.colorImages) : []
-  const sizes = product.sizes ?? []
+  // sizesOf, not product.sizes — many catalog rows carry sizes only as per-size price
+  // tiers, which is why some products showed no sizes at all.
+  const sizes = sizesOf(product)
   const status = product.status ?? "Active"
   const techs = techsOf(product)
   const shipFee = Number(product.shippingFee ?? product.shipping_fee ?? 0) || 0
@@ -119,8 +122,10 @@ export default function ProductDetailPage() {
       </Button>
 
       {/* Image column is capped (not a full 50/50 split) so the mockup doesn't blow up to
-          ~half the viewport on wide screens; the info column takes the rest. */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_1fr] lg:items-start">
+          ~half the viewport on wide screens. The whole grid is capped too: with only a
+          max-w on the page, the info column absorbed every extra pixel on a wide screen,
+          which stretched the cards and left the big empty right gutter. */}
+      <div className="grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:items-start">
         {/* Gallery sticks while the (much taller) info column scrolls — otherwise the
             left column dead-ends under the thumbnails and leaves a tall empty well. */}
         <div className="space-y-3 lg:sticky lg:top-6">
