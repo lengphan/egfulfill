@@ -2,6 +2,7 @@
 // Etsy v3 uses PKCE with the keystring as client_id; NO client secret is needed
 // for the token exchange. Access tokens last ~1h and are refreshed automatically.
 import { q } from '../db.js';
+import { usdRates } from '../fx.js';
 import { requireSpydeck } from '../entitlements.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
@@ -340,8 +341,31 @@ export async function searchListings(query, opts = {}) {
       }
     } catch (e) { /* image enrich is best-effort */ }
   }
-  const results = base.map((l) => mapListing(l, imgsById));
+  const results = await attachUsd(base.map((l) => mapListing(l, imgsById)));
   return { count: d.count || results.length, query, offset, limit, results };
+}
+
+/**
+ * Annotate listings with a USD price. Etsy returns each listing in the SHOP's currency,
+ * so results mixed "$39.00" with "MYR 111.00" — not comparable, and not sortable by
+ * price in any meaningful way. Rates are fetched ONCE per response (cached 12h in fx.js).
+ *
+ * price_usd stays NULL when we have no rate, and price_converted marks an approximation,
+ * so the UI can show the real number instead of relabelling a foreign amount as dollars.
+ */
+export async function attachUsd(results) {
+  const list = Array.isArray(results) ? results : [];
+  const foreign = list.some((r) => r.price != null && String(r.currency || 'USD').toUpperCase() !== 'USD');
+  const rates = foreign ? await usdRates() : null;
+  for (const r of list) {
+    const code = String(r.currency || 'USD').toUpperCase();
+    if (r.price == null) { r.price_usd = null; r.price_converted = false; continue; }
+    if (code === 'USD') { r.price_usd = r.price; r.price_converted = false; continue; }
+    const rate = rates && Number(rates[code]);
+    if (rate > 0) { r.price_usd = Math.round((r.price / rate) * 100) / 100; r.price_converted = true; }
+    else { r.price_usd = null; r.price_converted = false; }
+  }
+  return list;
 }
 
 // The ONE Etsy listing → app shape mapper. Search AND the shop analyzer both use it,
@@ -411,7 +435,7 @@ export async function shopListings(conn) {
       review_average: (shop && shop.review_average) || null,
     },
     count: (typeof r.count === 'number') ? r.count : base.length,
-    listings: base.map((l) => mapListing(l, imgsById)),
+    listings: await attachUsd(base.map((l) => mapListing(l, imgsById))),
   };
 }
 

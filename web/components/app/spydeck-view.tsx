@@ -16,12 +16,17 @@ import { MakeProductDialog } from "@/components/app/make-product-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 
-// Etsy prices come in the LISTING's own currency, not ours. The old version printed
-// "$" only when the code was literally USD and nothing at all otherwise — so a
-// non-USD listing rendered a bare "29,999.00" that read as a broken number.
-// Intl gives the right symbol per currency; an unknown/blank code falls back to
-// showing the code rather than pretending it's dollars.
-const money = (n: number | null, cur = "USD") => {
+// One currency, so listings are actually comparable. Etsy returns each listing in the
+// SHOP's currency, which mixed "$39.00" with "MYR 111.00" in the same grid. The server
+// converts to USD (fx.js, rates cached 12h) and marks what it converted.
+//
+// A converted price is prefixed "~" and keeps the original in its tooltip — relabelling
+// MYR 111 as $111 would overstate it ~4x, so an approximation is shown as one. When no
+// rate was available price_usd is null and we fall back to the real foreign amount
+// rather than inventing a dollar figure.
+const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n: number | null, cur = "USD", usdPrice?: number | null, converted?: boolean) => {
+  if (usdPrice != null) return converted ? `~${usd(usdPrice)}` : usd(usdPrice)
   if (n == null) return "—"
   const code = (cur || "USD").toUpperCase()
   try {
@@ -30,6 +35,8 @@ const money = (n: number | null, cur = "USD") => {
     return `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${code}`
   }
 }
+const origPrice = (n: number | null, cur?: string) =>
+  n == null ? undefined : `Listed at ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${(cur || "USD").toUpperCase()}`
 
 // Compact number/money (1,240 → 1.2K) — ported from eg-scout.js (_fmt / _money).
 const fmtK = (n: number) => {
@@ -111,7 +118,7 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
           )}
           {/* Price — always visible on the image, out of the stats. */}
           <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
-            {money(l.price, l.currency)}
+            <span title={l.price_converted ? origPrice(l.price, l.currency) : undefined}>{money(l.price, l.currency, l.price_usd, l.price_converted)}</span>
           </span>
         </div>
         <div className="flex flex-1 flex-col p-3">

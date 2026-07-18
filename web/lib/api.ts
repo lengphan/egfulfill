@@ -855,6 +855,11 @@ export type EtsyListing = {
   description?: string
   price: number | null
   currency: string
+  /** Server-converted USD price (fx.js). Null when no rate was available — show the
+   *  original `price`/`currency` then rather than a made-up dollar figure. */
+  price_usd?: number | null
+  /** True when price_usd came from a conversion, so the UI can mark it approximate. */
+  price_converted?: boolean
   url: string
   image: string | null
   images?: string[]

@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, CaretDown } from "@phosphor-icons/react"
+import { Check, CaretDown, LockSimple } from "@phosphor-icons/react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,13 +118,16 @@ export function VariantField({
  * dot-joined string in one place and labelled controls in another.
  */
 export function VariantStrip({
-  color, size, method, blank, className,
+  color, size, method, blank, className, locked,
 }: {
   color?: string | null
   size?: string | null
   method?: string | null
   blank?: string | null
   className?: string
+  /** Submitted order — variants are frozen (the server rejects changes once the cost is
+   *  locked). Shown greyed with a lock so it reads as "settled", not "broken". */
+  locked?: boolean
 }) {
   const chips = [
     blank ? { key: "blank", label: blank } : null,
@@ -137,16 +140,27 @@ export function VariantStrip({
   if (!chips.length) return <span className={cn("text-xs text-muted-foreground", className)}>No variant set</span>
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
+    <div className={cn("flex flex-wrap items-center gap-1", className)} title={locked ? "Locked — variants can't change after an order is submitted" : undefined}>
       {chips.map((c) => (
         <span
           key={c.key}
-          className="inline-flex max-w-[12rem] items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[11px] font-medium text-foreground/80"
+          className={cn(
+            "inline-flex max-w-[12rem] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium",
+            locked
+              ? "border-border/60 bg-muted/30 text-muted-foreground"
+              : "border-border bg-muted/50 text-foreground/80"
+          )}
         >
-          {c.swatch && <span className="size-2.5 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(c.label) }} />}
+          {c.swatch && (
+            <span
+              className={cn("size-2.5 shrink-0 rounded-full border border-black/10", locked && "opacity-60")}
+              style={{ background: swatchHex(c.label) }}
+            />
+          )}
           <span className="truncate">{c.label}</span>
         </span>
       ))}
+      {locked && <LockSimple size={11} weight="fill" className="shrink-0 text-muted-foreground/70" />}
     </div>
   )
 }

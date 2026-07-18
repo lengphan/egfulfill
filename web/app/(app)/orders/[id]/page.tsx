@@ -250,7 +250,7 @@ export default function OrderDetailPage() {
                           // arrive unset). Saving updates the quote in Summary.
                           <VariantPicker orderId={String(id)} item={it} catalog={catalog} onSaved={reload} />
                         ) : (
-                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} className="mt-2" />
+                          <VariantStrip blank={it.blank} color={it.color} size={it.size} method={it.print_type} locked className="mt-2" />
                         )}
 
                         {it.sku && (
