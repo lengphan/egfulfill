@@ -34,12 +34,15 @@ export function templatesRoutes(app, requireAuth) {
   // Templates are per-user product setups — each user (seller or staff) sees & deletes ONLY their
   // own. Prevents one seller reading or deleting another seller's templates.
   app.get('/api/templates', { preHandler: requireAuth }, async (req) => {
-    const r = await q(`select id, name, data, composite, layers from templates where seller_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
+    // owner_id, not seller_id — the insert above writes owner_id and no seller_id column
+    // has ever existed, so this query threw "column seller_id does not exist" on every
+    // call. Nothing read templates back (the only caller POSTs), so it went unseen.
+    const r = await q(`select id, name, data, composite, layers from templates where owner_id=$1 order by updated_at desc limit 200`, [req.user.sub]);
     return r.rows;
   });
 
   app.delete('/api/templates/:id', { preHandler: requireAuth }, async (req) => {
-    await q(`delete from templates where id=$1 and seller_id=$2`, [req.params.id, req.user.sub]);
+    await q(`delete from templates where id=$1 and owner_id=$2`, [req.params.id, req.user.sub]);
     return { ok: true };
   });
 }
