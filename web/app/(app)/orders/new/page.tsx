@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
+import { ProductCombobox } from "@/components/app/product-combobox"
 import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
 import { orderTotal } from "@/lib/pricing"
@@ -327,7 +328,17 @@ export default function NewOrderPage() {
               <div className="grid flex-1 grid-cols-[1fr_64px_88px_auto] items-end gap-3 sm:grid-cols-[1fr_72px_96px_100px_100px_auto]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
-                <Input value={l.name} onChange={(e) => setLine(i, { name: e.target.value })} placeholder="e.g. Classic Tee" className="h-9" />
+                <ProductCombobox
+                  value={l.name}
+                  onText={(v) => setLine(i, { name: v })}
+                  onPick={(p) => setLine(i, {
+                    name: p.name, sku: p.sku, img: p.img,
+                    price: p.price ? String(p.price) : "",
+                    color: p.color, size: p.sizes[0] ?? "", colors: p.colors, sizes: p.sizes,
+                  })}
+                  onBrowse={() => openPicker(i)}
+                  placeholder="e.g. Classic Tee"
+                />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Qty</span>

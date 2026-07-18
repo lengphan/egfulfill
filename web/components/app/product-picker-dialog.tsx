@@ -25,8 +25,26 @@ export type PickedProduct = {
   sizes: string[]
 }
 
+/** Catalog product → order-line prefill. Shared by the picker dialog and the inline
+ *  product combobox so both fill a line identically — a line prefilled one way and not
+ *  the other is how variant dropdowns end up empty. */
+export function toPickedProduct(p: CatalogProduct): PickedProduct {
+  return {
+    name: p.name ?? p.sku ?? "Item",
+    sku: p.sku ?? "",
+    img: imageOf(p),
+    price: priceOf(p),
+    color: p.mainColor || (p.colorImages ? Object.keys(p.colorImages)[0] || "" : ""),
+    // mainColor may not be a colorImages key, so union them and drop blanks.
+    colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
+    sizes: p.sizes ?? [],
+  }
+}
+
+export { imageOf as productImage, priceOf as productPrice }
+
 // Demo fallback so the picker is never empty in standalone/dev.
-const DEMO: CatalogProduct[] = [
+export const DEMO: CatalogProduct[] = [
   { name: "Heavyweight Hoodie", sku: "HOOD-HW", type: "Apparel", price: 42, sizes: ["S", "M", "L", "XL", "2XL"], colorImages: { Black: "" } },
   { name: "Classic Tee", sku: "TEE-CL", type: "Apparel", price: 18, sizes: ["S", "M", "L", "XL"], colorImages: { White: "" } },
   { name: "Embroidered Cap", sku: "CAP-EMB", type: "Headwear", price: 24, sizes: ["OS"], colorImages: { Black: "" } },
@@ -66,16 +84,7 @@ export function ProductPickerDialog({
   }, [products, query])
 
   const pick = (p: CatalogProduct) => {
-    onPick({
-      name: p.name ?? p.sku ?? "Item",
-      sku: p.sku ?? "",
-      img: imageOf(p),
-      price: priceOf(p),
-      color: p.mainColor || (p.colorImages ? Object.keys(p.colorImages)[0] || "" : ""),
-      // mainColor may not be a colorImages key, so union them and drop blanks.
-      colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
-      sizes: p.sizes ?? [],
-    })
+    onPick(toPickedProduct(p))
     onOpenChange(false)
   }
 
