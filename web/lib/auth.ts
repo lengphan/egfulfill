@@ -47,6 +47,11 @@ export function clearSession() {
   try {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    // Drop any half-finished OAuth handshake too. A verifier left behind by a logged-out
+    // session is bound to a code that can no longer be exchanged, and it survives into
+    // the next login where it just fails confusingly.
+    localStorage.removeItem("eg_etsy_pkce")
+    localStorage.removeItem("eg_shopify_oauth")
   } catch {
     /* ignore */
   }

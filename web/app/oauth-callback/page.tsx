@@ -5,6 +5,7 @@ import Link from "next/link"
 import { CheckCircle, XCircle, CircleNotch } from "@phosphor-icons/react"
 import { exchangeEtsy, exchangeShopify } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
+import { getToken } from "@/lib/auth"
 import { clearShopifyOAuth } from "@/lib/shopify-oauth"
 
 type State =
@@ -47,6 +48,17 @@ export default function OAuthCallbackPage() {
           clearShopifyOAuth()
           setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
         }
+        return
+      }
+
+      // The exchange is an AUTHENTICATED call — the shop connects to your account, so it
+      // cannot complete while signed out. Say that plainly instead of failing as a
+      // generic "Connection failed", which is what happens if you log out mid-flow.
+      if (!getToken()) {
+        setState({
+          kind: "error",
+          message: "You're signed out, so we can't attach this shop to your account. Sign in, then start the connection again from Stores.",
+        })
         return
       }
 
