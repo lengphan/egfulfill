@@ -23,7 +23,7 @@ const SUGGESTIONS = [
 
 // A conversation in the left rail — Support (AI + team), a per-order thread, or the
 // internal staff-only Factory channel.
-type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox"; title: string; sub: string; escalated?: boolean }
+type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox" | "design"; title: string; sub: string; escalated?: boolean }
 const STAFF_CHANNEL = "staff-general"
 
 export default function ChatPage() {
@@ -45,6 +45,9 @@ export default function ChatPage() {
   const cidSeq = useRef(0)
   const myName = getUser()?.name || "You"
   const isStaffUser = (() => { const r = getUser()?.role; return !!r && r !== "seller" })()
+  // Designers work artwork for the factory and aren't part of seller conversations, so
+  // they get the artwork threads instead of the seller support inbox (which 403s).
+  const isDesigner = getUser()?.role === "designer"
 
   useEffect(() => {
     cidBase.current = Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -67,11 +70,12 @@ export default function ChatPage() {
       } else {
         setSignedOut(true)
       }
-      if (!isStaffUser) getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
-      if (isStaffUser) getSupportThreads().then((rows) => alive && setInbox(rows ?? [])).catch(() => {})
+      // Staff need orders too now — each one carries an artwork thread.
+      getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
+      if (isStaffUser && !isDesigner) getSupportThreads().then((rows) => alive && setInbox(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
-  }, [isStaffUser])
+  }, [isStaffUser, isDesigner])
 
   const convos = useMemo<Convo[]>(() => {
     const list: Convo[] = []
@@ -88,6 +92,11 @@ export default function ChatPage() {
     }
     if (!isStaffUser) for (const o of orders.slice(0, 30)) {
       list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
+    }
+    // Artwork threads (design-<orderId>) — designer <-> factory, never visible to the
+    // seller. Capped so the list stays navigable on a busy shop.
+    if (isStaffUser) for (const o of orders.slice(0, 20)) {
+      list.push({ id: `design-${o.id}`, kind: "design", title: `Artwork · #${o.seq ?? o.id}`, sub: "Designer & factory" })
     }
     return list
   }, [isStaffUser, supportId, orders, inbox])
