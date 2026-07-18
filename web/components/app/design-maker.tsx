@@ -10,6 +10,7 @@ import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } fro
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { saveDesignLibrary, publishEtsy, getSpydeckTrending, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 
 const mockupOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
 
@@ -57,6 +58,15 @@ export function DesignMaker() {
   const router = useRouter()
   const productParam = useSearchParams().get("product")
   const [mockup, setMockup] = useState("")
+  // Kept alongside the mockup so the printable zone can be resolved from the product's
+  // own printAreas (falling back to its garment type).
+  const [product, setProduct] = useState<CatalogProduct | null>(null)
+  const [paW, setPaW] = useState(String(BASE_PRINT_IN.w))
+  const [paH, setPaH] = useState(String(BASE_PRINT_IN.h))
+  const [dragOver, setDragOver] = useState(false)
+  // The full catalog, so a product picked from the dialog (which hands back a flattened
+  // shape) can be resolved to its catalog row for the print zone.
+  const catalogRef = useRef<CatalogProduct[]>([])
   const [designUrl, setDesignUrl] = useState("")
   const [pos, setPos] = useState<Pos>(DEFAULT_POS)
   const [texts, setTexts] = useState<TextLayer[]>([])
@@ -68,19 +78,26 @@ export function DesignMaker() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
 
-  // Opened from a product ("Design this") → preload that product's mockup as the blank.
+  // Load the catalog once. Opened from a product ("Start designing") → preload that
+  // product's mockup as the blank.
   useEffect(() => {
-    if (!productParam) return
     const id = setTimeout(() => {
       getCatalogProducts()
         .then((rows) => {
-          const p = (rows ?? []).find((x) => String(x.id) === productParam || String(x.sku) === productParam)
-          if (p) setMockup(mockupOf(p))
+          catalogRef.current = rows ?? []
+          if (!productParam) return
+          const p = catalogRef.current.find((x) => String(x.id) === productParam || String(x.sku) === productParam)
+          if (p) { setMockup(mockupOf(p)); setProduct(p) }
         })
         .catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [productParam])
+
+  // The picker returns a flattened PickedProduct; the zone needs the catalog row, so
+  // look it back up by SKU.
+  const catalogFor = (sku: string): CatalogProduct | null =>
+    catalogRef.current.find((x) => String(x.sku ?? "") === sku) ?? null
 
   const updateText = (id: string, patch: Partial<TextLayer>) =>
     setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
@@ -119,6 +136,16 @@ export function DesignMaker() {
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Blank</div>
             <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setPickerOpen(true)}><Storefront size={15} weight="bold" /> {mockup ? "Change blank" : "Pick a blank"}</Button>
           </div>
+          {/* Print area — the printable rectangle scales against a 12x16 base, matching
+              what production actually trims to. */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Print area (in)</div>
+            <div className="flex items-center gap-1.5">
+              <Input value={paW} onChange={(e) => setPaW(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area width in inches" />
+              <span className="text-xs text-muted-foreground">x</span>
+              <Input value={paH} onChange={(e) => setPaH(e.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="h-8 text-xs" aria-label="Print area height in inches" />
+            </div>
+          </div>
           <div className="space-y-1.5">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Artwork</div>
             <label className="flex w-full cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">
@@ -148,7 +175,28 @@ export function DesignMaker() {
         {/* Center: canvas */}
         <div className="flex min-w-0 flex-1 items-center justify-center rounded-2xl border border-border bg-muted/20 p-4">
           <div className="w-full max-w-lg">
-            <DesignStage mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText} selected={selected} onSelect={setSelected} />
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault(); setDragOver(false)
+                readImageFile(e.dataTransfer.files?.[0], (u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }, (m) => setMsg({ tone: "err", text: m }))
+              }}
+              className={"relative w-full rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
+            >
+              <DesignStage
+                mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos}
+                onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText}
+                selected={selected} onSelect={setSelected}
+                printZone={printZoneOf(product, "front", { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h })}
+                printLabel={`${Number(paW) || BASE_PRINT_IN.w}" x ${Number(paH) || BASE_PRINT_IN.h}" print area`}
+              />
+              {dragOver && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-primary/10 text-sm font-medium text-primary">
+                  Drop artwork to place it
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -188,7 +236,7 @@ export function DesignMaker() {
         </aside>
       </div>
 
-      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => setMockup(p.img || "")} />
+      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => { setMockup(p.img || ""); setProduct(catalogFor(p.sku)) }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
       <PublishDialog open={pubOpen} onOpenChange={setPubOpen} getImage={() => composeDesign(designUrl, pos, texts, 1200)} defaultTitle={name} />
     </div>

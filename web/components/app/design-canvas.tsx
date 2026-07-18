@@ -20,6 +20,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 export function DesignStage({
   mockup, designUrl, pos, setPos, onRemove, className,
   texts, updateText, selected, onSelect, picking, onPickColor,
+  printZone, printLabel, emptyHint,
 }: {
   mockup?: string
   designUrl: string
@@ -33,6 +34,12 @@ export function DesignStage({
   onSelect?: (sel: string | null) => void
   picking?: boolean // eyedropper active — clicking the design samples a pixel colour
   onPickColor?: (hex: string) => void
+  /** Printable rectangle (0–100% of the stage). Drawn as the dashed guide the old maker
+   *  had — without it there's nothing showing where artwork may actually go. */
+  printZone?: { x: number; y: number; w: number; h: number }
+  printLabel?: string
+  /** Shown instead of a bare icon when there's no blank yet. */
+  emptyHint?: React.ReactNode
 }) {
   const stageRef = useRef<HTMLDivElement>(null)
   // Hidden canvas holding the design at natural resolution, so the eyedropper can read a
@@ -134,13 +141,35 @@ export function DesignStage({
           behind the mockup + pointer-transparent. */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.6),transparent_62%)] dark:bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.07),transparent_62%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.5] bg-[radial-gradient(rgba(0,0,0,0.07)_1px,transparent_1.4px)] [background-size:15px_15px] dark:bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1.4px)]" />
+      {/* Graph-paper ruling — the technical-flat cue from the old maker. Sits above the
+          dot texture, below the garment, and reads in both themes. */}
+      <div className="pointer-events-none absolute inset-0 opacity-[0.55] bg-[linear-gradient(to_right,rgba(0,0,0,0.055)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.055)_1px,transparent_1px)] [background-size:30px_30px] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)]" />
+
       {mockup ? (
         // p-[6%] lets the garment fill more of the bed than a raw object-contain, which
         // left wide dead margins around a portrait mockup.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain p-[6%] drop-shadow-[0_8px_24px_rgba(0,0,0,0.12)]" />
       ) : (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground/40"><ImageIcon size={40} weight="duotone" /></div>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
+          <ImageIcon size={38} weight="duotone" className="opacity-40" />
+          {emptyHint ?? <span className="text-xs">Pick a blank to start designing.</span>}
+        </div>
+      )}
+
+      {/* The printable area. Everything outside it is trimmed in production, so it has to
+          be visible while placing artwork — the port had dropped this entirely. */}
+      {printZone && mockup && (
+        <div
+          className="pointer-events-none absolute rounded-[2px] border border-dashed border-foreground/35"
+          style={{ left: `${printZone.x}%`, top: `${printZone.y}%`, width: `${printZone.w}%`, height: `${printZone.h}%` }}
+        >
+          {printLabel && (
+            <span className="absolute -top-5 left-0 rounded bg-background/80 px-1 text-[10px] font-medium tracking-wide text-muted-foreground">
+              {printLabel}
+            </span>
+          )}
+        </div>
       )}
 
       {designUrl && (
