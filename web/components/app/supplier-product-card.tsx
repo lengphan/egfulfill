@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { SupplierFlag } from "@/components/app/supplier-flag"
 import { Heart, Plus, CheckCircle, CircleNotch } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 
@@ -85,9 +86,7 @@ export function SupplierProductCard({
             <Heart size={14} weight={fav ? "fill" : "regular"} />
           </button>
         )}
-        {supplierLabel && (
-          <span className="absolute left-2 top-2 rounded-full bg-foreground/80 px-2 py-0.5 text-[10px] font-semibold text-background backdrop-blur">{supplierLabel}</span>
-        )}
+        {supplierLabel && <SupplierFlag label={supplierLabel} className="absolute left-2 top-2" />}
         {loadingColor && <div className="absolute inset-0 flex items-center justify-center bg-background/40"><CircleNotch size={18} className="animate-spin text-muted-foreground" /></div>}
       </div>
 
