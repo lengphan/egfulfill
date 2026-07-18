@@ -133,7 +133,7 @@ export function OrdersHub() {
     const key = `${order.id}:${item.sku}`
     setBusy(key)
     patchItem(order.id, item.sku, to)
-    try { await postItemStatus(order.id, item.sku, to) } catch { load() } finally { setBusy(null) }
+    try { await postItemStatus(order.id, item.sku, to, item.line_id) } catch { load() } finally { setBusy(null) }
   }
   const advanceOrder = async (order: OrderRow) => {
     for (const it of order.items ?? []) {
@@ -149,7 +149,7 @@ export function OrdersHub() {
   const shipOrder = async (order: OrderRow) => {
     setBusy(`ship:${order.id}`)
     try {
-      for (const it of order.items ?? []) if (it.sku) { patchItem(order.id, it.sku, "shipped"); await postItemStatus(order.id, it.sku, "shipped") }
+      for (const it of order.items ?? []) if (it.sku || it.line_id) { patchItem(order.id, it.sku ?? "", "shipped"); await postItemStatus(order.id, it.sku ?? "", "shipped", it.line_id) }
       await updateOrder(order.id, { tracking: tracking.trim() || undefined, carrier, factoryStatus: "shipped", status: "shipped" })
       setShipOpen(null); setTracking(""); load()
     } catch { load() } finally { setBusy(null) }
@@ -182,7 +182,7 @@ export function OrdersHub() {
   const setOrderStatus = async (o: OrderRow, to: string) => {
     setBusy(`ord:${o.id}`)
     try {
-      for (const it of o.items ?? []) if (it.sku) { patchItem(o.id, it.sku, to); await postItemStatus(o.id, it.sku, to) }
+      for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
       await updateOrder(o.id, { factoryStatus: to }).catch(() => {})
     } catch { load() } finally { setBusy(null) }
   }

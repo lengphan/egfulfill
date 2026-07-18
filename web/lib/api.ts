@@ -558,11 +558,13 @@ export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }
 
-// Staff: set one line item's factory_status (drives the production boards).
-export function postItemStatus(id: string, sku: string, status: string) {
+/** Staff: set ONE line item's factory_status (drives the production boards).
+ *  Pass line_id whenever the item has one — sku alone can't address a marketplace line
+ *  with a null sku, and moves identical-SKU siblings together. */
+export function postItemStatus(id: string, sku: string, status: string, lineId?: string | null) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/item-status`, {
     method: "POST",
-    body: JSON.stringify({ sku, status }),
+    body: JSON.stringify({ sku, status, line_id: lineId ?? undefined }),
   })
 }
 

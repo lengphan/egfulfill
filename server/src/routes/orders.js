@@ -396,15 +396,23 @@ export function ordersRoutes(app, requireAuth) {
   app.post('/api/orders/:id/item-status', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const { sku, status } = req.body || {};
-    if (!sku) { reply.code(400); return { error: 'sku required' }; }
-    const pre = await q('select factory_status from order_items where order_id=$1 and sku=$2 limit 1', [req.params.id, sku]);
+    // Keyed by line_id when present, exactly as item-setup is. Keying on sku alone was
+    // broken for two common cases: a marketplace line with a NULL sku never matched
+    // (sku = NULL is never true in SQL, so the update silently hit no rows and the
+    // status appeared not to save), and identical-SKU siblings moved TOGETHER because
+    // one UPDATE touched both. Both are routine on Etsy orders.
+    const lineId = (req.body || {}).line_id ? String((req.body || {}).line_id) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
+    const key = lineId ? 'line_id' : 'sku';
+    const val = lineId || sku;
+    const pre = await q(`select factory_status from order_items where order_id=$1 and ${key}=$2 limit 1`, [req.params.id, val]);
     if (!pre.rows[0]) { reply.code(404); return { error: 'item not found' }; }
     // Role gate — see stageDenial. Read the CURRENT stage first: an operator's reach
     // depends on where the item already is, not just where they're sending it.
     const denial = stageDenial(String(req.user.role || ''), pre.rows[0].factory_status, status);
     if (denial) { reply.code(403); return { error: denial }; }
-    await q('update order_items set factory_status=$1 where order_id=$2 and sku=$3',
-      [status || '', req.params.id, sku]);
+    await q(`update order_items set factory_status=$1 where order_id=$2 and ${key}=$3`,
+      [status || '', req.params.id, val]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
       before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
