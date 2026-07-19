@@ -2,11 +2,20 @@
 // add/promote/reset/delete accounts from the app instead of editing the DB.
 import { q } from '../db.js';
 import { hashPassword, isStaff } from '../auth.js';
+import { audit } from '../audit.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
 const PLANS = ['starter', 'pro', 'enterprise'];
 
 export function usersRoutes(app, requireAdmin, requireAuth) {
+  // Warehouse shares the day-to-day account chores (someone forgot a password, someone
+  // left) but must NOT be able to escalate: it cannot change roles or plans, and cannot
+  // touch an admin account at all. Otherwise a warehouse login could set an admin's
+  // password and take the whole system. Deleting stays admin-only — it's irreversible.
+  const canManageUsers = (u) => !!u && (u.role === 'admin' || u.role === 'warehouse');
+  const requireUserManager = async (req, reply) => {
+    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin or warehouse only' }); }
+  };
   // Cosmetic profile avatar (emoji + colour). Added at route-load, not just in
   // schema.sql, because that file only runs on FIRST db init — an existing
   // deployment would never get the columns. Both nullable: no avatar set → the
@@ -39,7 +48,7 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   // fresh installs; this alter covers existing databases.
   q('alter table users add column if not exists active boolean not null default true').catch(() => {});
 
-  app.get('/api/users', { preHandler: requireAdmin }, async () => {
+  app.get('/api/users', { preHandler: requireUserManager }, async () => {
     const r = await q('select id, email, name, role, store_name, active, plan, spydeck_addon, created_at from users order by created_at desc');
     return r.rows;   // never returns password_hash
   });
@@ -62,8 +71,15 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     }
   });
 
-  app.patch('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
+  app.patch('/api/users/:id', { preHandler: requireUserManager }, async (req, reply) => {
     const { role, password, name, active, plan, spydeck_addon } = req.body || {};
+    const isAdminCaller = req.user.role === 'admin';
+    if (!isAdminCaller) {
+      // Warehouse: no privilege changes, and hands off admin accounts entirely.
+      if (role != null || plan != null || spydeck_addon != null) { reply.code(403); return { error: 'Only an admin can change roles or plans' }; }
+      const target = await q('select role from users where id=$1', [req.params.id]).then((r) => r.rows[0]);
+      if (target && target.role === 'admin') { reply.code(403); return { error: 'Only an admin can change an admin account' }; }
+    }
     const sets = [], vals = []; let n = 1;
     if (plan != null) {
       if (!PLANS.includes(plan)) { reply.code(400); return { error: 'Invalid plan' }; }
@@ -80,12 +96,20 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
     if (!sets.length) return { ok: true };
     vals.push(req.params.id);
     await q(`update users set ${sets.join(',')} where id=$${n}`, vals);
+    // Account changes are exactly what you want a trail of after the fact — especially a
+    // password reset, which is indistinguishable from a takeover without one. The new
+    // password is never recorded, only that one was set.
+    audit(req, 'user.updated', {
+      entityType: 'user', entityId: req.params.id,
+      after: { role, name, active, plan, spydeck_addon, password: password ? 'reset' : undefined },
+    });
     return { ok: true };
   });
 
   app.delete('/api/users/:id', { preHandler: requireAdmin }, async (req, reply) => {
     if (req.params.id === req.user.sub) { reply.code(400); return { error: "You can't delete your own account" }; }
     await q('delete from users where id=$1', [req.params.id]);
+    audit(req, 'user.deleted', { entityType: 'user', entityId: req.params.id });
     return { ok: true };
   });
 }

@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree } from "@phosphor-icons/react"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +24,8 @@ import {
   removeMember,
   updateProfile,
   getFactorySettings,
+  deleteUserAdmin,
+  type ShipFromAddress,
   setFactorySettings,
   getUsers,
   updateUserAdmin,
@@ -485,6 +489,16 @@ function MoneyField({ label, hint, value, onChange }: { label: string; hint?: st
   )
 }
 
+/** Plain text counterpart to MoneyField, so the address rows match the money rows. */
+function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} className="h-9" />
+    </label>
+  )
+}
+
 function PlatformPanel() {
   const [loaded, setLoaded] = useState<FactorySettings | null>(null)
   const [designFee, setDesignFee] = useState("")
@@ -497,6 +511,11 @@ function PlatformPanel() {
   // Flat shipping bands + per-method surcharges. Held as strings so a half-typed "5." is
   // not fought by Number() on every keystroke.
   const [bands, setBands] = useState<Record<string, string>>({})
+  // The warehouse's own return address — the origin every shipping label is bought
+  // against. Lives here rather than in the ship dialog because it's set once for the
+  // whole team, not per shipment.
+  const [shipFrom, setShipFrom] = useState<ShipFromAddress>({})
+  const setFromField = (k: keyof ShipFromAddress, v: string) => setShipFrom((p) => ({ ...p, [k]: v }))
   const setBand = (k: string, v: string) => setBands((p) => ({ ...p, [k]: v.replace(/[^0-9.]/g, "") }))
 
   const load = useCallback(() => {
@@ -506,6 +525,7 @@ function PlatformPanel() {
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
+      setShipFrom(r.ship_from ?? {})
       setBands(Object.fromEntries(
         ["ship_cap", "ship_heavy", "ship_garment", "method_dtg", "method_dtf", "method_emb", "method_apl", "method_lsr"]
           .map((k) => [k, r[k] != null ? String(r[k]) : ""])
@@ -523,6 +543,7 @@ function PlatformPanel() {
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
         ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
+        ship_from: shipFrom,
       })
       if (r.error) throw new Error(r.error)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
@@ -540,6 +561,33 @@ function PlatformPanel() {
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+      </div>
+
+      {/* Ship-from. A label with no origin is rejected by the carrier, so this is the
+          one setting on this page that blocks work outright when it's blank — hence the
+          warning rather than a silent empty form. */}
+      <div className="border-t border-border p-5">
+        <div className="mb-1 text-sm font-medium">Warehouse ship-from address</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          The return address printed on every label. Set once for the whole team.
+        </p>
+        {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+            No ship-from address yet — buying a label will fail until street, city, state and ZIP are filled in.
+          </div>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField label="Name / company" value={shipFrom.name ?? ""} onChange={(v) => setFromField("name", v)} />
+          <TextField label="Phone" value={shipFrom.phone ?? ""} onChange={(v) => setFromField("phone", v)} />
+          <TextField label="Street" value={shipFrom.street ?? ""} onChange={(v) => setFromField("street", v)} />
+          <TextField label="Suite / unit" value={shipFrom.street2 ?? ""} onChange={(v) => setFromField("street2", v)} />
+          <TextField label="City" value={shipFrom.city ?? ""} onChange={(v) => setFromField("city", v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="State" value={shipFrom.state ?? ""} onChange={(v) => setFromField("state", v)} />
+            <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
+          </div>
+        </div>
       </div>
 
       {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
@@ -585,6 +633,19 @@ function UsersPanel() {
   const [busy, setBusy] = useState<string | null>(null)
   const [nu, setNu] = useState({ email: "", password: "", role: "operator" })
   const [nuErr, setNuErr] = useState<string | null>(null)
+  // A real directory gets long fast (sellers outnumber staff), so it needs finding, not
+  // just listing. Search covers name/email/store; the role chips answer "show me staff".
+  const [qStr, setQStr] = useState("")
+  const [roleFilter, setRoleFilter] = useState("all")
+  const [showInactive, setShowInactive] = useState(false)
+  // Role changes and deletion are admin-only server-side; mirror that here so warehouse
+  // isn't shown controls that will 403.
+  const isAdminCaller = (getUser()?.role || "") === "admin"
+  const [pwFor, setPwFor] = useState<AdminUser | null>(null)
+  const [pwValue, setPwValue] = useState("")
+  const [pwErr, setPwErr] = useState<string | null>(null)
+  const [pwDone, setPwDone] = useState(false)
+  const [removing, setRemoving] = useState<AdminUser | null>(null)
 
   const loadUsers = useCallback(() => { getUsers().then((r) => { setUsers(r ?? []); setLoaded(true) }).catch(() => setLoaded(true)) }, [])
   useEffect(() => { const id = setTimeout(loadUsers, 0); return () => clearTimeout(id) }, [loadUsers])
@@ -598,6 +659,33 @@ function UsersPanel() {
     setUsers((prev) => (prev ?? []).map((x) => (x.id === u.id ? { ...x, plan } : x)))
     try { await updateUserAdmin(u.id, { plan }) } catch { loadUsers() } finally { setBusy(null) }
   }
+  const setActive = async (u: AdminUser, active: boolean) => {
+    setBusy(u.id)
+    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, active } : x)))
+    try { await updateUserAdmin(u.id, { active }) } catch { loadUsers() } finally { setBusy(null) }
+  }
+  const resetPassword = async () => {
+    if (!pwFor) return
+    if (pwValue.length < 8) { setPwErr("Password must be at least 8 characters."); return }
+    setBusy(pwFor.id); setPwErr(null)
+    try {
+      const r = await updateUserAdmin(pwFor.id, { password: pwValue })
+      if (r?.error) throw new Error(r.error)
+      setPwDone(true)
+      setTimeout(() => { setPwFor(null); setPwValue(""); setPwDone(false) }, 1400)
+    } catch (e) { setPwErr(e instanceof Error ? e.message : "Couldn't set that password.") }
+    finally { setBusy(null) }
+  }
+  const removeUser = async () => {
+    if (!removing) return
+    setBusy(removing.id)
+    try {
+      const r = await deleteUserAdmin(removing.id)
+      if (r?.error) throw new Error(r.error)
+      setRemoving(null); loadUsers()
+    } catch { loadUsers(); setRemoving(null) } finally { setBusy(null) }
+  }
+
   const addUser = async () => {
     if (!nu.email.trim() || nu.password.length < 8) { setNuErr("Email/username and a password of 8+ characters are required."); return }
     setBusy("new"); setNuErr(null)
@@ -607,6 +695,15 @@ function UsersPanel() {
       setNu({ email: "", password: "", role: "operator" }); loadUsers()
     } catch (e) { setNuErr(e instanceof Error ? e.message : "Couldn't create the user.") } finally { setBusy(null) }
   }
+
+  const term = qStr.trim().toLowerCase()
+  const shown = users.filter((u) => {
+    if (!showInactive && u.active === false) return false
+    if (roleFilter === "staff" ? u.role === "seller" : roleFilter !== "all" && u.role !== roleFilter) return false
+    if (!term) return true
+    return [u.name, u.email, u.store_name, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
+  })
+  const inactiveCount = users.filter((u) => u.active === false).length
 
   return (
     <div className="space-y-4">
@@ -621,32 +718,138 @@ function UsersPanel() {
           {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}
         </div>
       </SectionCard>
-      <SectionCard title="Users" description="Change a role inline">
+      <SectionCard title="Users" description={`${users.length} account${users.length === 1 ? "" : "s"} — search, change a role, reset a password, or deactivate`}>
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3">
+          <div className="relative min-w-[220px] flex-1">
+            <MagnifyingGlass size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input value={qStr} onChange={(e) => setQStr(e.target.value)} placeholder="Search name, email or store…" className="h-9 pl-8" />
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            {[["all", "All"], ["staff", "Staff"], ["seller", "Sellers"], ["operator", "Operator"], ["warehouse", "Warehouse"], ["designer", "Designer"], ["admin", "Admin"]].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setRoleFilter(id)}
+                className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " + (roleFilter === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Deactivated accounts are hidden by default — they're kept so their orders
+              stay attached, not because anyone needs to see them daily. */}
+          {inactiveCount > 0 && (
+            <button
+              onClick={() => setShowInactive((v) => !v)}
+              className={"eg-tap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " + (showInactive ? "border-border bg-accent" : "border-border text-muted-foreground hover:bg-accent")}
+            >
+              {showInactive ? "Hide" : "Show"} {inactiveCount} deactivated
+            </button>
+          )}
+        </div>
         {!loaded ? <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div> : (
           <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Plan</TableHead><TableHead className="text-right">Joined</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Plan</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Manage</TableHead></TableRow></TableHeader>
             <TableBody>
-              {users.length === 0 ? <TableRow><TableCell colSpan={4} className="py-10 text-center text-muted-foreground">No users</TableCell></TableRow>
-                : users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.name || u.store_name || "—"}</TableCell>
+              {shown.length === 0 ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</TableCell></TableRow>
+                : shown.map((u) => (
+                  <TableRow key={u.id} className={u.active === false ? "opacity-55" : ""}>
+                    <TableCell className="font-medium">
+                      {u.name || u.store_name || "—"}
+                      {u.active === false && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell><select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select></TableCell>
+                    <TableCell>{!isAdminCaller ? <span className="text-sm capitalize">{u.role}</span> : <select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>}</TableCell>
                     <TableCell>
                       {/* Only meaningful for sellers — staff have no subscription. */}
-                      {u.role === "seller" ? (
+                      {u.role === "seller" && isAdminCaller ? (
                         <select value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                           {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
                         </select>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                      ) : u.role === "seller" ? <span className="text-sm capitalize">{u.plan ?? "starter"}</span> : <span className="text-xs text-muted-foreground">—</span>}
                     </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
+                    <TableCell className="text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          aria-label={`Manage ${u.email}`}
+                          className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                        >
+                          <DotsThree size={16} weight="bold" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem onClick={() => { setPwFor(u); setPwValue(""); setPwErr(null); setPwDone(false) }}>
+                            Set a new password
+                          </DropdownMenuItem>
+                          {u.active === false ? (
+                            <DropdownMenuItem onClick={() => setActive(u, true)}>Reactivate account</DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => setActive(u, false)}>Deactivate (blocks sign-in)</DropdownMenuItem>
+                          )}
+                          {/* Deleting is admin-only and unrecoverable — deactivating is
+                              the reversible answer to "they left", and keeps their orders
+                              attached to a real account. */}
+                          {isAdminCaller && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setRemoving(u)} className="text-destructive">Delete permanently…</DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
             </TableBody>
           </Table>
         )}
       </SectionCard>
+
+      {/* Password reset. We set a password rather than emailing a reset link because a
+          lot of these accounts are floor staff with usernames, not real mailboxes — the
+          manager hands it over directly. */}
+      <Dialog open={!!pwFor} onOpenChange={(v) => { if (!v) { setPwFor(null); setPwValue(""); setPwErr(null) } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Set a new password</DialogTitle></DialogHeader>
+          <div className="space-y-3 px-1">
+            <p className="text-sm text-muted-foreground">
+              For <span className="font-medium text-foreground">{pwFor?.email}</span>. They can sign in with it immediately — give it to them directly and have them change it.
+            </p>
+            <Input
+              type="text" value={pwValue} onChange={(e) => { setPwValue(e.target.value); setPwErr(null) }}
+              placeholder="8+ characters" className="h-9" autoFocus
+            />
+            {pwErr && <p className="text-sm text-destructive">{pwErr}</p>}
+            {pwDone && <p className="flex items-center gap-1.5 text-sm text-emerald-600"><Check size={14} weight="bold" /> Password updated.</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setPwFor(null)}>Cancel</Button>
+            <Button size="sm" onClick={resetPassword} disabled={busy === pwFor?.id || pwDone}>
+              {busy === pwFor?.id ? <CircleNotch size={14} className="animate-spin" /> : "Set password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!removing} onOpenChange={(v) => { if (!v) setRemoving(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Delete this account?</DialogTitle></DialogHeader>
+          <div className="space-y-3 px-1">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{removing?.email}</span> will be removed permanently. This cannot be undone.
+            </p>
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+              <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+              If they simply left, deactivate instead — that blocks sign-in but keeps their orders attached to a real account.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setRemoving(null)}>Cancel</Button>
+            <Button size="sm" variant="destructive" onClick={removeUser} disabled={busy === removing?.id}>
+              {busy === removing?.id ? <CircleNotch size={14} className="animate-spin" /> : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -702,7 +905,7 @@ export function SettingsView() {
         <TabsTrigger value="profile">Profile</TabsTrigger>
         <TabsTrigger value="keys">API keys</TabsTrigger>
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
-        {isAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+        {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
         <TabsTrigger value="team">Team</TabsTrigger>
@@ -721,7 +924,7 @@ export function SettingsView() {
           <PlatformPanel />
         </TabsContent>
       )}
-      {isAdmin && (
+      {canPlatform && (
         <TabsContent value="users">
           <UsersPanel />
         </TabsContent>

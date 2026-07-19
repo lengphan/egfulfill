@@ -95,8 +95,10 @@ export function OrdersHub() {
   const [busy, setBusy] = useState<string | null>(null)
   const [sent, setSent] = useState<Set<string>>(new Set())
   const [shipOpen, setShipOpen] = useState<string | null>(null)
-  // Collapsed order ids. Default expanded — a board that opens fully collapsed hides the
-  // work. Collapsing is for getting long boards under control, same as the seller list.
+  // EXPANDED order ids — the inverse of what this used to track. Rows now start closed:
+  // an Etsy order with five lines of personalisation is a screenful on its own, so a board
+  // that opens everything is unreadable and reads as "all my orders are open". Nothing is
+  // persisted across navigation, so coming back gives a clean, closed board.
   const [actionErr, setActionErr] = useState<string | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState("")
@@ -111,9 +113,9 @@ export function OrdersHub() {
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   const threadsRef = useRef<Record<string, boolean>>({})
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
-    setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+    setExpandedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
 
   const [carrier, setCarrier] = useState("USPS")
@@ -281,10 +283,11 @@ export function OrdersHub() {
 
   const paged = usePaged(filtered, 25)
 
-  // Threads + machine files for whatever is on screen, fetched once per order. Scoped to
-  // the visible page so a long board doesn't fan out into hundreds of requests, and
-  // skipped for orders already loaded so paging back is free.
-  const visibleIds = paged.pageItems.map((o) => o.id).join(",")
+  // Threads, machine files and placed artwork for the orders actually OPEN. Scoped to
+  // expansion rather than the page: rows start closed, so fetching the whole page would
+  // be ~3 requests each for detail nobody is looking at. Loaded once per order, so
+  // re-opening a row is free.
+  const visibleIds = paged.pageItems.filter((o) => expandedIds.has(o.id)).map((o) => o.id).join(",")
   useEffect(() => {
     const id = setTimeout(() => {
       for (const oid of visibleIds ? visibleIds.split(",") : []) {
@@ -364,7 +367,7 @@ export function OrdersHub() {
               const units = items.reduce((n, it) => n + (Number(it.qty) || 1), 0)
               const label = labels[o.id]
               const track = label?.trackingNumber || o.tracking
-              const isCollapsed = collapsed.has(o.id)
+              const isCollapsed = !expandedIds.has(o.id)
               return (
                 <div key={o.id} className="p-5">
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">

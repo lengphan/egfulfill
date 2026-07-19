@@ -127,6 +127,9 @@ export function getUsers() {
 export function createUserAdmin(body: { email: string; password: string; role?: string; name?: string }) {
   return api<AdminUser & { error?: string }>(`/api/users`, { method: "POST", body: JSON.stringify(body) })
 }
+export function deleteUserAdmin(id: string) {
+  return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
 export function updateUserAdmin(id: string, patch: { role?: string; password?: string; name?: string; active?: boolean; plan?: string; spydeck_addon?: boolean }) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
