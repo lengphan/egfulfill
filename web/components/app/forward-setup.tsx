@@ -16,7 +16,14 @@ import { getIngestAddress } from "@/lib/api"
  * thirty seconds rather than to pretend it can be automated.
  */
 
-type Provider = { id: string; label: string; steps: string[] }
+type Provider = {
+  id: string; label: string
+  /** Deep link to the exact settings page. We can't create the rule for them — that needs
+   *  mailbox access — but we can land them on the right screen with the address already
+   *  copied, which is the difference between "go find it" and "paste this here". */
+  deepLink?: string
+  steps: string[]
+}
 
 // Written as click-paths rather than prose: someone doing this once, quickly, needs the
 // menu names, not an explanation.
@@ -24,18 +31,20 @@ const PROVIDERS: Provider[] = [
   {
     id: "gmail",
     label: "Gmail",
+    deepLink: "https://mail.google.com/mail/u/0/#settings/fwdandpop",
     steps: [
-      "Settings (gear) → See all settings → Forwarding and POP/IMAP",
-      "Add a forwarding address → paste the address above → Next → Proceed",
-      "Gmail emails a confirmation link — we auto-confirm it, so just wait a moment",
-      "Back in Settings → Filters and Blocked Addresses → Create a new filter",
-      "In From, type: etsy.com → Create filter",
-      "Tick Forward it to and choose the address → Create filter",
+      "Forwarding and POP/IMAP → Add a forwarding address → paste → Next → Proceed",
+      "Gmail sends a confirmation link to that address — we confirm it automatically, so just wait a few seconds and reload",
+      "Leave the radio on “Disable forwarding” — do NOT turn on forward-a-copy, or Gmail sends us every email you receive",
+      "Now go to Filters and Blocked Addresses → Create a new filter",
+      "In From type: etsy.com → Create filter",
+      "Tick “Forward it to” → pick the address → Create filter",
     ],
   },
   {
     id: "outlook",
     label: "Outlook / Hotmail",
+    deepLink: "https://outlook.live.com/mail/0/options/mail/rules",
     steps: [
       "Settings (gear) → Mail → Rules → Add new rule",
       "Name it “Etsy sales”",
@@ -47,6 +56,7 @@ const PROVIDERS: Provider[] = [
   {
     id: "yahoo",
     label: "Yahoo Mail",
+    deepLink: "https://mail.yahoo.com/d/settings/1",
     steps: [
       "Settings → More Settings → Filters → Add new filters",
       "Name it “Etsy sales”",
@@ -91,6 +101,15 @@ export function ForwardSetup() {
   }
 
   const active = PROVIDERS.find((p) => p.id === provider) ?? PROVIDERS[0]
+
+  /** Copy the address, THEN open their mail settings — so the address is on the clipboard
+   *  by the time the page loads and the whole thing is paste-and-save. */
+  const openProvider = () => {
+    if (address) navigator.clipboard?.writeText(address).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
+    if (active.deepLink) window.open(active.deepLink, "_blank", "noopener,noreferrer")
+  }
 
   return (
     <SectionCard
@@ -140,6 +159,15 @@ export function ForwardSetup() {
                   </button>
                 ))}
               </div>
+              {active.deepLink && (
+                <button
+                  onClick={openProvider}
+                  className="eg-tap mb-3 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  <EnvelopeSimple size={14} weight="bold" />
+                  Copy address &amp; open {active.label} settings
+                </button>
+              )}
               <ol className="space-y-1.5 text-sm text-muted-foreground">
                 {active.steps.map((s, i) => (
                   <li key={i} className="flex gap-2">
@@ -153,8 +181,10 @@ export function ForwardSetup() {
             <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
               <EnvelopeSimple size={15} className="mt-0.5 shrink-0" />
               <span>
-                One rule, once. From then on every sale email fills its order&apos;s address automatically —
-                nothing to export or upload. We only ever receive the emails your rule forwards.
+                One rule, once — then every sale email fills its order&apos;s address automatically, with nothing
+                to export or upload. Use a <strong className="font-medium text-foreground">filter</strong>, not
+                blanket forwarding: a filter sends us only Etsy&apos;s emails, and we never see anything else in
+                your inbox.
               </span>
             </div>
           </>
