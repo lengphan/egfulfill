@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
+import { parseBlock } from "@/lib/address-paste"
 import { ProductCombobox } from "@/components/app/product-combobox"
 import { createOrder, getOrders, validateAddress, type NewOrderItem, type ValidatedAddress } from "@/lib/api"
 import { nextOrderId, nextSellerSeq } from "@/lib/order-id"
@@ -15,24 +16,6 @@ import { orderTotal } from "@/lib/pricing"
 
 // Best-effort parse of a pasted US address block → structured fields.
 // Last non-empty line is expected as "City, ST 12345" (comma optional).
-function parseAddress(text: string): { street: string; street2: string; city: string; state: string; zip: string } {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
-  const last = lines[lines.length - 1] ?? ""
-  const m = last.match(/^(.*?)[,\s]+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)\s*$/)
-  const city = m ? m[1].trim() : ""
-  const state = m ? m[2].toUpperCase() : ""
-  const zip = m ? m[3] : ""
-  const streetLines = m ? lines.slice(0, -1) : lines
-  return { street: streetLines[0] ?? "", street2: streetLines.slice(1).join(", "), city, state, zip }
-}
-
-// Split a pasted "Name / street / City, ST ZIP" block → name (first line) + address.
-function parseBlock(text: string) {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
-  const name = lines[0] ?? ""
-  const addr = parseAddress(lines.slice(1).join("\n"))
-  return { name, addr }
-}
 const zip5 = (z: string) => z.split("-")[0].trim() // USPS ZIPCode wants 5 digits, not ZIP+4
 
 // USPS's Addresses API now gates access behind an approval ("not authorized for

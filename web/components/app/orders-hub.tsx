@@ -5,6 +5,7 @@ import Image from "next/image"
 import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
+import { parseBlock } from "@/lib/address-paste"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
@@ -93,6 +94,8 @@ export function OrdersHub() {
   // Collapsed order ids. Default expanded — a board that opens fully collapsed hides the
   // work. Collapsing is for getting long boards under control, same as the seller list.
   const [actionErr, setActionErr] = useState<string | null>(null)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasteText, setPasteText] = useState("")
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
@@ -166,6 +169,7 @@ export function OrdersHub() {
   // Open the fulfill panel for an order — prefill recipient from the order address.
   const openFulfill = (o: OrderRow) => {
     setShipOpen(o.id); setLabelErr(null); setCarrier("USPS"); setTracking("")
+    setPasteOpen(false); setPasteText("")
     setTo(toAddrOf(o))
   }
   // Buy a real USPS-direct label (directUsps → skips the Shippo/EasyPost aggregator).
@@ -408,7 +412,48 @@ export function OrdersHub() {
                       <div className="grid gap-4 md:grid-cols-2">
                         {/* Ship to — prefilled from the order */}
                         <div className="space-y-2">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                            <button
+                              onClick={() => setPasteOpen((v) => !v)}
+                              className="text-[11px] font-medium text-primary hover:underline"
+                            >
+                              {pasteOpen ? "Hide paste box" : "Paste an address"}
+                            </button>
+                          </div>
+
+                          {/* The fastest way in while Etsy withholds buyer addresses:
+                              paste the block from anywhere and let it split itself. Same
+                              parser the manual-order form uses. */}
+                          {pasteOpen && (
+                            <div className="space-y-1.5 rounded-lg border border-dashed border-border p-2">
+                              <textarea
+                                value={pasteText}
+                                onChange={(e) => {
+                                  setPasteText(e.target.value)
+                                  const { name, addr } = parseBlock(e.target.value)
+                                  // Only overwrite what we actually parsed — a half-typed
+                                  // paste shouldn't wipe fields already filled in.
+                                  setTo((prev) => ({
+                                    ...prev,
+                                    name: name || prev.name,
+                                    street: addr.street || prev.street,
+                                    street2: addr.street2 || prev.street2,
+                                    city: addr.city || prev.city,
+                                    state: addr.state || prev.state,
+                                    zip: addr.zip || prev.zip,
+                                  }))
+                                }}
+                                rows={4}
+                                placeholder={"Jyoti Reddy\n881 Bergen Ave\nApt 4R\nBrooklyn, NY 11238"}
+                                className="w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                              />
+                              <p className="text-[10px] text-muted-foreground">
+                                Name on the first line, then the street, then City, ST ZIP. Fields below fill as you paste.
+                              </p>
+                            </div>
+                          )}
+
                           <Input value={to.name ?? ""} onChange={(e) => setTo({ ...to, name: e.target.value })} placeholder="Recipient name" className="h-9" />
                           <Input value={to.street ?? ""} onChange={(e) => setTo({ ...to, street: e.target.value })} placeholder="Street address" className="h-9" />
                           <Input value={to.street2 ?? ""} onChange={(e) => setTo({ ...to, street2: e.target.value })} placeholder="Apt, suite (optional)" className="h-9" />
