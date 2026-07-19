@@ -111,6 +111,26 @@ const adsCheck = (channel: "meta" | "google") => async (): Promise<Result> => {
   return b?.[channel]?.enabled ? { level: "configured" } : { level: "off" }
 }
 
+/**
+ * Status for ONE shipping provider. They used to share a row, which meant an
+ * unconfigured EasyPost dragged the row to "error" and buried whether Shippo actually
+ * worked — exactly the thing you check this page for.
+ *
+ * NB the match is `startsWith("ok")`, not `=== "ok"`: the endpoint reports mode as
+ * "ok (test)" / "ok (live)", so an equality check would read a healthy key as broken.
+ */
+function shippingProvider(which: "shippo" | "easypost") {
+  return async () => {
+    const r = await raw("/api/shipping/test")
+    if (r.status === 401 || r.status === 403) return { level: "restricted" as const }
+    if (!r.ok) return { level: "error" as const, detail: `HTTP ${r.status || "—"}` }
+    const v = String((r.body as Record<string, unknown>)?.[which] ?? "")
+    if (!v || /^no (key|token)$/i.test(v)) return { level: "off" as const, detail: "no key set" }
+    if (v.startsWith("ok")) return { level: "live" as const, detail: v.replace(/^ok\s*/, "").replace(/[()]/g, "") || undefined }
+    return { level: "error" as const, detail: v }
+  }
+}
+
 const INTEGRATIONS: Integration[] = [
   // Channels
   { key: "etsy", name: "Etsy", blurb: "Order sync + tracking", group: "Channels", check: configOnly("/api/etsy/config") },
@@ -134,17 +154,12 @@ const INTEGRATIONS: Integration[] = [
   },
   // Shipping
   {
-    key: "shipping", name: "Shipping (EasyPost / Shippo)", blurb: "Labels + rates", group: "Shipping",
-    check: async () => {
-      const r = await raw("/api/shipping/test")
-      if (r.status === 401 || r.status === 403) return { level: "restricted" }
-      if (!r.ok) return { level: "error", detail: `HTTP ${r.status || "—"}` }
-      const entries = Object.entries(r.body)
-      if (!entries.length) return { level: "off" }
-      const detail = entries.map(([k, v]) => `${k}: ${v}`).join(" · ")
-      const anyOk = entries.some(([, v]) => v === "ok")
-      return anyOk ? { level: "live", detail } : { level: "error", detail }
-    },
+    key: "shippo", name: "Shippo", blurb: "Labels + rates", group: "Shipping",
+    check: shippingProvider("shippo"),
+  },
+  {
+    key: "easypost", name: "EasyPost", blurb: "Labels + rates (alternative)", group: "Shipping",
+    check: shippingProvider("easypost"),
   },
   {
     key: "usps", name: "USPS direct", blurb: "USPS-direct labels", group: "Shipping",
