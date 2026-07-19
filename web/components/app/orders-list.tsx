@@ -2,7 +2,6 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
@@ -19,10 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getCatalogProducts, type OrderRow, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { getOrders, getCatalogProducts, getOrderDesigns, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { ItemAvatar } from "@/components/app/item-avatar"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
-import { itemImage } from "@/lib/order-image"
 import { VariantStrip } from "@/components/app/variant-field"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTotal, fmtDate, shipTo, trackUrl } from "@/lib/order-format"
@@ -30,27 +29,20 @@ import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 
 /** Overlapping thumbnails of an order's items — the photos the flat table was missing. */
-function PhotoStack({ items }: { items: OrderItem[] }) {
+function PhotoStack({ items, designs, catalog }: { items: OrderItem[]; designs?: Record<string, OrderDesign>; catalog?: CatalogProduct[] }) {
   const shown = items.slice(0, 3)
   const extra = items.length - shown.length
   return (
     <div className="flex shrink-0 items-center">
-      {shown.map((it, i) => {
-        const img = itemImage(it)
-        return (
-          <div
-            key={it.sku ?? i}
-            className={"relative size-8 overflow-hidden rounded-md border border-background bg-muted ring-1 ring-border " + (i ? "-ml-2.5" : "")}
-            style={{ zIndex: shown.length - i }}
-          >
-            {img ? (
-              <Image src={img} alt="" fill unoptimized sizes="32px" className="object-cover" />
-            ) : (
-              <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={12} weight="duotone" /></div>
-            )}
-          </div>
-        )
-      })}
+      {shown.map((it, i) => (
+        <span
+          key={it.sku ?? i}
+          className={"relative " + (i ? "-ml-2.5" : "")}
+          style={{ zIndex: shown.length - i }}
+        >
+          <ItemAvatar item={it} designs={designs} catalog={catalog} size={32} readOnly className="border-background ring-1 ring-border" />
+        </span>
+      ))}
       {extra > 0 && (
         <span className="-ml-2.5 flex size-8 items-center justify-center rounded-md border border-background bg-muted text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
           +{extra}
@@ -78,14 +70,14 @@ const cellClass = (id: OrderColId) => {
   const base = id === "items" ? "" : "truncate"
   return [base, c.align === "right" ? "text-right" : ""].filter(Boolean).join(" ")
 }
-function renderCell(id: OrderColId, o: OrderRow): React.ReactNode {
+function renderCell(id: OrderColId, o: OrderRow, designs?: Record<string, OrderDesign>, catalog?: CatalogProduct[]): React.ReactNode {
   switch (id) {
     case "order": return <span className="font-mono text-xs font-medium">{numOf(o)}</span>
     case "store": return <span className="text-muted-foreground">{storeOf(o)}</span>
     case "customer": return <span className="font-medium">{customerOf(o)}</span>
     case "items": return (
       <div className="flex min-w-0 items-center gap-2.5">
-        <PhotoStack items={o.items ?? []} />
+        <PhotoStack items={o.items ?? []} designs={designs} catalog={catalog} />
         <div className="min-w-0">
           <div className="truncate text-sm">{itemsLabel(o)}</div>
           <div className="truncate text-xs text-muted-foreground">{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</div>
@@ -109,6 +101,22 @@ export function OrdersList() {
   const [filter, setFilter] = useState<SellerFilter>("All")
   const [importOpen, setImportOpen] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  // Placed artwork per order. Fetched only when a row is opened: pulling designs for
+  // every row on load would be a request per order for imagery most sellers never expand.
+  const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
+  useEffect(() => {
+    if (!expanded || designs[expanded]) return
+    const oid = expanded
+    const t = setTimeout(() => {
+      getOrderDesigns(oid).then((r) => {
+        const list = Array.isArray(r) ? r : (r?.designs ?? [])
+        const bySku: Record<string, OrderDesign> = {}
+        for (const d of list) if (d?.sku) bySku[d.sku] = d
+        setDesigns((p) => ({ ...p, [oid]: bySku }))
+      }).catch(() => {})
+    }, 0)
+    return () => clearTimeout(t)
+  }, [expanded, designs])
   // Column layout is per-device; read after mount so prerender and hydration agree.
   // Powers the inline variant pickers below — an unsubmitted line can be set up right in
   // the row instead of opening the order first.
@@ -294,7 +302,7 @@ export function OrdersList() {
                         </button>
                       </TableCell>
                       {visibleCols.map((id) => (
-                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o)}</TableCell>
+                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o, designs[o.id], catalog)}</TableCell>
                       ))}
                     </TableRow>
 
@@ -308,13 +316,9 @@ export function OrdersList() {
                               {items.length === 0 ? (
                                 <div className="text-sm text-muted-foreground">No line items on this order.</div>
                               ) : items.map((it, i) => {
-                                const img = itemImage(it)
                                 return (
                                   <div key={it.sku ?? i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
-                                    <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                                      {img ? <Image src={img} alt="" fill unoptimized sizes="48px" className="object-cover" />
-                                        : <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={16} weight="duotone" /></div>}
-                                    </div>
+                                    <ItemAvatar item={it} designs={designs[o.id]} catalog={catalog} size={48} />
                                     <div className="min-w-0 flex-1">
                                       <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                                       {["", "new", "draft"].includes(String(o.factory_status || "")) ? (

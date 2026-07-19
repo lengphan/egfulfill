@@ -489,13 +489,13 @@ export function SpyDeckView() {
             {showFilters && (
               <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
                 <FilterField label="Category">
-                  <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                  <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                     <option value="">All</option>
                     {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </FilterField>
                 <FilterField label="Sort by">
-                  <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                  <select value={sortSel} onChange={(e) => setSortSel(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                     <option value="relevance">Relevance</option>
                     <option value="newest">Newest</option>
                     <option value="price_asc">Price: low → high</option>

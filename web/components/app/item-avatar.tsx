@@ -39,6 +39,9 @@ export type ItemAvatarProps = {
   size?: number
   /** Passed only where the viewer may reposition artwork. Absent → click opens the preview. */
   onEdit?: () => void
+  /** Renders the composite alone — no click, no swap, no preview. For decorative stacks
+   *  (a row's 3-up thumbnail cluster) where a control per thumb would be noise. */
+  readOnly?: boolean
   className?: string
 }
 
@@ -48,7 +51,7 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[]): string {
   return bestMockup(p, item.color, item.img || "")
 }
 
-export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, className }: ItemAvatarProps) {
+export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, className }: ItemAvatarProps) {
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
 
@@ -60,6 +63,17 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, classNam
   const canSwap = !!(art && listing && listing !== blank)
 
   const open = () => { if (onEdit) onEdit(); else setPreview(true) }
+
+  if (readOnly) {
+    return (
+      <span
+        className={"relative block shrink-0 overflow-hidden rounded-md border border-border bg-muted " + (className ?? "")}
+        style={{ width: size, height: size }}
+      >
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={false} alt={item.name || item.sku || "Item"} />
+      </span>
+    )
+  }
 
   return (
     <>

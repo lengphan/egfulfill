@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
+import { ItemAvatar } from "@/components/app/item-avatar"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,7 +36,7 @@ import {
 } from "@/lib/api"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
-import { designSrc, itemImage } from "@/lib/order-image"
+import { designSrc } from "@/lib/order-image"
 
 const fmtMsgTime = (ts?: number) => {
   if (!ts) return ""
@@ -46,7 +46,6 @@ const fmtMsgTime = (ts?: number) => {
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const itemImg = (it: OrderItem) => itemImage(it)
 const fmtDateTime = (s?: string | null) => {
   if (!s) return "—"
   const d = new Date(s)
@@ -215,21 +214,22 @@ export default function OrderDetailPage() {
                 {items.map((it, i) => {
                   const design = it.sku ? designs[it.sku] : undefined
                   const artwork = designSrc(design?.data)
-                  const img = artwork || itemImg(it)
                   const qty = Number(it.qty) || 1
                   const unit = Number(it.unit_price) || 0
                   return (
                     <div key={i} className="flex items-start gap-4 px-5 py-4">
-                      <div className="relative size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40">
-                        {img ? (
-                          <Image src={img} alt={it.name ?? "Item"} fill unoptimized className="object-cover" />
-                        ) : (
-                          <div className="flex size-full items-center justify-center text-muted-foreground">
-                            <Package size={18} weight="duotone" />
-                          </div>
-                        )}
+                      {/* The blank with its artwork placed — the seller sees the same
+                          composite the floor will produce from. */}
+                      <div className="relative shrink-0">
+                        <ItemAvatar
+                          item={it}
+                          designs={designs}
+                          catalog={catalog}
+                          size={56}
+                          onEdit={() => setCustomize(it)}
+                        />
                         {artwork && (
-                          <span className="absolute bottom-0 right-0 flex size-4 items-center justify-center rounded-tl bg-primary text-primary-foreground" title={design?.name || "Design attached"}>
+                          <span className="pointer-events-none absolute bottom-0 right-0 flex size-4 items-center justify-center rounded-tl bg-primary text-primary-foreground" title={design?.name || "Design attached"}>
                             <PenNib size={9} weight="fill" />
                           </span>
                         )}
