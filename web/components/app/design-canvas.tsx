@@ -247,15 +247,20 @@ export function DesignCanvasDialog({
   // saying out loud — it previously looked identical to "no artwork yet").
   const [threadErr, setThreadErr] = useState(false)
   useEffect(() => {
-    if (!isEmb || !designUrl) { setThreads([]); setThreadErr(false); return }
     let live = true
-    setThreadErr(false)
-    matchThreadColors(designUrl).then((t) => {
+    // Deferred: setting state synchronously inside an effect cascades a second render
+    // before paint, which the lint rule flags and which this doesn't need.
+    const id = setTimeout(() => {
       if (!live) return
-      setThreads(t)
-      setThreadErr(t.length === 0)
-    }).catch(() => { if (live) setThreadErr(true) })
-    return () => { live = false }
+      if (!isEmb || !designUrl) { setThreads([]); setThreadErr(false); return }
+      setThreadErr(false)
+      matchThreadColors(designUrl).then((t) => {
+        if (!live) return
+        setThreads(t)
+        setThreadErr(t.length === 0)
+      }).catch(() => { if (live) setThreadErr(true) })
+    }, 0)
+    return () => { live = false; clearTimeout(id) }
   }, [designUrl, isEmb])
   // Eyedropper: a sampled pixel → its nearest in-stock thread, appended (deduped) so the
   // operator can add a colour the auto-match missed. One pick, then the tool turns off.

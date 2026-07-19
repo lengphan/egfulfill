@@ -10,7 +10,6 @@ import {
   Warning,
 } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
-import { EtsyAddressImport } from "@/components/app/etsy-address-import"
 import { ForwardSetup } from "@/components/app/forward-setup"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -298,7 +297,6 @@ export function StoresManager() {
       {/* Forwarding first — it is the hands-off path; the CSV below is the fallback. */}
       <ForwardSetup />
 
-      <EtsyAddressImport />
     </div>
   )
 }
