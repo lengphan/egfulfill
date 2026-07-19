@@ -757,6 +757,46 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     } catch (e) { reply.code(400); return { error: e.message }; }
   });
 
+  /**
+   * Diagnostic: what does the UserAddress family actually return?
+   *
+   * The docs describe it as the authenticated user's own saved addresses (an address
+   * BOOK), not buyer ship-to data — but that's worth proving rather than assuming, since
+   * it's the one address endpoint we haven't tried. Tries the documented shapes and
+   * reports each verbatim.
+   */
+  app.get('/api/etsy/probe-user-addresses', { preHandler: requireStaff }, async (req, reply) => {
+    const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
+    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    // user_id is the prefix of the access token (Etsy encodes it as "<user_id>.<rest>").
+    const userId = String(conn.access_token || '').split('.')[0];
+    const paths = [
+      '/user/addresses',
+      `/users/${userId}/addresses`,
+      '/users/me/addresses',
+      `/shops/${conn.shop_id}/addresses`,
+    ];
+    const out = {};
+    for (const p of paths) {
+      try {
+        const d = await etsyGet(conn, p);
+        const first = (d && (d.results || [])[0]) || null;
+        out[p] = {
+          ok: true,
+          count: d && d.count != null ? d.count : (d && d.results ? d.results.length : null),
+          sample: first ? {
+            keys: Object.keys(first),
+            first_line: first.first_line ?? null, city: first.city ?? null,
+            state: first.state ?? null, zip: first.zip ?? null, name: first.name ?? null,
+          } : null,
+        };
+      } catch (e) {
+        out[p] = { ok: false, error: String(e.message || e).slice(0, 200) };
+      }
+    }
+    return { userId, scopes: conn.scopes || null, results: out };
+  });
+
   // Diagnostic: dump the address-relevant fields of the most recent receipt EXACTLY
   // as Etsy returns them — so we can tell whether Etsy is even sending the address
   // (vs a parsing bug here). Also lists every key on the receipt to spot a renamed
