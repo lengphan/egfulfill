@@ -2,6 +2,7 @@
 //   • seller  → only their own orders
 //   • staff   → all orders
 import { q } from '../db.js';
+import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
@@ -204,6 +205,24 @@ export function ordersRoutes(app, requireAuth) {
   // Placement (%-coords {x,y,w,h,r}) saved by the seller's order customizer — kept
   // here (seller-writable via canSeeOrder) because order_items.design_pos is staff-only.
   q('alter table order_designs add column if not exists pos jsonb').catch(() => {});
+  // Artwork fingerprints, so "we have already digitised this" is answerable. art_hash is
+  // exact and computed here; art_phash is fuzzy and comes from the browser (see
+  // fingerprint.js). Chained, not fired in parallel — two bare q() calls can land on
+  // different pool connections and run out of order.
+  q('alter table order_designs add column if not exists art_hash text')
+    .then(() => q('alter table order_designs add column if not exists art_phash text'))
+    .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
+    .then(async () => {
+      // Backfill in bounded batches: without it, every design saved before this feature
+      // is invisible to reuse, which is most of them.
+      const r = await q('select order_id, sku, kind, data from order_designs where art_hash is null and data is not null limit 1000');
+      for (const row of r.rows) {
+        const h = hashOf(row.data);
+        if (h) await q('update order_designs set art_hash=$1 where order_id=$2 and sku=$3 and kind=$4',
+          [h, row.order_id, row.sku, row.kind]).catch(() => {});
+      }
+    })
+    .catch(() => {});
   // What the seller was CHARGED per unit, frozen at submit (see pricing.js). Distinct
   // from unit_price, which is what the BUYER paid. Without freezing, editing a catalog
   // base price would silently rewrite the cost of orders already billed.
@@ -524,11 +543,17 @@ export function ordersRoutes(app, requireAuth) {
     const { sku, data, name, kind, pos } = req.body || {};
     if (!sku || !data) return { error: 'sku and data required' };
     const posJson = (pos && typeof pos === 'object') ? JSON.stringify(pos) : null;
+    // Exact hash is ours, never the client's — it decides whether an already-produced
+    // machine file may be reused, so a forged one would attach the wrong deliverable.
+    // The perceptual hash is only ever a suggestion, so taking it from the client is fine.
+    const artHash = hashOf(data);
+    const artPhash = isPhash(req.body && req.body.phash) ? String(req.body.phash).toLowerCase() : null;
     await q(
-      `insert into order_designs (order_id, sku, kind, data, name, pos, updated_at)
-       values ($1,$2,$3,$4,$5,$6, now())
-       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, pos=excluded.pos, updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', data, name || null, posJson]
+      `insert into order_designs (order_id, sku, kind, data, name, pos, art_hash, art_phash, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8, now())
+       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, pos=excluded.pos,
+         art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
+      [req.params.id, sku, kind || 'raster', data, name || null, posJson, artHash, artPhash]
     );
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };

@@ -371,6 +371,13 @@ export function setAdCampaignStatus(channel: string, id: string, status: "ACTIVE
 // deliverable, .emb = factory working file, image/* = artwork. Price is admin+
 // warehouse only, and that's enforced server-side — not just hidden in the UI.
 export type DesignFileRow = { designId: string; sku?: string | null; name?: string | null; mime?: string | null; kind?: string; price?: number; paid?: boolean; canPrice?: boolean; created_at?: string }
+/** A prior deliverable made from the same artwork. `distance` is set only on fuzzy hits. */
+export type ReuseMatch = { design_id: string; file_name?: string | null; kind?: string; order_id?: string; seller?: string; created_at?: string; distance?: number }
+/** exact = identical artwork, safe to reuse. similar = looks alike, needs a human to confirm. */
+export function getDesignReuse(orderId: string, sku: string) {
+  return api<{ exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>(
+    `/api/design_files/reuse?orderId=${encodeURIComponent(orderId)}&sku=${encodeURIComponent(sku)}`)
+}
 export function getDesignFiles(orderId: string) {
   return api<DesignFileRow[]>(`/api/design_files?orderId=${encodeURIComponent(orderId)}`)
 }
@@ -632,7 +639,7 @@ export function postOrderThreads(id: string, sku: string, threads: { code: strin
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }
-export function postOrderDesign(id: string, body: { sku: string; data: string; name?: string; pos?: DesignPos; kind?: string }) {
+export function postOrderDesign(id: string, body: { sku: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
     method: "POST",
     body: JSON.stringify(body),

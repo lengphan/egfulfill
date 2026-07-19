@@ -9,7 +9,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
@@ -18,6 +18,7 @@ import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 
@@ -55,6 +56,26 @@ const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.z
 /** Identity of ONE line. Two lines of the same SKU on an order (same product, different
  *  personalisation) are different jobs, so the sku alone is not an identity — keying on it
  *  made "send to board" flip every sibling line to Sent at once. */
+/** One prior deliverable. Fuzzy hits carry how far off they are, so "similar" is never
+ *  presented with the same confidence as "identical". */
+function MatchRow({ m, similar }: { m: ReuseMatch; similar?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+      <div className="min-w-0">
+        <div className="truncate font-mono text-xs font-medium">{m.design_id}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {m.file_name || m.kind} · order {m.order_id} · {m.seller}
+        </div>
+      </div>
+      {similar && m.distance != null && (
+        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {m.distance === 0 ? "near-identical" : `${m.distance}/64 different`}
+        </span>
+      )}
+    </div>
+  )
+}
+
 const lineKey = (o: { id: string }, it: OrderItem) => `${o.id}:${it.line_id ?? it.sku ?? ""}`
 
 // Open a bought label in a new tab, whatever shape it came back as (URL / base64 / mock HTML).
@@ -126,6 +147,9 @@ export function OrdersHub() {
   }, [designs])
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+  // A push that would duplicate work already done. Held until a human decides, because
+  // the alternative — silently reusing, or silently re-digitising — is wrong either way.
+  const [reuse, setReuse] = useState<{ order: OrderRow; item: OrderItem; exact: ReuseMatch[]; similar: ReuseMatch[] } | null>(null)
   const threadsRef = useRef<Record<string, boolean>>({})
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
@@ -265,13 +289,26 @@ export function OrdersHub() {
     } finally { setBusy(null) }
   }
   // Send a line item to the Designer board as a new card (whole-board upsert).
-  const sendToDesigner = async (o: OrderRow, it: OrderItem) => {
+  const sendToDesigner = async (o: OrderRow, it: OrderItem, force = false) => {
     const key = lineKey(o, it)
     // A designer card with no artwork is an empty job — there is nothing to digitise and
     // no way to tell what it should become. The button is disabled in this state; this is
     // the belt-and-braces check.
     if (!artworkFor(o, it)) return
     setBusy(`dsn:${key}`)
+    // Before spending a designer on this, ask whether we've already made the file. An
+    // exact hit means identical artwork; a fuzzy hit only means it looks alike, so both
+    // are shown to a human rather than acted on. `force` is the human saying "push anyway".
+    if (!force && it.sku) {
+      try {
+        const r = await getDesignReuse(o.id, it.sku)
+        if (r && (r.exact.length || r.similar.length)) {
+          setReuse({ order: o, item: it, exact: r.exact, similar: r.similar })
+          setBusy(null)
+          return
+        }
+      } catch { /* lookup is an optimisation — never block the push on it */ }
+    }
     try {
       const cards = await getDesignCards().catch(() => [])
       const dup = (cards ?? []).some((c) =>
@@ -833,6 +870,52 @@ export function OrdersHub() {
               )
             })}
           </div>
+          {/* "We may already have made this." Exact and similar are kept visually
+              separate on purpose: identical artwork is a safe reuse, whereas a
+              lookalike is a lead to check. Attaching a fuzzy match automatically
+              would eventually print the wrong artwork on a real order. */}
+          <Dialog open={!!reuse} onOpenChange={(v) => { if (!v) setReuse(null) }}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{reuse?.exact.length ? "This design already exists" : "Similar designs found"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 px-1 pb-1">
+                <p className="text-sm text-muted-foreground">
+                  {reuse?.exact.length
+                    ? "The same artwork has already been digitised. Reuse that file instead of sending this to a designer again."
+                    : "Nothing matches exactly, but these look similar. Check one before paying for the same work twice."}
+                </p>
+
+                {reuse?.exact.length ? (
+                  <div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Identical artwork</div>
+                    <div className="space-y-1.5">
+                      {reuse.exact.map((m) => <MatchRow key={m.design_id} m={m} />)}
+                    </div>
+                  </div>
+                ) : null}
+
+                {reuse?.similar.length ? (
+                  <div>
+                    <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Looks similar — confirm before reusing</div>
+                    <div className="space-y-1.5">
+                      {reuse.similar.map((m) => <MatchRow key={m.design_id} m={m} similar />)}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setReuse(null)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  onClick={() => { const r = reuse; setReuse(null); if (r) sendToDesigner(r.order, r.item, true) }}
+                >
+                  Send to the board anyway
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {/* One editor for the whole board — mounted once, pointed at whichever line was
               clicked. Reloads the order's designs on save so the row avatar rehydrates
               with the new placement immediately, without a full board refetch. */}

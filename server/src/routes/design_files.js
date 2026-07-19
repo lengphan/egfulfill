@@ -7,6 +7,7 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
+import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
 
 export function designFilesRoutes(app, requireAuth) {
   q(`create table if not exists design_file_data (
@@ -68,6 +69,65 @@ export function designFilesRoutes(app, requireAuth) {
   // body: { designId, data (base64 data-URL), orderId?, sku?, name?, mime?, hash?, price? }
   // `price` is what the SELLER pays to download it; only staff may set it (a seller
   // pricing their own paywall would be nonsense).
+  /**
+   * "Have we already made a machine file from this artwork?" — STAFF ONLY.
+   *
+   * Given an order line, look up its artwork fingerprint and return every deliverable
+   * (.pes / .emb) previously produced from the SAME artwork, on any order, for any
+   * seller. That's what lets the floor reuse a digitised file instead of paying a
+   * designer to redo work that already exists.
+   *
+   * Two tiers, kept strictly separate and never merged:
+   *   exact   — identical bytes. Safe to offer as a straight reuse.
+   *   similar — within PHASH_NEAR bits. A SUGGESTION for a human to confirm, never an
+   *             automatic attach: a false positive here puts the wrong artwork on
+   *             someone's order, which is far worse than digitising twice.
+   */
+  app.get('/api/design_files/reuse', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const orderId = String(req.query.orderId || '');
+    const sku = String(req.query.sku || '');
+    if (!orderId || !sku) { reply.code(400); return { error: 'orderId + sku required' }; }
+
+    const src = await q('select art_hash, art_phash from order_designs where order_id=$1 and sku=$2 and art_hash is not null limit 1',
+      [orderId, sku]).then((r) => r.rows[0]).catch(() => null);
+    if (!src || !src.art_hash) return { exact: [], similar: [], hashed: false };
+
+    // Files whose ORDER LINE carried the same artwork. Excludes this order's own files —
+    // "you already have one here" is not reuse, it's the normal case.
+    const exact = await q(
+      `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at,
+              coalesce(u.store_name, u.name, u.email, '—') as seller
+         from design_file_data f
+         join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+         left join users u on u.id = f.seller_id
+        where d.art_hash = $1 and f.order_id <> $2 and f.kind in ('pes','emb')
+        order by f.created_at desc limit 20`,
+      [src.art_hash, orderId]).then((r) => r.rows).catch(() => []);
+
+    // Fuzzy pass runs only when there's no exact hit — if we already have the real thing,
+    // offering lookalikes is noise.
+    let similar = [];
+    if (!exact.length && src.art_phash) {
+      const cand = await q(
+        `select f.design_id, f.file_name, f.kind, f.order_id, f.created_at, d.art_phash,
+                coalesce(u.store_name, u.name, u.email, '—') as seller
+           from design_file_data f
+           join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+           left join users u on u.id = f.seller_id
+          where d.art_phash is not null and f.order_id <> $1 and f.kind in ('pes','emb')
+          order by f.created_at desc limit 500`,
+        [orderId]).then((r) => r.rows).catch(() => []);
+      similar = cand
+        .map((row) => ({ row, dist: phashDistance(src.art_phash, row.art_phash) }))
+        .filter((x) => x.dist != null && x.dist <= PHASH_NEAR)
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 10)
+        .map((x) => ({ ...x.row, distance: x.dist, art_phash: undefined }));
+    }
+    return { exact, similar, hashed: true };
+  });
+
   app.post('/api/design_files', { preHandler: requireAuth }, async (req, reply) => {
     const b = req.body || {};
     if (!b.designId || !b.data) { reply.code(400); return { error: 'designId + data required' }; }

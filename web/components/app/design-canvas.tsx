@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
+import { perceptualHash } from "@/lib/phash"
 import { matchThreadColors, nearestThread, hexToRgb, type Thread } from "@/lib/thread-match"
 import { Eyedropper } from "@phosphor-icons/react"
 
@@ -263,7 +264,11 @@ export function DesignCanvasDialog({
     if (!designUrl || !item.sku) { setErr("Upload artwork first."); return }
     setSaving(true); setErr(null)
     try {
-      const r = await postOrderDesign(orderId, { sku: item.sku, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r } })
+      // Fingerprint the artwork as it's saved, so the factory can later tell that this
+      // design has already been digitised. Best-effort: a null phash costs us fuzzy
+      // matching, never the save.
+      const phash = await perceptualHash(designUrl).catch(() => null)
+      const r = await postOrderDesign(orderId, { sku: item.sku, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
       // Persist the matched threads alongside the design so the factory loads the right
       // cones. Best-effort — a design still saves even if the thread write hiccups.
