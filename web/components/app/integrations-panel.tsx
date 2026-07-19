@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input"
 import { api, ApiError, getAdminSecrets, setAdminSecret, getAiConfig, setAiConfig, testAiKey, type SecretMeta, type AiConfig } from "@/lib/api"
 
 // One integration credential row — read-only status, plus inline edit for whitelisted
-// secrets (saved to the DB; applied on the next server restart).
+// secrets (saved to the DB and to process.env live). Whether a change takes effect
+// immediately depends on the route: those reading process.env at call time pick it up on
+// the next request; any still snapshotting it into a module-level const need a restart.
 function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState("")
@@ -252,7 +254,9 @@ export function IntegrationsPanel() {
 
       <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5 text-xs text-muted-foreground">
         <ShieldCheck size={14} weight="fill" className="text-emerald-600" />
-        Click the <PencilSimple size={11} className="inline" /> to set or replace a credential — it&apos;s saved to the database and applied on the next server restart (no more editing <code className="font-mono">.env</code>).
+        Click the <PencilSimple size={11} className="inline" /> to set or replace a credential — it&apos;s saved to
+        the database and used straight away. Shipping and payment keys take effect on the next request; a few
+        integrations still read their credential once at boot and need a server restart to pick up a change.
       </div>
 
       <div className="space-y-6 p-5">

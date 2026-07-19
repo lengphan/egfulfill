@@ -3,14 +3,16 @@
 // create the intent and read its status. Works with test keys (pk_test/sk_test).
 //
 // .env:  STRIPE_SECRET_KEY=sk_...   STRIPE_PUBLISHABLE_KEY=pk_...
+// Credentials are read at CALL time: Settings › Integrations writes them to the DB and
+// into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { q } from '../db.js';
 
-const SK = process.env.STRIPE_SECRET_KEY || '';
-const PK = process.env.STRIPE_PUBLISHABLE_KEY || '';
+const skKey = () => (process.env.STRIPE_SECRET_KEY || '').trim();
+const pkKey = () => (process.env.STRIPE_PUBLISHABLE_KEY || '').trim();
 
 async function stripe(path, body, method) {
-  if (!SK) throw new Error('Server missing STRIPE_SECRET_KEY');
-  const opts = { method: method || (body ? 'POST' : 'GET'), headers: { Authorization: 'Bearer ' + SK } };
+  if (!skKey()) throw new Error('Server missing STRIPE_SECRET_KEY');
+  const opts = { method: method || (body ? 'POST' : 'GET'), headers: { Authorization: 'Bearer ' + skKey() } };
   if (body) { opts.headers['Content-Type'] = 'application/x-www-form-urlencoded'; opts.body = new URLSearchParams(body).toString(); }
   const r = await fetch('https://api.stripe.com/v1' + path, opts);
   const d = await r.json().catch(() => ({}));
@@ -48,7 +50,7 @@ async function customerFor(user) {
 
 export function stripeRoutes(app, requireAuth) {
   // Publishable key is public — the frontend needs it to mount the Payment Element.
-  app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: PK, enabled: !!(SK && PK) }));
+  app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: pkKey(), enabled: !!(skKey() && pkKey()) }));
 
   app.get('/api/stripe/test', { preHandler: requireAuth }, async () => {
     try { await stripe('/balance'); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }

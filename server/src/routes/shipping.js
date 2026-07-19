@@ -13,13 +13,18 @@
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
 import { readShipFrom } from './factory_settings.js';
 
-const EP_KEY = process.env.EASYPOST_API_KEY || '';
-const SH_TOKEN = process.env.SHIPPO_API_TOKEN || '';
+// Read at CALL time, not import time. Saving a credential in Settings › Integrations
+// writes it to the DB and applies it to process.env immediately (see secrets.js), but a
+// module-level `const KEY = process.env.X` snapshots the value at boot — so the running
+// code kept using the old (usually empty) one and the UI appeared to do nothing until a
+// redeploy. Functions close that gap: paste a key, use it on the next request.
+const epKey = () => (process.env.EASYPOST_API_KEY || '').trim();
+const shToken = () => (process.env.SHIPPO_API_TOKEN || '').trim();
 const EP_BASE = 'https://api.easypost.com/v2';
 const SH_BASE = 'https://api.goshippo.com';
 
-const epAuth = () => 'Basic ' + Buffer.from(EP_KEY + ':').toString('base64');
-const shAuth = () => 'ShippoToken ' + SH_TOKEN;
+const epAuth = () => 'Basic ' + Buffer.from(epKey() + ':').toString('base64');
+const shAuth = () => 'ShippoToken ' + shToken();
 
 function enc(obj) { return Buffer.from(JSON.stringify(obj)).toString('base64'); }
 function dec(tok) { try { return JSON.parse(Buffer.from(String(tok || ''), 'base64').toString('utf8')); } catch (e) { return null; } }
@@ -119,7 +124,7 @@ async function shBuy(rateObjectId) {
 }
 
 // Is any aggregator configured?
-export function shippingEnabled() { return !!(EP_KEY || SH_TOKEN); }
+export function shippingEnabled() { return !!(epKey() || shToken()); }
 
 /**
  * Verify + standardize a US address through whichever aggregator is configured.
@@ -130,7 +135,7 @@ export function shippingEnabled() { return !!(EP_KEY || SH_TOKEN); }
  */
 export async function aggregatorVerifyAddress(a) {
   const s = addr(a, false);
-  if (EP_KEY) {
+  if (epKey()) {
     // verify[]=delivery asks EasyPost to confirm it's actually deliverable, not just
     // parseable — a well-formed address that doesn't exist is the case worth catching.
     const r = await fetch(EP_BASE + '/addresses', {
@@ -150,7 +155,7 @@ export async function aggregatorVerifyAddress(a) {
       raw: d,
     };
   }
-  if (SH_TOKEN) {
+  if (shToken()) {
     const r = await fetch(SH_BASE + '/addresses/', {
       method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: s.name || 'Recipient', street1: s.street1, street2: s.street2, city: s.city, state: s.state, zip: s.zip, country: s.country, validate: true })
@@ -174,12 +179,12 @@ export async function aggregatorVerifyAddress(a) {
 // Rate-shop and buy the cheapest label — reused by /api/usps/label so EVERY label
 // path produces a real label. opts: { carrierPref, servicePref } (substring filters).
 export async function aggregatorBuyCheapest(to, from, pc, opts) {
-  if (!EP_KEY && !SH_TOKEN) return null;
+  if (!epKey() && !shToken()) return null;
   opts = opts || {};
   const T = addr(to), F = addr(from, true), P = parcel(pc);
   const jobs = [];
-  if (EP_KEY) jobs.push(epRates(T, F, P).catch(() => []));
-  if (SH_TOKEN) jobs.push(shRates(T, F, P).catch(() => []));
+  if (epKey()) jobs.push(epRates(T, F, P).catch(() => []));
+  if (shToken()) jobs.push(shRates(T, F, P).catch(() => []));
   let all = (await Promise.all(jobs)).flat();
   if (!all.length) return null;
   if (opts.carrierPref) { const w = String(opts.carrierPref).toLowerCase(); const f = all.filter((r) => (r.carrier || '').toLowerCase().includes(w)); if (f.length) all = f; }
@@ -207,7 +212,7 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
 export async function aggregatorRefundLabel(provider, providerId) {
   if (!providerId) return { ok: false, message: 'No provider reference stored for this label.' };
   if (provider === 'easypost') {
-    if (!EP_KEY) return { ok: false, message: 'EasyPost is not configured.' };
+    if (!epKey()) return { ok: false, message: 'EasyPost is not configured.' };
     const r = await fetch(EP_BASE + '/shipments/' + encodeURIComponent(providerId) + '/refund', {
       method: 'POST', headers: { Authorization: epAuth(), 'Content-Type': 'application/json' }
     });
@@ -216,7 +221,7 @@ export async function aggregatorRefundLabel(provider, providerId) {
     return { ok: true, status: d.refund_status || 'submitted', raw: d };
   }
   if (provider === 'shippo') {
-    if (!SH_TOKEN) return { ok: false, message: 'Shippo is not configured.' };
+    if (!shToken()) return { ok: false, message: 'Shippo is not configured.' };
     const r = await fetch(SH_BASE + '/refunds/', {
       method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ transaction: providerId, async: false })
@@ -232,7 +237,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   const guard = { preHandler: requireStaff };
 
   app.get('/api/shipping/config', guard, async () => ({
-    easypost: !!EP_KEY, shippo: !!SH_TOKEN, enabled: !!(EP_KEY || SH_TOKEN)
+    easypost: !!epKey(), shippo: !!shToken(), enabled: !!(epKey() || shToken())
   }));
 
   // Whether a key is TEST or LIVE is the single most useful thing to know while setting
@@ -242,13 +247,13 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
 
   app.get('/api/shipping/test', guard, async () => {
     const out = {};
-    if (EP_KEY) {
-      const mode = keyMode(EP_KEY, ['EZTK']);   // EZTK = test, EZAK = production
+    if (epKey()) {
+      const mode = keyMode(epKey(), ['EZTK']);   // EZTK = test, EZAK = production
       try { const r = await fetch(EP_BASE + '/api_keys', { headers: { Authorization: epAuth() } }); out.easypost = r.ok ? ('ok (' + mode + ')') : ('HTTP ' + r.status); }
       catch (e) { out.easypost = 'FAILED: ' + e.message; }
     } else out.easypost = 'no key';
-    if (SH_TOKEN) {
-      const mode = keyMode(SH_TOKEN, ['shippo_test_']);
+    if (shToken()) {
+      const mode = keyMode(shToken(), ['shippo_test_']);
       try { const r = await fetch(SH_BASE + '/addresses/?results=1', { headers: { Authorization: shAuth() } }); out.shippo = r.ok ? ('ok (' + mode + ')') : ('HTTP ' + r.status); }
       catch (e) { out.shippo = 'FAILED: ' + e.message; }
     } else out.shippo = 'no token';
@@ -257,14 +262,14 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
 
   // Merged, cheapest-first rates from all enabled providers.
   app.post('/api/shipping/rates', guard, async (req, reply) => {
-    if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
+    if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
     const b = req.body || {};
     const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
     if (!to.zip || !to.street1) { reply.code(400); return { error: 'Recipient street + ZIP required' }; }
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
     const jobs = [];
-    if (EP_KEY) jobs.push(epRates(to, from, pc).catch((e) => ({ _err: 'EasyPost: ' + e.message })));
-    if (SH_TOKEN) jobs.push(shRates(to, from, pc).catch((e) => ({ _err: 'Shippo: ' + e.message })));
+    if (epKey()) jobs.push(epRates(to, from, pc).catch((e) => ({ _err: 'EasyPost: ' + e.message })));
+    if (shToken()) jobs.push(shRates(to, from, pc).catch((e) => ({ _err: 'Shippo: ' + e.message })));
     const results = await Promise.all(jobs);
     const rates = [], errors = [];
     results.forEach((r) => { if (Array.isArray(r)) rates.push(...r); else if (r && r._err) errors.push(r._err); });
@@ -279,12 +284,12 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       let t = b.rateToken ? dec(b.rateToken) : null;
       if (!t) {
         // No token → rate-shop and pick the cheapest.
-        if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured' }; }
+        if (!epKey() && !shToken()) { reply.code(400); return { error: 'No shipping provider configured' }; }
         const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
         if (!to.zip || !to.street1 || !from.zip || !from.street1) { reply.code(400); return { error: 'Sender + recipient street + ZIP required' }; }
         const jobs = [];
-        if (EP_KEY) jobs.push(epRates(to, from, pc).catch(() => []));
-        if (SH_TOKEN) jobs.push(shRates(to, from, pc).catch(() => []));
+        if (epKey()) jobs.push(epRates(to, from, pc).catch(() => []));
+        if (shToken()) jobs.push(shRates(to, from, pc).catch(() => []));
         const all = (await Promise.all(jobs)).flat();
         // Optional service preference filter (substring match on service name).
         let pool = all;

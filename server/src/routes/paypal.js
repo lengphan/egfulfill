@@ -3,16 +3,18 @@
 // credited + recorded. Works with sandbox keys for testing, live keys in prod.
 //
 // .env:  PAYPAL_CLIENT_ID=...  PAYPAL_SECRET=...  PAYPAL_ENV=sandbox|live
+// Credentials are read at CALL time: Settings › Integrations writes them to the DB and
+// into process.env live, but a boot-time `const` would pin the old value until a redeploy.
 import { q } from '../db.js';
 
-const CID = process.env.PAYPAL_CLIENT_ID || '';
-const SEC = process.env.PAYPAL_SECRET || '';
+const cidKey = () => (process.env.PAYPAL_CLIENT_ID || '').trim();
+const secKey = () => (process.env.PAYPAL_SECRET || '').trim();
 const ENV = (process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
 const BASE = ENV === 'live' ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
 
 async function ppToken() {
-  if (!CID || !SEC) throw new Error('Server missing PAYPAL_CLIENT_ID / PAYPAL_SECRET');
-  const auth = Buffer.from(CID + ':' + SEC).toString('base64');
+  if (!cidKey() || !secKey()) throw new Error('Server missing PAYPAL_CLIENT_ID / PAYPAL_SECRET');
+  const auth = Buffer.from(cidKey() + ':' + secKey()).toString('base64');
   const r = await fetch(BASE + '/v1/oauth2/token', {
     method: 'POST',
     headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -45,7 +47,7 @@ export function paypalRoutes(app, requireAuth) {
        created_at  timestamptz default now())`).catch(() => {});
 
   // The client-id is public (it goes in the PayPal JS SDK URL); the frontend fetches it.
-  app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: CID, env: ENV, enabled: !!(CID && SEC) }));
+  app.get('/api/paypal/config', { preHandler: requireAuth }, async () => ({ clientId: cidKey(), env: ENV, enabled: !!(cidKey() && secKey()) }));
 
   app.get('/api/paypal/test', { preHandler: requireAuth }, async () => {
     try { await ppToken(); return { ok: true, env: ENV }; } catch (e) { return { ok: false, error: e.message }; }
