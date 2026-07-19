@@ -578,8 +578,19 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const { rows } = await fetchSheetRows(url);
     const mapped = mapAddressRows(rows);
     if (!mapped.length) return { skipped: 'no-mappable-rows' };
-    // No user → staff privileges, which is correct for a platform-level job.
-    return applyAddressRows(mapped, null);
+    // No user → staff privileges, which is correct for a platform-level job. Because it
+    // writes with those privileges on a TIMER, it must leave a record: an unattended job
+    // changing seller orders with no trail is how a bad sheet becomes an unexplainable
+    // data problem.
+    const res = await applyAddressRows(mapped, null);
+    if (res.updated > 0) {
+      await q(`insert into audit_log (actor, actor_role, action, entity_type, note)
+               values ($1,$2,$3,$4,$5)`,
+        ['system', 'system', 'etsy.address_sheet_poll', 'order',
+         `sheet poll filled ${res.updated} address(es); ${res.alreadyHad} already set, ${res.notFound} unmatched`])
+        .catch(() => {});
+    }
+    return res;
   }
 
   app.get('/api/etsy/address-sheet', { preHandler: requireStaff }, async () => {
@@ -1071,18 +1082,28 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       if (!cur) { notFound++; missing.push(rid); continue; }
       const existing = cur.address || {};
       if (existing.street || existing.first_line || existing.line1) { alreadyHad++; continue; }
-      const street = String(r.street || '').trim();
+      const cap = (v, n) => String(v || '').trim().slice(0, n) || null;
+      const street = cap(r.street, 120);
       if (!street) { skipped++; continue; }
-      await q('update orders set address=$1 where id=$2', [JSON.stringify({
+      // Scoped on the WRITE as well as the read. The select above already proved
+      // ownership, so this is belt-and-braces — but a write guarded only by an earlier
+      // select is one careless refactor away from being cross-tenant, and this touches
+      // other people's orders.
+      const wSql = staff
+        ? 'update orders set address=$1 where id=$2'
+        : 'update orders set address=$1 where id=$2 and seller_id=$3';
+      const wArgs = staff ? [null, id] : [null, id, user.sub];
+      wArgs[0] = JSON.stringify({
         ...existing,
-        name: String(r.name || existing.name || '').trim() || null,
-        street, street2: String(r.street2 || '').trim() || null,
-        city: String(r.city || '').trim() || null,
-        state: String(r.state || '').trim() || null,
-        zip: String(r.zip || '').trim() || null,
-        country: String(r.country || '').trim() || null,
+        name: cap(r.name || existing.name, 120),
+        street, street2: cap(r.street2, 120),
+        city: cap(r.city, 80),
+        state: cap(r.state, 40),
+        zip: cap(r.zip, 20),
+        country: cap(r.country, 40),
         source: 'etsy-csv',
-      }), id]);
+      });
+      await q(wSql, wArgs);
       updated++;
     }
     return { updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20) };

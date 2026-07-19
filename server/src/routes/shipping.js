@@ -73,7 +73,10 @@ async function epBuy(shipmentId, rateId) {
   return {
     provider: 'easypost', carrier: sr.carrier || '', service: sr.service || '',
     cost: Number(sr.rate) || null, tracking: d.tracking_code,
-    labelUrl: (d.postage_label && (d.postage_label.label_url || d.postage_label.label_pdf_url)) || ''
+    labelUrl: (d.postage_label && (d.postage_label.label_url || d.postage_label.label_pdf_url)) || '',
+    // The provider's own id, needed to void the label later. Tracking alone can't
+    // address a refund with either provider.
+    providerId: d.id || shipmentId
   };
 }
 
@@ -108,7 +111,8 @@ async function shBuy(rateObjectId) {
   return {
     provider: 'shippo', carrier: (d.rate && d.rate.provider) || '', service: (d.rate && d.rate.servicelevel && d.rate.servicelevel.name) || '',
     cost: (d.rate && Number(d.rate.amount)) || null, tracking: d.tracking_number || '',
-    labelUrl: d.label_url || ''
+    labelUrl: d.label_url || '',
+    providerId: d.object_id || ''
   };
 }
 
@@ -183,6 +187,43 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   if (t && t.p === 'ep') return await epBuy(t.s, t.r);
   if (t && t.p === 'sh') return await shBuy(t.r);
   return null;
+}
+
+
+/**
+ * Void a bought label and reclaim the postage.
+ *
+ * Both providers refund ASYNCHRONOUSLY — the call is accepted and settles later (EasyPost
+ * returns a refund_status, Shippo a QUEUED/PENDING refund). So this reports what the
+ * provider SAID rather than claiming the money is back; the caller records it as pending
+ * and the provider settles it.
+ *
+ * Refunds are only possible on an UNUSED label, and providers enforce their own windows
+ * (USPS commonly ~30 days). A refusal is returned as a message, not thrown, so the caller
+ * can record the reason.
+ */
+export async function aggregatorRefundLabel(provider, providerId) {
+  if (!providerId) return { ok: false, message: 'No provider reference stored for this label.' };
+  if (provider === 'easypost') {
+    if (!EP_KEY) return { ok: false, message: 'EasyPost is not configured.' };
+    const r = await fetch(EP_BASE + '/shipments/' + encodeURIComponent(providerId) + '/refund', {
+      method: 'POST', headers: { Authorization: epAuth(), 'Content-Type': 'application/json' }
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, message: (d.error && (d.error.message || JSON.stringify(d.error))) || ('EasyPost refund HTTP ' + r.status) };
+    return { ok: true, status: d.refund_status || 'submitted', raw: d };
+  }
+  if (provider === 'shippo') {
+    if (!SH_TOKEN) return { ok: false, message: 'Shippo is not configured.' };
+    const r = await fetch(SH_BASE + '/refunds/', {
+      method: 'POST', headers: { Authorization: shAuth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transaction: providerId, async: false })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, message: d.detail || ('Shippo refund HTTP ' + r.status) };
+    return { ok: true, status: (d.status || 'QUEUED').toLowerCase(), raw: d };
+  }
+  return { ok: false, message: `Labels bought via ${provider || 'this provider'} can't be voided automatically — refund it in the carrier's dashboard.` };
 }
 
 export function shippingRoutes(app, requireAuth, requireStaff) {
