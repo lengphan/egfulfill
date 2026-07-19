@@ -58,3 +58,26 @@ export const trackUrl = (carrier?: string | null, tracking?: string | null) => {
   if (c.includes("dhl")) return `https://www.dhl.com/en/express/tracking.html?AWB=${t}`
   return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${t}`
 }
+
+/** Where an order's address came from, so a board can say whether it synced or was
+ *  filled in by hand. Etsy withholds buyer addresses from the API, so "how did we get
+ *  this" is genuinely useful operational information, not trivia. */
+export type AddressSource = "etsy" | "csv" | "email" | "manual" | "none"
+export const addressSource = (o: OrderRow): AddressSource => {
+  const a = (o.address ?? {}) as Record<string, string>
+  const has = !!(a.street || a.first_line || a.line1 || a.address1)
+  if (!has) return "none"
+  if (a.source === "etsy-csv") return "csv"
+  if (a.source === "etsy-email") return "email"
+  // Came straight off the marketplace sync — the Etsy shape uses line1/first_line.
+  if (a.first_line || a.line1) return "etsy"
+  return "manual"
+}
+
+export const ADDRESS_SOURCE_LABEL: Record<AddressSource, string> = {
+  etsy: "from Etsy",
+  csv: "from CSV import",
+  email: "from sale email",
+  manual: "entered by hand",
+  none: "no address yet",
+}

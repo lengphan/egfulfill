@@ -16,7 +16,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
-import { numOf, variantOf, addrLine, fmtDate, trackUrl } from "@/lib/order-format"
+import { numOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 
@@ -328,7 +328,20 @@ export function OrdersHub() {
                         <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize">{o.store || o.source || "manual"}</span>
                         <span>{fmtDate(o.created_at)}</span>
                         <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
-                        {addrLine(o) && <span className="inline-flex items-center gap-0.5"><MapPin size={11} weight="fill" /> {addrLine(o)}</span>}
+                        {/* Address, and how we got it. A missing address is the single thing that stops
+                            this order shipping, so it's called out rather than simply absent. */}
+                        {addrLine(o) ? (
+                          <span className="inline-flex items-center gap-0.5" title={`Address ${ADDRESS_SOURCE_LABEL[addressSource(o)]}`}>
+                            <MapPin size={11} weight="fill" /> {addrLine(o)}
+                            <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">
+                              {ADDRESS_SOURCE_LABEL[addressSource(o)]}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800" title="Etsy withholds buyer addresses from its API — import the CSV, forward the sale email, or paste it on the label">
+                            <Warning size={10} weight="fill" /> No address — can&apos;t ship
+                          </span>
+                        )}
                         {track && (
                           <a
                             href={trackUrl(o.carrier || label?.carrier, track)}
@@ -536,6 +549,51 @@ export function OrdersHub() {
                       </div>
                     </div>
                   )}
+
+                  {/* Order detail — the things a board needs but the header can't hold:
+                      the full ship-to, the buyer's personalisation instructions, and any
+                      note. Previously none of this was reachable from a factory board at
+                      all, so staff had to open the seller's order page to read them. */}
+                  {!isCollapsed && (() => {
+                    const a = (o.address ?? {}) as Record<string, string>
+                    const street = a.street || a.first_line || a.line1 || a.address1 || ""
+                    const notes = (o as { notes?: string | null }).notes
+                    const personal = (o.items ?? []).map((it) => (it as { personalization?: string | null }).personalization).filter(Boolean)
+                    if (!street && !notes && !personal.length) return null
+                    return (
+                      <div className="mb-3 grid gap-3 rounded-lg border border-border bg-muted/30 p-3 text-xs sm:grid-cols-2">
+                        <div>
+                          <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Ship to</div>
+                          {street ? (
+                            <div className="leading-relaxed">
+                              {o.customer?.name && <div className="font-medium text-foreground">{o.customer.name}</div>}
+                              <div>{street}</div>
+                              {(a.street2 || a.second_line || a.line2) && <div>{a.street2 || a.second_line || a.line2}</div>}
+                              <div>{[a.city, a.state, a.zip || a.postal_code].filter(Boolean).join(", ")}</div>
+                              {(a.country || a.country_iso) && <div>{a.country || a.country_iso}</div>}
+                              <div className="mt-1 text-[10px] text-muted-foreground">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground">Not available yet.</div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {personal.length > 0 && (
+                            <div>
+                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Personalisation</div>
+                              {personal.map((p, i) => <div key={i} className="leading-relaxed">{p}</div>)}
+                            </div>
+                          )}
+                          {notes && (
+                            <div>
+                              <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Note</div>
+                              <div className="leading-relaxed">{notes}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   <div className={"space-y-2 " + (isCollapsed ? "hidden" : "")}>
                     {items.map((it, i) => {
