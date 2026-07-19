@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getOrders, getWallet, type OrderRow } from "@/lib/api"
+import { numOf } from "@/lib/order-format"
 import { getToken } from "@/lib/auth"
 import { clickableProps } from "@/lib/a11y"
 import { sellerStatus } from "@/lib/order-status"
@@ -29,7 +30,6 @@ const usd = (n: number) =>
 // "Open" = not yet shipped or closed (canonical seller groups).
 const OPEN_GROUPS = new Set(["received", "production", "attention"])
 
-const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
 const itemsLabel = (o: OrderRow) => {
   const items = o.items ?? []
   if (!items.length) return "—"

@@ -15,7 +15,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { itemImage } from "@/lib/order-image"
-import { numOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -451,7 +451,16 @@ export function OrdersHub() {
                         <span className="truncate text-sm font-medium">{o.customer?.name || "—"}</span>
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium capitalize">{o.store || o.source || "manual"}</span>
+                        {/* Platform fused with the shop, not a separate flag on the row
+                            above: they're one fact ("CustomBabeUSA, on Etsy"), and a
+                            per-row brand logo would put 50 colour spots in competition
+                            with the status badges, which are what should stand out. */}
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
+                          <span className="text-muted-foreground">{platformOf(o)}</span>
+                          {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && (
+                            <> · <span className="capitalize">{o.store}</span></>
+                          )}
+                        </span>
                         <span>{fmtDate(o.created_at)}</span>
                         <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
                         {/* Address, and how we got it. A missing address is the single thing that stops

@@ -7,10 +7,10 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { getOrders, type OrderRow } from "@/lib/api"
+import { numOf } from "@/lib/order-format"
 import { getToken, getUser } from "@/lib/auth"
 import { orderStage } from "@/lib/factory-status"
 
-const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
 const fmtDate = (s?: string | null) => {
   if (!s) return "—"
   const d = new Date(s)

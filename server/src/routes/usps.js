@@ -288,7 +288,22 @@ async function recordLabel(orderId, tracking, carrier) {
             const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
-        } catch (e2) { /* fall through to USPS-direct / mock */ }
+          reply.code(502);
+          return { error: 'The shipping provider returned no label. Nothing was charged.' };
+        } catch (e2) {
+          // Do NOT fall through to USPS-direct. That path bills a USPS EPS account, so a
+          // Shippo/EasyPost failure used to surface as "we are having trouble validating
+          // your credit card" — an EPS error for an account the aggregator path never
+          // needed, which sends you debugging the wrong system entirely.
+          reply.code(502);
+          return { error: 'Label purchase failed: ' + (e2 && e2.message ? e2.message : String(e2)) };
+        }
+      }
+      // No aggregator configured, and USPS-direct wasn't explicitly asked for. Say so
+      // plainly rather than attempting a path that needs USPS EPS billing approval.
+      if (!shippingEnabled() && !b.directUsps && !process.env.USPS_MOCK) {
+        reply.code(400);
+        return { error: 'No shipping provider is configured. Set SHIPPO_API_TOKEN (or EASYPOST_API_KEY) on the server, or pass directUsps to buy through USPS EPS.' };
       }
       // TEST MODE — when USPS_MOCK is set, skip OAuth/payment and return a SAMPLE
       // label so the whole flow (modal → label → tracking → seller sync) can be

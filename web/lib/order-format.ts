@@ -8,8 +8,23 @@ import { type OrderRow, type OrderItem } from "@/lib/api"
 
 export const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-/** Display id. NB: o.id !== o.num for marketplace orders — sellers know the seq. */
-export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : o.id)
+/**
+ * Display id. NB: o.id !== o.num for marketplace orders — sellers know the seq.
+ *
+ * Marketplace ids are stored prefixed (`etsy-4119530158`) because the prefix is
+ * load-bearing for filtering. It is NOT load-bearing for reading: the trailing number is
+ * the real Etsy receipt number, which is what the buyer quotes and what the seller's Etsy
+ * dashboard shows. Stripping the prefix makes the number matchable against the source
+ * instead of being an internal-looking string, and the platform is shown next to the shop
+ * on the row's second line, where it belongs.
+ */
+const SOURCE_PREFIX = /^(etsy|shopify|amazon|ebay|tiktok|woo|walmart)-/i
+export const numOf = (o: OrderRow) => (o.seq ? `#${o.seq}` : String(o.id).replace(SOURCE_PREFIX, ""))
+/** The platform an order came from, title-cased — "Etsy", "Shopify", or "Manual". */
+export const platformOf = (o: OrderRow) => {
+  const raw = String(o.source || (String(o.id).match(SOURCE_PREFIX)?.[1] ?? "") || "manual").toLowerCase()
+  return raw.charAt(0).toUpperCase() + raw.slice(1)
+}
 export const totalOf = (o: OrderRow) => Number(o.total ?? 0) || 0
 export const customerOf = (o: OrderRow) => o.customer?.name || "—"
 export const storeOf = (o: OrderRow) => {
