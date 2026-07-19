@@ -26,6 +26,7 @@ import {
   getFactorySettings,
   deleteUserAdmin,
   type ShipFromAddress,
+  type ProductType,
   setFactorySettings,
   getUsers,
   updateUserAdmin,
@@ -515,6 +516,9 @@ function PlatformPanel() {
   // against. Lives here rather than in the ship dialog because it's set once for the
   // whole team, not per shipment.
   const [shipFrom, setShipFrom] = useState<ShipFromAddress>({})
+  // Product types + the mockup that stands in for the whole category.
+  const [types, setTypes] = useState<ProductType[]>([])
+  const [newType, setNewType] = useState("")
   const setFromField = (k: keyof ShipFromAddress, v: string) => setShipFrom((p) => ({ ...p, [k]: v }))
   const setBand = (k: string, v: string) => setBands((p) => ({ ...p, [k]: v.replace(/[^0-9.]/g, "") }))
 
@@ -526,6 +530,7 @@ function PlatformPanel() {
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
       setShipFrom(r.ship_from ?? {})
+      setTypes(r.product_types ?? [])
       setBands(Object.fromEntries(
         ["ship_cap", "ship_heavy", "ship_garment", "method_dtg", "method_dtf", "method_emb", "method_apl", "method_lsr"]
           .map((k) => [k, r[k] != null ? String(r[k]) : ""])
@@ -544,6 +549,7 @@ function PlatformPanel() {
         emb_price: embPrice === "" ? undefined : Number(embPrice),
         ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
         ship_from: shipFrom,
+        product_types: types,
       })
       if (r.error) throw new Error(r.error)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
@@ -561,6 +567,64 @@ function PlatformPanel() {
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
+      </div>
+
+      {/* Product types. The default mockup is the labour-saver: set one 2D outline per
+          category and every product in it inherits a blank for the Design Maker, instead
+          of an upload per product. A product's own mockup still wins. */}
+      <div className="border-t border-border p-5">
+        <div className="mb-1 text-sm font-medium">Product types</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Each type can carry a default mockup — a simple 2D outline that represents the whole
+          category. Products of that type use it when they have no mockup of their own, so adding
+          three hats needs one hat graphic, not three.
+        </p>
+        <div className="space-y-2">
+          {types.map((t, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
+              <label className="relative size-12 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted">
+                {t.mockup ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.mockup} alt="" className="size-full object-contain" />
+                ) : (
+                  <span className="flex size-full items-center justify-center text-muted-foreground"><Plus size={14} /></span>
+                )}
+                <input
+                  type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]; if (!f) return
+                    const rd = new FileReader()
+                    rd.onload = () => setTypes((p) => p.map((x, j) => (j === i ? { ...x, mockup: String(rd.result) } : x)))
+                    rd.readAsDataURL(f)
+                  }}
+                />
+              </label>
+              <Input
+                value={t.name}
+                onChange={(e) => setTypes((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                className="h-9 flex-1"
+              />
+              {t.mockup && (
+                <Button variant="outline" size="sm" onClick={() => setTypes((p) => p.map((x, j) => (j === i ? { ...x, mockup: null } : x)))}>
+                  Clear mockup
+                </Button>
+              )}
+              <Button variant="outline" size="sm" aria-label={`Remove ${t.name}`} onClick={() => setTypes((p) => p.filter((_, j) => j !== i))}>
+                <Trash size={14} />
+              </Button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newType} onChange={(e) => setNewType(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && newType.trim()) { setTypes((p) => [...p, { name: newType.trim(), mockup: null }]); setNewType("") } }}
+              placeholder="Add a type…" className="h-9 max-w-xs"
+            />
+            <Button variant="outline" size="sm" disabled={!newType.trim()} onClick={() => { setTypes((p) => [...p, { name: newType.trim(), mockup: null }]); setNewType("") }}>
+              <Plus size={14} weight="bold" /> Add
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Ship-from. A label with no origin is rejected by the carrier, so this is the

@@ -80,8 +80,29 @@ export function mockupFaces(p: CatalogProduct | null, color?: string | null): Mo
 
 // The single best mockup image for a resolved product + colour (front face). Falls back
 // to the order line's own image when the product can't be resolved.
+/**
+ * Category mockups, keyed by product type. Populated once from platform settings (see
+ * `loadTypeMockups`) and consulted as the LAST resort in bestMockup — so a product with
+ * no imagery of its own still shows the right silhouette instead of an empty stage.
+ * Module-level rather than threaded through every call site, because every mockup lookup
+ * in the app would otherwise need the settings object passed down to it.
+ */
+let TYPE_MOCKUPS: Record<string, string> = {}
+export function setTypeMockups(types: { name: string; mockup?: string | null }[]) {
+  const m: Record<string, string> = {}
+  for (const t of types ?? []) if (t?.name && t.mockup) m[t.name.toLowerCase()] = t.mockup
+  TYPE_MOCKUPS = m
+}
+/** The category stand-in for a product, if its type has one. */
+export function typeMockupOf(p: CatalogProduct | null): string {
+  const key = String(p?.type ?? "").toLowerCase()
+  return (key && TYPE_MOCKUPS[key]) || ""
+}
+
 export function bestMockup(p: CatalogProduct | null, color?: string | null, fallback?: string): string {
-  return mockupFaces(p, color)[0]?.url || fallback || ""
+  // The category stand-in sits between the product's own imagery and the caller's
+  // fallback: better than a listing photo, worse than a real mockup of this product.
+  return mockupFaces(p, color)[0]?.url || typeMockupOf(p) || fallback || ""
 }
 
 /** Sizes a product offers. Many catalog rows carry no `sizes` array and define their

@@ -6,12 +6,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
-import { getFactorySettings, type CatalogProduct, type FactorySettings } from "@/lib/api"
+import { setTypeMockups } from "@/lib/variant-resolve"
+import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
 import { normTech } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
 const METHODS = ["DTG", "Embroidery", "Screen Print", "Sublimation", "Vinyl"]
+// Fallback only — the real list is managed in Settings → Platform. Used until settings
+// load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
 const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
 const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
@@ -69,6 +72,15 @@ export function ProductEditorDialog({
 }) {
   const [name, setName] = useState("")
   const [type, setType] = useState("Apparel")
+  // Managed types + their category mockups.
+  const [types, setTypes] = useState<ProductType[]>([])
+  useEffect(() => {
+    const t = setTimeout(() => { getFactorySettings().then((r) => { const t = r.product_types ?? []; setTypes(t); setTypeMockups(t) }).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+  const typeNames = types.length ? types.map((t) => t.name) : TYPES
+  /** The category's stand-in mockup, used when this product has none of its own. */
+  const typeMockup = types.find((t) => t.name === type)?.mockup ?? null
   const [method, setMethod] = useState("DTG")
   const [price, setPrice] = useState("")
   const [basePrice, setBasePrice] = useState("")
@@ -215,7 +227,7 @@ export function ProductEditorDialog({
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Type</span>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
                 <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Method</span>
                   <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
@@ -223,6 +235,7 @@ export function ProductEditorDialog({
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <UploadSimple size={13} /> The mockup becomes the blank in the Design Maker.
+                {typeMockup && !img && <span className="ml-1">Using the {type} default — upload one here to override it.</span>}
               </div>
             </div>
           </div>

@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, type CatalogProduct } from "@/lib/api"
+import { setTypeMockups } from "@/lib/variant-resolve"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
@@ -89,6 +90,13 @@ export function DesignMaker() {
 
   // Load the catalog once. Opened from a product ("Start designing") → preload that
   // product's mockup as the blank.
+  // Category mockups, so a product with no imagery of its own still resolves to the right
+  // silhouette instead of an empty stage.
+  useEffect(() => {
+    const t = setTimeout(() => { getProductTypes().then(setTypeMockups).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     const id = setTimeout(() => {
       getCatalogProducts()

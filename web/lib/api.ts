@@ -709,18 +709,26 @@ export type FactorySettings = {
 } & {
   ship_from?: ShipFromAddress | null
   ship_from_complete?: boolean
+  product_types?: ProductType[]
 }
+/** A managed product type and the 2D mockup that represents the whole category. */
+export type ProductType = { name: string; mockup?: string | null }
 export type ShipFromAddress = {
   name?: string; company?: string; street?: string; street2?: string
   city?: string; state?: string; zip?: string; country?: string
   phone?: string; email?: string
+}
+/** Types + category mockups, readable by any signed-in user (the seller Design Maker
+ *  needs them to resolve a blank). Distinct from getFactorySettings, which is staff-only. */
+export function getProductTypes() {
+  return api<ProductType[]>(`/api/product_types`)
 }
 export function getFactorySettings() {
   return api<FactorySettings>(`/api/factory/settings`)
 }
 /** The numeric keys are addressed by name from the settings form, so the body stays
  *  loosely keyed — but the values are narrowed to what the route actually accepts. */
-export function setFactorySettings(body: Record<string, number | ShipFromAddress | undefined>) {
+export function setFactorySettings(body: Record<string, number | ShipFromAddress | ProductType[] | undefined>) {
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 

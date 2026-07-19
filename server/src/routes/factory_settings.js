@@ -45,6 +45,26 @@ export function shippingBandOf(typeOrName) {
 // were previously bought with whatever `from` the client happened to send, which meant no
 // address at all; this is the single place the floor sets it once.
 export const SHIP_FROM_KEY = 'ship_from';
+
+/**
+ * Product types, managed rather than hardcoded — they were a literal array in the product
+ * dialog, so there was no way to add one, and no way to attach anything to one.
+ *
+ * Each type carries a DEFAULT MOCKUP. That's the point: a 2D outline that represents the
+ * whole category means adding three hats needs one hat graphic, set once, instead of an
+ * upload per product. A product's own mockup still wins when it has one.
+ */
+export const PRODUCT_TYPES_KEY = 'product_types';
+const DEFAULT_TYPES = ['Apparel', 'Headwear', 'Bags', 'Drinkware', 'Accessories', 'Other'];
+
+export async function readProductTypes() {
+  try {
+    const r = await q('select value from settings where key=$1', [PRODUCT_TYPES_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    if (Array.isArray(v)) return v.filter((t) => t && t.name);
+  } catch { /* table not ready */ }
+  return DEFAULT_TYPES.map((name) => ({ name, mockup: null }));
+}
 const SHIP_FROM_FIELDS = ['name', 'company', 'street', 'street2', 'city', 'state', 'zip', 'country', 'phone', 'email'];
 
 export async function readShipFrom() {
@@ -77,10 +97,19 @@ async function readAll() {
 }
 
 export function factorySettingsRoutes(app, requireAuth, requireStaff) {
+  // Types + their category mockups are needed by the SELLER-side Design Maker to resolve a
+  // blank, but /api/factory/settings is staff-only (it carries cost and margin policy).
+  // So the types get their own read, open to any signed-in user — names and mockup images
+  // only, nothing commercial.
+  app.get('/api/product_types', { preHandler: requireAuth }, async () => {
+    await ensure();
+    return readProductTypes();
+  });
+
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
-    const [nums, shipFrom] = await Promise.all([readAll(), readShipFrom()]);
-    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom) };
+    const [nums, shipFrom, types] = await Promise.all([readAll(), readShipFrom(), readProductTypes()]);
+    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: types };
   });
 
   app.put('/api/factory/settings', { preHandler: requireStaff }, async (req, reply) => {
@@ -101,7 +130,21 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
       addr.country = addr.country || 'US';
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHIP_FROM_KEY, JSON.stringify(addr)]);
     }
+    if (Array.isArray(b.product_types)) {
+      // Normalised on the way in: a blank name would create an unselectable type, and
+      // duplicates would make the product dropdown ambiguous.
+      const seen = new Set();
+      const types = [];
+      for (const t of b.product_types) {
+        const name = String((t && t.name) || '').trim();
+        if (!name || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        types.push({ name, mockup: (t && typeof t.mockup === 'string' && t.mockup) ? t.mockup : null });
+      }
+      await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',
+        [PRODUCT_TYPES_KEY, JSON.stringify(types)]);
+    }
     const shipFrom = await readShipFrom();
-    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom) };
+    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: await readProductTypes() };
   });
 }
