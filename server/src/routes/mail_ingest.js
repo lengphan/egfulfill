@@ -20,6 +20,7 @@
 // The last three are the same guards the CSV import uses, so a compromised pipe can do
 // no more than a mistyped spreadsheet.
 import { q } from '../db.js';
+import crypto from 'crypto';
 
 const SECRET = process.env.MAIL_INGEST_SECRET || '';
 
@@ -105,6 +106,21 @@ export function parseSaleEmail(text) {
  * Anything else is refused: this check is what stops someone who learns the ingest URL
  * from writing addresses onto orders.
  */
+/**
+ * Each seller gets a unique ingest address — u-<token>@inbound.<domain>. Matching on that
+ * is sturdier than matching the sender: mail forwarded by a rule frequently arrives with
+ * the FORWARDER's address, or Etsy's, rather than the seller's own, so From-matching
+ * rejects perfectly legitimate mail. The token also means a seller needs no registration
+ * step at all — they just forward to the address we show them.
+ */
+async function resolveByIngestToken(toField) {
+  const m = String(toField || '').match(/u-([a-z0-9]{12,})@/i);
+  if (!m) return null;
+  const r = await q(`select u.id, u.role from users u where u.ingest_token = $1 limit 1`, [m[1].toLowerCase()])
+    .catch(() => ({ rows: [] }));
+  return r.rows[0] || null;
+}
+
 async function resolveForwarder(email) {
   const byUser = (await q('select id, role from users where lower(email)=$1 limit 1', [email])).rows[0];
   if (byUser) return byUser;
@@ -144,13 +160,22 @@ export function normalizeInbound(body) {
     ? (fromRaw.Address || fromRaw.address || fromRaw.email || '')
     : String(fromRaw || '');
 
+  // Who it was addressed TO — that's the per-seller ingest address, and it identifies
+  // the account far more reliably than From, which forwarding routinely rewrites.
+  const toRaw = src.To || src.to || src.recipient || src.Recipient || '';
+  const toList = Array.isArray(toRaw) ? toRaw : [toRaw];
+  const to = toList.map((t) => (typeof t === 'object' ? (t.Address || t.address || t.email || '') : String(t || ''))).join(', ');
+
   const text = src.RawTextBody || src.TextBody || src.text || src['body-plain'] || src.Text || '';
   const html = src.RawHtmlBody || src.HtmlBody || src.html || src['body-html'] || src['stripped-html'] || src.Html || '';
   const subject = src.Subject || src.subject || '';
-  return { from: String(from || ''), subject: String(subject || ''), text: String(text || ''), html: String(html || '') };
+  return { from: String(from || ''), to: String(to || ''), subject: String(subject || ''), text: String(text || ''), html: String(html || '') };
 }
 
 export function mailIngestRoutes(app, requireAuth) {
+  q('alter table users add column if not exists ingest_token text').catch(() => {});
+  q('create unique index if not exists users_ingest_token_idx on users (ingest_token) where ingest_token is not null').catch(() => {});
+
   q(`create table if not exists mail_forwarders (
        email text primary key,
        user_id uuid references users(id) on delete cascade,
@@ -159,6 +184,22 @@ export function mailIngestRoutes(app, requireAuth) {
   // A seller registers the inbox they actually forward from. Scoped to themselves —
   // claiming an address only ever binds it to the caller's own account, so it can't be
   // used to hijack another seller's forwards.
+  /** The seller's own ingest address — minted on first ask, then stable. */
+  app.get('/api/mail/ingest-address', { preHandler: requireAuth }, async (req) => {
+    const domain = process.env.MAIL_INGEST_DOMAIN || '';
+    let row = (await q('select ingest_token from users where id=$1', [req.user.sub])).rows[0] || {};
+    if (!row.ingest_token) {
+      const tok = crypto.randomBytes(8).toString('hex');
+      await q('update users set ingest_token=$1 where id=$2 and ingest_token is null', [tok, req.user.sub]).catch(() => {});
+      row = (await q('select ingest_token from users where id=$1', [req.user.sub])).rows[0] || {};
+    }
+    return {
+      token: row.ingest_token || null,
+      address: row.ingest_token && domain ? `u-${row.ingest_token}@${domain}` : null,
+      configured: !!domain,
+    };
+  });
+
   app.get('/api/mail/forwarders', { preHandler: requireAuth }, async (req) => {
     const own = await q('select email from mail_forwarders where user_id=$1 order by email', [req.user.sub]).catch(() => ({ rows: [] }));
     const acct = (await q('select email from users where id=$1', [req.user.sub])).rows[0] || {};
@@ -201,8 +242,8 @@ export function mailIngestRoutes(app, requireAuth) {
     // The FORWARDER must be a known account — otherwise anyone who learns the URL could
     // post addresses. Staff may forward on any seller's behalf.
     const fromAddr = (b.from.match(/[\w.+-]+@[\w.-]+/) || [''])[0].toLowerCase();
-    if (!fromAddr) { reply.code(400); return { error: 'No sender address.' }; }
-    const sender = await resolveForwarder(fromAddr);
+    // TO first (the per-seller token), then fall back to identifying the sender.
+    const sender = (await resolveByIngestToken(b.to)) || (await resolveForwarder(fromAddr));
     if (!sender) {
       reply.code(403);
       return { error: `${fromAddr} isn't linked to an account. Add it under Settings → Forwarding addresses, or forward from the email you signed up with.` };
