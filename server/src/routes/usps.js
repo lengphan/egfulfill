@@ -14,6 +14,7 @@
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorVerifyAddress } from './shipping.js';
+import { missingArtwork } from './orders.js';
 
 // Map a USPS mailClass to a service-name hint for the aggregator rate filter.
 function _svcPref(mc) {
@@ -240,6 +241,27 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
     }
   });
 
+
+/**
+ * Record a bought label on the order.
+ *
+ * Buying a label is a fact, so tracking is always written. Flipping the order to SHIPPED
+ * is a CLAIM, and answers to the same rule as every other route to that status: every
+ * decorated item must have artwork. Without this the label routes wrote 'shipped'
+ * straight to SQL and quietly shipped work that was never designed.
+ */
+async function recordLabel(orderId, tracking, carrier) {
+  if (!orderId) return { shipped: false };
+  const missing = await missingArtwork(orderId).catch(() => []);
+  if (missing.length) {
+    await q('update orders set tracking=$1, carrier=$2 where id=$3', [tracking, carrier || 'USPS', orderId]).catch(() => {});
+    return { shipped: false, heldFor: missing };
+  }
+  await q(`update orders set tracking=$1, carrier=$2, factory_status='shipped', status='shipped' where id=$3`,
+    [tracking, carrier || 'USPS', orderId]).catch(() => {});
+  return { shipped: true };
+}
+
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},
   //   weightOz, length, width, height, mailClass, imageType('PDF'|'ZPL...'), orderId }
   app.post('/api/usps/label', { preHandler: requireStaff }, async (req, reply) => {
@@ -258,8 +280,8 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
           if (buy && buy.tracking) {
-            if (b.orderId) { try { await q(`update orders set tracking=$1, carrier=$2, factory_status='shipped', status='shipped' where id=$3`, [buy.tracking, buy.carrier || 'USPS', b.orderId]); } catch (e2) {} }
-            return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider };
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier);
+            return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
         } catch (e2) { /* fall through to USPS-direct / mock */ }
       }
@@ -279,7 +301,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
           + '<div style="text-align:center;font-family:monospace;font-weight:700;font-size:15px;margin-top:4px">' + t + '</div>'
           + ((b.refNo || b.refNo2 || b.contents) ? '<div style="border-top:1px dashed #bbb;margin-top:10px;padding-top:6px;font-size:10px;color:#555;line-height:1.5">' + [b.refNo ? 'Ref 1: ' + e(b.refNo) : '', b.refNo2 ? 'Ref 2: ' + e(b.refNo2) : '', b.contents ? e(b.contents) : ''].filter(Boolean).join('<br>') + '</div>' : '')
           + '<div style="text-align:center;font-size:10px;color:#999;margin-top:10px">NOT VALID FOR POSTAGE · TEST LABEL</div></div>';
-        if (b.orderId) { try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [t, b.orderId]); } catch (e2) {} }
+        const rec = await recordLabel(b.orderId, t, 'USPS');
         return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: html };
       }
       const oauth = await oauthToken();
@@ -328,7 +350,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
       }
       // Persist tracking onto the order if one was passed.
       if (b.orderId && tracking) {
-        try { await q(`update orders set tracking=$1, carrier='USPS', factory_status='shipped', status='shipped' where id=$2`, [tracking, b.orderId]); } catch (e) {}
+        await recordLabel(b.orderId, tracking, 'USPS');
       }
       return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
     } catch (e) { reply.code(400); return { error: e.message }; }

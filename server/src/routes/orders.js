@@ -80,18 +80,24 @@ export function stageDenial(role, current, target) {
  * An item is "decorated" if it carries a print method. A plain blank with no method needs
  * no artwork, so requiring one would deadlock those orders.
  */
-async function shipBlockers(orderId) {
-  const [items, order] = await Promise.all([
-    q('select sku, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows),
-    q('select tracking from orders where id=$1', [orderId]).then((r) => r.rows[0] || {}),
-  ]);
+/** Items still missing artwork. Exported because label purchase must apply the same rule
+ *  — it writes 'shipped' directly, and would otherwise ship undecorated work. */
+export async function missingArtwork(orderId) {
+  const items = await q('select sku, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows);
   const designs = await q('select distinct sku from order_designs where order_id=$1', [orderId])
     .then((r) => new Set(r.rows.map((x) => String(x.sku))))
     .catch(() => new Set());
-  const missing = items
-    .filter((it) => String(it.print_type || '').trim())          // decorated lines only
+  return items
+    .filter((it) => String(it.print_type || '').trim())
     .filter((it) => !designs.has(String(it.sku || '')))
     .map((it) => it.name || it.sku || 'an item');
+}
+
+async function shipBlockers(orderId) {
+  const [missing, order] = await Promise.all([
+    missingArtwork(orderId),
+    q('select tracking from orders where id=$1', [orderId]).then((r) => r.rows[0] || {}),
+  ]);
   const blockers = [];
   if (missing.length) blockers.push(`${missing.length} item${missing.length === 1 ? '' : 's'} still ${missing.length === 1 ? 'has' : 'have'} no artwork: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`);
   if (!order.tracking) blockers.push('no shipping label has been bought for this order yet');
