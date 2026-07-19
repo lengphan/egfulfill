@@ -297,6 +297,23 @@ export function ordersRoutes(app, requireAuth) {
   q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
   // List
+  // ONE order. The detail page used to fetch every order and search it, so an order the
+  // list happened to exclude read as "not found" even though it existed. Staff may read
+  // any order; a seller only their own.
+  app.get('/api/orders/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const agg = `coalesce(json_agg(i.* order by i.id) filter (where i.id is not null), '[]') as items`;
+    const r = await q(
+      `select o.*, ${agg} from orders o left join order_items i on i.order_id = o.id
+        where o.id = $1 group by o.id`, [req.params.id]);
+    const row = r.rows[0];
+    if (!row) { reply.code(404); return { error: 'Order not found' }; }
+    if (!isStaff(req.user)) {
+      const sel = await resolveSeller(req.user);
+      if (!sel || String(row.seller_id) !== String(sel)) { reply.code(404); return { error: 'Order not found' }; }
+    }
+    return row;
+  });
+
   app.get('/api/orders', { preHandler: requireAuth }, async (req) => {
     const join = `left join order_items i on i.order_id = o.id`;
     // ORDER BY i.id keeps line-item order stable across every board, so the per-line
@@ -312,6 +329,12 @@ export function ordersRoutes(app, requireAuth) {
         `select o.*, ${agg} from orders o ${join}
          where o.factory_order = true
             or coalesce(o.factory_status, '') not in ('new', 'draft', '')
+            -- ...OR the order belongs to a STAFF account, i.e. the factory created it
+            -- itself. Without this a manual order made on a factory board was invisible
+            -- to the board that made it: factory_order is derived from the id (etsy-%),
+            -- so a manual FF-* order can never set it, and a brand-new order is still at
+            -- '' / 'new', which the push filter excludes.
+            or exists (select 1 from users u where u.id = o.seller_id and u.role <> 'seller')
          group by o.id order by o.created_at desc`);
       return r.rows;
     }

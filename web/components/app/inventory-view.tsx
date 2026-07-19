@@ -133,7 +133,7 @@ export function InventoryView() {
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search SKU, name, variant…" className="h-9 pl-9" />
           </div>
           {cats.length > 0 && (
-            <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+            <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
               <option value="">All categories</option>
               {cats.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>

@@ -424,7 +424,7 @@ function TeamPanel() {
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="eg-select h-9 rounded-lg border border-border bg-card px-3 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          className="eg-select h-9 rounded-2xl border border-border bg-card px-3 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         >
           <option value="editor">Editor</option>
           <option value="viewer">Viewer</option>
@@ -776,7 +776,7 @@ function UsersPanel() {
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Email / username</span><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="ops@egful.store" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Password</span><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="8+ characters" className="h-9" /></label>
           <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Role</span>
-            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
+            <select value={nu.role} onChange={(e) => setNu({ ...nu, role: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>
           </label>
           <Button size="sm" onClick={addUser} disabled={busy === "new"}>{busy === "new" ? <CircleNotch size={14} className="animate-spin" /> : <><UserPlus size={14} weight="bold" /> Create</>}</Button>
           {nuErr && <span className="w-full text-sm text-destructive">{nuErr}</span>}
@@ -822,11 +822,11 @@ function UsersPanel() {
                       {u.active === false && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>{!isAdminCaller ? <span className="text-sm capitalize">{u.role}</span> : <select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>}</TableCell>
+                    <TableCell>{!isAdminCaller ? <span className="text-sm capitalize">{u.role}</span> : <select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>}</TableCell>
                     <TableCell>
                       {/* Only meaningful for sellers — staff have no subscription. */}
                       {u.role === "seller" && isAdminCaller ? (
-                        <select value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-lg border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                        <select value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                           {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
                         </select>
                       ) : u.role === "seller" ? <span className="text-sm capitalize">{u.plan ?? "starter"}</span> : <span className="text-xs text-muted-foreground">—</span>}

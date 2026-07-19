@@ -682,7 +682,7 @@ export function OrdersHub() {
                       <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground">Service</span>
-                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                             {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                           </select>
                         </label>
@@ -715,7 +715,7 @@ export function OrdersHub() {
                         <div className="flex flex-wrap items-end gap-2 border-t border-border p-3">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">Carrier</span>
-                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                               {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>
                           </label>
@@ -890,7 +890,7 @@ export function OrdersHub() {
                                   value=""
                                   onChange={(e) => { if (e.target.value) advanceItem(o, it, e.target.value) }}
                                   disabled={busy === key}
-                                  className="eg-select h-8 shrink-0 rounded-lg border border-border bg-card px-1.5 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                  className="eg-select h-8 shrink-0 rounded-2xl border border-border bg-card px-1.5 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                                   aria-label={`Flag ${it.name || it.sku}`}
                                   title="The warehouse has this item. You can still stop it if the artwork is wrong."
                                 >
@@ -904,7 +904,7 @@ export function OrdersHub() {
                                 value={normalizeStage(it.factory_status)}
                                 onChange={(e) => advanceItem(o, it, e.target.value)}
                                 disabled={busy === key}
-                                className={"eg-select h-8 shrink-0 rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
+                                className={"eg-select h-8 shrink-0 rounded-2xl border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-border bg-card hover:border-primary/40")}
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title="Set this item's status — forward or back"
                               >

@@ -57,7 +57,11 @@ export function staffTools(role?: string | null): StaffNavItem[] {
 }
 
 // Pages every staff member may use inside the seller (app) group.
-const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help"]
+// Seller-shell pages any staff role may sit on. /orders is here because the boards link
+// INTO it — "Open order" and manual order creation both land on seller-shell routes, and
+// without this a non-admin was silently bounced to their dashboard, which reads as the
+// page being broken rather than forbidden.
+const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help", "/orders"]
 // May this staff role sit on this (app) page? (admin = all; others = shared + their tools)
 export function staffCanUseAppPath(role: string | null | undefined, pathname: string): boolean {
   if (role === "admin") return true

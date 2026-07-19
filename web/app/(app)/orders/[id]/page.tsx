@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   getOrders,
+  getOrder,
   getOrderDesigns,
   getOrderMessages,
   getOrderQuote,
@@ -44,7 +45,11 @@ const fmtMsgTime = (ts?: number) => {
   return isNaN(d.getTime()) ? "" : d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
 }
 
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+// Coerce rather than trust: a manual order legitimately has no total until it's priced,
+// and a quote field can be absent — either one used to take the whole page down with
+// "cannot read properties of undefined".
+const usd = (n: number | string | null | undefined) =>
+  `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtDateTime = (s?: string | null) => {
   if (!s) return "—"
@@ -60,6 +65,7 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const id = decodeURIComponent(String(params?.id ?? ""))
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  const [one, setOne] = useState<OrderRow | null>(null)
   const [designs, setDesigns] = useState<Record<string, OrderDesign>>({})
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
@@ -84,6 +90,15 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     let alive = true
+    // Fetch THIS order directly. Scanning getOrders() meant an order the list filters out
+    // — a freshly created factory order, say — rendered as "Order not found" despite
+    // existing. The list is still loaded for neighbouring context, but it no longer
+    // decides whether the order exists.
+    if (id) {
+      getOrder(String(id))
+        .then((o) => { if (alive && o && !o.error) setOne(o) })
+        .catch(() => {})
+    }
     getOrders()
       .then((rows) => alive && setOrders(rows ?? []))
       .catch(() => alive && setOrders([]))
@@ -122,7 +137,8 @@ export default function OrderDetailPage() {
     }
   }
 
-  const order = useMemo(() => (orders ?? []).find((o) => o.id === id) ?? null, [orders, id])
+  // The directly-fetched order wins; the list is a fallback for anything already loaded.
+  const order = useMemo(() => one ?? (orders ?? []).find((o) => o.id === id) ?? null, [one, orders, id])
 
   // The quote is fetched HERE rather than inside the submit button because two places
   // render it: the Summary card (the breakdown) and the confirm dialog (the amount).
@@ -381,7 +397,7 @@ export default function OrderDetailPage() {
               falls back to the order's own totals. */}
           <SectionCard title="Summary">
             <dl className="space-y-2 p-5 text-sm">
-              {quote && !quote.unpriced.length ? (
+              {quote && !quote.unpriced?.length ? (
                 <>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Production</dt>
@@ -409,7 +425,7 @@ export default function OrderDetailPage() {
                   </div>
                 </>
               )}
-              {quote?.unpriced.length ? (
+              {quote?.unpriced?.length ? (
                 <p className="border-t border-border pt-2 text-xs text-destructive">
                   Not priced yet: {quote.unpriced.map((u) => u.sku).join(", ")} — pick a blank on those lines first.
                 </p>
@@ -469,8 +485,8 @@ function SubmitOrderButton({ order, quote, onDone }: { order: OrderRow; quote: O
     } finally { setBusy(false) }
   }
 
-  const money = (n: number) => `$${n.toFixed(2)}`
-  const blocked = !!quote?.unpriced.length
+  const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toFixed(2)}`
+  const blocked = !!quote?.unpriced?.length
 
   return (
     <>

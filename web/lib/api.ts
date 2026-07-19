@@ -575,6 +575,11 @@ export type OrderRow = {
   items?: OrderItem[]
 }
 
+/** ONE order by id. Staff may read any; a seller only their own. Preferred over scanning
+ *  getOrders(), which excludes orders by role/status and made a real order read as missing. */
+export function getOrder(id: string) {
+  return api<OrderRow & { error?: string }>(`/api/orders/${encodeURIComponent(id)}`)
+}
 export function getOrders() {
   return api<OrderRow[]>(`/api/orders`)
 }

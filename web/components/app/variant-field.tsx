@@ -63,7 +63,7 @@ export function VariantField({
     <DropdownMenuTrigger
       disabled={disabled || !hasOptions}
       className={cn(
-        "flex w-full min-w-0 items-center gap-1.5 rounded-lg border bg-card text-left font-medium transition-colors",
+        "flex w-full min-w-0 items-center gap-1.5 rounded-2xl border bg-card text-left font-medium transition-colors",
         "hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         "disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border",
         compact ? "h-7 px-2 text-[11px]" : "h-9 px-2.5 text-xs",

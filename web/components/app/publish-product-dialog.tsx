@@ -277,14 +277,14 @@ export function PublishProductDialog({
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Size priced</span>
-                    <select value={size} onChange={(e) => setSize(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    <select value={size} onChange={(e) => setSize(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                       {sizeOpts.length === 0 && <option value="">Any</option>}
                       {sizeOpts.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
-                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
                       {methodOpts.length === 0 && <option value="">Any</option>}
                       {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
