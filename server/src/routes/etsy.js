@@ -6,6 +6,7 @@ import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { usdRates } from '../fx.js';
 import { requireSpydeck } from '../entitlements.js';
+import { fetchSheetRows } from './sheets.js';
 
 const KEYSTRING   = (process.env.ETSY_KEYSTRING || '').trim();
 const SHARED_SECRET = (process.env.ETSY_SHARED_SECRET || '').trim();
@@ -534,6 +535,78 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // Staff can run it on demand; it also runs on a timer below.
   app.post('/api/etsy/backfill-addresses', { preHandler: requireStaff }, async () => backfillMissingAddresses(200));
 
+  // ── Address sheet (optional automation of the CSV step) ──────────────────────
+  // The seller still exports from Etsy by hand — that download is behind their Shop
+  // Manager session and automating it would mean holding their credentials, which we
+  // will not do. What IS automated is the INGESTION: drop the export into a
+  // link-shared Google Sheet and this reads it on a timer. Read-only, key-based, and
+  // it touches no seller credential.
+  const SHEET_KEY = 'etsy_address_sheet';
+
+  /** Map a sheet/CSV header row + rows into the address shape applyAddressRows expects.
+   *  Header matching is forgiving: Etsy has renamed these columns over the years and
+   *  sellers re-save through Excel. */
+  function mapAddressRows(rows) {
+    if (!rows || rows.length < 2) return [];
+    const norm = (h) => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const headers = rows[0].map(norm);
+    const pick = (...cands) => {
+      for (const c of cands) { const i = headers.indexOf(norm(c)); if (i >= 0) return i; }
+      for (const c of cands) { const i = headers.findIndex((h) => h.includes(norm(c))); if (i >= 0) return i; }
+      return -1;
+    };
+    const iOrder = pick('Order ID', 'Receipt ID', 'orderid');
+    const iStreet = pick('Ship Address1', 'Shipping Address1', 'Street 1', 'address1');
+    if (iOrder < 0 || iStreet < 0) return [];
+    const iName = pick('Ship Name', 'Full Name', 'Buyer', 'name');
+    const iStreet2 = pick('Ship Address2', 'Shipping Address2', 'Street 2', 'address2');
+    const iCity = pick('Ship City', 'Shipping City', 'city');
+    const iState = pick('Ship State', 'Shipping State', 'state', 'province');
+    const iZip = pick('Ship Zipcode', 'Ship Zip', 'Shipping Zip', 'zip', 'postalcode');
+    const iCountry = pick('Ship Country', 'Shipping Country', 'country');
+    const at = (r, i) => (i >= 0 ? String(r[i] ?? '').trim() : '');
+    return rows.slice(1).filter((r) => at(r, iOrder)).map((r) => ({
+      order_id: at(r, iOrder), name: at(r, iName), street: at(r, iStreet), street2: at(r, iStreet2),
+      city: at(r, iCity), state: at(r, iState), zip: at(r, iZip), country: at(r, iCountry),
+    }));
+  }
+
+  async function pollAddressSheet() {
+    const row = (await q('select value from settings where key=$1', [SHEET_KEY])).rows[0];
+    const url = row && String(row.value || '').replace(/^"|"$/g, '');
+    if (!url) return { skipped: 'not-configured' };
+    const { rows } = await fetchSheetRows(url);
+    const mapped = mapAddressRows(rows);
+    if (!mapped.length) return { skipped: 'no-mappable-rows' };
+    // No user → staff privileges, which is correct for a platform-level job.
+    return applyAddressRows(mapped, null);
+  }
+
+  app.get('/api/etsy/address-sheet', { preHandler: requireStaff }, async () => {
+    const row = (await q('select value from settings where key=$1', [SHEET_KEY])).rows[0];
+    return { url: row ? String(row.value || '').replace(/^"|"$/g, '') : '' };
+  });
+
+  app.put('/api/etsy/address-sheet', { preHandler: requireStaff }, async (req) => {
+    const url = String((req.body || {}).url || '').trim();
+    await q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`).catch(() => {});
+    await q('insert into settings (key,value,updated_at) values ($1,to_jsonb($2::text),now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHEET_KEY, url]).catch(() => {});
+    audit(req, 'etsy.address_sheet', { entityType: 'settings', entityId: SHEET_KEY, after: { url } });
+    return { ok: true, url };
+  });
+
+  // Run it now (staff) — so the sheet can be verified without waiting for the timer.
+  app.post('/api/etsy/address-sheet/run', { preHandler: requireStaff }, async (req, reply) => {
+    try { return { ok: true, ...(await pollAddressSheet()) }; }
+    catch (e) { reply.code(400); return { error: e.message }; }
+  });
+
+  // Hourly, alongside the API sweep. Both are no-ops when nothing is configured/available.
+  if (!globalThis.__egEtsyAddrSheet) {
+    globalThis.__egEtsyAddrSheet = setInterval(() => { pollAddressSheet().catch(() => {}); }, 60 * 60 * 1000);
+    if (globalThis.__egEtsyAddrSheet.unref) globalThis.__egEtsyAddrSheet.unref();
+  }
+
   // Hourly — far rarer than the 5-minute order sync, because this only matters on the
   // day Etsy flips the entitlement. Same single-instance guard + unref as the sync.
   if (KEYSTRING && SHARED_SECRET && !globalThis.__egEtsyAddrBackfill) {
@@ -974,27 +1047,33 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
    *
    * body: { rows: [{ order_id, name, street, street2, city, state, zip, country }] }
    */
-  app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {
-    const rows = Array.isArray((req.body || {}).rows) ? req.body.rows : [];
-    if (!rows.length) { reply.code(400); return { error: 'No rows to import.' }; }
+  /**
+   * Apply address rows to synced orders. Shared by the manual CSV upload and the
+   * scheduled sheet poll so both behave identically.
+   *
+   * Safety rules that must not be relaxed — these touch real seller orders:
+   *   • match on RECEIPT ID only (never buyer name: not unique, not stable)
+   *   • never overwrite an address that already exists (a re-import must not clobber a
+   *     hand-typed correction)
+   *   • a seller may only fill their OWN orders
+   */
+  async function applyAddressRows(rows, user) {
     let updated = 0, skipped = 0, notFound = 0, alreadyHad = 0;
     const missing = [];
     for (const r of rows) {
       const rid = String(r.order_id || '').replace(/[^0-9]/g, '');
       if (!rid) { skipped++; continue; }
       const id = 'etsy-' + rid;
-      // Staff may fill any order; a seller only their own.
-      const own = isStaff(req.user) ? '' : ' and seller_id=$2';
-      const params = isStaff(req.user) ? [id] : [id, req.user.sub];
-      const cur = (await q(`select id, address from orders where id=$1${own}`, params)).rows[0];
+      const staff = !user || isStaff(user);
+      const cur = staff
+        ? (await q('select id, address from orders where id=$1', [id])).rows[0]
+        : (await q('select id, address from orders where id=$1 and seller_id=$2', [id, user.sub])).rows[0];
       if (!cur) { notFound++; missing.push(rid); continue; }
       const existing = cur.address || {};
-      // Don't overwrite an address that's already there — a re-import shouldn't clobber
-      // a correction someone made by hand.
       if (existing.street || existing.first_line || existing.line1) { alreadyHad++; continue; }
       const street = String(r.street || '').trim();
       if (!street) { skipped++; continue; }
-      const addr = {
+      await q('update orders set address=$1 where id=$2', [JSON.stringify({
         ...existing,
         name: String(r.name || existing.name || '').trim() || null,
         street, street2: String(r.street2 || '').trim() || null,
@@ -1003,12 +1082,18 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         zip: String(r.zip || '').trim() || null,
         country: String(r.country || '').trim() || null,
         source: 'etsy-csv',
-      };
-      await q('update orders set address=$1 where id=$2', [JSON.stringify(addr), id]);
+      }), id]);
       updated++;
     }
-    audit(req, 'etsy.import_addresses', { entityType: 'order', after: { updated, skipped, notFound, alreadyHad } });
-    return { ok: true, updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20) };
+    return { updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20) };
+  }
+
+  app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {
+    const rows = Array.isArray((req.body || {}).rows) ? req.body.rows : [];
+    if (!rows.length) { reply.code(400); return { error: 'No rows to import.' }; }
+    const res = await applyAddressRows(rows, req.user);
+    audit(req, 'etsy.import_addresses', { entityType: 'order', after: res });
+    return { ok: true, ...res };
   });
 
   // ── Publish a design to Etsy as a DRAFT listing, then upload the design image.

@@ -1,11 +1,11 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { UploadSimple, CircleNotch, CheckCircle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { parseCSV } from "@/lib/order-import"
-import { importEtsyAddresses } from "@/lib/api"
+import { importEtsyAddresses, getAddressSheet, setAddressSheet, runAddressSheet } from "@/lib/api"
 
 /**
  * Backfill buyer addresses from the seller's own Etsy CSV export.
@@ -37,6 +37,27 @@ type Result = { updated: number; skipped: number; notFound: number; alreadyHad: 
 
 export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [sheet, setSheet] = useState("")
+  const [sheetBusy, setSheetBusy] = useState(false)
+  const [sheetMsg, setSheetMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    const id = setTimeout(() => { getAddressSheet().then((r) => setSheet(r.url || "")).catch(() => {}) }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const saveSheet = async () => {
+    setSheetBusy(true); setSheetMsg(null)
+    try {
+      await setAddressSheet(sheet.trim())
+      const r = await runAddressSheet()
+      if (r.error) throw new Error(r.error)
+      setSheetMsg(r.updated != null ? `Saved — filled ${r.updated} order${r.updated === 1 ? "" : "s"} just now.` : "Saved.")
+      onImported?.()
+    } catch (e) {
+      setSheetMsg(e instanceof Error ? e.message : "Couldn't read that sheet.")
+    } finally { setSheetBusy(false) }
+  }
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -117,6 +138,27 @@ export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
             <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /> {err}
           </div>
         )}
+
+        {/* Optional: automate the INGESTION (not the export). */}
+        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+          <div className="text-sm font-medium">Or keep it topped up automatically</div>
+          <p className="text-xs text-muted-foreground">
+            Paste the Etsy export into a Google Sheet shared as &ldquo;Anyone with the link&rdquo;, and we&apos;ll
+            re-read it every hour. We never touch your Etsy login — you still export from Etsy yourself.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={sheet}
+              onChange={(e) => setSheet(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/…"
+              className="h-9 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+            />
+            <Button size="sm" variant="outline" onClick={saveSheet} disabled={sheetBusy}>
+              {sheetBusy ? <CircleNotch size={14} className="animate-spin" /> : "Save & run"}
+            </Button>
+          </div>
+          {sheetMsg && <p className="text-xs text-muted-foreground">{sheetMsg}</p>}
+        </div>
 
         {result && (
           <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">

@@ -1145,3 +1145,17 @@ export function importEtsyAddresses(rows: { order_id: string; name?: string; str
   return api<{ ok?: boolean; updated: number; skipped: number; notFound: number; alreadyHad: number; missing?: string[]; error?: string }>(
     `/api/etsy/import-addresses`, { method: "POST", body: JSON.stringify({ rows }) })
 }
+
+/** Optional automation of the CSV step: the seller exports from Etsy by hand (that
+ *  download is behind their Shop Manager session — we never hold their credentials) and
+ *  drops it into a link-shared Google Sheet, which the server re-reads hourly. */
+export function getAddressSheet() {
+  return api<{ url: string }>(`/api/etsy/address-sheet`)
+}
+export function setAddressSheet(url: string) {
+  return api<{ ok?: boolean; url?: string; error?: string }>(`/api/etsy/address-sheet`, { method: "PUT", body: JSON.stringify({ url }) })
+}
+export function runAddressSheet() {
+  return api<{ ok?: boolean; updated?: number; skipped?: string | number; notFound?: number; alreadyHad?: number; error?: string }>(
+    `/api/etsy/address-sheet/run`, { method: "POST" })
+}

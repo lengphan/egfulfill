@@ -72,6 +72,45 @@ function extractGid(input) {
   return m ? m[1] : null;
 }
 
+/**
+ * Read a link-shared sheet's rows. Extracted from the /api/sheets route so scheduled jobs
+ * can reuse the exact tab-picking and formatting rules rather than re-implementing them.
+ *
+ * Read-only and key-based: it never holds a seller credential, so it cannot put a
+ * connected account at risk. Throws with a human-readable message on failure.
+ */
+export async function fetchSheetRows(raw, tabWanted) {
+  if (!API_KEY) throw new Error('Google Sheets import is not configured on the server.');
+  const id = extractId(raw);
+  if (!id) throw new Error('Could not read a spreadsheet ID from that link.');
+  const gid = extractGid(raw);
+  const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?key=${API_KEY}&fields=properties.title,sheets.properties(title,sheetId)`);
+  const meta = await metaR.json().catch(() => ({}));
+  if (!metaR.ok) {
+    const msg = (meta.error && meta.error.message) || metaR.status;
+    if (metaR.status === 403) throw new Error('That sheet isn\'t shared — set General access to "Anyone with the link" (Viewer).');
+    throw new Error('Google Sheets error: ' + msg);
+  }
+  const sheets = (meta.sheets || []).map((x) => x.properties).filter(Boolean);
+  let pick = null;
+  const wantTab = String(tabWanted || '').trim();
+  if (wantTab) pick = sheets.find((x) => x.title === wantTab);
+  if (!pick && gid != null) pick = sheets.find((x) => String(x.sheetId) === String(gid));
+  if (!pick) pick = sheets.find((x) => /^orders$/i.test(x.title));
+  if (!pick) pick = sheets[0];
+  if (!pick) throw new Error('The spreadsheet has no readable tabs.');
+  const range = encodeURIComponent(pick.title);
+  const valR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?key=${API_KEY}&majorDimension=ROWS`);
+  const val = await valR.json().catch(() => ({}));
+  if (!valR.ok) throw new Error('Could not read tab "' + pick.title + '": ' + ((val.error && val.error.message) || valR.status));
+  const rows = (val.values || [])
+    .map((r) => r.map((c) => (c == null ? '' : String(c))))
+    .filter((r) => r.some((c) => String(c).trim() !== ''));
+  return { title: meta.properties && meta.properties.title, tab: pick.title, rows };
+}
+
+
+
 export function sheetsRoutes(app, requireAuth) {
   // Public config: is import enabled, the template link, and whether the server
   // can auto-create a filled sheet (service account present).
