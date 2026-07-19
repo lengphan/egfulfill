@@ -18,7 +18,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
-import { ReadinessDots } from "@/components/app/readiness-dots"
+import { ReadinessStrip } from "@/components/app/readiness-dots"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -510,18 +510,15 @@ export function OrdersHub() {
                         </span>
                         <span>{fmtDate(o.created_at)}</span>
                         <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
-                        {/* Address, and how we got it. A missing address is the single thing that stops
-                            this order shipping, so it's called out rather than simply absent. */}
-                        {addrLine(o) ? (
+                        {/* Address + how we got it. The MISSING case is no longer flagged
+                            here — the readiness strip already names it, and saying it twice
+                            on one row is noise. This shows provenance when there IS one. */}
+                        {addrLine(o) && (
                           <span className="inline-flex items-center gap-0.5" title={`Address ${ADDRESS_SOURCE_LABEL[addressSource(o)]}`}>
                             <MapPin size={11} weight="fill" /> {addrLine(o)}
                             <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">
                               {ADDRESS_SOURCE_LABEL[addressSource(o)]}
                             </span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800" title="Etsy withholds buyer addresses from its API — import the CSV, forward the sale email, or paste it on the label">
-                            <Warning size={10} weight="fill" /> No address — can&apos;t ship
                           </span>
                         )}
                         {track && (
@@ -560,7 +557,7 @@ export function OrdersHub() {
                               left of a row is identity, the right is state and what to do
                               about it. Sharing a line with store/date/address made five
                               dots read as more clutter rather than a summary. */}
-                          <ReadinessDots order={o} missingArtwork={artworkMissingFor(o)} className="mr-1 hidden sm:inline-flex" />
+                          <ReadinessStrip order={o} missingArtwork={artworkMissingFor(o)} className="mr-1" />
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}><TrayArrowDown size={13} weight="bold" /> Start order</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further."><SkipForward size={13} weight="fill" /> Next stage</Button>}

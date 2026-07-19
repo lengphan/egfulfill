@@ -1,66 +1,50 @@
 "use client"
 
-import { orderReadiness, type Check } from "@/lib/order-format"
+import { CheckCircle } from "@phosphor-icons/react"
+import { orderReadiness } from "@/lib/order-format"
 import type { OrderRow } from "@/lib/api"
 
 /**
- * The order's readiness as a five-dot pipeline: Address → Artwork → Label → Printed →
- * Scanned, in the sequence they actually happen.
+ * What's stopping this order shipping — named, all of it, without hovering.
  *
- * The whole point is answering "is this ready, and if not what's missing?" at a glance,
- * across a board of fifty rows, without opening anything. So it reads left-to-right like
- * the work does, and the FIRST unmet dot is where the order is stuck — which is the one
- * question anyone actually has.
+ * This replaced a five-dot pipeline. Dots looked tidy but failed the actual job: they
+ * showed only the FIRST blocker in words, so you'd fix that, come back, and find another
+ * one waiting. And an unlabelled dot needs a hover to say which check it is, which is the
+ * opposite of at-a-glance.
  *
- * Each dot is a fact (see orderReadiness), not a pipeline stage. Colour is used sparingly
- * to stay within the palette: filled = done, hollow = not yet, and only the blocking dot
- * is tinted, so a board of ready orders stays quiet and a stuck one draws the eye.
+ * So: don't render the checklist, render the GAPS. A production board doesn't need a
+ * progress bar — everything done is the normal case and deserves one quiet word, while
+ * anything missing needs naming. Nothing hides behind a tooltip, and an order with three
+ * problems says three things.
  */
 
-export function ReadinessDots({ order, missingArtwork, className }: {
+export function ReadinessStrip({ order, missingArtwork, className }: {
   order: OrderRow
-  /** Pass when known; omitted leaves the artwork dot as not-applicable rather than failed. */
+  /** Pass when known; omitted leaves artwork out rather than claiming it's missing. */
   missingArtwork?: boolean
   className?: string
 }) {
-  const checks = orderReadiness(order, { missingArtwork })
-  const applicable = checks.filter((c) => c.met !== null)
-  const firstUnmet = applicable.find((c) => !c.met)
+  const gaps = orderReadiness(order, { missingArtwork }).filter((c) => c.met === false)
+
+  if (!gaps.length) {
+    return (
+      <span className={"inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 " + (className ?? "")}>
+        <CheckCircle size={12} weight="fill" /> Ready
+      </span>
+    )
+  }
 
   return (
-    <span
-      className={"inline-flex items-center gap-1.5 " + (className ?? "")}
-      title={checks.map((c) => `${c.label}: ${c.met === null ? "n/a" : c.met ? "done" : (c.detail || "not yet")}`).join("\n")}
-    >
-      <span className="inline-flex items-center">
-        {checks.map((c, i) => (
-          <span key={c.id} className="inline-flex items-center">
-            {i > 0 && <span className={"h-px w-2 " + (c.met ? "bg-foreground/25" : "bg-border")} />}
-            <Dot check={c} blocking={c.id === firstUnmet?.id} />
-          </span>
-        ))}
-      </span>
-      <span className={"text-[11px] font-medium " + (firstUnmet ? "text-amber-700" : "text-muted-foreground")}>
-        {firstUnmet ? (firstUnmet.blocked ?? `needs ${firstUnmet.label.toLowerCase()}`) : "ready to ship"}
-      </span>
+    <span className={"inline-flex flex-wrap items-center gap-1 " + (className ?? "")}>
+      {gaps.map((g) => (
+        <span
+          key={g.id}
+          title={g.detail}
+          className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
+        >
+          {g.blocked ?? g.label}
+        </span>
+      ))}
     </span>
-  )
-}
-
-function Dot({ check, blocking }: { check: Check; blocking: boolean }) {
-  // Not applicable reads as a faint tick mark rather than a gap — an undecorated blank
-  // isn't "missing artwork", and showing it as unmet would send someone looking for a
-  // problem that doesn't exist.
-  if (check.met === null) {
-    return <span className="size-2 rounded-full border border-dashed border-border" aria-label={`${check.label}: not applicable`} />
-  }
-  if (check.met) {
-    return <span className="size-2 rounded-full bg-foreground/70" aria-label={`${check.label}: done`} />
-  }
-  return (
-    <span
-      className={"size-2 rounded-full border " + (blocking ? "border-amber-500 bg-amber-400/40" : "border-border")}
-      aria-label={`${check.label}: ${check.detail || "not yet"}`}
-    />
   )
 }

@@ -10,7 +10,7 @@ import { getOrders, postItemStatus, updateOrder, markLabelPrinted, type OrderRow
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage } from "@/lib/factory-status"
-import { ReadinessDots } from "@/components/app/readiness-dots"
+import { ReadinessStrip } from "@/components/app/readiness-dots"
 
 /**
  * DISPATCH — everything that has finished production and is waiting to leave.
@@ -226,7 +226,7 @@ export function DispatchBoard() {
                       </span>
                       <span>{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</span>
                       {addrLine(o) && <span className="truncate">{addrLine(o)}</span>}
-                      <ReadinessDots order={o} />
+                      <ReadinessStrip order={o} />
                     </div>
                   </div>
                   {o.tracking && (
