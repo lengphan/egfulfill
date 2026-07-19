@@ -5,6 +5,7 @@ import { Package, Barcode, MapPin, Warning, CircleNotch, Plus } from "@phosphor-
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { LabelSheet, type LabelSpec } from "@/components/app/label-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -49,6 +50,11 @@ export function ConsignmentPanel() {
   const [asn, setAsn] = useState<{ carrier: string; tracking: string; expected: string; note: string }>({ carrier: "", tracking: "", expected: "", note: "" })
   const [asnLines, setAsnLines] = useState<{ name: string; seller_sku: string; qty: string }[]>([{ name: "", seller_sku: "", qty: "1" }])
   const [asnBusy, setAsnBusy] = useState(false)
+  // Barcode labels for what was just received. The internal SKU is minted at receive
+  // time, so this is the first moment a label CAN be printed — and the box needs one
+  // before it goes on a shelf, or the bin index is the only thing linking them.
+  const [labels, setLabels] = useState<LabelSpec[]>([])
+  const [labelsOpen, setLabelsOpen] = useState(false)
 
   const load = () => {
     getConsignmentShipments().then((r) => setShipments(r ?? [])).catch(() => setShipments([]))
@@ -72,6 +78,20 @@ export function ConsignmentPanel() {
       }))
       const r = await receiveConsignment(s.id, lines)
       if (r.error) throw new Error(r.error)
+      // One label per UNIT — a 12-piece line needs 12 barcodes on the floor, which is
+      // what LabelSheet's `copies` is for.
+      const printed: LabelSpec[] = (r.lines ?? [])
+        .filter((l) => l.internal_sku && (Number(l.qty_received) || 0) > 0)
+        .map((l) => {
+          const src = s.lines.find((x) => x.id === l.id)
+          return {
+            sku: l.internal_sku!,
+            name: src?.name || src?.seller_sku || "Consigned item",
+            variant: [s.seller_name, l.location].filter(Boolean).join(" · ") || null,
+            copies: Number(l.qty_received) || 1,
+          }
+        })
+      if (printed.length) { setLabels(printed); setLabelsOpen(true) }
       setMsg({
         tone: r.discrepancy ? "err" : "ok",
         text: r.discrepancy
@@ -232,11 +252,25 @@ export function ConsignmentPanel() {
                 <span className="w-20 text-right text-sm tabular-nums">
                   {r.on_hand - r.reserved}<span className="text-muted-foreground"> / {r.on_hand}</span>
                 </span>
+                <button
+                  onClick={() => {
+                    setLabels([{ sku: r.internal_sku ?? "", name: r.name || r.seller_sku, variant: [r.seller_name, r.location].filter(Boolean).join(" · ") || null, copies: 1 }])
+                    setLabelsOpen(true)
+                  }}
+                  title="Reprint this barcode"
+                  className="eg-tap flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Barcode size={14} weight="bold" />
+                </button>
               </div>
             ))}
           </div>
         )}
       </SectionCard>
+
+      {/* Barcode labels for the units just received — printed straight after counting,
+          because that's when the boxes are open and the SKUs exist. */}
+      <LabelSheet labels={labels} open={labelsOpen} onClose={() => setLabelsOpen(false)} title="consigned stock labels" />
 
       {/* Announce — the declaration that starts the flow. Kept deliberately light: a
           seller telling you what's coming shouldn't be a data-entry chore, and the

@@ -96,6 +96,91 @@ async function suggestLocation(internalSku, qty) {
   return r.rows[0]?.code ?? null;
 }
 
+/**
+ * Reserve consigned units for an order.
+ *
+ * Called when an order is submitted to production. For each line, if the SELLER has their
+ * own stock of it here, hold those units so another order can't take them — that's the
+ * whole point of consignment: their stock fulfils their orders, nobody else's.
+ *
+ * Matching is per-seller AND per-sku, and only ever against lines that seller owns. Sold
+ * out of their own stock, an order simply falls through to us buying a blank as before —
+ * partial cover is normal and fine.
+ *
+ * Idempotent by (order, line): re-submitting cannot double-reserve, because the reserved
+ * amount for a line is SET from the order's own requirement rather than incremented.
+ */
+export async function reserveConsigned(orderId) {
+  await ensure();
+  const order = (await q('select seller_id from orders where id=$1', [orderId])).rows[0];
+  if (!order || !order.seller_id) return { reserved: 0 };
+
+  const items = (await q('select sku, qty from order_items where order_id=$1', [orderId])).rows;
+  let reserved = 0;
+  for (const it of items) {
+    const sku = String(it.sku || '').trim();
+    if (!sku) continue;
+    const want = Math.max(1, parseInt(it.qty, 10) || 1);
+
+    // That seller's own consigned lines for this sku, oldest first (FIFO — the stock
+    // that has been sitting longest should move first).
+    const lines = (await q(`
+      select cl.id, cl.qty_received, cl.qty_reserved
+        from consignment_lines cl
+        join consignment_shipments s on s.id = cl.shipment_id
+       where s.seller_id = $1
+         and (upper(cl.seller_sku) = upper($2) or upper(cl.internal_sku) = upper($2))
+         and cl.qty_received > cl.qty_reserved
+       order by cl.id`, [order.seller_id, sku])).rows;
+
+    let remaining = want;
+    for (const l of lines) {
+      if (remaining <= 0) break;
+      const free = Number(l.qty_received) - Number(l.qty_reserved);
+      const take = Math.min(free, remaining);
+      if (take <= 0) continue;
+      await q('update consignment_lines set qty_reserved = qty_reserved + $1 where id=$2', [take, l.id]);
+      remaining -= take;
+      reserved += take;
+    }
+  }
+  return { reserved };
+}
+
+/**
+ * Release what an order was holding — cancelled, refunded, or never produced.
+ * Without this a cancelled order would strand the seller's stock permanently.
+ */
+export async function releaseConsigned(orderId) {
+  await ensure();
+  const order = (await q('select seller_id from orders where id=$1', [orderId])).rows[0];
+  if (!order || !order.seller_id) return { released: 0 };
+  const items = (await q('select sku, qty from order_items where order_id=$1', [orderId])).rows;
+  let released = 0;
+  for (const it of items) {
+    const sku = String(it.sku || '').trim();
+    if (!sku) continue;
+    let remaining = Math.max(1, parseInt(it.qty, 10) || 1);
+    const lines = (await q(`
+      select cl.id, cl.qty_reserved
+        from consignment_lines cl
+        join consignment_shipments s on s.id = cl.shipment_id
+       where s.seller_id = $1
+         and (upper(cl.seller_sku) = upper($2) or upper(cl.internal_sku) = upper($2))
+         and cl.qty_reserved > 0
+       order by cl.id desc`, [order.seller_id, sku])).rows;
+    for (const l of lines) {
+      if (remaining <= 0) break;
+      const give = Math.min(Number(l.qty_reserved), remaining);
+      if (give <= 0) continue;
+      await q('update consignment_lines set qty_reserved = greatest(0, qty_reserved - $1) where id=$2', [give, l.id]);
+      remaining -= give;
+      released += give;
+    }
+  }
+  return { released };
+}
+
 export function consignmentRoutes(app, requireAuth, requireStaff) {
   ensure();
 

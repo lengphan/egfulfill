@@ -8,6 +8,7 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
+import { reserveConsigned, releaseConsigned } from './consignment.js';
 
 // ── Stage vocabulary ───────────────────────────────────────────────────────────
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
@@ -150,6 +151,10 @@ async function chargeForSubmit(orderId, sellerId, by) {
   await freezeQuote(orderId, quote);
   await moveFunds({ from: sellerId, to: 'factory', amount: quote.total, type: CHARGE_TYPE,
                     ref: String(orderId), note: `Order ${orderId} pushed to production`, by });
+  // Hold any of the seller's OWN consigned stock this order needs, so a second order
+  // can't be promised the same units. Best-effort: consignment is an optional service,
+  // and a failure here must never block an order that's already been paid for.
+  reserveConsigned(orderId).catch(() => {});
   return { ok: true, charged: quote.total, quote };
 }
 
@@ -161,6 +166,9 @@ async function refundForCancel(orderId, sellerId, by) {
   if (await refundedAmount(orderId) > 0) return { ok: true, already: true };
   await moveFunds({ from: 'factory', to: sellerId, amount: charged, type: REFUND_TYPE,
                     ref: String(orderId), note: `Order ${orderId} cancelled — refund`, by });
+  // Give the units back. Without this a cancelled order strands the seller's own stock
+  // as permanently reserved against work that will never happen.
+  releaseConsigned(orderId).catch(() => {});
   return { ok: true, refunded: charged };
 }
 
