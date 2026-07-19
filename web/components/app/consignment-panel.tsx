@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react"
 import { Package, Barcode, MapPin, Warning, CircleNotch, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   getConsignmentShipments, receiveConsignment, getWarehouseBins, createWarehouseBin,
-  getConsignmentStock, type ConsignmentShipment, type WarehouseBin, type ConsignmentStock,
+  getConsignmentStock, createConsignmentShipment,
+  type ConsignmentShipment, type WarehouseBin, type ConsignmentStock,
 } from "@/lib/api"
 
 const fmtDate = (s?: string | null) => {
@@ -40,6 +43,12 @@ export function ConsignmentPanel() {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
   const [newBin, setNewBin] = useState("")
+  // Announcing a shipment is the ENTRY POINT to this whole flow — without it the board
+  // can only ever show empty states, which is exactly how it shipped.
+  const [asnOpen, setAsnOpen] = useState(false)
+  const [asn, setAsn] = useState<{ carrier: string; tracking: string; expected: string; note: string }>({ carrier: "", tracking: "", expected: "", note: "" })
+  const [asnLines, setAsnLines] = useState<{ name: string; seller_sku: string; qty: string }[]>([{ name: "", seller_sku: "", qty: "1" }])
+  const [asnBusy, setAsnBusy] = useState(false)
 
   const load = () => {
     getConsignmentShipments().then((r) => setShipments(r ?? [])).catch(() => setShipments([]))
@@ -87,6 +96,35 @@ export function ConsignmentPanel() {
 
   const inbound = (shipments ?? []).filter((s) => !["shelved", "closed", "cancelled"].includes(s.status))
 
+  const stats = {
+    inbound: inbound.length,
+    unitsIn: inbound.reduce((n, s) => n + s.lines.reduce((m, l) => m + (Number(l.qty_declared) || 0), 0), 0),
+    onHand: stock.reduce((n, r) => n + (Number(r.on_hand) || 0) - (Number(r.reserved) || 0), 0),
+    sellers: new Set(stock.map((r) => r.seller_id)).size,
+  }
+
+  const submitAsn = async () => {
+    const lines = asnLines
+      .filter((l) => l.name.trim() || l.seller_sku.trim())
+      .map((l) => ({ name: l.name.trim(), seller_sku: l.seller_sku.trim(), qty_declared: Number(l.qty) || 0 }))
+    if (!lines.length) { setMsg({ tone: "err", text: "Add at least one line — we need to know what's arriving." }); return }
+    setAsnBusy(true); setMsg(null)
+    try {
+      const r = await createConsignmentShipment({
+        carrier: asn.carrier || undefined, tracking: asn.tracking || undefined,
+        expected_at: asn.expected || undefined, note: asn.note || undefined, lines,
+      })
+      if (r.error) throw new Error(r.error)
+      setMsg({ tone: "ok", text: `Announced ${r.id}. It'll show under Inbound until it's received.` })
+      setAsnOpen(false)
+      setAsn({ carrier: "", tracking: "", expected: "", note: "" })
+      setAsnLines([{ name: "", seller_sku: "", qty: "1" }])
+      load()
+    } catch (e) {
+      setMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't announce that shipment." })
+    } finally { setAsnBusy(false) }
+  }
+
   return (
     <div className="space-y-4">
       {msg && (
@@ -95,12 +133,26 @@ export function ConsignmentPanel() {
         </div>
       )}
 
+      <StatGrid>
+        <StatCard label="Inbound" value={String(stats.inbound)} sub="shipments announced" />
+        <StatCard label="Units expected" value={String(stats.unitsIn)} sub="declared, not yet counted" />
+        <StatCard label="On hand" value={String(stats.onHand)} sub="available to pick" />
+        <StatCard label="Sellers" value={String(stats.sellers)} sub="with stock here" />
+      </StatGrid>
+
       {/* 1. Inbound — the declaration, so nothing arrives unannounced. */}
-      <SectionCard title="Inbound shipments" description="Stock sellers have told us they're sending">
+      <SectionCard
+        title="Inbound shipments"
+        description="Stock sellers have told us they're sending"
+        actions={<Button size="sm" onClick={() => setAsnOpen(true)}><Plus size={13} weight="bold" /> Announce shipment</Button>}
+      >
         {shipments === null ? (
           <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> Loading…</div>
         ) : inbound.length === 0 ? (
-          <div className="p-5 text-sm text-muted-foreground">Nothing inbound. Announced shipments appear here before they arrive.</div>
+          <div className="p-5 text-sm text-muted-foreground">
+            Nothing inbound yet. Use <span className="font-medium text-foreground">Announce shipment</span> when a
+            seller tells you stock is on the way — the declaration is what the counted quantities get checked against.
+          </div>
         ) : (
           <div className="divide-y divide-border">
             {inbound.map((s) => (
@@ -185,6 +237,73 @@ export function ConsignmentPanel() {
           </div>
         )}
       </SectionCard>
+
+      {/* Announce — the declaration that starts the flow. Kept deliberately light: a
+          seller telling you what's coming shouldn't be a data-entry chore, and the
+          counted quantities at receiving are what actually matter. */}
+      <Dialog open={asnOpen} onOpenChange={(v) => { if (!asnBusy) setAsnOpen(v) }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader><DialogTitle>Announce an inbound shipment</DialogTitle></DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Carrier</span>
+                <Input value={asn.carrier} onChange={(e) => setAsn({ ...asn, carrier: e.target.value })} placeholder="UPS" className="h-9" />
+              </label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Tracking</span>
+                <Input value={asn.tracking} onChange={(e) => setAsn({ ...asn, tracking: e.target.value })} placeholder="1Z…" className="h-9" />
+              </label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Expected</span>
+                <Input type="date" value={asn.expected} onChange={(e) => setAsn({ ...asn, expected: e.target.value })} className="h-9" />
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-sm font-medium">What&apos;s arriving</div>
+              {asnLines.map((l, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <Input
+                    value={l.name}
+                    onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    placeholder="Item name" className="h-9 min-w-0 flex-1"
+                  />
+                  <Input
+                    value={l.seller_sku}
+                    onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, seller_sku: e.target.value } : x)))}
+                    placeholder="Their SKU" className="h-9 w-32"
+                  />
+                  <Input
+                    value={l.qty}
+                    onChange={(e) => setAsnLines((p) => p.map((x, j) => (j === i ? { ...x, qty: e.target.value.replace(/[^0-9]/g, "") } : x)))}
+                    inputMode="numeric" placeholder="Qty" className="h-9 w-20"
+                  />
+                  {asnLines.length > 1 && (
+                    <button onClick={() => setAsnLines((p) => p.filter((_, j) => j !== i))} aria-label="Remove line"
+                      className="eg-tap flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-destructive">×</button>
+                  )}
+                </div>
+              ))}
+              <Button size="sm" variant="outline" onClick={() => setAsnLines((p) => [...p, { name: "", seller_sku: "", qty: "1" }])}>
+                <Plus size={13} weight="bold" /> Add line
+              </Button>
+            </div>
+
+            <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Note (optional)</span>
+              <Input value={asn.note} onChange={(e) => setAsn({ ...asn, note: e.target.value })} placeholder="Anything the floor should know" className="h-9" />
+            </label>
+
+            <p className="text-xs text-muted-foreground">
+              We keep this declaration and check the counted quantities against it, so a short or over
+              shipment shows as a discrepancy instead of quietly becoming the new truth.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setAsnOpen(false)} disabled={asnBusy}>Cancel</Button>
+            <Button onClick={submitAsn} disabled={asnBusy}>{asnBusy ? "Announcing…" : "Announce shipment"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 3. Bins. Chaotic storage with an index — any SKU may live in any bin, so what
              matters is capacity and the scan that binds SKU to location. */}
