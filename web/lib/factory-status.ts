@@ -20,9 +20,9 @@ export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 // order indistinguishable in the DB. Labels are what people read; ids are data.
 export const FACTORY_STAGES: FactoryStage[] = [
   { id: "in_review", label: "New", tone: "review" },        // submitted; cancellable by the seller
-  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // design sent to the board
-  { id: "printed", label: "Printed", tone: "qc" },          // shipping/barcode label printed
-  { id: "working", label: "Working", tone: "prod" },        // warehouse is making the item
+  { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // label bought; waiting on the scan
+  { id: "printed", label: "Printed", tone: "qc" },          // label printed (pre-scan paperwork)
+  { id: "working", label: "Working", tone: "prod" },        // scanned + combined with the design; being made
   { id: "shipped", label: "Shipped", tone: "shipped" },
 ]
 const ORDER = FACTORY_STAGES.map((s) => s.id)

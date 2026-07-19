@@ -264,8 +264,9 @@ export function OrdersHub() {
     setTo(toAddrOf(o))
   }
   // Buy a real label. Goes through the aggregator (Shippo/EasyPost) when one is
-  // configured, falling back to USPS-direct only if none is. On success the server writes
-  // tracking + the label URL and flips the order to shipped; we mirror locally.
+  // configured, falling back to USPS-direct only if none is. On success the server stores
+  // tracking + the label URL and moves the order to AWAITING SCAN — buying a label is not
+  // shipping it; the parcel still has to be scanned and made.
   const buyLabel = async (o: OrderRow) => {
     setLabelErr(null)
     if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }
@@ -279,7 +280,10 @@ export function OrdersHub() {
       const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
       if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }
       setLabels((prev) => ({ ...prev, [o.id]: r }))
-      for (const it of o.items ?? []) if (it.sku) patchItem(o.id, it.sku, "shipped")
+      // A bought label means "ready to be scanned", NOT "gone". The parcel still has to be
+      // scanned and made; marking the lines shipped here claimed work that hadn't happened
+      // and skipped the order past the scan queue entirely. The server sets the stage; we
+      // just reload rather than guessing at it.
       openLabel(r)
       setShipOpen(null); load()
     } catch (e) {

@@ -251,21 +251,37 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
  * decorated item must have artwork. Without this the label routes wrote 'shipped'
  * straight to SQL and quietly shipped work that was never designed.
  */
-// Persist the label URL alongside the tracking number. Without it a label could only ever
-// be printed once, at the moment of purchase — reprinting after a paper jam, or batching a
-// day's labels for a scan run, had nothing to point at.
+/**
+ * Record a bought label.
+ *
+ * Buying a label does NOT ship an order. The warehouse flow is:
+ *   label bought (tracking exists) → AWAITING SCAN → scanned (by us or a scan service,
+ *   and combined with the design) → WORKING → shipped
+ *
+ * This used to flip straight to 'shipped' the moment a label was bought, which skipped
+ * the scan and the entire make step — so a parcel was marked gone before anyone had made
+ * it, and it never appeared in the scan queue. Now it moves the order INTO awaiting_scan,
+ * which is exactly what "waiting to be scanned" means.
+ *
+ * Only ever moves an order FORWARD to awaiting_scan — an order already at working or
+ * shipped isn't dragged backwards by reprinting a label.
+ *
+ * The label URL is persisted alongside the tracking number so a label can be reprinted or
+ * batched later; without it a label could only be printed at the moment of purchase.
+ */
+const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'in_queue', 'queued', 'prescan'];
+
 async function recordLabel(orderId, tracking, carrier, labelUrl) {
   if (!orderId) return { shipped: false };
-  const missing = await missingArtwork(orderId).catch(() => []);
-  if (missing.length) {
-    await q('update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url) where id=$4',
-      [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
-    return { shipped: false, heldFor: missing };
-  }
-  await q(`update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url),
-             factory_status='shipped', status='shipped' where id=$4`,
+  const cur = await q('select factory_status from orders where id=$1', [orderId])
+    .then((r) => String((r.rows[0] || {}).factory_status || '').toLowerCase()).catch(() => '');
+  const advance = PRE_SCAN.includes(cur);
+  await q(
+    `update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url)
+       ${advance ? ", factory_status='awaiting_scan'" : ''}
+     where id=$4`,
     [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
-  return { shipped: true };
+  return { shipped: false, stage: advance ? 'awaiting_scan' : cur };
 }
 
   // Create a label. body: { to:{name,street,street2,city,state,zip}, from:{...},

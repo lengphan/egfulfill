@@ -25,7 +25,11 @@ import { canSetStage } from "@/lib/factory-status"
  */
 
 const STAGE = "awaiting_scan"
-const NEXT = "printed" // the label step — see factory-status' pipeline
+// Scanned parcels go to WORKING: once the scan service has scanned the label and it's been
+// combined with the design, the item is production work with its tasks checked. "printed"
+// sits between the two in the pipeline but describes the label step, which by this point
+// has already happened.
+const NEXT = "working"
 
 export function DispatchBoard() {
   const role = getUser()?.role || ""
@@ -151,7 +155,7 @@ export function DispatchBoard() {
 
       <SectionCard
         title="Dispatch"
-        description="Everything made and waiting to leave. Print the batch, scan it, then mark it out."
+        description="Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" disabled={!chosen.length} onClick={printManifest}>
