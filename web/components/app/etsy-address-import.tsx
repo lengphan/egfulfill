@@ -6,6 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { parseCSV } from "@/lib/order-import"
 import { importEtsyAddresses, getAddressSheet, setAddressSheet, runAddressSheet } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 
 /**
  * Backfill buyer addresses from the seller's own Etsy CSV export.
@@ -40,9 +41,18 @@ export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
   const [sheet, setSheet] = useState("")
   const [sheetBusy, setSheetBusy] = useState(false)
   const [sheetMsg, setSheetMsg] = useState<string | null>(null)
+  // The shared sheet is a PLATFORM setting (its endpoints are staff-only), so showing the
+  // field to a seller would just hand them a 403. Sellers upload their own export, which
+  // is scoped to their own orders anyway.
+  const [isStaff, setIsStaff] = useState(false)
 
   useEffect(() => {
-    const id = setTimeout(() => { getAddressSheet().then((r) => setSheet(r.url || "")).catch(() => {}) }, 0)
+    const id = setTimeout(() => {
+      const role = getUser()?.role
+      const staff = !!role && role !== "seller"
+      setIsStaff(staff)
+      if (staff) getAddressSheet().then((r) => setSheet(r.url || "")).catch(() => {})
+    }, 0)
     return () => clearTimeout(id)
   }, [])
 
@@ -139,7 +149,9 @@ export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
           </div>
         )}
 
-        {/* Optional: automate the INGESTION (not the export). */}
+        {/* Optional: automate the INGESTION (not the export). Staff only — it is a
+            platform-wide sheet, and its endpoints reject sellers. */}
+        {isStaff && (
         <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
           <div className="text-sm font-medium">Or keep it topped up automatically</div>
           <p className="text-xs text-muted-foreground">
@@ -159,6 +171,7 @@ export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
           </div>
           {sheetMsg && <p className="text-xs text-muted-foreground">{sheetMsg}</p>}
         </div>
+        )}
 
         {result && (
           <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
