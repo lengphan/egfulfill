@@ -33,7 +33,7 @@ const pick = (headers: string[], ...candidates: string[]) => {
   return -1
 }
 
-type Result = { updated: number; skipped: number; notFound: number; alreadyHad: number; missing?: string[] }
+type Result = { updated: number; skipped: number; notFound: number; alreadyHad: number; missing?: string[]; rejected?: { order_id: string; why: string }[] }
 
 export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -168,8 +168,16 @@ export function EtsyAddressImport({ onImported }: { onImported?: () => void }) {
             <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
               {result.alreadyHad > 0 && <li>{result.alreadyHad} already had one — left untouched so manual corrections aren&apos;t clobbered.</li>}
               {result.notFound > 0 && <li>{result.notFound} not matched to a synced order (sync first, then re-import).</li>}
-              {result.skipped > 0 && <li>{result.skipped} skipped — no street address in the row.</li>}
+              {result.skipped > 0 && <li>{result.skipped} skipped — no street address, or the row failed validation.</li>}
             </ul>
+            {result.rejected && result.rejected.length > 0 && (
+              <div className="mt-2 border-t border-border pt-2">
+                <div className="text-xs font-medium text-amber-700">Rejected rows — these look malformed, so nothing was written:</div>
+                <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                  {result.rejected.map((r) => <li key={r.order_id}>#{r.order_id} — {r.why}</li>)}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -612,9 +612,11 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     catch (e) { reply.code(400); return { error: e.message }; }
   });
 
-  // Hourly, alongside the API sweep. Both are no-ops when nothing is configured/available.
+  // Every 5 minutes, matching the order sync — a fresh export should appear while someone
+  // is still at their desk, not an hour later. Two API calls per run, and a no-op when
+  // nothing is missing an address, so the cost is negligible.
   if (!globalThis.__egEtsyAddrSheet) {
-    globalThis.__egEtsyAddrSheet = setInterval(() => { pollAddressSheet().catch(() => {}); }, 60 * 60 * 1000);
+    globalThis.__egEtsyAddrSheet = setInterval(() => { pollAddressSheet().catch(() => {}); }, 5 * 60 * 1000);
     if (globalThis.__egEtsyAddrSheet.unref) globalThis.__egEtsyAddrSheet.unref();
   }
 
@@ -1071,6 +1073,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   async function applyAddressRows(rows, user) {
     let updated = 0, skipped = 0, notFound = 0, alreadyHad = 0;
     const missing = [];
+    const rejected = [];
     for (const r of rows) {
       const rid = String(r.order_id || '').replace(/[^0-9]/g, '');
       if (!rid) { skipped++; continue; }
@@ -1085,6 +1088,17 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       const cap = (v, n) => String(v || '').trim().slice(0, n) || null;
       const street = cap(r.street, 120);
       if (!street) { skipped++; continue; }
+      // The sheet lives outside our control — anyone with edit access could mangle it,
+      // deliberately or by dragging a cell. Treat every row as untrusted and refuse
+      // anything not shaped like a US address rather than printing it on a label.
+      const st = String(r.state || '').trim().toUpperCase();
+      const zp = String(r.zip || '').trim();
+      const badState = st && !/^[A-Z]{2}$/.test(st);
+      const badZip = zp && !/^\d{5}(-\d{4})?$/.test(zp);
+      if (badState || badZip || !String(r.city || '').trim()) {
+        rejected.push({ order_id: rid, why: badState ? 'state is not 2 letters' : badZip ? 'zip is not 5 or 5-4 digits' : 'no city' });
+        skipped++; continue;
+      }
       // Scoped on the WRITE as well as the read. The select above already proved
       // ownership, so this is belt-and-braces — but a write guarded only by an earlier
       // select is one careless refactor away from being cross-tenant, and this touches
@@ -1106,7 +1120,7 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
       await q(wSql, wArgs);
       updated++;
     }
-    return { updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20) };
+    return { updated, skipped, notFound, alreadyHad, missing: missing.slice(0, 20), rejected: rejected.slice(0, 20) };
   }
 
   app.post('/api/etsy/import-addresses', { preHandler: requireAuth }, async (req, reply) => {

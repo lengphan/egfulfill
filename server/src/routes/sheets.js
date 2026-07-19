@@ -80,15 +80,31 @@ function extractGid(input) {
  * connected account at risk. Throws with a human-readable message on failure.
  */
 export async function fetchSheetRows(raw, tabWanted) {
-  if (!API_KEY) throw new Error('Google Sheets import is not configured on the server.');
   const id = extractId(raw);
   if (!id) throw new Error('Could not read a spreadsheet ID from that link.');
   const gid = extractGid(raw);
-  const metaR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}?key=${API_KEY}&fields=properties.title,sheets.properties(title,sheetId)`);
+
+  // PREFER the service account. An API key can only read a sheet shared "Anyone with the
+  // link" — which, for a sheet of buyer names and home addresses, means publishing your
+  // customers' PII to anyone who ever sees the URL. With a service account the sheet is
+  // shared with ONE address and stays private.
+  let auth = null;
+  try { auth = { Authorization: 'Bearer ' + (await getServiceToken()) }; } catch { auth = null; }
+  if (!auth && !API_KEY) {
+    throw new Error('Google Sheets is not configured — set GOOGLE_SERVICE_ACCOUNT (preferred, keeps the sheet private) or GOOGLE_SHEETS_API_KEY.');
+  }
+  const withAuth = (url) => (auth ? url : url + (url.includes('?') ? '&' : '?') + 'key=' + API_KEY);
+  const opts = auth ? { headers: auth } : undefined;
+
+  const metaR = await fetch(withAuth(`https://sheets.googleapis.com/v4/spreadsheets/${id}?fields=properties.title,sheets.properties(title,sheetId)`), opts);
   const meta = await metaR.json().catch(() => ({}));
   if (!metaR.ok) {
     const msg = (meta.error && meta.error.message) || metaR.status;
-    if (metaR.status === 403) throw new Error('That sheet isn\'t shared — set General access to "Anyone with the link" (Viewer).');
+    if (metaR.status === 403) {
+      throw new Error(auth
+        ? 'That sheet isn\'t shared with the service account — share it (Viewer) with the client_email from GOOGLE_SERVICE_ACCOUNT.'
+        : 'That sheet isn\'t shared. Prefer sharing it with a service account; sharing "Anyone with the link" exposes buyer addresses to anyone with the URL.');
+    }
     throw new Error('Google Sheets error: ' + msg);
   }
   const sheets = (meta.sheets || []).map((x) => x.properties).filter(Boolean);
@@ -100,7 +116,7 @@ export async function fetchSheetRows(raw, tabWanted) {
   if (!pick) pick = sheets[0];
   if (!pick) throw new Error('The spreadsheet has no readable tabs.');
   const range = encodeURIComponent(pick.title);
-  const valR = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?key=${API_KEY}&majorDimension=ROWS`);
+  const valR = await fetch(withAuth(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${range}?majorDimension=ROWS`), opts);
   const val = await valR.json().catch(() => ({}));
   if (!valR.ok) throw new Error('Could not read tab "' + pick.title + '": ' + ((val.error && val.error.message) || valR.status));
   const rows = (val.values || [])
