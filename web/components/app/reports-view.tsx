@@ -19,7 +19,7 @@ import { revenueSeries, channelBreakdown, topProducts, orderTotalOf, orderTs } f
 import { sellerStatus } from "@/lib/order-status"
 
 const DAY = 864e5
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 
 const DEMO: OrderRow[] = [
   { id: "etsy-1", seq: 1, source: "etsy", factory_status: "shipped", total: 63.75, created_at: new Date(Date.now() - 2 * DAY).toISOString(), items: [{ name: "Heavyweight Hoodie", qty: 1, unit_price: 42 }] },

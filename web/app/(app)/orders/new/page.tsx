@@ -55,7 +55,7 @@ function VariantSelect({ value, options, onChange, placeholder }: { value: strin
   )
 }
 
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export default function NewOrderPage() {
   const router = useRouter()

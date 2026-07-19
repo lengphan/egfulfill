@@ -11,7 +11,7 @@ import { StripeCardForm } from "@/components/app/stripe-card-form"
 import { createVietqrPayment, vietqrStatus, createTopupRequest, type VietqrPayment } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function Success({ title, sub, onDone }: { title: string; sub: string; onDone: () => void }) {
   return (

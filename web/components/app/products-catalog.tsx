@@ -20,7 +20,7 @@ const priceOf = (p: CatalogProduct) =>
 
 import { sizesOf } from "@/lib/variant-resolve"
 
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const imageOf = (p: CatalogProduct) =>
   p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages)[0] : "") || ""

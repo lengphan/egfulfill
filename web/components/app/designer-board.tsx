@@ -24,7 +24,7 @@ const colOf = (c: DesignCard) => {
   return COLS.some((x) => x.id === v) ? v : "incoming"
 }
 const amt = (v: unknown) => Number(v) || 0
-const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function DesignerBoard() {
   const [cards, setCards] = useState<DesignCard[] | null>(null)

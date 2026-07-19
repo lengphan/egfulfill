@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { ordersHomeFor } from "@/lib/staff-nav"
+import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -173,7 +175,8 @@ export default function OrderDetailPage() {
         </span>
         <div className="font-medium">Order not found</div>
         <div className="text-sm text-muted-foreground">It may have been removed, or the link is stale.</div>
-        <Button variant="outline" size="sm" onClick={() => router.push("/orders")}>
+        {/* Role-aware: staff belong on their production board, not the seller list. */}
+        <Button variant="outline" size="sm" onClick={() => router.push(ordersHomeFor(getUser()?.role))}>
           <ArrowLeft size={14} weight="bold" /> Back to orders
         </Button>
       </div>

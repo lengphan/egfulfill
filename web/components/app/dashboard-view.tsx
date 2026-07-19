@@ -24,8 +24,7 @@ import { sellerStatus } from "@/lib/order-status"
 import { revenueSeries, orderTotalOf as totalOf, orderTs as tsOf } from "@/lib/analytics"
 
 const DAY = 864e5
-const usd = (n: number) =>
-  `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: (Number(n) || 0) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
 
 // "Open" = not yet shipped or closed (canonical seller groups).
 const OPEN_GROUPS = new Set(["received", "production", "attention"])

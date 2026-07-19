@@ -24,7 +24,7 @@ import { ShopAnalyzer } from "@/components/app/shop-analyzer"
 // MYR 111 as $111 would overstate it ~4x, so an approximation is shown as one. When no
 // rate was available price_usd is null and we fall back to the real foreign amount
 // rather than inventing a dollar figure.
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const money = (n: number | null, cur = "USD", usdPrice?: number | null, converted?: boolean) => {
   if (usdPrice != null) return converted ? `~${usd(usdPrice)}` : usd(usdPrice)
   if (n == null) return "—"

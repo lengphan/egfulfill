@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { getWallet, type LedgerRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
 
-const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // The designer wallet's ledger (credits in on approval, payouts/withdrawals out).
 // Its own page now — loads the shared 'designer' wallet directly.

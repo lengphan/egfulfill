@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getAdsConfig, getAdConnections, getAdCampaigns, createAdCampaign, setAdCampaignStatus, type AdsConfig, type AdConnection, type AdsResponse } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
-const usd = (n: number) => `$${(n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const int = (n: number) => (n ?? 0).toLocaleString("en-US")
 const DAYS = [7, 14, 30, 90]
 

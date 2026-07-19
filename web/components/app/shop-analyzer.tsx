@@ -9,7 +9,7 @@ import { Markdown } from "@/components/app/markdown"
 import { Button } from "@/components/ui/button"
 import { getShopAnalysis, analyzeShop, type ShopAnalysis } from "@/lib/api"
 
-const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`
+const usd = (n: number | string | null | undefined) => `$${Math.round(Number(n) || 0).toLocaleString("en-US")}`
 const when = (s?: string) => {
   if (!s) return ""
   const d = new Date(s)

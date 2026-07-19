@@ -61,11 +61,28 @@ export function staffTools(role?: string | null): StaffNavItem[] {
 // INTO it — "Open order" and manual order creation both land on seller-shell routes, and
 // without this a non-admin was silently bounced to their dashboard, which reads as the
 // page being broken rather than forbidden.
-const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help", "/orders"]
+//
+// NB this allows the SUB-routes (/orders/new, /orders/:id). The seller order LIST at
+// exactly /orders is redirected away for staff — see ordersHomeFor. Two different
+// "Orders" pages in the same shell reads as the app switching between a seller and a
+// factory design, which is exactly what it looks like.
+const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help"]
+// Order routes are for roles that actually handle orders. A designer works the artwork
+// board and nothing else, so opening an order — let alone creating one — isn't theirs.
+const ORDER_ROLES = ["operator", "warehouse", "admin"]
+
+/** Where "orders" means for this role: staff get their production board, sellers the list. */
+export function ordersHomeFor(role?: string | null): string {
+  return isStaffRole(role) ? "/operator" : "/orders"
+}
 // May this staff role sit on this (app) page? (admin = all; others = shared + their tools)
 export function staffCanUseAppPath(role: string | null | undefined, pathname: string): boolean {
   if (role === "admin") return true
-  const allowed = [...STAFF_SHARED_PATHS, ...staffTools(role).map((i) => i.href)]
+  const allowed = [
+    ...STAFF_SHARED_PATHS,
+    ...(ORDER_ROLES.includes(String(role)) ? ["/orders"] : []),
+    ...staffTools(role).map((i) => i.href),
+  ]
   return allowed.some((p) => pathname === p || pathname.startsWith(p + "/"))
 }
 

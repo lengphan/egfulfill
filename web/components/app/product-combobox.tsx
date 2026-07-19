@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { DEMO, toPickedProduct, productImage, productPrice, type PickedProduct } from "@/components/app/product-picker-dialog"
 
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 // Module-level cache: an order can have many lines, and each one mounting its own
 // combobox shouldn't refetch the whole catalog.

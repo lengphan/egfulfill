@@ -11,7 +11,7 @@ import { sizesOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
 import { descriptionLines } from "@/lib/description"
 
-const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 
 const SWATCH: Record<string, string> = {

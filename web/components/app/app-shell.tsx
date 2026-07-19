@@ -7,7 +7,7 @@ import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
 import { PageTransition } from "@/components/motion/page-transition"
 import { getUser } from "@/lib/auth"
-import { isStaffRole, landingFor, staffCanUseAppPath } from "@/lib/staff-nav"
+import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
 
 // The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
 // (per their role — admin all, operator/warehouse a curated set, designer none) see the
@@ -21,6 +21,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const id = setTimeout(() => {
       const role = getUser()?.role
       if (isStaffRole(role)) {
+        // The seller order LIST is a different design from the production board. Staff
+        // reaching it (via a stale link, or "back") get their own board instead of the
+        // app appearing to switch between two layouts. Sub-routes still work.
+        if (pathname === "/orders") { router.replace(ordersHomeFor(role)); return }
         if (!staffCanUseAppPath(role, pathname)) { router.replace(landingFor(role)); return }
         setMode("staff")
       } else {
