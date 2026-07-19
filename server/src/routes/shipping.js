@@ -182,11 +182,20 @@ export async function aggregatorBuyCheapest(to, from, pc, opts) {
   if (!epKey() && !shToken()) return null;
   opts = opts || {};
   const T = addr(to), F = addr(from, true), P = parcel(pc);
+  // Keep each provider's failure. Swallowing them made an auth error, a rejected
+  // address and a genuinely empty rate list all look identical — "no rates" — which is
+  // the least useful thing to tell someone whose label just failed.
+  const problems = [];
   const jobs = [];
-  if (epKey()) jobs.push(epRates(T, F, P).catch(() => []));
-  if (shToken()) jobs.push(shRates(T, F, P).catch(() => []));
+  if (epKey()) jobs.push(epRates(T, F, P).catch((e) => { problems.push('EasyPost: ' + (e && e.message ? e.message : e)); return []; }));
+  if (shToken()) jobs.push(shRates(T, F, P).catch((e) => { problems.push('Shippo: ' + (e && e.message ? e.message : e)); return []; }));
   let all = (await Promise.all(jobs)).flat();
-  if (!all.length) return null;
+  if (!all.length) {
+    if (problems.length) throw new Error(problems.join(' · '));
+    // No error, just nothing offered. In Shippo TEST mode this usually means the account
+    // has no test carrier account enabled — rates come back empty rather than erroring.
+    throw new Error('No rates were returned for this parcel. In Shippo test mode, check that a USPS carrier account is enabled under test credentials.');
+  }
   if (opts.carrierPref) { const w = String(opts.carrierPref).toLowerCase(); const f = all.filter((r) => (r.carrier || '').toLowerCase().includes(w)); if (f.length) all = f; }
   if (opts.servicePref) { const w = String(opts.servicePref).toLowerCase(); const f = all.filter((r) => (r.service || '').toLowerCase().includes(w)); if (f.length) all = f; }
   all.sort((a, c) => a.amount - c.amount);
