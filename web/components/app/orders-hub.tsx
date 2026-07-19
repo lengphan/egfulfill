@@ -1,8 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import Image from "next/image"
-import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
+import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -10,7 +9,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
@@ -19,6 +18,8 @@ import { itemImage } from "@/lib/order-image"
 import { numOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
+import { ItemAvatar } from "@/components/app/item-avatar"
+import { DesignCanvasDialog } from "@/components/app/design-canvas"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
@@ -105,6 +106,10 @@ export function OrdersHub() {
   const [threads, setThreads] = useState<Record<string, OrderThreadRow[]>>({})
   const [dfiles, setDfiles] = useState<Record<string, DesignFileRow[]>>({})
   const [stock, setStock] = useState<Record<string, number>>({})
+  // Placed artwork per order, keyed by sku — what the row avatars composite onto the blank.
+  const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
+  // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
+  const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   const threadsRef = useRef<Record<string, boolean>>({})
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
@@ -133,6 +138,14 @@ export function OrdersHub() {
   // with no blank chosen). Loaded once.
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   useEffect(() => { getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => {}) }, [])
+  // Blank stock, once for the board — so each line can say whether we can actually make it.
+  useEffect(() => {
+    getInventory().then((rows) => {
+      const m: Record<string, number> = {}
+      for (const r of rows ?? []) if (r.sku) m[String(r.sku).toUpperCase()] = Number(r.in_stock) || 0
+      setStock(m)
+    }).catch(() => {})
+  }, [])
   // Restore the saved warehouse "from" address.
   useEffect(() => {
     const id = setTimeout(() => {
@@ -279,6 +292,12 @@ export function OrdersHub() {
         threadsRef.current[oid] = true
         getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
         getDesignFiles(oid).then((r) => setDfiles((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
+        getOrderDesigns(oid).then((r) => {
+          const list = Array.isArray(r) ? r : (r?.designs ?? [])
+          const bySku: Record<string, OrderDesign> = {}
+          for (const d of list) if (d?.sku) bySku[d.sku] = d
+          setDesigns((p) => ({ ...p, [oid]: bySku }))
+        }).catch(() => {})
       }
     }, 0)
     return () => clearTimeout(id)
@@ -637,12 +656,18 @@ export function OrdersHub() {
                   <div className={"space-y-2 " + (isCollapsed ? "hidden" : "")}>
                     {items.map((it, i) => {
                       const key = `${o.id}:${it.sku}`
-                      const img = itemImage(it)
                       return (
                         <div key={it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
-                          <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                            {img ? <Image src={img} alt="" fill unoptimized sizes="48px" className="object-cover" /> : <div className="flex size-full items-center justify-center text-muted-foreground/50"><Package size={16} weight="duotone" /></div>}
-                          </div>
+                          {/* Shows the blank with its artwork placed — what actually gets
+                              made — not the marketplace listing photo. Editing is offered
+                              only to the roles whose job it is; warehouse gets the zoom. */}
+                          <ItemAvatar
+                            item={it}
+                            designs={designs[o.id]}
+                            catalog={catalog}
+                            size={48}
+                            onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
@@ -689,7 +714,7 @@ export function OrdersHub() {
                                     )}
                                     {file && (
                                       <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
-                                        <PaperPlaneTilt size={10} weight="bold" /> {file.designId}
+                                        <FileArrowDown size={10} weight="bold" /> {file.designId}
                                       </span>
                                     )}
                                   </div>
@@ -769,6 +794,31 @@ export function OrdersHub() {
               )
             })}
           </div>
+          {/* One editor for the whole board — mounted once, pointed at whichever line was
+              clicked. Reloads the order's designs on save so the row avatar rehydrates
+              with the new placement immediately, without a full board refetch. */}
+          {editing && (
+            <DesignCanvasDialog
+              open
+              onOpenChange={(v) => { if (!v) setEditing(null) }}
+              orderId={editing.order.id}
+              item={editing.item}
+              initialDesign={designs[editing.order.id]?.[editing.item.sku ?? ""]?.data}
+              initialPos={designs[editing.order.id]?.[editing.item.sku ?? ""]?.pos}
+              catalog={catalog}
+              onSaved={() => {
+                const oid = editing.order.id
+                getOrderDesigns(oid).then((r) => {
+                  const list = Array.isArray(r) ? r : (r?.designs ?? [])
+                  const bySku: Record<string, OrderDesign> = {}
+                  for (const d of list) if (d?.sku) bySku[d.sku] = d
+                  setDesigns((p) => ({ ...p, [oid]: bySku }))
+                }).catch(() => {})
+                getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
+              }}
+            />
+          )}
+
           <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage} total={paged.total} start={paged.start} onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]} />
           </>
         )}

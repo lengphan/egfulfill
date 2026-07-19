@@ -184,21 +184,6 @@
 @media (pointer: coarse) {
   [data-slot="button"],
   [data-slot="dropdown-menu-trigger"],
-  /* Native <select> arrows are drawn by the OS — dark, chunky, and different on every
-     platform, which is why they stood out next to our own dropdowns. This replaces it
-     with the same thin grey caret the custom dropdowns use. Inlined as a data URI so it
-     survives the CSP and needs no asset. */
-  .eg-select {
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 0.85rem;
-    padding-right: 1.75rem;
-  }
-  .eg-select::-ms-expand { display: none; }
-
   .eg-tap {
     position: relative;
   }
@@ -216,3 +201,17 @@
     pointer-events: auto;
   }
 }
+
+/* Native <select> arrows are drawn by the OS — dark, chunky, and different on every
+   platform, which is why they stood out next to our own dropdowns. Replaced with the same
+   thin grey caret the custom dropdowns use, inlined as a data URI so it needs no asset. */
+.eg-select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6.5 8 10.5 12 6.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 0.85rem;
+  padding-right: 1.75rem;
+}
+.eg-select::-ms-expand { display: none; }
