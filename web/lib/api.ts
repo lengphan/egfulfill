@@ -734,6 +734,9 @@ export type DesignCard = {
   product?: string
   type?: string
   sku?: string
+  /** Stable per-line id. Two lines of the same SKU on one order (same product, different
+   *  personalisation) are DIFFERENT jobs — without this they collapse into one card. */
+  line_id?: string
   thumb?: string | null
   order_id?: string | null
   col?: string | null

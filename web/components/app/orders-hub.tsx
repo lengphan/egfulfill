@@ -52,6 +52,11 @@ const toAddrOf = (o: OrderRow): ShipAddress => {
 }
 const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.zip)
 
+/** Identity of ONE line. Two lines of the same SKU on an order (same product, different
+ *  personalisation) are different jobs, so the sku alone is not an identity — keying on it
+ *  made "send to board" flip every sibling line to Sent at once. */
+const lineKey = (o: { id: string }, it: OrderItem) => `${o.id}:${it.line_id ?? it.sku ?? ""}`
+
 // Open a bought label in a new tab, whatever shape it came back as (URL / base64 / mock HTML).
 const openLabel = (r: UspsLabelResult) => {
   if (r.labelUrl) { window.open(r.labelUrl, "_blank"); return }
@@ -110,6 +115,15 @@ export function OrdersHub() {
   const [stock, setStock] = useState<Record<string, number>>({})
   // Placed artwork per order, keyed by sku — what the row avatars composite onto the blank.
   const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
+  /**
+   * The artwork on a line, from either legitimate source: placed/uploaded on our side
+   * (order_designs), or synced in with a marketplace order (the buyer's own upload).
+   * Anything without one of these has nothing to print and nothing to digitise.
+   */
+  const artworkFor = useCallback((o: OrderRow, it: OrderItem): string => {
+    const placed = it.sku ? designs[o.id]?.[it.sku]?.data : undefined
+    return placed || it.design_src || ""
+  }, [designs])
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   const threadsRef = useRef<Record<string, boolean>>({})
@@ -164,14 +178,23 @@ export function OrdersHub() {
     return () => clearTimeout(id)
   }, [])
 
-  const patchItem = (orderId: string, sku: string, to: string) =>
-    setOrders((prev) => (prev ?? []).map((o) => (o.id !== orderId ? o : { ...o, items: (o.items ?? []).map((it) => (it.sku === sku ? { ...it, factory_status: to } : it)) })))
+  /** Optimistically move ONE line. Matches on line_id when the line has one — matching on
+   *  sku alone moved every same-SKU sibling, so advancing one of three identical shirts
+   *  appeared to advance all three. */
+  const patchItem = (orderId: string, sku: string, to: string, lineId?: string) =>
+    setOrders((prev) => (prev ?? []).map((o) => (o.id !== orderId ? o : {
+      ...o,
+      items: (o.items ?? []).map((it) => {
+        const hit = lineId ? it.line_id === lineId : (!it.line_id && it.sku === sku)
+        return hit ? { ...it, factory_status: to } : it
+      }),
+    })))
 
   const advanceItem = async (order: OrderRow, item: OrderItem, to: string) => {
     if (!item.sku) return
-    const key = `${order.id}:${item.sku}`
+    const key = lineKey(order, item)
     setBusy(key)
-    patchItem(order.id, item.sku, to)
+    patchItem(order.id, item.sku, to, item.line_id)
     try {
       await postItemStatus(order.id, item.sku, to, item.line_id)
       setActionErr(null)
@@ -233,7 +256,7 @@ export function OrdersHub() {
   const setOrderStatus = async (o: OrderRow, to: string) => {
     setBusy(`ord:${o.id}`)
     try {
-      for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
+      for (const it of o.items ?? []) if (it.sku || it.line_id) { patchItem(o.id, it.sku ?? "", to, it.line_id); await postItemStatus(o.id, it.sku ?? "", to, it.line_id) }
       await updateOrder(o.id, { factoryStatus: to })
       setActionErr(null)
     } catch (e) {
@@ -243,14 +266,19 @@ export function OrdersHub() {
   }
   // Send a line item to the Designer board as a new card (whole-board upsert).
   const sendToDesigner = async (o: OrderRow, it: OrderItem) => {
-    const key = `${o.id}:${it.sku}`
+    const key = lineKey(o, it)
+    // A designer card with no artwork is an empty job — there is nothing to digitise and
+    // no way to tell what it should become. The button is disabled in this state; this is
+    // the belt-and-braces check.
+    if (!artworkFor(o, it)) return
     setBusy(`dsn:${key}`)
     try {
       const cards = await getDesignCards().catch(() => [])
-      const dup = (cards ?? []).some((c) => c.order_id === o.id && c.sku === it.sku)
+      const dup = (cards ?? []).some((c) =>
+        c.order_id === o.id && (it.line_id ? c.line_id === it.line_id : !c.line_id && c.sku === it.sku))
       if (!dup) {
         const card: DesignCard = {
-          id: nowId(), order_id: o.id, sku: it.sku || undefined,
+          id: nowId(), order_id: o.id, sku: it.sku || undefined, line_id: it.line_id,
           title: it.name || it.sku || "Design", product: variantOf(it),
           type: it.print_type || undefined, thumb: itemImage(it) || null,
           col: "incoming", pay_status: "pending", payment: 0,
@@ -658,9 +686,10 @@ export function OrdersHub() {
 
                   <div className={"space-y-2 " + (isCollapsed ? "hidden" : "")}>
                     {items.map((it, i) => {
-                      const key = `${o.id}:${it.sku}`
+                      const key = lineKey(o, it)
+                      const art = artworkFor(o, it)
                       return (
-                        <div key={it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
+                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
                               only to the roles whose job it is; warehouse gets the zoom. */}
@@ -731,7 +760,14 @@ export function OrdersHub() {
                               Board/Design Lab glyph — reusing it here made one symbol
                               mean three different things. */}
                           {canDesign && (
-                            <Button size="sm" variant="outline" className="shrink-0" title="Create a card for this item on the Designer board" disabled={busy === `dsn:${key}` || sent.has(key)} onClick={() => sendToDesigner(o, it)}>
+                            <Button
+                              size="sm" variant="outline" className="shrink-0"
+                              title={art
+                                ? "Create a card for this item on the Designer board"
+                                : "No artwork on this line yet — it has to be synced from the marketplace or uploaded before a designer has anything to work from"}
+                              disabled={!art || busy === `dsn:${key}` || sent.has(key)}
+                              onClick={() => sendToDesigner(o, it)}
+                            >
                               {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
                                 : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> Sent</>
                                 : <><PaperPlaneTilt size={13} weight="bold" /> Board</>}
