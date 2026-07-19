@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { sizesOf } from "@/lib/variant-resolve"
 import { normalizeMethods } from "@/lib/print-method"
+import { descriptionLines } from "@/lib/description"
 
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
@@ -231,6 +232,19 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </SectionCard>
+
+          {descriptionLines(product.description).length > 0 && (
+            <SectionCard title="About this product">
+              <ul className="space-y-1.5 p-5 text-sm">
+                {descriptionLines(product.description).map((line, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
 
           {/* Print methods available — chips per technique, with the per-unit surcharge
               when the product carries one (methodPrices). */}

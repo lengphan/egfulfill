@@ -6,8 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
-import { type CatalogProduct } from "@/lib/api"
+import { getFactorySettings, type CatalogProduct, type FactorySettings } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
+import { normTech } from "@/lib/print-method"
+import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
 const METHODS = ["DTG", "Embroidery", "Screen Print", "Sublimation", "Vinyl"]
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
@@ -92,7 +94,9 @@ export function ProductEditorDialog({
       setPrice(p?.price != null ? String(p.price) : "")
       setBasePrice(p?.basePrice != null ? String(p.basePrice) : p?.base_price != null ? String(p.base_price) : "")
       setShipping(p?.shippingFee != null ? String(p.shippingFee) : p?.shipping_fee != null ? String(p.shipping_fee) : "")
-      setDesc(p?.description ?? "")
+      // Supplier feeds send HTML fragments (<p><strong>95% Cotton…</strong></p>), which
+      // rendered as literal tags in this textarea. Flatten to one feature per line.
+      setDesc(looksLikeHtml(p?.description) ? descriptionToText(p?.description) : (p?.description ?? ""))
       setSizes(p?.sizes ?? [])
       setTiers(tiersToStr(p?.sizePrices))
       setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
@@ -120,6 +124,39 @@ export function ProductEditorDialog({
     setColorInput("")
   }
   const supplier = product?.supplier
+
+  // Platform pricing policy: the per-method surcharge and the flat shipping band. Loaded
+  // so the editor can PREFILL a sensible retail price rather than leaving the seller to
+  // work out cost + surcharge in their head.
+  const [fees, setFees] = useState<FactorySettings | null>(null)
+  useEffect(() => {
+    const id = setTimeout(() => { getFactorySettings().then(setFees).catch(() => {}) }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  // Which flat shipping band this product falls in — mirrors shippingBandOf() on the
+  // server, matched on substrings because catalog types are loose.
+  const bandKey = (() => {
+    const t = `${type} ${name}`.toLowerCase()
+    if (/cap|hat|beanie|visor|headwear|trucker/.test(t)) return "ship_cap"
+    if (/hoodie|hooded|sweatshirt|sweater|crewneck|jacket|coat|pullover|fleece/.test(t)) return "ship_heavy"
+    return "ship_garment"
+  })()
+  const bandFee = fees?.[bandKey]
+  const methodKey = "method_" + (normTech(method)?.key ?? "dtg")
+  const surcharge = fees?.[methodKey] ?? 0
+
+  // Prefill retail = base cost + method surcharge, but ONLY until the seller types their
+  // own price. Recomputing after that would overwrite a deliberate figure on every
+  // keystroke elsewhere in the form.
+  const [priceTouched, setPriceTouched] = useState(false)
+  useEffect(() => {
+    if (priceTouched || !fees) return
+    const base = Number(basePrice)
+    if (!isFinite(base) || base <= 0) return
+    const id = setTimeout(() => setPrice(String(Math.round((base + surcharge) * 100) / 100)), 0)
+    return () => clearTimeout(id)
+  }, [basePrice, surcharge, fees, priceTouched])
 
   // Live margin readout.
   const retail = num(price), cost = num(basePrice), ship = num(shipping)
@@ -193,9 +230,9 @@ export function ProductEditorDialog({
           {/* Pricing + live margin */}
           <div className="rounded-xl border border-border p-4">
             <div className="grid grid-cols-3 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value.replace(/[^0-9.]/g, "")) }} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="default" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={bandFee != null ? `default ${bandFee}` : "default"} className="h-9" inputMode="decimal" /></label>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
               <span className="text-muted-foreground">Margin per unit</span>
