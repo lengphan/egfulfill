@@ -263,8 +263,9 @@ export function OrdersHub() {
     setPasteOpen(false); setPasteText("")
     setTo(toAddrOf(o))
   }
-  // Buy a real USPS-direct label (directUsps → skips the Shippo/EasyPost aggregator).
-  // On success the server writes tracking + flips the order to shipped; we mirror locally.
+  // Buy a real label. Goes through the aggregator (Shippo/EasyPost) when one is
+  // configured, falling back to USPS-direct only if none is. On success the server writes
+  // tracking + the label URL and flips the order to shipped; we mirror locally.
   const buyLabel = async (o: OrderRow) => {
     setLabelErr(null)
     if (!addrComplete(to)) { setLabelErr("Recipient needs a street, city, state and ZIP."); return }

@@ -471,9 +471,16 @@ export function undoScan(id: string) {
 // ── USPS-direct label (Labels 3.0) — buys a real label + writes tracking onto the order ──
 export type ShipAddress = { name?: string; street?: string; street2?: string; city?: string; state?: string; zip?: string }
 export type UspsLabelResult = { ok?: boolean; error?: string; mock?: boolean; trackingNumber?: string; labelUrl?: string; labelImage?: string; labelHtml?: string; imageType?: string; carrier?: string; service?: string; cost?: number }
-export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string }) {
-  // directUsps:true → skip the Shippo/EasyPost aggregator, buy USPS-direct.
-  return api<UspsLabelResult>(`/api/usps/label`, { method: "POST", body: JSON.stringify({ ...body, directUsps: true }) })
+export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightOz?: number; length?: number; width?: number; height?: number; mailClass?: string; orderId?: string; directUsps?: boolean }) {
+  // Route through the aggregator (Shippo/EasyPost) when one is configured — it needs no
+  // USPS EPS billing approval, and a test key buys free sample labels.
+  //
+  // This used to force directUsps:true on EVERY call, which skipped the aggregator
+  // unconditionally and billed USPS EPS instead. That's where "we are having trouble
+  // validating your credit card" came from: an EPS billing failure for an account the
+  // aggregator path never touches. Now opt-in, for when you deliberately want
+  // USPS-direct (Labels 3.0).
+  return api<UspsLabelResult>(`/api/usps/label`, { method: "POST", body: JSON.stringify(body) })
 }
 
 // ── Purchase orders (staff) — draft → placed → received ──
