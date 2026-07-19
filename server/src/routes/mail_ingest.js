@@ -122,6 +122,34 @@ async function resolveForwarder(email) {
   return byReg.rows[0] || null;
 }
 
+
+/**
+ * Normalise an inbound-email webhook body to { from, subject, text, html }.
+ *
+ * Every provider posts a different shape, and the differences are cosmetic — so accept
+ * them all rather than coupling this endpoint to one vendor:
+ *   Brevo     { items: [{ From: {Address}, Subject, RawTextBody, RawHtmlBody }] }
+ *   Mailgun   { sender, subject, 'body-plain', 'stripped-html' }
+ *   SendGrid  { from, subject, text, html }
+ *   Postmark  { From, Subject, TextBody, HtmlBody }
+ */
+export function normalizeInbound(body) {
+  const b = body || {};
+  // Brevo batches — take the first message; a forward is one message per POST.
+  const it = Array.isArray(b.items) && b.items.length ? b.items[0] : null;
+  const src = it || b;
+
+  const fromRaw = src.From || src.from || src.sender || src.Sender || '';
+  const from = typeof fromRaw === 'object'
+    ? (fromRaw.Address || fromRaw.address || fromRaw.email || '')
+    : String(fromRaw || '');
+
+  const text = src.RawTextBody || src.TextBody || src.text || src['body-plain'] || src.Text || '';
+  const html = src.RawHtmlBody || src.HtmlBody || src.html || src['body-html'] || src['stripped-html'] || src.Html || '';
+  const subject = src.Subject || src.subject || '';
+  return { from: String(from || ''), subject: String(subject || ''), text: String(text || ''), html: String(html || '') };
+}
+
 export function mailIngestRoutes(app, requireAuth) {
   q(`create table if not exists mail_forwarders (
        email text primary key,
@@ -166,13 +194,13 @@ export function mailIngestRoutes(app, requireAuth) {
     if (!SECRET) { reply.code(503); return { error: 'Email ingestion is not configured (set MAIL_INGEST_SECRET).' }; }
     if (String((req.query || {}).key || '') !== SECRET) { reply.code(403); return { error: 'forbidden' }; }
 
-    const b = req.body || {};
-    const text = String(b.text || '') || htmlToText(b.html);
-    if (!text) { reply.code(400); return { error: 'Empty message.' }; }
+    const b = normalizeInbound(req.body);
+    const text = b.text || htmlToText(b.html);
+    if (!text) { reply.code(400); return { error: 'Empty message — no text or html body in the webhook payload.' }; }
 
     // The FORWARDER must be a known account — otherwise anyone who learns the URL could
     // post addresses. Staff may forward on any seller's behalf.
-    const fromAddr = (String(b.from || '').match(/[\w.+-]+@[\w.-]+/) || [''])[0].toLowerCase();
+    const fromAddr = (b.from.match(/[\w.+-]+@[\w.-]+/) || [''])[0].toLowerCase();
     if (!fromAddr) { reply.code(400); return { error: 'No sender address.' }; }
     const sender = await resolveForwarder(fromAddr);
     if (!sender) {
