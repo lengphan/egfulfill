@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -558,9 +558,9 @@ export function OrdersHub() {
                               about it. Sharing a line with store/date/address made five
                               dots read as more clutter rather than a summary. */}
                           <ReadinessStrip order={o} missingArtwork={artworkMissingFor(o)} className="mr-1" />
-                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}><TrayArrowDown size={13} weight="bold" /> Start order</Button>}
-                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>}
-                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further."><SkipForward size={13} weight="fill" /> Next stage</Button>}
+                          {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>Start order</Button>}
+                          {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>Create new label</Button>}
+                          {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">Next stage</Button>}
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               aria-label="More actions"
@@ -573,7 +573,7 @@ export function OrdersHub() {
                               {/* the non-primary pipeline actions */}
                               <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> Open order</DropdownMenuItem>
                               {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
-                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</DropdownMenuItem>}
+                              {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Create new label</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> Reopen label</DropdownMenuItem>}
                               {canLabels && <DropdownMenuItem onClick={() => setBarcodeOrder(o)}><Barcode size={14} weight="bold" /> Print blank labels</DropdownMenuItem>}
                               {prod.length > 0 && (

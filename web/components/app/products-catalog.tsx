@@ -36,14 +36,12 @@ const SWATCH: Record<string, string> = {
 }
 const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
 
-// A stable, cheerful placeholder tint per product (no image) — index-based, no randomness.
-const TINTS = [
-  "from-violet-100 to-indigo-50 text-violet-500",
-  "from-amber-100 to-orange-50 text-amber-600",
-  "from-emerald-100 to-teal-50 text-emerald-600",
-  "from-sky-100 to-blue-50 text-sky-600",
-  "from-pink-100 to-rose-50 text-pink-600",
-]
+// Placeholder for a product with no photo. Deliberately NEUTRAL: this used to rotate
+// through five pastel gradients, so a catalog without images rendered as a grid of
+// lavender/amber/emerald/sky/pink tiles — a different visual language from every other
+// page, which reads as two apps rather than one. The image is the interesting thing on a
+// product card; its absence shouldn't be the loudest element on the page.
+const PLACEHOLDER = "bg-muted text-muted-foreground/60"
 
 // ── demo fallback (no session / API) ──────────────────────────
 const DEMO: CatalogProduct[] = [
@@ -211,7 +209,6 @@ export function ProductsCatalog() {
             const img = imageOf(p)
             const colors = colorsOf(p)
             const sizes = sizesOf(p)
-            const tint = TINTS[i % TINTS.length]
             const status = p.status ?? "Active"
             return (
               <motion.div
@@ -253,7 +250,7 @@ export function ProductsCatalog() {
                       className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
                     />
                   ) : (
-                    <div className={"flex size-full items-center justify-center bg-gradient-to-br " + tint}>
+                    <div className={"flex size-full items-center justify-center " + PLACEHOLDER}>
                       <span className="font-display text-4xl font-semibold">
                         {(p.name ?? "?").trim().charAt(0).toUpperCase()}
                       </span>
