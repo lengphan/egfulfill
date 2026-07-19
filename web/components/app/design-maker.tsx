@@ -230,8 +230,11 @@ export function DesignMaker() {
         </aside>
 
         {/* Center: canvas */}
-        <div className="flex min-w-0 flex-1 items-center justify-center rounded-2xl border border-border bg-muted/20 p-4">
-          <div className="w-full max-w-lg">
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-2xl border border-border bg-muted/20 p-4">
+          {/* Fill the panel instead of the old fixed max-w-lg, which left the stage
+              marooned in the middle of a wide screen. Capped by viewport height so the
+              square can't grow taller than the space it has. */}
+          <div className="flex h-full max-h-full w-full items-center justify-center">
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -242,6 +245,7 @@ export function DesignMaker() {
               className={"relative w-full rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
             >
               <DesignStage
+                className="h-full max-h-full w-auto max-w-full"
                 mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos}
                 onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText}
                 selected={selected} onSelect={setSelected}

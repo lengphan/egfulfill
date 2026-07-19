@@ -60,7 +60,7 @@ export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: bool
         <DialogHeader><DialogTitle>New design</DialogTitle></DialogHeader>
 
         <div className="mx-auto w-full max-w-sm">
-          <DesignStage mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} />
+          <DesignStage className="w-full" mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} />
         </div>
 
         <div className="space-y-3">
