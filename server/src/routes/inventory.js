@@ -3,6 +3,63 @@
 // present, so the table mirrors the client. Empty body never wipes (safety).
 import { q } from '../db.js';
 
+
+/**
+ * Scan against seller-consigned stock.
+ *
+ * Picking a unit both REMOVES it and consumes the hold that was placed on it when the
+ * order was submitted — so qty_received and qty_reserved fall together. Decrementing only
+ * one would either leave phantom stock or strand a reservation against goods that have
+ * already left the building.
+ *
+ * Returns null when the sku isn't consigned, so the caller can fall through to its 404.
+ */
+async function consignedScan(sku, delta, direction, qty, req, b) {
+  const line = (await q(`
+    select cl.*, s.seller_id, coalesce(nullif(u.name,''), u.email) as seller_name
+      from consignment_lines cl
+      join consignment_shipments s on s.id = cl.shipment_id
+      left join users u on u.id = s.seller_id
+     where upper(cl.internal_sku) = upper($1)
+     limit 1`, [sku]).catch(() => ({ rows: [] }))).rows[0];
+  if (!line) return null;
+
+  if (direction === 'out') {
+    const have = Number(line.qty_received) || 0;
+    if (have < qty) {
+      return { error: `Only ${have} of ${sku} on hand — can't pick ${qty}.`, consigned: true, onHand: have };
+    }
+    await q(`update consignment_lines
+                set qty_received = greatest(0, qty_received - $1),
+                    qty_reserved = greatest(0, qty_reserved - $1)
+              where id = $2`, [qty, line.id]);
+  } else {
+    await q('update consignment_lines set qty_received = qty_received + $1 where id = $2', [qty, line.id]);
+  }
+
+  const after = (await q('select qty_received, qty_reserved, location from consignment_lines where id=$1', [line.id])).rows[0] || {};
+  await q('insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5)',
+    [sku, direction, qty, b.order_ref || null, req.user?.id || null]).catch(() => {});
+
+  // Same shape the inventory path returns, so the scan station needs no special case —
+  // plus whose it is and where it lives, which is what matters at the shelf.
+  return {
+    ok: true,
+    consigned: true,
+    item: {
+      sku,
+      name: line.name || line.seller_sku || 'Consigned item',
+      variant: [line.seller_name, after.location].filter(Boolean).join(' · ') || null,
+      in_stock: Number(after.qty_received) || 0,
+      reserved: Number(after.qty_reserved) || 0,
+      reorder_at: 0,
+      category: 'Consigned',
+    },
+    seller: line.seller_name || null,
+    location: after.location || null,
+  };
+}
+
 export function inventoryRoutes(app, requireStaff) {
   q('alter table inventory add column if not exists supplier text').catch(() => {});
   // scan_history is declared in schema.sql, but that only runs on FIRST db init —
@@ -103,7 +160,15 @@ export function inventoryRoutes(app, requireStaff) {
       'update inventory set in_stock = coalesce(in_stock,0) + $1, updated_at = now() where sku = $2 returning *',
       [delta, sku]
     );
-    if (!upd.rows.length) { reply.code(404); return { error: 'Unknown SKU: ' + sku }; }
+
+    // Not ours? It may be CONSIGNED stock — the barcodes printed at receiving carry an
+    // internal SKU (EG-…) that lives in consignment_lines, not inventory. Without this a
+    // scan of a label we printed ourselves answers "Unknown SKU".
+    if (!upd.rows.length) {
+      const con = await consignedScan(sku, delta, direction, qty, req, b);
+      if (con) return con;
+      reply.code(404); return { error: 'Unknown SKU: ' + sku };
+    }
 
     const hist = await q(
       'insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5) returning id, created_at',
