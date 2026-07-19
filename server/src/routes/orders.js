@@ -84,6 +84,64 @@ export function stageDenial(role, current, target) {
  */
 /** Items still missing artwork. Exported because label purchase must apply the same rule
  *  — it writes 'shipped' directly, and would otherwise ship undecorated work. */
+
+/**
+ * Auto-push a line's artwork to the Designer board when it enters the design stage —
+ * UNLESS we already have what the designer would produce.
+ *
+ * The point is to save a manual step per line, not to create work. So three things hold
+ * a push back, in order of cost:
+ *   1. no artwork          — nothing to digitise; an empty card tells a designer nothing
+ *   2. already carded      — the line is on the board already
+ *   3. a file already exists for this EXACT artwork — someone has digitised it before,
+ *      on any order, for any seller, so re-cutting it is paid-for duplicate work
+ *
+ * Only the exact hash counts here. A perceptual near-match is a suggestion for a human to
+ * confirm in the UI; silently skipping a push on a lookalike would leave a real job
+ * un-designed and nobody would notice until it failed to ship.
+ *
+ * Best-effort throughout: this is a convenience on top of a status change, so a failure
+ * here must never fail the status change itself.
+ */
+async function autoPushDesigns(orderId, lineId, sku) {
+  const key = lineId ? 'line_id' : 'sku';
+  const val = lineId || sku;
+  const it = await q(
+    `select sku, line_id, name, print_type, img, design_src, color, size
+       from order_items where order_id=$1 and ${key}=$2 limit 1`, [orderId, val]
+  ).then((r) => r.rows[0]);
+  if (!it) return { pushed: false, reason: 'no-item' };
+
+  const design = await q('select data, art_hash from order_designs where order_id=$1 and sku=$2 limit 1',
+    [orderId, it.sku]).then((r) => r.rows[0]).catch(() => null);
+  const hasArt = !!((design && design.data) || it.design_src);
+  if (!hasArt) return { pushed: false, reason: 'no-artwork' };
+
+  const carded = await q(
+    `select 1 from design_cards where order_id=$1 and coalesce(sku,'')=coalesce($2,'') limit 1`,
+    [orderId, it.sku]).then((r) => r.rows.length > 0).catch(() => false);
+  if (carded) return { pushed: false, reason: 'already-on-board' };
+
+  if (design && design.art_hash) {
+    const existing = await q(
+      `select f.design_id from design_file_data f
+         join order_designs d on d.order_id = f.order_id and d.sku = f.sku
+        where d.art_hash = $1 and f.order_id <> $2 and f.kind in ('pes','emb') limit 1`,
+      [design.art_hash, orderId]).then((r) => r.rows[0]).catch(() => null);
+    if (existing) return { pushed: false, reason: 'file-exists', designId: existing.design_id };
+  }
+
+  const id = Date.now() + Math.floor(Math.random() * 1000);
+  const product = [it.color, it.size, it.print_type].filter(Boolean).join(' \u00b7 ');
+  await q(
+    `insert into design_cards (id, order_id, sku, title, col, type, product, pay_status, payment, is_emb, thumb)
+     values ($1,$2,$3,$4,'incoming',$5,$6,'pending',0,$7,$8)
+     on conflict (id) do nothing`,
+    [id, orderId, it.sku || null, it.name || it.sku || 'Design', it.print_type || null, product,
+     /emb/i.test(it.print_type || ''), it.img || null]).catch(() => {});
+  return { pushed: true, cardId: id };
+}
+
 export async function missingArtwork(orderId) {
   const items = await q('select sku, name, print_type from order_items where order_id=$1', [orderId]).then((r) => r.rows);
   const designs = await q('select distinct sku from order_designs where order_id=$1', [orderId])
@@ -497,8 +555,15 @@ export function ordersRoutes(app, requireAuth) {
       [status || '', req.params.id, val]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
       before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
+    // Entering the design stage hands the line to a designer — so do it automatically,
+    // and report what was HELD BACK. Silence would be wrong here: "nothing happened"
+    // and "we already have that file" look identical from the board.
+    let design = null;
+    if (normalizeStage(status) === 'awaiting_scan') {
+      design = await autoPushDesigns(req.params.id, lineId, sku).catch(() => null);
+    }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
-    return { ok: true };
+    return { ok: true, design };
   });
 
   // ── Variant setup — the blank/colour/size/method for a line item ────────────

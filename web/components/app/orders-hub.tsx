@@ -126,6 +126,8 @@ export function OrdersHub() {
   // that opens everything is unreadable and reads as "all my orders are open". Nothing is
   // persisted across navigation, so coming back gives a clean, closed board.
   const [actionErr, setActionErr] = useState<string | null>(null)
+  // Non-error feedback from an action (what the auto-push did), cleared on the next one.
+  const [note, setNote] = useState<string | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState("")
   // Per-order production detail the floor needs but the board never showed: matched
@@ -220,7 +222,14 @@ export function OrdersHub() {
     setBusy(key)
     patchItem(order.id, item.sku, to, item.line_id)
     try {
-      await postItemStatus(order.id, item.sku, to, item.line_id)
+      const r = await postItemStatus(order.id, item.sku, to, item.line_id)
+      // Say what the auto-push did. Held-back is the interesting case: without a word,
+      // "we already have that file" is indistinguishable from "nothing happened".
+      const d = r?.design
+      if (d?.pushed) setNote(`Sent ${item.name || item.sku || "the item"} to the Designer board.`)
+      else if (d?.reason === "file-exists") setNote(`Not sent — we already have a file for this artwork (${d.designId}). Reuse it instead of re-cutting.`)
+      else if (d?.reason === "no-artwork") setNote(`Not sent — no artwork on this line yet.`)
+      else if (d?.reason === "already-on-board") setNote(`Already on the Designer board.`)
       setActionErr(null)
     } catch (e) {
       // A 409 here is the ship gate explaining itself (missing artwork / no label).
@@ -397,6 +406,13 @@ export function OrdersHub() {
 
       {/* Why an action was refused — the ship gate's reasons land here rather than the
           status silently snapping back. */}
+      {note && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
+          <PaperPlaneTilt size={16} weight="bold" className="mt-0.5 shrink-0 text-muted-foreground" />
+          <span className="flex-1">{note}</span>
+          <button onClick={() => setNote(null)} className="shrink-0 font-medium text-muted-foreground underline underline-offset-2">Dismiss</button>
+        </div>
+      )}
       {actionErr && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
           <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />

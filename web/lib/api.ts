@@ -573,8 +573,10 @@ export function getOrders() {
 /** Staff: set ONE line item's factory_status (drives the production boards).
  *  Pass line_id whenever the item has one — sku alone can't address a marketplace line
  *  with a null sku, and moves identical-SKU siblings together. */
+/** What the auto-push did when a line entered the design stage (see autoPushDesigns). */
+export type AutoPushResult = { pushed: boolean; reason?: string; designId?: string; cardId?: number }
 export function postItemStatus(id: string, sku: string, status: string, lineId?: string | null) {
-  return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/item-status`, {
+  return api<{ ok?: boolean; error?: string; design?: AutoPushResult | null }>(`/api/orders/${encodeURIComponent(id)}/item-status`, {
     method: "POST",
     body: JSON.stringify({ sku, status, line_id: lineId ?? undefined }),
   })
