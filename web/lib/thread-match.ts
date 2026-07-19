@@ -60,6 +60,19 @@ export type DominantColor = { r: number; g: number; b: number; srcHex: string; c
 // single visual "purple" doesn't surface as three near-purples. Near-white/transparent
 // pixels are dropped (design backgrounds aren't a colour). Verbatim port of the tuning
 // constants — MIN_PCT 8%, MERGE_DIST 96 — so results match the old app.
+/**
+ * Canvas colour analysis needs a READABLE image. A remote CDN image taints the canvas, so
+ * getImageData throws — and with crossOrigin set, an upstream without CORS headers fails
+ * to load at all. Either way the match silently returned nothing, which is what "thread
+ * match doesn't work" looked like on a buyer's Etsy-hosted artwork.
+ *
+ * Our own img-proxy re-serves those same-origin, which is exactly why it exists. Data URLs
+ * (a design we stored ourselves) are already readable and pass through untouched.
+ */
+export function canvasReadableSrc(url: string): string {
+  return /^https?:\/\//i.test(url) ? `/api/etsy/img-proxy?url=${encodeURIComponent(url)}` : url
+}
+
 export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor[]> {
   return new Promise((resolve) => {
     if (!dataUrl || typeof document === "undefined") { resolve([]); return }
@@ -113,7 +126,7 @@ export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor
       })))
     }
     img.onerror = () => resolve([])
-    img.src = dataUrl
+    img.src = canvasReadableSrc(dataUrl)
   })
 }
 

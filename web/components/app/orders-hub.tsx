@@ -743,7 +743,7 @@ export function OrdersHub() {
                             item={it}
                             designs={designs[o.id]}
                             catalog={catalog}
-                            size={48}
+                            size={64}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                           />
                           <div className="min-w-0 flex-1">

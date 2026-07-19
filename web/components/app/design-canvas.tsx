@@ -243,10 +243,18 @@ export function DesignCanvasDialog({
   const isEmb = /emb/i.test(String(item.print_type || ""))
   const [threads, setThreads] = useState<Thread[]>([])
   const [picking, setPicking] = useState(false)
+  // null = not attempted, [] = attempted and found nothing (which is a real outcome worth
+  // saying out loud — it previously looked identical to "no artwork yet").
+  const [threadErr, setThreadErr] = useState(false)
   useEffect(() => {
-    if (!isEmb || !designUrl) { setThreads([]); return }
+    if (!isEmb || !designUrl) { setThreads([]); setThreadErr(false); return }
     let live = true
-    matchThreadColors(designUrl).then((t) => { if (live) setThreads(t) })
+    setThreadErr(false)
+    matchThreadColors(designUrl).then((t) => {
+      if (!live) return
+      setThreads(t)
+      setThreadErr(t.length === 0)
+    }).catch(() => { if (live) setThreadErr(true) })
     return () => { live = false }
   }, [designUrl, isEmb])
   // Eyedropper: a sampled pixel → its nearest in-stock thread, appended (deduped) so the
@@ -315,7 +323,11 @@ export function DesignCanvasDialog({
               )}
             </div>
             {threads.length === 0 ? (
-              <div className="text-xs text-muted-foreground/70">{designUrl ? "Reading colours…" : "Upload artwork to match embroidery threads."}</div>
+              <div className="text-xs text-muted-foreground/70">
+                {!designUrl ? "Upload artwork to match embroidery threads."
+                  : threadErr ? "Couldn't read this artwork's colours — pick them with the eyedropper instead."
+                  : "Reading colours…"}
+              </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {threads.map((t) => (

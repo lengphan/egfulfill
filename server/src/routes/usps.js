@@ -251,15 +251,20 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
  * decorated item must have artwork. Without this the label routes wrote 'shipped'
  * straight to SQL and quietly shipped work that was never designed.
  */
-async function recordLabel(orderId, tracking, carrier) {
+// Persist the label URL alongside the tracking number. Without it a label could only ever
+// be printed once, at the moment of purchase — reprinting after a paper jam, or batching a
+// day's labels for a scan run, had nothing to point at.
+async function recordLabel(orderId, tracking, carrier, labelUrl) {
   if (!orderId) return { shipped: false };
   const missing = await missingArtwork(orderId).catch(() => []);
   if (missing.length) {
-    await q('update orders set tracking=$1, carrier=$2 where id=$3', [tracking, carrier || 'USPS', orderId]).catch(() => {});
+    await q('update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url) where id=$4',
+      [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
     return { shipped: false, heldFor: missing };
   }
-  await q(`update orders set tracking=$1, carrier=$2, factory_status='shipped', status='shipped' where id=$3`,
-    [tracking, carrier || 'USPS', orderId]).catch(() => {});
+  await q(`update orders set tracking=$1, carrier=$2, tracking_label_url=coalesce($3, tracking_label_url),
+             factory_status='shipped', status='shipped' where id=$4`,
+    [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
   return { shipped: true };
 }
 
@@ -285,7 +290,7 @@ async function recordLabel(orderId, tracking, carrier) {
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502);
