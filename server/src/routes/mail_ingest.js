@@ -172,9 +172,51 @@ export function normalizeInbound(body) {
   return { from: String(from || ''), to: String(to || ''), subject: String(subject || ''), text: String(text || ''), html: String(html || '') };
 }
 
+
+/**
+ * Mail providers verify a forwarding address before they'll use it: Gmail sends a
+ * confirmation LINK, Yahoo and Outlook send a CODE. Those messages land here, at the
+ * address being verified — so handle them rather than letting setup dead-end at step 3.
+ *
+ * The link is fetched (it's our own address being confirmed, and that's the entire
+ * purpose of the message). A code can't be auto-used, so it's stored for the seller to
+ * read back in Settings.
+ */
+async function handleVerification(userId, subject, text) {
+  const hay = `${subject}\n${text}`;
+  const isVerify = /forwarding|verify|confirmation|confirm your/i.test(hay);
+  if (!isVerify) return null;
+
+  // Gmail's confirmation URL.
+  const link = (hay.match(/https:\/\/mail[\w.-]*google\.com\/[^\s"'<>]*/i) || [])[0]
+    || (hay.match(/https:\/\/[\w.-]*\/verify[^\s"'<>]*/i) || [])[0];
+  if (link) {
+    // A GET on the confirmation URL is exactly what clicking it does.
+    const ok = await fetch(link, { redirect: 'follow' }).then((r) => r.ok).catch(() => false);
+    return { kind: 'link', confirmed: ok, link };
+  }
+
+  // Otherwise look for a short numeric/alphanumeric code to show the seller.
+  const code = (hay.match(/\b(?:code|pin)\b[^\d]{0,20}(\d{4,10})/i) || [])[1]
+    || (hay.match(/\b(\d{6,9})\b/) || [])[1];
+  if (code) {
+    await q(`insert into mail_verifications (user_id, code, subject, created_at)
+             values ($1,$2,$3, now())`, [userId, String(code), String(subject || '').slice(0, 200)])
+      .catch(() => {});
+    return { kind: 'code', code };
+  }
+  return { kind: 'unknown' };
+}
+
 export function mailIngestRoutes(app, requireAuth) {
   q('alter table users add column if not exists ingest_token text').catch(() => {});
   q('create unique index if not exists users_ingest_token_idx on users (ingest_token) where ingest_token is not null').catch(() => {});
+
+  q(`create table if not exists mail_verifications (
+       id bigserial primary key,
+       user_id uuid references users(id) on delete cascade,
+       code text, subject text,
+       created_at timestamptz default now())`).catch(() => {});
 
   q(`create table if not exists mail_forwarders (
        email text primary key,
@@ -198,6 +240,14 @@ export function mailIngestRoutes(app, requireAuth) {
       address: row.ingest_token && domain ? `u-${row.ingest_token}@${domain}` : null,
       configured: !!domain,
     };
+  });
+
+  /** Verification codes a provider sent to the ingest address (Yahoo/Outlook flows). */
+  app.get('/api/mail/verifications', { preHandler: requireAuth }, async (req) => {
+    const r = await q(`select code, subject, created_at from mail_verifications
+                        where user_id=$1 and created_at > now() - interval '1 hour'
+                        order by created_at desc limit 5`, [req.user.sub]).catch(() => ({ rows: [] }));
+    return r.rows;
   });
 
   app.get('/api/mail/forwarders', { preHandler: requireAuth }, async (req) => {
@@ -247,6 +297,17 @@ export function mailIngestRoutes(app, requireAuth) {
     if (!sender) {
       reply.code(403);
       return { error: `${fromAddr} isn't linked to an account. Add it under Settings → Forwarding addresses, or forward from the email you signed up with.` };
+    }
+
+    // A verification message isn't a sale — deal with it first, or setup stalls at the
+    // provider's "confirm this address" step.
+    const verify = await handleVerification(sender.id, b.subject, text);
+    if (verify) {
+      return verify.kind === 'link'
+        ? { ok: true, verification: verify.confirmed ? 'confirmed' : 'link-failed' }
+        : verify.kind === 'code'
+          ? { ok: true, verification: 'code-stored', code: verify.code }
+          : { ok: true, verification: 'unrecognised' };
     }
 
     const { orderId, address } = parseSaleEmail(text);

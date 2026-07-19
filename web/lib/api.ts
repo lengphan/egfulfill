@@ -1159,3 +1159,8 @@ export function runAddressSheet() {
   return api<{ ok?: boolean; updated?: number; skipped?: string | number; notFound?: number; alreadyHad?: number; error?: string }>(
     `/api/etsy/address-sheet/run`, { method: "POST" })
 }
+
+/** The seller's unique inbound address for forwarding Etsy sale emails. */
+export function getIngestAddress() {
+  return api<{ token: string | null; address: string | null; configured: boolean }>(`/api/mail/ingest-address`)
+}
