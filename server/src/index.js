@@ -17,6 +17,7 @@ import { uspsRoutes } from './routes/usps.js';
 import { templatesRoutes } from './routes/templates.js';
 import { billingRoutes } from './routes/billing.js';
 import { consignmentRoutes } from './routes/consignment.js';
+import { mailIngestRoutes } from './routes/mail_ingest.js';
 import { vietqrRoutes } from './routes/vietqr.js';
 import { topupsRoutes } from './routes/topups.js';
 import { paypalRoutes } from './routes/paypal.js';
@@ -191,6 +192,7 @@ designFilesRoutes(app, requireAuth);                   // machine deliverable fi
 sheetsRoutes(app, requireAuth);                        // Google Sheets order import (link-shared sheet → existing import pipeline)
 billingRoutes(app, requireAuth);                       // subscription plan + SpyDeck add-on, charged from the wallet (402 names the shortfall so the client can offer a top-up)
 consignmentRoutes(app, requireAuth, requireStaff);     // inventory services: seller-owned stock (ASN -> count -> internal SKU + bin); kept OUT of `inventory`, which has no owner column
+mailIngestRoutes(app);                                // inbound Etsy sale emails -> order addresses (shared-secret URL; sender must be a known account)
 walletRoutes(app, requireAuth);                        // SERVER-authoritative wallet balance + append-only ledger (seller/factory/designer), idempotent by ref
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
