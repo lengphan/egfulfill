@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -9,6 +9,9 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Board", href: "/designer", icon: PenNib, roles: ["operator", "warehouse", "designer", "admin"] },
   // Earnings = a designer's own payout view. Admin sees designer credits in Wallet instead.
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
+  // Dispatch = orders leaving the building (batch, print, scan out). Distinct from Scan,
+  // which is the stock-in/out station for inventory.
+  { label: "Dispatch", href: "/dispatch", icon: Truck, roles: ["warehouse", "admin"] },
   { label: "Scan", href: "/scan", icon: Barcode, roles: ["warehouse", "admin"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },

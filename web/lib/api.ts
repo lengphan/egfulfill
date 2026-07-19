@@ -557,6 +557,8 @@ export type OrderRow = {
   factory_status?: string | null
   total?: number | string | null
   tracking?: string | null
+  /** Stored label file, so a label can be reprinted or batched after purchase. */
+  tracking_label_url?: string | null
   carrier?: string | null
   timeline?: Array<{ status?: string; at?: string }> | null
   created_at?: string | null
