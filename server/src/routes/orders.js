@@ -133,12 +133,17 @@ async function autoPushDesigns(orderId, lineId, sku) {
 
   const id = Date.now() + Math.floor(Math.random() * 1000);
   const product = [it.color, it.size, it.print_type].filter(Boolean).join(' \u00b7 ');
+  // The card thumb is the ARTWORK — the customer's synced upload, or what we placed
+  // ourselves. Never the marketplace listing photo: a designer opening a card needs to see
+  // what they're digitising, and a photo of the finished product tells them nothing about
+  // the file. design_src (a URL) is preferred over the placed data (base64) to keep the row small.
+  const thumb = it.design_src || (design && design.data) || null;
   await q(
     `insert into design_cards (id, order_id, sku, title, col, type, product, pay_status, payment, is_emb, thumb)
      values ($1,$2,$3,$4,'incoming',$5,$6,'pending',0,$7,$8)
      on conflict (id) do nothing`,
     [id, orderId, it.sku || null, it.name || it.sku || 'Design', it.print_type || null, product,
-     /emb/i.test(it.print_type || ''), it.img || null]).catch(() => {});
+     /emb/i.test(it.print_type || ''), thumb]).catch(() => {});
   return { pushed: true, cardId: id };
 }
 

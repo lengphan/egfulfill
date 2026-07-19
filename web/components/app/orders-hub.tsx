@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
+import { useRouter } from "next/navigation"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -14,11 +15,11 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
-import { itemImage } from "@/lib/order-image"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ReadinessDots } from "@/components/app/readiness-dots"
+import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
@@ -110,6 +111,7 @@ const FILTERS: { label: string; id: string }[] = [
 // action set adapts to the role: operators review artwork + drive production, warehouse
 // receives + ships, admin does everything.
 export function OrdersHub() {
+  const router = useRouter()
   const role = getUser()?.role || ""
   const isAdmin = role === "admin"
   const canFulfill = role === "warehouse" || isAdmin // receive (intake) + ship
@@ -129,6 +131,7 @@ export function OrdersHub() {
   const [actionErr, setActionErr] = useState<string | null>(null)
   // Non-error feedback from an action (what the auto-push did), cleared on the next one.
   const [note, setNote] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState("")
   // Per-order production detail the floor needs but the board never showed: matched
@@ -340,7 +343,9 @@ export function OrdersHub() {
         const card: DesignCard = {
           id: nowId(), order_id: o.id, sku: it.sku || undefined, line_id: it.line_id,
           title: it.name || it.sku || "Design", product: variantOf(it),
-          type: it.print_type || undefined, thumb: itemImage(it) || null,
+          // The ARTWORK, not the listing photo — a designer needs to see the file
+          // they're digitising, not a product shot.
+          type: it.print_type || undefined, thumb: artworkFor(o, it) || null,
           col: "incoming", pay_status: "pending", payment: 0,
           customer: o.customer?.name ?? null, is_emb: /emb/i.test(it.print_type || ""),
         }
@@ -435,7 +440,19 @@ export function OrdersHub() {
         </div>
       )}
 
-      <SectionCard title="Production queue">
+      <SectionCard
+        title="Production queue"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}>
+              <UploadSimple size={14} weight="bold" /> Import
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => router.push("/orders/new")}>
+              <Plus size={14} weight="bold" /> New order
+            </Button>
+          </div>
+        }
+      >
         <div className="flex flex-wrap gap-1.5 border-b border-border px-5 py-3">
           {FILTERS.map((f) => (
             <button key={f.id} onClick={() => setFilter(f.id)} className={"eg-tap rounded-full px-3 py-1 text-sm font-medium transition-colors " + (filter === f.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
@@ -485,9 +502,6 @@ export function OrdersHub() {
                             above: they're one fact ("CustomBabeUSA, on Etsy"), and a
                             per-row brand logo would put 50 colour spots in competition
                             with the status badges, which are what should stand out. */}
-                        {/* Every criterion at a glance — the first unmet dot is where the
-                            order is stuck, which is the only question anyone has. */}
-                        <ReadinessDots order={o} missingArtwork={artworkMissingFor(o)} />
                         <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
                           <span className="text-muted-foreground">{platformOf(o)}</span>
                           {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && (
@@ -542,6 +556,11 @@ export function OrdersHub() {
                       const busyO = busy?.startsWith(o.id)
                       return (
                         <div className="flex items-center gap-2">
+                          {/* Readiness sits with the actions, not in the metadata line: the
+                              left of a row is identity, the right is state and what to do
+                              about it. Sharing a line with store/date/address made five
+                              dots read as more clutter rather than a summary. */}
+                          <ReadinessDots order={o} missingArtwork={artworkMissingFor(o)} className="mr-1 hidden sm:inline-flex" />
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}><TrayArrowDown size={13} weight="bold" /> Start order</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further."><SkipForward size={13} weight="fill" /> Next stage</Button>}
@@ -555,6 +574,7 @@ export function OrdersHub() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-52">
                               {/* the non-primary pipeline actions */}
+                              <DropdownMenuItem onClick={() => router.push(`/orders/${encodeURIComponent(o.id)}`)}><ArrowSquareOut size={14} weight="bold" /> Open order</DropdownMenuItem>
                               {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
                               {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Label &amp; ship</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> Reopen label</DropdownMenuItem>}
@@ -912,6 +932,8 @@ export function OrdersHub() {
               )
             })}
           </div>
+          <ImportOrdersDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
+
           {/* "We may already have made this." Exact and similar are kept visually
               separate on purpose: identical artwork is a safe reuse, whereas a
               lookalike is a lead to check. Attaching a fuzzy match automatically

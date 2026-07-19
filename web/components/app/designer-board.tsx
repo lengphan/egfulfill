@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -161,6 +161,22 @@ export function DesignerBoard() {
                             <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
                           {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {/* Cancel the card without opening it. Hover-revealed so a full
+                              column isn't a grid of delete buttons, and it confirms —
+                              removal is not undoable and these sit under a drag handle. */}
+                          <button
+                            aria-label={`Cancel ${c.title || "card"}`}
+                            title="Cancel this card"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (window.confirm(`Cancel "${c.title || "this card"}"? It will be removed from the board.`)) {
+                                persist((cards ?? []).filter((x) => x.id !== c.id))
+                              }
+                            }}
+                            className="eg-tap absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
+                          >
+                            <X size={11} weight="bold" />
+                          </button>
                         </div>
                         <div className="p-2.5">
                           <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
