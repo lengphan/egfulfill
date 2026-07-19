@@ -75,7 +75,7 @@ export function VariantField({
         <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(value) }} />
       )}
       <span className={cn("min-w-0 flex-1 truncate", unset && "text-muted-foreground")}>{shown}</span>
-      {hasOptions && <CaretDown size={11} weight="bold" className="shrink-0 text-muted-foreground" />}
+      {hasOptions && <CaretDown size={11} className="shrink-0 text-muted-foreground" />}
     </DropdownMenuTrigger>
   )
 

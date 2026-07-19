@@ -215,10 +215,10 @@ export function ProductEditorDialog({
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Type</span>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
+                  <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
                 <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Method</span>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
                 </label>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -346,7 +346,7 @@ export function ProductEditorDialog({
           </label>
 
           <label className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">Status</span>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"><option>Active</option><option>Draft</option><option>Archived</option></select>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="eg-select h-8 rounded-md border border-input bg-transparent px-2 text-sm"><option>Active</option><option>Draft</option><option>Archived</option></select>
           </label>
 
           {err && <div className="text-sm text-destructive">{err}</div>}

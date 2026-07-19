@@ -11,6 +11,8 @@
 //   POST /api/shipping/rates  {to,from,parcel}            → merged rate list
 //   POST /api/shipping/label  {rateToken} | {to,from,parcel} → buy (specific or cheapest)
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
+import { readShipFrom } from './factory_settings.js';
+
 const EP_KEY = process.env.EASYPOST_API_KEY || '';
 const SH_TOKEN = process.env.SHIPPO_API_TOKEN || '';
 const EP_BASE = 'https://api.easypost.com/v2';
@@ -246,7 +248,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   app.post('/api/shipping/rates', guard, async (req, reply) => {
     if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured (set EASYPOST_API_KEY or SHIPPO_API_TOKEN)' }; }
     const b = req.body || {};
-    const to = addr(b.to), from = addr(b.from, true), pc = parcel(b.parcel || b);
+    const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
     if (!to.zip || !to.street1) { reply.code(400); return { error: 'Recipient street + ZIP required' }; }
     if (!from.zip || !from.street1) { reply.code(400); return { error: 'Sender street + ZIP required' }; }
     const jobs = [];
@@ -267,7 +269,7 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
       if (!t) {
         // No token → rate-shop and pick the cheapest.
         if (!EP_KEY && !SH_TOKEN) { reply.code(400); return { error: 'No shipping provider configured' }; }
-        const to = addr(b.to), from = addr(b.from, true), pc = parcel(b.parcel || b);
+        const to = addr(b.to), from = addr((b.from && b.from.street) ? b.from : (await readShipFrom()) || {}, true), pc = parcel(b.parcel || b);
         if (!to.zip || !to.street1 || !from.zip || !from.street1) { reply.code(400); return { error: 'Sender + recipient street + ZIP required' }; }
         const jobs = [];
         if (EP_KEY) jobs.push(epRates(to, from, pc).catch(() => []));

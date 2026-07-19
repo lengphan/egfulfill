@@ -692,12 +692,25 @@ export type FactorySettings = {
   design_fee?: number; ship_first?: number; ship_extra?: number; emb_price?: number
   ship_cap?: number; ship_heavy?: number; ship_garment?: number
   method_dtg?: number; method_dtf?: number; method_emb?: number; method_apl?: number; method_lsr?: number
+  /** The warehouse's own return address, used as the label origin. Shared by the whole
+   *  team — it used to live in each browser's localStorage, so it looked unsaved to
+   *  everyone but the person who typed it. */
   [key: string]: number | undefined
+} & {
+  ship_from?: ShipFromAddress | null
+  ship_from_complete?: boolean
+}
+export type ShipFromAddress = {
+  name?: string; company?: string; street?: string; street2?: string
+  city?: string; state?: string; zip?: string; country?: string
+  phone?: string; email?: string
 }
 export function getFactorySettings() {
   return api<FactorySettings>(`/api/factory/settings`)
 }
-export function setFactorySettings(body: FactorySettings) {
+/** The numeric keys are addressed by name from the settings form, so the body stays
+ *  loosely keyed — but the values are narrowed to what the route actually accepts. */
+export function setFactorySettings(body: Record<string, number | ShipFromAddress | undefined>) {
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 

@@ -13,6 +13,7 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
+import { readShipFrom } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorVerifyAddress } from './shipping.js';
 import { missingArtwork } from './orders.js';
 
@@ -267,9 +268,13 @@ async function recordLabel(orderId, tracking, carrier) {
   app.post('/api/usps/label', { preHandler: requireStaff }, async (req, reply) => {
     try {
       const b = req.body || {};
-      const to = b.to || {}, from = b.from || {};
+      const to = b.to || {};
+      // The floor sets its ship-from once in settings; the client no longer has to carry
+      // it on every buy. An explicit body.from still wins (multi-site / drop-ship).
+      const saved = await readShipFrom();
+      const from = (b.from && b.from.street) ? b.from : (saved || {});
       if (!to.zip || !to.street) { reply.code(400); return { error: 'Recipient street + ZIP are required' }; }
-      if (!from.zip || !from.street) { reply.code(400); return { error: 'Sender (from) street + ZIP are required' }; }
+      if (!from.zip || !from.street) { reply.code(400); return { error: 'No warehouse ship-from address set — add it in Settings → Shipping' }; }
       // PREFERRED PATH — when a shipping aggregator (Shippo/EasyPost) is configured,
       // buy a REAL label through it (test keys → real design, watermarked, no charge).
       // Restricted to USPS here so a UPS test-account gap can't fail the buy.

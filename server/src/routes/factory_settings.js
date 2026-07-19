@@ -40,10 +40,30 @@ export function shippingBandOf(typeOrName) {
   return 'ship_garment';
 }
 
+// The warehouse's own ship-from address. Kept out of KEYS because every other setting is
+// a number — this one is a JSON object, so it reads and writes on its own path. Labels
+// were previously bought with whatever `from` the client happened to send, which meant no
+// address at all; this is the single place the floor sets it once.
+export const SHIP_FROM_KEY = 'ship_from';
+const SHIP_FROM_FIELDS = ['name', 'company', 'street', 'street2', 'city', 'state', 'zip', 'country', 'phone', 'email'];
+
+export async function readShipFrom() {
+  try {
+    const r = await q('select value from settings where key=$1', [SHIP_FROM_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    return v && typeof v === 'object' ? v : null;
+  } catch { return null; }
+}
+
+/** A label needs a real street, city, state and ZIP — anything less and the carrier rejects it. */
+export function shipFromComplete(a) {
+  return !!(a && a.street && a.city && a.state && a.zip);
+}
+
 let _ready = null;
 function ensure() {
   if (_ready) return _ready;
-  _ready = q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`).catch(() => {});
+  _ready = q(`create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())`).catch(() => {});
   return _ready;
 }
 
@@ -59,7 +79,8 @@ async function readAll() {
 export function factorySettingsRoutes(app, requireAuth, requireStaff) {
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
-    return readAll();
+    const [nums, shipFrom] = await Promise.all([readAll(), readShipFrom()]);
+    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom) };
   });
 
   app.put('/api/factory/settings', { preHandler: requireStaff }, async (req, reply) => {
@@ -74,6 +95,13 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
       // settings.value is jsonb — store the number as a JSON number.
       await q('insert into settings (key,value,updated_at) values ($1, to_jsonb($2::numeric), now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [k, n]).catch(() => {});
     }
-    return { ok: true, ...(await readAll()) };
+    if (b.ship_from && typeof b.ship_from === 'object') {
+      const addr = {};
+      for (const f of SHIP_FROM_FIELDS) addr[f] = String(b.ship_from[f] ?? '').trim();
+      addr.country = addr.country || 'US';
+      await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [SHIP_FROM_KEY, JSON.stringify(addr)]);
+    }
+    const shipFrom = await readShipFrom();
+    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom) };
   });
 }

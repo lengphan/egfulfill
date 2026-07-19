@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
 import { Package, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, TrayArrowDown, SkipForward, PaperPlaneTilt, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getCatalogProducts, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
@@ -30,7 +30,10 @@ const MAIL_CLASSES: { id: string; label: string }[] = [
   { id: "PRIORITY_MAIL_EXPRESS", label: "Priority Express" },
 ]
 
-// Warehouse return address — set once, persisted locally (used as the label "from").
+// Warehouse return address — set once for the whole team and stored on the server
+// (settings.ship_from). It used to be localStorage-only, so it silently didn't exist for
+// anyone else and vanished on a different machine. localStorage is now just a warm cache
+// so the field isn't empty on first paint.
 const FROM_STORE = "eg_ship_from"
 const BLANK_ADDR: ShipAddress = { name: "", street: "", street2: "", city: "", state: "", zip: "" }
 
@@ -96,9 +99,18 @@ export function OrdersHub() {
   const [actionErr, setActionErr] = useState<string | null>(null)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [pasteText, setPasteText] = useState("")
+  // Per-order production detail the floor needs but the board never showed: matched
+  // thread cones, machine files, and how much of the blank we actually have. Fetched
+  // lazily per order (on expand) so a 50-order page doesn't make 150 requests.
+  const [threads, setThreads] = useState<Record<string, OrderThreadRow[]>>({})
+  const [dfiles, setDfiles] = useState<Record<string, DesignFileRow[]>>({})
+  const [stock, setStock] = useState<Record<string, number>>({})
+  const threadsRef = useRef<Record<string, boolean>>({})
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const toggleCollapse = (id: string) =>
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+
+
   const [carrier, setCarrier] = useState("USPS")
   const [tracking, setTracking] = useState("")
 
@@ -125,6 +137,14 @@ export function OrdersHub() {
   useEffect(() => {
     const id = setTimeout(() => {
       try { const raw = localStorage.getItem(FROM_STORE); if (raw) setFrom({ ...BLANK_ADDR, ...JSON.parse(raw) }) } catch {}
+      // Server wins over the local cache — it's what the label routes will actually use.
+      getFactorySettings().then((s) => {
+        if (s?.ship_from && s.ship_from.street) {
+          const a = { ...BLANK_ADDR, ...s.ship_from } as ShipAddress
+          setFrom(a)
+          try { localStorage.setItem(FROM_STORE, JSON.stringify(a)) } catch {}
+        }
+      }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -181,6 +201,9 @@ export function OrdersHub() {
     setBusy(`label:${o.id}`)
     try {
       try { localStorage.setItem(FROM_STORE, JSON.stringify(from)) } catch {}
+      // Persist for the whole team, not just this browser. Best-effort: a failed save
+      // must not block a label that's otherwise ready to buy.
+      setFactorySettings({ ship_from: from }).catch(() => {})
       const r = await buyUspsLabel({ to, from, orderId: o.id, ...pkg })
       if (!r.ok) { setLabelErr(r.error || "USPS couldn't create the label."); return }
       setLabels((prev) => ({ ...prev, [o.id]: r }))
@@ -244,6 +267,22 @@ export function OrdersHub() {
   }, [orders, filter])
 
   const paged = usePaged(filtered, 25)
+
+  // Threads + machine files for whatever is on screen, fetched once per order. Scoped to
+  // the visible page so a long board doesn't fan out into hundreds of requests, and
+  // skipped for orders already loaded so paging back is free.
+  const visibleIds = paged.pageItems.map((o) => o.id).join(",")
+  useEffect(() => {
+    const id = setTimeout(() => {
+      for (const oid of visibleIds ? visibleIds.split(",") : []) {
+        if (threadsRef.current[oid]) continue
+        threadsRef.current[oid] = true
+        getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
+        getDesignFiles(oid).then((r) => setDfiles((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
+      }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [visibleIds])
 
   const subtitle = isAdmin
     ? "Every order across the team — production to shipping."
@@ -497,7 +536,7 @@ export function OrdersHub() {
                       <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1">
                           <span className="text-xs text-muted-foreground">Service</span>
-                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                          <select value={pkg.mailClass} onChange={(e) => setPkg({ ...pkg, mailClass: e.target.value })} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">
                             {MAIL_CLASSES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                           </select>
                         </label>
@@ -530,7 +569,7 @@ export function OrdersHub() {
                         <div className="flex flex-wrap items-end gap-2 border-t border-border p-3">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs text-muted-foreground">Carrier</span>
-                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                            <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm">
                               {CARRIERS.map((c) => <option key={c} value={c}>{c}</option>)}
                             </select>
                           </label>
@@ -614,10 +653,49 @@ export function OrdersHub() {
                             {canDesign && stage === "" ? (
                               <VariantPicker orderId={o.id} item={it} catalog={catalog} onSaved={load} />
                             ) : (
+                              <>
                               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                 <VariantStrip color={it.color} size={it.size} method={it.print_type} marketplace={it.variant} />
                                 {it.qty ? <span className="text-[11px] text-muted-foreground">×{it.qty}</span> : null}
                               </div>
+
+                              {/* What the floor needs to actually MAKE this line: how much
+                                  blank we hold, which cones to load, and the machine file.
+                                  All three were stored already and shown nowhere. */}
+                              {(() => {
+                                const skuU = String(it.sku || "").toUpperCase()
+                                const have = stock[skuU]
+                                const need = Number(it.qty) || 1
+                                const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
+                                const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
+                                if (have == null && !cones.length && !file) return null
+                                return (
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                                    {have != null && (
+                                      <span
+                                        className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium " + (have >= need ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-800")}
+                                        title={have >= need ? "Enough blank stock for this line" : `Only ${have} in stock, this line needs ${need}`}
+                                      >
+                                        {have >= need ? `${have} in stock` : `Short — ${have} of ${need}`}
+                                      </span>
+                                    )}
+                                    {cones.length > 0 && (
+                                      <span className="inline-flex items-center gap-1 text-muted-foreground" title={cones.map((c) => `${c.code} ${c.name}`).join(", ")}>
+                                        {cones.map((c) => (
+                                          <span key={c.code} className="size-3 rounded-full border border-black/10" style={{ background: c.hex }} />
+                                        ))}
+                                        <span>{cones.length} cone{cones.length === 1 ? "" : "s"}</span>
+                                      </span>
+                                    )}
+                                    {file && (
+                                      <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
+                                        <PaperPlaneTilt size={10} weight="bold" /> {file.designId}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })()}
+                              </>
                             )}
                           </div>
                           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -628,7 +706,7 @@ export function OrdersHub() {
                             <Button size="sm" variant="outline" className="shrink-0" title="Create a card for this item on the Designer board" disabled={busy === `dsn:${key}` || sent.has(key)} onClick={() => sendToDesigner(o, it)}>
                               {busy === `dsn:${key}` ? <CircleNotch size={13} className="animate-spin" />
                                 : sent.has(key) ? <><CheckCircle size={13} weight="fill" className="text-emerald-600" /> Sent</>
-                                : <><PaperPlaneTilt size={13} weight="bold" /> Designer</>}
+                                : <><PaperPlaneTilt size={13} weight="bold" /> Board</>}
                             </Button>
                           )}
                           {/* ONE control per item. This row used to carry THREE things
@@ -652,7 +730,7 @@ export function OrdersHub() {
                                   value=""
                                   onChange={(e) => { if (e.target.value) advanceItem(o, it, e.target.value) }}
                                   disabled={busy === key}
-                                  className="h-8 shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs font-medium"
+                                  className="eg-select h-8 shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs font-medium"
                                   aria-label={`Flag ${it.name || it.sku}`}
                                   title="The warehouse has this item. You can still stop it if the artwork is wrong."
                                 >
@@ -666,7 +744,7 @@ export function OrdersHub() {
                                 value={normalizeStage(it.factory_status)}
                                 onChange={(e) => advanceItem(o, it, e.target.value)}
                                 disabled={busy === key}
-                                className={"h-8 shrink-0 rounded-md border px-1.5 text-xs font-medium " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-input bg-transparent")}
+                                className={"eg-select " + "h-8 shrink-0 rounded-md border px-1.5 text-xs font-medium " + (isException(it.factory_status) ? "border-red-300 bg-red-50 text-red-700" : "border-input bg-transparent")}
                                 aria-label={`Status for ${it.name || it.sku}`}
                                 title="Set this item's status — forward or back"
                               >

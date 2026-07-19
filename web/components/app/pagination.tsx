@@ -43,7 +43,7 @@ export function Pagination({
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-1.5 text-muted-foreground">
           <span className="hidden sm:inline">Per page</span>
-          <select value={perPage} onChange={(e) => onPerPage(Number(e.target.value))} className="h-8 rounded-md border border-input bg-transparent px-1.5 text-sm">
+          <select value={perPage} onChange={(e) => onPerPage(Number(e.target.value))} className="eg-select h-8 rounded-md border border-input bg-transparent px-1.5 text-sm">
             {perPageOptions.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>

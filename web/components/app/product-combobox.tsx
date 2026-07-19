@@ -107,7 +107,7 @@ export function ProductCombobox({
         onClick={() => setOpen((v) => !v)}
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
       >
-        <CaretDown size={13} weight="bold" />
+        <CaretDown size={13} className="text-muted-foreground" />
       </button>
 
       {/* Panel is wider than the field on purpose — the Product column is narrow, and

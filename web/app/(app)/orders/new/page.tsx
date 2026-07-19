@@ -47,7 +47,7 @@ function VariantSelect({ value, options, onChange, placeholder }: { value: strin
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      className="eg-select h-9 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
     >
       <option value="">{placeholder}…</option>
       {opts.map((o) => <option key={o} value={o}>{o}</option>)}

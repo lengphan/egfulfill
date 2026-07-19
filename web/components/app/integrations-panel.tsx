@@ -399,7 +399,7 @@ function AiAssistantCard() {
           <select
             value={model}
             onChange={(e) => { setModel(e.target.value); setSaved(false) }}
-            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+            className="eg-select h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             {models.length === 0 && <option value={model}>{model || "—"}</option>}
             {models.map((m) => (

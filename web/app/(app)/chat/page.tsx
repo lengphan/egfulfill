@@ -289,7 +289,7 @@ export default function ChatPage() {
             <select
               value={activeId ?? ""}
               onChange={(e) => setActiveId(e.target.value)}
-              className="h-8 max-w-[45%] rounded-md border border-input bg-transparent px-2 text-xs md:hidden"
+              className="eg-select h-8 max-w-[45%] rounded-md border border-input bg-transparent px-2 text-xs md:hidden"
               aria-label="Switch conversation"
             >
               {convos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}

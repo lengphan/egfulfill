@@ -277,14 +277,14 @@ export function PublishProductDialog({
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Size priced</span>
-                    <select value={size} onChange={(e) => setSize(e.target.value)} className="h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium">
+                    <select value={size} onChange={(e) => setSize(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium">
                       {sizeOpts.length === 0 && <option value="">Any</option>}
                       {sizeOpts.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
-                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium">
+                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-lg border border-border bg-card px-2 text-xs font-medium">
                       {methodOpts.length === 0 && <option value="">Any</option>}
                       {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>

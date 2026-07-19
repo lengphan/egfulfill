@@ -238,16 +238,16 @@ export function AllSuppliers() {
       {/* Filters — brand / category / price, applied to what's loaded */}
       {items !== null && items.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3 text-sm">
-          <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto"); setBrand(""); setCat("") }} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+          <select value={sup} onChange={(e) => { setSup(e.target.value as "" | "ss" | "otto"); setBrand(""); setCat("") }} className="eg-select h-8 rounded-md border border-input bg-transparent px-2 text-sm">
             <option value="">All suppliers</option>
             <option value="ss">S&amp;S Activewear</option>
             <option value="otto">Otto Cap</option>
           </select>
-          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+          <select value={brand} onChange={(e) => setBrand(e.target.value)} className="eg-select h-8 rounded-md border border-input bg-transparent px-2 text-sm">
             <option value="">All brands</option>
             {brands.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
-          <select value={cat} onChange={(e) => setCat(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+          <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-8 rounded-md border border-input bg-transparent px-2 text-sm">
             <option value="">All categories</option>
             {cats.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
