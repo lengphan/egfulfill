@@ -55,7 +55,17 @@ function ensure() {
       capacity int not null default 40,
       note text,
       created_at timestamptz default now())`);
-  })().catch(() => {});
+    // Lookup path for reservation. The query compares upper(sku), so a plain column index
+    // would never be used — these expression indexes match it exactly.
+    await q(`create index if not exists consignment_lines_sku on consignment_lines (upper(seller_sku))`);
+    await q(`create index if not exists consignment_lines_isku_u on consignment_lines (upper(internal_sku))`);
+  })().catch((e) => {
+    // Do NOT leave a resolved _ready behind on failure. A transient hiccup at boot would
+    // otherwise be cached forever: every later call returns the same settled promise, the
+    // tables are never created, and consignment is silently dead until the next restart.
+    _ready = null;
+    throw e;
+  });
   return _ready;
 }
 
@@ -182,7 +192,10 @@ export async function releaseConsigned(orderId) {
 }
 
 export function consignmentRoutes(app, requireAuth, requireStaff) {
-  ensure();
+  // Warm the schema at boot, but swallow here: ensure() now rethrows so callers can
+  // retry, and an unhandled rejection at registration would take the process down.
+  // Every route awaits it properly, so a failure here is retried on first use.
+  ensure().catch(() => {});
 
   // ── Bins ───────────────────────────────────────────────────────────────────
   app.get('/api/consignment/locations', { preHandler: requireStaff }, async () => {

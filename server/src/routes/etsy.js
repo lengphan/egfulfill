@@ -463,15 +463,19 @@ export async function shopListings(conn) {
 
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
-  q('alter table platform_connections add column if not exists seller_email text').catch(() => {});
-  // ensure table exists even on a DB that booted before this feature (idempotent)
+  // ensure table exists even on a DB that booted before this feature (idempotent).
+  // The ALTER is CHAINED off the CREATE, not fired alongside it: these q() calls are not
+  // awaited, so on a fresh database an independent ALTER could run first, fail (no table
+  // yet), be swallowed by .catch, and leave the column permanently missing.
   q(`create table if not exists platform_connections (
        id uuid primary key default gen_random_uuid(),
        platform text not null default 'etsy', shop_id text not null, shop_name text,
        access_token text, refresh_token text, token_expires_at timestamptz, scopes text,
        last_sync_at timestamptz, connected_by uuid references users(id) on delete set null,
        created_at timestamptz default now(), updated_at timestamptz default now(),
-       unique (platform, shop_id))`).catch(() => {});
+       unique (platform, shop_id))`)
+    .catch(() => {})
+    .then(() => q('alter table platform_connections add column if not exists seller_email text').catch(() => {}));
   // Buyer personalization text per item (added with the customer-upload feature).
   q('alter table order_items add column if not exists personalization text').catch(() => {});
   // factory_order: orders from the ADMIN/factory shop belong to the factory boards;

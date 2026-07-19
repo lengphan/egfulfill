@@ -209,8 +209,13 @@ async function handleVerification(userId, subject, text) {
 }
 
 export function mailIngestRoutes(app, requireAuth) {
-  q('alter table users add column if not exists ingest_token text').catch(() => {});
-  q('create unique index if not exists users_ingest_token_idx on users (ingest_token) where ingest_token is not null').catch(() => {});
+  // Index CHAINED off the column it indexes. Un-awaited q() calls can execute in any
+  // order, so firing these side by side risks creating the index before the column
+  // exists — the failure is swallowed and the uniqueness guarantee silently never
+  // applies, which is exactly the guarantee that stops two sellers sharing a token.
+  q('alter table users add column if not exists ingest_token text')
+    .catch(() => {})
+    .then(() => q('create unique index if not exists users_ingest_token_idx on users (ingest_token) where ingest_token is not null').catch(() => {}));
 
   q(`create table if not exists mail_verifications (
        id bigserial primary key,
