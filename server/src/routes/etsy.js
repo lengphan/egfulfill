@@ -147,6 +147,13 @@ async function ownerIsStaff(userId) {
 // isFactory: true → factory-owned (admin shop); false → seller-owned (seller's shop).
 async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
   const id = 'etsy-' + rc.receipt_id;
+  // Etsy's sale notifications go to the SHOP's email, which is usually not the seller's
+  // EGFULFILL login. Capture it so a forwarded sale email can be traced back to the right
+  // seller without them registering anything.
+  if (rc.seller_email) {
+    q(`update platform_connections set seller_email=$1 where id=$2 and (seller_email is null or seller_email <> $1)`,
+      [String(rc.seller_email).toLowerCase(), conn.id]).catch(() => {});
+  }
   const shipped = !!(rc.is_shipped || rc.was_shipped);
   const status = shipped ? 'shipped' : 'new';
   const createdTs = rc.created_timestamp || rc.create_timestamp;            // epoch seconds
@@ -456,6 +463,7 @@ export async function shopListings(conn) {
 
 // ── routes ───────────────────────────────────────────────────────────────--
 export function etsyRoutes(app, requireAuth, requireStaff) {
+  q('alter table platform_connections add column if not exists seller_email text').catch(() => {});
   // ensure table exists even on a DB that booted before this feature (idempotent)
   q(`create table if not exists platform_connections (
        id uuid primary key default gen_random_uuid(),

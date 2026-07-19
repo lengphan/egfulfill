@@ -92,7 +92,72 @@ export function parseSaleEmail(text) {
   };
 }
 
-export function mailIngestRoutes(app) {
+
+/**
+ * Which account does a forwarding address belong to?
+ *
+ * Three legitimate sources, because the address a sale email arrives at is usually NOT
+ * the seller's EGFULFILL login:
+ *   1. their account email
+ *   2. the Etsy SHOP email captured from receipts (seller_email) — no setup needed
+ *   3. an address they registered themselves (a personal inbox, a shared ops mailbox)
+ *
+ * Anything else is refused: this check is what stops someone who learns the ingest URL
+ * from writing addresses onto orders.
+ */
+async function resolveForwarder(email) {
+  const byUser = (await q('select id, role from users where lower(email)=$1 limit 1', [email])).rows[0];
+  if (byUser) return byUser;
+
+  const byShop = (await q(`
+    select u.id, u.role from platform_connections pc
+      join users u on u.id = pc.connected_by
+     where lower(pc.seller_email) = $1 limit 1`, [email])).rows[0];
+  if (byShop) return byShop;
+
+  const byReg = await q(`
+    select u.id, u.role from mail_forwarders mf
+      join users u on u.id = mf.user_id
+     where lower(mf.email) = $1 limit 1`, [email]).catch(() => ({ rows: [] }));
+  return byReg.rows[0] || null;
+}
+
+export function mailIngestRoutes(app, requireAuth) {
+  q(`create table if not exists mail_forwarders (
+       email text primary key,
+       user_id uuid references users(id) on delete cascade,
+       created_at timestamptz default now())`).catch(() => {});
+
+  // A seller registers the inbox they actually forward from. Scoped to themselves —
+  // claiming an address only ever binds it to the caller's own account, so it can't be
+  // used to hijack another seller's forwards.
+  app.get('/api/mail/forwarders', { preHandler: requireAuth }, async (req) => {
+    const own = await q('select email from mail_forwarders where user_id=$1 order by email', [req.user.sub]).catch(() => ({ rows: [] }));
+    const acct = (await q('select email from users where id=$1', [req.user.sub])).rows[0] || {};
+    const shop = await q('select seller_email from platform_connections where connected_by=$1 and seller_email is not null', [req.user.sub]).catch(() => ({ rows: [] }));
+    return {
+      account: acct.email || null,
+      shop: shop.rows.map((r) => r.seller_email),
+      registered: own.rows.map((r) => r.email),
+    };
+  });
+
+  app.post('/api/mail/forwarders', { preHandler: requireAuth }, async (req, reply) => {
+    const email = String((req.body || {}).email || '').trim().toLowerCase();
+    if (!/^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(email)) { reply.code(400); return { error: 'That does not look like an email address.' }; }
+    const taken = (await q('select user_id from mail_forwarders where email=$1', [email]).catch(() => ({ rows: [] }))).rows[0];
+    if (taken && String(taken.user_id) !== String(req.user.sub)) {
+      reply.code(409); return { error: 'That address is already linked to another account.' };
+    }
+    await q('insert into mail_forwarders (email, user_id) values ($1,$2) on conflict (email) do update set user_id=excluded.user_id', [email, req.user.sub]);
+    return { ok: true, email };
+  });
+
+  app.delete('/api/mail/forwarders/:email', { preHandler: requireAuth }, async (req) => {
+    await q('delete from mail_forwarders where email=$1 and user_id=$2', [String(req.params.email).toLowerCase(), req.user.sub]).catch(() => {});
+    return { ok: true };
+  });
+
   /**
    * POST /api/mail/etsy-sale?key=<MAIL_INGEST_SECRET>
    * body: { from, subject, text, html }  — the shape every inbound provider posts.
@@ -109,8 +174,11 @@ export function mailIngestRoutes(app) {
     // post addresses. Staff may forward on any seller's behalf.
     const fromAddr = (String(b.from || '').match(/[\w.+-]+@[\w.-]+/) || [''])[0].toLowerCase();
     if (!fromAddr) { reply.code(400); return { error: 'No sender address.' }; }
-    const sender = (await q('select id, role from users where lower(email)=$1 limit 1', [fromAddr])).rows[0];
-    if (!sender) { reply.code(403); return { error: `Forwarding address ${fromAddr} is not a registered account.` }; }
+    const sender = await resolveForwarder(fromAddr);
+    if (!sender) {
+      reply.code(403);
+      return { error: `${fromAddr} isn't linked to an account. Add it under Settings → Forwarding addresses, or forward from the email you signed up with.` };
+    }
 
     const { orderId, address } = parseSaleEmail(text);
     if (!orderId) { reply.code(422); return { error: 'No Etsy order number found in that email.' }; }
