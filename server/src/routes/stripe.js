@@ -52,8 +52,15 @@ export function stripeRoutes(app, requireAuth) {
   // Publishable key is public — the frontend needs it to mount the Payment Element.
   app.get('/api/stripe/config', { preHandler: requireAuth }, async () => ({ publishableKey: pkKey(), enabled: !!(skKey() && pkKey()) }));
 
+  // Mode comes from the key prefix (sk_test_ / sk_live_). Worth surfacing loudly: a live
+  // secret key pasted in while testing means real charges against a real card, and the
+  // only visible difference is four characters in a value the UI masks.
+  const stripeMode = () => (skKey().startsWith('sk_test_') ? 'test' : skKey().startsWith('sk_live_') ? 'live' : 'unknown');
+
   app.get('/api/stripe/test', { preHandler: requireAuth }, async () => {
-    try { await stripe('/balance'); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+    if (!skKey()) return { ok: false, error: 'no key' };
+    try { await stripe('/balance'); return { ok: true, mode: stripeMode() }; }
+    catch (e) { return { ok: false, mode: stripeMode(), error: e.message }; }
   });
 
   // Create a PaymentIntent for the entered amount (USD).

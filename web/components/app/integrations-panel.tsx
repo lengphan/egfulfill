@@ -98,8 +98,11 @@ const configThenTest = (
   if (!c.ok) return { level: "error", detail: `HTTP ${c.status || "—"}` }
   if (!c.body[enabledField]) return { level: "off" }
   const t = await raw(testPath)
-  if (t.body.ok === true) return { level: "live" }
-  return { level: "error", detail: String(t.body.error ?? "test failed") }
+  // Show the key's MODE when the endpoint reports one. For a payment key that's the
+  // difference between a sandbox and real customer charges, and the key itself is masked.
+  const mode = t.body && typeof t.body.mode === "string" ? String(t.body.mode) : undefined
+  if (t.body.ok === true) return { level: "live", detail: mode }
+  return { level: "error", detail: [mode, String(t.body.error ?? "test failed")].filter(Boolean).join(" · ") }
 }
 
 // /api/ads/config reports both channels at once; pick the one this card is for.
