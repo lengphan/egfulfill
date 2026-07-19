@@ -18,6 +18,7 @@ import { itemImage } from "@/lib/order-image"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
+import { ReadinessDots } from "@/components/app/readiness-dots"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
@@ -147,6 +148,14 @@ export function OrdersHub() {
     const placed = it.sku ? designs[o.id]?.[it.sku]?.data : undefined
     return placed || it.design_src || ""
   }, [designs])
+
+  /** Does any DECORATED line still lack artwork? Mirrors the server's ship gate: a plain
+   *  blank with no print method needs none, so requiring one would deadlock it. */
+  const artworkMissingFor = useCallback((o: OrderRow): boolean | undefined => {
+    if (!designs[o.id]) return undefined   // not loaded → don't claim either way
+    return (o.items ?? []).some((it) => String(it.print_type || "").trim() && !artworkFor(o, it))
+  }, [designs, artworkFor])
+
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   // A push that would duplicate work already done. Held until a human decides, because
@@ -476,6 +485,9 @@ export function OrdersHub() {
                             above: they're one fact ("CustomBabeUSA, on Etsy"), and a
                             per-row brand logo would put 50 colour spots in competition
                             with the status badges, which are what should stand out. */}
+                        {/* Every criterion at a glance — the first unmet dot is where the
+                            order is stuck, which is the only question anyone has. */}
+                        <ReadinessDots order={o} missingArtwork={artworkMissingFor(o)} />
                         <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
                           <span className="text-muted-foreground">{platformOf(o)}</span>
                           {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && (

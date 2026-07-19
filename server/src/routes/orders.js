@@ -285,6 +285,10 @@ export function ordersRoutes(app, requireAuth) {
   // from unit_price, which is what the BUYER paid. Without freezing, editing a catalog
   // base price would silently rewrite the cost of orders already billed.
   q('alter table order_items add column if not exists unit_cost numeric').catch(() => {});
+  // When the shipping label was actually PRINTED. Distinct from having one: a bought
+  // label sits in the system until someone puts it on paper, and "we have a label" vs
+  // "the label is on the parcel" are different answers to "can this go out?".
+  q('alter table orders add column if not exists label_printed_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
   // List
@@ -527,6 +531,17 @@ export function ordersRoutes(app, requireAuth) {
   // by (order, sku) to match the boards' item-status store; order_items already
   // has factory_status and /api/orders returns it on each item, so mobile and all
   // factory boards converge on the server instead of per-browser localStorage.
+  // Stamp a label as printed. Called when the label is actually opened for printing, so
+  // the board can distinguish "labelled" from "label on the parcel" without anyone
+  // remembering to tick a box.
+  app.post('/api/orders/:id/label-printed', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const undo = (req.body || {}).undo === true;
+    await q('update orders set label_printed_at=$1 where id=$2', [undo ? null : new Date(), req.params.id]);
+    audit(req, undo ? 'label.unprinted' : 'label.printed', { entityType: 'order', entityId: req.params.id });
+    return { ok: true, label_printed_at: undo ? null : new Date().toISOString() };
+  });
+
   app.post('/api/orders/:id/item-status', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const { sku, status } = req.body || {};

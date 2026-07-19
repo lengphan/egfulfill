@@ -96,3 +96,37 @@ export const ADDRESS_SOURCE_LABEL: Record<AddressSource, string> = {
   manual: "entered by hand",
   none: "no address yet",
 }
+
+
+/**
+ * The concrete criteria for "can this order go out?", each answered from a FACT rather
+ * than inferred from the pipeline stage.
+ *
+ * Stage says whose turn it is; these say what's actually true. Every shipping bug we hit
+ * came from confusing the two — a label buy assuming "shipped", a queue assuming a stage
+ * meant outbound. Anything checkable is checked here, and stage is used only for the one
+ * step that isn't independently knowable (whether the scan has happened).
+ *
+ * `met: null` means "not applicable to this order" (e.g. artwork on an undecorated blank),
+ * which reads differently from "not done yet" and shouldn't show as a gap.
+ */
+export type Check = {
+  id: string; label: string; met: boolean | null; detail?: string
+  /** How to say "this is what's missing" in a sentence — "needs Scanned" doesn't read. */
+  blocked?: string
+}
+
+export function orderReadiness(o: OrderRow, opts?: { missingArtwork?: boolean }): Check[] {
+  const stage = String(o.factory_status ?? "").toLowerCase()
+  const scanned = ["working", "shipped", "printed"].includes(stage)
+  const addr = (o.address ?? {}) as Record<string, string>
+  const hasAddr = !!((addr.street || addr.first_line || addr.line1 || addr.address1) && (addr.zip || addr.postal_code))
+  return [
+    { id: "address", label: "Address", met: hasAddr, blocked: "no address", detail: hasAddr ? addrLine(o) : "No address — can't ship" },
+    { id: "artwork", label: "Artwork", met: opts?.missingArtwork === undefined ? null : !opts.missingArtwork, blocked: "needs artwork" },
+    { id: "label", label: "Label", met: !!o.tracking, blocked: "needs a label", detail: o.tracking ?? "No label bought yet" },
+    { id: "printed", label: "Printed", met: !!o.label_printed_at, blocked: "label not printed", detail: o.label_printed_at ? `Printed ${fmtDate(o.label_printed_at)}` : "Label not printed yet" },
+    // The one genuinely stage-derived check: nothing else records that a scan happened.
+    { id: "scanned", label: "Scanned", met: scanned, blocked: "awaiting scan", detail: scanned ? "Scanned" : "Waiting on the scan" },
+  ]
+}

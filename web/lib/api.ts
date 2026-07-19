@@ -566,6 +566,8 @@ export type OrderRow = {
   tracking?: string | null
   /** Stored label file, so a label can be reprinted or batched after purchase. */
   tracking_label_url?: string | null
+  /** When the label was actually put on paper — distinct from having bought one. */
+  label_printed_at?: string | null
   carrier?: string | null
   timeline?: Array<{ status?: string; at?: string }> | null
   created_at?: string | null
@@ -582,6 +584,12 @@ export function getOrders() {
  *  with a null sku, and moves identical-SKU siblings together. */
 /** What the auto-push did when a line entered the design stage (see autoPushDesigns). */
 export type AutoPushResult = { pushed: boolean; reason?: string; designId?: string; cardId?: number }
+/** Stamp (or clear) a label as printed. */
+export function markLabelPrinted(id: string, undo = false) {
+  return api<{ ok?: boolean; label_printed_at?: string | null }>(`/api/orders/${encodeURIComponent(id)}/label-printed`, {
+    method: "POST", body: JSON.stringify({ undo }),
+  })
+}
 export function postItemStatus(id: string, sku: string, status: string, lineId?: string | null) {
   return api<{ ok?: boolean; error?: string; design?: AutoPushResult | null }>(`/api/orders/${encodeURIComponent(id)}/item-status`, {
     method: "POST",

@@ -6,10 +6,11 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, type OrderRow } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, markLabelPrinted, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage } from "@/lib/factory-status"
+import { ReadinessDots } from "@/components/app/readiness-dots"
 
 /**
  * DISPATCH — everything that has finished production and is waiting to leave.
@@ -90,8 +91,16 @@ export function DispatchBoard() {
     const urls = chosenWithLabel.map((o) => o.tracking_label_url).filter(Boolean) as string[]
     if (!urls.length) { setErr("None of the selected orders have a stored label file."); return }
     let blocked = 0
-    for (const u of urls) { if (!window.open(u, "_blank", "noopener")) blocked++ }
+    for (const o of chosenWithLabel) {
+      if (!o.tracking_label_url) continue
+      if (window.open(o.tracking_label_url, "_blank", "noopener")) {
+        // Stamp it as printed here rather than asking anyone to tick a box — opening the
+        // label for print IS the event, and a box nobody ticks makes the dot lie.
+        markLabelPrinted(o.id).catch(() => {})
+      } else blocked++
+    }
     if (blocked) setErr(`${blocked} label${blocked === 1 ? "" : "s"} were blocked by your popup blocker — allow popups for this site to print a whole batch at once.`)
+    else load()   // refresh so the Printed dots fill in
   }
 
   /**
@@ -217,6 +226,7 @@ export function DispatchBoard() {
                       </span>
                       <span>{unitsOf(o)} unit{unitsOf(o) === 1 ? "" : "s"}</span>
                       {addrLine(o) && <span className="truncate">{addrLine(o)}</span>}
+                      <ReadinessDots order={o} />
                     </div>
                   </div>
                   {o.tracking && (
