@@ -235,12 +235,23 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     easypost: !!EP_KEY, shippo: !!SH_TOKEN, enabled: !!(EP_KEY || SH_TOKEN)
   }));
 
+  // Whether a key is TEST or LIVE is the single most useful thing to know while setting
+  // this up — a test key buys sample labels for free, a live one spends real money — and
+  // it's readable from the key prefix without an API round-trip.
+  const keyMode = (k, testPrefixes) => (testPrefixes.some((p) => String(k).startsWith(p)) ? 'test' : 'live');
+
   app.get('/api/shipping/test', guard, async () => {
     const out = {};
-    if (EP_KEY) { try { const r = await fetch(EP_BASE + '/api_keys', { headers: { Authorization: epAuth() } }); out.easypost = r.ok ? 'ok' : ('HTTP ' + r.status); } catch (e) { out.easypost = 'FAILED: ' + e.message; } }
-    else out.easypost = 'no key';
-    if (SH_TOKEN) { try { const r = await fetch(SH_BASE + '/addresses/?results=1', { headers: { Authorization: shAuth() } }); out.shippo = r.ok ? 'ok' : ('HTTP ' + r.status); } catch (e) { out.shippo = 'FAILED: ' + e.message; } }
-    else out.shippo = 'no token';
+    if (EP_KEY) {
+      const mode = keyMode(EP_KEY, ['EZTK']);   // EZTK = test, EZAK = production
+      try { const r = await fetch(EP_BASE + '/api_keys', { headers: { Authorization: epAuth() } }); out.easypost = r.ok ? ('ok (' + mode + ')') : ('HTTP ' + r.status); }
+      catch (e) { out.easypost = 'FAILED: ' + e.message; }
+    } else out.easypost = 'no key';
+    if (SH_TOKEN) {
+      const mode = keyMode(SH_TOKEN, ['shippo_test_']);
+      try { const r = await fetch(SH_BASE + '/addresses/?results=1', { headers: { Authorization: shAuth() } }); out.shippo = r.ok ? ('ok (' + mode + ')') : ('HTTP ' + r.status); }
+      catch (e) { out.shippo = 'FAILED: ' + e.message; }
+    } else out.shippo = 'no token';
     return out;
   });
 
