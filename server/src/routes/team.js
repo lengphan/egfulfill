@@ -108,7 +108,8 @@ export function teamRoutes(app, requireAuth) {
     try {
       const r = await q(
         `select t.id, t.invite_token, t.role, t.permissions, t.owner_id, t.invited_at,
-                coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
+                coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name,
+                u.email as owner_email
            from team_members t left join users u on u.id::text = t.owner_id
           where (lower(t.email)=lower($1) or t.user_id=$2::text) and t.status='invited'
           order by t.invited_at desc`, [email, req.user.sub]);

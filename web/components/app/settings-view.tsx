@@ -537,7 +537,15 @@ function TeamPanel() {
       {invites.map((inv) => (
         <div key={inv.id} className="flex flex-col gap-2 border-b border-border bg-primary/5 px-5 py-4 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">{inv.owner_name} invited you to their team</div>
+            <div className="text-sm font-medium">
+              {inv.owner_name} invited you to their team
+            </div>
+            {/* The email, always. "Kathy Kay" is a store name anyone can set — and it
+                may not resemble the account you think sent it. Accepting shares your
+                data, so show the identifier they actually had to own. */}
+            {inv.owner_email && inv.owner_email !== inv.owner_name && (
+              <div className="text-xs font-medium text-muted-foreground">{inv.owner_email}</div>
+            )}
             <div className="text-xs text-muted-foreground">
               As {inv.role}. Accepting applies the access they shared with you — your menu will show only those pages.
             </div>

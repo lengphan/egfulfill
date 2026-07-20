@@ -1186,6 +1186,10 @@ export function getMyAccess() {
 export type MyInvite = {
   id: string; invite_token: string; role: string; permissions: string[]
   owner_id: string; owner_name: string; invited_at: string
+  /** The inviter's actual login email. A display name is self-chosen and can be
+   *  anything — accepting grants access to your account, so identify them by the
+   *  thing they had to prove they own. */
+  owner_email?: string | null
 }
 export function getMyInvites() {
   return api<MyInvite[]>(`/api/team/my-invites`)
