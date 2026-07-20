@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Printer, Minus, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Barcode } from "@/components/app/barcode"
+import { prettyColorName } from "@/lib/color-name"
 
 export type LabelSpec = { sku: string; name?: string | null; variant?: string | null; copies?: number }
 
@@ -16,6 +17,22 @@ export type LabelSpec = { sku: string; name?: string | null; variant?: string | 
  * `copies` is per label: a variant needing 12 pieces prints 12 identical barcodes,
  * which is what actually happens on the floor.
  */
+/** "031753A - Blk/Dk.Grn/Dk.Kha · OSFM" → "Black/Dark Green/Dark Khaki · OSFM". */
+function prettyVariant(v: string): string {
+  return v.split("·").map((part) => prettyColorName(part.trim())).join(" · ")
+}
+
+type StockId = "2x1" | "2.25x1.25" | "3x2" | "4x6" | "a4"
+/** Physical label stock. Dimensions are what gets written into @page, so what you see in
+ *  the preview is the sheet the printer is handed. */
+const STOCKS: { id: StockId; label: string; w: number; h: number }[] = [
+  { id: "2x1", label: '2" × 1"', w: 2, h: 1 },
+  { id: "2.25x1.25", label: '2.25" × 1.25" (Dymo)', w: 2.25, h: 1.25 },
+  { id: "3x2", label: '3" × 2"', w: 3, h: 2 },
+  { id: "4x6", label: '4" × 6" (shipping)', w: 4, h: 6 },
+  { id: "a4", label: "A4 sheet (multi-up)", w: 8.27, h: 11.69 },
+]
+
 export function LabelSheet({
   labels,
   open,
@@ -30,6 +47,13 @@ export function LabelSheet({
   // Global multiplier on top of each label's own `copies` — for "print the whole
   // sheet twice" without editing every row.
   const [multiplier, setMultiplier] = useState(1)
+  // Label stock. A thermal printer feeds ONE label at a time, so the page must BE the
+  // label — an A4 grid sent to a 2×1 roll prints one clipped label per sticker and wastes
+  // the rest of the roll. Sizes are the common thermal stocks; "A4 sheet" keeps the old
+  // multi-up behaviour for anyone printing on a laser.
+  const [stock, setStock] = useState<StockId>("2x1")
+  const spec = STOCKS.find((s) => s.id === stock) ?? STOCKS[0]
+  const oneUp = spec.id !== "a4"
   // Portalled to <body> so print CSS can display:none every OTHER body child. The
   // old rule used `visibility:hidden`, which hides but still RESERVES layout space —
   // the whole app (sidebar, table, stat cards) kept its full height, so a single
@@ -63,6 +87,16 @@ export function LabelSheet({
 
         <div className="ml-auto flex gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Label stock
+            <select
+              value={stock}
+              onChange={(e) => setStock(e.target.value as StockId)}
+              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {STOCKS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+          </label>
           <Button size="sm" onClick={() => window.print()} disabled={!sheet.length}><Printer size={14} weight="bold" /> Print</Button>
         </div>
       </div>
@@ -70,17 +104,32 @@ export function LabelSheet({
       {sheet.length === 0 ? (
         <div className="py-20 text-center text-sm text-muted-foreground">Nothing selected to print.</div>
       ) : (
-        <div className="print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4">
-          {sheet.map(({ key, l }) => (
-            <div key={key} className="flex flex-col items-center gap-1 overflow-hidden rounded border border-border p-2 text-center">
-              <div className="w-full truncate text-xs font-medium">{l.name || l.sku}</div>
-              {l.variant && <div className="w-full truncate text-[10px] text-muted-foreground">{l.variant}</div>}
-              {/* fit → scales to the label. A long SKU otherwise renders ~450px wide
-                  and spills across the card, printing a clipped, unscannable code. */}
-              <Barcode value={l.sku} height={46} fit className="w-full" />
-            </div>
-          ))}
-        </div>
+        <>
+          {/* @page must match the STOCK, or the printer scales/clips to whatever it
+              thinks the page is. Injected rather than hardcoded so the preview and the
+              print use one source of truth. */}
+          <style>{`@media print { @page { size: ${spec.w}in ${spec.h}in; margin: 0; } }`}</style>
+          <div className={oneUp ? "print-area flex flex-col items-center gap-4 p-4" : "print-area grid grid-cols-3 gap-3 p-4 sm:grid-cols-4"}>
+            {sheet.map(({ key, l }) => (
+              <div
+                key={key}
+                className={
+                  "eg-label flex flex-col items-center justify-center gap-0.5 overflow-hidden border border-border bg-white text-center " +
+                  (oneUp ? "rounded-none" : "gap-1 rounded p-2")
+                }
+                // On thermal stock the element IS the label, at true physical size — so
+                // what's on screen is what lands on the sticker.
+                style={oneUp ? { width: `${spec.w}in`, height: `${spec.h}in`, padding: "0.06in" } : undefined}
+              >
+                <div className="w-full truncate text-[11px] font-medium leading-tight">{l.name || l.sku}</div>
+                {l.variant && <div className="w-full truncate text-[9px] leading-tight text-muted-foreground">{prettyVariant(l.variant)}</div>}
+                {/* fit → scales to the label. A long SKU otherwise renders ~450px wide
+                    and spills across the card, printing a clipped, unscannable code. */}
+                <Barcode value={l.sku} height={oneUp ? Math.round(spec.h * 34) : 46} fit className="mx-auto w-full" />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>,
     host

@@ -3,6 +3,7 @@
 //   audit(req, 'order.updated', { entityType:'order', entityId:id, before, after, note })
 // Fire-and-forget: it must NEVER throw or block the request it's recording.
 import { q } from './db.js';
+import { isStaff } from './auth.js';
 
 let _ready = null;
 export function ensureAuditTable() {
@@ -29,8 +30,29 @@ export function ensureAuditTable() {
 // Admin-only read API for the Activity page. Filterable by entity / id / action /
 // actor / time, newest first. GET /api/audit?entityId=FF-123 answers "what happened
 // to this order?" without touching the server console.
-export function auditRoutes(app, requireAdmin) {
+export function auditRoutes(app, requireAdmin, requireAuth) {
   ensureAuditTable();
+
+  /**
+   * History for ONE entity — what happened to this order, in order.
+   *
+   * Split from the admin feed deliberately. The unfiltered log is an admin tool (it spans
+   * every seller and every action); the history of a single order is operational, and any
+   * staff working that order needs it. Requiring an entityId is what keeps the two apart:
+   * you can read the story of a thing you're already allowed to see, not browse everything.
+   */
+  if (requireAuth) {
+    app.get('/api/audit/entity', { preHandler: requireAuth }, async (req, reply) => {
+      if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+      const id = String((req.query || {}).entityId || '');
+      if (!id) { reply.code(400); return { error: 'entityId required' }; }
+      const r = await q(
+        `select id, ts, action, actor_email, actor_role, entity_type, entity_id, note, before, after
+           from audit_log where entity_id=$1 order by ts desc limit 200`, [id]);
+      return r.rows;
+    });
+  }
+
   app.get('/api/audit', { preHandler: requireAdmin }, async (req) => {
     const f = req.query || {};
     const where = [], vals = []; let n = 1;

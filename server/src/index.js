@@ -198,7 +198,7 @@ factoryListsRoutes(app, requireAuth);                  // shared factory queues 
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
 adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
-auditRoutes(app, requireAdmin);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
+auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
 purchaseRoutes(app, requireAuth, requireStaff);        // purchase orders — draft → placed (S&S/Otto) → received into inventory

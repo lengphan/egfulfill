@@ -139,11 +139,11 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
       <Dialog open={preview} onOpenChange={setPreview}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="truncate">{item.name || item.sku || "Item"}</DialogTitle>
+            <DialogTitle className="pr-6 text-sm leading-snug">{item.name || item.sku || "Item"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 px-1 pb-1">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
-              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} />
+              <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || "Item"} fit="contain" />
             </div>
             {canSwap && (
               <button
@@ -174,17 +174,17 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
  * so the same numbers hold at 44px in a row and at full size in the preview — one model,
  * no per-surface maths.
  */
-function Composite({ blank, art, pos, listing, showListing, alt }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string }) {
+function Composite({ blank, art, pos, listing, showListing, alt, fit }: { blank: string; art: string; pos?: DesignPos | null; listing: string; showListing: boolean; alt: string; fit?: "cover" | "contain" }) {
   const base = showListing ? (listing || blank) : (blank || listing)
   if (!base && !art) {
     return <span className="grid size-full place-items-center text-muted-foreground"><Package size={16} /></span>
   }
   // Artwork with no blank to sit on: show the artwork itself rather than an empty box.
-  if (!base) return <ImgFill src={art} alt={alt} />
+  if (!base) return <ImgFill src={art} alt={alt} fit={fit} />
 
   return (
     <span className="relative block size-full">
-      <ImgFill src={base} alt={alt} />
+      <ImgFill src={base} alt={alt} fit={fit} />
       {!showListing && art && <ArtLayer art={art} pos={pos} />}
     </span>
   )
@@ -212,12 +212,12 @@ function ArtLayer({ art, pos }: { art: string; pos?: DesignPos | null }) {
   )
 }
 
-function ImgFill({ src, alt }: { src: string; alt: string }) {
+function ImgFill({ src, alt, fit = "cover" }: { src: string; alt: string; fit?: "cover" | "contain" }) {
   // Designs arrive as data: URLs, which next/image can't optimise — so anything that
   // isn't a plain http(s) URL falls back to a bare <img>.
   if (!src.startsWith("http")) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={alt} className="size-full object-cover" />
+    return <img src={src} alt={alt} className={"size-full " + (fit === "contain" ? "object-contain" : "object-cover")} />
   }
-  return <Image src={src} alt={alt} fill sizes="96px" className="object-cover" unoptimized />
+  return <Image src={src} alt={alt} fill sizes="96px" className={fit === "contain" ? "object-contain" : "object-cover"} unoptimized />
 }

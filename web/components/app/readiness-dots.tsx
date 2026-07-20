@@ -1,6 +1,9 @@
 "use client"
 
-import type { OrderRow, OrderItem, OrderDesign, DesignFileRow } from "@/lib/api"
+import { useState } from "react"
+import { getOrderHistory, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { forTag, sayAction, EMPTY_HINT, type TagId } from "@/components/app/tag-history"
 
 /**
  * Three tags, always the same three, always in the same place: LABEL · SCAN · DESIGN.
@@ -22,17 +25,51 @@ import type { OrderRow, OrderItem, OrderDesign, DesignFileRow } from "@/lib/api"
 
 type State = "todo" | "doing" | "done"
 
-function Tag({ label, state, title }: { label: string; state: State; title?: string }) {
+function Tag({ id, label, state, title, orderId }: { id: TagId; label: string; state: State; title?: string; orderId: string }) {
   const cls =
     state === "done"
-      ? "bg-primary/10 text-primary"
+      ? "bg-primary/10 text-primary hover:bg-primary/15"
       : state === "doing"
-        ? "bg-primary/5 text-primary/70"
-        : "bg-muted text-muted-foreground/70"
+        ? "bg-primary/5 text-primary/70 hover:bg-primary/10"
+        : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
+  const [rows, setRows] = useState<AuditRow[] | null>(null)
+
+  // History loads on OPEN, not on render — a board of 50 rows would otherwise fire 150
+  // requests for popovers nobody opened.
+  const load = (open: boolean) => {
+    if (!open || rows) return
+    getOrderHistory(orderId).then((r) => setRows(r ?? [])).catch(() => setRows([]))
+  }
+
   return (
-    <span title={title} className={"rounded px-1.5 py-0.5 text-[11px] font-medium " + cls}>
-      {label}
-    </span>
+    <Popover onOpenChange={load}>
+      <PopoverTrigger
+        title={title}
+        className={"eg-tap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
+      >
+        {label}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <div className="border-b border-border px-3 py-2 text-xs font-semibold">{label}</div>
+        <div className="max-h-56 overflow-y-auto p-1">
+          {rows === null ? (
+            <div className="px-2 py-3 text-xs text-muted-foreground">Loading…</div>
+          ) : forTag(id, rows).length === 0 ? (
+            <div className="px-2 py-3 text-xs text-muted-foreground">{EMPTY_HINT[id]}</div>
+          ) : (
+            forTag(id, rows).map((r) => (
+              <div key={String(r.id)} className="rounded px-2 py-1.5 hover:bg-accent">
+                <div className="text-xs font-medium">{sayAction(r.action)}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  {r.actor_email ? ` · ${r.actor_email}` : r.actor_role ? ` · ${r.actor_role}` : ""}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -80,9 +117,9 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
 
   return (
     <span className={"inline-flex items-center gap-1 " + (className ?? "")}>
-      <Tag label="Label" state={hasLabel ? "done" : "todo"} title={labelTitle} />
-      <Tag label="Scan" state={scanned ? "done" : "todo"} title={scanned ? "Scanned out of dispatch" : "Waiting on the scan"} />
-      <Tag label={designLabel} state={designState} title={designTitle} />
+      <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"} title={labelTitle} />
+      <Tag id="scan" orderId={order.id} label="Scan" state={scanned ? "done" : "todo"} title={scanned ? "Scanned out of dispatch" : "Waiting on the scan"} />
+      <Tag id="design" orderId={order.id} label={designLabel} state={designState} title={designTitle} />
     </span>
   )
 }

@@ -149,6 +149,12 @@
   .no-print { display: none !important; }
   /* Never split a label across a page break. */
   .print-area > * { break-inside: avoid; page-break-inside: avoid; }
+  /* Thermal stock feeds ONE label at a time, so each label is its own page. Borders come
+     off in print — a printed hairline is just wasted ink on a sticker, and on a die-cut
+     label the edge IS the border. */
+  .print-area.flex > .eg-label { page-break-after: always; break-after: page; }
+  .print-area.flex > .eg-label:last-child { page-break-after: auto; break-after: auto; }
+  .eg-label { border: 0 !important; }
 }
 
 /* Marketing motion — soft drifting aura (respect reduced-motion). */

@@ -1,0 +1,45 @@
+import type { AuditRow } from "@/lib/api"
+
+/**
+ * Which audit actions belong to which tag, and how to say them in words.
+ *
+ * A tag answers "is this done?"; its history answers "how did it get that way, and who
+ * did it". The mapping lives here rather than in the popover so the tag, its history and
+ * its empty state can never drift apart — a tag that says done with a history that
+ * disagrees is worse than no history at all.
+ */
+export type TagId = "label" | "scan" | "design"
+
+const MATCH: Record<TagId, RegExp> = {
+  label: /^label\.|^order\.(shipped|tracking)/,
+  scan: /^item\.status|^order\.stage/,
+  design: /^design\.|^design_file\./,
+}
+
+/** Human wording for an action. Unknown actions fall back to the raw key rather than
+ *  being hidden — an unexplained event is still evidence. */
+const SAID: Record<string, string> = {
+  "label.printed": "Label printed",
+  "label.unprinted": "Label print undone",
+  "design.saved": "Artwork attached",
+  "design.pushed": "Sent to the designer board",
+  "design.approved": "Design approved",
+  "design_file.uploaded": "Machine file uploaded",
+  "item.status": "Item status changed",
+  "order.stage": "Order stage changed",
+}
+
+export function sayAction(a: string): string {
+  return SAID[a] ?? a.replace(/[._]/g, " ")
+}
+
+export function forTag(tag: TagId, rows: AuditRow[]): AuditRow[] {
+  return rows.filter((r) => MATCH[tag].test(r.action))
+}
+
+/** What to show when a tag has no history — a next step, not a dead end. */
+export const EMPTY_HINT: Record<TagId, string> = {
+  label: "No label yet — create one from the order's ⋯ menu.",
+  scan: "Not scanned yet — it moves here once dispatch scans the batch.",
+  design: "No design yet — attach artwork or send it to the board.",
+}

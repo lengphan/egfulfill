@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
+import { numOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
@@ -129,7 +130,11 @@ export default function OrderDetailPage() {
     if (!text) return
     setMsg("")
     const clientId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-    setMessages((prev) => [...prev, { id: clientId, role: "seller", text, ts: Date.now() }])
+    // Attribute the optimistic bubble to whoever is actually typing. It was hardcoded to
+    // "seller", so a warehouse message showed as coming from the seller — on the one
+    // surface where who-said-what is the whole point.
+    const myRole = getUser()?.role || "seller"
+    setMessages((prev) => [...prev, { id: clientId, role: myRole, text, ts: Date.now() }])
     try {
       await postOrderMessage(id, text, { clientId })
       const r = await getOrderMessages(id)
@@ -187,7 +192,9 @@ export default function OrderDetailPage() {
   // Variants are editable only before submit — after that the cost is frozen and the
   // server rejects changes. new/draft/"" = not yet submitted.
   const preSubmit = ["", "new", "draft"].includes(String(order.factory_status || ""))
-  const num = order.seq ? `#${order.seq}` : order.id
+  // Was a private copy of numOf, so the detail page still showed the raw "etsy-4120118148"
+  // after the boards were stripping the source prefix. Use the shared formatter.
+  const num = numOf(order)
   const store = (order.store || order.source || "manual").toString()
   const addr = (order.address ?? {}) as Addr
   const cust = order.customer ?? {}
@@ -324,7 +331,10 @@ export default function OrderDetailPage() {
                   <div className="py-6 text-center text-sm text-muted-foreground">No messages yet — start the conversation.</div>
                 ) : (
                   messages.map((m) => {
-                    const mine = (m.role ?? "seller") === "seller"
+                    // "Mine" is whoever is READING, not always the seller. On a staff
+                    // board every message rendered as if it came from the other side.
+                    const myRole = getUser()?.role || "seller"
+                    const mine = (m.role ?? "seller") === myRole
                     return (
                       <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
                         <div className={"max-w-[80%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "bg-primary text-primary-foreground" : "bg-muted")}>
