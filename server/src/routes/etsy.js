@@ -110,6 +110,20 @@ async function etsyFetch(conn, path, opts = {}) {
 // Resolve the listing image URL. Prefers the EXACT image the buyer saw
 // (transaction.listing_image_id); falls back to the listing's first image.
 // Cached per listing[:image] for the sync run.
+// Etsy HTML-encodes listing titles, so a title arrives as "Women&#39;s Shirt" and
+// rendered as literal markup on every SpyDeck card. Decode the handful of entities
+// Etsy actually emits — NOT with innerHTML (this is the server, and that would be an
+// injection sink for text we then store).
+function decodeEntities(t) {
+  return String(t || '')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');          // last: so &amp;#39; doesn't double-decode
+}
+
 function imgUrlOf(im) { return (im && (im.url_fullxfull || im.url_570xN || im.url_300x300 || im.url_170x135)) || null; }
 async function listingImage(conn, listingId, imageId, cache) {
   if (!listingId) return null;
@@ -449,7 +463,7 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
   const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
   return {
     listing_id: l.listing_id,
-    title: l.title || '',
+    title: decodeEntities(l.title),
     description: l.description || '',
     price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
     // What buyers can actually pay, across variations. Null when the listing has no

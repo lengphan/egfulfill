@@ -1059,6 +1059,12 @@ export function getSpydeckSaves() {
 }
 // Daily trending feed (server-cached) — auto-populates SpyDeck without a search.
 export type TrendingFeed = { date?: string; products?: EtsyListing[]; keywords?: string[]; error?: string }
+/** The heavy half of ONE listing (description + full images), served from the day's
+ *  cached pool. Kept out of the grid payload, which ships 120 rows. */
+export function getSpydeckListingDetail(id: number | string) {
+  return api<{ listing_id: number; description: string; images: string[] }>(
+    `/api/spydeck/listing/${encodeURIComponent(String(id))}/detail`)
+}
 export function getSpydeckTrending() {
   return api<TrendingFeed>(`/api/spydeck/trending`)
 }

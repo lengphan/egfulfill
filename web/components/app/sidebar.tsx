@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
-import { hasSpydeck } from "@/lib/plans"
+import { useEntitlements } from "@/lib/entitlements"
 import { getMyAccess } from "@/lib/api"
 import { clearSession, getToken } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
@@ -18,18 +18,10 @@ export function Sidebar() {
     clearSession()
     router.push("/login")
   }
-  // Plan-gated items (SpyDeck) — read entitlement after mount and re-check when the
-  // plan/add-on changes (setPlan/setSpydeckAddon fire "eg-plan-changed").
-  const [spydeck, setSpydeck] = useState(true)
-  useEffect(() => {
-    const sync = () => setSpydeck(hasSpydeck())
-    const id = setTimeout(sync, 0)
-    window.addEventListener("eg-plan-changed", sync)
-    return () => {
-      clearTimeout(id)
-      window.removeEventListener("eg-plan-changed", sync)
-    }
-  }, [])
+  // Plan-gated items (SpyDeck). Resolved SERVER-side via useEntitlements, not from the
+  // cached session: a team member's own row is always 'starter', so the cached answer
+  // drew a padlock next to a feature their leader had already paid for.
+  const spydeck = useEntitlements().spydeck
 
   // Team permissions: if I'm someone's member, show only the surfaces they shared. An
   // owner gets null → everything. Until it resolves we render the full nav (an owner is

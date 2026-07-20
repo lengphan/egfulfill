@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Image from "next/image"
+import { useEntitlements } from "@/lib/entitlements"
 import Link from "next/link"
 import { MagnifyingGlass, Binoculars, LockSimple, Check, TrendUp, Heart, Warning, SlidersHorizontal, CheckCircle, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -9,8 +10,8 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory, getBillingPlan } from "@/lib/api"
-import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
+import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { detectTrademarks } from "@/lib/trademarks"
 import { PublishProductDialog } from "@/components/app/publish-product-dialog"
@@ -264,39 +265,12 @@ function KeywordCloud({ words, onPick }: { words: { text: string; weight: number
 export function SpyDeckView() {
   // Plan gate: SpyDeck is a paid add-on (bundled-free on Pro/Enterprise). Assume
   // entitled until we can read localStorage after mount, then re-check on plan change.
-  const [entitled, setEntitled] = useState(true)
+  // Entitlement is resolved SERVER-side (useEntitlements) because a team member inherits
+  // their leader's plan and the cached session can't know that. `checked` gates the
+  // paywall so it never flashes before the answer arrives.
+  const { spydeck: entitled } = useEntitlements()
   const [checked, setChecked] = useState(false)
-  useEffect(() => {
-    let alive = true
-    // Two passes on purpose.
-    //
-    // 1. The CACHED session answers instantly, so there's no flash of the paywall for
-    //    someone who plainly has it.
-    // 2. Then ask the server — because the cache only knows what THIS account bought,
-    //    and a team member inherits their leader's plan. A member whose leader pays for
-    //    SpyDeck was being shown "add it for $9/mo" for something already paid for.
-    //    The server resolves inheritance (see resolveEntitlements), so it is the only
-    //    source that can answer this correctly.
-    const sync = () => {
-      if (!alive) return
-      setEntitled(hasSpydeck())
-      setChecked(true)
-      getBillingPlan()
-        .then((b) => {
-          if (!alive) return
-          const included = b.plan === "pro" || b.plan === "enterprise"
-          setEntitled(b.spydeck_addon === true || included || hasSpydeck())
-        })
-        .catch(() => { /* keep whatever the cache said */ })
-    }
-    const id = setTimeout(sync, 0)
-    window.addEventListener("eg-plan-changed", sync)
-    return () => {
-      alive = false
-      clearTimeout(id)
-      window.removeEventListener("eg-plan-changed", sync)
-    }
-  }, [])
+  useEffect(() => { const id = setTimeout(() => setChecked(true), 0); return () => clearTimeout(id) }, [])
 
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<EtsyListing[] | null>(null)
@@ -308,6 +282,22 @@ export function SpyDeckView() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   // "Make product" → Etsy draft. Track which listings have been uploaded (this session).
   const [makeListing, setMakeListing] = useState<EtsyListing | null>(null)
+  // description + images are NOT in the grid payload — they'd be ~5x the response for
+  // data no card shows. Fetched here for the one listing being turned into a product,
+  // from the server's cached pool (no extra Etsy call).
+  const [makeDetail, setMakeDetail] = useState<{ description?: string; images?: string[] } | null>(null)
+  useEffect(() => {
+    if (!makeListing) return
+    let alive = true
+    // Deferred: setState straight from an effect body cascades a render before paint.
+    const id = setTimeout(() => {
+      setMakeDetail(null)
+      getSpydeckListingDetail(makeListing.listing_id)
+        .then((d) => { if (alive) setMakeDetail(d) })
+        .catch(() => { if (alive) setMakeDetail(null) })   // publish still works, just without a prefilled body
+    }, 0)
+    return () => { alive = false; clearTimeout(id) }
+  }, [makeListing])
   const [uploaded, setUploaded] = useState<EtsyListing[]>([])
   const [uploadedIds, setUploadedIds] = useState<Set<string>>(new Set())
   const onPublished = (l: EtsyListing) => {
@@ -692,11 +682,11 @@ export function SpyDeckView() {
         onOpenChange={(v) => !v && setMakeListing(null)}
         prefill={makeListing ? {
           title: makeListing.title,
-          description: makeListing.description,
+          description: makeDetail?.description ?? makeListing.description ?? "",
           // Prefer the USD-converted price so the seller starts from a comparable number.
           price: makeListing.price_usd ?? makeListing.price,
           tags: makeListing.tags ?? [],
-          images: (makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []).filter(Boolean) as string[],
+          images: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
         } : null}
         onPublished={() => { if (makeListing) onPublished(makeListing) }}
         title="Make product"

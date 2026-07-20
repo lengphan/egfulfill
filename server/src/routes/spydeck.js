@@ -194,6 +194,47 @@ async function realSales(sellerId) {
 }
 
 export function spydeckRoutes(app, requireAuth) {
+  /**
+   * What a GRID CARD needs — and nothing else.
+   *
+   * The pool carries the full Etsy listing, including `description` (1-3KB each) and the
+   * whole `images` array. The grid renders neither: both are read in exactly one place,
+   * the "Make product" dialog, for the ONE listing you click. Shipping them for all 120
+   * meant most of the response was data no card could display.
+   *
+   * They stay in the cached pool, so /listing/:id/detail below answers from memory with
+   * no extra Etsy call — nothing is lost, it just isn't sent 120 times.
+   */
+  function gridRow(l) {
+    return {
+      listing_id: l.listing_id, title: l.title, price: l.price, currency: l.currency,
+      price_usd: l.price_usd, price_converted: l.price_converted,
+      price_min: l.price_min, price_max: l.price_max,
+      url: l.url, image: l.image, tags: l.tags, created: l.created,
+      views: l.views, shop_name: l.shop_name, num_favorers: l.num_favorers,
+      _sold24: l._sold24, _trending: l._trending,
+    };
+  }
+
+  /**
+   * The heavy half of one listing, for the Make-product dialog. Served from the day's
+   * cached pool — no Etsy call, no rate-limit cost.
+   */
+  app.get('/api/spydeck/listing/:id/detail', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    await ensure();
+    try {
+      const cached = await q("select value from settings where key='spydeck_trending'");
+      const v = cached.rows[0] ? JSON.parse(cached.rows[0].value || '{}') : null;
+      const hit = Array.isArray(v && v.products)
+        ? v.products.find((l) => String(l.listing_id) === String(req.params.id))
+        : null;
+      if (!hit) { reply.code(404); return { error: 'Not in today\'s feed' }; }
+      return { listing_id: hit.listing_id, description: hit.description || '', images: hit.images || [] };
+    } catch (e) {
+      reply.code(500); return { error: e.message };
+    }
+  });
+
   // Daily trending feed — 10 products (est. >10 sold/24h) + 10 keywords. Cached in
   // `settings` for the day so we hit Etsy a few times per DAY, not per visitor. Shared
   // by every SpyDeck (seller + factory). Signed-in users only.
@@ -201,7 +242,10 @@ export function spydeckRoutes(app, requireAuth) {
     await ensure();
     const today = new Date().toISOString().slice(0, 10);
     const staff = !!(req.user && req.user.role && req.user.role !== 'seller');
-    const serve = (feed) => ({ date: feed.date, keywords: feed.keywords || [], products: sliceFor(feed.products, staff) });
+    const serve = (feed) => ({
+      date: feed.date, keywords: feed.keywords || [],
+      products: sliceFor(feed.products, staff).map(gridRow),
+    });
 
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
