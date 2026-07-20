@@ -126,7 +126,7 @@ function mapProduct(p, meta) {
   };
 }
 
-export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
+export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
   // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),
   // so the browser can't hot-link cdn.ssactivewear.com from our site. Fetch the image
@@ -642,7 +642,9 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin) {
   //   2) Even when live, testOrder:true (S&S Test mode) unless the request passes { live:true }.
   // CONFIRM the exact S&S Orders field names (line identifier, testOrder flag, shippingMethod)
   // against your S&S "Orders_Post" API doc before flipping SS_ORDER_LIVE — S&S gates those docs.
-  app.post('/api/ss/order', { preHandler: requireStaff }, async (req, reply) => {
+  // Placing a supplier order SPENDS REAL MONEY the moment the LIVE flag is set.
+  // requireStaff included operator, which contradicts every other spend boundary.
+  app.post('/api/ss/order', { preHandler: requireWarehouse }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
     const b = req.body || {};
     const lines = (Array.isArray(b.lines) ? b.lines : [])

@@ -58,7 +58,7 @@ async function passthru(reply, path) {
   catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
 }
 
-export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
+export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // Config + live-token check (never leaks the secrets).
   app.get('/api/otto/status', { preHandler: requireStaff }, async () => {
     const out = { configured: ocConfigured(), base: OC_BASE, sandbox: isSandbox(), supplier: OC_SUPPLIER };
@@ -203,7 +203,9 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin) {
   // Place an order (PO). SAFETY: dry-run unless OTTOCAP_ORDER_LIVE='1'. With the sandbox base
   // (default) a "live" call is still just a SANDBOX test order — real orders need OTTOCAP_API_BASE
   // pointed at connectivity.ottocap.com AND live credentials from Otto.
-  app.post('/api/otto/order', { preHandler: requireStaff }, async (req, reply) => {
+  // Placing a supplier order SPENDS REAL MONEY the moment the LIVE flag is set.
+  // requireStaff included operator, which contradicts every other spend boundary.
+  app.post('/api/otto/order', { preHandler: requireWarehouse }, async (req, reply) => {
     const g = guard(reply); if (g) return g;
     const b = req.body || {};
     const items = (Array.isArray(b.items) ? b.items : [])

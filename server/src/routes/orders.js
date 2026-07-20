@@ -623,7 +623,11 @@ export function ordersRoutes(app, requireAuth) {
   // the board can distinguish "labelled" from "label on the parcel" without anyone
   // remembering to tick a box.
   app.post('/api/orders/:id/label-printed', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    // Dispatch is view-only for operators, and this stamp is a dispatch action —
+    // it asserts a label is on the parcel, which is a custody claim. Was staff-only,
+    // so the UI hid the button while the API still accepted it.
+    const role = req.user && req.user.role;
+    if (role !== 'admin' && role !== 'warehouse') { reply.code(403); return { error: 'Warehouse or admin only' }; }
     const undo = (req.body || {}).undo === true;
     await q('update orders set label_printed_at=$1 where id=$2', [undo ? null : new Date(), req.params.id]);
     audit(req, undo ? 'label.unprinted' : 'label.printed', { entityType: 'order', entityId: req.params.id });

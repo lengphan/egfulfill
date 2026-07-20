@@ -15,7 +15,7 @@ function ensure() {
   return _ready;
 }
 
-export function purchaseRoutes(app, requireAuth, requireStaff) {
+export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse) {
   app.get('/api/purchase', { preHandler: requireStaff }, async () => {
     await ensure();
     try { const r = await q('select num, supplier, items, status, total, meta, created_at from purchase_orders order by created_at desc'); return r.rows; }
@@ -23,9 +23,10 @@ export function purchaseRoutes(app, requireAuth, requireStaff) {
   });
 
   // Create/update one PO (draft edits, or status/meta after placing/receiving).
-  app.post('/api/purchase', { preHandler: requireStaff }, async (req, reply) => {
-    const role = req.user && req.user.role;
-    if (role !== 'admin' && role !== 'warehouse' && role !== 'operator') { reply.code(403); return { error: 'Staff only' }; }
+  // Writing a PO commits the factory to spend, so it is warehouse/admin — operator was
+  // explicitly allowed here, which contradicted every other spend boundary in the app.
+  // Reading stays open to any staff: knowing what's on order is not the same as ordering.
+  app.post('/api/purchase', { preHandler: requireWarehouse }, async (req, reply) => {
     await ensure();
     const b = req.body || {};
     const num = String(b.num || '').trim();
@@ -42,7 +43,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff) {
     return { ok: true, num };
   });
 
-  app.delete('/api/purchase/:num', { preHandler: requireStaff }, async (req) => {
+  app.delete('/api/purchase/:num', { preHandler: requireWarehouse }, async (req) => {
     await ensure();
     await q('delete from purchase_orders where num=$1', [req.params.num]).catch(() => {});
     return { ok: true };

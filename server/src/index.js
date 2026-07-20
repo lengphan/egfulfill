@@ -74,6 +74,26 @@ function requireStaff(req, reply, done) {
   if (!isStaff(req.user)) { reply.code(403).send({ error: 'Staff only' }); return; }
   done();
 }
+/**
+ * Warehouse or admin — CUSTODY + SPEND.
+ *
+ * requireStaff includes operator, and several routes that change physical stock or spend
+ * money were sitting behind it while the UI merely hid the buttons: the Scan station
+ * renders read-only for an operator, Dispatch renders view-only, and neither was enforced
+ * server-side. An operator's zone ends at the scan (see stageDenial in routes/orders.js);
+ * this makes that true off the order table too.
+ *
+ * Designer never reaches these — it isn't warehouse or admin.
+ */
+function requireWarehouse(req, reply, done) {
+  const role = req.user && req.user.role;
+  if (role !== 'admin' && role !== 'warehouse') {
+    reply.code(403).send({ error: 'Warehouse or admin only' });
+    return;
+  }
+  done();
+}
+
 function requireAdmin(req, reply, done) {
   if (!req.user || req.user.role !== 'admin') { reply.code(403).send({ error: 'Admin only' }); return; }
   done();
@@ -182,14 +202,14 @@ app.post('/api/auth/google', async (req, reply) => {
 
 // ── Data routes ──
 ordersRoutes(app, requireAuth);
-inventoryRoutes(app, requireStaff);
+inventoryRoutes(app, requireStaff, requireWarehouse);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin);
 catalogRoutes(app, requireAuth, requireStaff);
 etsyRoutes(app, requireAuth, requireStaff);
 tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)
 shopifyRoutes(app, requireAuth, requireStaff);  // Shopify per-store OAuth connect (seller + admin connect their own store)
-ssRoutes(app, requireAuth, requireStaff, requireAdmin);  // S&S Activewear catalog + inventory sync (factory blanks → New In tab)
-ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin);  // Otto Cap headwear supplier (auth + inventory + sandbox PO placement)
+ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  // S&S Activewear catalog + inventory sync (factory blanks → New In tab)
+ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);  // Otto Cap headwear supplier (auth + inventory + sandbox PO placement)
 usersRoutes(app, requireAdmin, requireAuth);   // admin user management + staff-readable GET /api/sellers (seller-adjust panel)
 uspsRoutes(app, requireAuth, requireStaff);
 templatesRoutes(app, requireAuth);
@@ -213,7 +233,7 @@ adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)
 factorySettingsRoutes(app, requireAuth, requireStaff); // platform factory settings — design fee, default shipping, emb file price (warehouse/admin)
-purchaseRoutes(app, requireAuth, requireStaff);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
+purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse);        // purchase orders — draft → placed (S&S/Otto) → received into inventory
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns

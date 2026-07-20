@@ -60,7 +60,12 @@ async function consignedScan(sku, delta, direction, qty, req, b) {
   };
 }
 
-export function inventoryRoutes(app, requireStaff) {
+export function inventoryRoutes(app, requireStaff, requireWarehouse) {
+  // READS stay open to any staff — an operator needs to look stock up. WRITES are
+  // warehouse/admin: a stock level is a claim about physical custody, and the whole-list
+  // upsert below DELETES any sku missing from the body, so an operator token could wipe
+  // inventory. The Scan station already rendered read-only for operators; this is the
+  // half that was missing.
   q('alter table inventory add column if not exists supplier text').catch(() => {});
   // scan_history is declared in schema.sql, but that only runs on FIRST db init —
   // an existing deployment never got it. Create it idempotently at route-load (same
@@ -82,7 +87,7 @@ export function inventoryRoutes(app, requireStaff) {
     return r.rows;
   });
 
-  app.post('/api/inventory', { preHandler: requireStaff }, async (req) => {
+  app.post('/api/inventory', { preHandler: requireWarehouse }, async (req) => {
     const rows = Array.isArray(req.body) ? req.body : [];
     for (const r of rows) {
       if (!r.sku) continue;
@@ -124,7 +129,7 @@ export function inventoryRoutes(app, requireStaff) {
   });
 
   // Create/upsert a SINGLE item (the Add-item dialog) — again, no whole-list write.
-  app.post('/api/inventory/item', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/inventory/item', { preHandler: requireWarehouse }, async (req, reply) => {
     const r = req.body || {};
     if (!r.sku) { reply.code(400); return { error: 'sku is required' }; }
     const out = await q(
@@ -148,7 +153,7 @@ export function inventoryRoutes(app, requireStaff) {
   // the full table would. Every scan is recorded in scan_history for the audit
   // drawer. Stock is allowed to go negative — a negative count is a real signal
   // that something was shipped without an intake, and hiding it loses the error.
-  app.post('/api/inventory/scan', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/inventory/scan', { preHandler: requireWarehouse }, async (req, reply) => {
     const b = req.body || {};
     const sku = String(b.sku || '').trim();
     const direction = b.direction === 'out' ? 'out' : 'in';
@@ -196,7 +201,7 @@ export function inventoryRoutes(app, requireStaff) {
   // Undo a mis-scan: reverse the delta and drop the row. Mis-scans are constant
   // on a scan gun and the correction has to be instant, so this removes the
   // record rather than logging a compensating entry that clutters the history.
-  app.delete('/api/inventory/scan/:id', { preHandler: requireStaff }, async (req, reply) => {
+  app.delete('/api/inventory/scan/:id', { preHandler: requireWarehouse }, async (req, reply) => {
     const id = String(req.params.id || '');
     // Guard the cast: a non-uuid makes Postgres throw 22P02 → a 500 with a stack,
     // where this route means to answer 404.
@@ -212,7 +217,7 @@ export function inventoryRoutes(app, requireStaff) {
     return { ok: true, item: upd.rows[0] || null };
   });
 
-  app.delete('/api/inventory/:sku', { preHandler: requireStaff }, async (req) => {
+  app.delete('/api/inventory/:sku', { preHandler: requireWarehouse }, async (req) => {
     await q('delete from inventory where sku=$1', [req.params.sku]);
     return { ok: true };
   });
