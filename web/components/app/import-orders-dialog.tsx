@@ -121,6 +121,10 @@ export function ImportOrdersDialog({
           name: it.name, sku: it.sku || undefined, img: it.img || undefined,
           qty: it.qty, unitPrice: it.unitPrice, color: it.color || undefined,
           size: it.size || undefined, printType: it.printType || undefined,
+          // The blank is what production and pricing key on — dropping it here was why an
+          // imported line arrived reading "not set up for production yet" even when the
+          // CSV named one.
+          blank: it.blank || undefined,
         }))
         const total = orderTotal(items.map((it) => ({ qty: it.qty ?? 1, unitPrice: it.unitPrice ?? 0, size: it.size })), []).total
         const hasAddress = !!(o.address.street || o.address.city)

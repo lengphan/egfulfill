@@ -619,6 +619,8 @@ export function updateOrder(id: string, patch: { status?: string; factoryStatus?
 export type NewOrderItem = {
   name?: string
   sku?: string
+  /** The catalog blank to produce on — what pricing and the stock barcode key on. */
+  blank?: string
   img?: string
   qty?: number
   unitPrice?: number

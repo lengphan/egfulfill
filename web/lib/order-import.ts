@@ -10,8 +10,10 @@ export const CSV_HEADERS = [
   "Order Number", "Ship Name", "Ship Email",
   "Ship Address 1", "Ship Address 2", "Ship City", "Ship State", "Ship Zip",
   "Store Name",
-  "Product Title", "Image Link/ID", "Item SKU", "Item Quantity", "Print Type",
-  "Item Color", "Item Size", "Item Price", "Shipping Service", "Internal Notes",
+  "Product Title", "Image Link/ID", "Item SKU", "Blank", "Template ID",
+  "Item Quantity", "Print Type",
+  "Item Color", "Item Size", "Item Price", "Design File URL",
+  "Shipping Service", "Internal Notes",
 ]
 
 // A ready-to-fill template with one clearly-labelled sample row (skipped on import).
@@ -20,7 +22,7 @@ export const CSV_TEMPLATE = (() => {
   const sample = [
     "1001", "Ava Brodeur — delete this row", "ava@example.com",
     "43 Calumet Rd", "", "Fairhaven", "MA", "02719",
-    "My Store", "Classic Tee", "", "TEE-CL", "1", "DTG", "Black", "M", "18.00", "Standard", "",
+    "My Store", "Classic Tee", "", "TEE-CL", "TEE-CL", "", "1", "DTG", "Black", "M", "18.00", "", "Standard", "",
   ]
   return [esc(CSV_HEADERS), esc(sample)].join("\n")
 })()
@@ -40,6 +42,13 @@ const COL_ALIASES: Record<string, string[]> = {
   ship_zip: ["ship_zip", "zip", "zipcode", "zip_code", "postal", "postal_code", "postcode", "shipping_zip"],
   store_name: ["store_name", "store", "shop", "shop_name"],
   item_sku: ["item_sku", "sku", "lineitem_sku", "line_item_sku", "product_sku", "variant_sku"],
+  // The BLANK we produce on. Without it an imported line can't be costed (pricing matches
+  // on the blank), can't be barcoded (the barcode is the stock code), and lands on the
+  // board reading "not set up for production yet".
+  blank: ["blank", "blank_sku", "base_product", "base_sku", "catalog_sku", "product_blank"],
+  // A saved template carries blank + artwork + placement + method in one reference, so a
+  // row that names one needs almost nothing else — the remaining columns become overrides.
+  template_id: ["template_id", "template", "tpl", "tpl_id", "design_template"],
   item_name: ["item_name", "item", "product", "product_name", "title", "lineitem_name", "item_title", "product_title", "description"],
   item_quantity: ["item_quantity", "quantity", "qty", "lineitem_quantity", "line_item_quantity", "item_qty"],
   item_price: ["item_price", "price", "unit_price", "lineitem_price", "line_item_price", "product_price"],
@@ -134,7 +143,7 @@ export function rowsToRecords(rows: string[][]): { records: ImportRecord[]; erro
   return { records }
 }
 
-export type ImportItem = { name: string; sku: string; img: string; qty: number; unitPrice: number; color: string; size: string; printType: string; designUrl: string; notes: string }
+export type ImportItem = { name: string; sku: string; img: string; qty: number; unitPrice: number; color: string; size: string; printType: string; designUrl: string; blank: string; templateId: string; notes: string }
 export type ImportOrder = {
   orderNumber: string
   customer: { name: string; email: string }
@@ -171,6 +180,10 @@ export function groupToOrders(records: ImportRecord[]): ImportOrder[] {
         color: S(r.item_color),
         size: S(r.item_size),
         designUrl: S(r.design_file_url),
+        // Carried through so the board can resolve production. `blank` is what we make on;
+        // `templateId` names a saved design to apply, which fills the rest.
+        blank: S(r.blank),
+        templateId: S(r.template_id),
         notes: S(r.internal_notes),
       }
     })
