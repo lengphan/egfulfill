@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { DitherImage } from "@/components/marketing/dither-image"
 import {
   PlugsConnected,
   Printer,
@@ -79,18 +78,10 @@ export default function MarketingHome() {
     <>
       {/* ── Hero ── */}
       <section className="eg-hero relative isolate overflow-hidden">
-        {/* Dithered live on a canvas by <DitherImage> rather than from a pre-baked
-            PNG: it dithers at REDUCED resolution and upscales with smoothing off, so
-            the dots stay dots at any viewport instead of resampling into moiré — and
-            it reveals a band at a time, like a print head crossing the sheet, which
-            is the headline answering itself. Ink/paper are inverted here for the
-            dark canvas. */}
+        {/* The dithered photo plate was removed at the user's request. The surface stays
+            dark because the headline and nav are light-on-dark — that's a brand surface
+            in BOTH themes, not a themed one, so it must not invert to white. */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#0b0b0c]">
-          <div className="eg-hero-plate absolute inset-0">
-            <DitherImage src="/hero/stair.jpg" ink="#d6d3cc" paper="#0b0b0c" scale={1.35} focusY={0.32} />
-          </div>
-          {/* Scrim over the plate — guarantees headline contrast without erasing image. */}
-          <div className="eg-hero-scrim absolute inset-0" />
           {/* One restrained wash of brand colour, so the section isn't purely monotone. */}
           <div
             className="absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-[130px] opacity-30"
