@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
+import { getUser } from "@/lib/auth"
 import { detectTrademarks } from "@/lib/trademarks"
 import { PublishProductDialog } from "@/components/app/publish-product-dialog"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -286,6 +287,17 @@ export function SpyDeckView() {
   const [minSold, setMinSold] = useState("")
   const [minFav, setMinFav] = useState("")
   const [showFilters, setShowFilters] = useState(false)
+  // Filters are a STAFF tool. A seller searching for inspiration wants a search box and
+  // results; sourcing decisions — "what's actually moving in this category above this
+  // price" — are the factory's job, and the controls only get in a seller's way.
+  const [canFilter, setCanFilter] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const r = getUser()?.role
+      setCanFilter(r === "admin" || r === "warehouse")
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
 
   useEffect(() => {
     if (!entitled) return
@@ -478,15 +490,17 @@ export function SpyDeckView() {
                   className="pl-9"
                 />
               </div>
-              <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
-                <SlidersHorizontal size={15} weight="bold" /> Filters
-              </Button>
+              {canFilter && (
+                <Button variant="outline" onClick={() => setShowFilters((s) => !s)} className={showFilters ? "border-primary text-primary" : ""}>
+                  <SlidersHorizontal size={15} weight="bold" /> Filters
+                </Button>
+              )}
               <Button onClick={() => run()} disabled={loading || (!query.trim() && !hasFilter)}>
                 {loading ? "Searching…" : "Search"}
               </Button>
             </div>
 
-            {showFilters && (
+            {canFilter && showFilters && (
               <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-3 lg:grid-cols-6">
                 <FilterField label="Category">
                   <select value={cat} onChange={(e) => setCat(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
