@@ -12,7 +12,8 @@ import crypto from 'crypto';
 import { q } from '../db.js';
 import { hashPassword } from '../auth.js';
 
-const APP_URL = (process.env.APP_URL || 'https://egful.store').replace(/\/+$/, '');
+// The REACT app — email links must land where the /reset-password route exists.
+const APP_URL = (process.env.APP_URL || 'https://app.egful.store').replace(/\/+$/, '');
 const SMTP_HOST = process.env.SMTP_HOST || '';
 
 let _mailer = null;
@@ -60,7 +61,10 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
         );
         const mailer = await getMailer(app);
         if (mailer) {
-          const link = APP_URL + '/reset-password.html?token=' + token;
+          // Path, not /reset-password.html: APP_URL now points at the REACT app, where
+          // the route is /reset-password (it reads the same ?token=). Leaving the .html
+          // suffix would 404 on Vercel and break every reset email.
+          const link = APP_URL + '/reset-password?token=' + token;
           try {
             await mailer.sendMail({
               from: process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + SMTP_HOST + '>'),

@@ -96,7 +96,9 @@ services:
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       # Password-reset email link (optional). Leave SMTP_HOST blank to keep resets
       # admin-mediated only; set these to turn on self-service email reset links.
-      APP_URL: ${APP_URL:-https://egful.store}
+      # Base URL for EMAIL LINKS (reset, team invite) — the React app, not the old
+      # static site, whose Settings page can't accept an invite. See .env.example.
+      APP_URL: ${APP_URL:-https://app.egful.store}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-}
