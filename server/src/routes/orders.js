@@ -197,7 +197,7 @@ async function refundedAmount(orderId) {
 // Charge the seller for an order. Returns {ok} or {error, ...} — never throws for an
 // expected refusal (short balance, unpriceable line), so the caller can pass the
 // message straight to the seller.
-async function chargeForSubmit(orderId, sellerId, by) {
+async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
   if (await chargedAmount(orderId) > 0) return { ok: true, already: true };
   const quote = await quoteOrder(orderId);
   if (quote.unpriced.length) {
@@ -209,6 +209,16 @@ async function chargeForSubmit(orderId, sellerId, by) {
   if (quote.total <= 0) return { error: 'This order prices out at $0 — check the catalog base cost.' };
   const balance = await balanceOf(sellerId);
   if (balance < quote.total) {
+    // A team member who can't SEE the wallet mustn't learn its balance from an error
+    // message — and telling them to "top up" is a dead end, because only the owner can.
+    // They get the fact (it can't go through) and the resolution (the owner funds it),
+    // with no figures; the owner gets notified so it doesn't just sit there.
+    if (hideMoney) {
+      return {
+        error: 'This order can\'t be submitted yet — the account needs funding. The account owner has been notified.',
+        needsOwnerTopup: true,
+      };
+    }
     return { error: `Not enough balance. This order costs $${quote.total.toFixed(2)} and your wallet has $${balance.toFixed(2)}.`,
              shortfall: Math.round((quote.total - balance) * 100) / 100, required: quote.total, balance, quote };
   }
@@ -501,8 +511,25 @@ export function ordersRoutes(app, requireAuth) {
       // exactly where it was. The reverse order would push unfunded work to the floor.
       const want = String(body.factoryStatus ?? body.status ?? '');
       if (want === 'in_review' && ['', 'new', 'draft'].includes(fs)) {
-        const paid = await chargeForSubmit(req.params.id, sel.id, req.user.sub);
-        if (paid.error) { reply.code(402); return paid; }        // 402 Payment Required
+        // A member submitting under the owner: hide the figures unless the owner has
+        // shared the wallet with them.
+        const seesWallet = !sel.member || (Array.isArray(sel.perms) && sel.perms.indexOf('wallet') >= 0);
+        const paid = await chargeForSubmit(req.params.id, sel.id, req.user.sub, !seesWallet);
+        if (paid.error) {
+          // Tell the OWNER, whoever hit the wall. A member can't top up and can't see the
+          // balance, so without this the order simply stops with nobody informed.
+          if (paid.needsOwnerTopup || paid.shortfall != null) {
+            notify({
+              userIds: [String(sel.id)],
+              type: 'wallet-low',
+              title: 'An order needs funds',
+              body: `${req.user.email || 'A team member'} tried to submit order ${req.params.id} but the wallet balance is too low.`,
+              href: '/wallet',
+              entityId: String(req.params.id),
+            });
+          }
+          reply.code(402); return paid;                          // 402 Payment Required
+        }
         _charged = paid.charged || 0;
       }
       if (want === 'cancelled' && !started) {
