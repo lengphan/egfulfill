@@ -44,7 +44,12 @@ egful.store {
 	# SECURITY: the static root is the whole repo dir, so secrets/source must be blocked
 	# from the web. Anything matching here is 404'd before file_server can serve it —
 	# .env, .git, server source, compose, package files, node_modules, etc.
-	@hidden path /.env* /.git /.git/* /.gitignore /.claude* /.dockerignore /server /server/* /node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/*
+	# NB this is an EXCLUSION list over the whole repo dir, so anything new at the root is
+	# public by default. /web (the Next.js app — served from Vercel, never from here) was
+	# missing: /web/lib/api.ts and /web/package.json were returning 200. Source disclosure
+	# on its own, but a web/.env.local (where Next.js keeps secrets, and which the
+	# root-only /.env* rule does NOT match) would have been readable too.
+	@hidden path /.env* /*/.env* /.git /.git/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/*
 	handle @hidden {
 		respond 404
 	}
