@@ -113,7 +113,13 @@ export function walletRoutes(app, requireAuth) {
   });
 
   // Append one ledger entry (idempotent by ref). Returns the new balance.
+  // STAFF ONLY. This writes an arbitrary delta straight into the ledger, and canAccess
+  // lets a non-staff caller pass for their OWN account — so any signed-in seller could
+  // POST {delta: 10000} and credit themselves. Nothing in the app calls this: real money
+  // moves through top-ups, refunds and transfers, which resolve their own accounts
+  // server-side. Locked to staff, where an arbitrary adjustment is a legitimate tool.
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const b = req.body || {};
     const account = b.account ? String(b.account) : req.user.sub;
     if (!canAccess(req.user, account)) { reply.code(403); return { error: 'forbidden' }; }
@@ -183,6 +189,13 @@ export function walletRoutes(app, requireAuth) {
     const b = req.body || {};
     const account = b.account ? String(b.account) : req.user.sub;
     if (!canAccess(req.user, account)) { reply.code(403); return { error: 'forbidden' }; }
+    // Moving money OUT is the account owner's call. A team member acts under the owner
+    // elsewhere, but spending and withdrawing are the leader's alone.
+    if (!isStaff(req.user)) {
+      const owner = await q("select owner_id from team_members where lower(email)=lower($1) and status='active' limit 1", [req.user.email || ''])
+        .then((r) => r.rows[0] && r.rows[0].owner_id).catch(() => null);
+      if (owner) { reply.code(403); return { error: 'Only the account owner can withdraw. Ask them to make the request.' }; }
+    }
     // Shared wallets (factory/designer) are staff-only.
     if ((account === 'factory' || account === 'designer') && !isStaff(req.user)) {
       reply.code(403); return { error: 'staff only' };

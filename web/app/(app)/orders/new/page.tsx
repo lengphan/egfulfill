@@ -317,7 +317,11 @@ export default function NewOrderPage() {
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => setLineImage(i, e.target.files?.[0])} />
               </label>
 
-              <div className="grid flex-1 grid-cols-[1fr_64px_88px_auto] items-end gap-3 sm:grid-cols-[1fr_72px_96px_100px_100px_auto]">
+              {/* The blank is the most important control on the line — it drives price,
+                  production and the stock barcode — so it gets the flexible column and
+                  everything else is sized to its content. Method was as wide as Product
+                  while holding one short word. */}
+              <div className="grid flex-1 grid-cols-[minmax(0,1fr)_60px_80px_auto] items-end gap-2.5 sm:grid-cols-[minmax(220px,1.6fr)_64px_84px_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_auto]">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-muted-foreground">Product</span>
                 <ProductCombobox
