@@ -879,6 +879,11 @@ export type DesignCard = {
   credited?: boolean // designer paid once on approval — guards against double-credit
   priority?: string | null
   is_emb?: boolean
+  /** Where the design work happens. null/absent = our own designers. A value means it's
+   *  OUTSOURCED to a partner (e.g. "pinkdesign") — our designers do embroidery, so DTG/DTF
+   *  goes out. Outsourced cards can't be claimed by a designer and never pay one. */
+  vendor?: string | null
+  vendor_ref?: string | null
   customer?: string | null
   [k: string]: unknown // preserve extra columns (specs/files/notes/…) on round-trip
 }

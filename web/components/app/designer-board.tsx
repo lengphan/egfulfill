@@ -25,6 +25,11 @@ const colOf = (c: DesignCard) => {
   const v = String(c.col || "incoming").toLowerCase()
   return COLS.some((x) => x.id === v) ? v : "incoming"
 }
+// Partner keys are storage values ("pinkdesign"); the board shows a human name. Unknown
+// vendors fall back to the raw key rather than hiding that the card is outsourced.
+const VENDOR_NAMES: Record<string, string> = { pinkdesign: "Pink Design" }
+const vendorLabel = (v?: string | null) => (v ? (VENDOR_NAMES[v] ?? v) : "")
+
 const amt = (v: unknown) => Number(v) || 0
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -170,6 +175,10 @@ export function DesignerBoard() {
                             <div className="flex size-full items-center justify-center text-muted-foreground/30"><PenNib size={26} weight="duotone" /></div>
                           )}
                           {c.is_emb && <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-indigo-600/90 px-1.5 py-0.5 text-[10px] font-medium text-white"><Needle size={9} weight="bold" /> EMB</span>}
+                          {/* Outsourced: whose queue this is actually in. Our designers do
+                              embroidery, so DTG/DTF is worked by a partner — showing it on
+                              the tile stops anyone reaching for a job that isn't theirs. */}
+                          {c.vendor && <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>}
                           {/* Cancel the card without opening it. Hover-revealed so a full
                               column isn't a grid of delete buttons, and it confirms —
                               removal is not undoable and these sit under a drag handle. */}
@@ -400,7 +409,16 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
 
         {/* Stage actions */}
         <div className="flex flex-wrap gap-2">
-          {col === "incoming" && <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>}
+          {col === "incoming" && (card.vendor ? (
+            // Not ours to take — the partner is working it. The server enforces this too
+            // (it preserves claimed_by/col for a designer), so this is the honest label
+            // rather than the guard.
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800">
+              Being designed by {vendorLabel(card.vendor)}
+            </span>
+          ) : (
+            <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>
+          ))}
           {col === "inprogress" && <Button size="sm" onClick={() => move("review")}><ArrowRight size={14} weight="bold" /> Send for review</Button>}
           {col === "review" && (
             <>
