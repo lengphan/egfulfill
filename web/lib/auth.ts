@@ -3,7 +3,7 @@
 const TOKEN_KEY = "eg_token"
 const USER_KEY = "eg_user"
 
-export type User = { id?: string; name?: string; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean; plan?: string; spydeck_addon?: boolean }
+export type User = { id?: string; name?: string; username?: string | null; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean; plan?: string; spydeck_addon?: boolean }
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null
