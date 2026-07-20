@@ -86,14 +86,26 @@ export function SubscriptionPanel() {
 
   // Price the pending change the same way the server does, so the confirm dialog can
   // state the real amount before anything is charged.
+  // Mirrors the SERVER's rule exactly (billing.js): price against the best tier this paid
+  // month already covers, not merely the tier in use. Dropping to Starter and back to Pro
+  // inside one paid month is $0 the second time — that month's Pro is already bought.
   const priceOf = (target: { plan?: PlanId; addon?: boolean }) => {
     const p = billing?.prices
     if (!p) return null
     const nextPlan = target.plan ?? (plan as PlanId)
     const nextAddon = target.addon ?? spydeckAddon
-    const planDelta = (p.plans[nextPlan] ?? 0) > (p.plans[plan] ?? 0) ? (p.plans[nextPlan] ?? 0) - (p.plans[plan] ?? 0) : 0
-    const addonDelta = nextAddon && !spydeckAddon ? p.spydeck_addon : 0
+    const paidPlan = billing?.paid_plan ?? plan
+    const baseline = (p.plans[paidPlan] ?? 0) >= (p.plans[plan] ?? 0) ? paidPlan : plan
+    const planDelta = (p.plans[nextPlan] ?? 0) > (p.plans[baseline] ?? 0) ? (p.plans[nextPlan] ?? 0) - (p.plans[baseline] ?? 0) : 0
+    const addonDelta = nextAddon && !(spydeckAddon || billing?.paid_addon) ? p.spydeck_addon : 0
     return planDelta + addonDelta
+  }
+  // True when the target tier is already covered by the running paid month, so the change
+  // costs nothing and the days already bought carry over.
+  const alreadyPaidFor = (target?: PlanId) => {
+    const p = billing?.prices
+    if (!p || !billing?.paid_plan || !target || daysLeft <= 0) return false
+    return (p.plans[target] ?? 0) <= (p.plans[billing.paid_plan] ?? 0)
   }
 
   const toggleRenew = async (on: boolean) => {
@@ -210,6 +222,19 @@ export function SubscriptionPanel() {
                 {usd(t.monthlyPrice)}
                 {t.monthlyPrice > 0 && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
               </div>
+              {/* What choosing THIS plan means for the month already paid for: how many
+                  days are left, and whether picking it costs anything right now. */}
+              {mounted && daysLeft > 0 && billing?.renews_at && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {isCurrent ? (
+                    <>{daysLeft} day{daysLeft === 1 ? "" : "s"} left · renews {fmtDate(billing.renews_at)}</>
+                  ) : alreadyPaidFor(t.id as PlanId) ? (
+                    <span className="font-medium text-emerald-600">$0 now — paid through {fmtDate(billing.renews_at)}</span>
+                  ) : (priceOf({ plan: t.id as PlanId }) ?? 0) > 0 ? (
+                    <>{usd(priceOf({ plan: t.id as PlanId }) ?? 0)} now for the {daysLeft} day{daysLeft === 1 ? "" : "s"} left</>
+                  ) : null}
+                </div>
+              )}
               <ul className="mt-4 flex-1 space-y-2">
                 {t.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -314,9 +339,22 @@ export function SubscriptionPanel() {
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
               <div className="font-medium">You&apos;ve already paid through {fmtDate(billing.renews_at)}.</div>
               <p className="mt-1">
-                That&apos;s {daysLeft} day{daysLeft === 1 ? "" : "s"} of {currentTier?.shortName ?? "your current plan"}{" left."}
-                Switching now ends it immediately and those days aren&apos;t refunded — to keep them, turn off
-                auto-renew instead and you&apos;ll drop to {pendingTier?.shortName ?? "the new plan"} on {fmtDate(billing.renews_at)}.
+                That&apos;s {daysLeft} day{daysLeft === 1 ? "" : "s"} of {currentTier?.shortName ?? "your current plan"} left.{" "}
+                Switching drops you to {pendingTier?.shortName ?? "the new plan"} now and the month isn&apos;t refunded — but
+                it stays yours: switch back before {fmtDate(billing.renews_at)} and there&apos;s no new charge. To keep the
+                {" "}{currentTier?.shortName ?? "current"} features until then, turn off auto-renew instead.
+              </p>
+            </div>
+          )}
+
+          {/* Returning to a tier this paid month already covers — no second charge. */}
+          {!isDowngrade && pending?.plan && alreadyPaidFor(pending.plan) && (priceOf(pending) ?? 0) === 0 && billing?.renews_at && (
+            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <div className="font-medium">Already paid — nothing to charge.</div>
+              <p className="mt-1">
+                Your {pendingTier?.shortName ?? "plan"} month runs through {fmtDate(billing.renews_at)}
+                {daysLeft > 0 ? ` — ${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : ""}. Switching back now costs $0,
+                and renewal continues as normal.
               </p>
             </div>
           )}

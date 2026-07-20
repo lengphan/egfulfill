@@ -1167,6 +1167,11 @@ export type BillingPlan = {
   renews_at: string | null
   auto_renew: boolean
   past_due_since: string | null
+  // What the CURRENT paid month covers (null once it lapses) — the high-water tier bought
+  // before renews_at. Lets the client price a change exactly as the server does: returning
+  // to a tier this month already paid for costs $0.
+  paid_plan: string | null
+  paid_addon: boolean
   grace_days: number
   balance: number
   prices: { plans: Record<string, number>; spydeck_addon: number }

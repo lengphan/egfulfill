@@ -89,6 +89,12 @@ export function billingRoutes(app, requireAuth) {
   q('alter table users add column if not exists plan_renews_at timestamptz').catch(() => {});
   q('alter table users add column if not exists plan_auto_renew boolean not null default true').catch(() => {});
   q('alter table users add column if not exists plan_past_due_since timestamptz').catch(() => {});
+  // What the CURRENT paid period actually covers — the highest tier/addon paid for before
+  // plan_renews_at. Distinct from `plan` (what they're using right now): downgrading
+  // mid-month drops the tier they use but does NOT un-pay the month. Without this, going
+  // Pro → Starter → Pro inside one paid month charged for Pro twice.
+  q('alter table users add column if not exists plan_paid_plan text').catch(() => {});
+  q('alter table users add column if not exists plan_paid_addon boolean not null default false').catch(() => {});
 
   // Hourly sweep. Same single-instance pattern as the Etsy auto-sync: a globalThis guard
   // so a hot reload can't stack timers, and unref() so it never holds the process open.
@@ -102,14 +108,19 @@ export function billingRoutes(app, requireAuth) {
   // What the seller is on now + what things cost. Prices come from here, not the client,
   // so the confirm dialog can show the true amount.
   app.get('/api/billing/plan', { preHandler: requireAuth }, async (req) => {
-    const r = await q('select plan, spydeck_addon, plan_renews_at, plan_auto_renew, plan_past_due_since from users where id=$1', [req.user.sub]);
+    const r = await q('select plan, spydeck_addon, plan_renews_at, plan_auto_renew, plan_past_due_since, plan_paid_plan, plan_paid_addon from users where id=$1', [req.user.sub]);
     const u = r.rows[0] || {};
+    const active = u.plan_renews_at ? new Date(u.plan_renews_at).getTime() > Date.now() : false;
     return {
       plan: u.plan || 'starter',
       spydeck_addon: u.spydeck_addon === true,
       renews_at: u.plan_renews_at || null,
       auto_renew: u.plan_auto_renew !== false,
       past_due_since: u.plan_past_due_since || null,
+      // What THIS paid month already covers, so the client can price a change the same
+      // way the server does (and show $0 for a tier that's already bought).
+      paid_plan: active ? (u.plan_paid_plan || u.plan || 'starter') : null,
+      paid_addon: active ? u.plan_paid_addon === true : false,
       grace_days: GRACE_DAYS,
       balance: await balanceOf(req.user.sub),
       prices: { plans: PLAN_PRICES, spydeck_addon: SPYDECK_ADDON_PRICE },
@@ -133,9 +144,14 @@ export function billingRoutes(app, requireAuth) {
     // Staff don't carry seller plans — they bypass the paywall by role.
     if (req.user.role && req.user.role !== 'seller') { reply.code(400); return { error: 'Staff accounts do not have a subscription plan.' }; }
 
-    const cur = (await q('select plan, spydeck_addon from users where id=$1', [req.user.sub])).rows[0] || {};
+    const cur = (await q('select plan, spydeck_addon, plan_renews_at, plan_paid_plan, plan_paid_addon from users where id=$1', [req.user.sub])).rows[0] || {};
     const curPlan = cur.plan || 'starter';
     const curAddon = cur.spydeck_addon === true;
+    // Is the month they already paid for still running?
+    const periodEnd = cur.plan_renews_at ? new Date(cur.plan_renews_at).getTime() : 0;
+    const activePeriod = periodEnd > Date.now();
+    const paidPlan = activePeriod ? (cur.plan_paid_plan || curPlan) : curPlan;
+    const paidAddon = activePeriod ? cur.plan_paid_addon === true : false;
 
     const plan = b.plan != null ? String(b.plan) : curPlan;
     if (!PLANS.includes(plan)) { reply.code(400); return { error: 'Invalid plan' }; }
@@ -144,10 +160,13 @@ export function billingRoutes(app, requireAuth) {
     }
     const addon = typeof b.spydeckAddon === 'boolean' ? b.spydeckAddon : curAddon;
 
-    // Charge only what's being ADDED this month. A downgrade or a removal costs nothing
-    // now (and isn't refunded — it simply stops billing next cycle).
-    const planCharge = PLAN_PRICES[plan] > PLAN_PRICES[curPlan] ? PLAN_PRICES[plan] - PLAN_PRICES[curPlan] : 0;
-    const addonCharge = addon && !curAddon ? SPYDECK_ADDON_PRICE : 0;
+    // Charge only what's being ADDED this month, measured against the BEST tier this
+    // period has already been paid for — not merely the tier in use. So Pro → Starter →
+    // Pro inside one paid month is free the second time: that month's Pro is bought.
+    // Upgrading past what's paid for still charges the difference.
+    const baseline = PLAN_PRICES[paidPlan] >= PLAN_PRICES[curPlan] ? paidPlan : curPlan;
+    const planCharge = PLAN_PRICES[plan] > PLAN_PRICES[baseline] ? PLAN_PRICES[plan] - PLAN_PRICES[baseline] : 0;
+    const addonCharge = addon && !(curAddon || paidAddon) ? SPYDECK_ADDON_PRICE : 0;
     const amount = planCharge + addonCharge;
 
     const method = String(b.method || 'wallet');
@@ -179,11 +198,22 @@ export function billingRoutes(app, requireAuth) {
       });
     }
 
-    const renews = plan === 'starter' && !addon ? null : monthFromNow();
+    // Keep the existing paid-through date while that month is still running — changing
+    // tier mid-period must NOT silently buy another month (an upgrade pays the delta for
+    // the remainder, a downgrade keeps the days already bought). Only start a fresh month
+    // when there's no live period. Nothing paid and nothing to run out ⇒ no renewal date.
+    const renews = activePeriod
+      ? new Date(periodEnd)
+      : (plan === 'starter' && !addon ? null : monthFromNow());
+    // What this period covers is the HIGH-WATER mark: dropping to Starter for a week
+    // doesn't refund the month, so coming back to Pro within it is already paid for.
+    const nextPaidPlan = PLAN_PRICES[plan] >= PLAN_PRICES[paidPlan] ? plan : paidPlan;
+    const nextPaidAddon = addon || paidAddon;
     // Paying for a plan re-arms renewal and clears any past-due state — otherwise someone
     // who had lapsed would pay and then silently lapse again next month.
-    await q('update users set plan=$1, spydeck_addon=$2, plan_renews_at=$3, plan_auto_renew=true, plan_past_due_since=null where id=$4',
-      [plan, addon, renews, req.user.sub]);
+    await q(`update users set plan=$1, spydeck_addon=$2, plan_renews_at=$3, plan_auto_renew=true,
+             plan_past_due_since=null, plan_paid_plan=$4, plan_paid_addon=$5 where id=$6`,
+      [plan, addon, renews, renews ? nextPaidPlan : null, renews ? nextPaidAddon : false, req.user.sub]);
 
     audit(req, 'billing.subscribe', {
       entityType: 'user', entityId: req.user.sub,
