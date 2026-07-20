@@ -58,7 +58,9 @@ export function CampaignsView() {
   }
 
   const connected = conns.length > 0
-  const anyEnabled = !!(cfg?.meta.enabled || cfg?.google.enabled)
+  // Optional-chain the NESTED keys too: `cfg?.meta.enabled` only guards cfg, so a config
+  // response without a `meta` block took the whole page down.
+  const anyEnabled = !!(cfg?.meta?.enabled || cfg?.google?.enabled)
 
   return (
     <div className="space-y-4">
@@ -103,8 +105,8 @@ export function CampaignsView() {
           <div className="space-y-3 p-5 text-sm">
             <p className="text-muted-foreground">Keys are set. Connect an ad account to pull its campaigns.</p>
             <div className="flex flex-wrap gap-2">
-              {cfg?.meta.enabled && <Button size="sm" variant="outline" disabled title="Meta OAuth — connect from Settings once App Review is granted">Connect Meta</Button>}
-              {cfg?.google.enabled && <Button size="sm" variant="outline" disabled title="Google OAuth — connect once your developer token is approved">Connect Google Ads</Button>}
+              {cfg?.meta?.enabled && <Button size="sm" variant="outline" disabled title="Meta OAuth — connect from Settings once App Review is granted">Connect Meta</Button>}
+              {cfg?.google?.enabled && <Button size="sm" variant="outline" disabled title="Google OAuth — connect once your developer token is approved">Connect Google Ads</Button>}
             </div>
             <p className="text-xs text-muted-foreground">Connect buttons activate once the provider approvals land — the OAuth exchange is wired and waiting.</p>
           </div>
@@ -215,7 +217,7 @@ function NewCampaignDialog({ open, onOpenChange, cfg, onCreated }: { open: boole
         <div className="space-y-3">
           <div className="flex rounded-lg border border-border p-0.5">
             {(["meta", "google"] as const).map((c) => (
-              <button key={c} onClick={() => setChannel(c)} disabled={c === "meta" ? !cfg?.meta.enabled : !cfg?.google.enabled}
+              <button key={c} onClick={() => setChannel(c)} disabled={c === "meta" ? !cfg?.meta?.enabled : !cfg?.google?.enabled}
                 className={"flex-1 rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:opacity-40 " + (channel === c ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
                 {CHANNEL[c].label}
               </button>
