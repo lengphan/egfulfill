@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -79,8 +79,14 @@ export function DesignerBoard() {
     // Credit on approval — use the card's payout, or the platform Design fee as the default.
     const amount = amt(card.payment) || designFee
     if (to === "approved" && !card.credited && amount > 0) {
-      walletTransfer({ fromAccount: "factory", toAccount: "designer", amount, ref: `DSN-${card.id}`, type: "design-pay", note: `Design payout · ${card.title || card.id}` })
-        .then((r) => { if (!r.error) patch(card.id, { credited: true, pay_status: "paid", payment: amount }) })
+      // The SERVER decides who gets paid: only a designer earns a payout (staff upload
+      // files too, and that isn't billable design work), and on a shared board the credit
+      // follows whoever claimed the card rather than a common pool.
+      creditDesignCard(card.id, amount)
+        .then((r) => {
+          if (r?.error) return
+          if (r?.credited) patch(card.id, { credited: true, pay_status: "paid", payment: amount })
+        })
         .catch(() => {})
     }
   }, [patch, designFee])

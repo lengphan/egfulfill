@@ -807,6 +807,13 @@ export type DesignCard = {
 export function getDesignCards() {
   return api<DesignCard[]>(`/api/design_cards`)
 }
+/** Credit the designer who claimed a card. The SERVER decides who (and whether) —
+ *  staff uploads aren't billable, and a shared board pays the claimer, not a pool. */
+export function creditDesignCard(id: string | number, amount: number) {
+  return api<{ ok?: boolean; credited?: boolean; account?: string; reason?: string; error?: string }>(
+    `/api/design_cards/${encodeURIComponent(String(id))}/credit`,
+    { method: "POST", body: JSON.stringify({ amount }) })
+}
 export function saveDesignCards(cards: DesignCard[]) {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/design_cards`, { method: "POST", body: JSON.stringify(cards) })
 }
