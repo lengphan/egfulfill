@@ -135,14 +135,12 @@ export function DesignStage({
   )
 
   return (
-    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square select-none overflow-hidden rounded-xl border border-border bg-muted " + (className ?? "w-full")}>
-      {/* Studio backdrop, on THEME tokens rather than the hardcoded beige it used to be.
-          A white garment no longer needs a warm bed to read against — the drop-shadow
-          under the mockup does that job — so the bed can just be `bg-muted` and match
-          every other surface. The dot texture is gone; only the graph-paper ruling stays,
-          as the technical-flat cue. Both layers sit behind the mockup, pointer-transparent. */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.55),transparent_62%)] dark:bg-[radial-gradient(circle_at_50%_36%,rgba(255,255,255,0.06),transparent_62%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.45] bg-[linear-gradient(to_right,rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.05)_1px,transparent_1px)] [background-size:32px_32px] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)]" />
+    // The stage is TRANSPARENT. The grid used to be painted here, so it stopped where the
+    // square stopped and left bare panel around it — the thing that kept looking wrong.
+    // The backdrop now belongs to the surrounding panel (see .eg-studio-bed), which fills
+    // the whole column, while this element stays square purely so the design's %-coords
+    // and the print zone keep a stable frame to measure against.
+    <div ref={stageRef} onPointerDown={() => onSelect?.(null)} style={{ containerType: "size" }} className={"relative aspect-square select-none " + (className ?? "w-full")}>
 
       {mockup ? (
         // p-[6%] lets the garment fill more of the bed than a raw object-contain, which

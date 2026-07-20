@@ -238,7 +238,7 @@ export function DesignMaker() {
         </aside>
 
         {/* Center: canvas */}
-        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-2xl border border-border bg-muted/20 p-4">
+        <div className="eg-studio-bed flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-border p-4">
           {/* The stage is a SQUARE, so it has to be bounded by both dimensions. Sized to
               full width alone, its height matched that width and the mockup ran off the
               top and bottom of the panel — the cap was cut off by the frame. Capping the
