@@ -47,8 +47,13 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
          JSON.stringify(c.history || []), JSON.stringify(c.checklist || [])]
       );
     }
-    const ids = rows.map((c) => c.id).filter((x) => x != null);
-    if (ids.length) await q('delete from design_cards where id <> all($1)', [ids]);
+    // Cast explicitly. design_cards.id is bigint, but node-pg returns bigint as a STRING,
+    // so a client round-trip sends string ids back — Postgres then infers text[] and
+    // `bigint <> text[]` throws. The upserts had already succeeded, so a deleted card
+    // silently reappeared on the next load: the delete was the only part that failed, and
+    // the client swallowed the error.
+    const ids = rows.map((c) => String(c.id)).filter((x) => x && x !== 'null');
+    if (ids.length) await q('delete from design_cards where id <> all($1::bigint[])', [ids]);
     return { ok: true, count: rows.length };
   });
 
