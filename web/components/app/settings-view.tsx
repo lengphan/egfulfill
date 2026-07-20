@@ -393,9 +393,25 @@ function ApiKeysPanel() {
 // ─────────────────────────── Team ───────────────────────────
 /** Surfaces an owner can share with a member. Deliberately short — each one hands over
  *  something private, so the list should stay a decision rather than a checklist. */
+// Everything a team leader can hand to a member, mirroring the seller sidebar so the
+// toggles read as "which of my pages does this person get". Ids are the surface keys the
+// server checks (orders/wallet/files are enforced in the API too — see canSurface below;
+// the rest gate the nav + pages).
+//
+// Settings is deliberately NOT shareable: it's where team permissions and billing live,
+// so sharing it would let a member grant themselves everything. Help is always open.
 const SHAREABLE = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "orders", label: "Orders" },
+  { id: "products", label: "Products" },
+  { id: "stores", label: "Stores" },
+  { id: "spydeck", label: "SpyDeck" },
+  { id: "reports", label: "Reports" },
   { id: "wallet", label: "Wallet" },
+  { id: "design", label: "Design Lab" },
   { id: "files", label: "Design files" },
+  { id: "chat", label: "Chat" },
+  { id: "developers", label: "Developers" },
 ]
 
 const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -433,9 +449,16 @@ function TeamPanel() {
     }
   }
 
+  // Optimistic: the pill flips instantly, and only reloads from the server if the write
+  // failed — a toggle that lags behind the click feels broken.
   const onPerms = async (id: TeamMember["id"], permissions: string[]) => {
     setMembers((prev) => (prev ?? []).map((m) => (m.id === id ? { ...m, permissions } : m)))
-    try { await updateTeamMember(id, { permissions }) } catch { load() }
+    try {
+      await updateTeamMember(id, { permissions })
+      // Tell any open session (incl. the member's own tab) to re-read its access so the
+      // sidebar reflects the change without a reload.
+      window.dispatchEvent(new CustomEvent("eg-perms-changed"))
+    } catch { load() }
   }
 
   const onRemove = async (id: TeamMember["id"]) => {
@@ -496,30 +519,36 @@ function TeamPanel() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {/* What this member may SEE. Both are off by default — the wallet and paid
-                    design files are the owner's, and a teammate added to help with orders
-                    shouldn't inherit the money by accident. Seeing is not spending:
-                    buying and withdrawing stay the owner's regardless of these. */}
-                {SHAREABLE.map((s) => {
-                  const perms = Array.isArray(m.permissions) ? m.permissions : []
-                  const on = perms.includes(s.id)
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => onPerms(m.id, on ? perms.filter((x) => x !== s.id) : [...perms, s.id])}
-                      title={on ? `${s.label} shared — click to hide` : `${s.label} hidden — click to share`}
-                      className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " +
-                        (on ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground hover:text-foreground")}
-                    >
-                      {on ? "Sharing" : "Hidden"} · {s.label}
-                    </button>
-                  )
-                })}
+              <div className="flex items-start gap-2">
+                {/* Every surface, off by default — a teammate added to help with orders
+                    shouldn't inherit the wallet or paid design files by accident. On =
+                    filled, off = plain; the label alone says which page, and the colour
+                    says whether they get it. Seeing is not spending: buying and
+                    withdrawing stay the owner's regardless of these. */}
+                <div className="flex flex-wrap justify-end gap-1.5">
+                  {SHAREABLE.map((s) => {
+                    const perms = Array.isArray(m.permissions) ? m.permissions : []
+                    const on = perms.includes(s.id)
+                    return (
+                      <button
+                        key={s.id}
+                        aria-pressed={on}
+                        onClick={() => onPerms(m.id, on ? perms.filter((x) => x !== s.id) : [...perms, s.id])}
+                        title={on ? `${s.label} — shared, click to stop sharing` : `${s.label} — not shared, click to share`}
+                        className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " +
+                          (on
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                            : "bg-muted text-muted-foreground hover:bg-accent hover:text-foreground")}
+                      >
+                        {s.label}
+                      </button>
+                    )
+                  })}
+                </div>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-muted-foreground hover:text-red-600"
+                  className="shrink-0 text-muted-foreground hover:text-red-600"
                   onClick={() => onRemove(m.id)}
                 >
                   <Trash size={14} weight="bold" /> Remove

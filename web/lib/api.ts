@@ -1158,6 +1158,14 @@ export function removeMember(id: number | string) {
   return api<{ ok: boolean }>(`/api/team/members/${encodeURIComponent(String(id))}`, { method: "DELETE" })
 }
 
+// Am I someone's team MEMBER, and which surfaces did they share with me? `member:false`
+// means I'm an owner (my own account) and see everything. Drives the seller sidebar so a
+// member only sees the pages their leader turned on.
+export type MyAccess = { member: boolean; ownerId?: string; role?: string; ownerName?: string; permissions: string[] | null }
+export function getMyAccess() {
+  return api<MyAccess>(`/api/team/my-access`)
+}
+
 // ── Subscription billing ──────────────────────────────────────────────────────
 // Plans are server truth (users.plan). Prices come from the server too — the client
 // copy in lib/plans.ts is for display only, so a caller can never set its own price.

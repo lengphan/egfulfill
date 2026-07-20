@@ -5,9 +5,10 @@ import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { SignOut, LockSimple } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
-import { sellerNav } from "@/lib/nav"
+import { sellerNav, allowedByPerms } from "@/lib/nav"
 import { hasSpydeck } from "@/lib/plans"
-import { clearSession } from "@/lib/auth"
+import { getMyAccess } from "@/lib/api"
+import { clearSession, getToken } from "@/lib/auth"
 import { MobileNav, type MobileNavSection } from "@/components/app/mobile-nav"
 
 export function Sidebar() {
@@ -30,7 +31,30 @@ export function Sidebar() {
     }
   }, [])
 
-  const mobileSections: MobileNavSection[] = sellerNav.map((s) => ({
+  // Team permissions: if I'm someone's member, show only the surfaces they shared. An
+  // owner gets null → everything. Until it resolves we render the full nav (an owner is
+  // the common case, and hiding then re-showing would flash).
+  const [perms, setPerms] = useState<string[] | null>(null)
+  useEffect(() => {
+    let live = true
+    const sync = () => {
+      if (!getToken()) return
+      getMyAccess()
+        .then((a) => { if (live) setPerms(a.member ? (a.permissions ?? []) : null) })
+        .catch(() => {})
+    }
+    const id = setTimeout(sync, 0)
+    // A leader toggling a surface fires this so an open member session updates.
+    window.addEventListener("eg-perms-changed", sync)
+    return () => { live = false; clearTimeout(id); window.removeEventListener("eg-perms-changed", sync) }
+  }, [])
+
+  // One filtered copy of the nav, used by both the desktop rail and the mobile sheet.
+  const sections = sellerNav
+    .map((s) => ({ ...s, items: s.items.filter((it) => allowedByPerms(it.href, perms)) }))
+    .filter((s) => s.items.length > 0)
+
+  const mobileSections: MobileNavSection[] = sections.map((s) => ({
     heading: s.heading,
     items: s.items.map((it) => ({ label: it.label, href: it.href, icon: it.icon, locked: it.gate === "spydeck" && !spydeck })),
   }))
@@ -47,7 +71,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-3">
-        {sellerNav.map((section, i) => (
+        {sections.map((section, i) => (
           <div key={i} className="mb-1">
             {section.heading && (
               <div className="px-3 pb-2 pt-5 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">

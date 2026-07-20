@@ -42,6 +42,30 @@ export const sellerNav: NavSection[] = [
   },
 ]
 
+// href → the team-permission surface id a leader toggles in Settings › Team. Pages absent
+// from this map are always available (Help, Settings — Settings deliberately, since it's
+// where permissions are granted). Keep in step with SHAREABLE in settings-view.tsx.
+const SURFACE_BY_HREF: Record<string, string> = {
+  "/dashboard": "dashboard", "/orders": "orders", "/products": "products",
+  "/stores": "stores", "/spydeck": "spydeck", "/reports": "reports",
+  "/wallet": "wallet", "/design": "design", "/chat": "chat", "/developers": "developers",
+}
+
+/** Surface id gating this path, or null when the page is always available. */
+export function surfaceOf(href: string): string | null {
+  return SURFACE_BY_HREF[href] ?? null
+}
+
+/**
+ * Is this nav item visible to me? An OWNER (not a team member) sees everything —
+ * `permissions` is null. A member sees only the surfaces their leader turned on.
+ */
+export function allowedByPerms(href: string, permissions: string[] | null): boolean {
+  if (!permissions) return true
+  const surface = surfaceOf(href)
+  return surface === null || permissions.includes(surface)
+}
+
 /** Flat lookup of href → label, for page titles / breadcrumbs. */
 export const navTitle = (pathname: string): string => {
   for (const section of sellerNav) {
