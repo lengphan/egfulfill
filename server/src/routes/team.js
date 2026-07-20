@@ -85,15 +85,35 @@ export function teamRoutes(app, requireAuth) {
 
   // Pending invites addressed to the signed-in user (so a member sees "you've been
   // invited to X's team" in their own Settings → Team, even without email delivery).
-  app.get('/api/team/my-invites', { preHandler: requireAuth }, async (req) => {
+  app.get('/api/team/my-invites', { preHandler: requireAuth }, async (req, reply) => {
+    // Resolve the identity from the DATABASE, not the JWT.
+    //
+    // The token is signed for 7 days and carries whatever email the account had when it
+    // was minted, so a stale token silently matches nothing and the invite panel renders
+    // empty — identical to having no invites. The user id in `sub` is the stable fact;
+    // read the current email from it and keep the token's copy only as a fallback.
+    let email = '';
+    try {
+      const me = await q('select email from users where id=$1', [req.user.sub]);
+      email = (me.rows[0] && me.rows[0].email) || '';
+    } catch (e) { /* fall through to the token's copy */ }
+    if (!email) email = req.user.email || '';
+
     try {
       const r = await q(
         `select t.id, t.invite_token, t.role, t.permissions, t.owner_id, t.invited_at,
                 coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
            from team_members t left join users u on u.id = t.owner_id
-          where lower(t.email)=lower($1) and t.status='invited' order by t.invited_at desc`, [req.user.email || '']);
+          where (lower(t.email)=lower($1) or t.user_id=$2) and t.status='invited'
+          order by t.invited_at desc`, [email, req.user.sub]);
       return r.rows;
-    } catch (e) { return []; }
+    } catch (e) {
+      // Returning [] on failure disguised a broken query as "you have no invites",
+      // which is exactly how a working invite looked like a missing feature.
+      req.log.error({ err: e }, 'my-invites query failed');
+      reply.code(500);
+      return { error: 'Could not read your invites: ' + e.message };
+    }
   });
 
   // ── Owner management — the caller is always the owner of the rows they touch ─
