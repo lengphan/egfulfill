@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
+import { useSearchParams } from "next/navigation"
+import { Storefront, UploadSimple, FolderOpen, TextT, Trash, Image as ImageIcon, CircleNotch, Export, FloppyDisk, Stack } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } from "@/components/app/design-canvas"
@@ -12,6 +12,7 @@ import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getP
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
 import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
+import { DesignLabTabs } from "@/components/app/design-lab-tabs"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
 // when the product has no imagery of its own — that outline exists precisely so a new
@@ -66,7 +67,6 @@ function composeDesign(designUrl: string, pos: Pos, texts: TextLayer[], size = 9
 const rid = () => "t" + Math.random().toString(36).slice(2, 8)
 
 export function DesignMaker() {
-  const router = useRouter()
   const search = useSearchParams()
   const productParam = search.get("product")
   const templateParam = search.get("template")
@@ -215,8 +215,7 @@ export function DesignMaker() {
   return (
     <div className="flex h-[calc(100svh-7rem)] flex-col gap-3">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push("/design")} className="text-muted-foreground"><ArrowLeft size={16} weight="bold" /> Design Lab</Button>
-        <h1 className="font-display text-xl font-semibold tracking-tight">Design maker</h1>
+        <DesignLabTabs />
         {msg && <span className={"ml-2 text-sm " + (msg.tone === "ok" ? "text-emerald-600" : "text-destructive")}>{msg.text}</span>}
       </div>
 
