@@ -34,6 +34,11 @@ const NEXT = "working"
 
 export function DispatchBoard() {
   const role = getUser()?.role || ""
+  // Operator sees the queue but changes nothing. Dispatch stages belong to admin and
+  // warehouse — an operator needs to know what's going out today without being able to
+  // claim it went. canSetStage already refuses their writes; this makes the UI say so
+  // instead of showing controls that would silently fail.
+  const viewOnly = role === "operator"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -164,18 +169,26 @@ export function DispatchBoard() {
 
       <SectionCard
         title="Dispatch"
-        description="Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
+        description={viewOnly
+          ? "Labelled and waiting to be scanned — view only; warehouse and admin scan the batch out."
+          : "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" disabled={!chosen.length} onClick={printManifest}>
               <ListChecks size={14} weight="bold" /> Print manifest
             </Button>
-            <Button size="sm" variant="outline" disabled={!chosenWithLabel.length} onClick={openLabels}>
-              <Printer size={14} weight="bold" /> Open labels
-            </Button>
+            {/* Opening labels STAMPS them as printed, so it's a write — not available
+                view-only. The manifest is a pure read and stays. */}
+            {!viewOnly && (
+              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length} onClick={openLabels}>
+                <Printer size={14} weight="bold" /> Open labels
+              </Button>
+            )}
+            {!viewOnly && (
             <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
               {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark scanned</>}
             </Button>
+            )}
           </div>
         }
       >
