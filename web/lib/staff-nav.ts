@@ -11,8 +11,10 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Earnings", href: "/earnings", icon: CurrencyDollar, roles: ["designer"] },
   // Dispatch = orders leaving the building (batch, print, scan out). Distinct from Scan,
   // which is the stock-in/out station for inventory.
-  { label: "Dispatch", href: "/dispatch", icon: Truck, roles: ["warehouse", "admin"] },
-  { label: "Scan", href: "/scan", icon: Barcode, roles: ["warehouse", "admin"] },
+  { label: "Dispatch", href: "/dispatch", icon: Truck, roles: ["operator", "warehouse", "admin"] },
+  // Operator sees Scan READ-ONLY: stock movements are the warehouse's claim about
+  // physical custody, but an operator needs to look up what's on hand.
+  { label: "Scan", href: "/scan", icon: Barcode, roles: ["operator", "warehouse", "admin"] },
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },

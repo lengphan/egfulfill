@@ -6,7 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getInventory, scanInventory, undoScan, type InventoryItem } from "@/lib/api"
-import { getToken } from "@/lib/auth"
+import { getToken, getUser } from "@/lib/auth"
 import { parseScan, exactSkuReady, scanBeep, buzz, cameraSupported, startCameraScan, releaseCamera } from "@/lib/barcode-scan"
 
 type Entry = { key: string; sku: string; qty: number; dir: "in" | "out"; ok: boolean; label: string; sub: string; scanId?: string }
@@ -18,6 +18,14 @@ const timeNow = () => new Date().toLocaleTimeString("en-US", { hour: "numeric", 
 // A gun is just a keyboard: it types the SKU then Enter. So the input stays focused
 // and refocuses on blur, and an exact SKU match auto-commits — no clicking, ever.
 export function ScanStation() {
+  // Operator gets a READ-ONLY station: they need to look up what's on hand, but moving
+  // stock is a claim about physical custody that belongs to the warehouse. Enforced here
+  // AND by leaving the commit path unreachable, not just by hiding the input.
+  const [readOnly, setReadOnly] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setReadOnly(getUser()?.role === "operator"), 0)
+    return () => clearTimeout(t)
+  }, [])
   const [items, setItems] = useState<InventoryItem[] | null>(null)
   const [mode, setMode] = useState<"in" | "out">("in")
   const [value, setValue] = useState("")
@@ -58,6 +66,7 @@ export function ScanStation() {
 
   // Commit one scan as an atomic server-side delta.
   const doCommit = useCallback(async (raw: string, dir: "in" | "out") => {
+    if (readOnly) return
     const { sku, qty } = parseScan(raw)
     if (!sku) return
     busyRef.current = true
@@ -86,7 +95,7 @@ export function ScanStation() {
       setBusy(false)
       inputRef.current?.focus()
     }
-  }, [])
+  }, [readOnly])
 
   // Serialize scans through a promise chain instead of dropping the ones that
   // land mid-request. A gun fired down a pallet can easily out-run a 300ms POST,
@@ -173,19 +182,28 @@ export function ScanStation() {
       </div>
 
       <SectionCard
-        title={isIn ? "Scanning IN — adds to stock" : "Scanning OUT — removes from stock"}
+        title={readOnly ? "Stock levels — view only" : isIn ? "Scanning IN — adds to stock" : "Scanning OUT — removes from stock"}
         actions={hasCam ? (
           <Button size="sm" variant="outline" onClick={() => setCamOpen(true)}><Camera size={14} weight="bold" /> Camera</Button>
         ) : undefined}
       >
         <div className="space-y-3 p-5">
+          {/* Say WHY rather than presenting a box that does nothing. A disabled input with
+              no explanation reads as broken. */}
+          {readOnly && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+              You can look up stock here, but moving it is the warehouse&apos;s call — scanning in and out
+              records physical custody.
+            </div>
+          )}
           <Input
             ref={inputRef}
+            disabled={readOnly}
             value={value}
-            autoFocus
+            autoFocus={!readOnly}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { if (autoRef.current) clearTimeout(autoRef.current); commit(value, mode) } }}
-            onBlur={() => { if (!camOpen) setTimeout(() => inputRef.current?.focus(), 0) }}
+            onBlur={() => { if (!camOpen && !readOnly) setTimeout(() => inputRef.current?.focus(), 0) }}
             placeholder="Scan or type a SKU…  (try SKU x5 for qty)"
             spellCheck={false}
             autoComplete="off"

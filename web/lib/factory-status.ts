@@ -115,6 +115,11 @@ export function canSetStage(role: string, current: string | null | undefined, ta
   if (role === "operator") {
     if (MONEY_STAGES.has(to) || to === "backorder") return false
     if (OP_STOPS.has(to)) return true
+    // The scan hand-off itself. An operator works Dispatch, so they must be able to
+    // complete the step they're standing at — awaiting_scan → working is the act of
+    // scanning a batch out. Everything BEYOND that (working → shipped) stays closed:
+    // shipping is a claim about physical custody the operator doesn't have.
+    if (at === "awaiting_scan" && to === "working") return true
     return OP_ZONE.has(at) && OP_ZONE.has(to)
   }
   return false

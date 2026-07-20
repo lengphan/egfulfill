@@ -28,16 +28,19 @@ function AdminTopups() {
   // Warehouse shares the factory wallet and sees the same ledger. APPROVING a top-up
   // stays admin-only though: that's confirming money arrived by bank transfer, which is
   // a higher-trust act than reading the balance.
-  const isAdmin = getUser()?.role === "admin"
+  // Admin and warehouse share the factory wallet, and the server already lets ANY staff
+  // confirm or reject (topups.js gates on isStaff) — so the admin-only check here was the
+  // outlier, hiding a panel from someone the API would happily have served.
+  const canReview = ["admin", "warehouse"].includes(getUser()?.role ?? "")
   const [topups, setTopups] = useState<TopupRequest[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const load = useCallback(() => { if (isAdmin) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [isAdmin])
+  const load = useCallback(() => { if (canReview) getTopups("pending").then((r) => setTopups(r ?? [])).catch(() => setTopups([])) }, [canReview])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
   const review = async (t: TopupRequest, action: "confirm" | "reject") => {
     setBusy(t.id); setTopups((prev) => (prev ?? []).filter((x) => x.id !== t.id))
     try { await (action === "confirm" ? confirmTopup(t.id) : rejectTopup(t.id)) } catch { load() } finally { setBusy(null) }
   }
-  if (!isAdmin || topups === null || topups.length === 0) return null
+  if (!canReview || topups === null || topups.length === 0) return null
   return (
     <SectionCard title={`Pending top-ups (${topups.length})`} description="Confirm to credit the seller's wallet; reject leaves it untouched">
       <div className="divide-y divide-border">
