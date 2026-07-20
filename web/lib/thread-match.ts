@@ -235,7 +235,10 @@ export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor
 // output would be duplicating it.
 
 export type ThreadRegion = {
+  /** The nearest cone — a suggestion, not a verdict. */
   thread: Thread
+  /** Other close cones, nearest-first, for the picker. Always includes `thread`. */
+  options: Thread[]
   /** The artwork colour that matched, not the cone's own hex. */
   srcHex: string
   /** Share of non-background design pixels, 0-100. */
@@ -288,7 +291,7 @@ export function matchThreadRegions(
       try { ctx.drawImage(img, 0, 0, N, N); data = ctx.getImageData(0, 0, N, N).data }
       catch { resolve([]); return }   // tainted canvas — same quiet give-up as the matcher
 
-      type Acc = { c: number; r: number; g: number; b: number; x0: number; y0: number; x1: number; y1: number }
+      type Acc = { c: number; r: number; g: number; b: number; x0: number; y0: number; x1: number; y1: number; sx: number; sy: number }
       const buckets: Record<string, Acc> = {}
       let total = 0
       for (let i = 0; i < data.length; i += 4) {
@@ -297,8 +300,8 @@ export function matchThreadRegions(
         if (r > 234 && g > 234 && b > 234) continue      // background, not a colour
         const p = i / 4, px = p % N, py = (p / N) | 0
         const key = `${r >> 5}_${g >> 5}_${b >> 5}`
-        const bk = buckets[key] || (buckets[key] = { c: 0, r: 0, g: 0, b: 0, x0: px, y0: py, x1: px, y1: py })
-        bk.c++; bk.r += r; bk.g += g; bk.b += b
+        const bk = buckets[key] || (buckets[key] = { c: 0, r: 0, g: 0, b: 0, x0: px, y0: py, x1: px, y1: py, sx: 0, sy: 0 })
+        bk.c++; bk.r += r; bk.g += g; bk.b += b; bk.sx += px; bk.sy += py
         if (px < bk.x0) bk.x0 = px; if (px > bk.x1) bk.x1 = px
         if (py < bk.y0) bk.y0 = py; if (py > bk.y1) bk.y1 = py
         total++
@@ -326,6 +329,7 @@ export function matchThreadRegions(
             // Boxes merge too, or the crop would only cover the first bucket.
             m.x0 = Math.min(m.x0, c.x0); m.y0 = Math.min(m.y0, c.y0)
             m.x1 = Math.max(m.x1, c.x1); m.y1 = Math.max(m.y1, c.y1)
+            m.sx += c.sx; m.sy += c.sy
             absorbed = true; break
           }
         }
@@ -349,10 +353,17 @@ export function matchThreadRegions(
         if (!t || seen.has(t.code)) continue        // same de-dupe as matchThreadColors
         seen.add(t.code)
 
-        // Square crop around the region's centre. Floored at 18% of the image so a
-        // thin outline colour doesn't produce a 2px crop that reads as a solid block.
-        const cxN = (m.x0 + m.x1) / 2, cyN = (m.y0 + m.y1) / 2
-        const sideN = Math.max(m.x1 - m.x0, m.y1 - m.y0, N * 0.18)
+        // Crop tightly, around the CENTROID of the colour's pixels.
+        //
+        // Using the bounding box centred a scattered colour (lettering across a design)
+        // on empty space, and sizing the crop to the whole box zoomed so far out the
+        // swatch was unreadable — it looked like a thumbnail of the design, not a
+        // detail of one colour. The window is clamped to 6-16% of the image: small
+        // enough to actually see the stitching, large enough that a thin outline still
+        // gets context around it.
+        const cxN = m.sx / m.c, cyN = m.sy / m.c
+        const bboxMax = Math.max(m.x1 - m.x0, m.y1 - m.y0)
+        const sideN = Math.min(Math.max(bboxMax, N * 0.06), N * 0.16)
         const half = sideN / 2
         const x0 = Math.max(0, Math.min(N - sideN, cxN - half))
         const y0 = Math.max(0, Math.min(N - sideN, cyN - half))
@@ -368,6 +379,7 @@ export function matchThreadRegions(
 
         out.push({
           thread: t,
+          options: nearestThreads(m.r, m.g, m.b, 10, palette),
           srcHex: ("#" + hx(m.r) + hx(m.g) + hx(m.b)).toUpperCase(),
           pct: Math.round((m.c / total) * 100),
           box: {

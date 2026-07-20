@@ -316,6 +316,26 @@ export function DesignCanvasDialog({
   // derived from artwork we already hold.
   const [mapOpen, setMapOpen] = useState(false)
   const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
+  // The cone chosen for each sampled colour, keyed by the ARTWORK hex. The auto-match
+  // is only a suggestion — the nearest cone by maths is not always the one you want on
+  // the garment — so this records the human's override and wins over region.thread.
+  const [picks, setPicks] = useState<Record<string, string>>({})
+
+  /** Swap the cone for one sampled colour, keeping the saved thread list in step. */
+  const chooseThread = (r: ThreadRegion, code: string) => {
+    const next = r.options.find((o) => o.code === code)
+    if (!next) return
+    const current = picks[r.srcHex] ?? r.thread.code
+    setPicks((p) => ({ ...p, [r.srcHex]: code }))
+    setThreads((prev) => {
+      // Drop the cone this colour used to claim, then add the new one — but only if no
+      // OTHER sampled colour still resolves to it, or picking would silently unload a
+      // cone another part of the design needs.
+      const stillUsed = (regions ?? []).some((o) => o.srcHex !== r.srcHex && (picks[o.srcHex] ?? o.thread.code) === current)
+      const without = stillUsed ? prev : prev.filter((t) => t.code !== current)
+      return without.some((t) => t.code === next.code) ? without : [...without, next]
+    })
+  }
   // null = not attempted, [] = attempted and found nothing (which is a real outcome worth
   // saying out loud — it previously looked identical to "no artwork yet").
   const [threadErr, setThreadErr] = useState(false)
@@ -457,25 +477,41 @@ export function DesignCanvasDialog({
                       <div key={r.thread.code} className="flex items-center gap-2.5 px-2.5 py-2">
                         {r.swatch ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={r.swatch} alt={`Detail using ${r.thread.name}`} className="size-11 shrink-0 rounded border border-border object-cover" />
+                          <img src={r.swatch} alt={`Detail using ${r.thread.name}`} className="size-14 shrink-0 rounded border border-border object-cover" />
                         ) : (
-                          <span className="size-11 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
+                          <span className="size-14 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
                         )}
                         <div className="min-w-0 flex-1">
+                          {/* The SAMPLED colour — what's actually in the artwork. */}
                           <div className="flex items-center gap-1.5">
-                            <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: r.thread.hex }} />
-                            <span className="truncate text-xs font-medium">{r.thread.name}</span>
-                            <span className="font-mono text-[10px] text-muted-foreground">{r.thread.code}</span>
+                            <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: r.srcHex }} />
+                            <span className="font-mono text-[11px] font-medium">{r.srcHex}</span>
+                            <span className="ml-auto text-[10px] font-medium text-muted-foreground">{r.pct}%</span>
                           </div>
-                          {/* Artwork colour vs cone colour — how far the match had to travel. */}
-                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <span className="font-mono">{r.srcHex}</span>
-                            <span>&rarr;</span>
-                            <span className="font-mono">{r.thread.hex.toUpperCase()}</span>
-                            <span className="ml-auto font-medium text-foreground">{r.pct}%</span>
+                          {/* -> the cone. A dropdown, not a verdict: the nearest cone by
+                              maths isn't always the one you want stitched, so every close
+                              alternative is offered and the human decides. */}
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground">&rarr;</span>
+                            <span
+                              className="size-3 shrink-0 rounded-full border border-black/15"
+                              style={{ background: (r.options.find((o) => o.code === (picks[r.srcHex] ?? r.thread.code)) ?? r.thread).hex }}
+                            />
+                            <select
+                              value={picks[r.srcHex] ?? r.thread.code}
+                              onChange={(e) => chooseThread(r, e.target.value)}
+                              className="eg-select h-7 min-w-0 flex-1 rounded-md border border-border bg-card px-1.5 text-[11px]"
+                              title="Choose the cone for this colour"
+                            >
+                              {r.options.map((o, i) => (
+                                <option key={o.code} value={o.code}>
+                                  {o.code} · {o.name}{i === 0 ? " (closest)" : ""}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         </div>
-                        <div className="relative size-8 shrink-0 rounded border border-border bg-muted" title="Position in the design">
+                        <div className="relative size-8 shrink-0 self-start rounded border border-border bg-muted" title="Position in the design">
                           <span className="absolute rounded-[2px] bg-primary/70"
                             style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }} />
                         </div>
