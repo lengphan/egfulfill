@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { VariantStrip } from "@/components/app/variant-field"
@@ -799,6 +799,20 @@ export function OrdersHub() {
                             catalog={catalog}
                             size={64}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
+                            onDropImage={canDesign && it.sku ? (dataUrl) => {
+                              postOrderDesign(o.id, { sku: it.sku!, data: dataUrl, name: it.name })
+                                .then(() => {
+                                  setNote(`Artwork attached to ${it.name || it.sku}.`)
+                                  return getOrderDesigns(o.id)
+                                })
+                                .then((r) => {
+                                  const list = Array.isArray(r) ? r : (r?.designs ?? [])
+                                  const bySku: Record<string, OrderDesign> = {}
+                                  for (const d of list) if (d?.sku) bySku[d.sku] = d
+                                  setDesigns((p) => ({ ...p, [o.id]: bySku }))
+                                })
+                                .catch(() => setActionErr("Couldn't attach that artwork."))
+                            } : undefined}
                           />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>

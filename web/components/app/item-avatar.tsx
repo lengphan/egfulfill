@@ -42,6 +42,9 @@ export type ItemAvatarProps = {
   /** Renders the composite alone — no click, no swap, no preview. For decorative stacks
    *  (a row's 3-up thumbnail cluster) where a control per thumb would be noise. */
   readOnly?: boolean
+  /** Accept artwork dropped straight onto the thumb. Passed wherever a design can be
+   *  attached — one handler here covers every surface that renders an item. */
+  onDropImage?: (dataUrl: string, file: File) => void
   className?: string
 }
 
@@ -51,9 +54,29 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[]): string {
   return bestMockup(p, item.color, item.img || "")
 }
 
-export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, className }: ItemAvatarProps) {
+export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, onDropImage, className }: ItemAvatarProps) {
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
+  const [over, setOver] = useState(false)
+
+  /** Drop artwork straight onto the thumb — the shortest path from a file to the item it
+   *  belongs to. Ignores anything that isn't an image so dragging a row doesn't trigger it. */
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setOver(false)
+    if (!onDropImage) return
+    const file = Array.from(e.dataTransfer?.files ?? []).find((f) => f.type.startsWith("image/"))
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => onDropImage(String(reader.result || ""), file)
+    reader.readAsDataURL(file)
+  }
+  const dropProps = onDropImage
+    ? {
+        onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setOver(true) },
+        onDragLeave: () => setOver(false),
+        onDrop: handleDrop,
+      }
+    : {}
 
   const design = designs && item.sku ? designs[item.sku] : null
   const art = designSrc(design?.data) || designSrc(item.design_src)
@@ -77,7 +100,11 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
 
   return (
     <>
-      <div className={"group/avatar relative shrink-0 " + (className ?? "")} style={{ width: size, height: size }}>
+      <div
+        {...dropProps}
+        className={"group/avatar relative shrink-0 " + (over ? "rounded-md ring-2 ring-primary ring-offset-1 " : "") + (className ?? "")}
+        style={{ width: size, height: size }}
+      >
         <button
           type="button"
           onClick={open}

@@ -18,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getCatalogProducts, getOrderDesigns, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { getOrders, getCatalogProducts, getOrderDesigns, postOrderDesign, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
+import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
 import { VariantStrip } from "@/components/app/variant-field"
@@ -104,6 +105,17 @@ export function OrdersList() {
   // Placed artwork per order. Fetched only when a row is opened: pulling designs for
   // every row on load would be a request per order for imagery most sellers never expand.
   const [designs, setDesigns] = useState<Record<string, Record<string, OrderDesign>>>({})
+  // The mini designer, opened from an item row — same surface the factory boards use, so
+  // a seller edits artwork where the item is rather than navigating to the order first.
+  const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
+  const reloadDesigns = useCallback((oid: string) => {
+    getOrderDesigns(oid).then((r) => {
+      const list = Array.isArray(r) ? r : (r?.designs ?? [])
+      const bySku: Record<string, OrderDesign> = {}
+      for (const d of list) if (d?.sku) bySku[d.sku] = d
+      setDesigns((p) => ({ ...p, [oid]: bySku }))
+    }).catch(() => {})
+  }, [])
   useEffect(() => {
     if (!expanded || designs[expanded]) return
     const oid = expanded
@@ -318,7 +330,19 @@ export function OrdersList() {
                               ) : items.map((it, i) => {
                                 return (
                                   <div key={it.sku ?? i} className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5">
-                                    <ItemAvatar item={it} designs={designs[o.id]} catalog={catalog} size={48} />
+                                    <ItemAvatar
+                                      item={it}
+                                      designs={designs[o.id]}
+                                      catalog={catalog}
+                                      size={48}
+                                      onEdit={() => setEditing({ order: o, item: it })}
+                                      onDropImage={(dataUrl) => {
+                                        if (!it.sku) return
+                                        postOrderDesign(o.id, { sku: it.sku, data: dataUrl, name: it.name })
+                                          .then(() => reloadDesigns(o.id))
+                                          .catch(() => {})
+                                      }}
+                                    />
                                     <div className="min-w-0 flex-1">
                                       <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                                       {["", "new", "draft"].includes(String(o.factory_status || "")) ? (
@@ -371,6 +395,21 @@ export function OrdersList() {
       </SectionCard>
 
       <ImportOrdersDialog open={importOpen} onOpenChange={setImportOpen} onImported={() => load()} />
+
+      {/* One editor for the list, pointed at whichever row was clicked. Reloads that
+          order's designs on save so the row thumb rehydrates immediately. */}
+      {editing && (
+        <DesignCanvasDialog
+          open
+          onOpenChange={(v) => { if (!v) setEditing(null) }}
+          orderId={editing.order.id}
+          item={editing.item}
+          initialDesign={designs[editing.order.id]?.[editing.item.sku ?? ""]?.data}
+          initialPos={designs[editing.order.id]?.[editing.item.sku ?? ""]?.pos}
+          catalog={catalog}
+          onSaved={() => reloadDesigns(editing.order.id)}
+        />
+      )}
     </div>
   )
 }
