@@ -6,7 +6,7 @@ import { MagnifyingGlass, Package } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
-import { sizesOf } from "@/lib/variant-resolve"
+import { sizesOf, methodsOf } from "@/lib/variant-resolve"
 
 const priceOf = (p: CatalogProduct) => Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 const imageOf = (p: CatalogProduct) =>
@@ -24,6 +24,9 @@ export type PickedProduct = {
    *  dropdown. Empty for a product that defines none. */
   colors: string[]
   sizes: string[]
+  /** Print methods the blank supports, split into individual options — a line needs one
+   *  to be produced or priced. */
+  methods: string[]
 }
 
 /** Catalog product → order-line prefill. Shared by the picker dialog and the inline
@@ -39,6 +42,7 @@ export function toPickedProduct(p: CatalogProduct): PickedProduct {
     // mainColor may not be a colorImages key, so union them and drop blanks.
     colors: Array.from(new Set([p.mainColor, ...Object.keys(p.colorImages ?? {})].filter((c): c is string => !!c))),
     sizes: sizesOf(p),
+    methods: methodsOf(p),
   }
 }
 

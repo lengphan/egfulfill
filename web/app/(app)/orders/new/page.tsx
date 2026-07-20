@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { prettyColorName } from "@/lib/color-name"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft, Plus, Trash, CheckCircle, WarningCircle, Package, Storefront, X } from "@phosphor-icons/react"
@@ -34,14 +35,14 @@ type Valid = { kind: "idle" } | { kind: "checking" } | { kind: "ok"; addr: Valid
 // colors/sizes are the OPTIONS the picked catalog product offers. Empty (a blank
 // item, or a product that defines no variants) → the field stays free text, so you
 // can still type anything; populated → it becomes a dropdown of real variants.
-type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string; colors: string[]; sizes: string[] }
-const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "", colors: [], sizes: [] })
+type Line = { name: string; sku: string; img: string; qty: string; price: string; color: string; size: string; method: string; colors: string[]; sizes: string[]; methods: string[] }
+const emptyLine = (): Line => ({ name: "", sku: "", img: "", qty: "1", price: "", color: "", size: "", method: "", colors: [], sizes: [], methods: [] })
 
 /** A variant dropdown for a picked catalog product. If the current value isn't one
  *  of the product's options (an older line, or a value typed before the product was
  *  picked) it's kept as an extra option rather than silently snapping to something
  *  else — losing a chosen variant is worse than showing an odd one. */
-function VariantSelect({ value, options, onChange, placeholder }: { value: string; options: string[]; onChange: (v: string) => void; placeholder: string }) {
+function VariantSelect({ value, options, onChange, placeholder, pretty }: { value: string; options: string[]; onChange: (v: string) => void; placeholder: string; pretty?: (v: string) => string }) {
   const opts = value && !options.includes(value) ? [value, ...options] : options
   return (
     <select
@@ -50,7 +51,10 @@ function VariantSelect({ value, options, onChange, placeholder }: { value: strin
       className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 transition-colors hover:border-primary/40"
     >
       <option value="">{placeholder}…</option>
-      {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+      {/* The VALUE stays the supplier's raw code — that's what orders and stock are keyed
+          on — while the LABEL is the readable name. Showing "031753A - Blk/Dk.Grn/Dk.Kha"
+          asks a human to decode a warehouse code. */}
+      {opts.map((o) => <option key={o} value={o}>{pretty ? pretty(o) : o}</option>)}
     </select>
   )
 }
@@ -134,6 +138,8 @@ export default function NewOrderPage() {
       size: p.sizes[0] ?? "",
       colors: p.colors,
       sizes: p.sizes,
+      methods: p.methods ?? [],
+      method: (p.methods ?? []).length === 1 ? p.methods[0] : "",
     }
     if (pickerTarget == null) setLines((prev) => [...prev, { ...emptyLine(), ...patch }])
     else setLine(pickerTarget, patch)
@@ -174,6 +180,9 @@ export default function NewOrderPage() {
           unitPrice: Number(l.price) || 0,
           color: l.color.trim() || undefined,
           size: l.size.trim() || undefined,
+          // Print method drives production AND pricing (embroidery carries a surcharge),
+          // so an order created without one can't be costed or made.
+          printType: l.method.trim() || undefined,
         }))
       const fa = valid.kind === "ok" ? valid.addr : parsed.addr
       const hasAddress = !!(fa.street || fa.city)
@@ -334,7 +343,7 @@ export default function NewOrderPage() {
               <label className="hidden flex-col gap-1 sm:flex">
                 <span className="text-xs text-muted-foreground">Color</span>
                 {l.colors.length > 0 ? (
-                  <VariantSelect value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder="Color" />
+                  <VariantSelect value={l.color} options={l.colors} onChange={(v) => setLine(i, { color: v })} placeholder="Color" pretty={prettyColorName} />
                 ) : (
                   <Input value={l.color} onChange={(e) => setLine(i, { color: e.target.value })} className="h-9" />
                 )}
@@ -345,6 +354,14 @@ export default function NewOrderPage() {
                   <VariantSelect value={l.size} options={l.sizes} onChange={(v) => setLine(i, { size: v })} placeholder="Size" />
                 ) : (
                   <Input value={l.size} onChange={(e) => setLine(i, { size: e.target.value })} className="h-9" />
+                )}
+              </label>
+              <label className="hidden flex-col gap-1 sm:flex">
+                <span className="text-xs text-muted-foreground">Method</span>
+                {l.methods.length > 0 ? (
+                  <VariantSelect value={l.method} options={l.methods} onChange={(v) => setLine(i, { method: v })} placeholder="Method" />
+                ) : (
+                  <Input value={l.method} onChange={(e) => setLine(i, { method: e.target.value })} className="h-9" placeholder="e.g. Embroidery" />
                 )}
               </label>
               <Button

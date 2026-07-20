@@ -1,6 +1,7 @@
 "use client"
 
 import { Check, CaretDown, LockSimple } from "@phosphor-icons/react"
+import { prettyColorName } from "@/lib/color-name"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,7 +57,10 @@ export function VariantField({
   // A product that declares no options for this attribute is a free choice, not a bug —
   // the field says "Any" and there's nothing to open.
   const hasOptions = options.length > 0
-  const shown = value || (hasOptions ? placeholder : emptyLabel)
+  // Colour values are supplier codes ("031753A - Blk/Dk.Grn/Dk.Kha"). Store the code,
+  // show the name — nobody should have to decode a warehouse SKU to pick a colour.
+  const pretty = (v: string) => (swatches ? prettyColorName(v) : v)
+  const shown = value ? pretty(value) : (hasOptions ? placeholder : emptyLabel)
   const unset = !value
 
   const trigger = (
@@ -90,7 +94,7 @@ export function VariantField({
         {options.map((o) => (
           <DropdownMenuItem key={o} onClick={() => onChange(o)} className="gap-2">
             {swatches && <span className="size-3 shrink-0 rounded-full border border-black/10" style={{ background: swatchHex(o) }} />}
-            <span className="min-w-0 flex-1 truncate">{o}</span>
+            <span className="min-w-0 flex-1 truncate">{pretty(o)}</span>
             {o === value && <Check size={12} weight="bold" className="shrink-0 text-primary" />}
           </DropdownMenuItem>
         ))}

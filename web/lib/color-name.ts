@@ -41,7 +41,11 @@ export function prettyColorName(raw: string): string {
   let s = String(raw).trim()
 
   // Strip a leading supplier code: "016 - ", "0317-", "12 – " (also en-dash).
-  s = s.replace(/^\s*\d+\s*[-–—]\s*/, "")
+  // Supplier codes lead the name and are not always numeric: "016 - White" but also
+  // "031753A - Blk/Dk.Grn" and "CP001 - Camo 001". Strip a leading token that's digits
+  // with an optional letter suffix, or letters followed by digits — both are codes. A
+  // real colour word ("Navy - Heather") is never shaped like that, so it survives.
+  s = s.replace(/^\s*(?:\d+[A-Za-z]?|[A-Za-z]{1,3}\d+)\s*[-–—]\s*/, "")
   // A trailing code in parentheses, e.g. "White (016)".
   s = s.replace(/\s*\(\s*\d+\s*\)\s*$/, "")
   if (!s) return String(raw).trim()
