@@ -119,7 +119,11 @@ export async function putObject(key, buffer, contentType = 'application/octet-st
   const { host, uri } = _hostAndUri(key);
   const { amzDate, dateStamp } = _stamps();
   const payloadHash = sha256hex(buffer);
-  const headers = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate, 'x-amz-acl': acl, 'content-type': contentType };
+  // Only send x-amz-acl when asking for PUBLIC access. Cloudflare R2 doesn't implement
+  // ACLs at all and rejects the header, and 'private' is already the default on S3,
+  // Spaces and R2 alike — so sending it buys nothing and breaks one provider.
+  const headers = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate, 'content-type': contentType };
+  if (acl && acl !== 'private') headers['x-amz-acl'] = acl;
   const authorization = signV4({ method: 'PUT', host, canonicalUri: uri, payloadHash, headers, amzDate, dateStamp });
   const res = await fetch(`https://${host}${uri}`, { method: 'PUT', headers: { ...headers, Authorization: authorization }, body: buffer });
   if (!res.ok) throw new Error('storage PUT failed: ' + res.status + ' ' + (await res.text()).slice(0, 200));
