@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { SubmitOrderButton, isSubmittable } from "@/components/app/submit-order-button"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -314,7 +315,25 @@ export function OrdersList() {
                         </button>
                       </TableCell>
                       {visibleCols.map((id) => (
-                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o, designs[o.id], catalog)}</TableCell>
+                        <TableCell key={id} className={cellClass(id)}>
+                          {renderCell(id, o, designs[o.id], catalog)}
+                          {/* Submit lives in the STATUS cell rather than a column of its
+                              own: it's an action on the status ("Pending" -> sent), it's
+                              where you already look to see a row needs you, and an extra
+                              column would be empty on most rows while stealing width from
+                              Items. Previously you had to open each order to submit it,
+                              which made a five-order morning five page loads. */}
+                          {id === "status" && isSubmittable(o) && (
+                            <div className="mt-1.5">
+                              <SubmitOrderButton
+                                order={o}
+                                onDone={load}
+                                label="Submit"
+                                className="h-6 w-full px-2 text-[11px]"
+                              />
+                            </div>
+                          )}
+                        </TableCell>
                       ))}
                     </TableRow>
 

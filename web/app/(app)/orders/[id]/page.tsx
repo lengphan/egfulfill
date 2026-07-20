@@ -11,17 +11,10 @@ import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { OrderHistory } from "@/components/app/order-history"
+import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   getOrders,
   getOrder,
@@ -31,7 +24,6 @@ import {
   getCatalogProducts,
   postOrderMessage,
   updateOrder,
-  ApiError,
   type OrderRow,
   type OrderItem,
   type OrderDesign,
@@ -473,91 +465,6 @@ export default function OrderDetailPage() {
  * (factory_status not in new/draft/''), which is what actually enforces this: hiding
  * the button is courtesy, the 403 is the gate.
  */
-// Submit to production — the CHARGE point. Nothing in the app pushed an order to the
-// factory before this, so a seller could never actually buy production; the server rule
-// existed with no caller. Shows the real quote first: people should see the price before
-// the button that takes the money, not after.
-function SubmitOrderButton({ order, quote, onDone }: { order: OrderRow; quote: OrderQuote | null; onDone: () => void }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [short, setShort] = useState(false)
-  const [open, setOpen] = useState(false)
-
-  const fs = String(order.factory_status || "")
-  const submittable = ["", "new", "draft"].includes(fs)
-  if (!submittable) return null
-
-  const submit = async () => {
-    setBusy(true); setErr(null); setShort(false)
-    try {
-      await updateOrder(order.id, { factoryStatus: "in_review", status: "in_review" })
-      setOpen(false)
-      onDone()
-    } catch (e) {
-      // 402 = the server refused on money grounds (short balance, or a line it can't
-      // price). Its message already names the amounts, so show it verbatim.
-      if (e instanceof ApiError && e.status === 402) setShort(true)
-      setErr(e instanceof Error ? e.message : "Could not submit this order")
-    } finally { setBusy(false) }
-  }
-
-  const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toFixed(2)}`
-  const blocked = !!quote?.unpriced?.length
-
-  return (
-    <>
-      <Button
-        size="sm"
-        onClick={() => setOpen(true)}
-        disabled={busy || blocked}
-        title={blocked ? "Some lines have no price yet — pick a blank on them first" : undefined}
-      >
-        <PaperPlaneTilt size={14} weight="bold" /> Submit to production
-      </Button>
-
-      {/* A dialog, not inline confirm text — confirming used to swap two extra buttons
-          into the header and reflow the whole row. */}
-      <Dialog open={open} onOpenChange={(v) => { if (busy) return; setOpen(v); if (!v) { setErr(null); setShort(false) } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Submit to production?</DialogTitle>
-            <DialogDescription>
-              This sends the order to the factory and charges your wallet. You can still cancel until the floor starts work.
-            </DialogDescription>
-          </DialogHeader>
-
-          {quote && (
-            <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Production</dt>
-                <dd className="tabular-nums">{money(quote.subtotal)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Shipping</dt>
-                <dd className="tabular-nums">{money(quote.shipping)}</dd>
-              </div>
-              <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <dt>Total</dt>
-                <dd className="tabular-nums">{money(quote.total)}</dd>
-              </div>
-            </dl>
-          )}
-
-          {err && <p className="text-sm text-destructive">{err}</p>}
-
-          <DialogFooter>
-            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
-            <Button onClick={submit} disabled={busy}>
-              {busy ? "Submitting…" : quote ? `Charge ${money(quote.total)}` : "Submit"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
 
 function CancelOrderButton({ order, onDone }: { order: OrderRow; onDone: () => void }) {
   const [busy, setBusy] = useState(false)

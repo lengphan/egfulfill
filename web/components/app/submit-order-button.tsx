@@ -1,0 +1,145 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { PaperPlaneTilt } from "@phosphor-icons/react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { updateOrder, getOrderQuote, ApiError, type OrderRow, type OrderQuote } from "@/lib/api"
+
+const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toFixed(2)}`
+
+/** An order can only be submitted before the factory has it. */
+export const isSubmittable = (o: { factory_status?: string | null }) =>
+  ["", "new", "draft"].includes(String(o.factory_status || ""))
+
+/**
+ * Submit to production — the CHARGE point.
+ *
+ * Lives here rather than inside the order detail page because the order LIST needs the
+ * same action: making someone open every order to submit it turns a five-order morning
+ * into five page loads, and two implementations of a button that spends money is exactly
+ * the drift this codebase has been bitten by before.
+ *
+ * `quote` is optional. The detail page already has one and passes it, so nothing extra
+ * is fetched there. The list does NOT — quoting every row on render would be a request
+ * per order for a price most people never look at — so it fetches on open instead. Either
+ * way the price is on screen before the button that takes the money.
+ */
+export function SubmitOrderButton({
+  order, quote, onDone, size = "sm", label = "Submit to production", className,
+}: {
+  order: OrderRow
+  /** Pass one if the caller already has it; otherwise it's fetched when the dialog opens. */
+  quote?: OrderQuote | null
+  onDone: () => void
+  size?: "sm" | "default"
+  label?: string
+  className?: string
+}) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [short, setShort] = useState(false)
+  const [open, setOpen] = useState(false)
+  // Only used when the caller didn't supply one.
+  const [fetched, setFetched] = useState<OrderQuote | null>(null)
+  const [loadingQuote, setLoadingQuote] = useState(false)
+
+  if (!isSubmittable(order)) return null
+
+  const q = quote ?? fetched
+
+  const openDialog = () => {
+    setOpen(true)
+    if (quote || fetched || loadingQuote) return
+    setLoadingQuote(true)
+    getOrderQuote(order.id)
+      .then((r) => setFetched(r))
+      .catch(() => { /* the dialog still works; it just can't show a total */ })
+      .finally(() => setLoadingQuote(false))
+  }
+
+  const submit = async () => {
+    setBusy(true); setErr(null); setShort(false)
+    try {
+      await updateOrder(order.id, { factoryStatus: "in_review", status: "in_review" })
+      setOpen(false)
+      onDone()
+    } catch (e) {
+      // 402 = the server refused on money grounds (short balance, or a line it can't
+      // price). Its message already names the amounts, so show it verbatim.
+      if (e instanceof ApiError && e.status === 402) setShort(true)
+      setErr(e instanceof Error ? e.message : "Could not submit this order")
+    } finally { setBusy(false) }
+  }
+
+  // Only block on a quote we actually have. An un-fetched quote is not evidence of a
+  // problem, and disabling the button because a request hasn't returned would read as
+  // "this order can't be submitted".
+  const blocked = !!q?.unpriced?.length
+
+  return (
+    <>
+      <Button
+        size={size}
+        className={className}
+        onClick={(e) => { e.stopPropagation(); openDialog() }}
+        disabled={busy || blocked}
+        title={blocked ? "Some lines have no price yet — pick a blank on them first" : undefined}
+      >
+        <PaperPlaneTilt size={14} weight="bold" /> {label}
+      </Button>
+
+      {/* A dialog, not inline confirm text — confirming used to swap two extra buttons
+          into the header and reflow the whole row. */}
+      <Dialog open={open} onOpenChange={(v) => { if (busy) return; setOpen(v); if (!v) { setErr(null); setShort(false) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit to production?</DialogTitle>
+            <DialogDescription>
+              This sends the order to the factory and charges your wallet. You can still cancel until the floor starts work.
+            </DialogDescription>
+          </DialogHeader>
+
+          {q ? (
+            <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Production</dt>
+                <dd className="tabular-nums">{money(q.subtotal)}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground">Shipping</dt>
+                <dd className="tabular-nums">{money(q.shipping)}</dd>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                <dt>Total</dt>
+                <dd className="tabular-nums">{money(q.total)}</dd>
+              </div>
+            </dl>
+          ) : loadingQuote ? (
+            <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+              Working out the price…
+            </div>
+          ) : null}
+
+          {q?.unpriced?.length ? (
+            <p className="text-sm text-destructive">
+              {q.unpriced.length} line{q.unpriced.length === 1 ? "" : "s"} can&apos;t be priced yet — pick a blank on them first.
+            </p>
+          ) : null}
+
+          {err && <p className="text-sm text-destructive">{err}</p>}
+
+          <DialogFooter>
+            {short && <Button variant="outline" onClick={() => router.push("/wallet")}>Top up wallet</Button>}
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>Not yet</Button>
+            <Button onClick={submit} disabled={busy || loadingQuote || !!q?.unpriced?.length}>
+              {busy ? "Submitting…" : q ? `Charge ${money(q.total)}` : "Submit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
