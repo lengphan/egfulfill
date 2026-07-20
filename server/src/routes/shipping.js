@@ -135,6 +135,9 @@ export function shippingEnabled() { return !!(epKey() || shToken()); }
  */
 export async function aggregatorVerifyAddress(a) {
   const s = addr(a, false);
+  // EasyPost was removed as a provider — Shippo is the aggregator. The EasyPost branch
+  // stays reachable only if someone deliberately sets EASYPOST_API_KEY again; nothing in
+  // the product offers it.
   if (epKey()) {
     // verify[]=delivery asks EasyPost to confirm it's actually deliverable, not just
     // parseable — a well-formed address that doesn't exist is the case worth catching.

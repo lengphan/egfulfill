@@ -22,8 +22,8 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
   if (editing) {
     return (
       <div className="flex items-center gap-1.5">
-        <span className="w-24 shrink-0 truncate text-[11px] text-muted-foreground">{s.label}</span>
-        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-7 flex-1 font-mono text-xs" autoFocus />
+        <span className="w-28 shrink-0 truncate text-[13px] text-muted-foreground">{s.label}</span>
+        <Input type="password" value={val} onChange={(e) => setVal(e.target.value)} placeholder="Paste new value" className="h-8 flex-1 font-mono text-[13px]" autoFocus />
         <Button size="sm" className="h-7 px-2" disabled={busy || !val.trim()} onClick={() => save(false)}>{busy ? <CircleNotch size={12} className="animate-spin" /> : <Check size={12} weight="bold" />}</Button>
         {s.set && <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground hover:text-red-600" title="Clear" disabled={busy} onClick={() => save(true)}>Clear</Button>}
         <Button size="sm" variant="ghost" className="h-7 px-1.5" onClick={() => { setEditing(false); setVal("") }}><X size={12} /></Button>
@@ -31,7 +31,7 @@ function SecretRow({ s, onSaved }: { s: SecretMeta; onSaved: () => void }) {
     )
   }
   return (
-    <div className="flex items-center justify-between gap-2 text-[11px]">
+    <div className="flex items-center justify-between gap-2 text-[13px]">
       <span className="text-muted-foreground">{s.label}</span>
       <span className="flex items-center gap-1.5 font-mono">
         {s.set ? <span className="text-foreground">••••{s.last4}</span> : <span className="text-muted-foreground">not set</span>}
@@ -160,10 +160,7 @@ const INTEGRATIONS: Integration[] = [
     key: "shippo", name: "Shippo", blurb: "Labels + rates", group: "Shipping",
     check: shippingProvider("shippo"),
   },
-  {
-    key: "easypost", name: "EasyPost", blurb: "Labels + rates (alternative)", group: "Shipping",
-    check: shippingProvider("easypost"),
-  },
+
   {
     key: "usps", name: "USPS direct", blurb: "USPS-direct labels", group: "Shipping",
     check: async () => {
@@ -293,15 +290,15 @@ export function IntegrationsPanel() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="truncate font-medium">{i.name}</div>
-                          <div className="truncate text-xs text-muted-foreground">{i.blurb}</div>
+                          <div className="truncate text-[13px] text-muted-foreground">{i.blurb}</div>
                         </div>
-                        <span className={"inline-flex shrink-0 items-center gap-1.5 text-xs font-medium " + meta.text}>
+                        <span className={"inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium " + meta.text}>
                           <span className={"size-2 rounded-full " + meta.dot} />
                           {meta.label}
                         </span>
                       </div>
                       {res.detail && (
-                        <div className="mt-2 truncate font-mono text-[11px] text-muted-foreground" title={res.detail}>
+                        <div className="mt-2 truncate font-mono text-[12px] text-muted-foreground" title={res.detail}>
                           {res.detail}
                         </div>
                       )}
