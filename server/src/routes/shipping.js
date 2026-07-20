@@ -23,6 +23,7 @@ const shToken = () => (process.env.SHIPPO_API_TOKEN || '').trim();
 const EP_BASE = 'https://api.easypost.com/v2';
 const SH_BASE = 'https://api.goshippo.com';
 
+let export_refreshTracking;
 const epAuth = () => 'Basic ' + Buffer.from(epKey() + ':').toString('base64');
 const shAuth = () => 'ShippoToken ' + shToken();
 
@@ -319,6 +320,67 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   });
 
   // Tracking status.
+  /**
+   * Shippo's tracking vocabulary, mapped to ours.
+   *
+   * PRE_TRANSIT is the one worth naming: the label exists but the carrier has never
+   * scanned it. That's the parcel still sitting behind a bench — invisible today, and
+   * the failure this whole path is actually for. RETURNED and FAILURE are flagged rather
+   * than treated as outcomes: both need a human, and neither is "delivered".
+   */
+  const DELIVERY_MAP = {
+    PRE_TRANSIT: { status: 'awaiting_pickup', detail: 'Label created — the carrier has not scanned it yet' },
+    TRANSIT: { status: 'in_transit', detail: 'On its way' },
+    DELIVERED: { status: 'delivered', detail: 'Delivered' },
+    RETURNED: { status: 'returned', detail: 'Coming back to us — needs a look' },
+    FAILURE: { status: 'failed', detail: 'The carrier could not deliver it — needs a look' },
+    UNKNOWN: { status: null, detail: null },
+  };
+
+  /** Read the carrier's status for one order and record it. Safe to call repeatedly. */
+  export_refreshTracking = async function refreshTracking(orderId) {
+    const row = await q('select id, tracking, carrier from orders where id=$1', [orderId]).then((r) => r.rows[0]);
+    if (!row || !row.tracking) return { ok: false, reason: 'no-tracking' };
+    if (!shToken()) return { ok: false, reason: 'no-provider' };
+    const r = await fetch(SH_BASE + '/tracks/' + encodeURIComponent((row.carrier || 'usps').toLowerCase()) + '/' + encodeURIComponent(row.tracking),
+      { headers: { Authorization: shAuth() } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, reason: d.detail || ('HTTP ' + r.status) };
+    const raw = (d.tracking_status && d.tracking_status.status) || 'UNKNOWN';
+    const m = DELIVERY_MAP[raw] || DELIVERY_MAP.UNKNOWN;
+    const detail = (d.tracking_status && d.tracking_status.status_details) || m.detail;
+    await q('update orders set delivery_status=$1, delivery_detail=$2, delivery_checked_at=now() where id=$3',
+      [m.status, detail || null, orderId]).catch(() => {});
+    return { ok: true, carrier_status: raw, status: m.status, detail };
+  };
+
+  // On-demand refresh for one order — the button behind "check with the carrier".
+  app.post('/api/orders/:id/refresh-tracking', { preHandler: guard }, async (req, reply) => {
+    const out = await export_refreshTracking(String(req.params.id)).catch((e) => ({ ok: false, reason: e.message }));
+    if (!out.ok) { reply.code(400); return { error: out.reason || 'Could not read the carrier status' }; }
+    return out;
+  });
+
+  /**
+   * Shippo webhook — the carrier telling US, instead of us asking on a timer.
+   *
+   * Polling a few hundred open parcels learns nothing most of the time; a webhook fires
+   * exactly when something moves. Unauthenticated by necessity (Shippo calls it), so it
+   * does nothing but look up an order by a tracking number WE issued and re-read the
+   * status from Shippo directly — a forged POST can't inject a status, only trigger a
+   * lookup we'd have done anyway.
+   */
+  app.post('/api/shipping/webhook', async (req) => {
+    const b = req.body || {};
+    const tracking = (b.data && (b.data.tracking_number || b.data.tracking_code)) || b.tracking_number;
+    if (!tracking) return { ok: true, ignored: 'no tracking number' };
+    const row = await q('select id from orders where tracking=$1 limit 1', [String(tracking)])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!row) return { ok: true, ignored: 'unknown tracking number' };
+    await export_refreshTracking(row.id).catch(() => {});
+    return { ok: true };
+  });
+
   app.get('/api/shipping/track', guard, async (req, reply) => {
     const q = req.query || {};
     const provider = q.provider, carrier = q.carrier, tracking = q.tracking;

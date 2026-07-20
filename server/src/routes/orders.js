@@ -311,6 +311,20 @@ export function ordersRoutes(app, requireAuth) {
   // label sits in the system until someone puts it on paper, and "we have a label" vs
   // "the label is on the parcel" are different answers to "can this go out?".
   q('alter table orders add column if not exists label_printed_at timestamptz').catch(() => {});
+  // Carrier delivery status, kept SEPARATE from factory_status on purpose.
+  //
+  // factory_status is what WE claim about the order — it drives permissions, the ship
+  // gate, who may move what. 'shipped' means we handed the parcel over, and that stays
+  // true whatever happens next. Delivery is the CARRIER's claim about the same parcel:
+  // a different fact, from a different party, that we don't control.
+  //
+  // Folding TRANSIT/DELIVERED into factory_status would mean every stage rule
+  // (canSetStage, stageDenial, orderStage, the ship gate) suddenly has to reason about
+  // states no human sets — and a carrier webhook could move an order behind the floor's
+  // back. Two fields, each owned by whoever actually knows.
+  q('alter table orders add column if not exists delivery_status text').catch(() => {});
+  q('alter table orders add column if not exists delivery_detail text').catch(() => {});
+  q('alter table orders add column if not exists delivery_checked_at timestamptz').catch(() => {});
   q('alter table order_items add column if not exists ship_fee numeric').catch(() => {});
 
   // List

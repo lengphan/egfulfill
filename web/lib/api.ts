@@ -591,6 +591,11 @@ export type OrderRow = {
   tracking_label_url?: string | null
   /** When the label was actually put on paper — distinct from having bought one. */
   label_printed_at?: string | null
+  /** The CARRIER's status, separate from factory_status. Ours ends at 'shipped'; this is
+   *  what happens to the parcel afterwards. */
+  delivery_status?: string | null
+  delivery_detail?: string | null
+  delivery_checked_at?: string | null
   carrier?: string | null
   timeline?: Array<{ status?: string; at?: string }> | null
   created_at?: string | null
@@ -613,6 +618,11 @@ export function getOrders() {
 /** What the auto-push did when a line entered the design stage (see autoPushDesigns). */
 export type AutoPushResult = { pushed: boolean; reason?: string; designId?: string; cardId?: number }
 /** Stamp (or clear) a label as printed. */
+/** Ask the carrier where a parcel is now. */
+export function refreshTracking(id: string) {
+  return api<{ ok?: boolean; status?: string | null; carrier_status?: string; detail?: string; error?: string }>(
+    `/api/orders/${encodeURIComponent(id)}/refresh-tracking`, { method: "POST" })
+}
 export function markLabelPrinted(id: string, undo = false) {
   return api<{ ok?: boolean; label_printed_at?: string | null }>(`/api/orders/${encodeURIComponent(id)}/label-printed`, {
     method: "POST", body: JSON.stringify({ undo }),

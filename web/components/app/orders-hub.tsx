@@ -20,6 +20,7 @@ import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSourc
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
+import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -560,7 +561,9 @@ export function OrdersHub() {
                               left of a row is identity, the right is state and what to do
                               about it. Sharing a line with store/date/address made five
                               dots read as more clutter rather than a summary. */}
-                          <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} className="mr-1" />
+                          {/* Ours ends at shipped; the carrier's status carries on from there. */}
+                        <DeliveryBadge order={o} onRefreshed={load} className="mr-1" />
+                        <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} className="mr-1" />
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>Start order</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>Create new label</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">Next stage</Button>}
