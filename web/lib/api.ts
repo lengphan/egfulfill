@@ -129,12 +129,22 @@ export type AdminUser = {
   team_permissions?: string[] | null
   /** How many active members this account leads. 0 = not a team leader. */
   team_size?: number
+  /** Wallet balance (sellers). Staff share the factory wallet, so theirs is always 0. */
+  balance?: number
 }
 export function getUsers() {
   return api<AdminUser[]>(`/api/users`)
 }
 export function createUserAdmin(body: { email: string; password: string; role?: string; name?: string }) {
   return api<AdminUser & { error?: string }>(`/api/users`, { method: "POST", body: JSON.stringify(body) })
+}
+/** Manual balance adjustment by staff. Positive credits, negative debits. The reason is
+ *  required — an unexplained movement in a money ledger is worse than no movement. */
+export function adjustBalance(body: { account: string; delta: number; note: string; ref?: string }) {
+  return api<{ ok?: boolean; balance?: number; duplicate?: boolean; error?: string }>(`/api/wallet/ledger`, {
+    method: "POST",
+    body: JSON.stringify({ account: body.account, delta: body.delta, note: body.note, type: "adjust", ref: body.ref }),
+  })
 }
 export function deleteUserAdmin(id: string) {
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" })

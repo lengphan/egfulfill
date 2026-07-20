@@ -5,6 +5,7 @@ import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, Us
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
+import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -26,6 +27,7 @@ import {
   updateProfile,
   getFactorySettings,
   deleteUserAdmin,
+  adjustBalance,
   type ShipFromAddress,
   type ProductType,
   ALL_SIDES,
@@ -376,6 +378,8 @@ const SHAREABLE = [
   { id: "wallet", label: "Wallet" },
   { id: "files", label: "Design files" },
 ]
+
+const usd2 = (n: number) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 function TeamPanel() {
   const [members, setMembers] = useState<TeamMember[] | null>(null)
@@ -822,6 +826,12 @@ function UsersPanel() {
   const [pwErr, setPwErr] = useState<string | null>(null)
   const [pwDone, setPwDone] = useState(false)
   const [removing, setRemoving] = useState<AdminUser | null>(null)
+  // Manual balance movement. A reason is required: an unexplained entry in a money
+  // ledger is worse than no entry, because nobody can tell later whether it was right.
+  const [adjFor, setAdjFor] = useState<AdminUser | null>(null)
+  const [adjAmt, setAdjAmt] = useState("")
+  const [adjNote, setAdjNote] = useState("")
+  const [adjErr, setAdjErr] = useState<string | null>(null)
 
   const loadUsers = useCallback(() => { getUsers().then((r) => { setUsers(r ?? []); setLoaded(true) }).catch(() => setLoaded(true)) }, [])
   useEffect(() => { const id = setTimeout(loadUsers, 0); return () => clearTimeout(id) }, [loadUsers])
@@ -852,6 +862,25 @@ function UsersPanel() {
     } catch (e) { setPwErr(e instanceof Error ? e.message : "Couldn't set that password.") }
     finally { setBusy(null) }
   }
+  const applyAdjust = async (sign: 1 | -1) => {
+    if (!adjFor) return
+    const amt = Math.abs(Number(adjAmt) || 0)
+    if (!amt) { setAdjErr("Enter an amount."); return }
+    if (!adjNote.trim()) { setAdjErr("Add a reason — this lands in the ledger permanently."); return }
+    setBusy(adjFor.id); setAdjErr(null)
+    try {
+      const r = await adjustBalance({
+        account: String(adjFor.id), delta: sign * amt, note: adjNote.trim(),
+        // A ref makes the write idempotent, so a double-click can't double-adjust.
+        ref: `manual-${adjFor.id}-${Date.now()}`,
+      })
+      if (r?.error) throw new Error(r.error)
+      setAdjFor(null); setAdjAmt(""); setAdjNote("")
+      loadUsers()
+    } catch (e) { setAdjErr(e instanceof Error ? e.message : "Couldn't adjust that balance.") }
+    finally { setBusy(null) }
+  }
+
   const removeUser = async () => {
     if (!removing) return
     setBusy(removing.id)
@@ -904,6 +933,11 @@ function UsersPanel() {
     return [u.name, u.email, u.store_name, u.role].some((f) => String(f ?? "").toLowerCase().includes(term))
   })
   const inactiveCount = users.filter((u) => u.active === false).length
+  // Teams have to stay whole: paging the flat list could put a leader on one page and
+  // their members on the next, which is exactly the relationship the grouping exists to
+  // show. So the list is grouped FIRST, then paged as groups.
+  const grouped = groupTeams(shown)
+  const paged = usePaged(grouped, 25)
 
   return (
     <div className="space-y-4">
@@ -955,10 +989,10 @@ function UsersPanel() {
              right. A team reads as a bordered group with its leader at the top, which the
              eye follows without needing the indent to do the work. */
           <div className="divide-y divide-border">
-            {shown.length === 0 ? (
+            {paged.pageItems.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</div>
             ) : (
-              groupTeams(shown).map(({ u, child }) => (
+              paged.pageItems.map(({ u, child }) => (
                 <div
                   key={u.id}
                   className={
@@ -989,6 +1023,21 @@ function UsersPanel() {
 
                   {/* Joined — context, not a control, so it stays quiet. */}
                   <span className="hidden w-24 shrink-0 text-xs text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
+
+                  {/* Balance, for sellers only — staff share the factory wallet, so a
+                      per-account figure would be meaningless for them. Amber at zero or
+                      below: that's an account that can't submit work. */}
+                  {u.role === "seller" ? (
+                    <span
+                      className={"hidden w-20 shrink-0 text-right text-xs tabular-nums sm:block " +
+                        ((u.balance ?? 0) <= 0 ? "font-medium text-amber-700" : "text-muted-foreground")}
+                      title={(u.balance ?? 0) <= 0 ? "No funds — this account can't submit orders" : "Wallet balance"}
+                    >
+                      {usd2(u.balance ?? 0)}
+                    </span>
+                  ) : (
+                    <span className="hidden w-20 shrink-0 sm:block" />
+                  )}
 
                   {/* Access: what this account may do, in one place. */}
                   <div className="flex shrink-0 items-center gap-1.5">
@@ -1023,6 +1072,11 @@ function UsersPanel() {
                         <DropdownMenuItem onClick={() => { setPwFor(u); setPwValue(""); setPwErr(null); setPwDone(false) }}>
                           Set a new password
                         </DropdownMenuItem>
+                        {u.role === "seller" && (
+                          <DropdownMenuItem onClick={() => { setAdjFor(u); setAdjAmt(""); setAdjNote(""); setAdjErr(null) }}>
+                            Adjust balance…
+                          </DropdownMenuItem>
+                        )}
                         {u.active === false ? (
                           <DropdownMenuItem onClick={() => setActive(u, true)}>Reactivate account</DropdownMenuItem>
                         ) : (
@@ -1041,6 +1095,13 @@ function UsersPanel() {
               ))
             )}
           </div>
+        )}
+        {loaded && grouped.length > 0 && (
+          <Pagination
+            page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage}
+            total={paged.total} start={paged.start}
+            onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[25, 50, 100]}
+          />
         )}
       </SectionCard>
 
@@ -1065,6 +1126,36 @@ function UsersPanel() {
             <Button variant="outline" size="sm" onClick={() => setPwFor(null)}>Cancel</Button>
             <Button size="sm" onClick={resetPassword} disabled={busy === pwFor?.id || pwDone}>
               {busy === pwFor?.id ? <CircleNotch size={14} className="animate-spin" /> : "Set password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual top-up / deduction. Two explicit buttons rather than a signed number: a
+          minus sign is easy to miss, and this writes to a money ledger that can't be
+          edited afterwards — only offset by another entry. */}
+      <Dialog open={!!adjFor} onOpenChange={(v) => { if (!v) { setAdjFor(null); setAdjErr(null) } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Adjust balance</DialogTitle></DialogHeader>
+          <div className="space-y-3 px-1">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{adjFor?.email}</span> · currently {usd2(adjFor?.balance ?? 0)}
+            </p>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Amount</span>
+              <Input value={adjAmt} onChange={(e) => { setAdjAmt(e.target.value.replace(/[^0-9.]/g, "")); setAdjErr(null) }} placeholder="0.00" inputMode="decimal" className="h-9" autoFocus />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Reason (recorded in the ledger)</span>
+              <Input value={adjNote} onChange={(e) => { setAdjNote(e.target.value); setAdjErr(null) }} placeholder="Bank transfer received · ref 4471" className="h-9" />
+            </label>
+            {adjErr && <p className="text-sm text-destructive">{adjErr}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setAdjFor(null)} disabled={busy === adjFor?.id}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => applyAdjust(-1)} disabled={busy === adjFor?.id}>Deduct</Button>
+            <Button size="sm" onClick={() => applyAdjust(1)} disabled={busy === adjFor?.id}>
+              {busy === adjFor?.id ? <CircleNotch size={14} className="animate-spin" /> : "Top up"}
             </Button>
           </DialogFooter>
         </DialogContent>

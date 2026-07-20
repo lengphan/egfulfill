@@ -57,7 +57,10 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
              tm.owner_id,
              coalesce(o.store_name, o.name, o.email) as owner_label,
              tm.permissions as team_permissions,
-             (select count(*)::int from team_members t2 where t2.owner_id = u.id::text and t2.status = 'active') as team_size
+             (select count(*)::int from team_members t2 where t2.owner_id = u.id::text and t2.status = 'active') as team_size,
+             -- Wallet balance, so an admin can see who's out of funds without opening
+             -- each account. One aggregate over the ledger rather than a request per row.
+             (select coalesce(sum(w.delta), 0)::float from wallet_ledger w where w.account = u.id::text) as balance
         from users u
         left join team_members tm on lower(tm.email) = lower(u.email) and tm.status = 'active'
         left join users o on o.id::text = tm.owner_id
