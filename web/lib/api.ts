@@ -1166,6 +1166,21 @@ export function getMyAccess() {
   return api<MyAccess>(`/api/team/my-access`)
 }
 
+// Invites addressed to ME that I haven't accepted. Until one is accepted the membership
+// stays 'invited', my-access reports member:false, and NO permission limits apply — so
+// this is the step that actually turns a leader's sharing toggles on.
+export type MyInvite = {
+  id: string; invite_token: string; role: string; permissions: string[]
+  owner_id: string; owner_name: string; invited_at: string
+}
+export function getMyInvites() {
+  return api<MyInvite[]>(`/api/team/my-invites`)
+}
+export function acceptInvite(token: string) {
+  return api<{ ok?: boolean; error?: string; permissions?: string[] }>(
+    `/api/team/accept/${encodeURIComponent(token)}`, { method: "POST" })
+}
+
 // ── Subscription billing ──────────────────────────────────────────────────────
 // Plans are server truth (users.plan). Prices come from the server too — the client
 // copy in lib/plans.ts is for display only, so a caller can never set its own price.

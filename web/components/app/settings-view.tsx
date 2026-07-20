@@ -21,6 +21,11 @@ import {
   createApiKey,
   revokeApiKey,
   getTeam,
+  getMyInvites,
+  getMyAccess,
+  acceptInvite,
+  type MyInvite,
+  type MyAccess,
   inviteMember,
   removeMember,
   updateTeamMember,
@@ -423,14 +428,37 @@ function TeamPanel() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // My OWN side of teams: invites waiting on me, and whether I'm already someone's
+  // member. Without this the panel only ever showed the team I lead, so an invited
+  // teammate saw "No team members yet" and had no way to accept — which left them
+  // 'invited' forever, and an un-accepted membership applies NO permission limits.
+  const [invites, setInvites] = useState<MyInvite[]>([])
+  const [access, setAccess] = useState<MyAccess | null>(null)
+  const [acceptBusy, setAcceptBusy] = useState<string | null>(null)
+
   const load = useCallback(() => {
     getTeam()
       .then((rows) => setMembers(rows ?? []))
       .catch(() => setMembers([]))
+    getMyInvites().then(setInvites).catch(() => setInvites([]))
+    getMyAccess().then(setAccess).catch(() => setAccess(null))
   }, [])
   useEffect(() => {
     load()
   }, [load])
+
+  const onAccept = async (inv: MyInvite) => {
+    setAcceptBusy(inv.id); setErr(null)
+    try {
+      const r = await acceptInvite(inv.invite_token)
+      if (r.error) throw new Error(r.error)
+      load()
+      // The nav is permission-filtered — re-read it now that limits actually apply.
+      window.dispatchEvent(new CustomEvent("eg-perms-changed"))
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : "Couldn't accept that invite.")
+    } finally { setAcceptBusy(null) }
+  }
 
   const onInvite = async () => {
     const e = email.trim()
@@ -472,6 +500,32 @@ function TeamPanel() {
 
   return (
     <SectionCard title="Team" description="Members and their access">
+      {/* MY side of things. An invite has to be accepted before any sharing limits take
+          effect — until then the membership is 'invited' and the member sees everything,
+          which looked exactly like "the toggles don't work". */}
+      {invites.map((inv) => (
+        <div key={inv.id} className="flex flex-col gap-2 border-b border-border bg-primary/5 px-5 py-4 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">{inv.owner_name} invited you to their team</div>
+            <div className="text-xs text-muted-foreground">
+              As {inv.role}. Accepting applies the access they shared with you — your menu will show only those pages.
+            </div>
+          </div>
+          <Button size="sm" onClick={() => onAccept(inv)} disabled={acceptBusy === inv.id}>
+            {acceptBusy === inv.id ? "Accepting…" : "Accept invite"}
+          </Button>
+        </div>
+      ))}
+      {access?.member && (
+        <div className="border-b border-border px-5 py-3 text-sm">
+          <span className="font-medium">You&apos;re on {access.ownerName}&apos;s team</span>
+          <span className="text-muted-foreground">
+            {" "}· {access.role ?? "member"} · {(access.permissions?.length ?? 0)} page
+            {(access.permissions?.length ?? 0) === 1 ? "" : "s"} shared with you
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
         <Input
           value={email}
