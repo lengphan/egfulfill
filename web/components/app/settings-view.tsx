@@ -480,6 +480,18 @@ function TeamPanel() {
     } finally { setAcceptBusy(null) }
   }
 
+  /** Decline a pending invite, or leave a team you've joined. Same row either way. */
+  const onDropMembership = async (id: string, label: string) => {
+    setAcceptBusy(id); setErr(null)
+    try {
+      await removeMember(id)
+      load()
+      window.dispatchEvent(new CustomEvent("eg-perms-changed"))
+    } catch (ex) {
+      setErr(ex instanceof Error ? ex.message : `Couldn't ${label}.`)
+    } finally { setAcceptBusy(null) }
+  }
+
   const onInvite = async () => {
     const e = email.trim()
     if (!e) return
@@ -550,18 +562,36 @@ function TeamPanel() {
               As {inv.role}. Accepting applies the access they shared with you — your menu will show only those pages.
             </div>
           </div>
-          <Button size="sm" onClick={() => onAccept(inv)} disabled={acceptBusy === inv.id}>
-            {acceptBusy === inv.id ? "Accepting…" : "Accept invite"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => onDropMembership(inv.id, "decline")} disabled={acceptBusy === inv.id}>
+              Decline
+            </Button>
+            <Button size="sm" onClick={() => onAccept(inv)} disabled={acceptBusy === inv.id}>
+              {acceptBusy === inv.id ? "Accepting…" : "Accept invite"}
+            </Button>
+          </div>
         </div>
       ))}
       {access?.member && (
-        <div className="border-b border-border px-5 py-3 text-sm">
-          <span className="font-medium">You&apos;re on {access.ownerName}&apos;s team</span>
-          <span className="text-muted-foreground">
-            {" "}· {access.role ?? "member"} · {(access.permissions?.length ?? 0)} page
-            {(access.permissions?.length ?? 0) === 1 ? "" : "s"} shared with you
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3 text-sm">
+          <span>
+            <span className="font-medium">You&apos;re on {access.ownerName}&apos;s team</span>
+            <span className="text-muted-foreground">
+              {" "}· {access.role ?? "member"} · {(access.permissions?.length ?? 0)} page
+              {(access.permissions?.length ?? 0) === 1 ? "" : "s"} shared with you
+            </span>
           </span>
+          {/* Joining was one-way until now: accepting restricted your menu to whatever
+              was shared, with no way out except asking the owner to remove you. */}
+          {access.membershipId && (
+            <Button
+              size="sm" variant="outline" className="ml-auto"
+              onClick={() => onDropMembership(String(access.membershipId), "leave the team")}
+              disabled={acceptBusy === String(access.membershipId)}
+            >
+              Leave team
+            </Button>
+          )}
         </div>
       )}
 

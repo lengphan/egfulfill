@@ -78,13 +78,14 @@ export function teamRoutes(app, requireAuth) {
   app.get('/api/team/my-access', { preHandler: requireAuth }, async (req) => {
     try {
       const r = await q(
-        `select t.owner_id, t.role, t.permissions,
+        `select t.id, t.owner_id, t.role, t.permissions,
                 coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
            from team_members t left join users u on u.id::text = t.owner_id
           where lower(t.email)=lower($1) and t.status='active' limit 1`, [req.user.email || '']);
       if (!r.rows[0]) return { member: false, permissions: null };
       const row = r.rows[0];
-      return { member: true, ownerId: row.owner_id, role: row.role, ownerName: row.owner_name || 'your team',
+      // membershipId lets the member leave the team from their own settings.
+      return { member: true, membershipId: row.id, ownerId: row.owner_id, role: row.role, ownerName: row.owner_name || 'your team',
                permissions: Array.isArray(row.permissions) ? row.permissions : [] };
     } catch (e) { return { member: false, permissions: null }; }
   });
@@ -189,9 +190,31 @@ export function teamRoutes(app, requireAuth) {
     return { ok: true };
   });
 
+  /**
+   * Remove a membership row. Two legitimate callers, and only these two:
+   *   • the OWNER — removing someone from their team, or cancelling a pending invite
+   *   • the MEMBER themselves — leaving a team, or declining an invite
+   *
+   * The member half was missing, so accepting was one-way: a mis-clicked invite left
+   * you restricted to whatever the owner had shared, with no way out except asking
+   * them to remove you. Declining a pending invite was impossible for the same reason,
+   * which is why test invites piled up instead of being cleared.
+   *
+   * Matched on user_id OR email because a PENDING invite has no user_id yet.
+   */
   app.delete('/api/team/members/:id', { preHandler: requireAuth }, async (req) => {
-    await q('delete from team_members where id=$1 and owner_id=$2', [req.params.id, req.user.sub]);
-    return { ok: true };
+    let email = '';
+    try {
+      const me = await q('select email from users where id=$1', [req.user.sub]);
+      email = (me.rows[0] && me.rows[0].email) || '';
+    } catch (e) { /* fall back to the token's copy */ }
+    if (!email) email = req.user.email || '';
+
+    const r = await q(
+      `delete from team_members
+        where id=$1 and (owner_id=$2 or user_id=$2::text or lower(email)=lower($3))`,
+      [req.params.id, req.user.sub, email]);
+    return { ok: true, removed: r.rowCount || 0 };
   });
 
   // Accept an invite — the invitee must be SIGNED IN and their email must match the
