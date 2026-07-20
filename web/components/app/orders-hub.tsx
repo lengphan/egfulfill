@@ -19,6 +19,7 @@ import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
+import { ThreadBreakdown } from "@/components/app/thread-breakdown"
 import { ReadinessStrip } from "@/components/app/readiness-dots"
 import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
@@ -874,12 +875,17 @@ export function OrdersHub() {
                                       </span>
                                     )}
                                     {cones.length > 0 && (
-                                      <span className="inline-flex items-center gap-1 text-muted-foreground" title={cones.map((c) => `${c.code} ${c.name}`).join(", ")}>
-                                        {cones.map((c) => (
-                                          <span key={c.code} className="size-3 rounded-full border border-black/10" style={{ background: c.hex }} />
-                                        ))}
-                                        <span>{cones.length} cone{cones.length === 1 ? "" : "s"}</span>
-                                      </span>
+                                      // The chip said WHICH cones; it now opens the map of
+                                      // which cone covers which part of the artwork — the
+                                      // half a digitiser was previously guessing at.
+                                      <ThreadBreakdown artwork={artworkFor(o, it)}>
+                                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                          {cones.map((c) => (
+                                            <span key={c.code} className="size-3 rounded-full border border-black/10" style={{ background: c.hex }} />
+                                          ))}
+                                          <span>{cones.length} cone{cones.length === 1 ? "" : "s"}</span>
+                                        </span>
+                                      </ThreadBreakdown>
                                     )}
                                     {file && (
                                       <span className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground" title={`Machine file ${file.name ?? ""} · ${file.designId}`}>
