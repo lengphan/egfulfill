@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/app/sidebar"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
 import { PageTransition } from "@/components/motion/page-transition"
+import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { getUser } from "@/lib/auth"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
 
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (mode === "staff") {
     return (
+      <ConfirmProvider>
       <div className="min-h-svh bg-background">
         <StaffSidebar />
         <div className="md:pl-60">
@@ -47,10 +49,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      </ConfirmProvider>
     )
   }
 
   return (
+    <ConfirmProvider>
     <div className="min-h-svh bg-background">
       <Sidebar />
       <div className="md:pl-60">
@@ -60,5 +64,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </ConfirmProvider>
   )
 }

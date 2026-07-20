@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { CircleNotch } from "@phosphor-icons/react"
 import { StaffSidebar } from "@/components/app/staff-sidebar"
+import { ConfirmProvider } from "@/components/app/confirm-dialog"
 import { TopBar } from "@/components/app/topbar"
 import { getUser, getToken } from "@/lib/auth"
 import { STAFF_ROLES, staffNav, landingFor } from "@/lib/staff-nav"
@@ -43,6 +44,7 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
   }
 
   return (
+    <ConfirmProvider>
     <div className="min-h-svh bg-background">
       <StaffSidebar />
       <div className="md:pl-60">
@@ -50,5 +52,6 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
         <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">{children}</main>
       </div>
     </div>
+    </ConfirmProvider>
   )
 }

@@ -933,6 +933,10 @@ export type EtsyListing = {
   price_usd?: number | null
   /** True when price_usd came from a conversion, so the UI can mark it approximate. */
   price_converted?: boolean
+  /** Real variation price range, when the listing has variable pricing. `price` alone is
+   *  a single figure that variations often override — a listing priced 38 can sell 19–30. */
+  price_min?: number | null
+  price_max?: number | null
   url: string
   image: string | null
   images?: string[]

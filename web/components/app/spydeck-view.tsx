@@ -36,6 +36,25 @@ const money = (n: number | null, cur = "USD", usdPrice?: number | null, converte
     return `${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${code}`
   }
 }
+/**
+ * What a buyer can actually pay. A listing's headline `price` is one figure, but
+ * variations override it — a necklace listed at 38 can sell 19–30 across lengths, so the
+ * single number is both wrong and hides that a range exists at all. Shows a range when
+ * the variations differ, and falls back to the single price when they don't.
+ */
+const priceLabel = (l: EtsyListing) => {
+  // The range arrives in the SHOP's currency, same as `price`. Applying the rate the
+  // server already derived (price_usd / price) keeps the range in the same unit as the
+  // single-price fallback — otherwise a MYR range would render with a $ sign.
+  const rate = l.price_converted && l.price ? (Number(l.price_usd) || 0) / Number(l.price) : 1
+  const conv = (v: number) => v * (isFinite(rate) && rate > 0 ? rate : 1)
+  const pre = l.price_converted ? "~" : ""
+  const lo = l.price_min, hi = l.price_max
+  if (lo != null && hi != null && hi - lo > 0.005) return `${pre}${usd(conv(lo))}–${usd(conv(hi))}`
+  if (lo != null) return `${pre}${usd(conv(lo))}`
+  return money(l.price, l.currency, l.price_usd, l.price_converted)
+}
+
 const origPrice = (n: number | null, cur?: string) =>
   n == null ? undefined : `Listed at ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${(cur || "USD").toUpperCase()}`
 
@@ -119,7 +138,7 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
           )}
           {/* Price — always visible on the image, out of the stats. */}
           <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-1 text-sm font-bold tabular-nums text-white backdrop-blur">
-            <span title={l.price_converted ? origPrice(l.price, l.currency) : undefined}>{money(l.price, l.currency, l.price_usd, l.price_converted)}</span>
+            <span title={l.price_converted ? origPrice(l.price, l.currency) : undefined}>{priceLabel(l)}</span>
           </span>
         </div>
         <div className="flex flex-1 flex-col p-3">
@@ -477,7 +496,7 @@ export function SpyDeckView() {
           </div>
         }
       >
-        {view === "search" && (
+        {(view === "search" || view === "trending") && (
           <div className="border-b border-border p-4">
             <div className="flex items-center gap-2">
               <div className="relative max-w-md flex-1">
@@ -495,7 +514,7 @@ export function SpyDeckView() {
                   <SlidersHorizontal size={15} weight="bold" /> Filters
                 </Button>
               )}
-              <Button onClick={() => run()} disabled={loading || (!query.trim() && !hasFilter)}>
+              <Button onClick={() => { setView("search"); run() }} disabled={loading || (!query.trim() && !hasFilter)}>
                 {loading ? "Searching…" : "Search"}
               </Button>
             </div>

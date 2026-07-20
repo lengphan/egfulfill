@@ -352,18 +352,40 @@ export async function searchListings(query, opts = {}) {
   const pickImg = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
   // findAllListingsActive frequently DROPS the Images include → batch-fetch images and merge.
   const imgsById = {};
+  // Real price RANGE per listing. A listing's `price` is a single figure that often does
+  // not match what a buyer sees: variations override it (a necklace listing priced 38 can
+  // sell 19–30 across lengths), so one number is both wrong and hides that a range exists.
+  // The range lives in Inventory, and /listings/batch already runs for images — asking for
+  // Inventory on the SAME call costs no extra request, up to 100 listings at a time.
+  const rangeById = {};
   const ids = base.map((l) => l.listing_id).filter(Boolean);
-  if (ids.length && base.some((l) => !(l.images && l.images[0]))) {
+  if (ids.length) {
     try {
-      const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images';
+      const bu = API + '/listings/batch?listing_ids=' + ids.slice(0, 100).join(',') + '&includes=Images,Inventory';
       const br = await fetch(bu, { headers: { 'x-api-key': API_KEY_HEADER } });
       if (br.ok) {
         const bd = await br.json().catch(() => ({}));
-        (bd.results || []).forEach((l) => { const arr = (l.images || []).map(pickImg).filter(Boolean); if (arr.length) imgsById[l.listing_id] = arr; });
+        (bd.results || []).forEach((l) => {
+          const arr = (l.images || []).map(pickImg).filter(Boolean);
+          if (arr.length) imgsById[l.listing_id] = arr;
+          const offs = (l.inventory && l.inventory.products) || [];
+          const prices = [];
+          for (const prod of offs) {
+            for (const o of (prod.offerings || [])) {
+              if (o && o.is_enabled === false) continue;
+              const p = o && o.price ? Number(o.price.amount) / (Number(o.price.divisor) || 100) : 0;
+              if (p > 0) prices.push(p);
+            }
+          }
+          if (prices.length) {
+            prices.sort((a, b) => a - b);
+            rangeById[l.listing_id] = { min: prices[0], max: prices[prices.length - 1] };
+          }
+        });
       }
-    } catch (e) { /* image enrich is best-effort */ }
+    } catch (e) { /* enrichment is best-effort — never fail a search over it */ }
   }
-  const results = await attachUsd(base.map((l) => mapListing(l, imgsById)));
+  const results = await attachUsd(base.map((l) => mapListing(l, imgsById, rangeById)));
   return { count: d.count || results.length, query, offset, limit, results };
 }
 
@@ -392,7 +414,7 @@ export async function attachUsd(results) {
 
 // The ONE Etsy listing → app shape mapper. Search AND the shop analyzer both use it,
 // so a listing has identical fields wherever SpyDeck renders it.
-export function mapListing(l, imgsById = {}) {
+export function mapListing(l, imgsById = {}, rangeById = {}) {
   const pick = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
   const inlineImgs = (l.images || []).map(pick).filter(Boolean);
   const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
@@ -401,6 +423,10 @@ export function mapListing(l, imgsById = {}) {
     title: l.title || '',
     description: l.description || '',
     price: l.price ? (Number(l.price.amount) / (Number(l.price.divisor) || 100)) : null,
+    // What buyers can actually pay, across variations. Null when the listing has no
+    // variable pricing (then `price` is the whole truth).
+    price_min: (rangeById[l.listing_id] || {}).min ?? null,
+    price_max: (rangeById[l.listing_id] || {}).max ?? null,
     currency: (l.price && l.price.currency_code) || 'USD',
     url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
     tags: Array.isArray(l.tags) ? l.tags : [],

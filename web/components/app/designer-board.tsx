@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getDesignCards, saveDesignCards, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
+import { useConfirm } from "@/components/app/confirm-dialog"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
@@ -27,6 +28,7 @@ const amt = (v: unknown) => Number(v) || 0
 const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 export function DesignerBoard() {
+  const confirm = useConfirm()
   const [cards, setCards] = useState<DesignCard[] | null>(null)
   const [dragId, setDragId] = useState<string | number | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
@@ -167,11 +169,15 @@ export function DesignerBoard() {
                           <button
                             aria-label={`Cancel ${c.title || "card"}`}
                             title="Cancel this card"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation()
-                              if (window.confirm(`Cancel "${c.title || "this card"}"? It will be removed from the board.`)) {
-                                persist((cards ?? []).filter((x) => x.id !== c.id))
-                              }
+                              const ok = await confirm({
+                                title: "Cancel this card?",
+                                body: `"${c.title || "This card"}" will be removed from the board. The order itself isn't affected.`,
+                                confirmLabel: "Cancel card",
+                                cancelLabel: "Keep it",
+                              })
+                              if (ok) persist((cards ?? []).filter((x) => x.id !== c.id))
                             }}
                             className="eg-tap absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
                           >
