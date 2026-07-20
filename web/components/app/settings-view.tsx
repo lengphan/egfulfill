@@ -1487,6 +1487,12 @@ export function SettingsView() {
   // API keys are for integrating AGAINST the platform — a seller wiring up their own
   // systems, or an admin. Floor roles have nothing to integrate.
   const [canUseKeys, setCanUseKeys] = useState(false)
+  // Anyone with a pending invite must be able to reach Team, whatever their role.
+  // The invite notification says "Open Settings -> Team to accept", but the tab was
+  // seller-only — so an invited staff account got a notification pointing at a tab that
+  // did not exist for them, and sat 'invited' forever. An un-accepted membership applies
+  // NO permission limits, so that state is not harmless.
+  const [hasInvites, setHasInvites] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
@@ -1495,9 +1501,11 @@ export function SettingsView() {
       // A plan is a seller subscription; staff roles don't have one.
       setIsSeller(!u?.role || u.role === "seller")
       setCanUseKeys(!u?.role || u.role === "seller" || u.role === "admin")
+      getMyInvites().then((r) => setHasInvites((r ?? []).length > 0)).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [])
+  const showTeam = isSeller || hasInvites
 
   return (
     <Tabs defaultValue="profile" className="space-y-4">
@@ -1514,7 +1522,7 @@ export function SettingsView() {
         {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
             in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
             them to invite people into an account that isn't theirs. */}
-        {isSeller && <TabsTrigger value="team">Team</TabsTrigger>}
+        {showTeam && <TabsTrigger value="team">Team</TabsTrigger>}
         {/* Plan is a SELLER subscription — operator/warehouse/admin have no plan. */}
         {isSeller && <TabsTrigger value="plan">Plan</TabsTrigger>}
       </TabsList>
@@ -1547,7 +1555,9 @@ export function SettingsView() {
           <IntegrationsPanel />
         </TabsContent>
       )}
-      {isSeller && (
+      {/* Same condition as the trigger — gating the two differently would render a tab
+          that opens onto nothing. */}
+      {showTeam && (
         <TabsContent value="team">
           <TeamPanel />
         </TabsContent>

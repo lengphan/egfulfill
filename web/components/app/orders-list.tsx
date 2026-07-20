@@ -1,7 +1,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { SubmitOrderButton, isSubmittable } from "@/components/app/submit-order-button"
+import { SubmitOrderButton } from "@/components/app/submit-order-button"
 import { useRouter } from "next/navigation"
 import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
@@ -342,25 +342,7 @@ export function OrdersList() {
                         </button>
                       </TableCell>
                       {visibleCols.map((id) => (
-                        <TableCell key={id} className={cellClass(id)}>
-                          {renderCell(id, o, designs[o.id], catalog)}
-                          {/* Submit lives in the STATUS cell rather than a column of its
-                              own: it's an action on the status ("Pending" -> sent), it's
-                              where you already look to see a row needs you, and an extra
-                              column would be empty on most rows while stealing width from
-                              Items. Previously you had to open each order to submit it,
-                              which made a five-order morning five page loads. */}
-                          {id === "status" && isSubmittable(o) && (
-                            <div className="mt-1.5">
-                              <SubmitOrderButton
-                                order={o}
-                                onDone={load}
-                                label="Submit"
-                                className="h-6 w-full px-2 text-[11px]"
-                              />
-                            </div>
-                          )}
-                        </TableCell>
+                        <TableCell key={id} className={cellClass(id)}>{renderCell(id, o, designs[o.id], catalog)}</TableCell>
                       ))}
                     </TableRow>
 
@@ -418,7 +400,13 @@ export function OrdersList() {
                               ) : (
                                 <span className="inline-flex items-center gap-1"><Truck size={12} weight="fill" /> No tracking yet</span>
                               )}
-                              <span className="ml-auto">
+                              {/* Actions live together in the expanded row. Submit was
+                                  briefly stacked under the Status badge, which put a
+                                  column of primary buttons down the table — status is a
+                                  STATE, submit is an ACTION, and six of them read as six
+                                  alarms rather than one thing to do. */}
+                              <span className="ml-auto flex items-center gap-2">
+                                <SubmitOrderButton order={o} onDone={load} label="Submit to production" />
                                 <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${encodeURIComponent(o.id)}`) }}>
                                   Open order <CaretRight size={12} weight="bold" />
                                 </Button>
