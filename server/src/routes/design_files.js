@@ -241,7 +241,13 @@ export function designFilesRoutes(app, requireAuth) {
     const eff = await effectiveSeller(req.user);
     if (row.seller_id && row.seller_id !== eff) { reply.code(403); return { error: 'forbidden' }; }
     const price = Number(row.price) || 0;
-    return { paid: price <= 0 || (await isPaid(row, eff)), price, name: row.file_name };
+    // canBuy tells the UI whether to offer the button at all — a team member should see
+    // "ask the owner", not a Buy button that 403s.
+    return {
+      paid: price <= 0 || (await isPaid(row, eff)),
+      price, name: row.file_name,
+      canBuy: String(eff) === String(req.user.sub),
+    };
   });
 
   // Buy the file — one idempotent debit. (account,type,ref) is uniquely indexed, so a
@@ -253,6 +259,16 @@ export function designFilesRoutes(app, requireAuth) {
     if (isStaff(req.user)) { reply.code(400); return { error: 'Staff already have access — nothing to buy' }; }
     const eff = await effectiveSeller(req.user);
     if (row.seller_id && row.seller_id !== eff) { reply.code(403); return { error: 'forbidden' }; }
+
+    // Only the account OWNER buys. A team member acts under the owner (effectiveSeller
+    // resolves to owner_id), which meant a member could spend the owner's wallet — so
+    // spending is restricted to the owner while everything else a member does still
+    // resolves to the owner as before. A purchased file stays usable by the whole team;
+    // it's the SPEND that's the leader's call.
+    if (String(eff) !== String(req.user.sub)) {
+      reply.code(403);
+      return { error: 'Only the account owner can buy design files. Ask them to purchase it for the team.' };
+    }
 
     const price = Number(row.price) || 0;
     if (price <= 0) return { ok: true, paid: true, free: true };
