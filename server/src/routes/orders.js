@@ -340,8 +340,19 @@ export function ordersRoutes(app, requireAuth) {
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Order not found' }; }
     if (!isStaff(req.user)) {
+      // resolveSeller returns an OBJECT {id, perms, member}. This compared String(sel) —
+      // always "[object Object]" — so the check could never pass and every seller got a
+      // 404 on their own order. Fail-closed, so nothing leaked, but the real ownership
+      // test wasn't running either.
+      //
+      // 404 (not 403) on all three refusals on purpose: telling a stranger "that exists
+      // but isn't yours" confirms the id. Same reason a team member without the `orders`
+      // surface gets the same answer as someone asking for an order that doesn't exist.
       const sel = await resolveSeller(req.user);
-      if (!sel || String(row.seller_id) !== String(sel)) { reply.code(404); return { error: 'Order not found' }; }
+      const mine = sel && sel.id && String(row.seller_id) === String(sel.id);
+      if (!mine || !_canSurface(sel, 'orders') || row.factory_order) {
+        reply.code(404); return { error: 'Order not found' };
+      }
     }
     return row;
   });

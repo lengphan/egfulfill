@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { SubmitOrderButton, isSubmittable } from "@/components/app/submit-order-button"
 import { useRouter } from "next/navigation"
-import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, UploadSimple, CaretRight, Truck, MapPin, ArrowSquareOut, Storefront } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getCatalogProducts, getOrderDesigns, postOrderDesign, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { getOrders, getCatalogProducts, getOrderDesigns, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken } from "@/lib/auth"
@@ -171,6 +171,22 @@ export function OrdersList() {
     return () => clearTimeout(id)
   }, [load])
 
+  // Whose orders am I looking at? A team member works IN their leader's shop — these are
+  // the leader's orders, not theirs — and without saying so the list is confusing in both
+  // directions ("where did my orders go?" / "why can they see these?"). Owners get null
+  // and no banner.
+  const [actingFor, setActingFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!getToken()) return
+    let live = true
+    const id = setTimeout(() => {
+      getMyAccess()
+        .then((a) => { if (live) setActingFor(a.member ? (a.ownerName ?? "your team") : null) })
+        .catch(() => {})
+    }, 0)
+    return () => { live = false; clearTimeout(id) }
+  }, [])
+
   const stats = useMemo(() => {
     const list = orders ?? []
     const byGroup = (g: string) => list.filter((o) => sellerStatus(o).group === g).length
@@ -195,6 +211,17 @@ export function OrdersList() {
 
   return (
     <div className="space-y-4">
+      {actingFor && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3.5 py-2 text-sm">
+          <Storefront size={15} weight="fill" className="shrink-0 text-primary" />
+          <span>
+            <span className="font-medium">Viewing {actingFor}&apos;s orders.</span>{" "}
+            <span className="text-muted-foreground">
+              You&apos;re working in their shop, so anything you create here belongs to them — your own orders stay separate and private.
+            </span>
+          </span>
+        </div>
+      )}
       <StatGrid>
         <StatCard label="Pending" value={String(stats.received)} sub="not submitted yet" />
         <StatCard label="In production" value={String(stats.prod)} sub="being fulfilled" />
