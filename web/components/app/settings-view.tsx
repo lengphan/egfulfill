@@ -23,6 +23,7 @@ import {
   revokeApiKey,
   getTeam,
   getMyInvites,
+  ApiError,
   getMyAccess,
   acceptInvite,
   type MyInvite,
@@ -437,12 +438,29 @@ function TeamPanel() {
   const [invites, setInvites] = useState<MyInvite[]>([])
   const [access, setAccess] = useState<MyAccess | null>(null)
   const [acceptBusy, setAcceptBusy] = useState<string | null>(null)
+  // Why the invite list is empty. Swallowing this made an expired session, a network
+  // failure and "you have no invites" render as the same blank panel — so a notification
+  // saying "you were invited" sat next to a page showing nothing, with no way to tell
+  // which of the three was happening.
+  const [inviteErr, setInviteErr] = useState<string | null>(null)
 
   const load = useCallback(() => {
     getTeam()
       .then((rows) => setMembers(rows ?? []))
       .catch(() => setMembers([]))
-    getMyInvites().then(setInvites).catch(() => setInvites([]))
+    getMyInvites()
+      .then((r) => { setInvites(r ?? []); setInviteErr(null) })
+      .catch((e) => {
+        setInvites([])
+        // ApiError carries the real status — read it rather than pattern-matching a
+        // message, which changes whenever the server's wording does.
+        const status = e instanceof ApiError ? e.status : 0
+        setInviteErr(
+          status === 401
+            ? "Your session has expired — sign out and back in to see invites."
+            : `Couldn't load invites${status ? ` (${status})` : ""}: ${e instanceof Error ? e.message : String(e)}`
+        )
+      })
     getMyAccess().then(setAccess).catch(() => setAccess(null))
   }, [])
   useEffect(() => {
@@ -513,6 +531,9 @@ function TeamPanel() {
       {/* MY side of things. An invite has to be accepted before any sharing limits take
           effect — until then the membership is 'invited' and the member sees everything,
           which looked exactly like "the toggles don't work". */}
+      {inviteErr && (
+        <div className="border-b border-border bg-destructive/10 px-5 py-3 text-sm text-destructive">{inviteErr}</div>
+      )}
       {invites.map((inv) => (
         <div key={inv.id} className="flex flex-col gap-2 border-b border-border bg-primary/5 px-5 py-4 sm:flex-row sm:items-center">
           <div className="min-w-0 flex-1">
