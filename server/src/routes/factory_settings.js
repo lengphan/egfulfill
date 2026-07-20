@@ -86,6 +86,56 @@ export async function readProductTypes() {
   } catch { /* table not ready */ }
   return DEFAULT_TYPES.map((t) => ({ name: t.name, sides: t.sides, mockups: {}, mockup: null }));
 }
+/**
+ * The factory's embroidery thread stock — code, name, colour.
+ *
+ * Was a hardcoded 16-colour array in the client. Matching is only ever as good as the
+ * cones on the shelf: with 16 colours a light blue resolves to Grey and a dusty pink
+ * had nowhere sensible to go. A real Madeira/Isacord chart is hundreds of cones, and
+ * which of them the factory actually stocks is a floor decision, not a code constant.
+ *
+ * Empty/unset = the client falls back to its built-in starter palette, so an install
+ * that never touches this keeps working exactly as before.
+ */
+export const THREAD_PALETTE_KEY = 'thread_palette';
+
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/** Stored palette, or [] when unset. Rows are validated on read as well as on write —
+ *  a hand-edited settings row must not be able to inject junk into every board. */
+export async function readThreadPalette() {
+  try {
+    const r = await q('select value from settings where key=$1', [THREAD_PALETTE_KEY]);
+    const v = r.rows[0] && r.rows[0].value;
+    if (Array.isArray(v)) {
+      return v
+        .filter((t) => t && t.code && t.name && HEX_RE.test(String(t.hex || '')))
+        .map((t) => ({ code: String(t.code), name: String(t.name), hex: String(t.hex).toUpperCase() }));
+    }
+  } catch { /* table not ready */ }
+  return [];
+}
+
+/** Validate + de-dupe an incoming palette. Returns null if the body isn't a palette. */
+export function normalizeThreadPalette(input) {
+  if (!Array.isArray(input)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const t of input) {
+    const code = String((t && t.code) || '').trim().slice(0, 24);
+    const name = String((t && t.name) || '').trim().slice(0, 60);
+    const hex = String((t && t.hex) || '').trim();
+    // A cone with no code can't be pulled off a shelf and a bad hex would silently
+    // match everything to black — drop rather than coerce.
+    if (!code || !name || !HEX_RE.test(hex)) continue;
+    const key = code.toLowerCase();
+    if (seen.has(key)) continue;            // code is the identity; last write wins is worse
+    seen.add(key);
+    out.push({ code, name, hex: hex.toUpperCase() });
+  }
+  return out;
+}
+
 const SHIP_FROM_FIELDS = ['name', 'company', 'street', 'street2', 'city', 'state', 'zip', 'country', 'phone', 'email'];
 
 export async function readShipFrom() {
@@ -127,10 +177,18 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
     return readProductTypes();
   });
 
+  // Cone codes/names/colours carry no cost or margin information, and the seller-side
+  // Design Maker needs them to thread-match — so this reads for any signed-in user,
+  // exactly like /api/product_types. Writing stays warehouse/admin.
+  app.get('/api/thread_palette', { preHandler: requireAuth }, async () => {
+    await ensure();
+    return readThreadPalette();
+  });
+
   app.get('/api/factory/settings', { preHandler: requireStaff }, async () => {
     await ensure();
-    const [nums, shipFrom, types] = await Promise.all([readAll(), readShipFrom(), readProductTypes()]);
-    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: types };
+    const [nums, shipFrom, types, threads] = await Promise.all([readAll(), readShipFrom(), readProductTypes(), readThreadPalette()]);
+    return { ...nums, ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: types, thread_palette: threads };
   });
 
   app.put('/api/factory/settings', { preHandler: requireStaff }, async (req, reply) => {
@@ -175,7 +233,14 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',
         [PRODUCT_TYPES_KEY, JSON.stringify(types)]);
     }
+    if (b.thread_palette !== undefined) {
+      const palette = normalizeThreadPalette(b.thread_palette);
+      if (palette) {
+        await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',
+          [THREAD_PALETTE_KEY, JSON.stringify(palette)]);
+      }
+    }
     const shipFrom = await readShipFrom();
-    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: await readProductTypes() };
+    return { ok: true, ...(await readAll()), ship_from: shipFrom, ship_from_complete: shipFromComplete(shipFrom), product_types: await readProductTypes(), thread_palette: await readThreadPalette() };
   });
 }

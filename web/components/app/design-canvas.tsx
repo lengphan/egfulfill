@@ -9,6 +9,7 @@ import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { matchThreadColors, nearestThread, hexToRgb, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
 
 export type Pos = { x: number; y: number; w: number; r: number }
@@ -326,7 +327,10 @@ export function DesignCanvasDialog({
       if (!live) return
       if (!isEmb || !designUrl) { setThreads([]); setThreadErr(false); return }
       setThreadErr(false)
-      matchThreadColors(designUrl).then((t) => {
+      // Load the factory's real cone stock BEFORE matching. Matching against the
+      // built-in starter set first would show cones nobody has on a shelf, and the
+      // loader is memoised so this is one fetch per session, not per design.
+      loadThreadPalette().then(() => matchThreadColors(designUrl)).then((t) => {
         if (!live) return
         setThreads(t)
         setThreadErr(t.length === 0)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { setActivePalette } from "@/lib/thread-match"
 import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -35,6 +36,7 @@ import {
   adjustBalance,
   type ShipFromAddress,
   type ProductType,
+  type ThreadColor,
   ALL_SIDES,
   setFactorySettings,
   getUsers,
@@ -717,6 +719,11 @@ function PlatformPanel() {
   // Product types + the mockup that stands in for the whole category.
   const [types, setTypes] = useState<ProductType[]>([])
   const [newType, setNewType] = useState("")
+  // The factory's embroidery cone stock. Matching is only ever as good as what's on the
+  // shelf — with the built-in 16 a light blue resolves to Grey — so this is floor data,
+  // not a code constant.
+  const [threads, setThreads] = useState<ThreadColor[]>([])
+  const [newThread, setNewThread] = useState<ThreadColor>({ code: "", name: "", hex: "#000000" })
   const setFromField = (k: keyof ShipFromAddress, v: string) => setShipFrom((p) => ({ ...p, [k]: v }))
   const setBand = (k: string, v: string) => setBands((p) => ({ ...p, [k]: v.replace(/[^0-9.]/g, "") }))
 
@@ -729,6 +736,7 @@ function PlatformPanel() {
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
       setShipFrom(r.ship_from ?? {})
       setTypes(r.product_types ?? [])
+      setThreads(r.thread_palette ?? [])
       setBands(Object.fromEntries(
         ["ship_cap", "ship_heavy", "ship_garment", "method_dtg", "method_dtf", "method_emb", "method_apl", "method_lsr"]
           .map((k) => [k, r[k] != null ? String(r[k]) : ""])
@@ -748,8 +756,12 @@ function PlatformPanel() {
         ...Object.fromEntries(Object.entries(bands).map(([k, v]) => [k, v === "" ? undefined : Number(v)])),
         ship_from: shipFrom,
         product_types: types,
+        thread_palette: threads,
       })
       if (r.error) throw new Error(r.error)
+      // Push the new stock into the matcher so open boards stop matching against the
+      // palette that was just replaced.
+      setActivePalette(r.thread_palette ?? threads)
       setSaved(true); setTimeout(() => setSaved(false), 2000)
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't save — warehouse/admin only.")
@@ -793,6 +805,108 @@ function PlatformPanel() {
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
+      <Fold title="Embroidery threads" hint="the cones you actually stock">
+
+        <p className="mb-3 text-xs text-muted-foreground">
+          Thread matching picks the nearest cone <em>you stock</em>. The built-in starter
+          list is 16 colours, which is why a light blue can come back as Grey — add your
+          real chart here and matches get proportionally better. Leave it empty to keep
+          the starter list.
+        </p>
+
+        <div className="mb-3 overflow-hidden rounded-lg border border-border">
+          <div className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <span className="w-6" />
+            <span>Code</span>
+            <span>Name</span>
+            <span className="w-8" />
+          </div>
+          {threads.length === 0 ? (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              No cones added — matching uses the 16-colour starter list.
+            </div>
+          ) : (
+            <div className="max-h-72 divide-y divide-border overflow-y-auto">
+              {threads.map((t, i) => (
+                <div key={`${t.code}-${i}`} className="grid grid-cols-[auto_7rem_1fr_auto] items-center gap-2 px-3 py-1.5">
+                  {/* The colour is the point — a native picker beats a hex field you
+                      have to imagine. The hex is still shown, because a cone chart
+                      lists hexes and people copy them across. */}
+                  <input
+                    type="color"
+                    value={t.hex}
+                    onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, hex: e.target.value.toUpperCase() } : x)))}
+                    className="size-6 cursor-pointer rounded border border-border bg-transparent p-0"
+                    aria-label={`Colour for ${t.name || t.code}`}
+                  />
+                  <Input
+                    value={t.code}
+                    onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)))}
+                    className="h-7 font-mono text-xs"
+                    placeholder="1801"
+                  />
+                  <Input
+                    value={t.name}
+                    onChange={(e) => setThreads((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
+                    className="h-7 text-xs"
+                    placeholder="White"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setThreads((p) => p.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-red-600"
+                    title={`Remove ${t.name || t.code}`}
+                  >
+                    <Trash size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <input
+            type="color"
+            value={newThread.hex}
+            onChange={(e) => setNewThread((p) => ({ ...p, hex: e.target.value.toUpperCase() }))}
+            className="size-9 cursor-pointer rounded border border-border bg-transparent p-0"
+            aria-label="New thread colour"
+          />
+          <Input
+            value={newThread.code}
+            onChange={(e) => setNewThread((p) => ({ ...p, code: e.target.value }))}
+            placeholder="Code"
+            className="h-9 w-28 font-mono"
+          />
+          <Input
+            value={newThread.name}
+            onChange={(e) => setNewThread((p) => ({ ...p, name: e.target.value }))}
+            placeholder="Colour name"
+            className="h-9 w-44"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!newThread.code.trim() || !newThread.name.trim()}
+            onClick={() => {
+              const code = newThread.code.trim(), name = newThread.name.trim()
+              // Code is the identity — the number pulled off the shelf. Silently
+              // appending a duplicate would make two rows fight over one cone.
+              if (threads.some((t) => t.code.toLowerCase() === code.toLowerCase())) {
+                setErr(`Thread ${code} is already in the list.`); return
+              }
+              setErr(null)
+              setThreads((p) => [...p, { code, name, hex: newThread.hex }])
+              setNewThread({ code: "", name: "", hex: "#000000" })
+            }}
+          >
+            <Plus size={13} weight="bold" /> Add thread
+          </Button>
+          <span className="text-xs text-muted-foreground">{threads.length} cone{threads.length === 1 ? "" : "s"} — remember to Save</span>
+        </div>
+      </Fold>
+
       <Fold title="Product types" hint="sides + positioning outlines per category">
 
         <p className="mb-3 text-xs text-muted-foreground">

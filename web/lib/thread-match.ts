@@ -25,6 +25,29 @@ export const DEFAULT_THREAD_PALETTE: Thread[] = [
   { code: "1733", name: "Tan", hex: "#C8AD7F" },
 ]
 
+/**
+ * The ACTIVE palette — the factory's own cone stock once loaded, else the starter set.
+ *
+ * Every matcher below already took a `palette` argument, so this is only about what the
+ * default is. Kept as a module-level cell rather than threaded through every call site
+ * because matching happens deep inside canvas code on several surfaces, and a palette
+ * that differs between the cone chips and the thread map would be worse than either.
+ *
+ * `loadThreadPalette()` should be called once per session; until it resolves, matching
+ * still works against the starter set rather than failing.
+ */
+let ACTIVE_PALETTE: Thread[] = DEFAULT_THREAD_PALETTE
+
+export function setActivePalette(p: Thread[] | null | undefined) {
+  ACTIVE_PALETTE = Array.isArray(p) && p.length ? p : DEFAULT_THREAD_PALETTE
+  // Both caches hold palette-DERIVED results, so editing the stock invalidates them.
+  // REGION_CACHE especially: its entries embed the matched Thread objects, so leaving
+  // it would keep showing cones that are no longer stocked.
+  LAB_CACHE.clear()
+  REGION_CACHE.clear()
+}
+export const getActivePalette = (): Thread[] => ACTIVE_PALETTE
+
 type RGB = { r: number; g: number; b: number }
 
 export function hexToRgb(hex: string): RGB {
@@ -89,7 +112,7 @@ function labOfHex(hex: string): Lab {
 }
 
 /** Nearest thread to an RGB triple, by perceptual (OKLab) distance. */
-export function nearestThread(r: number, g: number, b: number, palette = DEFAULT_THREAD_PALETTE): Thread | null {
+export function nearestThread(r: number, g: number, b: number, palette = ACTIVE_PALETTE): Thread | null {
   const target = rgbToOklab(r, g, b)
   let best: Thread | null = null, bestD = Infinity
   for (const t of palette) {
@@ -99,7 +122,7 @@ export function nearestThread(r: number, g: number, b: number, palette = DEFAULT
   return best
 }
 
-export function nearestThreads(r: number, g: number, b: number, k = 4, palette = DEFAULT_THREAD_PALETTE): Thread[] {
+export function nearestThreads(r: number, g: number, b: number, k = 4, palette = ACTIVE_PALETTE): Thread[] {
   const target = rgbToOklab(r, g, b)
   return palette
     .map((t) => ({ t, d: labDist2(target, labOfHex(t.hex)) }))
@@ -234,7 +257,7 @@ const CACHE_MAX = 24       // designs; bounded so a long session can't grow fore
  * adds the positional half that was being discarded.
  */
 export function matchThreadRegions(
-  dataUrl: string, max = 6, palette = DEFAULT_THREAD_PALETTE,
+  dataUrl: string, max = 6, palette = ACTIVE_PALETTE,
   /**
    * Minimum share of design pixels for a colour to count, 0-1.
    *
@@ -366,7 +389,7 @@ export function matchThreadRegions(
 }
 
 // Auto-match: each dominant colour → its single nearest thread, de-duped by code.
-export async function matchThreadColors(dataUrl: string, max = 6, palette = DEFAULT_THREAD_PALETTE): Promise<Thread[]> {
+export async function matchThreadColors(dataUrl: string, max = 6, palette = ACTIVE_PALETTE): Promise<Thread[]> {
   const cols = await extractDominant(dataUrl, max)
   const seen = new Set<string>(), out: Thread[] = []
   for (const col of cols) {

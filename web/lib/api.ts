@@ -805,6 +805,20 @@ export type FactorySettings = {
   ship_from?: ShipFromAddress | null
   ship_from_complete?: boolean
   product_types?: ProductType[]
+  /** The factory's own cone stock. Empty = fall back to the built-in starter palette. */
+  thread_palette?: ThreadColor[]
+}
+
+/** One cone on the shelf: code (what you pull), name (what you call it), hex (what it looks like). */
+export type ThreadColor = { code: string; name: string; hex: string }
+
+/**
+ * The cone stock. Readable by ANY signed-in user — the seller-side Design Maker
+ * thread-matches too, and codes/names/colours carry no cost information. Writing goes
+ * through setFactorySettings, which the server gates to warehouse/admin.
+ */
+export function getThreadPalette() {
+  return api<ThreadColor[]>(`/api/thread_palette`)
 }
 /** A managed product type and the 2D mockup that represents the whole category. */
 export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"] as const
@@ -832,7 +846,7 @@ export function getFactorySettings() {
 }
 /** The numeric keys are addressed by name from the settings form, so the body stays
  *  loosely keyed — but the values are narrowed to what the route actually accepts. */
-export function setFactorySettings(body: Record<string, number | ShipFromAddress | ProductType[] | undefined>) {
+export function setFactorySettings(body: Record<string, number | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 

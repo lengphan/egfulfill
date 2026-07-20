@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { CircleNotch } from "@phosphor-icons/react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { matchThreadRegions, type ThreadRegion } from "@/lib/thread-match"
+import { loadThreadPalette } from "@/lib/thread-palette-load"
 
 /**
  * The cone list says WHAT to load; this says WHERE each cone goes.
@@ -34,7 +35,12 @@ export function ThreadBreakdown({
     // is short but it is synchronous once it starts.
     const id = setTimeout(() => {
       setRegions(null)
-      matchThreadRegions(artwork).then((r) => { if (alive) setRegions(r) }).catch(() => { if (alive) setRegions([]) })
+      // Palette first — matching against the starter set and then re-matching would
+      // flash cones the factory doesn't stock.
+      loadThreadPalette()
+        .then(() => matchThreadRegions(artwork))
+        .then((r) => { if (alive) setRegions(r) })
+        .catch(() => { if (alive) setRegions([]) })
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [open, artwork])
