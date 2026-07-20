@@ -27,6 +27,7 @@ import {
   deleteUserAdmin,
   type ShipFromAddress,
   type ProductType,
+  ALL_SIDES,
   setFactorySettings,
   getUsers,
   updateUserAdmin,
@@ -575,52 +576,103 @@ function PlatformPanel() {
       <div className="border-t border-border p-5">
         <div className="mb-1 text-sm font-medium">Product types</div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Each type can carry a default mockup — a simple 2D outline that represents the whole
-          category. Products of that type use it when they have no mockup of their own, so adding
-          three hats needs one hat graphic, not three.
+          Sides and outlines are set once per category and inherited by every product in it —
+          define four faces on Headwear and fifty hats get them without fifty uploads. The
+          outlines are positioning aids for the Design Maker only; they never appear as a
+          product&apos;s catalog image.
         </p>
         <div className="space-y-2">
-          {types.map((t, i) => (
-            <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
-              <label className="relative size-12 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border bg-muted">
-                {t.mockup ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={t.mockup} alt="" className="size-full object-contain" />
-                ) : (
-                  <span className="flex size-full items-center justify-center text-muted-foreground"><Plus size={14} /></span>
-                )}
-                <input
-                  type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0]; if (!f) return
-                    const rd = new FileReader()
-                    rd.onload = () => setTypes((p) => p.map((x, j) => (j === i ? { ...x, mockup: String(rd.result) } : x)))
-                    rd.readAsDataURL(f)
-                  }}
-                />
-              </label>
-              <Input
-                value={t.name}
-                onChange={(e) => setTypes((p) => p.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                className="h-9 flex-1"
-              />
-              {t.mockup && (
-                <Button variant="outline" size="sm" onClick={() => setTypes((p) => p.map((x, j) => (j === i ? { ...x, mockup: null } : x)))}>
-                  Clear mockup
-                </Button>
-              )}
-              <Button variant="outline" size="sm" aria-label={`Remove ${t.name}`} onClick={() => setTypes((p) => p.filter((_, j) => j !== i))}>
-                <Trash size={14} />
-              </Button>
-            </div>
-          ))}
+          {types.map((t, i) => {
+            const sides = t.sides?.length ? t.sides : ["front"]
+            const setType = (patch: Partial<ProductType>) =>
+              setTypes((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)))
+            const toggleSide = (sd: string) => {
+              const on = sides.includes(sd)
+              // Front is never removable — a product with no front can't be designed on.
+              if (on && (sd === "front" || sides.length === 1)) return
+              const next = on ? sides.filter((x) => x !== sd) : [...sides, sd]
+              // Turning a side OFF drops its outline: an orphaned image would silently
+              // reappear if the side were re-enabled, which isn't what "off" means.
+              const mockups = { ...(t.mockups ?? {}) }
+              if (on) delete mockups[sd]
+              setType({ sides: next, mockups })
+            }
+            return (
+              <div key={i} className="space-y-2.5 rounded-lg border border-border bg-card p-3">
+                <div className="flex items-center gap-2">
+                  <Input value={t.name} onChange={(e) => setType({ name: e.target.value })} className="h-9 flex-1" />
+                  <Button variant="outline" size="sm" aria-label={`Remove ${t.name}`} onClick={() => setTypes((p) => p.filter((_, j) => j !== i))}>
+                    <Trash size={14} />
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sides</span>
+                  {ALL_SIDES.map((sd) => {
+                    const on = sides.includes(sd)
+                    return (
+                      <button
+                        key={sd}
+                        onClick={() => toggleSide(sd)}
+                        disabled={on && sd === "front"}
+                        title={sd === "front" ? "Every product has a front" : undefined}
+                        className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium capitalize transition-colors " +
+                          (on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground")}
+                      >
+                        {sd}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* One outline slot per ENABLED side — turn a side off and its slot goes
+                    with it, so the grid always matches what this category actually has. */}
+                <div className="flex flex-wrap gap-2">
+                  {sides.map((sd) => {
+                    const url = t.mockups?.[sd] || (sd === "front" ? t.mockup ?? "" : "")
+                    return (
+                      <label key={sd} className="relative size-16 cursor-pointer overflow-hidden rounded-md border border-border bg-muted" title={`${sd} outline`}>
+                        {url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={url} alt="" className="size-full object-contain" />
+                        ) : (
+                          <span className="flex size-full flex-col items-center justify-center gap-0.5 text-muted-foreground">
+                            <Plus size={12} />
+                            <span className="text-[9px] capitalize">{sd}</span>
+                          </span>
+                        )}
+                        <input
+                          type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]; if (!f) return
+                            const rd = new FileReader()
+                            rd.onload = () => setType({ mockups: { ...(t.mockups ?? {}), [sd]: String(rd.result) } })
+                            rd.readAsDataURL(f)
+                          }}
+                        />
+                        {url && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); const m = { ...(t.mockups ?? {}) }; delete m[sd]; setType({ mockups: m }) }}
+                            className="absolute right-0 top-0 grid size-4 place-items-center bg-background/85 text-[10px] text-muted-foreground hover:text-red-600"
+                            aria-label={`Clear ${sd} outline`}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
           <div className="flex items-center gap-2">
             <Input
               value={newType} onChange={(e) => setNewType(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newType.trim()) { setTypes((p) => [...p, { name: newType.trim(), mockup: null }]); setNewType("") } }}
+              onKeyDown={(e) => { if (e.key === "Enter" && newType.trim()) { setTypes((p) => [...p, { name: newType.trim(), sides: ["front"], mockups: {} }]); setNewType("") } }}
               placeholder="Add a type…" className="h-9 max-w-xs"
             />
-            <Button variant="outline" size="sm" disabled={!newType.trim()} onClick={() => { setTypes((p) => [...p, { name: newType.trim(), mockup: null }]); setNewType("") }}>
+            <Button variant="outline" size="sm" disabled={!newType.trim()} onClick={() => { setTypes((p) => [...p, { name: newType.trim(), sides: ["front"], mockups: {} }]); setNewType("") }}>
               <Plus size={14} weight="bold" /> Add
             </Button>
           </div>

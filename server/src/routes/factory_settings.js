@@ -55,15 +55,36 @@ export const SHIP_FROM_KEY = 'ship_from';
  * upload per product. A product's own mockup still wins when it has one.
  */
 export const PRODUCT_TYPES_KEY = 'product_types';
-const DEFAULT_TYPES = ['Apparel', 'Headwear', 'Bags', 'Drinkware', 'Accessories', 'Other'];
+
+/** Sides a product CAN have. Which ones a type actually uses is chosen per type. */
+export const ALL_SIDES = ['front', 'back', 'left', 'right', 'sleeve', 'hood', 'inside', 'wrap'];
+
+// Sensible starting sides per category, so a fresh install isn't a blank grid.
+const DEFAULT_TYPES = [
+  { name: 'Apparel', sides: ['front', 'back'] },
+  { name: 'Headwear', sides: ['front', 'back', 'left', 'right'] },
+  { name: 'Bags', sides: ['front', 'back'] },
+  { name: 'Drinkware', sides: ['front', 'wrap'] },
+  { name: 'Accessories', sides: ['front'] },
+  { name: 'Other', sides: ['front'] },
+];
 
 export async function readProductTypes() {
   try {
     const r = await q('select value from settings where key=$1', [PRODUCT_TYPES_KEY]);
     const v = r.rows[0] && r.rows[0].value;
-    if (Array.isArray(v)) return v.filter((t) => t && t.name);
+    if (Array.isArray(v)) {
+      return v.filter((t) => t && t.name).map((t) => ({
+        name: t.name,
+        sides: Array.isArray(t.sides) && t.sides.length ? t.sides.filter((x) => ALL_SIDES.includes(x)) : ['front'],
+        // Per-side outline. `mockup` (singular) is the legacy front-only field — kept in
+        // sync below so anything still reading it keeps working.
+        mockups: (t.mockups && typeof t.mockups === 'object') ? t.mockups : (t.mockup ? { front: t.mockup } : {}),
+        mockup: (t.mockups && t.mockups.front) || t.mockup || null,
+      }));
+    }
   } catch { /* table not ready */ }
-  return DEFAULT_TYPES.map((name) => ({ name, mockup: null }));
+  return DEFAULT_TYPES.map((t) => ({ name: t.name, sides: t.sides, mockups: {}, mockup: null }));
 }
 const SHIP_FROM_FIELDS = ['name', 'company', 'street', 'street2', 'city', 'state', 'zip', 'country', 'phone', 'email'];
 
@@ -139,7 +160,17 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
         const name = String((t && t.name) || '').trim();
         if (!name || seen.has(name.toLowerCase())) continue;
         seen.add(name.toLowerCase());
-        types.push({ name, mockup: (t && typeof t.mockup === 'string' && t.mockup) ? t.mockup : null });
+        // A type always has at least a front — a product with no sides can't be designed on.
+        const sides = Array.isArray(t.sides) ? t.sides.filter((x) => ALL_SIDES.includes(x)) : [];
+        if (!sides.length) sides.push('front');
+        // Only keep outlines for sides that are actually ON. Turning a side off should
+        // drop its image, not leave an orphan that reappears if it's re-enabled later.
+        const mockups = {};
+        for (const side of sides) {
+          const v = t.mockups && typeof t.mockups[side] === 'string' ? t.mockups[side] : '';
+          if (v) mockups[side] = v;
+        }
+        types.push({ name, sides, mockups, mockup: mockups.front || null });
       }
       await q('insert into settings (key,value,updated_at) values ($1,$2::jsonb,now()) on conflict (key) do update set value=excluded.value, updated_at=now()',
         [PRODUCT_TYPES_KEY, JSON.stringify(types)]);

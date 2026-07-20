@@ -10,7 +10,7 @@ import { ProductPickerDialog, type PickedProduct } from "@/components/app/produc
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, type CatalogProduct } from "@/lib/api"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
-import { mockupFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
+import { mockupFaces, setTypeMockups, typeMockupOf, typeSidesOf } from "@/lib/variant-resolve"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
 // The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
@@ -78,7 +78,15 @@ export function DesignMaker() {
   // a different print zone on each, so the side has to drive BOTH the image and the zone —
   // designing a back print against the front's zone puts the artwork in the wrong place.
   const [side, setSide] = useState("front")
-  const faces = mockupFaces(product, null)
+  // A product's OWN per-side images win. Otherwise fall back to the category's sides and
+  // outlines — that's the whole point of defining them once per type: fifty hats inherit
+  // four faces without fifty uploads.
+  const ownFaces = mockupFaces(product, null)
+  const faces = ownFaces.length > 1
+    ? ownFaces
+    : typeSidesOf(product)
+        .map((sd) => ({ side: sd, url: typeMockupOf(product, sd) || (sd === "front" ? ownFaces[0]?.url ?? "" : "") }))
+        .filter((f) => f.url)
   // Fall back to the single mockup when a product defines no per-side images, so a blank
   // without them behaves exactly as before rather than losing its picture.
   const faceUrl = faces.find((f) => f.side === side)?.url || (side === "front" ? typeMockupOf(product) : "")

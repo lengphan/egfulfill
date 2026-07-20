@@ -752,7 +752,16 @@ export type FactorySettings = {
   product_types?: ProductType[]
 }
 /** A managed product type and the 2D mockup that represents the whole category. */
-export type ProductType = { name: string; mockup?: string | null }
+export const ALL_SIDES = ["front", "back", "left", "right", "sleeve", "hood", "inside", "wrap"] as const
+export type ProductType = {
+  name: string
+  /** Which faces this category has — chosen once per type, inherited by every product in it. */
+  sides?: string[]
+  /** Positioning outline per side. Only sides that are ON carry one. */
+  mockups?: Record<string, string>
+  /** Legacy front-only field, kept in sync with mockups.front. */
+  mockup?: string | null
+}
 export type ShipFromAddress = {
   name?: string; company?: string; street?: string; street2?: string
   city?: string; state?: string; zip?: string; country?: string

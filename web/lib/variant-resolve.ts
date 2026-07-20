@@ -87,16 +87,28 @@ export function mockupFaces(p: CatalogProduct | null, color?: string | null): Mo
  * Module-level rather than threaded through every call site, because every mockup lookup
  * in the app would otherwise need the settings object passed down to it.
  */
-let TYPE_MOCKUPS: Record<string, string> = {}
-export function setTypeMockups(types: { name: string; mockup?: string | null }[]) {
-  const m: Record<string, string> = {}
-  for (const t of types ?? []) if (t?.name && t.mockup) m[t.name.toLowerCase()] = t.mockup
-  TYPE_MOCKUPS = m
+type TypeSpec = { sides: string[]; mockups: Record<string, string> }
+let TYPE_SPECS: Record<string, TypeSpec> = {}
+export function setTypeMockups(types: { name: string; sides?: string[]; mockups?: Record<string, string>; mockup?: string | null }[]) {
+  const m: Record<string, TypeSpec> = {}
+  for (const t of types ?? []) {
+    if (!t?.name) continue
+    const mockups = { ...(t.mockups ?? {}) }
+    if (t.mockup && !mockups.front) mockups.front = t.mockup
+    m[t.name.toLowerCase()] = { sides: t.sides?.length ? t.sides : ["front"], mockups }
+  }
+  TYPE_SPECS = m
 }
-/** The category stand-in for a product, if its type has one. */
-export function typeMockupOf(p: CatalogProduct | null): string {
-  const key = String(p?.type ?? "").toLowerCase()
-  return (key && TYPE_MOCKUPS[key]) || ""
+const specFor = (p: CatalogProduct | null): TypeSpec | null =>
+  TYPE_SPECS[String(p?.type ?? "").toLowerCase()] ?? null
+
+/** The category outline for a product's side, if its type defines one. */
+export function typeMockupOf(p: CatalogProduct | null, side = "front"): string {
+  return specFor(p)?.mockups?.[side] ?? ""
+}
+/** Sides this product can be designed on — its own faces, else its category's. */
+export function typeSidesOf(p: CatalogProduct | null): string[] {
+  return specFor(p)?.sides ?? ["front"]
 }
 
 export function bestMockup(p: CatalogProduct | null, color?: string | null, fallback?: string): string {
