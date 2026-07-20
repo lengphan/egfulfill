@@ -851,8 +851,14 @@ export function OrdersHub() {
                                   blank we hold, which cones to load, and the machine file.
                                   All three were stored already and shown nowhere. */}
                               {(() => {
-                                const skuU = String(it.sku || "").toUpperCase()
-                                const have = stock[skuU]
+                                // Stock is held against the BLANK we shelve, not the
+                                // marketplace listing SKU — same resolution the barcode
+                                // does. Keying on it.sku meant every Etsy line (which
+                                // arrives with no blank chosen) silently showed no stock
+                                // at all rather than "no blank picked yet".
+                                const stockSku = resolveProduct(it, catalog)?.sku || it.blank || ""
+                                const skuU = String(stockSku || it.sku || "").toUpperCase()
+                                const have = stockSku ? stock[skuU] : undefined
                                 const need = Number(it.qty) || 1
                                 const cones = (threads[o.id] ?? []).find((t) => String(t.sku).toUpperCase() === skuU)?.threads ?? []
                                 const file = (dfiles[o.id] ?? []).find((f) => String(f.sku ?? "").toUpperCase() === skuU)
