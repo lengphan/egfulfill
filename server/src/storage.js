@@ -41,6 +41,67 @@ function signV4({ method, host, canonicalUri, query = '', payloadHash, headers, 
   return `AWS4-HMAC-SHA256 Credential=${KEY}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
+/**
+ * How long a shared artwork link stays valid, in DAYS. Change with DESIGN_URL_TTL_DAYS
+ * in server/.env (then `docker compose up -d`). 0 = never expires (objects must then be
+ * public-read; see putObject's acl argument).
+ *
+ * Why this is a knob and not a constant: an outside design partner works asynchronously
+ * — task → review → "need fix" → rework — and their designers re-open the SOURCE artwork
+ * throughout. Too short and you break a revision mid-flight; too long and a leaked link
+ * outlives its usefulness. 7 days covers a normal revision cycle.
+ */
+const URL_TTL_DAYS = (() => {
+  const n = Number(process.env.DESIGN_URL_TTL_DAYS);
+  return Number.isFinite(n) && n >= 0 ? n : 7;
+})();
+export function designUrlTtlDays() { return URL_TTL_DAYS; }
+
+/**
+ * A time-limited GET link for a PRIVATE object — SigV4 in the QUERY STRING rather than a
+ * header, because whoever follows the link (a partner's fetcher, a browser) can't set
+ * headers. This is what makes expiry possible at all: a public-read object is reachable
+ * forever by anyone holding the URL.
+ *
+ * S3 caps a presigned URL at 7 days; a longer TTL is clamped to that rather than silently
+ * producing links the provider rejects.
+ */
+// The permanent public address for an object — only meaningful when it was written
+// public-read (TTL 0). Prefers the CDN alias when one is configured.
+export function publicUrl(key) {
+  if (!storageEnabled()) return null;
+  const { host, uri } = _hostAndUri(key);
+  return CDN ? `${CDN}/${key}` : `https://${host}${uri}`;
+}
+
+export function presignGet(key, ttlSeconds) {
+  if (!storageEnabled()) return null;
+  const MAX = 7 * 24 * 3600;                       // S3/SigV4 hard limit
+  const ttl = Math.min(Math.max(1, Math.floor(ttlSeconds || URL_TTL_DAYS * 24 * 3600)), MAX);
+  const { host, uri } = _hostAndUri(key);
+  const { amzDate, dateStamp } = _stamps();
+  const scope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
+  const qp = new URLSearchParams({
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${KEY}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(ttl),
+    'X-Amz-SignedHeaders': 'host',
+  });
+  // S3 requires the canonical query sorted by key; URLSearchParams preserves insertion
+  // order, so sort explicitly rather than relying on the order above.
+  const canonicalQuery = [...qp.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${enc(k)}=${enc(v)}`).join('&');
+  const canonicalRequest = ['GET', uri, canonicalQuery, `host:${host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256hex(canonicalRequest)].join('\n');
+  const kDate = hmac('AWS4' + SECRET, dateStamp);
+  const kSigning = hmac(hmac(hmac(kDate, REGION), SERVICE), 'aws4_request');
+  const signature = crypto.createHmac('sha256', kSigning).update(stringToSign, 'utf8').digest('hex');
+  // NB signed against the ORIGIN host — a CDN alias isn't what was signed, so don't swap
+  // in SPACES_CDN here the way putObject does for public URLs.
+  return `https://${host}${uri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
 function _stamps() {
   const d = new Date();
   const amzDate = d.toISOString().replace(/[:-]|\.\d{3}/g, '');   // YYYYMMDDTHHMMSSZ

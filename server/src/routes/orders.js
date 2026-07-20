@@ -11,6 +11,7 @@ import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
+import { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
 
 // ── Stage vocabulary ───────────────────────────────────────────────────────────
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
@@ -111,6 +112,26 @@ export function stageDenial(role, current, target) {
  * Best-effort throughout: this is a convenience on top of a status change, so a failure
  * here must never fail the status change itself.
  */
+// Extension for a stored object. Purely cosmetic — the key is a content hash, so this
+// only makes a URL recognisable (and lets a CDN/browser guess the type from the path).
+// The shareable link for one design row: signed + expiring while a TTL is set, a plain
+// public URL when TTL is 0, null for rows that predate storage (inline base64).
+function designUrlOf(row) {
+  if (!row || !row.storage_key) return null;
+  return designUrlTtlDays() > 0 ? presignGet(row.storage_key) : publicUrl(row.storage_key);
+}
+
+function extFromMime(mime) {
+  const m = String(mime || '').toLowerCase();
+  if (m.includes('png')) return '.png';
+  if (m.includes('jpeg') || m.includes('jpg')) return '.jpg';
+  if (m.includes('webp')) return '.webp';
+  if (m.includes('gif')) return '.gif';
+  if (m.includes('svg')) return '.svg';
+  if (m.includes('pdf')) return '.pdf';
+  return '';
+}
+
 async function autoPushDesigns(orderId, lineId, sku) {
   const key = lineId ? 'line_id' : 'sku';
   const val = lineId || sku;
@@ -292,6 +313,9 @@ export function ordersRoutes(app, requireAuth) {
   // different pool connections and run out of order.
   q('alter table order_designs add column if not exists art_hash text')
     .then(() => q('alter table order_designs add column if not exists art_phash text'))
+    // Object-storage URL for the artwork. When set, `data` is null — the bytes live in
+    // storage, not Postgres. Readers take url ?? data.
+    .then(() => q('alter table order_designs add column if not exists storage_key text'))
     .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
     .then(async () => {
       // Backfill in bounded batches: without it, every design saved before this feature
@@ -724,12 +748,32 @@ export function ordersRoutes(app, requireAuth) {
     // The perceptual hash is only ever a suggestion, so taking it from the client is fine.
     const artHash = hashOf(data);
     const artPhash = isPhash(req.body && req.body.phash) ? String(req.body.phash).toLowerCase() : null;
+    // Push the bytes to object storage when it's configured, and keep only the URL in
+    // Postgres. Two reasons: base64 artwork bloats the DB and every query that touches it,
+    // and an outside design partner (Pink Design) can ONLY be given a URL — it has no file
+    // upload. When storage is off, `data` keeps the inline base64 exactly as before, so
+    // nothing breaks on an unconfigured server. Readers take `url ?? data`.
+    let storedData = data, storedKey = null;
+    if (storageEnabled()) {
+      try {
+        const parsed = fromDataUrl(data);
+        const key = `order-designs/${artHash}${extFromMime(parsed.mime)}`;
+        // PRIVATE when links are meant to expire — a public-read object stays readable
+        // forever by anyone holding the URL, which would make the TTL a lie. TTL 0 is an
+        // explicit opt-in to permanent links, so public-read is right there.
+        await putObject(key, parsed.buffer, parsed.mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
+        storedKey = key;          // the URL is minted per read, never stored
+        storedData = null;
+      } catch (e) {
+        req.log?.warn?.({ err: e }, 'design upload to storage failed - keeping inline base64');
+      }
+    }
     await q(
-      `insert into order_designs (order_id, sku, kind, data, name, pos, art_hash, art_phash, updated_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8, now())
-       on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, pos=excluded.pos,
+      `insert into order_designs (order_id, sku, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
+       values ($1,$2,$3,$4,$9,$5,$6,$7,$8, now())
+       on conflict (order_id, sku, kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', data, name || null, posJson, artHash, artPhash]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey]
     );
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };
@@ -738,8 +782,14 @@ export function ordersRoutes(app, requireAuth) {
   // big base64 payload never rides along on the main /api/orders list.
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    const r = await q(`select sku, kind, data, name, pos from order_designs where order_id=$1`, [req.params.id]);
-    return r.rows;
+    const r = await q(`select sku, kind, data, storage_key, name, pos from order_designs where order_id=$1`, [req.params.id]);
+    // Minted per read, not stored: a signed URL expires, so a persisted one would go
+    // stale. Returned through `data` because that's what every client already renders
+    // (an <img src> takes a URL or a data-URL either way).
+    return r.rows.map((row) => {
+      const url = designUrlOf(row);
+      return { sku: row.sku, kind: row.kind, name: row.name, pos: row.pos, data: url || row.data, url };
+    });
   });
 
   // ── Thread colours (embroidery) — persisted SERVER-side so they survive a refresh

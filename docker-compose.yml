@@ -108,6 +108,17 @@ services:
       # Brevo HTTP API — preferred email transport (sends over HTTPS:443, so it works
       # even though the host blocks outbound SMTP ports). Set BREVO_API_KEY in .env.
       BREVO_API_KEY: ${BREVO_API_KEY:-}
+
+      # Object storage for design artwork (S3-compatible). Unset = inline base64 in
+      # Postgres, which also means no URL to give an outside design partner. See
+      # .env.example for the setup and for DESIGN_URL_TTL_DAYS (link expiry).
+      SPACES_ENDPOINT: ${SPACES_ENDPOINT:-}
+      SPACES_REGION: ${SPACES_REGION:-nyc3}
+      SPACES_BUCKET: ${SPACES_BUCKET:-}
+      SPACES_KEY: ${SPACES_KEY:-}
+      SPACES_SECRET: ${SPACES_SECRET:-}
+      SPACES_CDN: ${SPACES_CDN:-}
+      DESIGN_URL_TTL_DAYS: ${DESIGN_URL_TTL_DAYS:-7}
       # Google Sheets order import (API key reads link-shared sheets) + optional
       # service account to auto-CREATE a ready-filled sheet, + optional copy link.
       GOOGLE_SHEETS_API_KEY: ${GOOGLE_SHEETS_API_KEY:-}
