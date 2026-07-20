@@ -4,7 +4,7 @@
 // get their permissions from GET /api/team/my-access (the client reads it on load),
 // so a missing membership simply means "no restriction" → full access (fail-open).
 import { q } from '../db.js';
-import { sendMail, mailConfigured } from '../mailer.js';
+import { sendMail, mailConfigured, lastMailError } from '../mailer.js';
 import { notify } from './notifications.js';
 
 // Best-effort invite email (no-op unless SMTP_* is configured). Points the invitee at
@@ -38,10 +38,16 @@ export function teamRoutes(app, requireAuth) {
         html: '<div style="font-family:Inter,Arial,sans-serif">If you can read this, your EGFULFILL email is working. 🎉</div>'
       });
     } catch (e) { error = e.message; }
+    // sendMail never throws, so `error` was ALWAYS null here — the real reason lived
+    // inside the mailer and was discarded. Report it, plus the From address, because the
+    // most common Brevo rejection is a sender that hasn't been verified in their dashboard.
+    if (!sent && !error) error = lastMailError();
     return {
       mailConfigured: mailConfigured(),
       transport: process.env.BREVO_API_KEY ? 'brevo-api' : (process.env.SMTP_HOST ? 'smtp' : 'none'),
-      to, sent, error
+      from: process.env.SMTP_FROM || process.env.MAIL_FROM || '(unset → EGFULFILL <no-reply@egful.store>)',
+      to, sent, error,
+      hint: sent ? undefined : 'A Brevo 400/401 here is almost always an unverified sender or a bad key. The From address above must be verified under Senders, Domains & Dedicated IPs → Senders.',
     };
   });
 

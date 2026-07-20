@@ -56,22 +56,40 @@ async function getMailer() {
 
 export function mailConfigured() { return !!(process.env.BREVO_API_KEY || process.env.SMTP_HOST); }
 
+// Why the last send failed. sendMail() deliberately never throws (a failed invite email
+// must not fail the invite), but swallowing the reason made a failure undiagnosable:
+// /api/team/test-email could only report `sent:false, error:null`, which says nothing
+// about WHY — an invalid key and an unverified sender looked identical. Brevo returns a
+// precise message; keep it so the diagnostic can show it.
+let _lastError = null;
+export function lastMailError() { return _lastError; }
+
 // Send an email; returns true if a transport accepted it, false if email is off /
-// failed. Never throws. Throwing inside is caught and surfaced via the return value.
+// failed. Never throws — inspect lastMailError() for the reason.
 export async function sendMail(opts) {
   opts = opts || {};
+  _lastError = null;
   // 1) HTTP API first (works through SMTP blocks).
   try {
     const r = await sendViaBrevoApi(opts);
     if (r === true) return true;
     // r === null → API not configured; fall through to SMTP.
-  } catch (e) { /* API failed → try SMTP */ }
+  } catch (e) {
+    _lastError = 'brevo: ' + (e && e.message ? e.message : String(e));
+  }
   // 2) SMTP.
   try {
     const m = await getMailer();
-    if (!m) return false;
+    if (!m) {
+      // No SMTP fallback configured, so the Brevo failure above is the whole story.
+      if (!_lastError) _lastError = 'no transport configured (set BREVO_API_KEY or SMTP_HOST)';
+      return false;
+    }
     await m.sendMail(Object.assign(
       { from: process.env.SMTP_FROM || ('EGFULFILL <no-reply@' + process.env.SMTP_HOST + '>') }, opts));
     return true;
-  } catch (e) { return false; }
+  } catch (e) {
+    _lastError = (_lastError ? _lastError + ' | ' : '') + 'smtp: ' + (e && e.message ? e.message : String(e));
+    return false;
+  }
 }
