@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { readImageFile } from "@/components/app/design-canvas"
-import { setTypeMockups } from "@/lib/variant-resolve"
+import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
 import { normTech } from "@/lib/print-method"
@@ -74,6 +74,21 @@ export function ProductEditorDialog({
   const [type, setType] = useState("Apparel")
   // Managed types + their category mockups.
   const [types, setTypes] = useState<ProductType[]>([])
+  /**
+   * The product's image gallery. Everything a supplier gave us plus anything uploaded —
+   * previously only the hero survived, so extraImages and per-colour images were fetched
+   * and thrown away the moment a product was added.
+   */
+  const [gallery, setGallery] = useState<string[]>([])
+  /** colour → which gallery image represents it. */
+  const [colorImgs, setColorImgs] = useState<Record<string, string>>({})
+  /**
+   * Per-side outline OVERRIDES for this product. Empty means "inherit the type's" —
+   * a factory board can override what admin defined in Settings, but a product that
+   * hasn't been overridden keeps following settings, so changing a category updates
+   * everything that never disagreed with it.
+   */
+  const [sideMockups, setSideMockups] = useState<Record<string, string>>({})
   useEffect(() => {
     const t = setTimeout(() => { getFactorySettings().then((r) => { const t = r.product_types ?? []; setTypes(t); setTypeMockups(t) }).catch(() => {}) }, 0)
     return () => clearTimeout(t)
@@ -81,6 +96,7 @@ export function ProductEditorDialog({
   const typeNames = types.length ? types.map((t) => t.name) : TYPES
   /** The category's stand-in mockup, used when this product has none of its own. */
   const typeMockup = types.find((t) => t.name === type)?.mockup ?? null
+  const typeSides = types.find((t) => t.name === type)?.sides ?? []
   const [method, setMethod] = useState("DTG")
   const [price, setPrice] = useState("")
   const [basePrice, setBasePrice] = useState("")
@@ -112,6 +128,15 @@ export function ProductEditorDialog({
       setSizes(p?.sizes ?? [])
       setTiers(tiersToStr(p?.sizePrices))
       setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
+      // Collect every image we know about — hero, gallery, per-colour — de-duped, so
+      // nothing a supplier sent is dropped just because it wasn't the main shot.
+      setGallery(Array.from(new Set([
+        p?.img, p?.image, p?.hero,
+        ...(p?.images ?? []),
+        ...Object.values(p?.colorImages ?? {}),
+      ].filter((x): x is string => !!x))))
+      setColorImgs({ ...((p?.colorImages ?? {}) as Record<string, string>) })
+      setSideMockups({ ...((p?.side_mockups ?? p?.sideMockups ?? {}) as Record<string, string>) })
       setStatus(p?.status ?? "Active")
       setImg(p ? imageOf(p) : "")
       setColorInput("")
@@ -178,7 +203,7 @@ export function ProductEditorDialog({
   const save = () => {
     if (!name.trim()) { setErr("Give the product a name."); return }
     const colorImages: Record<string, string> = {}
-    for (const c of colors) colorImages[c] = (product?.colorImages?.[c] as string) || ""
+    for (const c of colors) colorImages[c] = colorImgs[c] || ""
     const next: CatalogProduct = {
       ...(product ?? {}),
       id: product?.id ?? genId(newIdSeed),
@@ -192,7 +217,13 @@ export function ProductEditorDialog({
       sizes,
       colorImages,
       mainColor: colors[0] || product?.mainColor,
-      img, // the mockup — read first by the maker's blank picker
+      // Everything we hold, hero first — the gallery is the record, `img` is which one
+      // represents the product in the catalog.
+      images: Array.from(new Set([img, ...gallery].filter(Boolean))) as string[],
+      // Only send overrides that exist. An empty map means "inherit the type", and
+      // writing {} explicitly is how a product goes back to following settings.
+      side_mockups: Object.fromEntries(Object.entries(sideMockups).filter(([, v]) => !!v)),
+      img, // the hero — what the catalog shows
     }
     onSave(next)
     onOpenChange(false)
@@ -221,7 +252,10 @@ export function ProductEditorDialog({
               ) : (
                 <div className="flex flex-col items-center gap-1 text-muted-foreground"><ImageIcon size={22} weight="duotone" /><span className="text-[10px]">Mockup</span></div>
               )}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => readImageFile(e.target.files?.[0], setImg, setErr)} />
+              <input
+                type="file" accept="image/*" className="hidden"
+                onChange={(e) => readImageFile(e.target.files?.[0], (u) => { setImg(u); setGallery((g) => (g.includes(u) ? g : [...g, u])) }, setErr)}
+              />
             </label>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
@@ -298,12 +332,135 @@ export function ProductEditorDialog({
             )}
           </div>
 
+          {/* ── Images ──────────────────────────────────────────────────────────────
+              Every picture we hold for this product, in one place. Supplier extras and
+              per-colour shots used to be fetched and discarded because the editor had a
+              single file input; now nothing is lost on import. One image is the HERO
+              (what the catalog shows); the rest are available to assign to a colour. */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Images</span>
+              <span className="text-xs text-muted-foreground">{gallery.length} held · click one to make it the main image</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {gallery.map((u) => (
+                <div key={u} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => setImg(u)}
+                    title={u === img ? "Main image" : "Make this the main image"}
+                    className={"relative block size-16 overflow-hidden rounded-lg border-2 transition-colors " + (u === img ? "border-primary" : "border-border hover:border-primary/50")}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="" className="size-full object-cover" />
+                    {u === img && (
+                      <span className="absolute inset-x-0 bottom-0 bg-primary py-0.5 text-center text-[9px] font-semibold text-primary-foreground">Main</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Remove image"
+                    onClick={() => {
+                      setGallery((g) => g.filter((x) => x !== u))
+                      if (img === u) setImg("")
+                      // Drop any colour or side pointing at it, or they'd reference a
+                      // picture that no longer exists.
+                      setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
+                      setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
+                    }}
+                    className="absolute -right-1 -top-1 hidden size-4 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
+                  >
+                    <X size={9} weight="bold" />
+                  </button>
+                </div>
+              ))}
+              <label className="grid size-16 cursor-pointer place-items-center rounded-lg border border-dashed border-border bg-muted/40 text-muted-foreground hover:bg-accent">
+                <Plus size={16} />
+                <input
+                  type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? [])
+                    files.forEach((f) => readImageFile(f, (u) => setGallery((g) => (g.includes(u) ? g : [...g, u])), setErr))
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* ── Print sides ─────────────────────────────────────────────────────────
+              Sides come from the TYPE (Settings → Platform), so a category change reaches
+              every product that never disagreed with it. A board can override a side here
+              with one of this product's own images — for the blank whose back really does
+              look different. Clearing an override returns that side to following settings,
+              rather than leaving it stuck on whatever it was overridden to. */}
+          {typeSides.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Print sides</span>
+                <span className="text-xs text-muted-foreground">from {type} · override only if this blank differs</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {typeSides.map((sd) => {
+                  const override = sideMockups[sd] || ""
+                  const inherited = typeMockupOf({ type } as CatalogProduct, sd)
+                  const shown = override || inherited
+                  return (
+                    <div key={sd} className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-1">
+                      <span className="w-14 truncate text-[11px] font-medium capitalize">{sd}</span>
+                      {shown ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={shown} alt="" className={"size-8 rounded border object-contain " + (override ? "border-primary" : "border-border opacity-70")} />
+                      ) : (
+                        <span className="grid size-8 place-items-center rounded border border-dashed border-border text-muted-foreground"><ImageIcon size={12} /></span>
+                      )}
+                      <select
+                        value={override}
+                        onChange={(e) => setSideMockups((m) => {
+                          const next = { ...m }
+                          if (e.target.value) next[sd] = e.target.value; else delete next[sd]
+                          return next
+                        })}
+                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-[11px] transition-colors hover:border-primary/40"
+                      >
+                        <option value="">{inherited ? "Use settings" : "None set"}</option>
+                        {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
+                      </select>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Colors — chips + suggested */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Colors</span>
               {colors.length > 0 && <button onClick={() => setColors([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
             </div>
+            {/* Each colour can point at one of the gallery images. A colour with none
+                falls back to the product's main image, same as before. */}
+            {colors.length > 0 && gallery.length > 0 && (
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2">
+                {colors.map((c) => (
+                  <div key={c} className="flex items-center gap-1.5 rounded-md bg-card px-1.5 py-1">
+                    <span className="max-w-[110px] truncate text-[11px] font-medium">{prettyColorName(c)}</span>
+                    <select
+                      value={colorImgs[c] ?? ""}
+                      onChange={(e) => setColorImgs((m) => ({ ...m, [c]: e.target.value }))}
+                      className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-[11px] transition-colors hover:border-primary/40"
+                    >
+                      <option value="">Main image</option>
+                      {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
+                    </select>
+                    {colorImgs[c] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={colorImgs[c]} alt="" className="size-6 rounded border border-border object-cover" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {colors.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {colors.map((c) => (

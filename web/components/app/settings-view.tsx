@@ -22,6 +22,7 @@ import {
   getTeam,
   inviteMember,
   removeMember,
+  updateTeamMember,
   updateProfile,
   getFactorySettings,
   deleteUserAdmin,
@@ -369,6 +370,13 @@ function ApiKeysPanel() {
 }
 
 // ─────────────────────────── Team ───────────────────────────
+/** Surfaces an owner can share with a member. Deliberately short — each one hands over
+ *  something private, so the list should stay a decision rather than a checklist. */
+const SHAREABLE = [
+  { id: "wallet", label: "Wallet" },
+  { id: "files", label: "Design files" },
+]
+
 function TeamPanel() {
   const [members, setMembers] = useState<TeamMember[] | null>(null)
   const [email, setEmail] = useState("")
@@ -400,6 +408,11 @@ function TeamPanel() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const onPerms = async (id: TeamMember["id"], permissions: string[]) => {
+    setMembers((prev) => (prev ?? []).map((m) => (m.id === id ? { ...m, permissions } : m)))
+    try { await updateTeamMember(id, { permissions }) } catch { load() }
   }
 
   const onRemove = async (id: TeamMember["id"]) => {
@@ -460,14 +473,35 @@ function TeamPanel() {
                   </div>
                 </div>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground hover:text-red-600"
-                onClick={() => onRemove(m.id)}
-              >
-                <Trash size={14} weight="bold" /> Remove
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* What this member may SEE. Both are off by default — the wallet and paid
+                    design files are the owner's, and a teammate added to help with orders
+                    shouldn't inherit the money by accident. Seeing is not spending:
+                    buying and withdrawing stay the owner's regardless of these. */}
+                {SHAREABLE.map((s) => {
+                  const perms = Array.isArray(m.permissions) ? m.permissions : []
+                  const on = perms.includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => onPerms(m.id, on ? perms.filter((x) => x !== s.id) : [...perms, s.id])}
+                      title={on ? `${s.label} shared — click to hide` : `${s.label} hidden — click to share`}
+                      className={"eg-tap rounded-full px-2.5 py-1 text-xs font-medium transition-colors " +
+                        (on ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground hover:text-foreground")}
+                    >
+                      {on ? "Sharing" : "Hidden"} · {s.label}
+                    </button>
+                  )
+                })}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-red-600"
+                  onClick={() => onRemove(m.id)}
+                >
+                  <Trash size={14} weight="bold" /> Remove
+                </Button>
+              </div>
             </div>
           ))}
         </div>

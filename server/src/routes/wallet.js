@@ -100,11 +100,38 @@ export function walletRoutes(app, requireAuth) {
     return account === user.sub;
   }
 
+  /**
+   * A team member's view of the OWNER's wallet — off unless the owner grants it.
+   *
+   * canAccess compares against the member's own id, so a member never saw the owner's
+   * balance by default, which is the safe default. This is the opt-IN: the owner adds
+   * 'wallet' to that member's permissions and they can read it. Spending stays the
+   * owner's alone either way — visibility and authority are separate questions.
+   *
+   * Returns the owner id when the member may look, else null.
+   */
+  async function ownerWalletFor(user) {
+    if (!user || isStaff(user)) return null;
+    try {
+      const r = await q(
+        "select owner_id, permissions from team_members where lower(email)=lower($1) and status='active' limit 1",
+        [user.email || '']);
+      const row = r.rows[0];
+      if (!row || !row.owner_id) return null;
+      const perms = Array.isArray(row.permissions) ? row.permissions : [];
+      return perms.indexOf('wallet') >= 0 ? String(row.owner_id) : null;
+    } catch { return null; }
+  }
+
 
   // GET balance + recent ledger. Seller → own; staff may pass ?account=.
   app.get('/api/wallet', { preHandler: requireAuth }, async (req, reply) => {
-    const account = (req.query && req.query.account) ? String(req.query.account) : req.user.sub;
-    if (!canAccess(req.user, account)) { reply.code(403); return { error: 'forbidden' }; }
+    let account = (req.query && req.query.account) ? String(req.query.account) : req.user.sub;
+    // A member with the 'wallet' permission reads the OWNER's wallet — theirs is empty
+    // and meaningless. Without it they stay on their own and see nothing.
+    const shared = await ownerWalletFor(req.user);
+    if (shared && account === req.user.sub) account = shared;
+    if (!canAccess(req.user, account) && account !== shared) { reply.code(403); return { error: 'forbidden' }; }
     const bal = await balanceOf(account);
     const led = await q(
       `select id, delta, type, ref, note, created_by, created_at

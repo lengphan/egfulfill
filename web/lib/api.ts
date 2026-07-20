@@ -1086,6 +1086,12 @@ export function getTeam() {
   return api<TeamMember[]>(`/api/team`)
 }
 
+/** Owner-only: change what a member may see. Scoped to the caller's own team server-side. */
+export function updateTeamMember(id: number | string, patch: { permissions?: string[]; role?: string; status?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/team/members/${encodeURIComponent(String(id))}`, {
+    method: "PATCH", body: JSON.stringify(patch),
+  })
+}
 export function inviteMember(body: { email: string; role?: string; permissions?: string[] }) {
   return api<{ ok?: boolean; id?: number | string; error?: string }>(`/api/team/invite`, {
     method: "POST",

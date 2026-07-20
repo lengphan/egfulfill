@@ -314,6 +314,17 @@ export function designFilesRoutes(app, requireAuth) {
       const eff = await effectiveSeller(req.user);
       // Sellers get their .pes deliverable only. Factory working files (.emb) and
       // internal mockups stay on the factory boards.
+      // Design files are the OWNER's by default — a member sees none unless the owner
+      // grants 'files'. Same shape as the wallet: hidden until shared, and sharing the
+      // VIEW never grants the ability to buy, which stays the owner's alone.
+      const isMember = String(eff) !== String(req.user.sub);
+      if (isMember) {
+        const perms = await q(
+          "select permissions from team_members where lower(email)=lower($1) and status='active' limit 1",
+          [req.user.email || '']
+        ).then((x) => (Array.isArray(x.rows[0]?.permissions) ? x.rows[0].permissions : [])).catch(() => []);
+        if (perms.indexOf('files') < 0) return [];
+      }
       const mine = r.rows.filter((x) => (!x.seller_id || x.seller_id === eff) && x.kind === 'pes');
       if (r.rows.length && !mine.length) { reply.code(403); return { error: 'forbidden' }; }
       // Tell the seller what's unlocked without handing over any bytes.
