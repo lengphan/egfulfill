@@ -5,18 +5,21 @@
 // so a missing membership simply means "no restriction" → full access (fail-open).
 import { q } from '../db.js';
 import { sendMail, mailConfigured } from '../mailer.js';
+import { notify } from './notifications.js';
 
 // Best-effort invite email (no-op unless SMTP_* is configured). Points the invitee at
 // Settings → Team, where the in-app banner lets them accept.
 function emailInvite(toEmail, ownerName) {
-  const base = process.env.APP_URL || 'https://egful.store';
+  // The APP (React) lives on app.egful.store; egful.store is the old static site. Linking
+  // to /settings.html there sent invitees to a page that can't accept the invite at all.
+  const base = process.env.APP_URL || 'https://app.egful.store';
   sendMail({
     to: toEmail,
     subject: (ownerName ? (ownerName + ' invited you') : 'You\'ve been invited') + ' to a team on EGFULFILL',
     html: '<div style="font-family:Inter,Arial,sans-serif;color:#191918;line-height:1.6">'
       + '<p><b>' + (ownerName || 'A team') + '</b> invited you to join their team on EGFULFILL.</p>'
-      + '<p>Sign in with this email, then open <a href="' + base + '/settings.html#team" style="color:#111827;font-weight:600">Settings → Team</a> and click <b>Accept invite</b>.</p>'
-      + '<p style="color:#9ca3af;font-size:13px">If you don\'t have an account yet, sign up first at ' + base + '/seller-login.html</p></div>'
+      + '<p>Sign in with this email, then open <a href="' + base + '/settings" style="color:#111827;font-weight:600">Settings → Team</a> and click <b>Accept invite</b>.</p>'
+      + '<p style="color:#9ca3af;font-size:13px">If you don\'t have an account yet, sign up first at ' + base + '/signup</p></div>'
   }).catch(() => {});
 }
 
@@ -104,8 +107,27 @@ export function teamRoutes(app, requireAuth) {
     if (email === String(req.user.email || '').toLowerCase()) return { error: "you can't invite yourself" };
     const token = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
     const perms = JSON.stringify(Array.isArray(b.permissions) ? b.permissions : ['orders']);
-    // Email the invitee a link (no-op unless SMTP is configured).
-    try { const on = await q(`select coalesce(nullif(store_name,''),nullif(name,''),email) as nm from users where id=$1`, [req.user.sub]); emailInvite(email, on.rows[0] && on.rows[0].nm); } catch (e) {}
+    // Tell the invitee, two ways. Email is best-effort and SILENTLY no-ops when neither
+    // BREVO_API_KEY nor SMTP_HOST is set, so it can't be the only signal — an in-app
+    // notification lands in their bell whether or not mail is wired, provided they
+    // already have an account (the common case: you invite someone who signed up).
+    let ownerName = null;
+    try {
+      const on = await q(`select coalesce(nullif(store_name,''),nullif(name,''),email) as nm from users where id=$1`, [req.user.sub]);
+      ownerName = on.rows[0] && on.rows[0].nm;
+      emailInvite(email, ownerName);
+    } catch (e) {}
+    try {
+      const u = await q('select id from users where lower(email)=lower($1) limit 1', [email]);
+      if (u.rows[0]) {
+        notify({
+          userIds: [u.rows[0].id], type: 'team-invite',
+          title: `${ownerName || 'A seller'} invited you to their team`,
+          body: 'Open Settings → Team to accept. Until you accept, nothing changes for your account.',
+          href: '/settings',
+        }).catch(() => {});
+      }
+    } catch (e) {}
     const ex = await q('select id from team_members where owner_id=$1 and lower(email)=lower($2)', [req.user.sub, email]);
     if (ex.rows[0]) {
       await q(`update team_members set role=$1, permissions=$2, invite_token=$3, status=case when status='active' then 'active' else 'invited' end where id=$4`,

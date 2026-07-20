@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { Button } from "@/components/ui/button"
@@ -489,10 +489,18 @@ function TeamPanel() {
     } catch { load() }
   }
 
+  // Removing is one click and irreversible (they'd need re-inviting), so it asks first —
+  // and the dialog spells out that it does NOT delete their account, which is the thing a
+  // leader would otherwise be afraid of.
+  const [removing, setRemoving] = useState<TeamMember | null>(null)
   const onRemove = async (id: TeamMember["id"]) => {
     setMembers((prev) => (prev ?? []).filter((m) => m.id !== id))
+    setRemoving(null)
     try {
       await removeMember(id)
+      // Their access is resolved per-request from team_members, so it's already revoked;
+      // this just refreshes any open view.
+      window.dispatchEvent(new CustomEvent("eg-perms-changed"))
     } catch {
       load()
     }
@@ -603,7 +611,7 @@ function TeamPanel() {
                   size="sm"
                   variant="ghost"
                   className="shrink-0 text-muted-foreground hover:text-red-600"
-                  onClick={() => onRemove(m.id)}
+                  onClick={() => setRemoving(m)}
                 >
                   <Trash size={14} weight="bold" /> Remove
                 </Button>
@@ -612,6 +620,29 @@ function TeamPanel() {
           ))}
         </div>
       )}
+
+      {/* Remove = revoke access, NOT delete the person. Their login and their own seller
+          account survive; they simply stop resolving to this team and land back on their
+          own (empty) board. Saying so plainly matters — otherwise "Remove" reads like it
+          deletes a human being's account. */}
+      <Dialog open={!!removing} onOpenChange={(v) => { if (!v) setRemoving(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove {removing?.email} from your team?</DialogTitle>
+            <DialogDescription>They lose access to your account immediately.</DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-1.5 text-sm text-muted-foreground">
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Your orders, wallet, stores and design files are hidden from them right away.</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />Work they did stays on your account — nothing of yours is deleted.</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-emerald-500/60" />Their account is <span className="font-medium text-foreground">not</span> deleted. They keep the same login and go back to their own empty seller board.</li>
+            <li className="flex gap-2"><span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />To bring them back later, invite the same email again.</li>
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoving(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => removing && onRemove(removing.id)}>Remove from team</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SectionCard>
   )
 }
