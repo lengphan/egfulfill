@@ -10,6 +10,7 @@ import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
+import { autoReplenish } from '../replenish.js';
 
 // ── Stage vocabulary ───────────────────────────────────────────────────────────
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
@@ -649,12 +650,16 @@ export function ordersRoutes(app, requireAuth) {
     // Entering the design stage hands the line to a designer — so do it automatically,
     // and report what was HELD BACK. Silence would be wrong here: "nothing happened"
     // and "we already have that file" look identical from the board.
-    let design = null;
+    let design = null, replenish = null;
     if (normalizeStage(status) === 'awaiting_scan') {
       design = await autoPushDesigns(req.params.id, lineId, sku).catch(() => null);
+      // Same gate tops the blanks back up: anything now projected below its reorder
+      // point is appended to that supplier's DRAFT purchase order. Draft only —
+      // placing an order with a supplier stays a human click on the Purchase board.
+      replenish = await autoReplenish(req.params.id).catch(() => null);
     }
     egBroadcast({ type: 'item-status' });   // no id/sku — see the note above
-    return { ok: true, design };
+    return { ok: true, design, replenish };
   });
 
   // ── Variant setup — the blank/colour/size/method for a line item ────────────

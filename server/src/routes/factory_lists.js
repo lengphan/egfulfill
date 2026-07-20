@@ -10,6 +10,7 @@ import { isStaff } from '../auth.js';
 // the ship_origin blob) — all shared across every staff board + device (was per-browser localStorage).
 const ALLOWED = {
   backorders: 1, purchase_orders: 1, inventory: 1, ship_origin: 1,
+  po_saved: 1,           // PO lines pulled OUT of a draft but kept to re-add later
   neworder_setup: 1,     // factory's blank/colour/size/method picks per order line (keyed object)
   design_cards: 1,       // design-board workflow state (columns, assignee, checklist, notes)
   design_lab_assigned: 1,// design-lab assignments

@@ -355,7 +355,10 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   };
 
   // On-demand refresh for one order — the button behind "check with the carrier".
-  app.post('/api/orders/:id/refresh-tracking', { preHandler: guard }, async (req, reply) => {
+  // `guard` IS the options object ({preHandler: requireStaff}) — wrapping it again as
+  // {preHandler: guard} made Fastify throw at registration, which takes down the whole
+  // server, not just this route. Every /api/* 502s.
+  app.post('/api/orders/:id/refresh-tracking', guard, async (req, reply) => {
     const out = await export_refreshTracking(String(req.params.id)).catch((e) => ({ ok: false, reason: e.message }));
     if (!out.ok) { reply.code(400); return { error: out.reason || 'Could not read the carrier status' }; }
     return out;

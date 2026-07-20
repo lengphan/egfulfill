@@ -308,6 +308,21 @@ export function getSsStyle(id: string) {
 export function ssSync() {
   return api<{ ok?: boolean; count?: number; error?: string }>(`/api/ss/sync`, { method: "POST" })
 }
+// Synced S&S products at SKU level (style search only gets you a style — a PO line
+// needs the orderable sku, i.e. a specific colour + size).
+export type SsProduct = {
+  sku: string; style_id?: string | null; brand?: string | null; style_name?: string | null
+  color?: string | null; size?: string | null; price?: number | string | null; qty?: number | null
+  image?: string | null; category?: string | null
+}
+export function getSsProducts(p: { search?: string; limit?: number; offset?: number }) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit) s.set("limit", String(p.limit))
+  if (p.offset) s.set("offset", String(p.offset))
+  return api<{ total: number; products: SsProduct[]; error?: string }>(`/api/ss/products?${s.toString()}`)
+}
+
 // S&S favorites (shared staff shortlist).
 export function getSsFavorites() {
   return api<{ favorites: SsStyle[] }>(`/api/ss/favorites`)
@@ -518,6 +533,17 @@ export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightO
 
 // ── Purchase orders (staff) — draft → placed → received ──
 export type POLine = { sku: string; name?: string; variant?: string; qty: number; price?: number }
+
+// ── Factory-global shared lists (staff-only KV blobs, whole-array replace) ──
+// The key must be on the server's ALLOWED whitelist in routes/factory_lists.js.
+export function getFactoryList<T>(k: string) {
+  return api<T | null>(`/api/factory_lists/${encodeURIComponent(k)}`)
+}
+export function saveFactoryList(k: string, v: unknown) {
+  return api<{ ok?: boolean }>(`/api/factory_lists/${encodeURIComponent(k)}`, { method: "POST", body: JSON.stringify(v) })
+}
+/** A PO line pulled out of a draft but kept to re-add later. */
+export type SavedPOLine = POLine & { supplier?: string | null; savedAt?: string }
 export type PurchaseOrder = { num: string; supplier?: string | null; items: POLine[]; status: string; total?: number; meta?: Record<string, unknown> | null; created_at?: string }
 export function getPurchaseOrders() {
   return api<PurchaseOrder[]>(`/api/purchase`)

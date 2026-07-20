@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  ssOrder, ottoOrder, type InventoryItem, type PurchaseOrder, type POLine,
+  getFactoryList, saveFactoryList,
+  ssOrder, ottoOrder, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
+import { POAddItems } from "@/components/app/po-add-items"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -32,10 +34,16 @@ export function PurchaseView() {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // Lines pulled out of a draft but kept for a later order. Factory-global (staff
+  // share one list), so it survives the browser that removed the line.
+  const [saved, setSaved] = useState<SavedPOLine[]>([])
+  const [addTo, setAddTo] = useState<PurchaseOrder | null>(null)
+
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
     getInventory().then((r) => setInv(r ?? [])).catch(() => setInv([]))
     getPurchaseOrders().then((r) => setPos(r ?? [])).catch(() => setPos([]))
+    getFactoryList<SavedPOLine[]>("po_saved").then((r) => setSaved(Array.isArray(r) ? r : [])).catch(() => {})
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
@@ -69,6 +77,39 @@ export function PurchaseView() {
     patchPO(po, po.items.map((l) => (l.sku === sku ? { ...l, qty } : l)))
   const removeLine = (po: PurchaseOrder, sku: string) =>
     patchPO(po, po.items.filter((l) => l.sku !== sku))
+
+  // Persist the shared saved-for-later list. Optimistic: the UI moves immediately,
+  // the blob is replaced wholesale (that's the factory_lists contract).
+  const putSaved = (next: SavedPOLine[]) => {
+    setSaved(next)
+    saveFactoryList("po_saved", next).catch(() => {})
+  }
+  /** Pull a line OUT of the draft but keep it — the common "not this order, next one" case. */
+  const saveForLater = (po: PurchaseOrder, l: POLine) => {
+    removeLine(po, l.sku)
+    if (saved.some((s) => s.sku === l.sku)) return          // already parked
+    putSaved([...saved, { ...l, supplier: po.supplier ?? null, savedAt: new Date().toISOString() }])
+  }
+  /** Put a parked line back on a draft, merging the qty if the sku is already there. */
+  const restore = (l: SavedPOLine) => {
+    const target = drafts.find((p) => supKey(p.supplier) === supKey(l.supplier)) ?? drafts[0]
+    if (!target) { setMsg({ ok: false, text: "No draft PO open — create one first, then restore into it." }); return }
+    const hit = target.items.find((x) => x.sku === l.sku)
+    patchPO(target, hit
+      ? target.items.map((x) => (x.sku === l.sku ? { ...x, qty: num(x.qty) + num(l.qty) } : x))
+      : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
+    putSaved(saved.filter((s) => s.sku !== l.sku))
+  }
+  /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
+  const addLines = (po: PurchaseOrder, lines: POLine[]) => {
+    const next = po.items.map((l) => ({ ...l }))
+    for (const l of lines) {
+      const hit = next.find((x) => x.sku === l.sku)
+      if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
+      else next.push({ ...l, qty: num(l.qty) || 1 })
+    }
+    patchPO(po, next)
+  }
 
   const place = async (po: PurchaseOrder) => {
     const lines = po.items.filter((l) => num(l.qty) > 0).map((l) => ({ sku: l.sku, qty: num(l.qty) }))
@@ -153,6 +194,7 @@ export function PurchaseView() {
         <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
           actions={<div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{poTotal(po)} units</span>
+            <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
             <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
             <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
           </div>}>
@@ -164,12 +206,37 @@ export function PurchaseView() {
                   <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
                 </div>
                 <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
-                <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove"><Trash size={14} /></button>
+                {/* Two distinct exits: park it for the next order, or drop it for good.
+                    One button doing both would make "not now" indistinguishable from
+                    "never" — and the parked list is how a short blank survives a PO
+                    that gets placed without it. */}
+                <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
+                <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
               </div>
             ))}
           </div>
         </SectionCard>
       ))}
+
+      {/* Saved for later — only shown when it has something in it, so it never sits
+          on the page as an empty card competing with the drafts. */}
+      {saved.length > 0 && (
+        <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
+          <div className="divide-y divide-border">
+            {saved.map((l) => (
+              <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                  <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
+                </div>
+                <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
+                <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
+                <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       {/* History */}
       <SectionCard title="Order history">
@@ -200,6 +267,14 @@ export function PurchaseView() {
                 onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
             )}
       </SectionCard>
+
+      <POAddItems
+        key={addTo?.num ?? "none"}
+        po={addTo}
+        onClose={() => setAddTo(null)}
+        inventory={inv ?? []}
+        onAdd={(lines) => { if (addTo) addLines(addTo, lines) }}
+      />
     </div>
   )
 }
