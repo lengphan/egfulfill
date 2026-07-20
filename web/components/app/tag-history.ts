@@ -43,3 +43,18 @@ export const EMPTY_HINT: Record<TagId, string> = {
   scan: "Not scanned yet — it moves here once dispatch scans the batch.",
   design: "No design yet — attach artwork or send it to the board.",
 }
+
+/**
+ * What to say when a tag reads DONE but no history was recorded for it.
+ *
+ * These two can legitimately disagree: the tag reads the order's current state, history
+ * reads events, and an action taken before auditing covered it — or by a path that
+ * doesn't audit — leaves state without a trail. The tag is the truth; the popover must
+ * never contradict it, or a board that says "scanned" and "not scanned yet" at once
+ * teaches people to distrust both.
+ */
+export const DONE_NO_HISTORY: Record<TagId, string> = {
+  label: "Label exists, but no recorded history for how it was created.",
+  scan: "Already past the scan, but no recorded history for that step.",
+  design: "A design exists, but no recorded history for how it got here.",
+}

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { getOrderHistory, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { forTag, sayAction, EMPTY_HINT, type TagId } from "@/components/app/tag-history"
+import { forTag, sayAction, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/components/app/tag-history"
 
 /**
  * Three tags, always the same three, always in the same place: LABEL · SCAN · DESIGN.
@@ -55,7 +55,14 @@ function Tag({ id, label, state, title, orderId }: { id: TagId; label: string; s
           {rows === null ? (
             <div className="px-2 py-3 text-xs text-muted-foreground">Loading…</div>
           ) : forTag(id, rows).length === 0 ? (
-            <div className="px-2 py-3 text-xs text-muted-foreground">{EMPTY_HINT[id]}</div>
+            /* The tag's STATE is the truth — it reads what the order actually is. History
+               is supporting evidence and can legitimately be missing (an action taken
+               before auditing covered it, or by a path that doesn't audit). So the empty
+               message FOLLOWS the tag: a done tag never says "not done yet", which is the
+               contradiction that teaches people to distrust the board. */
+            <div className="px-2 py-3 text-xs text-muted-foreground">
+              {state === "todo" ? EMPTY_HINT[id] : DONE_NO_HISTORY[id]}
+            </div>
           ) : (
             forTag(id, rows).map((r) => (
               <div key={String(r.id)} className="rounded px-2 py-1.5 hover:bg-accent">

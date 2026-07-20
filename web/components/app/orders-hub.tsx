@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
+import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
@@ -572,7 +573,22 @@ export function OrdersHub() {
                               {primary !== "advance" && canAdvance && <DropdownMenuItem onClick={() => advanceOrder(o)}><SkipForward size={14} weight="fill" /> Next stage</DropdownMenuItem>}
                               {primary !== "ship" && canShip && <DropdownMenuItem onClick={() => openFulfill(o)}><Truck size={14} weight="bold" /> Create new label</DropdownMenuItem>}
                               {label && <DropdownMenuItem onClick={() => openLabel(label)}><Printer size={14} weight="bold" /> Reopen label</DropdownMenuItem>}
-                              {canLabels && <DropdownMenuItem onClick={() => setBarcodeOrder(o)}><Barcode size={14} weight="bold" /> Print blank labels</DropdownMenuItem>}
+                              {/* Only printable once a blank is chosen — the barcode is the
+                                  STOCK code, so a line without a blank has nothing to
+                                  encode. Disabled with the reason rather than hidden, so
+                                  it's clear what's missing. */}
+                              {canLabels && (() => {
+                                const printable = (o.items ?? []).some((it) => resolveProduct(it, catalog)?.sku || it.blank)
+                                return (
+                                  <DropdownMenuItem
+                                    disabled={!printable}
+                                    onClick={() => printable && setBarcodeOrder(o)}
+                                    title={printable ? undefined : "Pick a blank on at least one line first — the barcode is the stock code"}
+                                  >
+                                    <Barcode size={14} weight="bold" /> Print blank labels
+                                  </DropdownMenuItem>
+                                )
+                              })()}
                               {prod.length > 0 && (
                                 <>
                                   <DropdownMenuSeparator />
@@ -1023,9 +1039,23 @@ export function OrdersHub() {
         open={!!barcodeOrder}
         onClose={() => setBarcodeOrder(null)}
         title={barcodeOrder ? `labels · ${numOf(barcodeOrder)}` : "labels"}
+        /* The barcode is an INVENTORY code, so it must encode the BLANK we stock — not the
+           marketplace listing SKU. Scanning "LA6" off an Etsy line tells the warehouse
+           nothing: it isn't a thing on a shelf, and it can't drive a reorder. Lines with
+           no blank chosen are excluded rather than printed with a meaningless code. */
         labels={(barcodeOrder?.items ?? [])
-          .filter((it) => it.sku && variantOf(it))
-          .map((it) => ({ sku: it.sku as string, name: it.name || it.sku, variant: variantOf(it), copies: Number(it.qty) || 1 }))}
+          .map((it) => {
+            const blank = resolveProduct(it, catalog)
+            const stockSku = blank?.sku || it.blank || ""
+            return { it, stockSku }
+          })
+          .filter(({ stockSku }) => !!stockSku)
+          .map(({ it, stockSku }) => ({
+            sku: stockSku,
+            name: it.name || stockSku,
+            variant: variantOf(it),
+            copies: Number(it.qty) || 1,
+          }))}
       />
 
       <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>

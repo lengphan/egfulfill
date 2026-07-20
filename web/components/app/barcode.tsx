@@ -11,13 +11,18 @@ import JsBarcode from "jsbarcode"
 // clipped, i.e. unscannable. With `fit` we copy the natural size into a viewBox and
 // let CSS size it, so it scales down to the label. It stays vector (print is crisp)
 // and uniform scaling preserves the bar RATIOS, which is what a scanner reads.
-export function Barcode({ value, height = 40, width = 1.5, fontSize = 11, displayValue = true, fit = false, className }: {
+export function Barcode({ value, height = 40, width = 1.5, fontSize = 11, displayValue = true, fit = false, stretch = false, className }: {
   value: string
   height?: number
   width?: number
   fontSize?: number
   displayValue?: boolean
   fit?: boolean
+  /** Fill the parent's height instead of deriving it from the aspect ratio. Bars scale
+   *  uniformly in X (relative widths preserved, so it still scans) while Y is free —
+   *  which is what a fixed-height sticker needs. Without it a wide code renders tall
+   *  enough to push everything else off the label. */
+  stretch?: boolean
   className?: string
 }) {
   const ref = useRef<SVGSVGElement>(null)
@@ -31,14 +36,14 @@ export function Barcode({ value, height = 40, width = 1.5, fontSize = 11, displa
         const h = svg.getAttribute("height")
         if (w && h) {
           svg.setAttribute("viewBox", `0 0 ${w} ${h}`)
-          svg.setAttribute("preserveAspectRatio", "xMidYMid meet")
+          svg.setAttribute("preserveAspectRatio", stretch ? "none" : "xMidYMid meet")
           svg.removeAttribute("width")
           svg.removeAttribute("height")
           svg.style.width = "100%"
-          svg.style.height = "auto"
+          svg.style.height = stretch ? "100%" : "auto"
         }
       }
     } catch { /* invalid value → leave empty */ }
-  }, [value, height, width, fontSize, displayValue, fit])
+  }, [value, height, width, fontSize, displayValue, fit, stretch])
   return <svg ref={ref} className={className} />
 }

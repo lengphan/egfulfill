@@ -121,11 +121,28 @@ export function LabelSheet({
                 // what's on screen is what lands on the sticker.
                 style={oneUp ? { width: `${spec.w}in`, height: `${spec.h}in`, padding: "0.06in" } : undefined}
               >
-                <div className="w-full truncate text-[11px] font-medium leading-tight">{l.name || l.sku}</div>
-                {l.variant && <div className="w-full truncate text-[9px] leading-tight text-muted-foreground">{prettyVariant(l.variant)}</div>}
+                {/* A 2×1 sticker is ~190px: a 60-character marketplace title cannot fit,
+                    and truncating mid-word tells the picker nothing. Two clamped lines at
+                    a size that stays readable on thermal, with the SKU underneath as the
+                    thing that's actually scanned. */}
+                <div className="line-clamp-2 w-full text-[8px] font-semibold leading-[1.15]">{l.name || l.sku}</div>
+                {l.variant && <div className="line-clamp-1 w-full text-[7px] leading-tight text-muted-foreground">{prettyVariant(l.variant)}</div>}
                 {/* fit → scales to the label. A long SKU otherwise renders ~450px wide
                     and spills across the card, printing a clipped, unscannable code. */}
-                <Barcode value={l.sku} height={oneUp ? Math.round(spec.h * 34) : 46} fit className="mx-auto w-full" />
+                {oneUp ? (
+                  // Fixed slice of the sticker so the code can never crowd out the text.
+                  <div className="w-full flex-1 min-h-0">
+                    <Barcode value={l.sku} height={40} displayValue={false} fit stretch className="block size-full" />
+                  </div>
+                ) : (
+                  <Barcode value={l.sku} height={46} fit className="mx-auto block w-full max-w-full" />
+                )}
+                {/* On thermal stock the SKU is drawn HERE, not by JsBarcode: its text is
+                    stamped inside the svg and scales down with it, so on a 2×1 the code
+                    was legible and the number underneath was clipped mid-digit. */}
+                {oneUp && (
+                  <div className="w-full truncate font-mono text-[8px] leading-none tracking-tight">{l.sku}</div>
+                )}
               </div>
             ))}
           </div>
