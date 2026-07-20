@@ -49,8 +49,11 @@ export function OrderHistory({ orderId }: { orderId: string }) {
 
   // A seller gets 403 → empty. Rendering an empty card would imply nothing happened,
   // which is a different claim from "you can't see this", so it renders nothing at all.
+  // Only factory staff get this far, so an empty list genuinely means "nothing recorded
+  // yet" rather than "you can't see it" — and saying so beats rendering nothing, which is
+  // indistinguishable from the feature being missing. Most existing orders predate
+  // auditing, so empty is the common first impression.
   if (!allowed) return null
-  if (rows !== null && rows.length === 0) return null
 
   return (
     <SectionCard
@@ -60,6 +63,11 @@ export function OrderHistory({ orderId }: { orderId: string }) {
       {rows === null ? (
         <div className="flex items-center justify-center py-8 text-muted-foreground"><CircleNotch size={18} className="animate-spin" /></div>
       ) : (
+        rows.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-muted-foreground">
+            Nothing recorded for this order yet — changes from here on will appear.
+          </div>
+        ) : (
         <div className="max-h-72 divide-y divide-border overflow-y-auto">
           {rows.map((r) => (
             <div key={String(r.id)} className="flex items-start gap-3 px-5 py-2.5">
@@ -76,6 +84,7 @@ export function OrderHistory({ orderId }: { orderId: string }) {
             </div>
           ))}
         </div>
+        )
       )}
     </SectionCard>
   )

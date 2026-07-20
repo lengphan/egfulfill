@@ -921,73 +921,100 @@ function UsersPanel() {
           )}
         </div>
         {!loaded ? <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div> : (
-          <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Plan</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Manage</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {shown.length === 0 ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</TableCell></TableRow>
-                : groupTeams(shown).map(({ u, child }) => (
-                  <TableRow key={u.id} className={u.active === false ? "opacity-55" : ""}>
-                    <TableCell className="font-medium">
-                      <span className={child ? "ml-5 inline-flex items-center gap-1.5 text-muted-foreground" : "inline-flex items-center gap-1.5"}>
-                        {child && <span className="text-muted-foreground/60">↳</span>}
-                        {u.name || u.store_name || "—"}
-                      </span>
+          /* Rows, not a table.
+             The table was carrying six columns — name, email, role, plan, joined, manage —
+             which left every cell cramped and made the team grouping lean on indentation
+             alone. Identity (avatar + name + email) is ONE thing, so it's one cell; role
+             and plan are both "what this account may do", so they sit together on the
+             right. A team reads as a bordered group with its leader at the top, which the
+             eye follows without needing the indent to do the work. */
+          <div className="divide-y divide-border">
+            {shown.length === 0 ? (
+              <div className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</div>
+            ) : (
+              groupTeams(shown).map(({ u, child }) => (
+                <div
+                  key={u.id}
+                  className={
+                    "flex flex-wrap items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40 " +
+                    (child ? "border-l-2 border-primary/25 bg-muted/20 pl-10" : "") +
+                    (u.active === false ? " opacity-55" : "")
+                  }
+                >
+                  {/* Identity */}
+                  <span className={"grid shrink-0 place-items-center rounded-full bg-muted font-medium text-muted-foreground " + (child ? "size-7 text-xs" : "size-9 text-sm")}>
+                    {(u.name || u.email || "?").charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={child ? "truncate text-sm" : "truncate text-sm font-medium"}>{u.name || u.store_name || "—"}</span>
                       {!child && (u.team_size ?? 0) > 0 && (
-                        <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                          Team leader · {u.team_size}
-                        </span>
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Leads {u.team_size}</span>
                       )}
                       {child && (
-                        <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          Member of {u.owner_label || "a team"}
-                        </span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Member</span>
                       )}
-                      {u.active === false && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>{!isAdminCaller ? <span className="text-sm capitalize">{u.role}</span> : <select value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select>}</TableCell>
-                    <TableCell>
-                      {/* Only meaningful for sellers — staff have no subscription. */}
-                      {u.role === "seller" && isAdminCaller ? (
-                        <select value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id} className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                          {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      ) : u.role === "seller" ? <span className="text-sm capitalize">{u.plan ?? "starter"}</span> : <span className="text-xs text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{fmtDate(u.created_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          aria-label={`Manage ${u.email}`}
-                          className="eg-tap inline-flex size-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                        >
-                          <DotsThree size={16} weight="bold" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem onClick={() => { setPwFor(u); setPwValue(""); setPwErr(null); setPwDone(false) }}>
-                            Set a new password
-                          </DropdownMenuItem>
-                          {u.active === false ? (
-                            <DropdownMenuItem onClick={() => setActive(u, true)}>Reactivate account</DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={() => setActive(u, false)}>Deactivate (blocks sign-in)</DropdownMenuItem>
-                          )}
-                          {/* Deleting is admin-only and unrecoverable — deactivating is
-                              the reversible answer to "they left", and keeps their orders
-                              attached to a real account. */}
-                          {isAdminCaller && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => setRemoving(u)} className="text-destructive">Delete permanently…</DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
+                      {u.active === false && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>
+                      )}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+                  </div>
+
+                  {/* Joined — context, not a control, so it stays quiet. */}
+                  <span className="hidden w-24 shrink-0 text-xs text-muted-foreground lg:block">{fmtDate(u.created_at)}</span>
+
+                  {/* Access: what this account may do, in one place. */}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {!isAdminCaller ? (
+                      <span className="text-sm capitalize">{u.role}</span>
+                    ) : (
+                      <select
+                        value={u.role} onChange={(e) => changeRole(u, e.target.value)} disabled={busy === u.id}
+                        className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      >
+                        {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    )}
+                    {u.role === "seller" && (isAdminCaller ? (
+                      <select
+                        value={u.plan ?? "starter"} onChange={(e) => changePlan(u, e.target.value)} disabled={busy === u.id}
+                        className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm capitalize transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      >
+                        {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-sm capitalize text-muted-foreground">{u.plan ?? "starter"}</span>
+                    ))}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        aria-label={`Manage ${u.email}`}
+                        className="eg-tap inline-flex size-8 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                      >
+                        <DotsThree size={16} weight="bold" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={() => { setPwFor(u); setPwValue(""); setPwErr(null); setPwDone(false) }}>
+                          Set a new password
+                        </DropdownMenuItem>
+                        {u.active === false ? (
+                          <DropdownMenuItem onClick={() => setActive(u, true)}>Reactivate account</DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => setActive(u, false)}>Deactivate (blocks sign-in)</DropdownMenuItem>
+                        )}
+                        {isAdminCaller && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setRemoving(u)} className="text-destructive">Delete permanently…</DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         )}
       </SectionCard>
 
