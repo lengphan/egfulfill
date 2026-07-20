@@ -10,6 +10,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
+import { OrderHistory } from "@/components/app/order-history"
 import { SellerDesignFiles } from "@/components/app/design-files-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -323,6 +324,9 @@ export default function OrderDetailPage() {
               </ol>
             </SectionCard>
           )}
+
+          {/* The RECORD, distinct from the conversation below it. */}
+          <OrderHistory orderId={String(id)} />
 
           <SectionCard title="Order activity" description="Messages & notes on this order">
             <div className="flex flex-col">

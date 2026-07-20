@@ -120,7 +120,16 @@ export function getMyTopups() {
 }
 
 // ── Admin ──────────────────────────────────────────────────────────────────
-export type AdminUser = { id: string; email: string; name?: string | null; role: string; store_name?: string | null; active?: boolean; plan?: string; spydeck_addon?: boolean; created_at?: string }
+export type AdminUser = {
+  id: string; email: string; name?: string | null; role: string; store_name?: string | null
+  active?: boolean; plan?: string; spydeck_addon?: boolean; created_at?: string
+  /** Set when this account is a MEMBER of someone else's team. */
+  owner_id?: string | null
+  owner_label?: string | null
+  team_permissions?: string[] | null
+  /** How many active members this account leads. 0 = not a team leader. */
+  team_size?: number
+}
 export function getUsers() {
   return api<AdminUser[]>(`/api/users`)
 }

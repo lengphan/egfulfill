@@ -1,0 +1,58 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import { ClockCounterClockwise, CircleNotch } from "@phosphor-icons/react"
+import { SectionCard } from "@/components/app/section-card"
+import { getOrderHistory, type AuditRow } from "@/lib/api"
+import { sayAction } from "@/components/app/tag-history"
+
+/**
+ * Everything that has happened to one order, newest first.
+ *
+ * Distinct from the messages panel, which is a conversation. This is the record: who
+ * changed what and when, drawn from audit_log rather than reconstructed from current
+ * state — so it still answers "who moved this to shipped" after the fact.
+ *
+ * Staff-only by API (GET /api/audit/entity requires staff), so this renders empty for a
+ * seller rather than leaking who on the floor touched their order.
+ */
+export function OrderHistory({ orderId }: { orderId: string }) {
+  const [rows, setRows] = useState<AuditRow[] | null>(null)
+
+  const load = useCallback(() => {
+    if (!orderId) return
+    getOrderHistory(orderId).then((r) => setRows(r ?? [])).catch(() => setRows([]))
+  }, [orderId])
+  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+
+  // A seller gets 403 → empty. Rendering an empty card would imply nothing happened,
+  // which is a different claim from "you can't see this", so it renders nothing at all.
+  if (rows !== null && rows.length === 0) return null
+
+  return (
+    <SectionCard
+      title="Order history"
+      description="Every recorded change to this order, newest first"
+    >
+      {rows === null ? (
+        <div className="flex items-center justify-center py-8 text-muted-foreground"><CircleNotch size={18} className="animate-spin" /></div>
+      ) : (
+        <div className="max-h-72 divide-y divide-border overflow-y-auto">
+          {rows.map((r) => (
+            <div key={String(r.id)} className="flex items-start gap-3 px-5 py-2.5">
+              <ClockCounterClockwise size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium">{sayAction(r.action)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {new Date(r.ts).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  {r.actor_email ? ` · ${r.actor_email}` : r.actor_role ? ` · ${r.actor_role}` : ""}
+                  {r.note ? ` · ${r.note}` : ""}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  )
+}

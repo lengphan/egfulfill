@@ -847,6 +847,30 @@ function UsersPanel() {
   }
 
   const term = qStr.trim().toLowerCase()
+  /**
+   * Order the list so a team reads as a team: each leader followed by their members,
+   * indented. A flat list of "Owner" and "Member" rows tells you nothing about who
+   * belongs to whom, which is the first thing you need before changing anything.
+   */
+  const groupTeams = (list: AdminUser[]) => {
+    const byId = new Map(list.map((u) => [String(u.id), u]))
+    const members = new Map<string, AdminUser[]>()
+    for (const u of list) {
+      if (u.owner_id && byId.has(String(u.owner_id))) {
+        const k = String(u.owner_id)
+        members.set(k, [...(members.get(k) ?? []), u])
+      }
+    }
+    const out: { u: AdminUser; child: boolean }[] = []
+    for (const u of list) {
+      // Members are emitted under their leader, not again at top level.
+      if (u.owner_id && byId.has(String(u.owner_id))) continue
+      out.push({ u, child: false })
+      for (const m of members.get(String(u.id)) ?? []) out.push({ u: m, child: true })
+    }
+    return out
+  }
+
   const shown = users.filter((u) => {
     if (!showInactive && u.active === false) return false
     if (roleFilter === "staff" ? u.role === "seller" : roleFilter !== "all" && u.role !== roleFilter) return false
@@ -901,10 +925,23 @@ function UsersPanel() {
             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Plan</TableHead><TableHead>Joined</TableHead><TableHead className="text-right">Manage</TableHead></TableRow></TableHeader>
             <TableBody>
               {shown.length === 0 ? <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</TableCell></TableRow>
-                : shown.map((u) => (
+                : groupTeams(shown).map(({ u, child }) => (
                   <TableRow key={u.id} className={u.active === false ? "opacity-55" : ""}>
                     <TableCell className="font-medium">
-                      {u.name || u.store_name || "—"}
+                      <span className={child ? "ml-5 inline-flex items-center gap-1.5 text-muted-foreground" : "inline-flex items-center gap-1.5"}>
+                        {child && <span className="text-muted-foreground/60">↳</span>}
+                        {u.name || u.store_name || "—"}
+                      </span>
+                      {!child && (u.team_size ?? 0) > 0 && (
+                        <span className="ml-1.5 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          Team leader · {u.team_size}
+                        </span>
+                      )}
+                      {child && (
+                        <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          Member of {u.owner_label || "a team"}
+                        </span>
+                      )}
                       {u.active === false && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Deactivated</span>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{u.email}</TableCell>

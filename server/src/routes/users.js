@@ -49,7 +49,19 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   q('alter table users add column if not exists active boolean not null default true').catch(() => {});
 
   app.get('/api/users', { preHandler: requireUserManager }, async () => {
-    const r = await q('select id, email, name, role, store_name, active, plan, spydeck_addon, created_at from users order by created_at desc');
+    // Include the TEAM relationship so the admin screen can group members under their
+    // leader. Without it a list of "Owner" and "Member" rows says nothing about which
+    // member belongs to whom — the one thing you need before changing anything.
+    const r = await q(`
+      select u.id, u.email, u.name, u.role, u.store_name, u.active, u.plan, u.spydeck_addon, u.created_at,
+             tm.owner_id,
+             coalesce(o.store_name, o.name, o.email) as owner_label,
+             tm.permissions as team_permissions,
+             (select count(*)::int from team_members t2 where t2.owner_id = u.id::text and t2.status = 'active') as team_size
+        from users u
+        left join team_members tm on lower(tm.email) = lower(u.email) and tm.status = 'active'
+        left join users o on o.id::text = tm.owner_id
+       order by u.created_at desc`);
     return r.rows;   // never returns password_hash
   });
 
