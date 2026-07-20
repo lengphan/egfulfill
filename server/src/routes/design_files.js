@@ -7,6 +7,7 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
+import { audit } from '../audit.js';
 import { phashDistance, PHASH_NEAR } from '../fingerprint.js';
 
 export function designFilesRoutes(app, requireAuth) {
@@ -126,6 +127,46 @@ export function designFilesRoutes(app, requireAuth) {
         .map((x) => ({ ...x.row, distance: x.dist, art_phash: undefined }));
     }
     return { exact, similar, hashed: true };
+  });
+
+  /**
+   * Reuse an existing machine file on ANOTHER order — staff only.
+   *
+   * The factory can see that two sellers uploaded the same artwork and reuse the file
+   * rather than paying to digitise it twice. The receiving seller must NOT learn that:
+   * they see a deliverable on their own order, priced and downloadable, with no hint of
+   * where it came from.
+   *
+   * So this COPIES rather than links. A link would mean either exposing the source row
+   * (whose seller_id is someone else's, and which their file list would reject anyway)
+   * or loosening the seller filter — both leak. A copy is a normal file on their order,
+   * indistinguishable from one made for them, and the entitlement they buy is their own.
+   */
+  app.post('/api/design_files/:designId/reuse', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const b = req.body || {};
+    const orderId = String(b.orderId || '');
+    const sku = String(b.sku || '');
+    if (!orderId || !sku) { reply.code(400); return { error: 'orderId + sku required' }; }
+
+    const src = await q('select * from design_file_data where design_id=$1', [String(req.params.designId)])
+      .then((r) => r.rows[0]);
+    if (!src) { reply.code(404); return { error: 'Source file not found' }; }
+
+    const seller = await ownerOfOrder(orderId, null);
+    const newId = `${src.kind === 'pes' ? 'DL' : 'EMB'}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    await q(
+      `insert into design_file_data (design_id, order_id, sku, seller_id, file_name, mime, data, url, content_hash, price, kind, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), now())`,
+      [newId, orderId, sku, seller || null, src.file_name, src.mime, src.data, src.url, src.content_hash,
+       Number(src.price) || 0, src.kind]
+    );
+    // Audited so the reuse is traceable on OUR side even though it's invisible on theirs.
+    audit(req, 'design_file.reused', {
+      entityType: 'order', entityId: orderId,
+      after: { from: String(req.params.designId), to: newId, sku },
+    });
+    return { ok: true, designId: newId };
   });
 
   app.post('/api/design_files', { preHandler: requireAuth }, async (req, reply) => {

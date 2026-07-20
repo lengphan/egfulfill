@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -61,7 +61,7 @@ const addrComplete = (a: ShipAddress) => !!(a.street && a.city && a.state && a.z
  *  made "send to board" flip every sibling line to Sent at once. */
 /** One prior deliverable. Fuzzy hits carry how far off they are, so "similar" is never
  *  presented with the same confidence as "identical". */
-function MatchRow({ m, similar }: { m: ReuseMatch; similar?: boolean }) {
+function MatchRow({ m, similar, onUse }: { m: ReuseMatch; similar?: boolean; onUse?: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
       <div className="min-w-0">
@@ -74,6 +74,11 @@ function MatchRow({ m, similar }: { m: ReuseMatch; similar?: boolean }) {
         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
           {m.distance === 0 ? "near-identical" : `${m.distance}/64 different`}
         </span>
+      )}
+      {onUse && (
+        <Button size="sm" variant="outline" className="shrink-0" onClick={onUse} title="Copy this file onto this order">
+          Use this file
+        </Button>
       )}
     </div>
   )
@@ -968,7 +973,7 @@ export function OrdersHub() {
               <div className="space-y-4 px-1 pb-1">
                 <p className="text-sm text-muted-foreground">
                   {reuse?.exact.length
-                    ? "The same artwork has already been digitised. Reuse that file instead of sending this to a designer again."
+                    ? "The same artwork has already been digitised. Reuse that file instead of sending this to a designer again — the seller sees a normal deliverable on their own order and nothing about where it came from."
                     : "Nothing matches exactly, but these look similar. Check one before paying for the same work twice."}
                 </p>
 
@@ -976,7 +981,25 @@ export function OrdersHub() {
                   <div>
                     <div className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Identical artwork</div>
                     <div className="space-y-1.5">
-                      {reuse.exact.map((m) => <MatchRow key={m.design_id} m={m} />)}
+                      {reuse.exact.map((m) => (
+                    <MatchRow
+                      key={m.design_id}
+                      m={m}
+                      onUse={async () => {
+                        const r = reuse
+                        if (!r?.item.sku) return
+                        setReuse(null)
+                        try {
+                          const res = await reuseDesignFile(m.design_id, { orderId: r.order.id, sku: r.item.sku })
+                          if (res?.error) throw new Error(res.error)
+                          setNote(`Reused an existing file for ${r.item.name || r.item.sku} — nothing sent to the board.`)
+                          getDesignFiles(r.order.id).then((f) => setDfiles((p) => ({ ...p, [r.order.id]: f ?? [] }))).catch(() => {})
+                        } catch (e) {
+                          setActionErr(e instanceof Error ? e.message : "Couldn't reuse that file.")
+                        }
+                      }}
+                    />
+                  ))}
                     </div>
                   </div>
                 ) : null}

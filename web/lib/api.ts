@@ -381,6 +381,13 @@ export type DesignFileRow = { designId: string; sku?: string | null; name?: stri
 /** A prior deliverable made from the same artwork. `distance` is set only on fuzzy hits. */
 export type ReuseMatch = { design_id: string; file_name?: string | null; kind?: string; order_id?: string; seller?: string; created_at?: string; distance?: number }
 /** exact = identical artwork, safe to reuse. similar = looks alike, needs a human to confirm. */
+/** Copy an existing machine file onto another order. Staff only — the receiving seller
+ *  sees a normal deliverable on their own order and learns nothing about its origin. */
+export function reuseDesignFile(designId: string, body: { orderId: string; sku: string }) {
+  return api<{ ok?: boolean; designId?: string; error?: string }>(
+    `/api/design_files/${encodeURIComponent(designId)}/reuse`,
+    { method: "POST", body: JSON.stringify(body) })
+}
 export function getDesignReuse(orderId: string, sku: string) {
   return api<{ exact: ReuseMatch[]; similar: ReuseMatch[]; hashed: boolean }>(
     `/api/design_files/reuse?orderId=${encodeURIComponent(orderId)}&sku=${encodeURIComponent(sku)}`)
