@@ -1210,6 +1210,9 @@ export function acceptInvite(token: string) {
 export type BillingPlan = {
   plan: string
   spydeck_addon: boolean
+  /** Owner id when this plan comes from a team leader rather than your own subscription.
+   *  Access is inherited; billing control is NOT — renewal fields stay your own. */
+  inherited_from?: string | null
   renews_at: string | null
   auto_renew: boolean
   past_due_since: string | null

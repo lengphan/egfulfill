@@ -547,19 +547,22 @@ function TeamPanel() {
         <div className="border-b border-border bg-destructive/10 px-5 py-3 text-sm text-destructive">{inviteErr}</div>
       )}
       {invites.map((inv) => (
-        <div key={inv.id} className="flex flex-col gap-2 border-b border-border bg-primary/5 px-5 py-4 sm:flex-row sm:items-center">
+        <div key={inv.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-primary/5 px-5 py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">
-              {inv.owner_name} invited you to their team
+            {/* One line, not three. The identity and the consequence are what matter;
+                the previous card spent four lines saying it and pushed everything else
+                down the panel. The email is always shown because "Leng" is a display
+                name anyone can set — accepting shares your data, so identify them by
+                the thing they had to prove they own. */}
+            <div className="truncate text-sm">
+              <span className="font-medium">{inv.owner_name}</span>
+              {inv.owner_email && inv.owner_email !== inv.owner_name && (
+                <span className="text-muted-foreground"> ({inv.owner_email})</span>
+              )}
+              <span className="text-muted-foreground"> invited you as {inv.role}</span>
             </div>
-            {/* The email, always. "Kathy Kay" is a store name anyone can set — and it
-                may not resemble the account you think sent it. Accepting shares your
-                data, so show the identifier they actually had to own. */}
-            {inv.owner_email && inv.owner_email !== inv.owner_name && (
-              <div className="text-xs font-medium text-muted-foreground">{inv.owner_email}</div>
-            )}
-            <div className="text-xs text-muted-foreground">
-              As {inv.role}. Accepting applies the access they shared with you — your menu will show only those pages.
+            <div className="truncate text-xs text-muted-foreground">
+              Accepting limits your menu to the pages they shared.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -572,28 +575,6 @@ function TeamPanel() {
           </div>
         </div>
       ))}
-      {access?.member && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-3 text-sm">
-          <span>
-            <span className="font-medium">You&apos;re on {access.ownerName}&apos;s team</span>
-            <span className="text-muted-foreground">
-              {" "}· {access.role ?? "member"} · {(access.permissions?.length ?? 0)} page
-              {(access.permissions?.length ?? 0) === 1 ? "" : "s"} shared with you
-            </span>
-          </span>
-          {/* Joining was one-way until now: accepting restricted your menu to whatever
-              was shared, with no way out except asking the owner to remove you. */}
-          {access.membershipId && (
-            <Button
-              size="sm" variant="outline" className="ml-auto"
-              onClick={() => onDropMembership(String(access.membershipId), "leave the team")}
-              disabled={acceptBusy === String(access.membershipId)}
-            >
-              Leave team
-            </Button>
-          )}
-        </div>
-      )}
 
       <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center">
         <Input
@@ -679,6 +660,31 @@ function TeamPanel() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Your membership of SOMEONE ELSE'S team. Below the table on purpose: the table
+          above is the team you LEAD, this is a team you're IN, and stacking it on top
+          pushed the invite form and the member list down behind information that isn't
+          about them. */}
+      {access?.member && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-5 py-3 text-sm">
+          <span className="min-w-0">
+            <span className="font-medium">You&apos;re on {access.ownerName}&apos;s team</span>
+            <span className="text-muted-foreground">
+              {" "}· {access.role ?? "member"} · {(access.permissions?.length ?? 0)} page
+              {(access.permissions?.length ?? 0) === 1 ? "" : "s"} shared with you
+            </span>
+          </span>
+          {access.membershipId && (
+            <Button
+              size="sm" variant="outline" className="ml-auto"
+              onClick={() => onDropMembership(String(access.membershipId), "leave the team")}
+              disabled={acceptBusy === String(access.membershipId)}
+            >
+              Leave team
+            </Button>
+          )}
         </div>
       )}
 

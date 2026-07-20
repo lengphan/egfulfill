@@ -7,6 +7,7 @@
 // fund it, so the client can send the seller to top up (or, later, pay a provider
 // directly — see `method` below).
 import { q } from '../db.js';
+import { resolveEntitlements } from '../auth.js';
 import { balanceOf, moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
 import { notify } from './notifications.js';
@@ -111,9 +112,20 @@ export function billingRoutes(app, requireAuth) {
     const r = await q('select plan, spydeck_addon, plan_renews_at, plan_auto_renew, plan_past_due_since, plan_paid_plan, plan_paid_addon from users where id=$1', [req.user.sub]);
     const u = r.rows[0] || {};
     const active = u.plan_renews_at ? new Date(u.plan_renews_at).getTime() > Date.now() : false;
+    // A team member inherits their leader's plan. Resolved here as well as at sign-in so
+    // a leader upgrading unlocks it for the team immediately, rather than when each
+    // member's 7-day token happens to be re-issued.
+    //
+    // NB only `plan`/`spydeck_addon` are inherited — renewal dates, auto-renew and the
+    // paid-month fields stay the member's OWN, because those describe a subscription
+    // they'd be managing and paying for. Inheriting access must not imply inheriting
+    // billing control.
+    const ent = await resolveEntitlements({ ...req.user, id: req.user.sub, plan: u.plan, spydeck_addon: u.spydeck_addon });
     return {
-      plan: u.plan || 'starter',
-      spydeck_addon: u.spydeck_addon === true,
+      plan: ent.plan,
+      spydeck_addon: ent.spydeck_addon,
+      /** Owner id when this access came from a team leader, else null. */
+      inherited_from: ent.inherited_from,
       renews_at: u.plan_renews_at || null,
       auto_renew: u.plan_auto_renew !== false,
       past_due_since: u.plan_past_due_since || null,

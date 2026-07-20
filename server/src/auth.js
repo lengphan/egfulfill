@@ -110,10 +110,49 @@ export async function login({ email, username, password }) {
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
   const safe = { id: u.id, email: u.email, username: u.username || null, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false, plan: u.plan || 'starter', spydeck_addon: u.spydeck_addon === true };
+  // A team member inherits their leader's plan — they never bought one themselves.
+  Object.assign(safe, await resolveEntitlements(safe));
   return { user: safe, token: sign(safe) };
 }
 
 export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'designer'].includes(user.role);
+
+/**
+ * Entitlements a user actually has, INCLUDING ones inherited from their team leader.
+ *
+ * A team member's own row is always 'starter' with no add-ons — they never buy anything;
+ * the leader does. Reading the member's own columns meant a teammate on a Pro account was
+ * shown "SpyDeck is a research add-on, $9/mo" for something the leader had already paid
+ * for, and would have been charged twice for one seat.
+ *
+ * The leader's plan is the ceiling: we take the better of the two rather than replacing,
+ * so someone who happens to hold their own subscription is never downgraded by joining
+ * a team. Only an ACTIVE membership counts — a pending invite grants nothing.
+ *
+ * Returns { plan, spydeck_addon, inherited_from } — inherited_from is the owner id when
+ * the entitlement came from the team, else null, so the UI can say WHY it's unlocked.
+ */
+const PLAN_RANK = { starter: 0, pro: 1, enterprise: 2 };
+export async function resolveEntitlements(user) {
+  const own = { plan: user.plan || 'starter', spydeck_addon: user.spydeck_addon === true, inherited_from: null };
+  if (!user || isStaff(user) || !user.email) return own;
+  try {
+    const r = await q(
+      `select u.id as owner_id, u.plan, u.spydeck_addon
+         from team_members t join users u on u.id::text = t.owner_id
+        where lower(t.email)=lower($1) and t.status='active' limit 1`, [user.email]);
+    const o = r.rows[0];
+    if (!o) return own;
+    const ownerPlan = o.plan || 'starter';
+    const better = (PLAN_RANK[ownerPlan] ?? 0) > (PLAN_RANK[own.plan] ?? 0) ? ownerPlan : own.plan;
+    const addon = own.spydeck_addon || o.spydeck_addon === true;
+    // Only claim inheritance when the team actually added something.
+    const gained = better !== own.plan || (addon && !own.spydeck_addon);
+    return { plan: better, spydeck_addon: addon, inherited_from: gained ? String(o.owner_id) : null };
+  } catch (e) {
+    return own;   // never let a billing lookup block sign-in
+  }
+}
 
 // Reusable bcrypt hasher for admin-created users / password resets.
 export async function hashPassword(plain) { return bcrypt.hash(plain, 10); }
@@ -136,5 +175,6 @@ export async function googleAuth({ email, name = '' }) {
   }
   if (u.active === false) throw new Error('This account has been deactivated. Contact an admin.');
   const safe = { id: u.id, email: u.email, username: u.username || null, role: u.role, name: u.name, avatar_emoji: u.avatar_emoji || null, avatar_color: u.avatar_color || null, notify_sound: u.notify_sound !== false, plan: u.plan || 'starter', spydeck_addon: u.spydeck_addon === true };
+  Object.assign(safe, await resolveEntitlements(safe));
   return { user: safe, token: sign(safe) };
 }
