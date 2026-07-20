@@ -73,8 +73,17 @@ export function ImportOrdersDialog({
   const takeFile = (file?: File | null) => {
     if (!file) return
     if (!/\.csv$/i.test(file.name)) { setError("Please upload a .csv file (export or paste for .xlsx / Sheets)."); return }
+    // An empty or unreadable file used to do NOTHING — no preview, no error, no clue.
+    // Silence is the worst outcome here: it's indistinguishable from the click not
+    // registering, so people re-try the same broken file.
+    if (!file.size) { setError(`"${file.name}" is empty — nothing to import.`); return }
     const reader = new FileReader()
-    reader.onload = () => ingest(parseCSV(String(reader.result || "")))
+    reader.onload = () => {
+      const text = String(reader.result || "")
+      if (!text.trim()) { setError(`"${file.name}" has no readable text.`); return }
+      ingest(parseCSV(text))
+    }
+    reader.onerror = () => setError(`Couldn't read "${file.name}". Try re-exporting it, or use Paste.`)
     reader.readAsText(file)
   }
 

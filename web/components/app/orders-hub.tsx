@@ -425,6 +425,10 @@ export function OrdersHub() {
 
       {/* Why an action was refused — the ship gate's reasons land here rather than the
           status silently snapping back. */}
+      {/* Opened from the header, so it must mount regardless of whether the list has
+          rows — inside the list branch it was dead on an empty board. */}
+      <ImportOrdersDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
+
       {note && (
         <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
           <PaperPlaneTilt size={16} weight="bold" className="mt-0.5 shrink-0 text-muted-foreground" />
@@ -929,8 +933,6 @@ export function OrdersHub() {
               )
             })}
           </div>
-          <ImportOrdersDialog open={importOpen} onOpenChange={setImportOpen} onImported={load} />
-
           {/* "We may already have made this." Exact and similar are kept visually
               separate on purpose: identical artwork is a safe reuse, whereas a
               lookalike is a lead to check. Attaching a fuzzy match automatically
