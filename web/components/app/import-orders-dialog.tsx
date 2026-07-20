@@ -42,6 +42,7 @@ export function ImportOrdersDialog({
   const [dragOver, setDragOver] = useState(false)
   const [paste, setPaste] = useState("")
   const [sheetUrl, setSheetUrl] = useState("")
+  const [notice, setNotice] = useState<string | null>(null)
   const [sheetLoading, setSheetLoading] = useState(false)
   const [sheetsEnabled, setSheetsEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -90,6 +91,21 @@ export function ImportOrdersDialog({
   const ingestPaste = () => {
     if (!paste.trim()) return
     ingest(parsePasted(paste))
+  }
+
+  /**
+   * Open a new Google Sheet pre-filled with our template.
+   *
+   * Google has no "create a sheet from this CSV" URL, so this uses the documented
+   * create-and-import flow: a blank sheet opens and the template lands on the clipboard
+   * for a single paste. Better than telling someone to build the columns themselves,
+   * which is where most import failures start.
+   */
+  const makeSheetCopy = async () => {
+    try { await navigator.clipboard?.writeText(CSV_TEMPLATE.replace(/,/g, "\t")) } catch { /* clipboard may be blocked */ }
+    window.open("https://sheets.new", "_blank", "noopener")
+    setError(null)
+    setNotice("A blank Google Sheet is opening — the template is on your clipboard, so press ⌘V / Ctrl+V in cell A1.")
   }
 
   const loadSheet = async () => {
@@ -214,11 +230,27 @@ export function ImportOrdersDialog({
                       {sheetLoading ? <CircleNotch size={15} className="animate-spin" /> : "Load"}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Share the sheet as “anyone with the link can view”, then paste it here.</p>
+                  {/* Start from a correctly-shaped sheet rather than describing the shape.
+                      "Make a copy" hands them a Google Sheet with our exact headers, which
+                      removes the whole class of import failures that begin with a column
+                      named something we don't recognise. */}
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                    <span className="text-xs text-muted-foreground">No sheet yet?</span>
+                    <Button variant="outline" size="sm" onClick={makeSheetCopy}>
+                      <Table size={13} weight="bold" /> Make a copy in Google Sheets
+                    </Button>
+                    <span className="text-[11px] text-muted-foreground">opens a copy already set up with the right columns</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Then share it as “anyone with the link can view” and paste the link above.
+                  </p>
                 </TabsContent>
               )}
             </Tabs>
 
+            {notice && (
+              <div className="mt-3 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">{notice}</div>
+            )}
             {error && (
               <div className="flex items-start gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 <WarningCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> {error}

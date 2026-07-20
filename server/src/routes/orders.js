@@ -63,6 +63,13 @@ export function stageDenial(role, current, target) {
     if (EXCEPTIONS.includes(at)) return 'This item is stopped — warehouse or admin decides what happens next.';
     if (!OP_ZONE.has(at)) return 'The warehouse has this item — only warehouse or admin can change its status now.';
     if (!OP_ZONE.has(to)) return 'Operators can move an item as far as Awaiting scan.';
+    // Reverting OUT of in_review un-does a submission the seller was CHARGED for. The
+    // charge is idempotent so nothing double-bills, but the order goes back to looking
+    // untouched while the money stays taken — and the seller sees it as editable again.
+    // Anything that leaves a paid order looking unpaid is warehouse or admin.
+    if (at === 'in_review' && (to === '' || to === 'new' || to === 'draft')) {
+      return 'This order has been paid for — only warehouse or admin can send it back.';
+    }
     return null;
   }
   return 'Your role cannot change production status.';        // designer, and anything new

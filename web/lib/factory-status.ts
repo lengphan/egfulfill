@@ -19,7 +19,7 @@ export type FactoryStage = { id: string; label: string; tone: FactoryTone }
 // normalizeStage — reusing it would make a seller's unsubmitted draft and a submitted
 // order indistinguishable in the DB. Labels are what people read; ids are data.
 export const FACTORY_STAGES: FactoryStage[] = [
-  { id: "in_review", label: "New", tone: "review" },        // submitted; cancellable by the seller
+  { id: "in_review", label: "Submitted", tone: "review" },  // seller pushed it + paid; cancellable by them
   { id: "awaiting_scan", label: "Awaiting scan", tone: "neutral" }, // label bought; waiting on the scan
   { id: "printed", label: "Printed", tone: "qc" },          // label printed (pre-scan paperwork)
   { id: "working", label: "Working", tone: "prod" },        // scanned + combined with the design; being made
@@ -38,7 +38,11 @@ export const EXCEPTION_STAGES: FactoryStage[] = [
 const EXCEPTIONS = new Set(EXCEPTION_STAGES.map((s) => s.id))
 
 // Everything a staff member can set (new = received / cleared).
-export const ALL_STATUSES: FactoryStage[] = [{ id: "", label: "New (received)", tone: "new" }, ...FACTORY_STAGES, ...EXCEPTION_STAGES]
+// "" and in_review are DIFFERENT states that both used to read "New": "" is an order
+// that arrived and nobody has started (a marketplace sync lands here, unpaid); in_review
+// is one the seller has submitted AND been charged for. Confusing them is how a paid
+// order gets treated as untouched — so they're named for what they are.
+export const ALL_STATUSES: FactoryStage[] = [{ id: "", label: "Received", tone: "new" }, ...FACTORY_STAGES, ...EXCEPTION_STAGES]
 
 // Collapse the many raw factory_status values onto a canonical id. "" = not started.
 export function normalizeStage(s?: string | null): string {
@@ -115,6 +119,10 @@ export function canSetStage(role: string, current: string | null | undefined, ta
   if (role === "operator") {
     if (MONEY_STAGES.has(to) || to === "backorder") return false
     if (OP_STOPS.has(to)) return true
+    // Sending a SUBMITTED order back un-does something the seller paid for: the charge
+    // is idempotent so nothing double-bills, but the order reads as untouched while the
+    // money stays taken. Warehouse or admin only. (Server enforces the same.)
+    if (at === "in_review" && (to === "" || to === "new" || to === "draft")) return false
     return OP_ZONE.has(at) && OP_ZONE.has(to)
   }
   return false

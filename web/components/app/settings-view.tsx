@@ -1102,6 +1102,9 @@ export function SettingsView() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [canPlatform, setCanPlatform] = useState(false)
   const [isSeller, setIsSeller] = useState(false)
+  // API keys are for integrating AGAINST the platform — a seller wiring up their own
+  // systems, or an admin. Floor roles have nothing to integrate.
+  const [canUseKeys, setCanUseKeys] = useState(false)
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
@@ -1109,6 +1112,7 @@ export function SettingsView() {
       setCanPlatform(u?.role === "admin" || u?.role === "warehouse")
       // A plan is a seller subscription; staff roles don't have one.
       setIsSeller(!u?.role || u.role === "seller")
+      setCanUseKeys(!u?.role || u.role === "seller" || u.role === "admin")
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -1117,12 +1121,18 @@ export function SettingsView() {
     <Tabs defaultValue="profile" className="space-y-4">
       <TabsList>
         <TabsTrigger value="profile">Profile</TabsTrigger>
-        <TabsTrigger value="keys">API keys</TabsTrigger>
+        {/* API keys are for building AGAINST the platform — a seller integrating their
+            own systems, or an admin. An operator works the floor and has nothing to
+            integrate, so the tab is noise on their settings. */}
+        {canUseKeys && <TabsTrigger value="keys">API keys</TabsTrigger>}
         {canPlatform && <TabsTrigger value="platform">Platform</TabsTrigger>}
         {canPlatform && <TabsTrigger value="users">Users</TabsTrigger>}
         {isAdmin && <TabsTrigger value="integrations">Integrations</TabsTrigger>}
         {isAdmin && <TabsTrigger value="activity">Activity</TabsTrigger>}
-        <TabsTrigger value="team">Team</TabsTrigger>
+        {/* Team is a SELLER's own staff (and their permissions). Factory roles are managed
+            in Users by admin/warehouse, so a "Team" tab on an operator's settings invites
+            them to invite people into an account that isn't theirs. */}
+        {isSeller && <TabsTrigger value="team">Team</TabsTrigger>}
         {/* Plan is a SELLER subscription — operator/warehouse/admin have no plan. */}
         {isSeller && <TabsTrigger value="plan">Plan</TabsTrigger>}
       </TabsList>
@@ -1130,9 +1140,11 @@ export function SettingsView() {
       <TabsContent value="profile">
         <ProfilePanel />
       </TabsContent>
-      <TabsContent value="keys">
-        <ApiKeysPanel />
-      </TabsContent>
+      {canUseKeys && (
+        <TabsContent value="keys">
+          <ApiKeysPanel />
+        </TabsContent>
+      )}
       {canPlatform && (
         <TabsContent value="platform">
           <PlatformPanel />
@@ -1153,9 +1165,11 @@ export function SettingsView() {
           <IntegrationsPanel />
         </TabsContent>
       )}
-      <TabsContent value="team">
-        <TeamPanel />
-      </TabsContent>
+      {isSeller && (
+        <TabsContent value="team">
+          <TeamPanel />
+        </TabsContent>
+      )}
       {isSeller && (
         <TabsContent value="plan">
           <SubscriptionPanel />
