@@ -216,9 +216,7 @@ export function DispatchBoard() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
                       <span className="truncate text-sm">{customerOf(o)}</span>
-                      {!ready && (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">No label yet</span>
-                      )}
+
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span className="rounded bg-muted px-1.5 py-0.5 font-medium">

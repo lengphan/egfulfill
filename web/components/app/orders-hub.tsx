@@ -152,13 +152,6 @@ export function OrdersHub() {
     return placed || it.design_src || ""
   }, [designs])
 
-  /** Does any DECORATED line still lack artwork? Mirrors the server's ship gate: a plain
-   *  blank with no print method needs none, so requiring one would deadlock it. */
-  const artworkMissingFor = useCallback((o: OrderRow): boolean | undefined => {
-    if (!designs[o.id]) return undefined   // not loaded → don't claim either way
-    return (o.items ?? []).some((it) => String(it.print_type || "").trim() && !artworkFor(o, it))
-  }, [designs, artworkFor])
-
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.
   const [editing, setEditing] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   // A push that would duplicate work already done. Held until a human decides, because
@@ -561,7 +554,7 @@ export function OrdersHub() {
                               left of a row is identity, the right is state and what to do
                               about it. Sharing a line with store/date/address made five
                               dots read as more clutter rather than a summary. */}
-                          <ReadinessStrip order={o} missingArtwork={artworkMissingFor(o)} className="mr-1" />
+                          <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} className="mr-1" />
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>Start order</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>Create new label</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">Next stage</Button>}

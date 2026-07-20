@@ -1,50 +1,88 @@
 "use client"
 
-import { CheckCircle } from "@phosphor-icons/react"
-import { orderReadiness } from "@/lib/order-format"
-import type { OrderRow } from "@/lib/api"
+import type { OrderRow, OrderItem, OrderDesign, DesignFileRow } from "@/lib/api"
 
 /**
- * What's stopping this order shipping — named, all of it, without hovering.
+ * Three tags, always the same three, always in the same place: LABEL · SCAN · DESIGN.
  *
- * This replaced a five-dot pipeline. Dots looked tidy but failed the actual job: they
- * showed only the FIRST blocker in words, so you'd fix that, come back, and find another
- * one waiting. And an unlabelled dot needs a hover to say which check it is, which is the
- * opposite of at-a-glance.
+ * Earlier versions rendered only what was WRONG, so the tags moved around and the count
+ * changed row to row — you couldn't scan a column, and four amber chips read as four
+ * alarms when they meant "not done yet". A production board is scanned vertically; the
+ * shape has to be constant for that to work.
  *
- * So: don't render the checklist, render the GAPS. A production board doesn't need a
- * progress bar — everything done is the normal case and deserves one quiet word, while
- * anything missing needs naming. Nothing hides behind a tooltip, and an order with three
- * problems says three things.
+ * Grey = not done. Tinted = done. Colour is the app's accent rather than amber, because
+ * amber already means "something is wrong" everywhere else (short stock, past due) — a
+ * colour that means both "good" and "problem" means neither.
+ *
+ * DESIGN carries the one middle state that matters: artwork exists and is with a designer
+ * ("Design sent") versus a machine file actually produced from it ("Design approved").
+ * That's the difference between work queued and work done, and it's the question the
+ * floor asks before starting a job.
  */
 
-export function ReadinessStrip({ order, missingArtwork, className }: {
+type State = "todo" | "doing" | "done"
+
+function Tag({ label, state, title }: { label: string; state: State; title?: string }) {
+  const cls =
+    state === "done"
+      ? "bg-primary/10 text-primary"
+      : state === "doing"
+        ? "bg-primary/5 text-primary/70"
+        : "bg-muted text-muted-foreground/70"
+  return (
+    <span title={title} className={"rounded px-1.5 py-0.5 text-[11px] font-medium " + cls}>
+      {label}
+    </span>
+  )
+}
+
+export function ReadinessStrip({ order, items, designs, files, className }: {
   order: OrderRow
-  /** Pass when known; omitted leaves artwork out rather than claiming it's missing. */
-  missingArtwork?: boolean
+  items?: OrderItem[]
+  /** Placed artwork keyed by sku — presence means a design exists to work from. */
+  designs?: Record<string, OrderDesign>
+  /** Machine files produced for this order — presence means a design was approved. */
+  files?: DesignFileRow[]
   className?: string
 }) {
-  const gaps = orderReadiness(order, { missingArtwork }).filter((c) => c.met === false)
+  const stage = String(order.factory_status ?? "").toLowerCase()
 
-  if (!gaps.length) {
-    return (
-      <span className={"inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 " + (className ?? "")}>
-        <CheckCircle size={12} weight="fill" /> Ready
-      </span>
-    )
-  }
+  // A label needs an address, so its absence covers both — the tooltip names the reason
+  // rather than spending a second tag on it.
+  const hasLabel = !!order.tracking
+  const addr = (order.address ?? {}) as Record<string, string>
+  const hasAddr = !!((addr.street || addr.first_line || addr.line1 || addr.address1) && (addr.zip || addr.postal_code))
+  const labelTitle = hasLabel
+    ? `Label ${order.label_printed_at ? "printed" : "created"} · ${order.tracking}`
+    : hasAddr ? "No label bought yet" : "No address yet — a label can't be created without one"
+
+  // Scanned = past the scan queue. Nothing else records that the batch went out.
+  const scanned = ["working", "printed", "shipped"].includes(stage)
+
+  const list = items ?? order.items ?? []
+  const decorated = list.filter((it) => String(it.print_type || "").trim())
+  const withArt = decorated.filter((it) => (it.sku && designs?.[it.sku]?.data) || it.design_src)
+  const approved = (files ?? []).some((f) => f.kind === "pes" || f.kind === "emb")
+
+  const designState: State = approved
+    ? "done"
+    : decorated.length > 0 && withArt.length === decorated.length
+      ? "doing"
+      : "todo"
+  const designLabel = approved ? "Design approved" : designState === "doing" ? "Design sent" : "Design"
+  const designTitle = approved
+    ? "A machine file has been produced for this order"
+    : designState === "doing"
+      ? "Artwork is attached and with a designer — no machine file yet"
+      : decorated.length === 0
+        ? "No decorated lines on this order"
+        : `${decorated.length - withArt.length} of ${decorated.length} lines still need artwork`
 
   return (
-    <span className={"inline-flex flex-wrap items-center gap-1 " + (className ?? "")}>
-      {gaps.map((g) => (
-        <span
-          key={g.id}
-          title={g.detail}
-          className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800"
-        >
-          {g.blocked ?? g.label}
-        </span>
-      ))}
+    <span className={"inline-flex items-center gap-1 " + (className ?? "")}>
+      <Tag label="Label" state={hasLabel ? "done" : "todo"} title={labelTitle} />
+      <Tag label="Scan" state={scanned ? "done" : "todo"} title={scanned ? "Scanned out of dispatch" : "Waiting on the scan"} />
+      <Tag label={designLabel} state={designState} title={designTitle} />
     </span>
   )
 }
