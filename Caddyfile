@@ -49,7 +49,11 @@ egful.store {
 	# missing: /web/lib/api.ts and /web/package.json were returning 200. Source disclosure
 	# on its own, but a web/.env.local (where Next.js keeps secrets, and which the
 	# root-only /.env* rule does NOT match) would have been readable too.
-	@hidden path /.env* /*/.env* /.git /.git/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/*
+	# /docs was missing: https://egful.store/docs/MIGRATION-PLAN.md returned 200 with the
+	# full architecture doc. Markdown at the root is blocked too — CLAUDE.md is only
+	# absent today because it's gitignored, so it would go public the moment anyone
+	# commits it, which is not a safe thing to depend on.
+	@hidden path /.env* /*/.env* /.git /.git/* /.gitignore /.claude* /.dockerignore /server /server/* /web /web/* /node_modules/* /*/node_modules/* /docker-compose.yml /docker-compose.yaml /Caddyfile /package.json /package-lock.json /agents/* /rules/* /memory/* /screenshots/* /docs /docs/* /*.md
 	handle @hidden {
 		respond 404
 	}
