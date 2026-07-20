@@ -34,20 +34,75 @@ export function hexToRgb(hex: string): RGB {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
 
-// Nearest thread to an RGB triple by squared Euclidean distance.
+// ── Perceptual colour distance (OKLab) ───────────────────────────────────────
+// Matching used straight Euclidean distance in sRGB, which is not a perceptual
+// metric — equal numeric steps are wildly unequal to the eye, especially across
+// saturation. Measured failure: a lotus pink #E38BA8 matched TAN (RGB d² 3566)
+// over FLAMINGO (d² 12629), because desaturating is numerically cheap in RGB even
+// though it is obviously wrong to look at. That is what "the thread match isn't
+// swatching properly" was — the sampling was fine, the ruler was broken.
+//
+// OKLab is perceptually uniform, so nearest-in-OKLab is nearest-to-the-eye. Same
+// space the app's design tokens already use (oklch).
+type Lab = { L: number; a: number; b: number }
+
+const srgbToLinear = (c: number) => {
+  const v = c / 255
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+}
+
+export function rgbToOklab(r: number, g: number, b: number): Lab {
+  const R = srgbToLinear(r), G = srgbToLinear(g), B = srgbToLinear(b)
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B)
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B)
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B)
+  return {
+    L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+    a: 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    b: 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+  }
+}
+
+/**
+ * Lightness is deliberately down-weighted for THREAD matching.
+ *
+ * On a garment, hue is the colour's identity and lightness is a shade choice — a cone
+ * that's a bit darker than the artwork reads as the same colour; a cone of the wrong
+ * hue reads as a mistake. Unweighted OKLab picked TAN for a dusty pink purely because
+ * the only pink in stock (Flamingo) is much darker: L 0.570 vs 0.736. Halving the
+ * lightness term flips that to Flamingo without disturbing matches that were already
+ * hue-correct.
+ */
+const L_WEIGHT = 0.5
+const labDist2 = (x: Lab, y: Lab) =>
+  ((x.L - y.L) * L_WEIGHT) ** 2 + (x.a - y.a) ** 2 + (x.b - y.b) ** 2
+
+// Palette conversion is pure and repeated per pixel-cluster, so memoise per hex.
+const LAB_CACHE = new Map<string, Lab>()
+function labOfHex(hex: string): Lab {
+  const hit = LAB_CACHE.get(hex)
+  if (hit) return hit
+  const c = hexToRgb(hex)
+  const lab = rgbToOklab(c.r, c.g, c.b)
+  LAB_CACHE.set(hex, lab)
+  return lab
+}
+
+/** Nearest thread to an RGB triple, by perceptual (OKLab) distance. */
 export function nearestThread(r: number, g: number, b: number, palette = DEFAULT_THREAD_PALETTE): Thread | null {
+  const target = rgbToOklab(r, g, b)
   let best: Thread | null = null, bestD = Infinity
   for (const t of palette) {
-    const c = hexToRgb(t.hex)
-    const d = (r - c.r) ** 2 + (g - c.g) ** 2 + (b - c.b) ** 2
+    const d = labDist2(target, labOfHex(t.hex))
     if (d < bestD) { bestD = d; best = t }
   }
   return best
 }
 
 export function nearestThreads(r: number, g: number, b: number, k = 4, palette = DEFAULT_THREAD_PALETTE): Thread[] {
+  const target = rgbToOklab(r, g, b)
   return palette
-    .map((t) => { const c = hexToRgb(t.hex); return { t, d: (r - c.r) ** 2 + (g - c.g) ** 2 + (b - c.b) ** 2 } })
+    .map((t) => ({ t, d: labDist2(target, labOfHex(t.hex)) }))
     .sort((x, y) => x.d - y.d)
     .slice(0, k)
     .map((s) => s.t)
@@ -55,11 +110,25 @@ export function nearestThreads(r: number, g: number, b: number, k = 4, palette =
 
 export type DominantColor = { r: number; g: number; b: number; srcHex: string; c: number }
 
+/**
+ * Minimum share of non-background pixels for a colour to count.
+ *
+ * Was 8%, inherited verbatim from the old app. That is too high for embroidery: an
+ * outline, a face, a small floral accent is routinely 3-6% of the artwork and is
+ * exactly the cone a digitiser cannot infer. Confirmed twice — a synthetic strip at
+ * ~9% was dropped, and a real lotus design matched White/Orange/Black/Old Gold while
+ * silently omitting the pink that covers half the flower.
+ *
+ * Shared by the cone list AND the thread map so the two can never disagree about
+ * which threads a design needs.
+ */
+export const MIN_COLOR_SHARE = 0.03
+
 // Sample a design image → dominant colours. Coarse quantization (8 levels/channel) so
 // anti-aliased edges merge into their parent, then a greedy merge within MERGE_DIST so a
 // single visual "purple" doesn't surface as three near-purples. Near-white/transparent
-// pixels are dropped (design backgrounds aren't a colour). Verbatim port of the tuning
-// constants — MIN_PCT 8%, MERGE_DIST 96 — so results match the old app.
+// pixels are dropped (design backgrounds aren't a colour). MERGE_DIST 96 is the old
+// app's value; the share floor is NOT — see MIN_COLOR_SHARE.
 /**
  * Canvas colour analysis needs a READABLE image. A remote CDN image taints the canvas, so
  * getImageData throws — and with crossOrigin set, an upstream without CORS headers fails
@@ -97,7 +166,7 @@ export function extractDominant(dataUrl: string, max = 6): Promise<DominantColor
         bk.c++; bk.r += r; bk.g += g; bk.b += b; total++
       }
       if (!total) { resolve([]); return }
-      const minCount = Math.max(2, total * 0.08)
+      const minCount = Math.max(2, total * MIN_COLOR_SHARE)
       const MERGE_DIST = 96
       const hx = (v: number) => ("0" + v.toString(16)).slice(-2)
       const cols = Object.values(buckets)
@@ -175,7 +244,7 @@ export function matchThreadRegions(
    * ~9% of a test design was being dropped entirely at the old floor. Lower floor
    * costs nothing because this runs on demand and stores nothing.
    */
-  minShare = 0.03,
+  minShare = MIN_COLOR_SHARE,
 ): Promise<ThreadRegion[]> {
   const cached = REGION_CACHE.get(dataUrl)
   if (cached) return Promise.resolve(cached)

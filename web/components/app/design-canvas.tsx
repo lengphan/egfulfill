@@ -8,8 +8,8 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
-import { matchThreadColors, nearestThread, hexToRgb, type Thread } from "@/lib/thread-match"
-import { Eyedropper } from "@phosphor-icons/react"
+import { matchThreadColors, nearestThread, hexToRgb, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
 
 export type Pos = { x: number; y: number; w: number; r: number }
 export type TextLayer = { id: string; text: string; x: number; y: number; size: number; r: number; color: string; bold?: boolean }
@@ -66,25 +66,71 @@ export function DesignStage({
   // so we map the click into the design's own unrotated frame (inverse-rotate around its
   // centre) before reading natural coords — otherwise a rotated design samples the wrong
   // pixel. Off-image clicks are ignored.
-  const sampleAt = (e: React.MouseEvent, imgEl: HTMLElement) => {
+  const LOUPE = 104, LOUPE_ZOOM = 9
+  const loupeRef = useRef<HTMLCanvasElement>(null)
+  const [loupe, setLoupe] = useState<{ x: number; y: number; hex: string } | null>(null)
+
+  /** Click/hover point -> the design's own natural pixel coords, or null if outside. */
+  const designPixelAt = (clientX: number, clientY: number, imgEl: HTMLElement) => {
     const s = sampleRef.current, stage = stageRef.current
-    if (!s || !stage) return
+    if (!s || !stage) return null
     const box = imgEl.getBoundingClientRect()             // centre is rotation-invariant
     const cx = box.left + box.width / 2, cy = box.top + box.height / 2
     const stageW = stage.getBoundingClientRect().width
     const renderedW = (pos.w / 100) * stageW
     const renderedH = renderedW * (s.h / s.w)
     const rad = (-(pos.r || 0) * Math.PI) / 180
-    const dx = e.clientX - cx, dy = e.clientY - cy
+    const dx = clientX - cx, dy = clientY - cy
     const ux = dx * Math.cos(rad) - dy * Math.sin(rad)    // into the unrotated frame
     const uy = dx * Math.sin(rad) + dy * Math.cos(rad)
     const fx = ux / renderedW + 0.5, fy = uy / renderedH + 0.5
-    if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return
+    if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return null
+    return { s, px: Math.floor(fx * s.w), py: Math.floor(fy * s.h) }
+  }
+
+  const hexAt = (px: number, py: number, s: { canvas: HTMLCanvasElement }) => {
     const ctx = s.canvas.getContext("2d", { willReadFrequently: true })
-    if (!ctx) return
-    const px = ctx.getImageData(Math.floor(fx * s.w), Math.floor(fy * s.h), 1, 1).data
+    if (!ctx) return null
+    const d = ctx.getImageData(px, py, 1, 1).data
     const hx = (v: number) => ("0" + v.toString(16)).slice(-2)
-    onPickColor?.(("#" + hx(px[0]) + hx(px[1]) + hx(px[2])).toUpperCase())
+    return ("#" + hx(d[0]) + hx(d[1]) + hx(d[2])).toUpperCase()
+  }
+
+  const sampleAt = (e: React.MouseEvent, imgEl: HTMLElement) => {
+    const hit = designPixelAt(e.clientX, e.clientY, imgEl)
+    if (!hit) return
+    const hex = hexAt(hit.px, hit.py, hit.s)
+    if (hex) onPickColor?.(hex)
+  }
+
+  /**
+   * Magnifier loupe. A bare crosshair asks you to hit a specific pixel of a design
+   * rendered at maybe 300px wide - on a thin outline or small detail that is a guess.
+   * The loupe draws surrounding pixels at LOUPE_ZOOM with smoothing OFF, so you can
+   * see the individual pixels you are choosing between, plus the exact hex a click
+   * would take. Shares designPixelAt with the click, so what it shows is what you get.
+   */
+  const moveLoupe = (e: React.MouseEvent, imgEl: HTMLElement) => {
+    const hit = designPixelAt(e.clientX, e.clientY, imgEl)
+    if (!hit) { setLoupe(null); return }
+    const hex = hexAt(hit.px, hit.py, hit.s)
+    if (!hex) { setLoupe(null); return }
+    const sb = stageRef.current?.getBoundingClientRect()
+    setLoupe({ x: e.clientX - (sb?.left ?? 0), y: e.clientY - (sb?.top ?? 0), hex })
+
+    const cv = loupeRef.current
+    const ctx = cv?.getContext("2d")
+    if (!cv || !ctx) return
+    const span = LOUPE / LOUPE_ZOOM                       // source pixels across the loupe
+    ctx.imageSmoothingEnabled = false                     // show PIXELS, not a blur
+    ctx.clearRect(0, 0, LOUPE, LOUPE)
+    ctx.drawImage(hit.s.canvas, hit.px - span / 2, hit.py - span / 2, span, span, 0, 0, LOUPE, LOUPE)
+    // Centre reticle - the pixel that will actually be taken.
+    const c = LOUPE / 2, z = LOUPE_ZOOM
+    ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.lineWidth = 1
+    ctx.strokeRect(c - z / 2 - 0.5, c - z / 2 - 0.5, z + 1, z + 1)
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"
+    ctx.strokeRect(c - z / 2 - 1.5, c - z / 2 - 1.5, z + 3, z + 3)
   }
 
   // target: "image" or a text-layer id. mode: move | resize | rotate.
@@ -173,6 +219,8 @@ export function DesignStage({
         <div
           onPointerDown={picking ? undefined : startDrag("image", "move")}
           onClick={picking ? (e) => sampleAt(e, e.currentTarget) : undefined}
+          onMouseMove={picking ? (e) => moveLoupe(e, e.currentTarget) : undefined}
+          onMouseLeave={picking ? () => setLoupe(null) : undefined}
           style={{ left: `${pos.x}%`, top: `${pos.y}%`, width: `${pos.w}%`, transform: `translate(-50%,-50%) rotate(${pos.r}deg)` }}
           className={"absolute touch-none " + (picking ? "cursor-crosshair" : "cursor-move")}
         >
@@ -182,6 +230,27 @@ export function DesignStage({
           {onRemove && (selected == null || selected === "image") && (
             <button onPointerDown={(e) => e.stopPropagation()} onClick={onRemove} className="absolute -right-2.5 -top-2.5 flex size-6 items-center justify-center rounded-full bg-foreground text-background shadow" aria-label="Remove artwork"><X size={12} weight="bold" /></button>
           )}
+        </div>
+      )}
+
+      {/* Loupe. Rendered last so it is above every layer, and pointer-events-none so
+          it can never intercept the click it exists to help you aim. */}
+      {picking && loupe && (
+        <div
+          className="pointer-events-none absolute z-50"
+          style={{ left: loupe.x, top: loupe.y, transform: `translate(-50%, -100%) translateY(-14px)` }}
+        >
+          <canvas
+            ref={loupeRef}
+            width={LOUPE}
+            height={LOUPE}
+            className="block rounded-full border-2 border-white shadow-lg ring-1 ring-black/20"
+            style={{ width: LOUPE, height: LOUPE }}
+          />
+          <div className="mt-1 flex items-center justify-center gap-1.5 rounded-md bg-foreground/90 px-1.5 py-0.5 text-[10px] font-medium text-background">
+            <span className="size-2.5 rounded-full border border-white/40" style={{ background: loupe.hex }} />
+            <span className="font-mono">{loupe.hex}</span>
+          </div>
         </div>
       )}
 
@@ -241,6 +310,11 @@ export function DesignCanvasDialog({
   const isEmb = /emb/i.test(String(item.print_type || ""))
   const [threads, setThreads] = useState<Thread[]>([])
   const [picking, setPicking] = useState(false)
+  // The thread MAP: which cone covers which part. Off by default (the chip row is the
+  // at-a-glance answer); computed only when opened, and never persisted — the crops are
+  // derived from artwork we already hold.
+  const [mapOpen, setMapOpen] = useState(false)
+  const [regions, setRegions] = useState<ThreadRegion[] | null>(null)
   // null = not attempted, [] = attempted and found nothing (which is a real outcome worth
   // saying out loud — it previously looked identical to "no artwork yet").
   const [threadErr, setThreadErr] = useState(false)
@@ -262,6 +336,16 @@ export function DesignCanvasDialog({
   }, [designUrl, isEmb])
   // Eyedropper: a sampled pixel → its nearest in-stock thread, appended (deduped) so the
   // operator can add a colour the auto-match missed. One pick, then the tool turns off.
+  useEffect(() => {
+    if (!mapOpen || !designUrl) return
+    let alive = true
+    const id = setTimeout(() => {
+      setRegions(null)
+      matchThreadRegions(designUrl).then((r) => { if (alive) setRegions(r) }).catch(() => { if (alive) setRegions([]) })
+    }, 0)
+    return () => { alive = false; clearTimeout(id) }
+  }, [mapOpen, designUrl])
+
   const onPickColor = (hex: string) => {
     const { r, g, b } = hexToRgb(hex)
     const t = nearestThread(r, g, b)
@@ -315,6 +399,15 @@ export function DesignCanvasDialog({
                 Thread match {threads.length ? `· ${threads.length} cone${threads.length === 1 ? "" : "s"}` : ""}
               </span>
               {designUrl && (
+                <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMapOpen((v) => !v)}
+                  title="Show which cone covers which part of the design"
+                  className={"inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors " + (mapOpen ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-accent")}
+                >
+                  <MapPinSimple size={13} weight="bold" /> Map
+                </button>
                 <button
                   type="button"
                   onClick={() => setPicking((v) => !v)}
@@ -323,6 +416,7 @@ export function DesignCanvasDialog({
                 >
                   <Eyedropper size={13} weight="bold" /> {picking ? "Click the design…" : "Pick"}
                 </button>
+                </div>
               )}
             </div>
             {threads.length === 0 ? (
@@ -340,6 +434,51 @@ export function DesignCanvasDialog({
                     <span className="font-mono text-[10px] text-muted-foreground">{t.code}</span>
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* The map. Each row is a crop of the artwork taken from where that colour
+                actually sits — the half a digitiser was previously guessing at. */}
+            {mapOpen && (
+              <div className="mt-2 rounded-md border border-border bg-card">
+                {regions === null ? (
+                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">Reading the artwork…</div>
+                ) : regions.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-xs text-muted-foreground">
+                    Couldn&apos;t read this artwork&apos;s colours — use the eyedropper instead.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {regions.map((r) => (
+                      <div key={r.thread.code} className="flex items-center gap-2.5 px-2.5 py-2">
+                        {r.swatch ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={r.swatch} alt={`Detail using ${r.thread.name}`} className="size-11 shrink-0 rounded border border-border object-cover" />
+                        ) : (
+                          <span className="size-11 shrink-0 rounded border border-border" style={{ background: r.srcHex }} />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="size-3 shrink-0 rounded-full border border-black/15" style={{ background: r.thread.hex }} />
+                            <span className="truncate text-xs font-medium">{r.thread.name}</span>
+                            <span className="font-mono text-[10px] text-muted-foreground">{r.thread.code}</span>
+                          </div>
+                          {/* Artwork colour vs cone colour — how far the match had to travel. */}
+                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <span className="font-mono">{r.srcHex}</span>
+                            <span>&rarr;</span>
+                            <span className="font-mono">{r.thread.hex.toUpperCase()}</span>
+                            <span className="ml-auto font-medium text-foreground">{r.pct}%</span>
+                          </div>
+                        </div>
+                        <div className="relative size-8 shrink-0 rounded border border-border bg-muted" title="Position in the design">
+                          <span className="absolute rounded-[2px] bg-primary/70"
+                            style={{ left: `${r.box.x}%`, top: `${r.box.y}%`, width: `${r.box.w}%`, height: `${r.box.h}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
