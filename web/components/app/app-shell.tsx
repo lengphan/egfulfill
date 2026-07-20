@@ -7,8 +7,10 @@ import { StaffSidebar } from "@/components/app/staff-sidebar"
 import { TopBar } from "@/components/app/topbar"
 import { PageTransition } from "@/components/motion/page-transition"
 import { ConfirmProvider } from "@/components/app/confirm-dialog"
-import { getUser } from "@/lib/auth"
+import { getUser, getToken } from "@/lib/auth"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
+import { sellerNav, allowedByPerms } from "@/lib/nav"
+import { getMyAccess } from "@/lib/api"
 
 // The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
 // (per their role — admin all, operator/warehouse a curated set, designer none) see the
@@ -34,6 +36,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }, 0)
     return () => clearTimeout(id)
   }, [router, pathname])
+
+  // Team members: hiding a nav item doesn't stop someone typing /wallet, so the shell
+  // bounces them off a surface their leader didn't share — the same way it bounces staff
+  // off a board their role can't use. Only acts once access is KNOWN (an owner resolves
+  // to null perms → unrestricted), so it can't redirect during the initial load.
+  useEffect(() => {
+    if (mode !== "seller" || !getToken()) return
+    let live = true
+    getMyAccess()
+      .then((a) => {
+        if (!live || !a.member) return
+        const perms = a.permissions ?? []
+        if (allowedByPerms(pathname, perms)) return
+        // Send them somewhere they actually have: their first shared page, else Settings
+        // (always available, and where the team banner explains their access).
+        const home = sellerNav.flatMap((s) => s.items).find((it) => allowedByPerms(it.href, perms))
+        router.replace(home?.href ?? "/settings")
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [mode, pathname, router])
 
   if (mode === "loading") return null
 
