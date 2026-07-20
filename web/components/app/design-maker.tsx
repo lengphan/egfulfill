@@ -10,10 +10,20 @@ import { ProductPickerDialog, type PickedProduct } from "@/components/app/produc
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, type CatalogProduct } from "@/lib/api"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
-import { mockupFaces, setTypeMockups } from "@/lib/variant-resolve"
+import { mockupFaces, setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
-const mockupOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
+// The blank to DESIGN on. Falls back to the type's default mockup (Settings → Platform)
+// when the product has no imagery of its own — that outline exists precisely so a new
+// hat or sweatshirt can be positioned without uploading a mockup per product.
+//
+// This fallback is deliberately scoped to DESIGN surfaces: the catalog has its own
+// resolver and never sees it, so a category outline can't end up as a product's listing
+// image. Design maker, mini designer and positioning only.
+const mockupOf = (p: CatalogProduct) =>
+  p.img || p.image || p.hero || p.images?.[0] ||
+  (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") ||
+  typeMockupOf(p) || ""
 
 // Composite the artwork + text layers onto a transparent square canvas → PNG data URL.
 // (Only data-URL sources are drawn, so the canvas never taints.)
@@ -71,7 +81,7 @@ export function DesignMaker() {
   const faces = mockupFaces(product, null)
   // Fall back to the single mockup when a product defines no per-side images, so a blank
   // without them behaves exactly as before rather than losing its picture.
-  const faceUrl = faces.find((f) => f.side === side)?.url || ""
+  const faceUrl = faces.find((f) => f.side === side)?.url || (side === "front" ? typeMockupOf(product) : "")
   const [paW, setPaW] = useState(String(BASE_PRINT_IN.w))
   const [paH, setPaH] = useState(String(BASE_PRINT_IN.h))
   const [dragOver, setDragOver] = useState(false)
@@ -343,7 +353,14 @@ export function DesignMaker() {
         </aside>
       </div>
 
-      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => { setMockup(p.img || ""); setProduct(catalogFor(p.sku)); setSide("front") }} />
+      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => {
+          // Resolve through mockupOf, not p.img — the picker's img is empty for a product
+          // with no imagery, which skipped the type-default fallback entirely.
+          const cp = catalogFor(p.sku)
+          setProduct(cp)
+          setMockup(p.img || (cp ? mockupOf(cp) : ""))
+          setSide("front")
+        }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
       <PublishProductDialog
         open={pubOpen}
