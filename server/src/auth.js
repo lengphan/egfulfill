@@ -21,6 +21,10 @@ export function normalizeUsername(raw) {
 }
 const looksLikeEmail = (s) => String(s || '').includes('@');
 
+// Deliberately permissive — this rejects "linh", not exotic-but-valid addresses. The
+// only job is to stop a NON-address being stored in the email column.
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
 // Added idempotently at boot — an existing deployment's users table predates this.
 // The unique index is case-insensitive so "Linh" and "linh" can't both be taken.
 let _usernameReady = null;
@@ -41,6 +45,16 @@ export function verify(token) {
 
 export async function signup({ email, password, role = 'seller', name = '', store_name = '', username = '' }) {
   if (!email || !password) throw new Error('Email and password are required');
+  // A real address, not just a non-empty string.
+  //
+  // Signup accepted anything, and the form said "Email/Username", so someone could
+  // register as "linh" and have it stored in the email column. Two consequences, both
+  // silent: password reset can never reach them, and — since login routes an
+  // identifier with no '@' to the USERNAME column — they could never sign in again
+  // either. The account was unreachable from the moment it was created.
+  if (!EMAIL_RE.test(String(email).trim())) {
+    throw new Error('Enter a real email address — it\'s how you reset your password.');
+  }
   if (password.length < 8) throw new Error('Password must be at least 8 characters');
   // Optional at signup — throws with a readable message if the shape is wrong.
   const uname = username ? normalizeUsername(username) : null;
@@ -76,11 +90,20 @@ export async function login({ email, username, password }) {
   const id = String(username || email || '').trim().toLowerCase();
   if (!id) throw new Error('Email or username is required');
   await ensureUsernameColumn().catch(() => {});
-  // Matched against exactly ONE column depending on the shape — never "email or
-  // username" across both, so a username can't be used to probe for an email.
-  const r = looksLikeEmail(id)
-    ? await q('select * from users where email=$1', [id])
+  // An identifier CONTAINING '@' is an email and only ever matches the email column —
+  // that's what stops a username being used to squat or probe a real address.
+  //
+  // An identifier without '@' tries username first, then falls back to email. The
+  // fallback exists because staff accounts provisioned before usernames existed have a
+  // bare NAME in the email column ('linh', 'uyen', 'abdul'), and routing strictly to
+  // the username column locked every one of them out of their own account. A string
+  // with no '@' cannot collide with a valid address, so the fallback costs nothing.
+  let r = looksLikeEmail(id)
+    ? await q('select * from users where lower(email)=$1', [id])
     : await q('select * from users where lower(username)=$1', [id]).catch(() => ({ rows: [] }));
+  if (!r.rows[0] && !looksLikeEmail(id)) {
+    r = await q('select * from users where lower(email)=$1', [id]).catch(() => ({ rows: [] }));
+  }
   const u = r.rows[0];
   if (!u || !(await bcrypt.compare(password || '', u.password_hash))) {
     throw new Error('Invalid email or password');

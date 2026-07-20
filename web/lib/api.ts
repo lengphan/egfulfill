@@ -938,7 +938,7 @@ export function getGoogleClientId() {
 }
 
 // ─────────────────────────── Auth: signup / password reset ───────────────────────────
-export function signupUser(body: { email: string; password: string; name?: string; store_name?: string }) {
+export function signupUser(body: { email: string; username?: string; password: string; name?: string; store_name?: string }) {
   return api<{ token?: string; user?: Record<string, unknown>; error?: string }>(`/api/auth/signup`, {
     method: "POST",
     body: JSON.stringify(body),

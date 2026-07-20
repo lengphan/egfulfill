@@ -14,6 +14,7 @@ export default function SignupPage() {
   const router = useRouter()
   const [store, setStore] = useState("")
   const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -27,7 +28,7 @@ export default function SignupPage() {
     }
     setLoading(true)
     try {
-      const r = await signupUser({ email: email.trim(), password, store_name: store.trim(), name: store.trim() })
+      const r = await signupUser({ email: email.trim(), username: username.trim() || undefined, password, store_name: store.trim(), name: store.trim() })
       if (r.error) throw new Error(r.error)
       if (r.token) {
         setSession(r.token, r.user ?? {})
@@ -49,9 +50,20 @@ export default function SignupPage() {
           <span className="text-sm font-medium">Store name</span>
           <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="My Store" autoComplete="organization" />
         </label>
+        {/* Email and username are SEPARATE, and email is required.
+            The combined "Email/Username" field let someone register as "linh", which
+            was stored in the email column — so password reset could never reach them,
+            and because sign-in routes an identifier with no '@' to the username column,
+            they could never sign in again either. */}
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Email/Username</span>
-          <Input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="username" required />
+          <span className="text-sm font-medium">Email</span>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required />
+          <span className="text-xs text-muted-foreground">We only use this for sign-in and password resets.</span>
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Username <span className="font-normal text-muted-foreground">— optional</span></span>
+          <Input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="yourname" autoComplete="username" />
+          <span className="text-xs text-muted-foreground">A shorter way to sign in. Letters, numbers, dot, dash or underscore.</span>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-medium">Password</span>
@@ -62,10 +74,8 @@ export default function SignupPage() {
           {loading ? "Creating…" : "Create account"}
         </Button>
 
-        <div className="relative py-1">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-          <div className="relative flex justify-center"><span className="bg-card px-2 text-xs text-muted-foreground">or</span></div>
-        </div>
+        {/* No divider here — GoogleSignIn renders its own, so this page was showing
+            two "or" separators stacked. */}
         <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
 
         <p className="text-center text-sm text-muted-foreground">
