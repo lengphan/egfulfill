@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import Image from "next/image"
-import { CaretDown, Package, Storefront } from "@phosphor-icons/react"
+import { CaretDown, Package } from "@phosphor-icons/react"
 import { Input } from "@/components/ui/input"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
 import { DEMO, toPickedProduct, productImage, productPrice, type PickedProduct } from "@/components/app/product-picker-dialog"
@@ -86,7 +86,7 @@ export function ProductCombobox({
       <Input
         value={value}
         onChange={(e) => { onText(e.target.value); setOpen(true); setCursor(0) }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => { if (value.trim()) setOpen(true) }}
         onKeyDown={(e) => {
           if (!open && (e.key === "ArrowDown" || e.key === "Enter")) { setOpen(true); return }
           if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, matches.length - 1)) }
@@ -100,11 +100,16 @@ export function ProductCombobox({
         aria-expanded={open}
         aria-autocomplete="list"
       />
+      {/* The caret opens the full product browser directly. It used to drop a small panel
+          whose only real action was a "Browse all products…" row at the bottom — a click to
+          reach a click. Typing still filters inline below, so the two paths are distinct:
+          type to narrow, click to browse. */}
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Browse catalog"
-        onClick={() => setOpen((v) => !v)}
+        aria-label="Browse all products"
+        title="Browse all products"
+        onClick={() => { setOpen(false); onBrowse() }}
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
       >
         <CaretDown size={13} className="text-muted-foreground" />
@@ -157,13 +162,7 @@ export function ProductCombobox({
               })
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onBrowse() }}
-            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Storefront size={13} weight="bold" /> Browse all products…
-          </button>
+
         </div>
       )}
     </div>
