@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { usePaged, Pagination } from "@/components/app/pagination"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { Loading } from "@/components/app/loading"
@@ -199,6 +200,9 @@ export function AllSuppliers() {
   const pool = (items ?? []).filter((it) => !sup || it.supplier === sup)
   const brands = Array.from(new Set(pool.map(brandOf).filter(Boolean))).sort()
   const cats = Array.from(new Set(pool.map(catOf).filter(Boolean))).sort()
+  // The supplier pool runs to thousands of blanks once a few catalogs are loaded, so the
+  // grid pages rather than rendering everything — the filters narrow WHAT you see, paging
+  // keeps the page from becoming unusable when they don't narrow enough.
   const visible = (items ?? []).filter((it) => {
     if (sup && it.supplier !== sup) return false
     if (brand && brandOf(it) !== brand) return false
@@ -208,6 +212,7 @@ export function AllSuppliers() {
     if (maxP && p > Number(maxP)) return false
     return true
   })
+  const paged = usePaged(visible, 48)
   const anyFilter = !!(sup || brand || cat || minP || maxP)
   const clearFilters = () => { setSup(""); setBrand(""); setCat(""); setMinP(""); setMaxP("") }
 
@@ -272,7 +277,7 @@ export function AllSuppliers() {
             <div className="py-16 text-center text-sm text-muted-foreground">{anyFilter ? "No loaded blanks match these filters — load more to widen the pool." : `No blanks match “${debounced}”.`}</div>
           ) : (
             <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 lg:grid-cols-4">
-              {visible.map((it) => (
+              {paged.pageItems.map((it) => (
                 <SupplierProductCard
                   key={keyOf(it)}
                   data={cardData(it)}
@@ -286,6 +291,11 @@ export function AllSuppliers() {
                 />
               ))}
             </div>
+          )}
+          {visible.length > paged.perPage && (
+            <Pagination page={paged.page} pageCount={paged.pageCount} perPage={paged.perPage}
+              total={paged.total} start={paged.start}
+              onPage={paged.setPage} onPerPage={paged.setPerPage} perPageOptions={[48, 96, 192]} />
           )}
           {canLoadMore && (
             <div className="flex justify-center border-t border-border p-4">

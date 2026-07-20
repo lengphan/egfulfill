@@ -627,12 +627,35 @@ function PlatformPanel() {
 
   return (
     <SectionCard title="Platform" description="Factory-wide defaults (warehouse & admin)">
-      <div className="grid gap-4 p-5 sm:grid-cols-2">
+      <Fold title="Warehouse ship-from address" hint="the return address on every label">
+
+        <p className="mb-3 text-xs text-muted-foreground">
+          The return address printed on every label. Set once for the whole team.
+        </p>
+        {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
+            No ship-from address yet — buying a label will fail until street, city, state and ZIP are filled in.
+          </div>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField label="Name / company" value={shipFrom.name ?? ""} onChange={(v) => setFromField("name", v)} />
+          <TextField label="Phone" value={shipFrom.phone ?? ""} onChange={(v) => setFromField("phone", v)} />
+          <TextField label="Street" value={shipFrom.street ?? ""} onChange={(v) => setFromField("street", v)} />
+          <TextField label="Suite / unit" value={shipFrom.street2 ?? ""} onChange={(v) => setFromField("street2", v)} />
+          <TextField label="City" value={shipFrom.city ?? ""} onChange={(v) => setFromField("city", v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <TextField label="State" value={shipFrom.state ?? ""} onChange={(v) => setFromField("state", v)} />
+            <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
+          </div>
+        </div>
+      </Fold>
+      <Fold title="Fees" hint="design payout, file price, default shipping">
         <MoneyField label="Design fee" hint="Default payout credited to a designer per approved design" value={designFee} onChange={setDesignFee} />
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
-      </div>
+      </Fold>
 
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
@@ -746,29 +769,6 @@ function PlatformPanel() {
       {/* Ship-from. A label with no origin is rejected by the carrier, so this is the
           one setting on this page that blocks work outright when it's blank — hence the
           warning rather than a silent empty form. */}
-      <Fold title="Warehouse ship-from address" hint="the return address on every label">
-
-        <p className="mb-3 text-xs text-muted-foreground">
-          The return address printed on every label. Set once for the whole team.
-        </p>
-        {!(shipFrom.street && shipFrom.city && shipFrom.state && shipFrom.zip) && (
-          <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
-            <Warning size={14} weight="fill" className="mt-0.5 shrink-0" />
-            No ship-from address yet — buying a label will fail until street, city, state and ZIP are filled in.
-          </div>
-        )}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Name / company" value={shipFrom.name ?? ""} onChange={(v) => setFromField("name", v)} />
-          <TextField label="Phone" value={shipFrom.phone ?? ""} onChange={(v) => setFromField("phone", v)} />
-          <TextField label="Street" value={shipFrom.street ?? ""} onChange={(v) => setFromField("street", v)} />
-          <TextField label="Suite / unit" value={shipFrom.street2 ?? ""} onChange={(v) => setFromField("street2", v)} />
-          <TextField label="City" value={shipFrom.city ?? ""} onChange={(v) => setFromField("city", v)} />
-          <div className="grid grid-cols-2 gap-3">
-            <TextField label="State" value={shipFrom.state ?? ""} onChange={(v) => setFromField("state", v)} />
-            <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
-          </div>
-        </div>
-      </Fold>
 
       {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
           what a product WITHOUT one falls back to, instead of one flat platform number. */}
@@ -989,6 +989,18 @@ function UsersPanel() {
              right. A team reads as a bordered group with its leader at the top, which the
              eye follows without needing the indent to do the work. */
           <div className="divide-y divide-border">
+            {/* Header. The rows carry four aligned columns — joined, balance, access,
+                actions — and without labels a bare "$0.00" or a date is a number with no
+                claim attached. Hidden on small screens, where those columns collapse. */}
+            {paged.pageItems.length > 0 && (
+              <div className="hidden items-center gap-3 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:flex">
+                <span className="size-9 shrink-0" />
+                <span className="min-w-0 flex-1">Account</span>
+                <span className="hidden w-24 shrink-0 lg:block">Joined</span>
+                <span className="w-20 shrink-0 text-right">Balance</span>
+                <span className="w-[188px] shrink-0">Access</span>
+              </div>
+            )}
             {paged.pageItems.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">{users.length ? "No users match that search." : "No users"}</div>
             ) : (

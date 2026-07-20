@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt } from "@phosphor-icons/react"
+import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -47,7 +48,11 @@ export function PurchaseView() {
   }, [inv])
 
   const drafts = (pos ?? []).filter((p) => p.status === "draft")
+  // History grows forever — every PO ever placed — so it pages. Drafts are the working
+  // set and stay whole; there are never many, and hiding one behind a page would mean
+  // missing something you're mid-way through.
   const history = (pos ?? []).filter((p) => p.status !== "draft")
+  const pagedHistory = usePaged(history, 20)
 
   const createDraft = async (supplier: string, items: InventoryItem[]) => {
     setBusy("new"); setMsg(null)
@@ -174,7 +179,7 @@ export function PurchaseView() {
           <div className="py-12 text-center text-sm text-muted-foreground">No placed orders yet.</div>
         ) : (
           <div className="divide-y divide-border">
-            {history.map((po) => (
+            {pagedHistory.pageItems.map((po) => (
               <div key={po.num} className="flex flex-wrap items-center gap-2 px-5 py-3">
                 <span className="font-mono text-sm font-medium">{po.num}</span>
                 <span className="text-sm text-muted-foreground">{po.supplier} · {poTotal(po)} units</span>
@@ -189,6 +194,11 @@ export function PurchaseView() {
             ))}
           </div>
         )}
+            {history.length > 20 && (
+              <Pagination page={pagedHistory.page} pageCount={pagedHistory.pageCount} perPage={pagedHistory.perPage}
+                total={pagedHistory.total} start={pagedHistory.start}
+                onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
+            )}
       </SectionCard>
     </div>
   )
