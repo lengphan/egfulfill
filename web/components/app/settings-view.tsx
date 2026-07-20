@@ -1046,7 +1046,8 @@ function UsersPanel() {
                 <span className="min-w-0 flex-1">Account</span>
                 <span className="hidden w-24 shrink-0 lg:block">Joined</span>
                 <span className="w-20 shrink-0 text-right">Balance</span>
-                <span className="w-[188px] shrink-0">Access</span>
+                {/* Must match the row's Access cell exactly — see the note there. */}
+                <span className="w-[280px] shrink-0">Access</span>
               </div>
             )}
             {paged.pageItems.length === 0 ? (
@@ -1099,8 +1100,13 @@ function UsersPanel() {
                     <span className="hidden w-20 shrink-0 sm:block" />
                   )}
 
-                  {/* Access: what this account may do, in one place. */}
-                  <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Access: what this account may do, in one place.
+                      FIXED width, matching the header. Without it the cell sized to its
+                      contents — and a seller carries an extra Plan select that staff
+                      don't — so staff rows were narrower here and their Joined/Balance
+                      columns sat further right than the sellers' below them. That's the
+                      "wallet balance pushing the date" misalignment. */}
+                  <div className="flex w-[280px] shrink-0 items-center gap-1.5">
                     {!isAdminCaller ? (
                       <span className="text-sm capitalize">{u.role}</span>
                     ) : (
