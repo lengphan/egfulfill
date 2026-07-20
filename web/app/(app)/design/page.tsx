@@ -27,10 +27,15 @@ function DesignLab() {
     if (!getToken()) { setSignedOut(true); setDesigns([]); return }
     getDesignLibrary().then((r) => setDesigns(r ?? [])).catch(() => setDesigns([]))
   }, [])
+  // Only when the Library tab is actually showing. Thumbs are base64 data URLs, so
+  // landing on ?tab=templates used to pull the whole library down to render none of it.
+  // `designs` gates the refetch: switching tabs keeps this component mounted, so the
+  // list survives and coming back doesn't re-download it.
   useEffect(() => {
+    if (tab !== "library" || designs !== null) return
     const id = setTimeout(load, 0)
     return () => clearTimeout(id)
-  }, [load])
+  }, [tab, designs, load])
 
   const remove = async (id: number | string) => {
     setDesigns((prev) => (prev ?? []).filter((d) => d.id !== id))
@@ -126,8 +131,21 @@ function DesignLab() {
 
 export default function DesignPage() {
   // useSearchParams (via useDesignLabTab) needs a Suspense boundary to prerender.
+  // The fallback mirrors the default (Library) view — bar plus the same 8-card grid the
+  // loading state uses — so the page doesn't collapse to a sliver and pop back.
   return (
-    <Suspense fallback={<div className="h-8 w-72 animate-pulse rounded-2xl bg-muted" />}>
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <div className="h-8 w-72 animate-pulse rounded-2xl bg-muted" />
+          <Card className="gap-0 overflow-hidden p-0">
+            <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-52 animate-pulse rounded-xl bg-muted" />)}
+            </div>
+          </Card>
+        </div>
+      }
+    >
       <DesignLab />
     </Suspense>
   )

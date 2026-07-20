@@ -1,19 +1,22 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import { PenNib, Stack, Sparkle } from "@phosphor-icons/react"
-import { tabsListVariants } from "@/components/ui/tabs"
+import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
+import { getToken } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
 /**
  * Design Lab's three surfaces as one toggle bar.
  *
- * Links rather than shadcn Tabs because the maker lives on its own route — it's a
- * full-height editor and doesn't fit inside a tab panel. The bar renders on that route
- * too, so the maker still reads as one of the three toggles instead of a page you got
- * navigated away to. Styling reuses `tabsListVariants` so it stays identical to the
- * tab bars in Settings and Wallet.
+ * Links, not shadcn Tabs, because the maker lives on its own route — it's a full-height
+ * editor that doesn't fit in a tab panel, and the bar renders there too so it still reads
+ * as one of the three. That means these ARE navigation, so they stay anchors with
+ * aria-current; role="tab" would promise the ARIA tab pattern (arrow keys, a controlled
+ * tabpanel) that links can't honour. Styling comes from tabsTriggerVariants so the bar
+ * can't drift from the real tab bars in Settings and Wallet.
  */
 const TABS = [
   { key: "library", label: "Library", href: "/design", icon: PenNib },
@@ -33,30 +36,47 @@ export function useDesignLabTab(): DesignLabTab {
 
 export function DesignLabTabs({ className }: { className?: string }) {
   const active = useDesignLabTab()
+  // Read after mount — getToken() touches localStorage, which the prerender doesn't have.
+  // Deferred rather than set inline, matching how every other page here reads the session.
+  const [signedOut, setSignedOut] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setSignedOut(!getToken()), 0)
+    return () => clearTimeout(id)
+  }, [])
 
   return (
-    <div role="tablist" className={cn(tabsListVariants(), "h-8", className)}>
+    <nav aria-label="Design Lab sections" className={cn(tabsListVariants(), "h-8", className)}>
       {TABS.map(({ key, label, href, icon: Icon }) => {
         const on = key === active
+        // The maker is the only surface that needs a session — it loads the catalog and
+        // saves. Signed out it renders an empty stage with a Save that 401s, so it's
+        // disabled here the way the old "Open maker" button was.
+        const disabled = signedOut && key === "maker"
+        const body = <><Icon size={14} weight="bold" /> {label}</>
+        const classes = cn(tabsTriggerVariants({ active: on }), "px-3")
+
+        // The active toggle is inert on purpose: navigating to a tab's bare href while
+        // already on it would strip ?template=/?product= out from under a loaded maker
+        // session, leaving the editor holding a template the URL no longer names.
+        if (on || disabled) {
+          return (
+            <span
+              key={key}
+              aria-current={on ? "page" : undefined}
+              aria-disabled={disabled || undefined}
+              title={disabled ? "Sign in to use the design maker" : undefined}
+              className={cn(classes, disabled && "opacity-50")}
+            >
+              {body}
+            </span>
+          )
+        }
         return (
-          <Link
-            key={key}
-            href={href}
-            role="tab"
-            aria-selected={on}
-            className={cn(
-              "relative inline-flex h-full items-center justify-center gap-1.5 rounded-2xl px-3 text-sm font-medium whitespace-nowrap transition-all",
-              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring",
-              on
-                ? "bg-background text-foreground dark:border dark:border-input dark:bg-input/30"
-                : "text-foreground/60 hover:text-foreground dark:text-muted-foreground dark:hover:text-foreground"
-            )}
-          >
-            <Icon size={14} weight="bold" />
-            {label}
+          <Link key={key} href={href} className={classes}>
+            {body}
           </Link>
         )
       })}
-    </div>
+    </nav>
   )
 }
