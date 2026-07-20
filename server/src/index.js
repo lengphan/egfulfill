@@ -1,7 +1,7 @@
 // EGFULFILL API — Fastify entry point.
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { signup, login, verify, isStaff, googleAuth } from './auth.js';
+import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
 import { inventoryRoutes } from './routes/inventory.js';
@@ -115,13 +115,25 @@ app.patch('/api/me', { preHandler: requireAuth }, async (req, reply) => {
     put('avatar_color', c || null);
   }
   if (b.notify_sound !== undefined) put('notify_sound', !!b.notify_sound);
+  // Username — a second way to sign in. null/'' clears it back to email-only.
+  if (b.username !== undefined) {
+    await ensureUsernameColumn().catch(() => {});
+    try { put('username', b.username === null || b.username === '' ? null : normalizeUsername(b.username)); }
+    catch (e) { reply.code(400); return { error: e.message }; }
+  }
   if (!sets.length) { reply.code(400); return { error: 'Nothing to update' }; }
 
   vals.push(req.user.sub);
-  const r = await q(
-    'update users set ' + sets.join(', ') + ' where id=$' + vals.length + ' returning id, email, role, name, avatar_emoji, avatar_color, notify_sound',
-    vals
-  );
+  let r;
+  try {
+    r = await q(
+      'update users set ' + sets.join(', ') + ' where id=$' + vals.length + ' returning id, email, username, role, name, avatar_emoji, avatar_color, notify_sound',
+      vals
+    );
+  } catch (e) {
+    if (e.code === '23505') { reply.code(409); return { error: 'That username is already taken' }; }
+    throw e;
+  }
   if (!r.rows.length) { reply.code(404); return { error: 'User not found' }; }
   return r.rows[0];
 });

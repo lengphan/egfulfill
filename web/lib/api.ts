@@ -837,8 +837,8 @@ export function setFactorySettings(body: Record<string, number | ShipFromAddress
 }
 
 // Update the signed-in user's profile (currently just the display name).
-export function updateProfile(patch: { name?: string; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean }) {
-  return api<{ id?: string; name?: string; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; error?: string }>(`/api/me`, {
+export function updateProfile(patch: { name?: string; username?: string | null; avatar_emoji?: string | null; avatar_color?: string | null; notify_sound?: boolean }) {
+  return api<{ id?: string; name?: string; username?: string | null; email?: string; role?: string; avatar_emoji?: string | null; avatar_color?: string | null; error?: string }>(`/api/me`, {
     method: "PATCH",
     body: JSON.stringify(patch),
   })

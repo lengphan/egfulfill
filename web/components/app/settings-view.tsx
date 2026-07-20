@@ -53,6 +53,7 @@ const fmtDate = (s?: string | null) => {
 function ProfilePanel() {
   const [user, setUser] = useState<ReturnType<typeof getUser>>(null)
   const [name, setName] = useState("")
+  const [uname, setUname] = useState("")
   const [emoji, setEmoji] = useState<string>("")
   const [color, setColor] = useState<string>(AVATAR_COLORS[0])
   const [sound, setSound] = useState(true)
@@ -64,6 +65,7 @@ function ProfilePanel() {
       const u = getUser()
       setUser(u)
       setName(u?.name ?? "")
+      setUname(u?.username ?? "")
       setEmoji(u?.avatar_emoji ?? "")
       setColor(u?.avatar_color ?? AVATAR_COLORS[0])
       setSound(u?.notify_sound !== false)
@@ -71,10 +73,11 @@ function ProfilePanel() {
     return () => clearTimeout(id)
   }, [])
 
+  const usernameDirty = uname.trim().toLowerCase() !== (user?.username ?? "")
   const nameDirty = !!name.trim() && name.trim() !== (user?.name ?? "")
   const avatarDirty = emoji !== (user?.avatar_emoji ?? "") || color !== (user?.avatar_color ?? AVATAR_COLORS[0])
   const soundDirty = sound !== (user?.notify_sound !== false)
-  const dirty = !!user && (nameDirty || avatarDirty || soundDirty)
+  const dirty = !!user && (nameDirty || usernameDirty || avatarDirty || soundDirty)
 
   const save = async () => {
     if (!dirty) return
@@ -83,12 +86,13 @@ function ProfilePanel() {
       // Send null (not "") to clear — the server treats null as "back to the initial".
       const r = await updateProfile({
         name: name.trim(),
+        username: uname.trim() ? uname.trim().toLowerCase() : null,
         avatar_emoji: emoji || null,
         avatar_color: color || null,
         notify_sound: sound,
       })
       if (r.error) throw new Error(r.error)
-      const next = { name: r.name ?? name.trim(), avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
+      const next = { name: r.name ?? name.trim(), username: r.username ?? null, avatar_emoji: emoji || null, avatar_color: color || null, notify_sound: sound }
       updateUser(next)
       setUser((u) => (u ? { ...u, ...next } : u))
       setSaved(true)
@@ -128,6 +132,21 @@ function ProfilePanel() {
             disabled={!user}
             className="max-w-sm"
           />
+        </label>
+
+        {/* Username — the SECOND way to sign in (email still works). No '@' allowed,
+            which is what stops a username ever colliding with someone's email. */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">Username <span className="font-normal text-muted-foreground">— optional, for signing in</span></span>
+          <Input
+            value={uname}
+            onChange={(e) => { setUname(e.target.value); setSaved(false) }}
+            onKeyDown={(e) => { if (e.key === "Enter") save() }}
+            placeholder="yourname"
+            disabled={!user}
+            className="max-w-sm"
+          />
+          <span className="text-xs text-muted-foreground">3–30 characters: letters, numbers, dot, dash or underscore. Sign in with this or your email.</span>
         </label>
 
         {/* Avatar — an emoji + a colour. Deliberately not an image upload: no file

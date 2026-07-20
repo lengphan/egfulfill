@@ -58,15 +58,15 @@ export default function LoginPage() {
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-6">
           <label className="flex flex-col gap-1.5">
-            {/* Email ONLY — there is no username column; login() looks up by email.
-                The old "Email/Username" label made a bare name look like a valid
-                sign-in and it just failed as "Invalid email or password". */}
-            <span className="text-sm font-medium">Email</span>
+            {/* Either identifier. type="text", NOT type="email" — the browser's email
+                validation would reject a bare username before the form ever submits.
+                The server decides which column to match on by whether it contains '@'. */}
+            <span className="text-sm font-medium">Email or username</span>
             <Input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder="you@example.com or yourname"
               autoComplete="username"
               required
             />
