@@ -143,7 +143,7 @@ export function updateUserAdmin(id: string, patch: { role?: string; password?: s
   return api<{ ok?: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 
-export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_email?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null }
+export type AuditRow = { id: number | string; ts: string; actor?: string | null; actor_email?: string | null; actor_name?: string | null; actor_role?: string | null; action: string; entity_type?: string | null; entity_id?: string | null; note?: string | null }
 /**
  * Everything that has happened to one order, newest first. Staff-readable (the unfiltered
  * admin log is separate) — an operator working an order needs its story.

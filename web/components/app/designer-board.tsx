@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getDesignCards, saveDesignCards, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
+import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
@@ -388,6 +389,10 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
           <div className="space-y-1.5">
             <span className="text-sm font-medium">Files</span>
             <DesignFilesPanel orderId={String(card.order_id)} sku={card.sku || undefined} />
+            {/* Who touched this design and when. A designer is gated to the design story
+                server-side; operator/warehouse/admin see the order's full history here
+                too, including which team member uploaded or removed a file. */}
+            <OrderHistory orderId={String(card.order_id)} />
           </div>
         )}
 

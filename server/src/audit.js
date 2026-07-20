@@ -22,6 +22,9 @@ export function ensureAuditTable() {
       note        text
     )`).catch(() => {});
     await q('create index if not exists audit_log_entity_idx on audit_log(entity_type, entity_id, ts desc)').catch(() => {});
+    // Display name of the actor. A team tracking "who did this" asks by name, not by
+    // login — and a member's email is often noise on a shared account.
+    await q('alter table audit_log add column if not exists actor_name text').catch(() => {});
     await q('create index if not exists audit_log_ts_idx on audit_log(ts desc)').catch(() => {});
   })();
   return _ready;
@@ -46,9 +49,18 @@ export function auditRoutes(app, requireAdmin, requireAuth) {
       if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
       const id = String((req.query || {}).entityId || '');
       if (!id) { reply.code(400); return { error: 'entityId required' }; }
+      // A DESIGNER sees only the design story. They work artwork for the factory and
+      // aren't part of fulfilment, so status moves, labels and money aren't theirs to
+      // read — while everything about the design, including who on the team uploaded or
+      // removed a file, is exactly what they need.
+      const designOnly = req.user.role === 'designer';
       const r = await q(
-        `select id, ts, action, actor_email, actor_role, entity_type, entity_id, note, before, after
-           from audit_log where entity_id=$1 order by ts desc limit 200`, [id]);
+        `select id, ts, action, actor as actor_email, actor_name, actor_role,
+                entity_type, entity_id, note, before, after
+           from audit_log
+          where entity_id = $1
+            ${designOnly ? "and (action like 'design.%' or action like 'design_file.%')" : ''}
+          order by ts desc limit 200`, [id]);
       return r.rows;
     });
   }
@@ -75,10 +87,11 @@ export function audit(req, action, opts) {
     opts = opts || {};
     const u = (req && req.user) || {};
     const actor = opts.actor || u.email || u.sub || null;
+    const name = opts.actorName || u.name || null;
     const role = opts.actorRole || u.role || (req ? null : 'system');
     ensureAuditTable().then(() => {
-      q('insert into audit_log (actor, actor_role, action, entity_type, entity_id, before, after, note) values ($1,$2,$3,$4,$5,$6,$7,$8)',
-        [actor, role, action,
+      q('insert into audit_log (actor, actor_name, actor_role, action, entity_type, entity_id, before, after, note) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        [actor, name, role, action,
           opts.entityType || null,
           opts.entityId != null ? String(opts.entityId) : null,
           opts.before != null ? JSON.stringify(opts.before) : null,
