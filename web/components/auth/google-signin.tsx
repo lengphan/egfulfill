@@ -113,6 +113,14 @@ export function GoogleSignIn({
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
       />
+      <div className="relative py-1">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-2 text-xs text-muted-foreground">or</span>
+        </div>
+      </div>
       <div className="flex justify-center" ref={btnRef} />
     </>
   )

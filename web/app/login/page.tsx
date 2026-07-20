@@ -58,9 +58,12 @@ export default function LoginPage() {
         </div>
         <form onSubmit={onSubmit} className="space-y-4 p-6">
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Email/Username</span>
+            {/* Email ONLY — there is no username column; login() looks up by email.
+                The old "Email/Username" label made a bare name look like a valid
+                sign-in and it just failed as "Invalid email or password". */}
+            <span className="text-sm font-medium">Email</span>
             <Input
-              type="text"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -86,15 +89,9 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </Button>
 
-          <div className="relative py-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-card px-2 text-xs text-muted-foreground">or</span>
-            </div>
-          </div>
-
+          {/* The divider lives INSIDE GoogleSignIn — when Google isn't configured the
+              button renders nothing, and a lone "or" above empty space read as a
+              broken button. */}
           <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
 
           <div className="flex items-center justify-between text-xs">
