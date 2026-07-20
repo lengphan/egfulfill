@@ -9,8 +9,8 @@ import { DesignStage, DEFAULT_POS, readImageFile, type Pos, type TextLayer } fro
 import { ProductPickerDialog, type PickedProduct } from "@/components/app/product-picker-dialog"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { saveDesignLibrary, saveTemplate, getTemplates, getCatalogProducts, getProductTypes, type CatalogProduct } from "@/lib/api"
-import { setTypeMockups } from "@/lib/variant-resolve"
 import { printZoneOf, BASE_PRINT_IN } from "@/lib/print-zone"
+import { mockupFaces, setTypeMockups } from "@/lib/variant-resolve"
 import { PublishProductDialog, type PublishPrefill } from "@/components/app/publish-product-dialog"
 
 const mockupOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
@@ -64,6 +64,14 @@ export function DesignMaker() {
   // Kept alongside the mockup so the printable zone can be resolved from the product's
   // own printAreas (falling back to its garment type).
   const [product, setProduct] = useState<CatalogProduct | null>(null)
+  // Which face of the garment we're designing. A blank with back/sleeve/hood mockups has
+  // a different print zone on each, so the side has to drive BOTH the image and the zone —
+  // designing a back print against the front's zone puts the artwork in the wrong place.
+  const [side, setSide] = useState("front")
+  const faces = mockupFaces(product, null)
+  // Fall back to the single mockup when a product defines no per-side images, so a blank
+  // without them behaves exactly as before rather than losing its picture.
+  const faceUrl = faces.find((f) => f.side === side)?.url || ""
   const [paW, setPaW] = useState(String(BASE_PRINT_IN.w))
   const [paH, setPaH] = useState(String(BASE_PRINT_IN.h))
   const [dragOver, setDragOver] = useState(false)
@@ -104,7 +112,7 @@ export function DesignMaker() {
           catalogRef.current = rows ?? []
           if (!productParam) return
           const p = catalogRef.current.find((x) => String(x.id) === productParam || String(x.sku) === productParam)
-          if (p) { setMockup(mockupOf(p)); setProduct(p) }
+          if (p) { setMockup(mockupOf(p)); setProduct(p); setSide("front") }
         })
         .catch(() => {})
     }, 0)
@@ -135,7 +143,7 @@ export function DesignMaker() {
           if (d.printArea?.w) setPaW(String(d.printArea.w))
           if (d.printArea?.h) setPaH(String(d.printArea.h))
           const p = d.blank ? catalogRef.current.find((x) => x.name === d.blank) : null
-          if (p) { setProduct(p); setMockup(mockupOf(p)) }
+          if (p) { setProduct(p); setMockup(mockupOf(p)); setSide("front") }
         })
         .catch(() => {})
     }, 0)
@@ -243,7 +251,25 @@ export function DesignMaker() {
               full width alone, its height matched that width and the mockup ran off the
               top and bottom of the panel — the cap was cut off by the frame. Capping the
               width by viewport height keeps the whole square visible. */}
-          <div className="flex h-full max-h-full w-full items-center justify-center">
+          <div className="flex h-full max-h-full w-full flex-col items-center justify-center gap-3">
+            {/* Position pills — only when the blank actually has more than one face. A
+                single-face blank showing a lone "Front" pill is noise, not a choice. */}
+            {faces.length > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-1 rounded-full border border-border bg-card/80 p-0.5 backdrop-blur">
+                {faces.map((f) => (
+                  <button
+                    key={f.side}
+                    onClick={() => setSide(f.side)}
+                    className={
+                      "eg-tap rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors " +
+                      (side === f.side ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")
+                    }
+                  >
+                    {f.side}
+                  </button>
+                ))}
+              </div>
+            )}
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -255,10 +281,10 @@ export function DesignMaker() {
             >
               <DesignStage
                 className="w-full"
-                mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos}
+                mockup={faceUrl || mockup} designUrl={designUrl} pos={pos} setPos={setPos}
                 onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText}
                 selected={selected} onSelect={setSelected}
-                printZone={printZoneOf(product, "front", { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h })}
+                printZone={printZoneOf(product, side, { w: Number(paW) || BASE_PRINT_IN.w, h: Number(paH) || BASE_PRINT_IN.h })}
                 printLabel={`${Number(paW) || BASE_PRINT_IN.w}" x ${Number(paH) || BASE_PRINT_IN.h}" print area`}
               />
               {dragOver && (
@@ -317,7 +343,7 @@ export function DesignMaker() {
         </aside>
       </div>
 
-      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => { setMockup(p.img || ""); setProduct(catalogFor(p.sku)) }} />
+      <ProductPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} onPick={(p: PickedProduct) => { setMockup(p.img || ""); setProduct(catalogFor(p.sku)); setSide("front") }} />
       <LibraryPickerDialog open={libOpen} onOpenChange={setLibOpen} onPick={(u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }} />
       <PublishProductDialog
         open={pubOpen}
