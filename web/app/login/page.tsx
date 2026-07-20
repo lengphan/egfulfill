@@ -10,6 +10,7 @@ import { setSession } from "@/lib/auth"
 import { API_BASE } from "@/lib/api"
 import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
+import { DitherImage } from "@/components/marketing/dither-image"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -50,8 +51,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-sm gap-0 p-0">
+    // Same dithered plate as the marketing hero — signing in should feel like the
+    // same product, not a bare form on a grey page. The CARD stays themed (it holds
+    // real inputs); only the surround is brand-dark.
+    <div className="eg-auth-bg flex min-h-svh items-center justify-center p-6">
+      <div aria-hidden className="eg-auth-plate">
+        <DitherImage src="/hero/stair.jpg" ink="#d6d3cc" paper="#0b0b0c" scale={1.6} animate={false} focusY={0.3} />
+      </div>
+      <Card className="relative w-full max-w-sm gap-0 p-0 shadow-2xl shadow-black/50">
         <div className="border-b border-border px-6 py-5 text-center">
           <div className="font-display text-2xl font-semibold tracking-tight">egfulfill</div>
           <div className="mt-1 text-sm text-muted-foreground">Sign in to your account</div>

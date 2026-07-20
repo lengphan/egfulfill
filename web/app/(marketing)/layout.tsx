@@ -1,4 +1,7 @@
+"use client"
+
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { buttonVariants } from "@/components/ui/button"
 
 const nav = [
@@ -9,9 +12,21 @@ const nav = [
 ]
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+  // The home hero is a black brand surface. A light nav bar sitting on top of it
+  // draws a hard white line across the design, so on "/" ONLY the header goes
+  // transparent and light-on-dark and lets the hero run underneath it. Every other
+  // marketing page is a light surface and keeps the normal header.
+  const onDarkHero = usePathname() === "/"
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
+      <header
+        className={
+          "sticky top-0 z-30 " +
+          (onDarkHero
+            ? "border-b border-white/10 bg-[#0b0b0c]/60 text-white backdrop-blur"
+            : "border-b border-border bg-background/80 backdrop-blur")
+        }
+      >
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
           <Link href="/" className="font-display text-2xl font-semibold tracking-tight">
             egfulfill
@@ -21,14 +36,20 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Link
                 key={n.label}
                 href={n.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                className={
+                  "text-sm font-medium transition-colors " +
+                  (onDarkHero ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground")
+                }
               >
                 {n.label}
               </Link>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            <Link
+              href="/login"
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + (onDarkHero ? " text-white hover:bg-white/10 hover:text-white" : "")}
+            >
               Log in
             </Link>
             <Link href="/login" className={buttonVariants({ size: "sm" })}>

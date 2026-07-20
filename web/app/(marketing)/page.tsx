@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { DitherImage } from "@/components/marketing/dither-image"
 import {
   PlugsConnected,
   Printer,
@@ -77,32 +78,35 @@ export default function MarketingHome() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="relative isolate overflow-hidden">
-        {/* soft drifting aura — on-theme, slowly moving, clean */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <section className="eg-hero relative isolate overflow-hidden">
+        {/* Dithered live on a canvas by <DitherImage> rather than from a pre-baked
+            PNG: it dithers at REDUCED resolution and upscales with smoothing off, so
+            the dots stay dots at any viewport instead of resampling into moiré — and
+            it reveals a band at a time, like a print head crossing the sheet, which
+            is the headline answering itself. Ink/paper are inverted here for the
+            dark canvas. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#0b0b0c]">
+          <div className="eg-hero-plate absolute inset-0">
+            <DitherImage src="/hero/stair.jpg" ink="#d6d3cc" paper="#0b0b0c" scale={1.35} focusY={0.32} />
+          </div>
+          {/* Scrim over the plate — guarantees headline contrast without erasing image. */}
+          <div className="eg-hero-scrim absolute inset-0" />
+          {/* One restrained wash of brand colour, so the section isn't purely monotone. */}
           <div
-            className="eg-drift-1 absolute left-[10%] top-[-14%] h-[460px] w-[580px] rounded-full blur-[120px]"
-            style={{ background: "radial-gradient(circle at center, oklch(0.62 0.2 285 / 0.30), transparent 68%)" }}
-          />
-          <div
-            className="eg-drift-2 absolute right-[6%] top-[-8%] h-[420px] w-[520px] rounded-full blur-[120px]"
-            style={{ background: "radial-gradient(circle at center, oklch(0.68 0.16 305 / 0.22), transparent 68%)" }}
-          />
-          <div
-            className="eg-drift-3 absolute left-[36%] top-[12%] h-[400px] w-[500px] rounded-full blur-[130px]"
-            style={{ background: "radial-gradient(circle at center, oklch(0.7 0.12 245 / 0.18), transparent 70%)" }}
+            className="absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-[130px] opacity-30"
+            style={{ background: "radial-gradient(circle at center, oklch(0.55 0.19 285 / 0.55), transparent 70%)" }}
           />
         </div>
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
           <Reveal delay={0}>
-            <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance sm:text-7xl">
-              What if every order <span className="text-primary italic">printed itself?</span>
+            <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance text-white sm:text-7xl">
+              What if every order <span className="italic text-[oklch(0.72_0.17_285)]">printed itself?</span>
             </h1>
           </Reveal>
 
           <Reveal delay={0.08}>
-            <p className="mx-auto mt-7 max-w-2xl text-lg text-muted-foreground text-pretty">
+            <p className="mx-auto mt-7 max-w-2xl text-lg text-white/70 text-pretty">
               Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with
               tracking pushed back — completely hands off.
             </p>
@@ -113,44 +117,30 @@ export default function MarketingHome() {
               <Link href="/login" className={buttonVariants({ size: "lg" })}>
                 Start for free <ArrowRight size={16} weight="bold" />
               </Link>
-              <Link href="/how-it-works" className={buttonVariants({ variant: "outline", size: "lg" })}>
+              {/* Outline variant is themed for a light surface — on the black hero it
+                  renders a white slab. Overridden to a glass outline instead. */}
+              <Link
+                href="/how-it-works"
+                className={buttonVariants({ variant: "outline", size: "lg" }) + " border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
+              >
                 See how it works
               </Link>
-            </div>
-          </Reveal>
-
-          {/* avatar-stack social proof */}
-          <Reveal delay={0.24}>
-            <div className="mt-8 flex items-center justify-center gap-3">
-              <div className="flex -space-x-2.5">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <span
-                    key={i}
-                    className="size-8 rounded-full bg-muted ring-2 ring-background"
-                    aria-hidden
-                  />
-                ))}
-              </div>
-              <div className="text-left">
-                <div className="text-sm text-amber-500">★★★★★</div>
-                <div className="text-xs text-muted-foreground">2,400+ sellers shipping hands-off</div>
-              </div>
             </div>
           </Reveal>
 
           {/* integration row */}
           <Reveal delay={0.32}>
             <div className="mt-12 flex flex-col items-center gap-3">
-              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              <span className="text-xs font-medium uppercase tracking-widest text-white/45">
                 Works with
               </span>
-              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-lg font-semibold text-muted-foreground/70">
+              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-lg font-semibold text-white/70">
                 <span>Etsy</span>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-white/25">·</span>
                 <span>Shopify</span>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-white/25">·</span>
                 <span>TikTok Shop</span>
-                <span className="text-muted-foreground/30">·</span>
+                <span className="text-white/25">·</span>
                 <span>WooCommerce</span>
               </div>
             </div>
