@@ -9,7 +9,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory, getBillingPlan } from "@/lib/api"
 import { hasSpydeck, getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { detectTrademarks } from "@/lib/trademarks"
@@ -267,10 +267,32 @@ export function SpyDeckView() {
   const [entitled, setEntitled] = useState(true)
   const [checked, setChecked] = useState(false)
   useEffect(() => {
-    const sync = () => { setEntitled(hasSpydeck()); setChecked(true) }
+    let alive = true
+    // Two passes on purpose.
+    //
+    // 1. The CACHED session answers instantly, so there's no flash of the paywall for
+    //    someone who plainly has it.
+    // 2. Then ask the server — because the cache only knows what THIS account bought,
+    //    and a team member inherits their leader's plan. A member whose leader pays for
+    //    SpyDeck was being shown "add it for $9/mo" for something already paid for.
+    //    The server resolves inheritance (see resolveEntitlements), so it is the only
+    //    source that can answer this correctly.
+    const sync = () => {
+      if (!alive) return
+      setEntitled(hasSpydeck())
+      setChecked(true)
+      getBillingPlan()
+        .then((b) => {
+          if (!alive) return
+          const included = b.plan === "pro" || b.plan === "enterprise"
+          setEntitled(b.spydeck_addon === true || included || hasSpydeck())
+        })
+        .catch(() => { /* keep whatever the cache said */ })
+    }
     const id = setTimeout(sync, 0)
     window.addEventListener("eg-plan-changed", sync)
     return () => {
+      alive = false
       clearTimeout(id)
       window.removeEventListener("eg-plan-changed", sync)
     }
