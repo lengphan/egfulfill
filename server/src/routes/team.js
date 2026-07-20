@@ -69,12 +69,18 @@ export function teamRoutes(app, requireAuth) {
   // ── The member-facing endpoint (drives nav-hiding) ─────────────────────────
   // The ACTIVE membership for the signed-in user, by email. Returns null perms
   // when they aren't a restricted member → the client shows everything.
+  // NB the joins below cast u.id to text: users.id is uuid, team_members.owner_id is
+  // text. Postgres refuses 'uuid = text' with "operator does not exist", and BOTH of
+  // these queries were wrapped in a catch that returned an empty/none result — so the
+  // whole team feature failed silently from the day it was written. Invites never
+  // listed, and my-access always reported "not a member", which meant permission
+  // limits never applied to anyone.
   app.get('/api/team/my-access', { preHandler: requireAuth }, async (req) => {
     try {
       const r = await q(
         `select t.owner_id, t.role, t.permissions,
                 coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
-           from team_members t left join users u on u.id = t.owner_id
+           from team_members t left join users u on u.id::text = t.owner_id
           where lower(t.email)=lower($1) and t.status='active' limit 1`, [req.user.email || '']);
       if (!r.rows[0]) return { member: false, permissions: null };
       const row = r.rows[0];
@@ -103,8 +109,8 @@ export function teamRoutes(app, requireAuth) {
       const r = await q(
         `select t.id, t.invite_token, t.role, t.permissions, t.owner_id, t.invited_at,
                 coalesce(nullif(u.store_name,''), nullif(u.name,''), u.email) as owner_name
-           from team_members t left join users u on u.id = t.owner_id
-          where (lower(t.email)=lower($1) or t.user_id=$2) and t.status='invited'
+           from team_members t left join users u on u.id::text = t.owner_id
+          where (lower(t.email)=lower($1) or t.user_id=$2::text) and t.status='invited'
           order by t.invited_at desc`, [email, req.user.sub]);
       return r.rows;
     } catch (e) {
