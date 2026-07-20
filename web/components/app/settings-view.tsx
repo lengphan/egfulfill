@@ -1493,6 +1493,13 @@ export function SettingsView() {
   // did not exist for them, and sat 'invited' forever. An un-accepted membership applies
   // NO permission limits, so that state is not harmless.
   const [hasInvites, setHasInvites] = useState(false)
+  // Which tab to open on. Two sources, in order:
+  //   1. ?tab= in the URL — how the notification bell deep-links here
+  //   2. a pending invite — so an OLD notification (whose href is bare '/settings')
+  //      still lands on the thing it is telling you to do
+  // Without this, clicking "X invited you to their team" opened Settings on Profile
+  // and the invite was two clicks away with no sign it existed.
+  const [tab, setTab] = useState("profile")
   useEffect(() => {
     const id = setTimeout(() => {
       const u = getUser()
@@ -1501,14 +1508,20 @@ export function SettingsView() {
       // A plan is a seller subscription; staff roles don't have one.
       setIsSeller(!u?.role || u.role === "seller")
       setCanUseKeys(!u?.role || u.role === "seller" || u.role === "admin")
-      getMyInvites().then((r) => setHasInvites((r ?? []).length > 0)).catch(() => {})
+      const wanted = new URLSearchParams(window.location.search).get("tab")
+      if (wanted) setTab(wanted)
+      getMyInvites().then((r) => {
+        const any = (r ?? []).length > 0
+        setHasInvites(any)
+        if (any && !wanted) setTab("team")
+      }).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [])
   const showTeam = isSeller || hasInvites
 
   return (
-    <Tabs defaultValue="profile" className="space-y-4">
+    <Tabs value={tab} onValueChange={setTab} className="space-y-4">
       <TabsList>
         <TabsTrigger value="profile">Profile</TabsTrigger>
         {/* API keys are for building AGAINST the platform — a seller integrating their

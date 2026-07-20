@@ -130,7 +130,10 @@ export function teamRoutes(app, requireAuth) {
           userIds: [u.rows[0].id], type: 'team-invite',
           title: `${ownerName || 'A seller'} invited you to their team`,
           body: 'Open Settings → Team to accept. Until you accept, nothing changes for your account.',
-          href: '/settings',
+          // Deep-link to the TAB, not just the page. A bare '/settings' opened on
+          // Profile, so the notification pointed at a page where the invite was
+          // invisible — which reads as the invite not existing.
+          href: '/settings?tab=team',
         }).catch(() => {});
       }
     } catch (e) {}
