@@ -148,7 +148,7 @@ export function DesignStage({
         // p-[6%] lets the garment fill more of the bed than a raw object-contain, which
         // left wide dead margins around a portrait mockup.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain p-[3%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]" />
+        <img src={mockup} alt="" className="pointer-events-none absolute inset-0 size-full object-contain p-[5%] drop-shadow-[0_10px_28px_rgba(0,0,0,0.16)]" />
       ) : (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center text-muted-foreground">
           <ImageIcon size={38} weight="duotone" className="opacity-40" />

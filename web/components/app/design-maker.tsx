@@ -239,9 +239,10 @@ export function DesignMaker() {
 
         {/* Center: canvas */}
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-2xl border border-border bg-muted/20 p-4">
-          {/* Fill the panel instead of the old fixed max-w-lg, which left the stage
-              marooned in the middle of a wide screen. Capped by viewport height so the
-              square can't grow taller than the space it has. */}
+          {/* The stage is a SQUARE, so it has to be bounded by both dimensions. Sized to
+              full width alone, its height matched that width and the mockup ran off the
+              top and bottom of the panel — the cap was cut off by the frame. Capping the
+              width by viewport height keeps the whole square visible. */}
           <div className="flex h-full max-h-full w-full items-center justify-center">
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
@@ -250,10 +251,10 @@ export function DesignMaker() {
                 e.preventDefault(); setDragOver(false)
                 readImageFile(e.dataTransfer.files?.[0], (u) => { setDesignUrl(u); setPos(DEFAULT_POS); setSelected("image") }, (m) => setMsg({ tone: "err", text: m }))
               }}
-              className={"relative w-full rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
+              className={"relative w-full max-w-[min(100%,calc(100svh-12rem))] rounded-xl transition-shadow " + (dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "")}
             >
               <DesignStage
-                className="h-full max-h-full w-auto max-w-full"
+                className="w-full"
                 mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos}
                 onRemove={() => setDesignUrl("")} texts={texts} updateText={updateText}
                 selected={selected} onSelect={setSelected}
