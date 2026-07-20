@@ -25,6 +25,9 @@ const fmtDT2 = (s?: string | null) => { if (!s) return "—"; const d = new Date
 
 // Admin review of pending seller top-ups (moved here from the old Console).
 function AdminTopups() {
+  // Warehouse shares the factory wallet and sees the same ledger. APPROVING a top-up
+  // stays admin-only though: that's confirming money arrived by bank transfer, which is
+  // a higher-trust act than reading the balance.
   const isAdmin = getUser()?.role === "admin"
   const [topups, setTopups] = useState<TopupRequest[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)

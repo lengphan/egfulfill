@@ -16,7 +16,10 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
-  { label: "Campaigns", href: "/campaigns", icon: Megaphone, roles: ["warehouse", "admin"] },
+  // Campaigns is HIDDEN until Meta/Google connections exist — there are no settings to
+  // connect an ad account yet, so the page can only show an empty shell. The route and
+  // component are intact; restore the roles here to bring it back.
+  { label: "Campaigns", href: "/campaigns", icon: Megaphone, roles: [] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
@@ -46,7 +49,7 @@ const STAFF_TOOLS: StaffNavItem[] = [
   // redundant with the factory Orders hub, so they're intentionally not here.)
   { label: "Stores", href: "/stores", icon: Storefront, roles: ["admin"] },
   { label: "Reports", href: "/reports", icon: ChartBar, roles: ["admin"] },
-  { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin"] },
+  { label: "Wallet", href: "/wallet", icon: Wallet, roles: ["admin", "warehouse"] },
   // API keys are a SELLER integration concern — an operator minting live keys is
   // not something the role needs. Warehouse keeps it for connection testing.
   { label: "Developers", href: "/developers", icon: Code, roles: ["warehouse", "admin"] },
