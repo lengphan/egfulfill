@@ -10,7 +10,6 @@ import {
   Warning,
 } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
-import { ForwardSetup } from "@/components/app/forward-setup"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -291,11 +290,6 @@ export function StoresManager() {
           ))}
         </div>
       </div>
-
-      {/* Stopgap while Etsy's address entitlement is pending — sits with the Etsy
-          connection because that's where a seller goes when orders won't ship. */}
-      {/* Forwarding first — it is the hands-off path; the CSV below is the fallback. */}
-      <ForwardSetup />
 
     </div>
   )
