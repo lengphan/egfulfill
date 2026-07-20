@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -535,6 +535,32 @@ function TextField({ label, value, onChange }: { label: string; value: string; o
   )
 }
 
+/**
+ * A collapsible block inside Platform.
+ *
+ * The page stacked five independent settings — fees, product types with an outline grid
+ * per category, the ship-from address, shipping bands, method surcharges — so reaching
+ * any one meant scrolling past the rest. They share a page, not a purpose; folded, the
+ * page becomes a menu instead of a wall.
+ */
+function Fold({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-border">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="eg-tap flex w-full items-center gap-2 px-5 py-3.5 text-left transition-colors hover:bg-accent/40"
+      >
+        <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-90" : "")} />
+        <span className="text-sm font-medium">{title}</span>
+        {hint && <span className="truncate text-xs text-muted-foreground">· {hint}</span>}
+      </button>
+      {open && <div className="px-5 pb-5">{children}</div>}
+    </div>
+  )
+}
+
 function PlatformPanel() {
   const [loaded, setLoaded] = useState<FactorySettings | null>(null)
   const [designFee, setDesignFee] = useState("")
@@ -607,8 +633,8 @@ function PlatformPanel() {
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
-      <div className="border-t border-border p-5">
-        <div className="mb-1 text-sm font-medium">Product types</div>
+      <Fold title="Product types" hint="sides + positioning outlines per category">
+
         <p className="mb-3 text-xs text-muted-foreground">
           Sides and outlines are set once per category and inherited by every product in it —
           define four faces on Headwear and fifty hats get them without fifty uploads. The
@@ -711,13 +737,13 @@ function PlatformPanel() {
             </Button>
           </div>
         </div>
-      </div>
+      </Fold>
 
       {/* Ship-from. A label with no origin is rejected by the carrier, so this is the
           one setting on this page that blocks work outright when it's blank — hence the
           warning rather than a silent empty form. */}
-      <div className="border-t border-border p-5">
-        <div className="mb-1 text-sm font-medium">Warehouse ship-from address</div>
+      <Fold title="Warehouse ship-from address" hint="the return address on every label">
+
         <p className="mb-3 text-xs text-muted-foreground">
           The return address printed on every label. Set once for the whole team.
         </p>
@@ -738,23 +764,23 @@ function PlatformPanel() {
             <TextField label="ZIP" value={shipFrom.zip ?? ""} onChange={(v) => setFromField("zip", v)} />
           </div>
         </div>
-      </div>
+      </Fold>
 
       {/* Flat shipping by garment class. A product's own shippingFee still wins; these are
           what a product WITHOUT one falls back to, instead of one flat platform number. */}
-      <div className="border-t border-border p-5">
-        <div className="text-sm font-medium">Shipping by product type</div>
+      <Fold title="Shipping by product type" hint="flat rate per garment class">
+
         <p className="mb-3 text-xs text-muted-foreground">Used when a product has no shipping fee of its own.</p>
         <div className="grid gap-4 sm:grid-cols-3">
           <MoneyField label="Caps & hats" value={bands.ship_cap ?? ""} onChange={(v) => setBand("ship_cap", v)} />
           <MoneyField label="Sweatshirts, hoodies, jackets" value={bands.ship_heavy ?? ""} onChange={(v) => setBand("ship_heavy", v)} />
           <MoneyField label="All other garments" value={bands.ship_garment ?? ""} onChange={(v) => setBand("ship_garment", v)} />
         </div>
-      </div>
+      </Fold>
 
       {/* Per-method surcharge on top of the blank's base cost. */}
-      <div className="border-t border-border p-5">
-        <div className="text-sm font-medium">Print method surcharge</div>
+      <Fold title="Print method surcharge" hint="added per unit by technique">
+
         <p className="mb-3 text-xs text-muted-foreground">Added to the base cost per unit. A product can override this for its own methods.</p>
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <MoneyField label="DTG printing" value={bands.method_dtg ?? ""} onChange={(v) => setBand("method_dtg", v)} />
@@ -763,7 +789,7 @@ function PlatformPanel() {
           <MoneyField label="Appliqué" value={bands.method_apl ?? ""} onChange={(v) => setBand("method_apl", v)} />
           <MoneyField label="Laser" value={bands.method_lsr ?? ""} onChange={(v) => setBand("method_lsr", v)} />
         </div>
-      </div>
+      </Fold>
       <div className="flex items-center gap-3 border-t border-border px-5 py-3">
         <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         {saved && <span className="inline-flex items-center gap-1 text-sm text-emerald-600"><Check size={14} weight="bold" /> Saved</span>}

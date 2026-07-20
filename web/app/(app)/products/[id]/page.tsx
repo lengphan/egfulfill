@@ -22,12 +22,22 @@ const SWATCH: Record<string, string> = {
 }
 const swatchHex = (name: string) => SWATCH[name.toLowerCase().trim()] ?? "#c7c4bd"
 
-// Every image we can show: colorImages values + images[] + single fields, de-duped.
+/**
+ * Every PHOTO we can show — colour shots, the gallery, the hero — de-duped.
+ *
+ * Print outlines are excluded. A side mockup is a positioning aid for the Design Maker,
+ * not a picture of the product: it's a line drawing of a blank cap, and showing it in a
+ * product gallery next to real photography reads as a broken image. They're a different
+ * kind of asset that happens to be stored on the same row.
+ */
 function galleryOf(p: CatalogProduct): string[] {
+  const outlines = new Set(
+    Object.values({ ...(p.side_mockups ?? {}), ...(p.sideMockups ?? {}) } as Record<string, string>).filter(Boolean)
+  )
   const set = new Set<string>()
-  if (p.colorImages) Object.values(p.colorImages).forEach((u) => u && set.add(u))
-  ;(p.images ?? []).forEach((u) => u && set.add(u))
-  ;[p.img, p.image, p.hero].forEach((u) => u && set.add(u))
+  if (p.colorImages) Object.values(p.colorImages).forEach((u) => u && !outlines.has(u) && set.add(u))
+  ;(p.images ?? []).forEach((u) => u && !outlines.has(u) && set.add(u))
+  ;[p.img, p.image, p.hero].forEach((u) => u && !outlines.has(u) && set.add(u))
   return Array.from(set)
 }
 

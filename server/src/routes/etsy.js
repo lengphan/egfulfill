@@ -224,11 +224,40 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
     const exItem = existing[String(tr.sku || '')];
     if (!hasItems.rowCount) {
       const img = await listingImage(conn, tr.listing_id, tr.listing_image_id, imgCache);   // first import → fetch once
+      // Did WE publish this listing? If so we know exactly what it was built from, and the
+      // line can arrive ready to make instead of anonymous.
+      const built = await q('select * from published_listings where listing_id=$1', [String(tr.listing_id || '')])
+        .then((r) => r.rows[0]).catch(() => null);
+      const lineId = genLineId();
       await q(
-        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type, line_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization, method, genLineId()]
+        `insert into order_items (order_id, sku, name, qty, variant, unit_price, img, design_src, personalization, print_type, line_id, blank)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [id, tr.sku || null, tr.title || null, tr.quantity || 1, variant, money(tr.price), img, uploadUrl, personalization,
+         method || (built && built.print_type) || null, lineId, (built && built.blank_sku) || null]
       );
+      if (built) {
+        // Colour/size are only applied when the BUYER's variant matches what we listed.
+        // A variant we don't recognise means the buyer chose something outside our spec —
+        // guessing there would set the wrong blank and the floor would make the wrong
+        // thing. Better to arrive blank and be picked by a human; the DESIGN still comes
+        // through, which is the part that's expensive to recreate.
+        const v = String(variant || '').toLowerCase();
+        const known = (x) => x && v.includes(String(x).toLowerCase());
+        await q(
+          `update order_items set color = coalesce($1, color), size = coalesce($2, size)
+            where order_id=$3 and line_id=$4`,
+          [known(built.color) ? built.color : null, known(built.size) ? built.size : null, id, lineId]
+        ).catch(() => {});
+        // The artwork is the expensive part — attach it regardless of variant match.
+        if (built.design_data) {
+          await q(
+            `insert into order_designs (order_id, sku, kind, data, name, pos, updated_at)
+             values ($1,$2,'raster',$3,$4,$5, now())
+             on conflict (order_id, sku, kind) do nothing`,
+            [id, tr.sku || null, built.design_data, 'Published artwork', built.design_pos || null]
+          ).catch(() => {});
+        }
+      }
     } else if (exItem) {
       // Backfill the method on re-sync if a prior import stored it without one.
       if (method && !exItem.print_type) await q(`update order_items set print_type=$1 where order_id=$2 and sku is not distinct from $3 and (print_type is null or print_type='')`, [method, id, tr.sku || null]);
@@ -1212,6 +1241,31 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   // ── Publish a design to Etsy as a DRAFT listing, then upload the design image.
   // Called from the "Publish to store" window on the seller + factory design pages.
   // body: { title, description, price, quantity?, image (data URL), images?[], sku?, taxonomy_id? }
+  /**
+   * What we published, and what it was made FROM.
+   *
+   * Publishing a listing throws away everything the seller set up — which blank, which
+   * artwork, where it sits — so the order that comes back weeks later arrives as an
+   * anonymous marketplace line reading "not set up for production yet", and somebody
+   * re-does work that was already done. This table is the memory: listing_id → the
+   * blank, design and placement it was built from.
+   *
+   * Keyed by listing_id because that's the only identifier that survives the round trip.
+   */
+  q(`create table if not exists published_listings (
+       listing_id  text primary key,
+       platform    text not null default 'etsy',
+       seller_id   uuid,
+       blank_sku   text,
+       design_id   text,
+       design_data text,
+       design_pos  jsonb,
+       print_type  text,
+       color       text,
+       size        text,
+       created_at  timestamptz default now()
+     )`).catch(() => {});
+
   app.post('/api/etsy/publish', { preHandler: requireAuth }, async (req, reply) => {
     try {
       if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET.' }; }
@@ -1277,6 +1331,22 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString()
       });
       const listingId = listing.listing_id;
+
+      // Remember what this listing was built from, so the order it eventually produces
+      // arrives ready to make instead of anonymous. Best-effort: a publish that succeeded
+      // must not fail because we couldn't write a note about it.
+      q(`insert into published_listings
+           (listing_id, platform, seller_id, blank_sku, design_id, design_data, design_pos, print_type, color, size)
+         values ($1,'etsy',$2,$3,$4,$5,$6,$7,$8,$9)
+         on conflict (listing_id) do update set
+           blank_sku=excluded.blank_sku, design_id=excluded.design_id,
+           design_data=excluded.design_data, design_pos=excluded.design_pos,
+           print_type=excluded.print_type, color=excluded.color, size=excluded.size`,
+        [String(listingId), req.user.sub || null, b.blank || b.sku || null, b.designId || null,
+         b.designUrl || b.design || null,
+         b.designPos ? JSON.stringify(b.designPos) : null,
+         b.printType || b.method || null, b.color || null, b.size || null]
+      ).catch(() => {});
 
       // Upload the design image(s).
       const imgs = (Array.isArray(b.images) && b.images.length) ? b.images : (b.image ? [b.image] : []);

@@ -37,13 +37,16 @@ export default function DesignPage() {
     try { await deleteDesignLibrary(id) } catch { load() }
   }
 
+  const [copied, setCopied] = useState<string | null>(null)
   const list = designs ?? []
 
   return (
     <div className="space-y-4">
+      {/* The PAGE is Design Lab; this section is the artwork library inside it. Sharing
+          the name made the page look like it held two of the same thing. */}
       <SectionCard
-        title="Design Lab"
-        description="Create and store reusable designs, then drop them onto orders"
+        title="Your designs"
+        description="Artwork you've uploaded — drop any of it onto an order"
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => router.push("/design/maker")} disabled={signedOut}>
@@ -95,7 +98,19 @@ export default function DesignPage() {
                 </div>
                 <div className="p-3">
                   <div className="truncate text-sm font-semibold">{d.name || "Untitled"}</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{fmtDate(d.created_at)}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">{fmtDate(d.created_at)}</span>
+                    {/* The ID, visible and copyable. Import accepts a design reference, but
+                        nobody could fill that column in while the id was only ever in the
+                        database. */}
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(`DSN-${d.id}`).catch(() => {}); setCopied(String(d.id)); setTimeout(() => setCopied(null), 1400) }}
+                      title="Copy this design's ID"
+                      className="eg-tap ml-auto rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {copied === String(d.id) ? "Copied" : `DSN-${d.id}`}
+                    </button>
+                  </div>
                 </div>
               </Card>
             ))}
