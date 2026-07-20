@@ -70,6 +70,20 @@ export function SubscriptionPanel() {
     return () => clearTimeout(id)
   }, [])
 
+  // A downgrade is any move to a cheaper plan — that's the case where time already paid
+  // for is at stake, and where "nothing is charged" is the least useful thing to say.
+  const rank = (id?: string) => PLAN_TIERS.findIndex((t) => t.id === id)
+  const isDowngrade = !!pending?.plan && rank(pending.plan) >= 0 && rank(pending.plan) < rank(plan)
+  const currentTier = PLAN_TIERS.find((t) => t.id === plan)
+  const pendingTier = PLAN_TIERS.find((t) => t.id === pending?.plan)
+  // Stamped once after mount rather than read during render: Date.now() during render is
+  // impure and would give a different answer on every re-render.
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => { const t = setTimeout(() => setNow(Date.now()), 0); return () => clearTimeout(t) }, [])
+  const daysLeft = billing?.renews_at && now
+    ? Math.max(0, Math.ceil((new Date(billing.renews_at).getTime() - now) / 86400000))
+    : 0
+
   // Price the pending change the same way the server does, so the confirm dialog can
   // state the real amount before anything is charged.
   const priceOf = (target: { plan?: PlanId; addon?: boolean }) => {
@@ -291,7 +305,23 @@ export function SubscriptionPanel() {
             </DialogDescription>
           </DialogHeader>
 
-          {billing && (
+
+          {/* Downgrading mid-cycle forfeits time already paid for. The old copy said only
+              "isn't refunded", which reads as "no money back" — not "you lose the 29 days
+              of Pro you already bought". Spell out the date and the days so the choice is
+              made with the facts, and offer the obvious alternative: wait it out. */}
+          {isDowngrade && billing?.renews_at && daysLeft > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="font-medium">You&apos;ve already paid through {fmtDate(billing.renews_at)}.</div>
+              <p className="mt-1">
+                That&apos;s {daysLeft} day{daysLeft === 1 ? "" : "s"} of {currentTier?.shortName ?? "your current plan"}{" left."}
+                Switching now ends it immediately and those days aren&apos;t refunded — to keep them, turn off
+                auto-renew instead and you&apos;ll drop to {pendingTier?.shortName ?? "the new plan"} on {fmtDate(billing.renews_at)}.
+              </p>
+            </div>
+          )}
+
+          {billing && (priceOf(pending ?? {}) ?? 0) > 0 && (
             <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Due now</dt>
