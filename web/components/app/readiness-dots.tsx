@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { CircleNotch, DownloadSimple } from "@phosphor-icons/react"
 import { getOrderHistory, downloadDesignFile, type AuditRow, type OrderRow, type OrderItem, type OrderDesign, type DesignFileRow } from "@/lib/api"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
@@ -53,6 +53,21 @@ function Tag({ id, label, state, title, orderId, status, files }: {
         ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
         : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
   const [rows, setRows] = useState<AuditRow[] | null>(null)
+  const [open, setOpen] = useState(false)
+  // Hover in, hover out — with two different delays, for two different mistakes.
+  //
+  // OPENING waits ~140ms so sweeping the mouse across a row of tags doesn't flash three
+  // panels open (and fire three history requests) on the way past.
+  //
+  // CLOSING waits ~220ms so the gap between the chip and the panel doesn't count as
+  // leaving. Without that grace, moving down to click a file closes the thing you were
+  // reaching for, which is the single most annoying way a hover menu can fail.
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearHover = () => { if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null } }
+  const openLater = () => { clearHover(); hoverTimer.current = setTimeout(() => { setOpen(true); load(true) }, 140) }
+  const closeLater = () => { clearHover(); hoverTimer.current = setTimeout(() => setOpen(false), 220) }
+  // Never leave a timer behind on a board that re-renders constantly.
+  useEffect(() => clearHover, [])
 
   // History loads on OPEN, not on render — a board of 50 rows would otherwise fire 150
   // requests for popovers nobody opened.
@@ -62,14 +77,24 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   }
 
   return (
-    <Popover onOpenChange={load}>
+    <Popover open={open} onOpenChange={(v: boolean) => { setOpen(v); load(v) }}>
       <PopoverTrigger
         title={title}
+        // Click still works, and has to: touch devices have no hover at all, so a
+        // hover-only panel would be unreachable on the phone the floor actually uses.
+        onMouseEnter={openLater}
+        onMouseLeave={closeLater}
+        onFocus={() => { setOpen(true); load(true) }}
         className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
       >
         {label}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-0">
+      <PopoverContent align="start" className="w-80 p-0"
+        // Entering the panel cancels the pending close, so it stays put while you read
+        // it; leaving the panel starts the close again.
+        onMouseEnter={clearHover}
+        onMouseLeave={closeLater}
+      >
         <div className="border-b border-border px-3 py-2">
           <div className="text-xs font-semibold">{label}</div>
           {/* Where "Design sent" / "Pre-scanned" went. Saying it here keeps the chip's
