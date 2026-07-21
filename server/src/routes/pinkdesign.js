@@ -97,8 +97,21 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     const orderId = String(b.orderId || '');
     const sku = b.sku != null ? String(b.sku) : null;
     if (!orderId || !sku) { reply.code(400); return { error: 'orderId and sku required' }; }
-    const board = String(b.boardId || boardId() || '');
-    if (!board) { reply.code(400); return { error: 'No board chosen — set PINKDESIGN_BOARD_ID or pass boardId (see /api/pinkdesign/status for the list).' }; }
+    // Board: explicit wins, else the configured one, else — when the account has exactly
+    // ONE board — just use it. Making someone copy an id they have no choice about is a
+    // config step that can only be got wrong.
+    let board = String(b.boardId || boardId() || '');
+    if (!board) {
+      const bl = await pink('/board_list');
+      const list = (bl.ok && (Array.isArray(bl.data) ? bl.data : bl.data?.data)) || [];
+      if (list.length === 1) board = String(list[0].id ?? list[0].board_id ?? list[0]._id ?? '');
+      else if (list.length > 1) {
+        reply.code(400);
+        return { error: 'Several boards exist — choose one (Settings › Integrations, PINKDESIGN_BOARD_ID).',
+                 boards: list.map((x) => ({ id: x.id ?? x.board_id, name: x.name ?? x.title })) };
+      }
+    }
+    if (!board) { reply.code(400); return { error: 'No board available from Pink Design — check /api/pinkdesign/status.' }; }
 
     const item = (await q(
       `select i.sku, i.name, i.qty, i.print_type, o.id as order_id
