@@ -28,6 +28,24 @@ import { forTag, sayAction, EMPTY_HINT, DONE_NO_HISTORY, type TagId } from "@/co
 
 type State = "todo" | "doing" | "done"
 
+/**
+ * Only ONE tag popover may be open at a time, anywhere on the page.
+ *
+ * Each tag owned its `open` state and nothing coordinated them, so moving from a tag on one
+ * card to a tag on another left both panels up: the first one's close is on a 220ms grace
+ * timer (deliberately — see below), and the second opens inside that window. Two panels
+ * overlapping, and it got worse the faster you moved, because a pointer that leaves a chip
+ * diagonally can skip the mouseleave entirely and strand the panel open indefinitely.
+ *
+ * Every mounted tag registers a closer here; opening one runs all the others. That also
+ * cancels their PENDING opens, so a sweep across a row can't queue a panel that appears
+ * after you've already settled somewhere else.
+ */
+const closers = new Set<() => void>()
+function closeOtherTags(mine: () => void) {
+  for (const c of closers) if (c !== mine) c()
+}
+
 /** A file reachable from a tag. `href` opens directly; `designId` goes through the API so
  *  the paywall and the seller/staff checks still apply. */
 export type TagFile = { key: string; name: string; note?: string; href?: string; designId?: string }
@@ -64,7 +82,22 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   // reaching for, which is the single most annoying way a hover menu can fail.
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearHover = () => { if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null } }
-  const openLater = () => { clearHover(); hoverTimer.current = setTimeout(() => { setOpen(true); load(true) }, 140) }
+  // This tag's entry in the page-wide registry. Closing means dropping the panel AND
+  // dropping any pending open — a queued timer that fires later would reopen a tag the
+  // user has already moved on from.
+  const closeSelf = useRef<() => void>(() => {})
+  useEffect(() => {
+    const fn = () => {
+      if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null }
+      setOpen(false)
+    }
+    closeSelf.current = fn
+    closers.add(fn)
+    return () => { closers.delete(fn) }
+  }, [])
+
+  const openNow = () => { closeOtherTags(closeSelf.current); setOpen(true); load(true) }
+  const openLater = () => { clearHover(); hoverTimer.current = setTimeout(openNow, 140) }
   const closeLater = () => { clearHover(); hoverTimer.current = setTimeout(() => setOpen(false), 220) }
   // Never leave a timer behind on a board that re-renders constantly.
   useEffect(() => clearHover, [])
@@ -77,14 +110,16 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   }
 
   return (
-    <Popover open={open} onOpenChange={(v: boolean) => { setOpen(v); load(v) }}>
+    // Click and keyboard go through onOpenChange, hover doesn't — both routes have to
+    // clear the others, or tapping a tag on a phone still stacks panels.
+    <Popover open={open} onOpenChange={(v: boolean) => { if (v) openNow(); else setOpen(false) }}>
       <PopoverTrigger
         title={title}
         // Click still works, and has to: touch devices have no hover at all, so a
         // hover-only panel would be unreachable on the phone the floor actually uses.
         onMouseEnter={openLater}
         onMouseLeave={closeLater}
-        onFocus={() => { setOpen(true); load(true) }}
+        onFocus={openNow}
         className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
       >
         {label}
