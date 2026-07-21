@@ -169,19 +169,19 @@ export function POAddItems({
 
   const loadSs = useCallback(() => {
     setSs(null)
-    getSsProducts({ search: q, limit: 60 }).then((r) => {
+    getSsProducts({ search: q, limit: 200 }).then((r) => {
       const found = r?.products ?? []
       setSs(found)
       // Nothing locally? Ask the STYLE list, which is cached whole and covers everything
       // S&S sell. The style is what a person knows; its skus are fetched when opened.
       if (!found.length && q) {
-        getSsStylesAll({ search: q, limit: 40 }).then((sr) => setSsStyleHits(sr?.styles ?? [])).catch(() => setSsStyleHits([]))
+        getSsStylesAll({ search: q, limit: 120 }).then((sr) => setSsStyleHits(sr?.styles ?? [])).catch(() => setSsStyleHits([]))
       } else setSsStyleHits(null)
     }).catch(() => setSs([]))
   }, [q])
   const loadOtto = useCallback(() => {
     setOtto(null)
-    getOttoProducts({ search: q, limit: 60 }).then((r) => setOtto(r?.items ?? [])).catch(() => setOtto([]))
+    getOttoProducts({ search: q, limit: 200 }).then((r) => setOtto(r?.items ?? [])).catch(() => setOtto([]))
   }, [q])
 
   // Deferred by a 0ms timer (the pattern used across the app pages): both loaders
@@ -200,7 +200,7 @@ export function POAddItems({
 
   const invRows = useMemo(() => {
     const t = q.toLowerCase()
-    return inventory.filter((i) => !t || `${i.sku} ${i.name ?? ""} ${i.variant ?? ""}`.toLowerCase().includes(t)).slice(0, 60)
+    return inventory.filter((i) => !t || `${i.sku} ${i.name ?? ""} ${i.variant ?? ""}`.toLowerCase().includes(t)).slice(0, 300)
   }, [inventory, q])
 
   const toggle = (line: POLine) =>
@@ -290,9 +290,6 @@ export function POAddItems({
                 // Not synced, but S&S DO sell it. Open a style to pull its skus live —
                 // they're cached on the way through, so it's searchable from then on.
                 <>
-                  <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
-                    Not in your synced catalogue yet — open a style to load its sizes and colours from S&amp;S.
-                  </div>
                   {ssStyleHits.map((st) => (
                     <div key={st.styleID}>
                       <button type="button" onClick={() => expandSs(String(st.styleID))}

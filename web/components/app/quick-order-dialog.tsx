@@ -78,9 +78,11 @@ export function QuickOrderDialog({
       const current = await getFactoryList<SavedPOLine[]>("po_saved").catch(() => [])
       const next: SavedPOLine[] = Array.isArray(current) ? current.map((l) => ({ ...l })) : []
       for (const { s, q } of picked) {
-        // A size with no sku of its own is keyed to the style so it still reaches the
-        // list — dropping it would silently lose part of what was asked for.
-        const sku = s.sku || `${product.style}-${s.size}`
+        // Never invent a sku. `style-size` produced codes no supplier has ever heard of —
+        // they look orderable, reach a purchase order, and are rejected at the supplier.
+        // A size without a real sku is skipped and reported instead.
+        const sku = s.sku
+        if (!sku) continue
         const hit = next.find((x) => x.sku === sku)
         if (hit) hit.qty = num(hit.qty) + q
         else next.push({
@@ -96,9 +98,15 @@ export function QuickOrderDialog({
           savedAt: new Date().toISOString(),
         })
       }
+      const skipped = picked.filter(({ s }) => !s.sku).length
+      if (skipped === picked.length) {
+        setErr("None of these sizes have a supplier sku yet, so there's nothing orderable to add. Open the style in Add items instead.")
+        return
+      }
       await saveFactoryList("po_saved", next)
       onAdded?.()
-      onClose()
+      if (skipped) setErr(`Added — but ${skipped} size${skipped === 1 ? "" : "s"} had no supplier sku and were left out.`)
+      else onClose()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't add these to the order list.")
     } finally { setBusy(false) }
@@ -126,12 +134,14 @@ export function QuickOrderDialog({
             <div key={s.size} className="flex items-center gap-2 py-1.5">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{s.size}</div>
-                {s.sku && <div className="truncate font-mono text-[10px] text-muted-foreground">{s.sku}</div>}
+                {s.sku
+                  ? <div className="truncate font-mono text-[10px] text-muted-foreground">{s.sku}</div>
+                  : <div className="truncate text-[10px] text-amber-700">no supplier sku — can&apos;t be ordered</div>}
               </div>
               <Input
                 value={qty[s.size] ?? ""}
                 onChange={(e) => setQty((p) => ({ ...p, [s.size]: e.target.value.replace(/[^0-9]/g, "") }))}
-                placeholder="0" inputMode="numeric" disabled={busy}
+                placeholder="0" inputMode="numeric" disabled={busy || !s.sku}
                 className="h-8 w-16 text-center" aria-label={`Quantity for ${s.size}`}
               />
               <Input

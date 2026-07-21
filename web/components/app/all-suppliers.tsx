@@ -144,6 +144,22 @@ export function AllSuppliers() {
   // this decides what we BUY, and it goes to the to-order list without importing
   // anything — needing six of a blank shouldn't put it on the shop.
   const [quickOrder, setQuickOrder] = useState<QuickOrderProduct | null>(null)
+  /**
+   * Resolve a card into something orderable.
+   *
+   * The card only carries size STRINGS, so building a sku as `style-size` produced codes
+   * like "10-271-L/XL" that no supplier has ever heard of — they'd be rejected at order
+   * time, and they carry no image because nothing in the catalogue matches them. Otto's
+   * real variant skus live on the style detail, so fetch them.
+   */
+  const loadOttoVariants = async (style: string) => {
+    try {
+      const d = await getOttoStyle(style)
+      const vs = Array.isArray(d?.variants) ? d.variants : []
+      return vs.map((v) => ({ size: [v.color, v.size].filter(Boolean).join(" / ") || v.sku, sku: v.sku, price: v.price ?? null }))
+    } catch { return [] }
+  }
+
   const quickOrderFor = (it: Item): QuickOrderProduct => {
     const d = cardData(it)
     // S&S sizes are only loaded once a card has been expanded; Otto ships them with the
@@ -315,7 +331,15 @@ export function AllSuppliers() {
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
                   onEditVariants={() => addToCatalog(it)}
-                  onQuickOrder={() => setQuickOrder(quickOrderFor(it))}
+                  onQuickOrder={async () => {
+                    const base = quickOrderFor(it)
+                    // Otto sizes have no sku on the card; fetch the real ones so what's
+                    // ordered is a code the supplier recognises.
+                    if (it.supplier === "otto") {
+                      const sizes = await loadOttoVariants(it.id)
+                      setQuickOrder(sizes.length ? { ...base, sizes } : base)
+                    } else setQuickOrder(base)
+                  }}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}
                 />
