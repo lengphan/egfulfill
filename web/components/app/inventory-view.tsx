@@ -204,14 +204,25 @@ export function InventoryView() {
                             what "the barcode won't scan" actually was. `fit` matters as
                             much as the size: without it JsBarcode writes a fixed pixel
                             width and no viewBox, so max-w clipped the bars outright. */}
+                        {/* Width lives on the WRAPPER, not the svg: `fit` sets an inline
+                            style="width:100%" that beats any class on the barcode itself,
+                            so sizing it there silently did nothing and the code grew to
+                            fill the column (and grew the row with it). */}
                         <button
                           type="button"
                           onClick={() => setZoomSku(it.sku)}
                           title="Tap to enlarge for scanning"
-                          className="flex w-full flex-col gap-0.5 text-left transition-opacity hover:opacity-70"
+                          className="flex w-[130px] flex-col gap-0.5 text-left transition-opacity hover:opacity-70"
                         >
                           <span className="font-mono text-xs font-medium">{it.sku}</span>
-                          <Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} fit className="w-[120px]" />
+                          {/* Fixed-height slot + `stretch`: height:auto never collapsed to
+                              the viewBox ratio here, so the code kept its full 150px and
+                              dragged the row with it. stretch lets Y fill this box while X
+                              still scales uniformly, so bar RATIOS survive — the thumbnail
+                              only has to be recognisable; the overlay is what gets scanned. */}
+                          <div className="h-6 w-full">
+                            <Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} fit stretch />
+                          </div>
                         </button>
                       </td>
                       <td className="px-4 py-2"><div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>{it.variant && <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant}</div>}</td>
@@ -275,16 +286,22 @@ export function InventoryView() {
 /**
  * One SKU's barcode, big enough to scan off the screen.
  *
- * The scrim is dark so the phone's exposure settles on the code instead of a bright
+ * The surround is dark so the phone's exposure settles on the code instead of a bright
  * page, but the barcode itself stays BLACK ON WHITE. Inverting it — light bars on a
  * dark field — is what breaks scanning: BarcodeDetector and ZXing both expect dark
  * bars on a light quiet zone, and most handheld guns won't read an inverted code at
  * all. So: dark room, white card.
+ *
+ * Deliberately dark in BOTH themes rather than following light mode. The darkness is
+ * doing a job — it isolates the code and stops a bright page dragging the camera's
+ * auto-exposure down onto the white card. A light surround in day mode would undo
+ * that. Tinted toward the app's violet (hue 280) so it reads as ours and not as a
+ * black void.
  */
 function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void }) {
   return (
     <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
-      <DialogContent className="border-none bg-black/90 sm:max-w-xl">
+      <DialogContent className="border-none bg-[oklch(0.19_0.05_280)] sm:max-w-xl">
         <DialogHeader><DialogTitle className="text-white">Scan this code</DialogTitle></DialogHeader>
         {sku && (
           <div className="space-y-3 pb-2">
