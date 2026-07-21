@@ -271,7 +271,10 @@ async function refundForCancel(orderId, sellerId, by) {
   const state = await orderCharges(orderId);
   if (state.charged <= 0) return { ok: true, nothingToRefund: true };
   if (state.refundable <= 0) return { ok: true, already: true };
-  const out = await refundOrder({ orderId, amount: state.refundable, by,
+  // A cancellation returns EVERYTHING still owed — every part, not a figure. Naming an
+  // amount here would freeze a total read a moment earlier; `full` is evaluated inside
+  // the lock against the balances that are true when the money actually moves.
+  const out = await refundOrder({ orderId, full: true, by,
                                   note: `Order ${orderId} cancelled — refund`,
                                   clientId: `cancel-${orderId}` });
   if (out.error) return out;
