@@ -30,7 +30,7 @@ export function PurchaseView() {
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; tone?: "warn" } | null>(null)
 
   // Lines pulled out of a draft but kept for a later order. Factory-global (staff
   // share one list), so it survives the browser that removed the line.
@@ -239,7 +239,16 @@ export function PurchaseView() {
       // The original is superseded by its parts; leaving it would double-count the spend.
       if (parts.length > 1) await deletePurchaseOrder(po.num).catch(() => {})
 
-      setMsg({ ok: !results.some((r) => r.includes("failed")), text: results.join(" · ") })
+      // A mixed result is neither. Reporting "S&S sent, Otto failed" in red reads as
+      // nothing having happened — and the S&S half really was placed, so acting on that
+      // belief means placing it twice.
+      const anyFailed = results.some((r) => r.includes("failed"))
+      const anySent = results.some((r) => !r.includes("failed"))
+      setMsg({
+        ok: !anyFailed,
+        tone: anyFailed && anySent ? "warn" : undefined,
+        text: (anyFailed && anySent ? "Partly placed. " : "") + results.join(" · "),
+      })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place the order." })
@@ -261,6 +270,58 @@ export function PurchaseView() {
       await savePurchaseOrder({ ...po, status: "received", meta: { ...(po.meta || {}), receivedAt: new Date().toISOString() } })
       setInv(next); setMsg({ ok: true, text: "Received into inventory." }); load()
     } catch { setMsg({ ok: false, text: "Couldn't receive." }) } finally { setBusy(null) }
+  }
+
+  /** The supplier's own order number, dug out of whatever shape their response took. */
+  const supplierOrderNo = (po: PurchaseOrder): string | null => {
+    const m = (po.meta || {}) as Record<string, unknown>
+    const r = (m.response ?? {}) as Record<string, unknown>
+    const nested = ((r.ssResponse ?? r.ottoResponse ?? {}) as Record<string, unknown>)
+    const pick = (o: Record<string, unknown>) =>
+      o.orderNumber ?? o.order_number ?? o.orderNo ?? o.salesOrderNumber ?? o.id
+    const v = pick(nested) ?? pick(r)
+    return v == null ? null : String(v)
+  }
+  const trackingOf = (po: PurchaseOrder): string =>
+    String(((po.meta || {}) as Record<string, string>).tracking ?? "")
+
+  /** Record a carrier tracking number against a PO, so an inbound box can be chased. */
+  const setTracking = async (po: PurchaseOrder, tracking: string) => {
+    const meta = { ...(po.meta || {}), tracking: tracking.trim() || undefined }
+    setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, meta } : p)))
+    await savePurchaseOrder({ ...po, meta }).catch(() => {})
+  }
+
+  /**
+   * Cancel a PO.
+   *
+   * This cancels OUR record. It does NOT reach the supplier: neither S&S's nor Otto's
+   * cancel endpoint has been wired or verified, and quietly marking a live order
+   * cancelled while the goods are still on a truck is the worst outcome available —
+   * stock arrives that nothing expects, against an order the system says never existed.
+   *
+   * So a placed PO says so plainly and asks for confirmation. A draft was never sent
+   * anywhere, so it just goes.
+   */
+  const cancelPO = async (po: PurchaseOrder) => {
+    const wasPlaced = po.status === "placed"
+    if (wasPlaced && !window.confirm(
+      `Cancel ${po.num}?\n\nThis marks OUR record cancelled. It does NOT cancel the order with ${po.supplier || "the supplier"} — contact them directly if the goods haven't shipped.`
+    )) return
+    setBusy(po.num); setMsg(null)
+    try {
+      const r = await savePurchaseOrder({
+        ...po, status: "cancelled",
+        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString() },
+      })
+      if (r?.error) throw new Error(r.error)
+      setMsg({ ok: true, text: wasPlaced
+        ? `${po.num} marked cancelled here — contact ${po.supplier || "the supplier"} to stop the actual order.`
+        : `${po.num} cancelled.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
+    } finally { setBusy(null) }
   }
 
   const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
@@ -349,7 +410,12 @@ export function PurchaseView() {
         <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
       </StatGrid>
 
-      {msg && <div className={"rounded-lg border px-4 py-2 text-sm " + (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>}
+      {msg && (
+        <div className={"rounded-lg border px-4 py-2 text-sm " + (
+          msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
+            : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
+      )}
 
       {/* Reorder suggestions */}
       <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
@@ -447,18 +513,44 @@ export function PurchaseView() {
                       </span>
                     </button>
                     {po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
-                      : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+                      : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
+                        : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       <ArrowClockwise size={13} weight="bold" /> Reorder
                     </Button>
                     {po.status === "placed" && (
-                      <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
-                        {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
-                      </Button>
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
+                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
+                        </Button>
+                        <button onClick={() => cancelPO(po)} disabled={busy === po.num}
+                          className="text-xs font-medium text-muted-foreground hover:text-red-600"
+                          title="Cancel our record of this order">Cancel</button>
+                      </>
                     )}
                   </div>
                   {isOpen && (
                     <div className="border-t border-border bg-muted/30 px-5 py-1">
+                      {/* How to chase this order: their reference, and the carrier number
+                          for the box coming back. Kept on the PO because "where are my
+                          blanks" is asked of the PO, not of a shipment record elsewhere. */}
+                      {po.status !== "cancelled" && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border py-2.5 text-xs">
+                          <span className="text-muted-foreground">
+                            Supplier order{" "}
+                            <span className="font-mono text-foreground">{supplierOrderNo(po) ?? "—"}</span>
+                          </span>
+                          <label className="flex items-center gap-1.5 text-muted-foreground">
+                            Tracking
+                            <Input
+                              defaultValue={trackingOf(po)}
+                              onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
+                              placeholder="paste carrier number"
+                              className="h-7 w-48 font-mono text-xs"
+                            />
+                          </label>
+                        </div>
+                      )}
                       {po.items.length === 0 ? (
                         <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
                       ) : po.items.map((l) => (
