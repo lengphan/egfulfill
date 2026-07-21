@@ -85,7 +85,7 @@ const bad = (reply, msg, fields) => { reply.code(400); return { error: msg, mode
 // A key used to be all-or-nothing: a partner who only needed to push orders held one
 // that could also read the whole catalogue and manage webhooks. Least privilege matters
 // most for the credential you hand to someone else.
-export const API_SCOPES = ['orders.read', 'orders.write', 'products.read', 'webhooks.read', 'webhooks.write'];
+export const API_SCOPES = ['orders.read', 'orders.write', 'products.read', 'webhooks.read', 'webhooks.write', 'billing.read'];
 
 /**
  * Does this key carry `scope`?
@@ -429,6 +429,79 @@ export function sandboxRoutes(app, requireAuth) {
     return { object: 'order', mode: 'test', id: testId, status: 'received', items: priced,
       shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
       created: nowISO(), _note: 'Simulated — nothing was created in the factory, but order.received WAS delivered to your webhooks (test:true). Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
+  });
+
+  // ── Billing ────────────────────────────────────────────────────────────────
+  // How a partner answers "what do I owe you, and for what".
+  //
+  // Read-only, straight off wallet_ledger, which is append-only — so a statement for a
+  // past period cannot change after the fact. No invoice OBJECT is invented: an invoice
+  // that lives in its own table can disagree with the ledger, and then two systems both
+  // claim to know what is owed. The ledger is the single source; this presents it.
+  //
+  // Money is numeric(12,2) and node-pg hands numerics back as STRINGS, so every value is
+  // parsed before arithmetic — concatenating two charges instead of adding them is the
+  // classic way this goes wrong silently.
+  const money = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
+
+  app.get('/api/v1/balance', async (req, reply) => {
+    const k = await requireKey(req, reply, { scope: 'billing.read' }); if (k.error) return k;
+    try {
+      const r = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1', [String(k.seller_id)]);
+      const balance = money(r.rows[0] && r.rows[0].bal);
+      return { object: 'balance', mode: k.mode, account: String(k.seller_id), balance, currency: 'USD',
+        note: balance < 0 ? 'Negative balance means charges exceed funds on account.' : undefined };
+    } catch (e) { reply.code(500); return { error: 'Could not read balance.' }; }
+  });
+
+  app.get('/api/v1/statement', async (req, reply) => {
+    const k = await requireKey(req, reply, { scope: 'billing.read' }); if (k.error) return k;
+    const qy = req.query || {};
+    // Default to the current calendar month — the period anyone reconciling actually wants.
+    const now = new Date();
+    const from = String(qy.from || new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10));
+    const to = String(qy.to || now.toISOString().slice(0, 10));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return bad(reply, 'from and to must be YYYY-MM-DD dates.', ['from', 'to']);
+    }
+    try {
+      const acct = String(k.seller_id);
+      // Opening balance is everything BEFORE the window — without it the closing figure
+      // can't be checked against anything and the statement is just a list.
+      const open = await q('select coalesce(sum(delta),0) as bal from wallet_ledger where account=$1 and created_at < $2::date',
+        [acct, from]).then((r) => money(r.rows[0] && r.rows[0].bal));
+      // `to` is inclusive: a partner asking for 01→31 means the whole 31st, so compare
+      // against the following midnight rather than dropping the last day's charges.
+      const r = await q(
+        `select id, created_at, type, ref, note, delta, order_id
+           from wallet_ledger
+          where account=$1 and created_at >= $2::date and created_at < ($3::date + interval '1 day')
+          order by created_at, id`,
+        [acct, from, to]
+      );
+      let running = open;
+      const lines = r.rows.map((row) => {
+        const amount = money(row.delta);
+        running = money(running + amount);
+        return { id: String(row.id), date: row.created_at, type: row.type,
+          order_id: row.order_id || null, reference: row.ref || null,
+          description: row.note || row.type, amount, balance: running };
+      });
+      const sum = (f) => money(lines.filter(f).reduce((s, l) => s + l.amount, 0));
+      return {
+        object: 'statement', mode: k.mode, account: acct, currency: 'USD',
+        period: { from, to },
+        opening_balance: open,
+        closing_balance: running,
+        totals: {
+          charges: sum((l) => l.amount < 0),
+          credits: sum((l) => l.amount > 0),
+          net: money(running - open),
+        },
+        lines,
+        _note: 'Charges are negative, credits positive. The ledger is append-only, so a closed period never changes.',
+      };
+    } catch (e) { reply.code(500); return { error: 'Could not build statement.' }; }
   });
 
   app.get('/api/v1/orders/:id', async (req, reply) => {

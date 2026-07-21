@@ -34,6 +34,7 @@ const SCOPES: { name: string; allows: string }[] = [
   { name: "products.read", allows: "List the blanks you can order." },
   { name: "webhooks.read", allows: "List endpoints and their delivery history." },
   { name: "webhooks.write", allows: "Add, remove and test endpoints." },
+  { name: "billing.read", allows: "Read your balance and statements." },
 ]
 
 const LIMITS: { scope: string; limit: string }[] = [
@@ -77,7 +78,8 @@ export default function DocsPage() {
       <nav aria-label="Contents" className="mb-12 flex flex-wrap gap-x-4 gap-y-1 border-y border-border py-3 text-sm">
         {[
           ["auth", "Authentication"], ["limits", "Rate limits"], ["endpoints", "Endpoints"],
-          ["webhooks", "Webhooks"], ["verify", "Verifying signatures"], ["errors", "Errors"],
+          ["billing", "Billing"], ["webhooks", "Webhooks"], ["verify", "Verifying signatures"],
+          ["errors", "Errors"],
         ].map(([id, label]) => (
           <a key={id} href={`#${id}`} className="text-muted-foreground transition-colors hover:text-foreground">{label}</a>
         ))}
@@ -175,6 +177,36 @@ export default function DocsPage() {
               </div>
             ))}
           </div>
+        </Section>
+
+        <Section id="billing" title="Billing">
+          <p className="text-muted-foreground">
+            <Code>GET /api/v1/balance</Code> returns what is currently on account.
+            <Code>GET /api/v1/statement?from=YYYY-MM-DD&amp;to=YYYY-MM-DD</Code> returns every movement
+            in a period, defaulting to the current calendar month. Both need <Code>billing.read</Code>.
+          </p>
+          <Block>{`{
+  "object": "statement",
+  "period": { "from": "2026-07-01", "to": "2026-07-31" },
+  "opening_balance": 12.30,
+  "closing_balance": 90.80,
+  "totals": { "charges": -46.00, "credits": 124.50, "net": 78.50 },
+  "lines": [
+    { "id": "1", "date": "2026-07-02T09:14:22.104Z", "type": "order-out",
+      "order_id": "API-9F2C1A", "description": "Order API-9F2C1A",
+      "amount": -24.50, "balance": -12.20 }
+  ]
+}`}</Block>
+          <p className="text-muted-foreground">
+            Charges are negative, credits positive, and every line carries the running balance
+            after it. <Code>opening_balance + totals.net</Code> always equals
+            <Code>closing_balance</Code> — if it does not, tell us rather than working around it.
+          </p>
+          <p className="text-muted-foreground">
+            There is no separate invoice object, deliberately. The ledger is append-only, so a
+            statement for a closed period cannot change after the fact; inventing an invoice record
+            alongside it would create a second thing that can disagree about what is owed.
+          </p>
         </Section>
 
         <Section id="webhooks" title="Webhooks">
