@@ -729,6 +729,44 @@ function MoneyField({ label, hint, value, onChange }: { label: string; hint?: st
   )
 }
 
+/**
+ * The base-cost formula, shown as the equation it actually is.
+ *
+ * As a plain "Base cost markup" money box, nothing on screen said what it did to a
+ * price — you had to already know that pricing reads it. Rendering the formula makes
+ * the default legible too: leave it at 0 and base cost simply equals product cost.
+ */
+function MarkupFormula({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const x = Number(value) || 0
+  const example = 12.5
+  return (
+    <div className="flex flex-col gap-1.5 sm:col-span-2">
+      <span className="text-sm font-medium">Base cost formula</span>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+        <span className="text-sm font-medium">Base cost</span>
+        <span className="text-muted-foreground">=</span>
+        <span className="rounded-md bg-background px-2 py-1 text-sm font-medium">Product cost</span>
+        <span className="text-muted-foreground">+</span>
+        <div className="relative w-28">
+          <CurrencyDollar size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+            placeholder="0.00" inputMode="decimal" className="h-9 pl-7"
+            aria-label="Base cost markup"
+          />
+        </div>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {x > 0
+          ? `A blank costing $${example.toFixed(2)} from your supplier sells at $${(example + x).toFixed(2)} before the print-method surcharge.`
+          : "Leave it at 0 and base cost simply copies the product cost — set a number here to add a default margin to every synced product."}
+        {" "}A base cost typed on a product always wins, and print-method surcharges are added on top.
+      </span>
+    </div>
+  )
+}
+
 /** Plain text counterpart to MoneyField, so the address rows match the money rows. */
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -867,14 +905,12 @@ function PlatformPanel() {
         </div>
       </Fold>
       <Fold title="Fees" hint="design payout, file price, default shipping">
+        {/* Design-side money together: what a designer is paid, then what a file costs
+            to download. The base-cost formula sits below them because it spans the row
+            and would otherwise split the pair. */}
         <MoneyField label="Design fee" hint="Default payout credited to a designer per approved design" value={designFee} onChange={setDesignFee} />
-        <MoneyField
-          label="Base cost markup"
-          hint="Added to a supplier's product cost to get the base cost sellers pay. A base cost typed on the product always wins. Print-method surcharges are added on top of this."
-          value={baseMarkup}
-          onChange={setBaseMarkup}
-        />
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
+        <MarkupFormula value={baseMarkup} onChange={setBaseMarkup} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
       </Fold>
