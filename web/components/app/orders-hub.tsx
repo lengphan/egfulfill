@@ -523,15 +523,21 @@ export function OrdersHub() {
           </div>
         ) : (
           <>
-          {/* Batch dispatch bar. Only rendered when the partner is configured — an action
-              that can't work shouldn't occupy the header. */}
-          {dispatchOn && (selected.size > 0 || selectableOnPage.length > 0) && (
+          {/* Batch dispatch bar. Two conditions, both necessary:
+              • the partner is configured — an action that can't work shouldn't occupy
+                the header
+              • something is actually SELECTED — it used to appear whenever anything was
+                selectable, so a board with nothing ticked still showed "Select page (1)"
+                and "Select all 7 in this filter", which reads as a selection you didn't
+                make. Rows carry their own checkbox, so this is not the only way in. */}
+          {dispatchOn && selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5">
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input type="checkbox" checked={allOnPageSelected} onChange={togglePage}
                   className="size-4 rounded border-input accent-primary" aria-label="Select every dispatchable order on this page" />
                 <span className="text-muted-foreground">
-                  {selected.size ? `${selected.size} selected` : `Select page (${selectableOnPage.length})`}
+                  {selected.size} selected
+                  {!allOnPageSelected && selectableOnPage.length > selected.size && ` · select page (${selectableOnPage.length})`}
                 </span>
               </label>
               {filtered.filter(dispatchable).length > selectableOnPage.length && (
