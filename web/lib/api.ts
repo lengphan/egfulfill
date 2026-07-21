@@ -53,6 +53,12 @@ export type WalletResponse = {
   account: string
   balance: number
   ledger: LedgerRow[]
+  /** The threshold the SERVER considers low, and whether this balance is under it.
+   *  Sent with the balance so no client decides for itself what "low" means — two
+   *  screens using different numbers is how one warns and the other stays quiet.
+   *  Null for house accounts, which may run negative by design. */
+  lowBelow?: number | null
+  low?: boolean
 }
 
 export function getWallet(account?: string) {
@@ -1768,3 +1774,11 @@ export type OttoVariant = { sku: string; color: string | null; size: string | nu
 /** A payment profile label from a supplier — never a full number. S&S return a name like
  *  "BMO Harris Bank 1234 (John Doe)", which already carries the last four. */
 export type PaymentProfile = { id: string; type: string | null; name: string | null }
+
+/** Every brand and category across BOTH supplier catalogues, plus the price range.
+ *  Read from the whole table, not the loaded page — a filter exists to reach what you
+ *  can't already see, so deriving it from what's on screen defeats the point. */
+export function getCatalogFilters() {
+  return api<{ brands: string[]; categories: string[]; priceMin: number | null; priceMax: number | null }>(
+    `/api/purchase/catalog-filters`)
+}

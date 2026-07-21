@@ -39,6 +39,40 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
   });
 
   /**
+   * Every brand, category and the price range across BOTH suppliers' catalogues.
+   *
+   * The filters were built from whatever happened to be on screen, so a brand two pages
+   * deep simply wasn't offered — and the fewer results a search returned, the fewer ways
+   * there were to narrow it. That's backwards: a filter exists to reach what you can't
+   * already see.
+   *
+   * DISTINCT over indexed columns rather than loading rows to derive it — the point is to
+   * avoid paging through a catalogue, not to page through it server-side instead.
+   */
+  app.get('/api/purchase/catalog-filters', { preHandler: requireStaff }, async () => {
+    const [ssB, ottoB, ssC, ottoC, ssP, ottoP] = await Promise.all([
+      softQ('ss brands', "select distinct brand from ss_products where coalesce(brand,'') <> ''"),
+      softQ('otto brands', "select distinct brand from otto_products where coalesce(brand,'') <> ''"),
+      softQ('ss cats', "select distinct category from ss_products where coalesce(category,'') <> ''"),
+      softQ('otto cats', "select distinct category from otto_products where coalesce(category,'') <> ''"),
+      softQ('ss price', 'select min(price)::float lo, max(price)::float hi from ss_products where price > 0'),
+      softQ('otto price', 'select min(price)::float lo, max(price)::float hi from otto_products where price > 0'),
+    ]);
+    const uniq = (rows, col) => rows.map((r) => String(r[col]).trim()).filter(Boolean);
+    const brands = [...new Set([...uniq(ssB.rows, 'brand'), ...uniq(ottoB.rows, 'brand')])]
+      .sort((a, b) => a.localeCompare(b));
+    const categories = [...new Set([...uniq(ssC.rows, 'category'), ...uniq(ottoC.rows, 'category')])]
+      .sort((a, b) => a.localeCompare(b));
+    const lows = [ssP.rows[0]?.lo, ottoP.rows[0]?.lo].filter((n) => n != null);
+    const highs = [ssP.rows[0]?.hi, ottoP.rows[0]?.hi].filter((n) => n != null);
+    return {
+      brands, categories,
+      priceMin: lows.length ? Math.floor(Math.min(...lows)) : null,
+      priceMax: highs.length ? Math.ceil(Math.max(...highs)) : null,
+    };
+  });
+
+  /**
    * Which supplier each SKU actually comes from.
    *
    * The client used to infer this from the PO's supplier NAME with a substring match,

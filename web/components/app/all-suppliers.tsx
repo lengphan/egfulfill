@@ -14,12 +14,12 @@ import { Input } from "@/components/ui/input"
 import { parseCSV } from "@/lib/order-import"
 import {
   getSsStylesAll, getSsStyleImgs, getSsStyle, toggleSsFavorite, ssWarm,
-  getOttoProducts, getOttoStyle, toggleOttoFavorite, importOttoProducts,
+  getOttoProducts, getOttoStyle, getSsStyleSkus, getCatalogFilters, toggleOttoFavorite, importOttoProducts,
   getCatalogProducts, saveCatalogProducts, colorNames,
   type SsStyle, type OttoStyle, type OttoImportRow, type CatalogProduct,
 } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { driveImg, driveMap, ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
+import { driveImg, prettyColor, driveMap, ssCatalogProduct, ottoCatalogProduct } from "@/lib/supplier-catalog"
 
 const PAGE = 30
 
@@ -72,6 +72,11 @@ export function AllSuppliers() {
   const [ottoTotal, setOttoTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [added, setAdded] = useState<Set<string>>(new Set())
+  const [allFilters, setAllFilters] = useState<{ brands: string[]; categories: string[]; priceMin: number | null; priceMax: number | null } | null>(null)
+  useEffect(() => {
+    const t = setTimeout(() => { getCatalogFilters().then(setAllFilters).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
   const [addingId, setAddingId] = useState<string | null>(null)
   // Supplier products used to land in the catalog the instant you clicked Add — no look
   // at what was imported, no chance to fix a title/price/sizes first. The resolved
@@ -152,11 +157,27 @@ export function AllSuppliers() {
    * time, and they carry no image because nothing in the catalogue matches them. Otto's
    * real variant skus live on the style detail, so fetch them.
    */
+  const loadSsVariants = async (styleId: string) => {
+    try {
+      const d = await getSsStyleSkus(styleId)
+      return (d?.products ?? []).map((p) => ({
+        size: [p.color, p.size].filter(Boolean).join(" / ") || p.sku,
+        sku: p.sku, price: typeof p.price === "number" ? p.price : Number(p.price) || null,
+        image: p.image ?? null,
+      }))
+    } catch { return [] }
+  }
+
   const loadOttoVariants = async (style: string) => {
     try {
       const d = await getOttoStyle(style)
       const vs = Array.isArray(d?.variants) ? d.variants : []
-      return vs.map((v) => ({ size: [v.color, v.size].filter(Boolean).join(" / ") || v.sku, sku: v.sku, price: v.price ?? null }))
+      return vs.map((v) => ({
+        // Otto colour names arrive as supplier codes ("S.Pnk/Blk/H.Pnk"); tidy them so a
+        // row reads as a colour rather than an abbreviation nobody says out loud.
+        size: [prettyColor(v.color), v.size].filter(Boolean).join(" / ") || v.sku,
+        sku: v.sku, price: v.price ?? null, image: driveImg(v.image) || null,
+      }))
     } catch { return [] }
   }
 
@@ -239,8 +260,14 @@ export function AllSuppliers() {
   const catOf = (it: Item) => (it.supplier === "ss" ? it.ss.category || "" : it.otto.category || "")
   const priceOf = (it: Item) => Number(it.supplier === "ss" ? it.ss.price : it.otto.price) || 0
   const pool = (items ?? []).filter((it) => !sup || it.supplier === sup)
-  const brands = Array.from(new Set(pool.map(brandOf).filter(Boolean))).sort()
-  const cats = Array.from(new Set(pool.map(catOf).filter(Boolean))).sort()
+  // Filter options come from the WHOLE catalogue, not the loaded page. Deriving them from
+  // `pool` meant a brand two pages deep was never offered — and the fewer results a search
+  // returned, the fewer ways there were to narrow it, which is exactly backwards.
+  // Falls back to the on-screen values if the lookup fails, so the filters still work.
+  const poolBrands = Array.from(new Set(pool.map(brandOf).filter(Boolean))).sort()
+  const poolCats = Array.from(new Set(pool.map(catOf).filter(Boolean))).sort()
+  const brands = allFilters?.brands?.length ? allFilters.brands : poolBrands
+  const cats = allFilters?.categories?.length ? allFilters.categories : poolCats
   // The supplier pool runs to thousands of blanks once a few catalogs are loaded, so the
   // grid pages rather than rendering everything — the filters narrow WHAT you see, paging
   // keeps the page from becoming unusable when they don't narrow enough.
@@ -303,9 +330,9 @@ export function AllSuppliers() {
           </select>
           <div className="flex items-center gap-1">
             <span className="text-muted-foreground">$</span>
-            <Input value={minP} onChange={(e) => setMinP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="min" inputMode="decimal" className="h-8 w-16 px-2" />
+            <Input value={minP} onChange={(e) => setMinP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={allFilters?.priceMin != null ? String(allFilters.priceMin) : "min"} inputMode="decimal" className="h-8 w-16 px-2" />
             <span className="text-muted-foreground">–</span>
-            <Input value={maxP} onChange={(e) => setMaxP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="max" inputMode="decimal" className="h-8 w-16 px-2" />
+            <Input value={maxP} onChange={(e) => setMaxP(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={allFilters?.priceMax != null ? String(allFilters.priceMax) : "max"} inputMode="decimal" className="h-8 w-16 px-2" />
           </div>
           {anyFilter && <button onClick={clearFilters} className="text-xs font-medium text-primary hover:underline">Clear filters</button>}
           <span className="ml-auto text-xs text-muted-foreground">{visible.length.toLocaleString()} shown</span>
@@ -335,10 +362,13 @@ export function AllSuppliers() {
                     const base = quickOrderFor(it)
                     // Otto sizes have no sku on the card; fetch the real ones so what's
                     // ordered is a code the supplier recognises.
-                    if (it.supplier === "otto") {
-                      const sizes = await loadOttoVariants(it.id)
-                      setQuickOrder(sizes.length ? { ...base, sizes } : base)
-                    } else setQuickOrder(base)
+                    // BOTH suppliers need their real variants fetched: an S&S card only
+                    // has sizes once it's been expanded, so quick-ordering an unexpanded
+                    // one showed "this product lists no sizes" for a product that has 40.
+                    const sizes = it.supplier === "otto"
+                      ? await loadOttoVariants(it.id)
+                      : await loadSsVariants(it.id)
+                    setQuickOrder(sizes.length ? { ...base, sizes } : base)
                   }}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}

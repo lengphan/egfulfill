@@ -204,7 +204,18 @@ export function walletRoutes(app, requireAuth) {
     const led = await q(
       `select id, delta, type, ref, note, created_by, created_at
          from wallet_ledger where account=$1 order by created_at desc, id desc limit 200`, [account]);
-    return { account, balance: bal, ledger: led.rows };
+    // Ship the warning threshold WITH the balance, so a client never has to decide for
+    // itself what "low" means — two screens using different numbers is how one warns and
+    // the other doesn't. House accounts are exempt: they may run negative by design.
+    let lowBelow = null;
+    if (!isHouseAccount(account)) {
+      try {
+        const { readAll } = await import('./factory_settings.js');
+        const n = Number((await readAll()).low_balance_warn);
+        lowBelow = Number.isFinite(n) && n > 0 ? n : null;
+      } catch { lowBelow = null; }
+    }
+    return { account, balance: bal, ledger: led.rows, lowBelow, low: lowBelow != null && bal < lowBelow };
   });
 
   // Append one ledger entry (idempotent by ref). Returns the new balance.

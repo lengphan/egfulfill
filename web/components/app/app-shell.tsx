@@ -11,6 +11,7 @@ import { getUser, getToken } from "@/lib/auth"
 import { isStaffRole, landingFor, staffCanUseAppPath, ordersHomeFor } from "@/lib/staff-nav"
 import { sellerNav, allowedByPerms } from "@/lib/nav"
 import { getMyAccess } from "@/lib/api"
+import { LowBalanceBanner } from "@/components/app/low-balance-banner"
 
 // The (app) shell is role-aware: sellers see the seller Sidebar; staff who may use a page
 // (per their role — admin all, operator/warehouse a curated set, designer none) see the
@@ -82,7 +83,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <div className="md:pl-60">
         <TopBar />
-        <main className="mx-auto max-w-[1600px] px-4 py-5 md:px-8 md:py-6">
+        <main className="mx-auto max-w-[1600px] space-y-4 px-4 py-5 md:px-8 md:py-6">
+          {/* Seller-only, and above the page rather than on one screen: a short wallet
+              stops an order being submitted from ANYWHERE, so a warning that only appears
+              on the wallet page arrives after the refusal it was meant to prevent.
+              Renders nothing unless the server says the balance is actually low. */}
+          <LowBalanceBanner />
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

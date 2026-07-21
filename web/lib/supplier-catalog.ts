@@ -39,3 +39,34 @@ export async function ottoCatalogProduct(style: string, fb: OttoFb): Promise<Cat
     description: d?.description ?? undefined, supplier: "Otto Cap",
   }
 }
+
+/**
+ * Tidy a supplier colour code into something readable.
+ *
+ * Otto ship colours as abbreviations — "S.Pnk/Blk/H.Pnk" — which nobody says out loud and
+ * which read as a part number in a list. Expands the common ones and spaces the slashes;
+ * anything unrecognised is left alone rather than mangled into a worse guess.
+ */
+const COLOR_WORDS: Record<string, string> = {
+  blk: "Black", wht: "White", nvy: "Navy", gry: "Grey", gry2: "Grey", chr: "Charcoal",
+  pnk: "Pink", red: "Red", roy: "Royal", grn: "Green", oli: "Olive", brn: "Brown",
+  org: "Orange", yel: "Yellow", pur: "Purple", tan: "Tan", khk: "Khaki", crm: "Cream",
+  s: "Soft", h: "Heather", l: "Light", d: "Dark", m: "Medium",
+}
+export function prettyColor(raw?: string | null): string {
+  if (!raw) return ""
+  const s = String(raw).trim()
+  if (!s) return ""
+  // Only touch strings that actually look like codes — dotted or slashed abbreviations.
+  if (!/[./]/.test(s)) return s
+  return s
+    .split("/")
+    .map((part) =>
+      part.split(".").map((w) => {
+        const k = w.trim().toLowerCase()
+        return COLOR_WORDS[k] ?? (w.trim() ? w.trim()[0].toUpperCase() + w.trim().slice(1) : "")
+      }).filter(Boolean).join(" ")
+    )
+    .filter(Boolean)
+    .join(" / ")
+}

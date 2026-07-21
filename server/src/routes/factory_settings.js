@@ -24,6 +24,7 @@ const KEYS = [
   'base_markup',
   // Expedited dispatch: what the seller pays vs what the partner costs us.
   'expedite_fee', 'expedite_cost', 'design_partner_cost',
+  'low_balance_warn',
 ];
 
 // Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
@@ -66,6 +67,12 @@ export const SETTING_DEFAULTS = {
   expedite_fee: 2,    // charged to the seller, per order
   expedite_cost: 0.5, // what the dispatch partner charges us, per label
   design_partner_cost: 0, // what the outsourced design partner costs us, per task
+  // When to start warning a seller their wallet is running out. A seller wallet must stay
+  // POSITIVE — an order can't be submitted without funds — so the warning has to arrive
+  // while there's still time to top up, not at the moment a submit is refused.
+  // House accounts (factory/designer) are exempt: they're allowed to run negative on
+  // purpose, because that's how a loss becomes visible instead of blocking the floor.
+  low_balance_warn: 50,
 };
 
 /**

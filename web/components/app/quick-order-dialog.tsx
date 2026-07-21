@@ -20,7 +20,7 @@ export type QuickOrderProduct = {
   image?: string | null
   /** Sizes offered. A size with a known sku orders exactly; one without is recorded
    *  against the style for someone to resolve, rather than dropped. */
-  sizes: { size: string; sku?: string | null; price?: number | null }[]
+  sizes: { size: string; sku?: string | null; price?: number | null; image?: string | null }[]
   defaultPrice?: number | null
 }
 
@@ -122,7 +122,8 @@ export function QuickOrderDialog({
 
         <div className="max-h-[55vh] space-y-1 overflow-y-auto py-2">
           <div className="flex items-center gap-2 pb-1 text-[11px] font-medium text-muted-foreground">
-            <span className="flex-1">Size</span>
+            <span className="w-10 shrink-0" aria-hidden />
+            <span className="flex-1">Colour / size</span>
             <span className="w-16 text-center">Qty</span>
             <span className="w-24 text-right">Unit price</span>
           </div>
@@ -132,6 +133,12 @@ export function QuickOrderDialog({
             </div>
           ) : product.sizes.map((s) => (
             <div key={s.size} className="flex items-center gap-2 py-1.5">
+              {/* The variant's OWN picture. Colour names alone can't be checked — "S.Pnk"
+                  against "H.Pnk" is a guess until you see them side by side. */}
+              {s.image
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={s.image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
+                : <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{s.size}</div>
                 {s.sku
