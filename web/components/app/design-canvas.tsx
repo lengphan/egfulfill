@@ -8,7 +8,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
-import { matchThreadColors, nearestThread, hexToRgb, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
+import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
 
@@ -370,10 +370,20 @@ export function DesignCanvasDialog({
     return () => { alive = false; clearTimeout(id) }
   }, [mapOpen, designUrl])
 
+  // What the eyedropper landed on, when nothing in stock is actually close. The cone is
+  // still added — refusing to add one would leave the line with no thread at all — but
+  // the sample is named so the difference is visible, and the fix (add that colour, or
+  // choose a different cone) is stated.
+  const [pickWarn, setPickWarn] = useState<{ hex: string; thread: string } | null>(null)
+
   const onPickColor = (hex: string) => {
     const { r, g, b } = hexToRgb(hex)
     const t = nearestThread(r, g, b)
-    if (t) setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
+    if (t) {
+      setThreads((prev) => (prev.some((x) => x.code === t.code) ? prev : [...prev, t]))
+      const { poor } = matchQuality(r, g, b, t)
+      setPickWarn(poor ? { hex, thread: `${t.code} ${t.name}` } : null)
+    }
     setPicking(false)
   }
   const [err, setErr] = useState<string | null>(null)
@@ -463,6 +473,17 @@ export function DesignCanvasDialog({
 
             {/* The map. Each row is a crop of the artwork taken from where that colour
                 actually sits — the half a digitiser was previously guessing at. */}
+            {pickWarn && (
+              <div className="mt-2 flex items-start gap-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+                <span className="mt-0.5 size-3 shrink-0 rounded-full border border-black/15" style={{ background: pickWarn.hex }} />
+                <span>
+                  You sampled <span className="font-mono font-medium">{pickWarn.hex}</span>, but the closest cone you stock is{" "}
+                  <span className="font-medium">{pickWarn.thread}</span> — not a real match. Add this colour under
+                  Settings → Platform → Embroidery threads, or pick a different cone.
+                </span>
+                <button onClick={() => setPickWarn(null)} className="ml-auto shrink-0 font-medium hover:underline">Dismiss</button>
+              </div>
+            )}
             {mapOpen && (
               <div className="mt-2 rounded-md border border-border bg-card">
                 {regions === null ? (
@@ -491,6 +512,15 @@ export function DesignCanvasDialog({
                           {/* -> the cone. A dropdown, not a verdict: the nearest cone by
                               maths isn't always the one you want stitched, so every close
                               alternative is offered and the human decides. */}
+                          {/* No cone you stock is close. Said plainly, because the
+                              dropdown below still has to name SOMETHING — and a wrong
+                              cone presented confidently is how the floor loads red as
+                              white. */}
+                          {r.poor && (
+                            <div className="mt-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                              No close match in your thread stock — pick one below, or add this colour in Settings.
+                            </div>
+                          )}
                           <div className="mt-1 flex items-center gap-1.5">
                             <span className="text-[10px] text-muted-foreground">&rarr;</span>
                             <span

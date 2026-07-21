@@ -111,6 +111,39 @@ function labOfHex(hex: string): Lab {
   return lab
 }
 
+/**
+ * How good is this match, really?
+ *
+ * nearestThread ALWAYS returns something — it just picks the closest cone in stock, with
+ * no notion of "close enough". With a palette of two cones that means a red logo is
+ * reported as White, stated with exactly the same confidence as a perfect match. The
+ * floor would load the wrong thread and nothing on screen would have hinted otherwise.
+ *
+ * Two signals, because distance alone doesn't separate the cases:
+ *   • distance — measured against the SAME weighted OKLab metric used to pick
+ *   • chroma loss — a colourful artwork matched to a near-neutral cone. Dusty pink to
+ *     Flamingo scores 0.116 and is a fine thread choice (right hue, darker shade);
+ *     sky blue to Grey scores only 0.081 and is plainly wrong. Distance alone would
+ *     flag the good one and pass the bad one.
+ *
+ * Calibrated against the starter palette: exact 0.000, near-navy 0.014, red 0.034,
+ * pink→Flamingo 0.116 (ok), sky→Grey 0.081 (wrong), and every match against a
+ * two-cone palette 0.13+.
+ */
+const POOR_DISTANCE = 0.13
+const COLOURFUL = 0.06        // OKLab chroma above which artwork counts as "a colour"
+const NEUTRAL = 0.03          // and below which a cone counts as grey/black/white
+
+export function matchQuality(r: number, g: number, b: number, thread: Thread): { distance: number; poor: boolean } {
+  const src = rgbToOklab(r, g, b)
+  const cone = labOfHex(thread.hex)
+  const distance = Math.sqrt(labDist2(src, cone))
+  const srcChroma = Math.hypot(src.a, src.b)
+  const coneChroma = Math.hypot(cone.a, cone.b)
+  const washedOut = srcChroma > COLOURFUL && coneChroma < NEUTRAL
+  return { distance: +distance.toFixed(3), poor: distance > POOR_DISTANCE || washedOut }
+}
+
 /** Nearest thread to an RGB triple, by perceptual (OKLab) distance. */
 export function nearestThread(r: number, g: number, b: number, palette = ACTIVE_PALETTE): Thread | null {
   const target = rgbToOklab(r, g, b)
@@ -247,6 +280,10 @@ export type ThreadRegion = {
   box: { x: number; y: number; w: number; h: number }
   /** A small crop of the design centred on that region. PNG data URL. */
   swatch: string
+  /** Perceptual distance from the artwork colour to the matched cone. 0 = exact. */
+  distance: number
+  /** True when no cone you stock is a real match — pick manually or add the colour. */
+  poor: boolean
 }
 
 const SWATCH = 72          // px, square
@@ -377,8 +414,10 @@ export function matchThreadRegions(
           } catch { swatch = "" }
         }
 
+        const quality = matchQuality(m.r, m.g, m.b, t)
         out.push({
           thread: t,
+          ...quality,
           options: nearestThreads(m.r, m.g, m.b, 10, palette),
           srcHex: ("#" + hx(m.r) + hx(m.g) + hx(m.b)).toUpperCase(),
           pct: Math.round((m.c / total) * 100),

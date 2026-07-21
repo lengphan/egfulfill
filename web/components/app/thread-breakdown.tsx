@@ -99,6 +99,11 @@ export function ThreadBreakdown({
                   </div>
                   {/* Artwork colour AND cone colour: they are not the same, and a
                       digitiser needs to see how far the match had to travel. */}
+                  {r.poor && (
+                    <div className="mt-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                      No close match in stock
+                    </div>
+                  )}
                   <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="font-mono">{r.srcHex}</span>
                     <span>→</span>
