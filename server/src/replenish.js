@@ -112,8 +112,18 @@ export async function autoReplenish(orderId) {
     const merged = existing.map((l) => ({ ...l }));
     for (const it of items) {
       const hit = merged.find((l) => String(l.sku || '').toUpperCase() === it.sku);
-      if (hit) hit.qty = (Number(hit.qty) || 0) + it.qty;
-      else merged.push({ sku: it.sku, qty: it.qty, price: 0, auto: true });
+      // WHICH ORDER drove this quantity, per LINE. The PO already recorded which orders
+      // it had counted (meta.orders, for idempotency), but that's the whole document —
+      // so a line reading "×150" gave whoever placed it no way to know where 150 came
+      // from, or whether it was one urgent order or thirty small ones. A line nobody can
+      // trace is a line nobody can defend when the invoice arrives.
+      const src = { order: String(orderId), qty: it.qty };
+      if (hit) {
+        hit.qty = (Number(hit.qty) || 0) + it.qty;
+        hit.sources = [...(Array.isArray(hit.sources) ? hit.sources : []), src];
+      } else {
+        merged.push({ sku: it.sku, qty: it.qty, price: 0, auto: true, sources: [src] });
+      }
       ordered.push({ sku: it.sku, qty: it.qty, supplier, po: num, have: it.have, promised: it.promised });
     }
     seen.add(orderId);

@@ -28,6 +28,33 @@ const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
 // "ss"). The supplier is a property of the PRODUCT, resolved server-side from the synced
 // catalogs — see resolveSuppliers / place().
 
+/**
+ * Which orders drove a purchase-order line.
+ *
+ * Shown wherever a line appears: on a draft about to be placed, and on a parked one being
+ * weighed up. "×150" alone is a number nobody can defend when the invoice lands, and the
+ * whole point of parking something is returning to it later — by which time "why did I
+ * save this" is exactly the question.
+ *
+ * Module scope, not inside the view: a component declared during render is a new type on
+ * every render, so React remounts it and any state inside it is lost.
+ */
+function SourceTags({ line }: { line: POLine }) {
+  const src = Array.isArray(line.sources) ? line.sources : []
+  if (!src.length) return null
+  return (
+    <span className="mt-0.5 flex flex-wrap items-center gap-1">
+      {src.slice(0, 4).map((s, i) => (
+        <span key={i} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+              title={`${s.qty} of these are for order ${s.order}`}>
+          #{s.order} ×{s.qty}
+        </span>
+      ))}
+      {src.length > 4 && <span className="text-[10px] text-muted-foreground">+{src.length - 4} more</span>}
+    </span>
+  )
+}
+
 export function PurchaseView() {
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
@@ -526,6 +553,7 @@ export function PurchaseView() {
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{l.name || l.sku}</div>
                             <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                            <SourceTags line={l} />
                           </div>
                           {/* A single line can be re-ordered on its own — restocking one
                               short blank shouldn't drag the whole past PO along with it. */}
@@ -626,6 +654,7 @@ export function PurchaseView() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                     <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                    <SourceTags line={l} />
                   </div>
                   <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
                   {/* Two distinct exits: park it for the next order, or drop it for good.
@@ -650,6 +679,7 @@ export function PurchaseView() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                     <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
+                    <SourceTags line={l} />
                   </div>
                   <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
                   <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>

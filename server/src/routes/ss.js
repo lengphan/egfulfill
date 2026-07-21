@@ -628,7 +628,18 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     const limit = Math.min(200, Math.max(1, parseInt(req.query?.limit, 10) || 50));
     const offset = Math.max(0, parseInt(req.query?.offset, 10) || 0);
     const where = [], args = [];
-    if (search) { args.push('%' + search.toLowerCase() + '%'); where.push(`(lower(sku) like $${args.length} or lower(style_name) like $${args.length} or lower(brand) like $${args.length})`); }
+    // Search every field someone actually types. It covered sku, style_name and brand
+    // only — so a style NUMBER ("375"), a colour ("sport grey") or a size ("2XL") all
+    // matched nothing, which is most of how a garment gets described out loud. Terms are
+    // AND-ed, so "gildan 2xl navy" narrows instead of returning everything Gildan.
+    for (const term of search.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6)) {
+      args.push('%' + term + '%');
+      const i = args.length;
+      where.push(`(lower(sku) like $${i} or lower(coalesce(style_name,'')) like $${i}
+                   or lower(coalesce(brand,'')) like $${i} or lower(coalesce(color,'')) like $${i}
+                   or lower(coalesce(size,'')) like $${i} or lower(coalesce(style_id,'')) like $${i}
+                   or lower(coalesce(category,'')) like $${i})`);
+    }
     if (brand) { args.push(brand); where.push(`brand = $${args.length}`); }
     const wc = where.length ? 'where ' + where.join(' and ') : '';
     try {

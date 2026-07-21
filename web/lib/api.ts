@@ -561,7 +561,14 @@ export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightO
 }
 
 // ── Purchase orders (staff) — draft → placed → received ──
-export type POLine = { sku: string; name?: string; variant?: string; qty: number; price?: number }
+/** A purchase-order line. `sources` records WHICH ORDERS drove the quantity — an
+ *  auto-replenished line of 150 is meaningless without knowing whether that's one urgent
+ *  order or thirty small ones, and a line nobody can trace is one nobody can defend when
+ *  the invoice arrives. */
+export type POLine = {
+  sku: string; name?: string; variant?: string; qty: number; price?: number
+  auto?: boolean; sources?: { order: string; qty: number }[]
+}
 
 // ── Factory-global shared lists (staff-only KV blobs, whole-array replace) ──
 // The key must be on the server's ALLOWED whitelist in routes/factory_lists.js.

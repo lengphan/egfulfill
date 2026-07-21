@@ -15,8 +15,12 @@ type Tab = "inventory" | "ss" | "otto"
 // Defined at module scope, not inside the component: a component created during
 // render gets a new identity every pass, so React unmounts and remounts the whole
 // list on each keystroke (and eslint's react-hooks/static-components rejects it).
-function PickRow({ line, title, sub, right, meta, on, onToggle }: {
+function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
   line: POLine; title: string; sub?: string; right?: string
+  /** Small (_fs) product thumbnail. S&S publish three sizes by filename suffix, so this
+   *  costs no storage — it's a URL through our proxy, not a stored image. Picking a blank
+   *  by name alone is how the wrong colourway ends up on a PO. */
+  image?: string | null
   /** Labelled identifiers (Style / SKU). Labelled because a bare number leaves you
    *  guessing which of a supplier's two ids you're looking at — and they're ordered by
    *  one and discussed by the other. */
@@ -32,6 +36,12 @@ function PickRow({ line, title, sub, right, meta, on, onToggle }: {
       <span className={"flex size-5 shrink-0 items-center justify-center rounded border " + (on ? "border-primary bg-primary text-primary-foreground" : "border-border")}>
         {on && <Check size={12} weight="bold" />}
       </span>
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
+      ) : (
+        <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{title}</span>
         {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
@@ -203,6 +213,8 @@ export function POAddItems({
               : invRows.map((i) => (
                 <PickRow key={i.sku}
                   line={{ sku: i.sku, name: i.name ?? undefined, variant: i.variant ?? undefined, qty: 1 }}
+                  // Stocked blanks carry no image of their own — inventory rows are
+                  // sku/name/qty. The dashed placeholder says "no picture", not "loading".
                   title={i.name || i.sku}
                   sub={[i.variant, i.sku].filter(Boolean).join(" · ")}
                   right={`${num(i.in_stock)} in stock`}
@@ -216,6 +228,7 @@ export function POAddItems({
                 : ss.map((p) => (
                   <PickRow key={p.sku}
                     line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
+                    image={p.image ?? null}
                     title={ssTitle(p) || p.sku}
                     sub={[p.color, p.size].filter(Boolean).join(" / ")}
                     // The two numbers that identify an S&S line, LABELLED. The sku is what
@@ -250,7 +263,7 @@ export function POAddItems({
                         {styleSkus[s.style] === undefined ? <Loading />
                           : styleSkus[s.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
                             : styleSkus[s.style].map((sku) => (
-                              <PickRow key={sku} line={{ sku, name: s.name ?? undefined, qty: 1, price: num(s.price) }} title={sku} sub={s.name ?? undefined}
+                              <PickRow key={sku} line={{ sku, name: s.name ?? undefined, qty: 1, price: num(s.price) }} title={sku} sub={s.name ?? undefined} image={s.image ?? null}
                                 on={!!picked[sku]} onToggle={toggle} />
                             ))}
                       </div>

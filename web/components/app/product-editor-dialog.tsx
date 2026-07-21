@@ -279,21 +279,33 @@ export function ProductEditorDialog({
         <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {/* Mockup + name */}
           <div className="flex gap-4">
-            <label className="group relative flex size-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-border bg-muted/40 hover:bg-accent">
+            {/* PREVIEW, not an uploader.
+                This used to be a second, independent file input that also wrote `img` —
+                so the dialog had two places to add a picture and no indication they were
+                the same field. Pictures now come in one way, through the Images well
+                below, and this shows whichever of them is currently main.
+                Nothing about the mockup's BEHAVIOUR changes: `img` is still the value the
+                Design Maker treats as the blank and the item rows hydrate from. This is
+                purely where it's uploaded and how it's shown. */}
+            <div
+              className="relative flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted/40"
+              title={img ? "The main image, chosen in Images below" : "No image yet — add one in Images below"}
+            >
               {img ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={img} alt="" className="size-full object-contain" />
+              ) : typeMockup ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="size-full object-contain" />
-                  <button type="button" onClick={(e) => { e.preventDefault(); setImg("") }} className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/70 text-background"><X size={11} weight="bold" /></button>
+                  <img src={typeMockup} alt="" className="size-full object-contain opacity-50" />
+                  <span className="absolute inset-x-0 bottom-0 bg-background/85 py-0.5 text-center text-xs text-muted-foreground">{type} default</span>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-1 text-muted-foreground"><ImageIcon size={22} weight="duotone" /><span className="text-xs">Mockup</span></div>
+                <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                  <ImageIcon size={22} weight="duotone" /><span className="text-xs">Main image</span>
+                </div>
               )}
-              <input
-                type="file" accept="image/*" className="hidden"
-                onChange={(e) => readImageFile(e.target.files?.[0], (u) => { setImg(u); setGallery((g) => (g.includes(u) ? g : [...g, u])) }, setErr)}
-              />
-            </label>
+            </div>
             <div className="flex-1 space-y-2">
               <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
               <div className="grid grid-cols-2 gap-2">
@@ -510,14 +522,18 @@ export function ProductEditorDialog({
                   const inherited = typeMockupOf({ type } as CatalogProduct, sd)
                   const shown = override || inherited
                   return (
-                    <div key={sd} className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-1">
-                      <span className="w-14 truncate text-xs font-medium capitalize">{sd}</span>
+                    /* A vertical tile, matching the Images grid above: picture on top,
+                       label, then the control. The old row squeezed a 32px thumb between
+                       a label and a select, so the one thing you're choosing — a picture
+                       — was the smallest element in its own control. */
+                    <div key={sd} className="flex w-28 flex-col gap-1.5">
                       {shown ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={shown} alt="" className={"size-8 rounded border object-contain " + (override ? "border-primary" : "border-border opacity-70")} />
+                        <img src={shown} alt="" className={"size-28 rounded-lg border-2 object-contain " + (override ? "border-primary" : "border-border opacity-70")} />
                       ) : (
-                        <span className="grid size-8 place-items-center rounded border border-dashed border-border text-muted-foreground"><ImageIcon size={12} /></span>
+                        <span className="grid size-28 place-items-center rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground"><ImageIcon size={20} /></span>
                       )}
+                      <span className="truncate text-xs font-medium capitalize">{sd}</span>
                       <select
                         value={override}
                         onChange={(e) => setSideMockups((m) => {
@@ -525,7 +541,7 @@ export function ProductEditorDialog({
                           if (e.target.value) next[sd] = e.target.value; else delete next[sd]
                           return next
                         })}
-                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
+                        className="eg-select h-8 w-full rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
                       >
                         <option value="">{inherited ? "Use settings" : "None set"}</option>
                         {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
