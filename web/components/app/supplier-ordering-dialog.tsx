@@ -186,7 +186,7 @@ export function SupplierOrderingDialog({
                   ) : (
                     <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                       {opts.suppliers.ss.paymentProfiles?.reason
-                        ?? "No saved cards found — S&S will bill the account on file."}
+                        ?? "No saved cards on this account — S&S will bill the account on file."}
                     </p>
                   )}
                 </Field>
@@ -228,7 +228,7 @@ export function SupplierOrderingDialog({
                   </div>
                 ) : (
                   <>
-                    <Field label="Payment method">
+                    <Field label="Pays with">
                       <select value={ottoPay} onChange={(e) => setOttoPay(e.target.value)} disabled={busy}
                         className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                         {ottoPayOpts.length === 0 && <option value="net30">net30</option>}
@@ -257,7 +257,10 @@ export function SupplierOrderingDialog({
                         )}
                       </select>
                     </Field>
-                    <p className="text-xs text-muted-foreground">Read live from your Otto account, so these are your terms — not a copied list.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Read live from your Otto account. These are billing TERMS (Net 30, billed to us) —
+                      Otto&apos;s API exposes no saved cards, so there is no card to pick here.
+                    </p>
                   </>
                 )}
               </section>
