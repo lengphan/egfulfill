@@ -1413,7 +1413,25 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
       const r = await fetch(url, { method: 'DELETE', headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
-      if (!r.ok) { reply.code(502); return { error: 'S&S refused the cancellation', status: r.status, detail: data }; }
+      if (!r.ok) {
+        // Their guide: cancellation is only possible within 10 MINUTES of the order being
+        // sent. That's the refusal almost everyone will hit, so name it rather than
+        // returning a bare status code.
+        reply.code(502);
+        return {
+          error: `S&S wouldn't cancel it (${r.status}). Orders can only be cancelled through the API within 10 minutes of being placed — after that it has to go through them directly.`,
+          status: r.status, detail: data,
+        };
+      }
+
+      // 204 No Content IS their success response — their own sample checks for exactly
+      // that. Reading orderStatus from an empty body would find nothing and report a
+      // cancellation that DID happen as a failure, which is the worst way to be wrong
+      // here: you'd chase an order that was already stopped.
+      if (r.status === 204 || data == null || data === '') {
+        return { ok: true, cancelled: true, orderStatus: 'Cancelled', orderNumber: num,
+                 note: 'S&S returned 204 No Content, their success response for a cancellation.' };
+      }
 
       const row = Array.isArray(data) ? data[0] : data;
       const status = String((row && row.orderStatus) || '').trim();
@@ -1426,7 +1444,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         reply.code(409);
         return {
           error: status
-            ? `S&S did not cancel it — the order is "${status}". Too late to stop it through the API; call them if it hasn't shipped.`
+            ? `S&S did not cancel it — the order is "${status}". Past the 10-minute window, or already picked; call them if it hasn't shipped.`
             : 'S&S accepted the request but did not report the order as cancelled. Check the portal before assuming it stopped.',
           cancelled: false, orderStatus: status || null, orderNumber: (row && row.orderNumber) || num, detail: row,
         };

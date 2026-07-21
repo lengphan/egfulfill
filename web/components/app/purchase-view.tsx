@@ -591,6 +591,18 @@ export function PurchaseView() {
    * of mistake as marking an order Refunded without refunding it: a status asserting
    * something that never happened.
    */
+  /**
+   * Minutes since an order was actually sent. S&S only accept a cancellation within TEN
+   * MINUTES — after that their API refuses and it becomes a phone call. Knowing which
+   * side of that line you're on changes whether Cancel is worth pressing at all.
+   */
+  const minutesSincePlaced = (po: PurchaseOrder) => {
+    const at = ((po.meta || {}) as { placedAt?: string }).placedAt
+    if (!at) return null
+    const ms = Date.now() - new Date(at).getTime()
+    return isFinite(ms) ? Math.floor(ms / 60000) : null
+  }
+
   const reallySent = (po: PurchaseOrder) => {
     const m = (po.meta || {}) as Record<string, unknown>
     const r = (m.response ?? {}) as Record<string, unknown>
@@ -751,9 +763,24 @@ export function PurchaseView() {
                         <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
                           {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
                         </Button>
-                        <button onClick={() => cancelPO(po)} disabled={busy === po.num}
-                          className="text-xs font-medium text-muted-foreground hover:text-red-600"
-                          title="Cancel our record of this order">Cancel</button>
+                        {(() => {
+                          const mins = minutesSincePlaced(po)
+                          const ss = /s&s|activewear/i.test(po.supplier || "")
+                          // Past ten minutes S&S will refuse, so say so on the button
+                          // rather than letting someone press it and read a rejection.
+                          const tooLate = ss && reallySent(po) && mins != null && mins >= 10
+                          return (
+                            <button onClick={() => cancelPO(po)} disabled={busy === po.num}
+                              className="text-xs font-medium text-muted-foreground hover:text-red-600"
+                              title={tooLate
+                                ? "Past S&S's 10-minute cancellation window — this will only cancel our record"
+                                : ss && reallySent(po)
+                                  ? `Cancels with S&S too — ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
+                                  : "Cancel our record of this order"}>
+                              Cancel{tooLate ? " (our record only)" : ""}
+                            </button>
+                          )
+                        })()}
                       </>
                     )}
                   </div>
