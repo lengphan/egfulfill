@@ -45,7 +45,7 @@ export async function balanceOf(account) {
 const HOUSE_ACCOUNTS = new Set(['factory', 'designer']);
 export const isHouseAccount = (a) => HOUSE_ACCOUNTS.has(String(a));
 
-export async function moveFunds({ from, to, amount, type = 'transfer', ref = null, note = null, by = null }) {
+export async function moveFunds({ from, to, amount, type = 'transfer', ref = null, note = null, by = null, partner = null }) {
   const amt = parseFloat(amount);
   if (!isFinite(amt) || amt === 0) throw new Error('amount must be a non-zero number');
   if (String(from) === String(to)) throw new Error('source and destination are the same wallet');
@@ -54,6 +54,7 @@ export async function moveFunds({ from, to, amount, type = 'transfer', ref = nul
     { account: String(from), delta: -amt, type: type + '-out' },
     { account: String(to), delta: amt, type: type + '-in' },
   ];
+  const pt = partner ? String(partner) : null;
 
   // Already applied? Then this is a retry, and re-checking the balance would refuse a
   // move that has in fact already happened.
@@ -89,9 +90,9 @@ export async function moveFunds({ from, to, amount, type = 'transfer', ref = nul
       if (dup.rowCount) continue;
     }
     await q(
-      `insert into wallet_ledger (account, delta, type, ref, note, created_by)
-       values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
-      [row.account, row.delta, row.type, r, note, by]);
+      `insert into wallet_ledger (account, delta, type, ref, note, created_by, partner)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict do nothing`,
+      [row.account, row.delta, row.type, r, note, by, pt]);
   }
   return { fromBalance: await balanceOf(from), toBalance: await balanceOf(to) };
 }
@@ -107,6 +108,13 @@ export function walletRoutes(app, requireAuth) {
        created_by  text,
        created_at  timestamptz not null default now()
      )`).catch(() => {});
+  // WHO the money is with, when it isn't us. Neither the dispatch partner nor the design
+  // partner has a billing API we can charge or credit against — both settle by invoice —
+  // so their costs only ever exist on OUR ledger. Without a column naming them you can
+  // only guess from the `type` string, which makes "what do we owe byeastside this month"
+  // a manual sift. Null for ordinary seller movements.
+  q('alter table wallet_ledger add column if not exists partner text').catch(() => {});
+  q('create index if not exists wallet_ledger_partner on wallet_ledger (partner, created_at desc)').catch(() => {});
   // De-dupe key: same (account,type,ref) can only land once. Partial index so
   // many ref-less manual adjustments are still allowed.
   q(`create unique index if not exists wallet_ledger_dedupe
@@ -187,6 +195,76 @@ export function walletRoutes(app, requireAuth) {
   // POST {delta: 10000} and credit themselves. Nothing in the app calls this: real money
   // moves through top-ups, refunds and transfers, which resolve their own accounts
   // server-side. Locked to staff, where an arbitrary adjustment is a legitimate tool.
+  /**
+   * Partner statement — every movement attributable to one partner, as JSON or CSV.
+   *
+   * Neither partner can be charged through an API: both settle by invoice, so this
+   * ledger IS the record we reconcile their bill against. That makes two things
+   * non-negotiable — the rows must be filterable by partner without pattern-matching a
+   * note field, and exportable so the figures can sit next to their invoice.
+   *
+   * Staff only. Amounts are signed from OUR side: negative = we owe / paid out.
+   */
+  // Partner of a row. Prefers the explicit `partner` column, and falls back to the cost
+  // TYPE — costs.js books one type per partner (expedite-cost = byeastside,
+  // design-partner-cost = Pink Design), so every row already written is attributable
+  // without backfilling anything. Kept in SQL so filtering and grouping use the same
+  // rule the export prints.
+  const PARTNER_SQL = `coalesce(partner, case
+      when type = 'expedite-cost'       then 'byeastside'
+      when type in ('expedite-in','expedite-out') then 'byeastside'
+      when type = 'design-partner-cost' then 'pinkdesign'
+      when type = 'label-cost'          then 'carrier'
+      when type = 'blanks-cost'         then 'suppliers'
+    end)`;
+
+  app.get('/api/wallet/export', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const qy = req.query || {};
+    const where = [], args = [];
+    if (qy.partner) { args.push(String(qy.partner)); where.push(`${PARTNER_SQL} = $${args.length}`); }
+    if (qy.account) { args.push(String(qy.account)); where.push(`account = $${args.length}`); }
+    if (qy.type) { args.push(String(qy.type)); where.push(`type = $${args.length}`); }
+    // Dates are inclusive of the whole end day — a statement "to the 31st" that silently
+    // stops at 00:00 on the 31st is off by a day's trading.
+    if (qy.from) { args.push(String(qy.from)); where.push(`created_at >= $${args.length}::date`); }
+    if (qy.to) { args.push(String(qy.to)); where.push(`created_at < ($${args.length}::date + interval '1 day')`); }
+    const wc = where.length ? 'where ' + where.join(' and ') : '';
+
+    const rows = (await q(
+      `select id, created_at, account, ${PARTNER_SQL} as partner, type,
+              delta::float as delta, ref, note
+         from wallet_ledger ${wc} order by created_at desc limit 5000`, args
+    ).catch(() => ({ rows: [] }))).rows;
+
+    if (String(qy.format || '').toLowerCase() === 'csv') {
+      // Quote everything and double internal quotes — a note containing a comma must not
+      // shift every later column, which is exactly how a reconciliation goes wrong.
+      const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const head = ['id', 'date', 'account', 'partner', 'type', 'amount', 'ref', 'note'];
+      const body = rows.map((r) => [r.id, new Date(r.created_at).toISOString(), r.account,
+        r.partner || '', r.type, Number(r.delta).toFixed(2), r.ref || '', r.note || ''].map(esc).join(','));
+      const name = `ledger-${qy.partner || qy.account || 'all'}-${new Date().toISOString().slice(0, 10)}.csv`;
+      reply.header('Content-Type', 'text/csv; charset=utf-8');
+      reply.header('Content-Disposition', `attachment; filename="${name}"`);
+      return [head.map(esc).join(','), ...body].join('\n');
+    }
+
+    const total = rows.reduce((a, r) => a + Number(r.delta), 0);
+    return { count: rows.length, total: Math.round(total * 100) / 100, rows };
+  });
+
+  /** Which partners actually appear in the ledger — so the filter offers real values. */
+  app.get('/api/wallet/partners', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    const r = await q(
+      `select ${PARTNER_SQL} as partner, count(*)::int as entries, sum(delta)::float as total
+         from wallet_ledger where ${PARTNER_SQL} is not null
+         group by 1 order by 1`
+    ).catch(() => ({ rows: [] }));
+    return r.rows;
+  });
+
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {
     if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const b = req.body || {};
@@ -207,10 +285,11 @@ export function walletRoutes(app, requireAuth) {
       if (dup.rowCount) { return { ok: true, duplicate: true, balance: await balanceOf(account) }; }
     }
     await q(
-      `insert into wallet_ledger (account, delta, type, ref, note, created_by)
-       values ($1,$2,$3,$4,$5,$6)
+      `insert into wallet_ledger (account, delta, type, ref, note, created_by, partner)
+       values ($1,$2,$3,$4,$5,$6,$7)
        on conflict do nothing`,
-      [account, delta, b.type || 'adjust', ref, b.note || null, req.user.sub]);
+      [account, delta, b.type || 'adjust', ref, b.note || null, req.user.sub,
+       b.partner ? String(b.partner) : null]);
     audit(req, 'wallet.ledger', { entityType: 'wallet', entityId: account, after: { delta, type: b.type || 'adjust', ref, note: b.note || null } });
     return { ok: true, balance: await balanceOf(account) };
   });
