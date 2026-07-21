@@ -571,6 +571,10 @@ export function buyUspsLabel(body: { to: ShipAddress; from: ShipAddress; weightO
 export type POLine = {
   sku: string; name?: string; variant?: string; qty: number; price?: number
   auto?: boolean; sources?: { order: string; qty: number }[]
+  /** Product thumbnail, captured when the line was picked. Supplier names differ by a
+   *  single word, so the picture is what confirms the right sku was chosen. Lines without
+   *  one (auto-replenished from inventory) resolve it by sku at render time. */
+  image?: string | null
 }
 
 // ── Factory-global shared lists (staff-only KV blobs, whole-array replace) ──
@@ -1590,7 +1594,7 @@ export function getOrderDesignStatus(id: string) {
  *  catalogs (authoritative — the sku IS theirs) then inventory.supplier. A sku in neither
  *  gets no api, so it's ordered by hand rather than guessed at from a PO's name. */
 export function resolveSuppliers(skus: string[]) {
-  return api<{ bySku: Record<string, { api: "ss" | "otto" | null; supplier: string | null; source: string }> }>(
+  return api<{ bySku: Record<string, { api: "ss" | "otto" | null; supplier: string | null; source: string; image?: string | null; variant?: string | null }> }>(
     `/api/purchase/resolve-suppliers`, { method: "POST", body: JSON.stringify({ skus }) })
 }
 

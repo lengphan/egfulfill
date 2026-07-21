@@ -31,7 +31,7 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
   return (
     <button
       type="button"
-      onClick={() => onToggle(line)}
+      onClick={() => onToggle(image ? { ...line, image } : line)}
       className={"flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors " + (on ? "bg-primary/5" : "hover:bg-muted/50")}
     >
       <span className={"flex size-5 shrink-0 items-center justify-center rounded border " + (on ? "border-primary bg-primary text-primary-foreground" : "border-border")}>

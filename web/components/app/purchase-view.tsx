@@ -43,6 +43,20 @@ const POOL: PurchaseOrder = { num: "__pool__", supplier: null, items: [], status
  * Module scope, not inside the view: a component declared during render is a new type on
  * every render, so React remounts it and any state inside it is lost.
  */
+/**
+ * The product's picture on a line.
+ *
+ * Supplier names differ by a single word — "Unisex DryBlend Crewneck" against "Unisex
+ * Heavy Blend Crewneck" — so a name alone doesn't confirm you picked the right sku. The
+ * picture is what makes a wrong pick obvious before it's ordered instead of when the box
+ * arrives. A dashed square means "no picture", never "still loading".
+ */
+function LineThumb({ src }: { src?: string | null }) {
+  if (!src) return <span className="size-9 shrink-0 rounded border border-dashed border-border" aria-hidden />
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" loading="lazy" className="size-9 shrink-0 rounded border border-border bg-white object-contain" />
+}
+
 function SourceTags({ line }: { line: POLine }) {
   const src = Array.isArray(line.sources) ? line.sources : []
   if (!src.length) return null
@@ -384,7 +398,11 @@ export function PurchaseView() {
   // Suppliers are resolved SERVER-side from the synced catalogues — a sku is either in
   // S&S's or it isn't — never guessed from a typed name. That guess is what once sent
   // every "Unassigned" PO to S&S, because "unassigned" contains "ss".
-  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null }>>({})
+  // Images for lines inside an opened purchase order. Historic POs predate line images,
+  // so they're resolved by sku when a row is expanded — not on load, since most rows are
+  // never opened and a lookup per PO would cost a query for nothing.
+  const [poImgs, setPoImgs] = useState<Record<string, string>>({})
+  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
   useEffect(() => {
     const skus = saved.map((l) => l.sku).filter(Boolean)
     if (!skus.length) return
@@ -525,7 +543,21 @@ export function PurchaseView() {
 
   const toggle = (n: string) => setOpen((prev) => {
     const next = new Set(prev)
-    if (!next.delete(n)) next.add(n)
+    if (!next.delete(n)) {
+      next.add(n)
+      // Fill in pictures for the lines about to be shown, for skus we don't have yet.
+      const po = (pos ?? []).find((p) => p.num === n)
+      const want = (po?.items ?? []).map((l) => l.sku).filter((s2) => s2 && !poImgs[s2])
+      if (want.length) {
+        resolveSuppliers(want)
+          .then((r) => setPoImgs((m) => {
+            const add: Record<string, string> = {}
+            for (const [sku, v] of Object.entries(r.bySku ?? {})) if (v.image) add[sku] = v.image
+            return Object.keys(add).length ? { ...m, ...add } : m
+          }))
+          .catch(() => {})
+      }
+    }
     return next
   })
 
@@ -704,9 +736,13 @@ export function PurchaseView() {
                         <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
                       ) : po.items.map((l) => (
                         <div key={l.sku} className="flex items-center gap-3 py-2 text-sm">
+                          <LineThumb src={l.image ?? poImgs[l.sku]} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{l.name || l.sku}</div>
-                            <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {l.variant || l.sku}
+                              <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
+                            </div>
                             <SourceTags line={l} />
                           </div>
                           {/* A single line can be re-ordered on its own — restocking one
@@ -819,9 +855,13 @@ export function PurchaseView() {
                   </div>
                   {g.lines.map((l) => (
                     <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                      <LineThumb src={l.image ?? supByS[l.sku]?.image} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                        <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {l.variant || supByS[l.sku]?.variant || l.sku}
+                          <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
+                        </div>
                         <SourceTags line={l} />
                       </div>
                       <Input

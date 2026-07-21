@@ -38,6 +38,8 @@ export function ssImgSize(u, size = 'fs') {
   return String(u).replace(/_(fs|fm|fl)(\.[a-z]+)$/i, `_${size}$2`);
 }
 
+export const ssImgUrl = (u) => ssImg(u);
+
 function ssImg(u) {
   if (!u) return null;
   const str = String(u);

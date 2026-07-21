@@ -46,13 +46,19 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       .map((x) => String(x || '').trim()).filter(Boolean))];
     if (!skus.length) return { bySku: {} };
 
+    // Pull the IMAGE alongside the supplier. Product names differ by a word — "Unisex
+    // DryBlend Crewneck" against "Unisex Heavy Blend Crewneck" — so a picture on the line
+    // is what makes a mis-picked sku obvious before it's ordered rather than after it
+    // arrives. One query already runs here; taking the image with it costs nothing.
     const [ss, otto, inv] = await Promise.all([
-      softQ('ss supplier lookup', 'select sku from ss_products where sku = any($1)', [skus]),
-      softQ('otto supplier lookup', 'select sku from otto_products where sku = any($1)', [skus]),
+      softQ('ss supplier lookup', 'select sku, image, color, size from ss_products where sku = any($1)', [skus]),
+      softQ('otto supplier lookup', 'select sku, image, color, size from otto_products where sku = any($1)', [skus]),
       softQ('inventory supplier lookup', 'select sku, supplier from inventory where sku = any($1)', [skus]),
     ]);
-    const ssSet = new Set(ss.rows.map((r) => String(r.sku)));
-    const ottoSet = new Set(otto.rows.map((r) => String(r.sku)));
+    const ssRow = new Map(ss.rows.map((r) => [String(r.sku), r]));
+    const ottoRow = new Map(otto.rows.map((r) => [String(r.sku), r]));
+    const ssSet = new Set(ssRow.keys());
+    const ottoSet = new Set(ottoRow.keys());
     const invSup = new Map(inv.rows.map((r) => [String(r.sku), r.supplier || null]));
 
     // Only a name we can tie to an actual integration becomes an api. Anything else is
@@ -66,12 +72,20 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       return null;
     };
 
+    // Both suppliers store raw URLs the browser can't load cross-origin, so route them
+    // through the same proxy everything else uses. ssImg is idempotent.
+    const { ssImgUrl } = await import('./ss.js').then((m) => ({ ssImgUrl: m.ssImgUrl })).catch(() => ({ ssImgUrl: null }));
+    const proxied = (u) => (u && ssImgUrl ? ssImgUrl(u) : u || null);
+
     const bySku = {};
     for (const sku of skus) {
-      if (ssSet.has(sku)) { bySku[sku] = { api: 'ss', supplier: 'S&S Activewear', source: 'catalog' }; continue; }
-      if (ottoSet.has(sku)) { bySku[sku] = { api: 'otto', supplier: 'Otto Cap', source: 'catalog' }; continue; }
+      const r = ssRow.get(sku) || ottoRow.get(sku) || null;
+      const variant = r ? [r.color, r.size].filter(Boolean).join(' / ') || null : null;
+      const image = proxied(r ? r.image : null);
+      if (ssSet.has(sku)) { bySku[sku] = { api: 'ss', supplier: 'S&S Activewear', source: 'catalog', image, variant }; continue; }
+      if (ottoSet.has(sku)) { bySku[sku] = { api: 'otto', supplier: 'Otto Cap', source: 'catalog', image, variant }; continue; }
       const name = invSup.get(sku) || null;
-      bySku[sku] = { api: apiFromName(name), supplier: name, source: name ? 'inventory' : 'unknown' };
+      bySku[sku] = { api: apiFromName(name), supplier: name, source: name ? 'inventory' : 'unknown', image: null, variant: null };
     }
     return { bySku };
   });

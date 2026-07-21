@@ -86,6 +86,9 @@ export function QuickOrderDialog({
         else next.push({
           sku,
           name: product.name,
+          // Keep the picture with the line. Resolving it later works only while the sku is
+          // still in a synced catalogue; carrying it survives that.
+          image: product.image ?? null,
           variant: s.size,
           qty: q,
           price: num(price[s.size]) || 0,
