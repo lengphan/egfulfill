@@ -17,6 +17,62 @@ const MAX_TAGS = 13
 const MAX_IMAGES = 10 // Etsy's hard limit — an 11th slot silently never publishes.
 const cleanTag = (raw: string) => raw.replace(/[^\p{L}\p{N} '-]/gu, "").trim().slice(0, 20)
 
+/**
+ * A toggleable set of variant options with All / None.
+ *
+ * Module scope, not nested in the dialog — a component defined during render is a new
+ * type every pass, so React unmounts and remounts the whole set on each keystroke
+ * (repo lint rule react-hooks/static-components).
+ */
+function VariantChips({
+  label, options, picked, onChange, render,
+}: {
+  label: string
+  options: string[]
+  picked: string[]
+  onChange: (next: string[]) => void
+  render?: (v: string) => string
+}) {
+  const allOn = picked.length === options.length && options.length > 0
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label} ({picked.length}/{options.length})
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(allOn ? [] : options)}
+          className="text-[11px] font-medium text-primary transition-colors hover:underline"
+        >
+          {allOn ? "None" : "All"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {options.map((o) => {
+          const on = picked.includes(o)
+          return (
+            <button
+              key={o}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(on ? picked.filter((x) => x !== o) : [...picked, o])}
+              className={
+                "rounded border px-1.5 py-0.5 text-[11px] transition-colors " +
+                (on
+                  ? "border-primary bg-primary/10 font-medium text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground")
+              }
+            >
+              {render ? render(o) : o}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /** Everything a source can prefill. Whatever it can't fill stays empty and editable. */
 export type PublishPrefill = {
   title?: string
@@ -62,7 +118,14 @@ export function PublishProductDialog({
   const [images, setImages] = useState<string[]>([])
   const [size, setSize] = useState("")
   const [method, setMethod] = useState("")
-  const [quote, setQuote] = useState<SpecQuote | null>(null)
+  // Which variants actually go on the listing. Both default to everything the blank
+  // offers (what this dialog always published), but a colourway you don't want to sell
+  // shouldn't need editing on Etsy afterwards.
+  const [pickedColors, setPickedColors] = useState<string[]>([])
+  const [pickedSizes, setPickedSizes] = useState<string[]>([])
+  // One quote per size, not one for "the priced size": cost varies by size, so a single
+  // margin figure was only ever true for whichever size happened to be selected.
+  const [sizeQuotes, setSizeQuotes] = useState<Record<string, SpecQuote>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -104,24 +167,50 @@ export function PublishProductDialog({
     return () => clearTimeout(id)
   }, [sizeOpts, methodOpts, size, method])
 
+  // Selecting a blank offers all of its variants. Keyed off the option lists rather than
+  // the blank so a product whose colours load late still ends up fully selected.
+  useEffect(() => {
+    const id = setTimeout(() => { setPickedColors(colorOpts); setPickedSizes(sizeOpts) }, 0)
+    return () => clearTimeout(id)
+  }, [colorOpts, sizeOpts])
+
   // Cost comes from the server's pricing path — the same one that bills an order, so the
-  // margin shown here is the margin actually earned.
+  // margin shown here is the margin actually earned. Quoted for EVERY size the blank has,
+  // not just the selected one, so toggling a size doesn't refetch and the table can show
+  // the whole run at once.
   useEffect(() => {
     let live = true
-    const id = setTimeout(() => {
+    const id = setTimeout(async () => {
       if (!live) return
-      if (!blank?.name) { setQuote(null); return }
-      getSpecQuote({ blank: blank.name, sku: blank.sku, size, printType: method })
-        .then((r) => { if (live) setQuote(r) })
-        .catch(() => { if (live) setQuote(null) })
+      if (!blank?.name) { setSizeQuotes({}); return }
+      const list = sizeOpts.length ? sizeOpts : [""]
+      const pairs = await Promise.all(list.map(async (s) => {
+        try { return [s, await getSpecQuote({ blank: blank.name, sku: blank.sku, size: s, printType: method })] as const }
+        catch { return [s, null] as const }
+      }))
+      if (live) setSizeQuotes(Object.fromEntries(pairs.filter((p): p is readonly [string, SpecQuote] => !!p[1])))
     }, 0)
     return () => { live = false; clearTimeout(id) }
-  }, [blank, size, method])
+  }, [blank, sizeOpts, method])
 
-  const cost = quote?.total ?? null
   const retailN = Number(retail) || 0
+  // The single-figure summary still needs one representative quote: the selected size, or
+  // the sole quote when the blank has no size run at all.
+  const quote = sizeQuotes[size] ?? sizeQuotes[""] ?? null
+  const cost = quote?.total ?? null
   const margin = cost != null && retailN > 0 ? retailN - cost : null
   const marginPct = margin != null && retailN > 0 ? (margin / retailN) * 100 : null
+
+  /** Per-size economics for the sizes actually being published. */
+  const sizeRows = useMemo(() => pickedSizes.map((s) => {
+    const q = sizeQuotes[s] ?? null
+    const total = q?.total ?? null
+    const m = total != null && retailN > 0 ? retailN - total : null
+    return { size: s, unitCost: q?.unitCost ?? null, shipping: q?.shipping ?? null, total, margin: m,
+             pct: m != null && retailN > 0 ? (m / retailN) * 100 : null }
+  }), [pickedSizes, sizeQuotes, retailN])
+
+  const anyLoss = sizeRows.some((r) => r.margin != null && r.margin < 0)
 
   const addTag = (raw: string) => {
     const t = cleanTag(raw)
@@ -149,8 +238,8 @@ export function PublishProductDialog({
         // Real Etsy variants, each stamped with OUR sku so the buyer's order line
         // resolves back to this exact blank+colour+size no matter how the seller renames
         // the variant on the marketplace.
-        colors: blank ? colorOpts : [],
-        sizes: blank ? sizeOpts : [],
+        colors: blank ? pickedColors : [],
+        sizes: blank ? pickedSizes : [],
         sku_base: blank?.sku ?? undefined,
       })
       if (r.error) throw new Error(r.error)
@@ -272,35 +361,45 @@ export function PublishProductDialog({
                 </p>
               </div>
 
+              {/* No "size priced" picker any more — the table below prices every size, so
+                  choosing one to represent the rest was the thing hiding the others. */}
               {blank && (
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Size priced</span>
-                    <select value={size} onChange={(e) => setSize(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                      {sizeOpts.length === 0 && <option value="">Any</option>}
-                      {sizeOpts.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
-                    <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                      {methodOpts.length === 0 && <option value="">Any</option>}
-                      {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </label>
-                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Method</span>
+                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-xs font-medium transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    {methodOpts.length === 0 && <option value="">Any</option>}
+                    {methodOpts.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </label>
               )}
 
+              {/* Colours and sizes are CHOICES now, not a readout. Every chip that's on
+                  becomes an Etsy variant, so the listing offers what you meant to sell
+                  rather than everything the blank happens to come in. No cap on the list:
+                  hiding colours behind a "+N" made them unreachable. */}
               {blank && colorOpts.length > 0 && (
-                <div className="space-y-1">
-                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Colours offered ({colorOpts.length})</div>
-                  <div className="flex flex-wrap gap-1">
-                    {colorOpts.slice(0, 12).map((c) => (
-                      <span key={c} className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">{prettyColorName(c)}</span>
-                    ))}
-                    {colorOpts.length > 12 && <span className="text-[11px] text-muted-foreground">+{colorOpts.length - 12}</span>}
-                  </div>
-                </div>
+                <VariantChips
+                  label="Colours"
+                  options={colorOpts}
+                  picked={pickedColors}
+                  onChange={setPickedColors}
+                  render={prettyColorName}
+                />
+              )}
+
+              {blank && sizeOpts.length > 0 && (
+                <VariantChips
+                  label="Sizes"
+                  options={sizeOpts}
+                  picked={pickedSizes}
+                  onChange={setPickedSizes}
+                />
+              )}
+
+              {blank && (pickedColors.length === 0 || (sizeOpts.length > 0 && pickedSizes.length === 0)) && (
+                <p className="text-xs text-amber-700">
+                  With none selected this publishes as a flat listing with no variants.
+                </p>
               )}
 
               <div className="grid grid-cols-2 gap-3">
@@ -312,16 +411,54 @@ export function PublishProductDialog({
                 </label>
               </div>
 
-              {/* The economics the old dialogs never showed. */}
-              <dl className="space-y-2 rounded-lg border border-border bg-muted/40 p-4 text-sm">
+              {/* The economics the old dialogs never showed — now per size, because cost
+                  varies across a size run and a single margin figure was only ever true
+                  for whichever size the old picker happened to be set to. */}
+              <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
                 {!blank ? (
                   <p className="text-xs text-muted-foreground">Pick a base product to see your cost and margin.</p>
+                ) : sizeRows.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs tabular-nums">
+                        <thead>
+                          <tr className="text-muted-foreground">
+                            <th className="pb-1 text-left font-medium">Size</th>
+                            <th className="pb-1 text-right font-medium">Production</th>
+                            <th className="pb-1 text-right font-medium">Shipping</th>
+                            <th className="pb-1 text-right font-medium">Your cost</th>
+                            <th className="pb-1 text-right font-medium">Profit</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sizeRows.map((r) => (
+                            <tr key={r.size} className="border-t border-border">
+                              <td className="py-1 text-left font-medium">{r.size || "One size"}</td>
+                              <td className="py-1 text-right">{r.unitCost == null ? "—" : usd(r.unitCost)}</td>
+                              <td className="py-1 text-right">{r.shipping == null ? "—" : usd(r.shipping)}</td>
+                              <td className="py-1 text-right font-medium">{r.total == null ? "—" : usd(r.total)}</td>
+                              <td className={"py-1 text-right font-semibold " + (r.margin != null && r.margin < 0 ? "text-destructive" : "")}>
+                                {r.margin == null ? "—" : `${usd(r.margin)}${r.pct != null ? ` · ${r.pct.toFixed(0)}%` : ""}`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* A dash in the table means "we don't know", which reads identically to
+                        "it's free" unless we say which. */}
+                    {sizeRows.some((r) => r.total == null) && (
+                      <p className="text-xs text-amber-700">Some sizes have no price set on the blank — add pricing in Products.</p>
+                    )}
+                    {retailN <= 0 && <p className="text-xs text-muted-foreground">Enter a retail price to see profit per size.</p>}
+                    {anyLoss && <p className="text-xs text-destructive">Sizes shown in red sell at a loss at this retail price.</p>}
+                  </div>
                 ) : quote?.unitCost == null ? (
                   <p className="text-xs text-amber-700">
                     That blank has no price set, so we can&apos;t work out a margin. Add pricing to it in Products.
                   </p>
                 ) : (
-                  <>
+                  <dl className="space-y-2">
                     <div className="flex justify-between"><dt className="text-muted-foreground">Production</dt><dd className="tabular-nums">{usd(quote.unitCost)}</dd></div>
                     <div className="flex justify-between"><dt className="text-muted-foreground">Shipping</dt><dd className="tabular-nums">{usd(quote.shipping ?? 0)}</dd></div>
                     <div className="flex justify-between border-t border-border pt-2"><dt className="text-muted-foreground">Your cost</dt><dd className="font-medium tabular-nums">{usd(cost ?? 0)}</dd></div>
@@ -335,9 +472,9 @@ export function PublishProductDialog({
                     {margin != null && margin < 0 && (
                       <p className="text-xs text-destructive">This sells at a loss — raise the retail price.</p>
                     )}
-                  </>
+                  </dl>
                 )}
-              </dl>
+              </div>
 
               {result && !result.ok && <p className="text-sm text-destructive">{result.text}</p>}
 
