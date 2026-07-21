@@ -654,6 +654,50 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // against your S&S "Orders_Post" API doc before flipping SS_ORDER_LIVE — S&S gates those docs.
   // Placing a supplier order SPENDS REAL MONEY the moment the LIVE flag is set.
   // requireStaff included operator, which contradicts every other spend boundary.
+  /**
+   * Cancel an order with S&S.
+   *
+   * UNVERIFIED. Their docs list a DELETE Orders operation, but api.ssactivewear.com
+   * returns 403 to anything that isn't a browser, so the exact path and response shape
+   * have not been read — only inferred from the REST pattern the other endpoints follow.
+   *
+   * So it is built exactly like placing: DEFAULT IS A DRY RUN that returns the request it
+   * WOULD send. Review that against the real doc, confirm the path, then set
+   * SS_ORDER_LIVE=1. Guessing a cancel endpoint is worse than guessing an order one — a
+   * wrong POST fails loudly, a wrong DELETE can silently no-op and leave you believing an
+   * order was stopped when it is still on a truck.
+   */
+  app.delete('/api/ss/order/:num', { preHandler: requireWarehouse }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const num = String(req.params.num || '').trim();
+    if (!num) { reply.code(400); return { error: 'An S&S order number is required.' }; }
+    const url = SS_BASE + '/orders/' + encodeURIComponent(num);
+
+    if (String(process.env.SS_ORDER_LIVE || '') !== '1') {
+      return {
+        dryRun: true,
+        method: 'DELETE',
+        url,
+        note: 'SS_ORDER_LIVE!=1 → nothing sent. This is the request that WOULD go. The DELETE path is inferred from their REST pattern, not read from the doc — confirm it before enabling.',
+      };
+    }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(url, {
+        method: 'DELETE',
+        headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' },
+      });
+      const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
+      if (!r.ok) { reply.code(502); return { error: 'S&S refused the cancellation', status: r.status, detail: data }; }
+      // A 2xx is NOT proof it cancelled — some APIs accept a delete for an order already
+      // in picking and simply do nothing. Their response is returned verbatim so a human
+      // can tell the difference.
+      return { ok: true, ssResponse: data, verify: 'Confirm in the S&S portal — a 2xx here does not guarantee the order was stopped.' };
+    } catch (e) {
+      reply.code(502); return { error: String((e && e.message) || e) };
+    }
+  });
+
   app.post('/api/ss/order', { preHandler: requireWarehouse }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
     const b = req.body || {};
