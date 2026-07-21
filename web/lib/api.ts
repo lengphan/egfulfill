@@ -1853,3 +1853,10 @@ export function getSsInventory(skus: string[]) {
                notFound: string[]; discontinued?: boolean }>(
     `/api/ss/inventory?skus=${encodeURIComponent(skus.join(","))}`)
 }
+
+/** Mark a label scanned IN-HOUSE — the warehouse did it, not the dispatch partner. The
+ *  fact recorded is identical (tracking is live); only the route differs. */
+export function markScannedInHouse(orderId: string, undo = false) {
+  return api<{ ok?: boolean; scanned?: boolean; already?: boolean; via?: string; error?: string }>(
+    `/api/orders/${encodeURIComponent(orderId)}/scanned`, { method: "POST", body: JSON.stringify({ undo }) })
+}

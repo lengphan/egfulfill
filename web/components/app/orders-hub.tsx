@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, pushToDispatch, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, pushToDispatch, markScannedInHouse, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -413,6 +413,24 @@ export function OrdersHub() {
   // "All matching this filter" — not just the page, since a warehouse thinks in runs.
   const selectAllFiltered = () => setSelected(new Set(filtered.filter(dispatchable).map((o) => o.id)))
 
+  /** Record an in-house scan for the selection — no partner, no fee. */
+  const scanHere = async () => {
+    if (!selected.size) return
+    setPushing(true); setPushMsg(null)
+    try {
+      const ids = [...selected]
+      const results = await Promise.all(ids.map((id) => markScannedInHouse(id).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "failed" }))))
+      const failed = results.filter((r: unknown) => !!(r as { error?: string })?.error)
+      setPushMsg(failed.length
+        ? { tone: "err", text: `${ids.length - failed.length} marked scanned · ${failed.length} failed — ${(failed[0] as { error?: string }).error}` }
+        : { tone: "ok", text: `${ids.length} marked scanned here.` })
+      setSelected(new Set())
+      load()
+    } catch (e) {
+      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't mark those scanned." })
+    } finally { setPushing(false) }
+  }
+
   const doPush = async () => {
     if (!selected.size) return
     setPushing(true); setPushMsg(null)
@@ -573,6 +591,15 @@ export function OrdersHub() {
               {filtered.filter(dispatchable).length > selectableOnPage.length && (
                 <button onClick={selectAllFiltered} className="text-sm font-medium text-primary hover:underline">
                   Select all {filtered.filter(dispatchable).length} in this filter
+                </button>
+              )}
+              {/* Scanning in-house is the OTHER way to start the tracking clock. Same
+                  fact, no partner, no per-label fee — and it was previously unrecordable,
+                  so an order the floor scanned itself looked permanently unscanned. */}
+              {selected.size > 0 && (
+                <button onClick={scanHere} disabled={pushing}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-60">
+                  Mark {selected.size} scanned here
                 </button>
               )}
               {selected.size > 0 && (

@@ -153,6 +153,59 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   }
 
   /**
+   * Mark a label scanned IN-HOUSE — the warehouse did it themselves.
+   *
+   * Pre-scanning exists to start the buyer's tracking clock, and the dispatch partner is
+   * one way to do that, not the only way. When the floor scans the label here, the fact is
+   * identical — tracking is live — but until now only byeastside could record it, so an
+   * in-house scan left the order looking permanently unscanned and the readiness tag dark.
+   *
+   * Records WHO and by which route. "Scanned" and "scanned by us at 14:02" answer different
+   * questions when a carrier says they never received it, and the second one is the one
+   * that settles it.
+   *
+   * Sets label_scanned_at ONLY. The production stage is untouched, for the same reason the
+   * partner path leaves it alone: a scan is not a claim about how far the work has got.
+   */
+  app.post('/api/orders/:id/scanned', { preHandler: requireAuth }, async (req, reply) => {
+    // Same boundary as every other custody claim: an operator's zone ends at the scan, and
+    // asserting the label is physically scanned is a warehouse fact.
+    const role = req.user && req.user.role;
+    if (!['admin', 'warehouse', 'operator'].includes(role)) {
+      reply.code(403);
+      return { error: 'Only the floor can mark a label scanned.' };
+    }
+    const id = String(req.params.id);
+    const undo = (req.body || {}).undo === true;
+
+    const row = await q('select id, tracking, label_scanned_at from orders where id=$1', [id])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!row) { reply.code(404); return { error: 'Order not found' }; }
+
+    if (undo) {
+      await q('update orders set label_scanned_at=null, scanned_by=null, scanned_via=null where id=$1', [id]);
+      audit(req, 'order.scan.undo', { entityType: 'order', entityId: id });
+      return { ok: true, scanned: false };
+    }
+
+    // No label, nothing to scan. Refusing beats recording a scan of something that doesn't
+    // exist — which would light the readiness tag on an order that can't ship.
+    if (!row.tracking) {
+      reply.code(409);
+      return { error: 'No label on this order yet, so there is nothing to scan. Buy the label first.' };
+    }
+    if (row.label_scanned_at) {
+      return { ok: true, already: true, scannedAt: row.label_scanned_at };
+    }
+
+    await q(`update orders set label_scanned_at=now(), scanned_by=$2, scanned_via='in-house' where id=$1`,
+      [id, String((req.user && req.user.sub) || '')]).catch(() => {});
+    audit(req, 'order.scan', { entityType: 'order', entityId: id, after: { via: 'in-house' } });
+    egBroadcast({ type: 'order-scanned', id });
+    return { ok: true, scanned: true, via: 'in-house' };
+  });
+
+  /**
    * Push selected orders to the dispatch list. Manual on purpose — pre-scanning starts
    * the buyer's clock, which is a timing decision a person makes, not something software
    * should guess at.
