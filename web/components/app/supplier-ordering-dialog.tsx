@@ -8,7 +8,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getSupplierOptions, setFactorySettings, getSsDaysInTransit, type SupplierOptions } from "@/lib/api"
+import { getSupplierOptions, setFactorySettings, getSsDaysInTransit, setAdminSecret, type SupplierOptions } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 
 /**
  * Show a payment profile safely.
@@ -71,6 +72,12 @@ export function SupplierOrderingDialog({
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [ssShip, setSsShip] = useState("")
   const [ssCard, setSsCard] = useState("")
+  // Editing a credential is admin-only server-side; the input is hidden for everyone else
+  // rather than offered and then refused.
+  const isAdmin = getUser()?.role === "admin"
+  const [editKey, setEditKey] = useState<string | null>(null)
+  const [keyVal, setKeyVal] = useState("")
+  const [keyBusy, setKeyBusy] = useState(false)
   const [ottoPay, setOttoPay] = useState("")
   const [ottoShip, setOttoShip] = useState("")
   const [ssEmail, setSsEmail] = useState("")
@@ -127,6 +134,21 @@ export function SupplierOrderingDialog({
     } finally { setBusy(false) }
   }
 
+  /** Save one credential, then re-read so the mask reflects what's actually stored. */
+  const saveKey = async (name: string) => {
+    if (!keyVal.trim()) { setEditKey(null); return }
+    setKeyBusy(true)
+    try {
+      const r = await setAdminSecret(name, keyVal.trim())
+      if (r.error) { setMsg({ ok: false, text: r.error }); return }
+      setMsg({ ok: true, text: `${name} updated.` })
+      setEditKey(null); setKeyVal("")
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save that key." })
+    } finally { setKeyBusy(false) }
+  }
+
   const addr = opts?.shipTo ?? {}
   const addrLine = [addr.company || addr.name, addr.street, addr.street2, [addr.city, addr.state, addr.zip].filter(Boolean).join(" "), addr.country]
     .filter(Boolean).join(", ")
@@ -179,20 +201,16 @@ export function SupplierOrderingDialog({
                       </span>
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground">
-                    Blanks come back to the same warehouse they go out from, so it&apos;s set in one place rather than kept twice.
-                  </p>
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear <LiveChip live={opts.suppliers.ss.live} /></h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear</h3>
                   <Field label="Shipping method">
                     <select value={ssShip} onChange={(e) => setSsShip(e.target.value)} disabled={busy}
                       className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                       {opts.suppliers.ss.shippingMethods.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
                   </Field>
-                  <p className="text-xs text-muted-foreground">{opts.suppliers.ss.shippingNote}</p>
                   {transit && transit.length > 0 && (
                     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
                       <div className="mb-1 text-xs font-medium">Transit to your warehouse</div>
@@ -210,7 +228,7 @@ export function SupplierOrderingDialog({
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap <LiveChip live={opts.suppliers.otto.live} /></h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap</h3>
                   {!opts.suppliers.otto.available ? (
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
@@ -235,7 +253,7 @@ export function SupplierOrderingDialog({
               {/* ── PAYMENT ──────────────────────────────────────────────────── */}
               <TabsContent value="payment" className="mt-4 space-y-5">
                 <section className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear <LiveChip live={opts.suppliers.ss.live} /></h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">S&amp;S Activewear</h3>
                   {/* No full number exists in their API — the label already carries the
                       last four — so there is nothing stored here that could leak. */}
                   <Field label="Pays with">
@@ -256,7 +274,7 @@ export function SupplierOrderingDialog({
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap <LiveChip live={opts.suppliers.otto.live} /></h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">Otto Cap</h3>
                   {!opts.suppliers.otto.available ? (
                     <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />
@@ -272,8 +290,7 @@ export function SupplierOrderingDialog({
                         </select>
                       </Field>
                       <p className="text-xs text-muted-foreground">
-                        Read live from your Otto account. These are billing TERMS (Net 30, billed to us) —
-                        Otto&apos;s API exposes no saved cards, so there is no card to pick here.
+                        Billing terms from your Otto account — they expose no saved cards.
                       </p>
                     </>
                   )}
@@ -292,8 +309,7 @@ export function SupplierOrderingDialog({
                            placeholder="the address this S&S account is registered to" className="h-9" />
                   </Field>
                   <p className="text-xs text-muted-foreground">
-                    Also decides whose saved cards appear under <strong>Payment</strong> — S&amp;S profiles belong to a
-                    person on the account. <strong>Save</strong> after changing it; the cards are looked up server-side.
+                    Decides whose saved cards appear under <strong>Payment</strong>. Save after changing it.
                   </p>
                 </section>
 
@@ -315,12 +331,14 @@ export function SupplierOrderingDialog({
                       ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
                       : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
                   </h3>
-                  <dl className="space-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
-                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Account number</dt>
-                      <dd className="font-mono">{opts.keys?.ss?.account ?? "—"}</dd></div>
-                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">API key</dt>
-                      <dd className="font-mono">{opts.keys?.ss?.masked ?? "not set"}</dd></div>
-                  </dl>
+                  <KeyRow label="Account number" name="SS_ACCOUNT_NUMBER" shown={opts.keys?.ss?.account ?? null}
+                    isAdmin={isAdmin} editing={editKey === "SS_ACCOUNT_NUMBER"} value={keyVal} busy={keyBusy}
+                    onEdit={() => { setEditKey("SS_ACCOUNT_NUMBER"); setKeyVal("") }}
+                    onChange={setKeyVal} onSave={() => saveKey("SS_ACCOUNT_NUMBER")} onCancel={() => setEditKey(null)} />
+                  <KeyRow label="API key" name="SS_API_KEY" shown={opts.keys?.ss?.masked ?? null}
+                    isAdmin={isAdmin} editing={editKey === "SS_API_KEY"} value={keyVal} busy={keyBusy}
+                    onEdit={() => { setEditKey("SS_API_KEY"); setKeyVal("") }}
+                    onChange={setKeyVal} onSave={() => saveKey("SS_API_KEY")} onCancel={() => setEditKey(null)} />
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
@@ -330,20 +348,25 @@ export function SupplierOrderingDialog({
                       ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
                       : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
                   </h3>
-                  <dl className="space-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
-                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Username</dt>
-                      <dd className="font-mono">{opts.keys?.otto?.user ?? "—"}</dd></div>
-                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Client secret</dt>
-                      <dd className="font-mono">{opts.keys?.otto?.masked ?? "not set"}</dd></div>
-                  </dl>
+                  {/* Username/password aren't in the editable set server-side — only the
+                      OAuth client pair is — so the username is shown, not offered. */}
+                  <KeyRow label="Username" name="OTTOCAP_USERNAME" shown={opts.keys?.otto?.user ?? null}
+                    isAdmin={false} editing={false} value="" busy={false}
+                    onEdit={() => {}} onChange={() => {}} onSave={() => {}} onCancel={() => {}} />
+                  <KeyRow label="Client secret" name="OTTOCAP_CLIENT_SECRET" shown={opts.keys?.otto?.masked ?? null}
+                    isAdmin={isAdmin} editing={editKey === "OTTOCAP_CLIENT_SECRET"} value={keyVal} busy={keyBusy}
+                    onEdit={() => { setEditKey("OTTOCAP_CLIENT_SECRET"); setKeyVal("") }}
+                    onChange={setKeyVal} onSave={() => saveKey("OTTOCAP_CLIENT_SECRET")} onCancel={() => setEditKey(null)} />
                 </section>
 
                 {/* Shown, never editable. Checking a connection belongs next to the order
                     you're about to place; CHANGING a credential belongs in Integrations,
                     with its audit trail. */}
-                <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-                  Masked, for reference only — change them in Settings › Integrations.
-                </p>
+                {!isAdmin && (
+                  <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                    Only an admin can change these.
+                  </p>
+                )}
               </TabsContent>
 
               {msg && (
@@ -368,12 +391,40 @@ export function SupplierOrderingDialog({
   )
 }
 
-/** Whether orders to this supplier actually go out, or stop at a dry run. Stated rather
- *  than hidden — "placed" means something different under each. */
-function LiveChip({ live }: { live: boolean }) {
-  return live
-    ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Live orders</span>
-    : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Dry run</span>
+/**
+ * One credential: masked, and editable in place by an admin.
+ *
+ * The field starts EMPTY rather than pre-filled with the mask — a masked value typed back
+ * would save the dots as the key. Nothing readable is ever populated into the input, so
+ * there is no state where the real secret is on screen.
+ */
+function KeyRow({ label, shown, isAdmin, editing, value, busy, onEdit, onChange, onSave, onCancel }: {
+  label: string; name: string; shown: string | null; isAdmin: boolean; editing: boolean
+  value: string; busy: boolean
+  onEdit: () => void; onChange: (v: string) => void; onSave: () => void; onCancel: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+      <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
+      {editing ? (
+        <>
+          <Input value={value} onChange={(e) => onChange(e.target.value)} disabled={busy}
+                 placeholder="paste the new value" autoFocus className="h-7 flex-1 font-mono text-xs" />
+          <Button size="sm" className="h-7" onClick={onSave} disabled={busy || !value.trim()}>Save</Button>
+          <button onClick={onCancel} disabled={busy} className="text-muted-foreground hover:text-foreground">Cancel</button>
+        </>
+      ) : (
+        <>
+          <span className="flex-1 truncate font-mono">{shown ?? "not set"}</span>
+          {isAdmin && (
+            <button onClick={onEdit} className="font-medium text-primary hover:underline">
+              {shown ? "Change" : "Set"}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
