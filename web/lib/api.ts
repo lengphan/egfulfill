@@ -1563,3 +1563,11 @@ export type OrderDesignStatus = {
 export function getOrderDesignStatus(id: string) {
   return api<OrderDesignStatus>(`/api/orders/${encodeURIComponent(id)}/design-status`)
 }
+
+/** Which supplier each SKU actually comes from, resolved server-side from the synced
+ *  catalogs (authoritative — the sku IS theirs) then inventory.supplier. A sku in neither
+ *  gets no api, so it's ordered by hand rather than guessed at from a PO's name. */
+export function resolveSuppliers(skus: string[]) {
+  return api<{ bySku: Record<string, { api: "ss" | "otto" | null; supplier: string | null; source: string }> }>(
+    `/api/purchase/resolve-suppliers`, { method: "POST", body: JSON.stringify({ skus }) })
+}

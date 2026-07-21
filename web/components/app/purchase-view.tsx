@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList,
-  ssOrder, ottoOrder, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
+  ssOrder, ottoOrder, resolveSuppliers, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { getToken } from "@/lib/auth"
@@ -20,21 +20,10 @@ const isLow = (it: InventoryItem) => num(it.in_stock) <= (it.reorder_at ?? 25)
 const suggestQty = (it: InventoryItem) => Math.max(1, (it.reorder_at ?? 25) * 2 - num(it.in_stock))
 const supKey = (s?: string | null) => (s || "Unassigned")
 const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
-// Which supplier API (if any) can place this PO automatically.
-//
-// Matched on WORD boundaries. A bare `includes("ss")` sent every "Unassigned" PO down
-// the S&S path — "unassigned" contains "ss" — so a PO with no supplier at all was being
-// handed to a real supplier's API.
-//
-// "Unassigned" is the placeholder supKey() uses for a null supplier, not a company, so it
-// resolves to no API: a PO nobody has assigned can only be placed by hand.
-const placer = (supplier?: string | null): "ss" | "otto" | null => {
-  const s = (supplier || "").trim().toLowerCase()
-  if (!s || s === "unassigned") return null
-  if (/\botto\b|ottocap/.test(s)) return "otto"
-  if (/s&s|\bss\b|activewear/.test(s)) return "ss"
-  return null
-}
+// NOTE: there is deliberately no supplier-name matcher here any more. Guessing an API
+// from a typed name is what sent every "Unassigned" PO to S&S ("unassigned" contains
+// "ss"). The supplier is a property of the PRODUCT, resolved server-side from the synced
+// catalogs — see resolveSuppliers / place().
 
 export function PurchaseView() {
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
@@ -125,17 +114,80 @@ export function PurchaseView() {
   /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
   const addLines = (po: PurchaseOrder, lines: POLine[]) => patchPO(po, mergeLines(po.items, lines))
 
+  /**
+   * Place a PO — split by the SUPPLIER EACH LINE ACTUALLY COMES FROM.
+   *
+   * A draft is assembled from whatever was low, so one PO routinely holds blanks from
+   * two suppliers. Sending it as a single order meant everything went to whichever
+   * supplier the PO's NAME matched — the other supplier's lines included, ordered from a
+   * company that doesn't stock them.
+   *
+   * So: resolve every line's supplier from the catalogs (server-side — the sku is either
+   * in S&S's catalog or it isn't, which beats matching a typed name), group the lines,
+   * and place one order per supplier. Each group becomes its own PO so what was ordered
+   * from whom is recorded separately — a single receipt covering two suppliers can't
+   * later answer "what did S&S actually send us".
+   *
+   * Lines whose supplier can't be resolved are NOT sent anywhere. They stay behind on a
+   * draft to be handled by hand, because the failure mode of guessing here is a real
+   * order placed with the wrong company.
+   */
   const place = async (po: PurchaseOrder) => {
-    const lines = po.items.filter((l) => num(l.qty) > 0).map((l) => ({ sku: l.sku, qty: num(l.qty) }))
+    const lines = po.items.filter((l) => num(l.qty) > 0)
     if (!lines.length) { setMsg({ ok: false, text: "Add at least one item with a quantity." }); return }
     setBusy(po.num); setMsg(null)
     try {
-      const p = placer(po.supplier)
-      let resp: unknown = { manual: true }
-      if (p === "otto") { const r = await ottoOrder(lines); if (r.error) throw new Error(r.error); resp = r }
-      else if (p === "ss") { const r = await ssOrder(lines); if (r.error) throw new Error(r.error); resp = r }
-      await savePurchaseOrder({ ...po, status: "placed", meta: { response: resp, placedAt: new Date().toISOString() } })
-      setMsg({ ok: true, text: p ? `Sent to ${po.supplier} (test/dry-run — set live keys to place for real).` : "Marked placed (no supplier API — record manually)." })
+      const { bySku } = await resolveSuppliers(lines.map((l) => l.sku))
+
+      // Group by the API that can place it; unresolved lines are kept aside, not sent.
+      const groups = new Map<string, { api: "ss" | "otto" | null; supplier: string | null; lines: POLine[] }>()
+      for (const l of lines) {
+        const r = bySku[l.sku] ?? { api: null, supplier: null, source: "unknown" }
+        // Key on the API when there is one, else on the supplier name, so two hand-ordered
+        // suppliers don't collapse into one pile.
+        const key = r.api ?? `manual:${r.supplier ?? "unassigned"}`
+        if (!groups.has(key)) groups.set(key, { api: r.api, supplier: r.supplier, lines: [] })
+        groups.get(key)!.lines.push(l)
+      }
+
+      const parts = [...groups.values()]
+      const placedAt = new Date().toISOString()
+      const results: string[] = []
+
+      for (const [i, g] of parts.entries()) {
+        const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) }))
+        let resp: unknown = { manual: true }
+        let placedOk = true
+        try {
+          if (g.api === "otto") { const r = await ottoOrder(payload); if (r.error) throw new Error(r.error); resp = r }
+          else if (g.api === "ss") { const r = await ssOrder(payload); if (r.error) throw new Error(r.error); resp = r }
+        } catch (e) {
+          placedOk = false
+          resp = { error: e instanceof Error ? e.message : "failed" }
+        }
+
+        // One PO per supplier. The original keeps its number when there's only one group,
+        // so the common single-supplier case doesn't gain a confusing suffix.
+        const numFor = parts.length === 1 ? po.num : `${po.num}-${(g.supplier || "MANUAL").replace(/[^A-Za-z0-9]+/g, "").slice(0, 6).toUpperCase() || String(i + 1)}`
+        await savePurchaseOrder({
+          ...po,
+          num: numFor,
+          supplier: g.supplier ?? po.supplier ?? null,
+          items: g.lines,
+          status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
+          meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
+        })
+        results.push(
+          !placedOk ? `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`
+            : g.api ? `${g.supplier}: sent (test/dry-run — set live keys to place for real)`
+              : `${g.supplier ?? "Unassigned"}: marked placed, order it manually (no supplier API for these SKUs)`
+        )
+      }
+
+      // The original is superseded by its parts; leaving it would double-count the spend.
+      if (parts.length > 1) await deletePurchaseOrder(po.num).catch(() => {})
+
+      setMsg({ ok: !results.some((r) => r.includes("failed")), text: results.join(" · ") })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place the order." })
