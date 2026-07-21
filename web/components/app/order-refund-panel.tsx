@@ -29,6 +29,10 @@ const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(3
  */
 export function OrderRefundPanel({ orderId }: { orderId: string }) {
   const [state, setState] = useState<OrderCharges | null>(null)
+  // Distinguishes "couldn't read this" from "there's nothing here". Without it a dead
+  // endpoint renders exactly like an order that was never charged, and the panel simply
+  // appears not to exist — which is how a broken deploy looks like a missing feature.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [amounts, setAmounts] = useState<Record<string, string>>({})
   const [note, setNote] = useState("")
@@ -42,13 +46,30 @@ export function OrderRefundPanel({ orderId }: { orderId: string }) {
   const sending = useRef(false)
 
   const load = useCallback(() => {
-    getOrderCharges(orderId).then(setState).catch(() => setState(null))
+    setLoadErr(null)
+    getOrderCharges(orderId)
+      .then((r) => { setState(r); setLoadErr(null) })
+      .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't load this order's charges."))
   }, [orderId])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
 
-  // Staff who can't refund don't get the panel at all. The server enforces this; hiding
-  // it just avoids offering an action that would only ever 403.
-  if (!state || !state.canRefund) return null
+  // A read that FAILED is reported, never hidden. The commonest cause is an API that
+  // hasn't been redeployed yet, and silently showing nothing sends someone hunting for a
+  // missing button instead of a missing deploy.
+  if (loadErr) {
+    return (
+      <SectionCard title="Refund">
+        <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
+          <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
+          <span>Couldn&apos;t load this order&apos;s charges, so refunds can&apos;t be shown. {loadErr}</span>
+        </div>
+      </SectionCard>
+    )
+  }
+  if (!state) return null                       // still loading
+  // Staff who can't refund don't get the panel. The server enforces this; hiding it just
+  // avoids offering an action that would only ever 403.
+  if (!state.canRefund) return null
   // Nothing was ever charged (an unsubmitted order) — there's no money story to tell yet.
   if (state.charged <= 0) return null
 
