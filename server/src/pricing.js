@@ -27,6 +27,7 @@ const FEE_KEYS = [
   'ship_first', 'ship_extra',
   'ship_cap', 'ship_heavy', 'ship_garment',
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
+  'method_scr', 'method_sub', 'method_vnl',
 ];
 export async function feeSettings() {
   const out = { ...FALLBACK, ...SETTING_DEFAULTS };
@@ -118,8 +119,12 @@ function unitCostOf(row, item, fees) {
 function methodAddOn(d, printType, fees) {
   const tech = String(printType || '').toUpperCase();
   if (!tech) return 0;
+  // Keep in step with normTech() in web/lib/print-method.ts — the picker offers these
+  // labels, so every one of them must resolve to a key that has a surcharge.
   const k = /EMB/.test(tech) ? 'EMB' : /DTF/.test(tech) ? 'DTF' : /APL|APPLIQ/.test(tech) ? 'APL'
-          : /LSR|LASER/.test(tech) ? 'LSR' : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
+          : /LSR|LASER|ENGRAV/.test(tech) ? 'LSR' : /SCR|SCREEN/.test(tech) ? 'SCR'
+          : /SUBLIM|\bDYE\b/.test(tech) ? 'SUB' : /VINYL|\bHTV\b|\bVNL\b/.test(tech) ? 'VNL'
+          : /DTG|DIRECT/.test(tech) ? 'DTG' : tech;
   // A product may override the surcharge for its own method mix.
   if (d.methodPrices) {
     const mp = num(d.methodPrices[k] != null ? d.methodPrices[k] : d.methodPrices[tech]);

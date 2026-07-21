@@ -1045,6 +1045,8 @@ export type EtsyListing = {
   price_max?: number | null
   url: string
   image: string | null
+  /** Etsy's 300x300 variant, for grid cards. `image` (570px) is for the publish flow. */
+  thumb?: string | null
   images?: string[]
   views: number | null
   num_favorers?: number | null

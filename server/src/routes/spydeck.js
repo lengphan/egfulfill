@@ -210,7 +210,7 @@ export function spydeckRoutes(app, requireAuth) {
       listing_id: l.listing_id, title: l.title, price: l.price, currency: l.currency,
       price_usd: l.price_usd, price_converted: l.price_converted,
       price_min: l.price_min, price_max: l.price_max,
-      url: l.url, image: l.image, tags: l.tags, created: l.created,
+      url: l.url, image: l.image, thumb: l.thumb || l.image, tags: l.tags, created: l.created,
       views: l.views, shop_name: l.shop_name, num_favorers: l.num_favorers,
       _sold24: l._sold24, _trending: l._trending,
     };

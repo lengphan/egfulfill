@@ -9,10 +9,12 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
-import { normTech } from "@/lib/print-method"
+import { normTech, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
-const METHODS = ["DTG", "Embroidery", "Screen Print", "Sublimation", "Vinyl"]
+// Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
+// surcharges cannot drift apart again.
+const METHODS = PRODUCT_METHODS.map((m) => m.label)
 // Fallback only — the real list is managed in Settings → Platform. Used until settings
 // load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]

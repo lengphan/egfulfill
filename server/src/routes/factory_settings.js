@@ -14,6 +14,10 @@ const KEYS = [
   'ship_cap', 'ship_heavy', 'ship_garment',
   // Print-method surcharge, keyed by the same codes pricing.js normalises to.
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
+  // Offered in the product editor but previously unpriced: methodAddOn fell through to
+  // a key that didn't exist ('method_screen print') and returned 0, so screen-print,
+  // sublimation and vinyl work carried NO surcharge at all.
+  'method_scr', 'method_sub', 'method_vnl',
 ];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
@@ -27,6 +31,9 @@ export const SETTING_DEFAULTS = {
   method_emb: 5,       // stitches cost more than ink
   method_apl: 2,
   method_lsr: 2,
+  method_scr: 2,      // screen print — setup per colour
+  method_sub: 1,      // sublimation
+  method_vnl: 2,      // heat-transfer vinyl, cut + weed
 };
 
 /**

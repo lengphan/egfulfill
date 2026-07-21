@@ -8,6 +8,26 @@
 
 export type PrintMethod = { key: string; label: string }
 
+/**
+ * The methods a product may be assigned — the SINGLE source for the picker.
+ *
+ * These were hardcoded in product-editor-dialog.tsx and had drifted from both this file
+ * and the pricing surcharges: the picker offered Screen Print / Sublimation / Vinyl,
+ * which had no `method_*` fee key at all (so they priced at $0), while DTF, Appliqué and
+ * Laser were priced but couldn't be selected. Every entry here now has a matching
+ * surcharge in factory_settings KEYS — keep the three in step.
+ */
+export const PRODUCT_METHODS: PrintMethod[] = [
+  { key: "dtg", label: "DTG" },
+  { key: "dtf", label: "DTF" },
+  { key: "emb", label: "Embroidery" },
+  { key: "apl", label: "Appliqué" },
+  { key: "lsr", label: "Laser" },
+  { key: "scr", label: "Screen Print" },
+  { key: "sub", label: "Sublimation" },
+  { key: "vnl", label: "Vinyl" },
+]
+
 /** Normalise one raw technique to a stable {key,label}. */
 export function normTech(raw: string): PrintMethod | null {
   const s = String(raw || "").trim().toLowerCase()

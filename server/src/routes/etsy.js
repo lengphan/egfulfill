@@ -459,6 +459,11 @@ export async function attachUsd(results) {
 // so a listing has identical fields wherever SpyDeck renders it.
 export function mapListing(l, imgsById = {}, rangeById = {}) {
   const pick = (im) => (im && (im.url_570xN || im.url_fullxfull || im.url_680x540 || im.url_300x300)) || null;
+  // A separate, SMALLER variant for grid cards. The card renders ~300px wide, so
+  // shipping the 570px file was ~3.6x the pixels needed on every tile — the single
+  // biggest cost on a 24-card page. The full-size `image` is still returned for the
+  // product/publish path, which actually displays it large.
+  const pickThumb = (im) => (im && (im.url_300x300 || im.url_570xN || im.url_680x540 || im.url_fullxfull)) || null;
   const inlineImgs = (l.images || []).map(pick).filter(Boolean);
   const images = inlineImgs.length ? inlineImgs : (imgsById[l.listing_id] || []);
   return {
@@ -474,6 +479,7 @@ export function mapListing(l, imgsById = {}, rangeById = {}) {
     url: l.url || ('https://www.etsy.com/listing/' + l.listing_id),
     tags: Array.isArray(l.tags) ? l.tags : [],
     image: images[0] || null,
+    thumb: pickThumb((l.images || [])[0]) || images[0] || null,
     images: images,
     created: l.original_creation_timestamp || l.created_timestamp || l.creation_tsz || null,
     views: (typeof l.views === 'number' ? l.views : null),

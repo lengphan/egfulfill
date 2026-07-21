@@ -127,8 +127,12 @@ function ResultCard({ l, saved, uploaded, onToggleSave, onSearchTag, onMakeProdu
       </button>
       <a href={l.url} target="_blank" rel="noopener noreferrer" className="flex flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
         <div className="relative aspect-square overflow-hidden bg-muted/40">
+          {/* thumb is Etsy's 300x300; `image` is 570px and is what the publish flow uses.
+              The card renders ~300px wide, so serving 570px was ~3.6x the pixels needed on
+              every one of 24 tiles. `sizes` keeps it honest if optimisation is ever enabled
+              (needs i.etsystatic.com in next.config remotePatterns). */}
           {l.image ? (
-            <Image src={l.image} alt={l.title} fill unoptimized className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
+            <Image src={l.thumb || l.image} alt={l.title} fill unoptimized sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" />
           ) : (
             <div className="flex size-full items-center justify-center text-muted-foreground"><Binoculars size={22} weight="duotone" /></div>
           )}
