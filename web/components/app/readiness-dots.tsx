@@ -200,14 +200,31 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   // Sent to the partner's queue but not yet scanned back — previously indistinguishable
   // from "nothing has happened", which is the state you most want to tell apart when
   // chasing a parcel.
-  const scanPending = !preScanned && !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
-  const scanTitle = scanPending && !preScanned
-    ? "With the dispatch partner — pushed to their queue, not scanned back yet."
-    : preScanned
-    ? `Pre-scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} — tracking is live for the buyer. The parcel may still be in production.`
-    : order.tracking
-      ? "Label exists but hasn't been pre-scanned — the buyer's tracking has not started"
-      : "No label yet, so nothing to scan"
+  // AMBER = queued to be scanned, by either route. Two ways in, and they read
+  // differently, because "we haven't got to it" and "someone else has it" are different
+  // problems with different people to chase.
+  const withPartner = !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
+  const queuedHere = String(order.factory_status || "") === "awaiting_scan"
+  const scanPending = !preScanned && (withPartner || queuedHere)
+
+  const scanTitle = preScanned
+    // VIOLET the moment a scan is actually recorded, whoever did it. The route is a
+    // detail; the fact is that the buyer's tracking has started.
+    ? `Scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${
+        (order as { scanned_via?: string | null }).scanned_via === "partner" ? " by the dispatch partner" :
+        (order as { scanned_via?: string | null }).scanned_via === "in-house" ? " here" : ""
+      } — tracking is live for the buyer. The parcel may still be in production.`
+    // AMBER covers both queued cases, and stays amber while the partner holds it. Their
+    // receiving it is not their scanning it — the buyer's tracking hasn't moved until
+    // they actually scan, so the colour mustn't move either. Where it is goes in the
+    // words, and the history below records the hand-off.
+    : scanPending
+      ? withPartner
+        ? "With the dispatch partner — in their queue, not scanned yet."
+        : "On the dispatch board, waiting to be scanned."
+      : order.tracking
+        ? "Label exists but hasn't been scanned — the buyer's tracking has not started."
+        : "No label yet, so nothing to scan."
 
   const list = items ?? order.items ?? []
   const decorated = list.filter((it) => String(it.print_type || "").trim())
