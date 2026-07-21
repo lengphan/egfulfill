@@ -584,11 +584,23 @@ export function deletePurchaseOrder(num: string) {
   return api<{ ok?: boolean }>(`/api/purchase/${encodeURIComponent(num)}`, { method: "DELETE" })
 }
 // Place a supplier order (safe/test mode server-side by default).
-export function ssOrder(lines: { sku: string; qty: number }[], live = false) {
-  return api<{ ok?: boolean; testOrder?: boolean; error?: string; detail?: unknown }>(`/api/ss/order`, { method: "POST", body: JSON.stringify({ lines, live }) })
+/** Place with S&S. `extra` carries the fields a real PO needs beyond sku+qty — the
+ *  delivery address, shipping method, PO number and confirmation email. The endpoint has
+ *  always accepted them; sending only lines is what made the orders incomplete. */
+export function ssOrder(
+  lines: { sku: string; qty: number }[],
+  extra: { shippingAddress?: unknown; shippingMethod?: string; email?: string; poNumber?: string } = {},
+  live = false
+) {
+  return api<{ ok?: boolean; testOrder?: boolean; dryRun?: boolean; error?: string; detail?: unknown }>(
+    `/api/ss/order`, { method: "POST", body: JSON.stringify({ lines, live, ...extra }) })
 }
-export function ottoOrder(items: { sku: string; qty: number }[]) {
-  return api<{ ok?: boolean; dryRun?: boolean; error?: string; ottoResponse?: unknown }>(`/api/otto/order`, { method: "POST", body: JSON.stringify({ items }) })
+export function ottoOrder(
+  items: { sku: string; qty: number }[],
+  extra: { shipping_address?: unknown; shipping_method?: string; payment_method?: string; customer_po?: string } = {}
+) {
+  return api<{ ok?: boolean; dryRun?: boolean; error?: string; ottoResponse?: unknown }>(
+    `/api/otto/order`, { method: "POST", body: JSON.stringify({ items, ...extra }) })
 }
 
 // Otto Cap has no live catalog API — we import their Product Data export into otto_products
@@ -951,7 +963,7 @@ export function getFactorySettings() {
 }
 /** The numeric keys are addressed by name from the settings form, so the body stays
  *  loosely keyed — but the values are narrowed to what the route actually accepts. */
-export function setFactorySettings(body: Record<string, number | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {
+export function setFactorySettings(body: Record<string, string | number | ShipFromAddress | ProductType[] | ThreadColor[] | undefined>) {
   return api<FactorySettings & { ok?: boolean; error?: string }>(`/api/factory/settings`, { method: "PUT", body: JSON.stringify(body) })
 }
 
@@ -1570,4 +1582,25 @@ export function getOrderDesignStatus(id: string) {
 export function resolveSuppliers(skus: string[]) {
   return api<{ bySku: Record<string, { api: "ss" | "otto" | null; supplier: string | null; source: string }> }>(
     `/api/purchase/resolve-suppliers`, { method: "POST", body: JSON.stringify({ skus }) })
+}
+
+// ── Supplier ordering (address / payment / shipping) ───────────────────────────
+export type SupplierOptions = {
+  shipTo: Record<string, string>
+  shipToComplete: boolean
+  suppliers: {
+    ss: { live: boolean; paymentMethods: null; paymentNote: string
+          shippingMethods: { id: string; label: string }[]; shippingNote: string }
+    otto: { live: boolean; available: boolean; reason: string | null
+            paymentMethods: unknown[]; shippingMethods: unknown[] }
+  }
+  defaults: {
+    ss_shipping_method: string; otto_payment_method: string
+    otto_shipping_method: string; order_email: string
+  }
+}
+/** Where supplier orders ship, how they pay, how they move. Otto's methods are read LIVE
+ *  from their API (they're per-account); S&S has no such endpoint and bills the account. */
+export function getSupplierOptions() {
+  return api<SupplierOptions>(`/api/purchase/supplier-options`)
 }

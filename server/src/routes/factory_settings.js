@@ -26,6 +26,11 @@ const KEYS = [
   'expedite_fee', 'expedite_cost', 'design_partner_cost',
 ];
 
+// Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
+// Number() — these are identifiers ('net30', a method id) and an email, which that
+// coercion would turn into NaN.
+const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_method', 'order_email'];
+
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.
 export const SETTING_DEFAULTS = {
@@ -196,6 +201,14 @@ export async function readAll() {
     const r = await q('select key, value from settings where key = any($1)', [KEYS]);
     for (const row of r.rows) { const n = Number(row.value); if (isFinite(n)) out[row.key] = n; }
   } catch { /* table not ready */ }
+  // Text settings read separately — Number() would make NaN of every one of them.
+  try {
+    const t = await q('select key, value from settings where key = any($1)', [TEXT_KEYS]);
+    for (const row of t.rows) {
+      const v = typeof row.value === 'string' ? row.value : JSON.stringify(row.value ?? '');
+      out[row.key] = String(v).replace(/^"|"$/g, '');
+    }
+  } catch { /* table not ready */ }
   return out;
 }
 
@@ -234,6 +247,12 @@ export function factorySettingsRoutes(app, requireAuth, requireStaff) {
       if (!isFinite(n) || n < 0) continue;
       // settings.value is jsonb — store the number as a JSON number.
       await q('insert into settings (key,value,updated_at) values ($1, to_jsonb($2::numeric), now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [k, n]).catch(() => {});
+    }
+    // Supplier-ordering defaults — stored as JSON strings, not coerced to numbers.
+    for (const k of TEXT_KEYS) {
+      if (b[k] === undefined) continue;
+      const v = String(b[k] ?? '').trim();
+      await q('insert into settings (key,value,updated_at) values ($1, to_jsonb($2::text), now()) on conflict (key) do update set value=excluded.value, updated_at=now()', [k, v]).catch(() => {});
     }
     if (b.ship_from && typeof b.ship_from === 'object') {
       const addr = {};

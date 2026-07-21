@@ -10,9 +10,10 @@ import { Input } from "@/components/ui/input"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList,
-  ssOrder, ottoOrder, resolveSuppliers, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
+  ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
+import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -38,6 +39,7 @@ export function PurchaseView() {
   // Which history rows are expanded. A set, not a single id — comparing two past POs
   // side by side is the normal reason to open them.
   const [open, setOpen] = useState<Set<string>>(new Set())
+  const [supplierCfg, setSupplierCfg] = useState(false)
 
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
@@ -159,7 +161,18 @@ export function PurchaseView() {
     if (!lines.length) { setMsg({ ok: false, text: "Add at least one item with a quantity." }); return }
     setBusy(po.num); setMsg(null)
     try {
-      const { bySku } = await resolveSuppliers(lines.map((l) => l.sku))
+      const [{ bySku }, opts] = await Promise.all([
+        resolveSuppliers(lines.map((l) => l.sku)),
+        getSupplierOptions(),
+      ])
+
+      // No delivery address means the supplier has nowhere to send the blanks. Refuse
+      // rather than place an order that arrives nowhere — this is the one field a
+      // purchase order genuinely cannot be completed without.
+      if (!opts.shipToComplete) {
+        setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Supplier ordering." })
+        return
+      }
 
       // Group by the API that can place it; unresolved lines are kept aside, not sent.
       const groups = new Map<string, { api: "ss" | "otto" | null; supplier: string | null; lines: POLine[] }>()
@@ -181,8 +194,25 @@ export function PurchaseView() {
         let resp: unknown = { manual: true }
         let placedOk = true
         try {
-          if (g.api === "otto") { const r = await ottoOrder(payload); if (r.error) throw new Error(r.error); resp = r }
-          else if (g.api === "ss") { const r = await ssOrder(payload); if (r.error) throw new Error(r.error); resp = r }
+          // The rest of what a purchase order needs: where it goes, how it ships, how it
+          // pays, and a PO number that ties their confirmation back to this row.
+          if (g.api === "otto") {
+            const r = await ottoOrder(payload, {
+              shipping_address: opts.shipTo,
+              shipping_method: opts.defaults.otto_shipping_method || undefined,
+              payment_method: opts.defaults.otto_payment_method || undefined,
+              customer_po: po.num,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          } else if (g.api === "ss") {
+            const r = await ssOrder(payload, {
+              shippingAddress: opts.shipTo,
+              shippingMethod: opts.defaults.ss_shipping_method || undefined,
+              email: opts.defaults.order_email || undefined,
+              poNumber: po.num,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          }
         } catch (e) {
           placedOk = false
           resp = { error: e instanceof Error ? e.message : "failed" }
@@ -302,7 +332,10 @@ export function PurchaseView() {
         </div>
       </div>
 
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
+          <Truck size={13} weight="bold" /> Supplier ordering
+        </Button>
         <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
           {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
           New purchase order
@@ -455,6 +488,8 @@ export function PurchaseView() {
                 onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
             )}
       </SectionCard>
+
+      <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
 
       <POAddItems
         key={addTo?.num ?? "none"}

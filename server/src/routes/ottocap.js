@@ -49,6 +49,11 @@ async function ocFetch(path, opts) {
   return { ok: r.ok, status: r.status, data };
 }
 const ocGet = (path) => ocFetch(path, { method: 'GET' });
+// Exported so the purchase board can read Otto's per-account payment and shipping methods
+// without duplicating the token dance. Read-only GETs only — placing stays in this file,
+// behind its live gate.
+export const ottoEnabled = () => ocConfigured();
+export const ottoGet = (path) => ocGet(path);
 const ocPost = (path, b) => ocFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) });
 
 // Small helper to keep the routes terse + consistent.

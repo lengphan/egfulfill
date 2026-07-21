@@ -75,6 +75,74 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
     return { bySku };
   });
 
+  /**
+   * Everything a real supplier order needs, gathered in one read: where it ships, how it
+   * pays, how it moves — plus an honest account of what's missing.
+   *
+   * Both supplier payloads have always ACCEPTED an address, a PO number and shipping and
+   * payment methods; the UI simply never sent any of them, so the orders were routed
+   * correctly and still incomplete. This is what lets the client fill them in.
+   *
+   * The ship-to is the factory's existing `ship_from` address — the warehouse is where
+   * blanks are delivered, and it's already entered for shipping labels. A second address
+   * field for the same building is a second thing to keep correct.
+   *
+   * Payment and shipping methods are fetched LIVE from Otto rather than hardcoded: they
+   * are per-account (terms, negotiated carriers), so a baked-in list would be wrong for
+   * anyone but whoever it was copied from, and wrong silently. S&S has no such endpoint —
+   * it bills the account on file — which is stated rather than faked with an empty list.
+   */
+  app.get('/api/purchase/supplier-options', { preHandler: requireStaff }, async () => {
+    const { readShipFrom, shipFromComplete, readAll } = await import('./factory_settings.js');
+    const [shipFrom, cfg] = await Promise.all([readShipFrom().catch(() => ({})), readAll().catch(() => ({}))]);
+
+    // Otto's methods come from THEIR API. A failure here is reported, not swallowed into
+    // an empty list — "no payment methods" and "couldn't ask" look identical otherwise,
+    // and one of them means the order will be placed on the wrong terms.
+    let otto = { available: false, reason: 'Otto Cap is not configured.', paymentMethods: [], shippingMethods: [] };
+    try {
+      const { ottoEnabled, ottoGet } = await import('./ottocap.js');
+      if (typeof ottoEnabled === 'function' && ottoEnabled()) {
+        const [pay, ship] = await Promise.all([
+          ottoGet('/payment_methods').catch((e) => ({ ok: false, error: e.message })),
+          ottoGet('/shipping_methods').catch((e) => ({ ok: false, error: e.message })),
+        ]);
+        otto = {
+          available: !!(pay && pay.ok),
+          reason: pay && pay.ok ? null : `Couldn't read Otto's payment methods${pay && pay.error ? ` — ${pay.error}` : ''}.`,
+          paymentMethods: (pay && pay.ok && pay.data) || [],
+          shippingMethods: (ship && ship.ok && ship.data) || [],
+        };
+      }
+    } catch (e) {
+      otto = { available: false, reason: `Couldn't reach Otto Cap — ${e.message}`, paymentMethods: [], shippingMethods: [] };
+    }
+
+    return {
+      shipTo: shipFrom || {},
+      shipToComplete: shipFromComplete(shipFrom || {}),
+      suppliers: {
+        ss: {
+          // S&S numbers its shipping methods; 1 is ground. Their API has no method list to
+          // read, so this is the documented set rather than a live one — flagged as such
+          // so nobody assumes it reflects the account.
+          live: String(process.env.SS_ORDER_LIVE || '') === '1',
+          paymentMethods: null,
+          paymentNote: 'S&S bills the account on file — there is no payment method to choose per order.',
+          shippingMethods: [{ id: '1', label: 'Ground' }, { id: '2', label: '2nd Day Air' }, { id: '3', label: 'Next Day Air' }],
+          shippingNote: 'From the S&S Orders doc, not read from your account.',
+        },
+        otto: { live: String(process.env.OTTOCAP_ORDER_LIVE || '') === '1', ...otto },
+      },
+      defaults: {
+        ss_shipping_method: cfg.ss_shipping_method ?? '1',
+        otto_payment_method: cfg.otto_payment_method ?? 'net30',
+        otto_shipping_method: cfg.otto_shipping_method ?? '',
+        order_email: cfg.order_email ?? '',
+      },
+    };
+  });
+
   // Create/update one PO (draft edits, or status/meta after placing/receiving).
   // Writing a PO commits the factory to spend, so it is warehouse/admin — operator was
   // explicitly allowed here, which contradicted every other spend boundary in the app.
