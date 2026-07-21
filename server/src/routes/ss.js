@@ -26,6 +26,18 @@ const SS_CDN = 'https://cdn.ssactivewear.com/';
 // <img src="https://cdn.ssactivewear.com/…"> fails from our origin. Route every image URL
 // through our same-origin proxy (GET /api/ss/img) — the server fetches it (no browser
 // Origin / CORP restriction) and re-serves it. Returns a RELATIVE url so it works in dev + prod.
+/**
+ * Swap S&S's image size suffix.  _fs = small, _fm = medium (what they return), _fl = large.
+ *
+ * Documented on the styles object. It means a thumbnail costs nothing to store and little
+ * to move: we keep a URL, not an image, and asking for the SMALL variant on a list row
+ * avoids pulling a full-size product photo per line just to draw it at 40px.
+ */
+export function ssImgSize(u, size = 'fs') {
+  if (!u) return u;
+  return String(u).replace(/_(fs|fm|fl)(\.[a-z]+)$/i, `_${size}$2`);
+}
+
 function ssImg(u) {
   if (!u) return null;
   const abs = /^https?:/i.test(u) ? u : SS_CDN + String(u).replace(/^\//, '');
@@ -120,7 +132,7 @@ function mapProduct(p, meta) {
     map_price: num(p.mapPrice),
     qty: int(p.qty),
     warehouses: JSON.stringify(Array.isArray(p.warehouses) ? p.warehouses : []),
-    image: ssImg(p.colorFrontImage || p.colorSwatchImage),   // relative path → CDN-prefixed
+    image: ssImg(ssImgSize(p.colorFrontImage || p.colorSwatchImage, 'fs')),   // SMALL variant: list rows, not hero shots
     category: (meta && meta.category) || p.baseCategory || null,
     data: p,
   };
@@ -221,10 +233,15 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   let _stylesCache = { at: 0, data: null };
   let _stylesRefreshing = null;
   async function _pullStyles() {
-    const r = await ssGet('/styles/?fields=styleID,brandName,title,baseCategory,styleImage', 60000, true);   // 60s + BYPASS the cap
+    // styleName + partNumber are what a person actually types — "18500", "00760". They
+    // were never fetched, so searching for a style NUMBER matched nothing and the only
+    // way in was scrolling. They cost nothing to add to a list we already pull.
+    const r = await ssGet('/styles/?fields=styleID,partNumber,brandName,styleName,title,baseCategory,styleImage', 60000, true);   // 60s + BYPASS the cap
     if (!r.ok || !Array.isArray(r.data)) { const e = new Error('S&S styles fetch failed (' + r.status + ')'); e.status = r.status; throw e; }
     const mapped = r.data.map((s) => ({
       styleID: String(s.styleID),
+      partNumber: s.partNumber ? String(s.partNumber) : '',
+      styleName: s.styleName ? String(s.styleName) : '',
       brand: s.brandName || '',
       title: ((s.brandName ? s.brandName + ' ' : '') + (s.title || '')).trim() || (s.title || ''),
       category: s.baseCategory || '',
@@ -263,7 +280,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     try {
       let list = await fetchStyles();
       if (brand) list = list.filter((s) => s.brand.toLowerCase() === brand);
-      if (search) list = list.filter((s) => (s.title + ' ' + s.brand + ' ' + s.category).toLowerCase().includes(search));
+      // Search the NUMBERS as well as the words. "18500" and "Gildan 5000" are how a
+      // style is referred to on the floor and on every S&S page; matching only the
+      // marketing title meant the fastest way in didn't work.
+      if (search) list = list.filter((s) =>
+        (s.title + ' ' + s.brand + ' ' + s.category + ' ' + (s.styleName || '') + ' ' + (s.partNumber || ''))
+          .toLowerCase().includes(search));
       const total = list.length;
       let favs = new Set();
       try { const fr = await q('select style_id from ss_favorites'); favs = new Set(fr.rows.map((r) => String(r.style_id))); } catch (e) {}
@@ -295,7 +317,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         colors: Array.isArray(r.colors) ? r.colors : [],
         favorited: favs.has(String(r.style_id)),
       }));
-      if (search) list = list.filter((s) => (s.title + ' ' + s.brand + ' ' + s.category).toLowerCase().includes(search));
+      // Search the NUMBERS as well as the words. "18500" and "Gildan 5000" are how a
+      // style is referred to on the floor and on every S&S page; matching only the
+      // marketing title meant the fastest way in didn't work.
+      if (search) list = list.filter((s) =>
+        (s.title + ' ' + s.brand + ' ' + s.category + ' ' + (s.styleName || '') + ' ' + (s.partNumber || ''))
+          .toLowerCase().includes(search));
       list.sort((a, b) => (a.brand + a.title).localeCompare(b.brand + b.title));
       return { synced: true, total: list.length, styles: list.slice(offset, offset + limit) };
     } catch (e) { reply.code(500); return { error: 'synced styles error: ' + e.message }; }
@@ -889,19 +916,37 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       .filter((l) => l.identifier && l.qty > 0);
     if (!lines.length) { reply.code(400); return { error: 'No order lines — each needs a sku + qty.' }; }
     const wantLive = b.live === true;
+    // Their required address shape. Refuse rather than send a partial one: an order with
+    // no valid delivery address is the one thing that cannot be fixed after the fact.
+    const shippingAddress = toSsAddress(b.shippingAddress);
+    if (b.shippingAddress && !shippingAddress) {
+      reply.code(400);
+      return { error: 'The warehouse address is incomplete or malformed for S&S — it needs a street, city, 2-letter state and 5-digit ZIP.' };
+    }
+
     const payload = {
       testOrder: !wantLive,                          // S&S Test mode unless the caller explicitly asks for a live order
       poNumber: b.poNumber || ('EG-' + Date.now()),
       shippingMethod: b.shippingMethod || '1',
-      warehouseAbbr: b.warehouseAbbr || undefined,   // pickup DC (optional)
-      shippingAddress: b.shippingAddress || undefined,
+      shippingAddress: shippingAddress || undefined,
       emailConfirmation: b.email || undefined,
-      // Which stored card/bank pays. NOTE: the profile LIST endpoint is documented and
-      // its field confirmed; the name this takes on POST Orders is not — their doc says
-      // profileID is "used in POST - Orders" without naming the field. Sent under the
-      // conventional spelling, and visible in the dry-run payload for confirmation
-      // against the Orders doc before SS_ORDER_LIVE=1.
-      paymentProfileId: b.paymentProfileId || undefined,
+      // Let S&S choose the warehouses and split lines across them. Their doc: with this
+      // on, per-line warehouseAbbr is IGNORED — so sending both would be a contradiction
+      // where only one side wins silently. We have no view of their stock levels at
+      // order time, so they are better placed to decide than we are.
+      autoselectWarehouse: b.autoselectWarehouse !== false,
+      // A saved card/bank on the ssactivewear.com account. It is an OBJECT of
+      // {email, profileID} — NOT a flat id, which is what the profiles doc's phrasing
+      // ("used in POST - Orders") led me to guess before reading this page.
+      ...(b.paymentProfileId && b.paymentProfileEmail
+        ? { paymentProfile: { email: String(b.paymentProfileEmail), profileID: parseInt(b.paymentProfileId, 10) || undefined } }
+        : {}),
+      // FALSE on purpose: place what can be filled and report the rest, rather than
+      // rejecting a 12-line order because one blank is out of stock. The unfillable lines
+      // come back as LineErrors, which is information; a wholesale rejection is not.
+      rejectLineErrors: b.rejectLineErrors === true,
+      ...(b.shipByDate ? { shipByDate: String(b.shipByDate) } : {}),
+      ...(b.promotionCode ? { promotionCode: String(b.promotionCode) } : {}),
       lines
     };
     // GATE 1 — never contact S&S unless SS_ORDER_LIVE='1'. Default = DRY RUN (return the payload only).
@@ -917,7 +962,24 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       });
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch (e) { data = txt; }
       if (!r.ok) { reply.code(502); return { error: 'S&S rejected the order', status: r.status, testOrder: payload.testOrder, detail: data }; }
-      return { ok: true, testOrder: payload.testOrder, ssResponse: data };
+      // Products from multiple warehouses come back as MULTIPLE orders, and with
+      // rejectLineErrors=false the body carries lineErrors alongside them. Both are
+      // summarised rather than buried: "placed" hiding three unfilled lines is how a job
+      // reaches the floor missing its blanks.
+      const orders = Array.isArray(data) ? data.filter((x) => x && x.orderNumber) : (data && data.orderNumber ? [data] : []);
+      const lineErrors = Array.isArray(data) ? data.flatMap((x) => (x && Array.isArray(x.lineErrors)) ? x.lineErrors : [])
+        : (data && Array.isArray(data.lineErrors) ? data.lineErrors : []);
+      return {
+        ok: true, testOrder: payload.testOrder,
+        orders: orders.map((o) => ({
+          orderNumber: String(o.orderNumber), guid: o.guid || null, warehouse: o.warehouseAbbr || null,
+          status: o.orderStatus || null, total: Number(o.total) || 0,
+          expectedDelivery: o.expectedDeliveryDate || null, carrier: o.shippingCarrier || null,
+          shippingMethod: o.shippingMethod || null, lines: Array.isArray(o.lines) ? o.lines.length : 0,
+        })),
+        lineErrors,
+        ssResponse: data,
+      };
     } catch (e) {
       reply.code(502); return { error: 'S&S order request failed', detail: String((e && e.message) || e) };
     }
