@@ -600,26 +600,57 @@ export function ProductEditorDialog({
                        label, then the control. The old row squeezed a 32px thumb between
                        a label and a select, so the one thing you're choosing — a picture
                        — was the smallest element in its own control. */
-                    <div key={sd} className="flex w-28 flex-col gap-1.5">
-                      {shown ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={shown} alt="" className={"size-28 rounded-lg border-2 object-contain " + (override ? "border-primary" : "border-border opacity-70")} />
-                      ) : (
-                        <span className="grid size-28 place-items-center rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground"><ImageIcon size={20} /></span>
-                      )}
+                    /* The tile IS the control. There used to be a "Use settings" dropdown
+                       under every side — six visible selects saying the same thing, when
+                       following settings is the default and needs no instruction. Now:
+                       click the tile to change it, X to clear it back to settings, and a
+                       small tag only when this product actually disagrees with its type. */
+                    <div key={sd} className="group/side flex w-28 flex-col gap-1.5">
+                      <label className="relative block cursor-pointer">
+                        {shown ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={shown} alt="" className={"size-28 rounded-lg border-2 object-contain transition-colors " + (override ? "border-primary" : "border-border opacity-70 hover:opacity-100")} />
+                        ) : (
+                          <span className="grid size-28 place-items-center rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50"><ImageIcon size={20} /></span>
+                        )}
+                        {/* Says "this one is ours", so the absence of a tag means it's
+                            following the type — the common case stays silent. */}
+                        {override && (
+                          <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-primary/90 py-0.5 text-center text-xs font-medium text-primary-foreground">Custom</span>
+                        )}
+                        {/* A real select, visually hidden — keeps keyboard and screen-reader
+                            behaviour while the tile is what you actually click. */}
+                        <select
+                          aria-label={`Mockup for ${sd}`}
+                          value={override}
+                          onChange={(e) => setSideMockups((m) => {
+                            const next = { ...m }
+                            if (e.target.value) next[sd] = e.target.value; else delete next[sd]
+                            return next
+                          })}
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        >
+                          <option value="">{inherited ? "Use settings" : "None set"}</option>
+                          {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
+                        </select>
+                        {/* Clear back to the type's mockup. Only when there IS an override —
+                            an X that undoes nothing is a trap. */}
+                        {override && (
+                          <button
+                            type="button"
+                            aria-label={`Clear the ${sd} mockup`}
+                            title="Remove this override — go back to the type's mockup"
+                            onClick={(e) => {
+                              e.preventDefault(); e.stopPropagation()
+                              setSideMockups((m) => { const n = { ...m }; delete n[sd]; return n })
+                            }}
+                            className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/side:opacity-100 focus-visible:opacity-100"
+                          >
+                            <X size={12} weight="bold" />
+                          </button>
+                        )}
+                      </label>
                       <span className="truncate text-xs font-medium capitalize">{sd}</span>
-                      <select
-                        value={override}
-                        onChange={(e) => setSideMockups((m) => {
-                          const next = { ...m }
-                          if (e.target.value) next[sd] = e.target.value; else delete next[sd]
-                          return next
-                        })}
-                        className="eg-select h-8 w-full rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
-                      >
-                        <option value="">{inherited ? "Use settings" : "None set"}</option>
-                        {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
-                      </select>
                     </div>
                   )
                 })}
