@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import { signup, login, verify, isStaff, googleAuth, normalizeUsername, ensureUsernameColumn } from './auth.js';
 import { q } from './db.js';
 import { ordersRoutes } from './routes/orders.js';
+import { orderRefundRoutes } from './routes/order_refunds.js';
 import { inventoryRoutes } from './routes/inventory.js';
 import { designCardsRoutes } from './routes/design_cards.js';
 import { catalogRoutes } from './routes/catalog.js';
@@ -243,6 +244,7 @@ app.post('/api/auth/google', async (req, reply) => {
 
 // ── Data routes ──
 ordersRoutes(app, requireAuth);
+orderRefundRoutes(app, requireAuth);                    // itemised per-order charges + partial refunds back to the seller's wallet (admin/warehouse only)
 inventoryRoutes(app, requireStaff, requireWarehouse);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin);
 catalogRoutes(app, requireAuth, requireStaff);

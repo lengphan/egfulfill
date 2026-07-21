@@ -9,6 +9,7 @@ import { notify } from './notifications.js';
 import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
+import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
 import { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
@@ -205,8 +206,7 @@ async function shipBlockers(orderId) {
 // Both sides move through wallet.js's moveFunds (one money mechanism for the whole
 // app) and are idempotent on the order id, so a double-click, a retry, or two tabs
 // submitting at once can only ever produce ONE charge and ONE refund.
-const CHARGE_TYPE = 'order-charge';
-const REFUND_TYPE = 'order-refund';
+const CHARGE_TYPE = 'order-charge';   // refunds live in order_refunds.js
 
 // Has this order already been charged? Reads the ledger rather than a flag on the
 // order — the ledger is the source of truth for money, and a flag could drift from it.
@@ -216,12 +216,10 @@ async function chargedAmount(orderId) {
     [String(orderId), CHARGE_TYPE + '-in']);      // the factory's credit leg
   return parseFloat(r.rows[0].amt) || 0;
 }
-async function refundedAmount(orderId) {
-  const r = await q(
-    `select coalesce(sum(delta),0) as amt from wallet_ledger where ref=$1 and type=$2`,
-    [String(orderId), REFUND_TYPE + '-in']);      // the seller's credit leg
-  return parseFloat(r.rows[0].amt) || 0;
-}
+// (A refundedAmount() used to live here, matching refunds on the bare order id. Partial
+// refunds key on `refund-<id>-<n>`, so it silently under-counted them — and anything
+// deciding "how much is left" from an under-count pays out money twice. orderCharges()
+// in order_refunds.js is the one reader now.)
 
 // Charge the seller for an order. Returns {ok} or {error, ...} — never throws for an
 // expected refusal (short balance, unpriceable line), so the caller can pass the
@@ -263,16 +261,24 @@ async function chargeForSubmit(orderId, sellerId, by, hideMoney = false) {
 
 // Reverse the charge when a seller cancels inside their zone. Idempotent: refunding
 // twice is a no-op, and an order that was never charged has nothing to give back.
+//
+// Refunds what is LEFT, not what was charged. Admin/warehouse can now issue partial
+// refunds mid-flight (order_refunds.js), so "charged $50" no longer implies "$50 is
+// owed back" — a $10 goodwill refund followed by a cancel must return $40, not $50.
+// Reading the remainder makes both directions safe: nothing is paid twice, and a
+// partly-refunded order still gets its balance back rather than being treated as done.
 async function refundForCancel(orderId, sellerId, by) {
-  const charged = await chargedAmount(orderId);
-  if (charged <= 0) return { ok: true, nothingToRefund: true };
-  if (await refundedAmount(orderId) > 0) return { ok: true, already: true };
-  await moveFunds({ from: 'factory', to: sellerId, amount: charged, type: REFUND_TYPE,
-                    ref: String(orderId), note: `Order ${orderId} cancelled — refund`, by });
+  const state = await orderCharges(orderId);
+  if (state.charged <= 0) return { ok: true, nothingToRefund: true };
+  if (state.refundable <= 0) return { ok: true, already: true };
+  const out = await refundOrder({ orderId, amount: state.refundable, by,
+                                  note: `Order ${orderId} cancelled — refund`,
+                                  clientId: `cancel-${orderId}` });
+  if (out.error) return out;
   // Give the units back. Without this a cancelled order strands the seller's own stock
   // as permanently reserved against work that will never happen.
   releaseConsigned(orderId).catch(() => {});
-  return { ok: true, refunded: charged };
+  return { ok: true, refunded: out.refunded };
 }
 
 export function ordersRoutes(app, requireAuth) {

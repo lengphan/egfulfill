@@ -16,10 +16,6 @@ import { shippingBandOf, SETTING_DEFAULTS } from './routes/factory_settings.js';
 const num = (v) => { const n = parseFloat(v); return isFinite(n) ? n : null; };
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-// Platform fee defaults. Keys are `ship_first`/`ship_extra` — the ones factory_settings.js
-// reads and the Settings UI writes. (schema.sql also seeds eg_default_shipping_fee /
-// eg_default_addl_item_fee, but nothing has ever read those; they're old-app orphans.)
-const FALLBACK = { ship_first: 5, ship_extra: 2 };
 // The per-band shipping and per-method surcharge keys, so a settings change is a pricing
 // change without a deploy. Defaults come from factory_settings so the admin screen and
 // the billing path can't disagree about what "unset" means.
@@ -31,7 +27,9 @@ const FEE_KEYS = [
   'base_markup',
 ];
 export async function feeSettings() {
-  const out = { ...FALLBACK, ...SETTING_DEFAULTS };
+  // SETTING_DEFAULTS is the ONE definition of an unset fee — the Settings screen reads
+  // the same object, so what an admin sees is what the quote charges.
+  const out = { ...SETTING_DEFAULTS };
   try {
     const r = await q(`select key, value from settings where key = any($1)`, [FEE_KEYS]);
     for (const row of r.rows) { const n = num(row.value); if (n != null && n >= 0) out[row.key] = n; }

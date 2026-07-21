@@ -29,6 +29,15 @@ const KEYS = [
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.
 export const SETTING_DEFAULTS = {
+  // Default shipping. These were in KEYS but had NO default here, so the Settings screen
+  // rendered them as $0.00 while pricing.js used a private fallback of 5/2 — two numbers
+  // for one fee, and the screen showing the wrong one. Worse, saving that screen wrote
+  // the 0 back and shipping really did become free. Values match the legacy seeds
+  // (eg_default_shipping_fee / eg_default_addl_item_fee in schema.sql).
+  ship_first: 5,       // first unit — one order is one parcel
+  ship_extra: 2,       // every additional UNIT in that same parcel
+  design_fee: 2.5,     // design service, per order (legacy eg_designer_fee_rate)
+  emb_price: 0,        // default price of an embroidery FILE; per-file price overrides
   ship_cap: 5.99,      // caps / hats
   ship_heavy: 9.99,    // sweatshirts / hoodies / jackets
   ship_garment: 6.99,  // everything else

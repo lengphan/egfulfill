@@ -74,16 +74,25 @@ export function notificationRoutes(app, requireAuth) {
   ensureNotifications().catch(() => {});
 
   // The bell: recent notifications + unread count.
+  // The bell reads the top of this list; the notifications PAGE pages through all of
+  // it. Same endpoint on purpose — one channel per user, two views of it — so a
+  // role-targeted announcement lands in exactly one place.
   app.get('/api/notifications', { preHandler: requireAuth }, async (req) => {
     await ensureNotifications();
-    const limit = Math.min(50, Math.max(1, Number(req.query?.limit) || 20));
+    const limit = Math.min(100, Math.max(1, Number(req.query?.limit) || 20));
+    const offset = Math.max(0, Number(req.query?.offset) || 0);
+    const unreadOnly = String(req.query?.unread || '') === '1';
+    const where = unreadOnly ? 'and read_at is null' : '';
     const r = await q(
       `select id, type, title, body, href, entity_id, read_at, created_at
-         from notifications where user_id=$1 order by created_at desc limit $2`,
-      [req.user.sub, limit]
+         from notifications where user_id=$1 ${where}
+         order by created_at desc limit $2 offset $3`,
+      [req.user.sub, limit, offset]
     );
     const c = await q('select count(*)::int as n from notifications where user_id=$1 and read_at is null', [req.user.sub]);
-    return { unread: c.rows[0]?.n || 0, notifications: r.rows };
+    // Total for the CURRENT filter, so the pager knows how far it goes.
+    const t = await q(`select count(*)::int as n from notifications where user_id=$1 ${where}`, [req.user.sub]);
+    return { unread: c.rows[0]?.n || 0, total: t.rows[0]?.n || 0, notifications: r.rows };
   });
 
   // Mark one read, or all when no id is given.
