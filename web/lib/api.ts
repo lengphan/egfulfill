@@ -769,6 +769,23 @@ export function getDispatchStatus() {
 export function pushToDispatch(orderIds: string[]) {
   return api<DispatchPushResult>(`/api/dispatch/push`, { method: "POST", body: JSON.stringify({ orderIds }) })
 }
+/**
+ * Pull labels back OUT of the pre-scan queue — "we pushed 5, one got picked, we want the
+ * other 4 back". Per order, because each push uploads its own PDF.
+ *
+ * `reason` per order: 'already-scanned' means the partner has picked it and the buyer's
+ * tracking clock has started, so it genuinely can't be recalled. 'not-pushed' means it
+ * was never there.
+ */
+export type DispatchCancelResult = {
+  ok?: boolean
+  cancelled?: number
+  results?: { id: string; ok: boolean; reason?: string }[]
+  error?: string
+}
+export function cancelDispatch(orderIds: string[]) {
+  return api<DispatchCancelResult>(`/api/dispatch/cancel`, { method: "POST", body: JSON.stringify({ orderIds }) })
+}
 export function syncDispatch() {
   return api<{ ok?: boolean; checked?: number; scanned?: number }>(`/api/dispatch/sync`, { method: "POST" })
 }
@@ -1433,4 +1450,34 @@ export function runAddressSheet() {
 /** The seller's unique inbound address for forwarding Etsy sale emails. */
 export function getIngestAddress() {
   return api<{ token: string | null; address: string | null; configured: boolean }>(`/api/mail/ingest-address`)
+}
+
+// ── Per-order charges + refunds ────────────────────────────────────────────────
+// Charges are itemised into PARTS (product / shipping / expedite / …) so a refund can
+// name what goes back rather than only how much — the same shape a marketplace refund
+// takes. Reading is staff-wide; issuing is admin/warehouse, enforced server-side.
+export type OrderChargePart = {
+  key: string; label: string; charged: number; refunded: number; refundable: number
+}
+export type OrderCharges = {
+  lines: { part: string; label: string; amount: number; note?: string | null; at: string }[]
+  parts: OrderChargePart[]
+  refunds: { amount: number; part: string | null; note?: string | null; at: string; by?: string | null }[]
+  charged: number; refunded: number; refundable: number
+  canRefund?: boolean
+}
+export function getOrderCharges(id: string) {
+  return api<OrderCharges>(`/api/orders/${encodeURIComponent(id)}/charges`)
+}
+/** `full` refunds everything left; `select` names parts to refund whole; `amount` is
+ *  either a figure (spent top-down) or a per-part map. `clientId` makes a double-click
+ *  idempotent — the server dedupes on it. */
+export function refundOrder(
+  id: string,
+  body: { full?: boolean; select?: string[]; amount?: number | Record<string, number>; note?: string; clientId?: string }
+) {
+  return api<OrderCharges & { ok?: boolean; refunded?: number; error?: string; balance?: number | null }>(
+    `/api/orders/${encodeURIComponent(id)}/refund`,
+    { method: "POST", body: JSON.stringify(body) }
+  )
 }

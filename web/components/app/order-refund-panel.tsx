@@ -1,0 +1,197 @@
+"use client"
+
+import { useCallback, useEffect, useRef, useState } from "react"
+import { ArrowUUpLeft, CircleNotch, CheckCircle, Warning } from "@phosphor-icons/react"
+import { SectionCard } from "@/components/app/section-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { getOrderCharges, refundOrder, type OrderCharges } from "@/lib/api"
+
+const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+
+// Module scope, not the component body: these are impure, and the purity lint rightly
+// refuses them during render. One id per refund press, so the server can dedupe a retry.
+const newClientId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+
+/**
+ * Refund panel — admin and warehouse only.
+ *
+ * Shows what an order actually charged, split into parts, and lets whoever's handling it
+ * send back some or all of it. The parts exist because a refund is rarely the whole
+ * order: shipping goes back when a parcel is late, the garment goes back when it's
+ * misprinted, and the expedite fee usually does NOT go back because we already paid the
+ * partner for it.
+ *
+ * Deliberately shows what's already been refunded per part. The dangerous mistake here
+ * isn't refunding too little, it's refunding the same thing twice because the first one
+ * isn't visible — the server caps it either way, but a refusal after the fact reads as a
+ * bug, where a struck-through balance reads as information.
+ */
+export function OrderRefundPanel({ orderId }: { orderId: string }) {
+  const [state, setState] = useState<OrderCharges | null>(null)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [amounts, setAmounts] = useState<Record<string, string>>({})
+  const [note, setNote] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // A REF, not the `busy` state, guards re-entry. State updates are async, so a fast
+  // double-click can land a second press before `busy` has re-rendered the button into
+  // its disabled form — and each press mints its own idempotency key, so two presses
+  // would be two genuinely different refunds rather than one deduped retry. Declared
+  // with the other hooks, above the early returns, so the hook order never varies.
+  const sending = useRef(false)
+
+  const load = useCallback(() => {
+    getOrderCharges(orderId).then(setState).catch(() => setState(null))
+  }, [orderId])
+  useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+
+  // Staff who can't refund don't get the panel at all. The server enforces this; hiding
+  // it just avoids offering an action that would only ever 403.
+  if (!state || !state.canRefund) return null
+  // Nothing was ever charged (an unsubmitted order) — there's no money story to tell yet.
+  if (state.charged <= 0) return null
+
+  const parts = state.parts
+  const toggle = (k: string) => setPicked((p) => {
+    const n = new Set(p); if (!n.delete(k)) n.add(k); return n
+  })
+
+  // What the current selection would pay out. A typed amount overrides a ticked part, so
+  // the figure shown is always the figure that will move.
+  const selected = parts.filter((p) => picked.has(p.key) && p.refundable > 0)
+  const planned = selected.reduce((s, p) => {
+    const typed = Number(amounts[p.key])
+    return s + (isFinite(typed) && typed > 0 ? Math.min(typed, p.refundable) : p.refundable)
+  }, 0)
+
+  const send = async (mode: "full" | "selected") => {
+    if (sending.current) return
+    sending.current = true
+    setBusy(true); setMsg(null)
+    const clientId = newClientId()
+    try {
+      const body = mode === "full"
+        ? { full: true, note: note.trim() || undefined, clientId }
+        : {
+            amount: Object.fromEntries(selected.map((p) => {
+              const typed = Number(amounts[p.key])
+              return [p.key, isFinite(typed) && typed > 0 ? Math.min(typed, p.refundable) : p.refundable]
+            })),
+            note: note.trim() || undefined, clientId,
+          }
+      const r = await refundOrder(orderId, body)
+      if (r.error) { setMsg({ ok: false, text: r.error }); return }
+      setMsg({ ok: true, text: `Refunded ${usd(r.refunded || 0)} to the seller's wallet.` })
+      setPicked(new Set()); setAmounts({}); setNote("")
+      setState(r)
+    } catch {
+      setMsg({ ok: false, text: "Couldn't process the refund — nothing was charged back." })
+    } finally { sending.current = false; setBusy(false) }
+  }
+
+  const nothingLeft = state.refundable <= 0
+
+  return (
+    <SectionCard
+      title="Refund"
+      description="Send part or all of this order back to the seller's wallet"
+      actions={<span className="text-xs text-muted-foreground">{usd(state.refundable)} refundable</span>}
+    >
+      <div className="divide-y divide-border">
+        {parts.map((p) => {
+          const spent = p.refundable <= 0
+          return (
+            <label
+              key={p.key}
+              className={"flex items-center gap-3 px-5 py-2.5 text-sm " + (spent ? "opacity-60" : "cursor-pointer")}
+            >
+              <input
+                type="checkbox"
+                disabled={spent || busy}
+                checked={picked.has(p.key)}
+                onChange={() => toggle(p.key)}
+                className="size-4 accent-primary"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium">{p.label}</div>
+                {/* State what's gone rather than only what's left — a part that's already
+                    been refunded should say so, not just look unavailable. */}
+                <div className="text-xs text-muted-foreground">
+                  {usd(p.charged)} charged
+                  {p.refunded > 0 && <> · <span className="text-emerald-600">{usd(p.refunded)} refunded</span></>}
+                </div>
+              </div>
+              {spent ? (
+                <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                  <CheckCircle size={12} weight="fill" /> fully refunded
+                </span>
+              ) : (
+                <Input
+                  value={amounts[p.key] ?? ""}
+                  placeholder={p.refundable.toFixed(2)}
+                  disabled={busy || !picked.has(p.key)}
+                  onChange={(e) => setAmounts((a) => ({ ...a, [p.key]: e.target.value.replace(/[^0-9.]/g, "") }))}
+                  inputMode="decimal"
+                  className="h-8 w-24 text-right tabular-nums"
+                />
+              )}
+            </label>
+          )
+        })}
+      </div>
+
+      <div className="space-y-3 border-t border-border px-5 py-4">
+        {msg && (
+          <div className={"flex items-start gap-2 rounded-lg border px-3 py-2 text-sm " +
+            (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>
+            {msg.ok ? <CheckCircle size={15} weight="fill" className="mt-0.5 shrink-0" /> : <Warning size={15} weight="fill" className="mt-0.5 shrink-0" />}
+            <span>{msg.text}</span>
+          </div>
+        )}
+        {nothingLeft ? (
+          <p className="text-sm text-muted-foreground">Everything charged on this order has been refunded.</p>
+        ) : (
+          <>
+            <Input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Reason (shown on the ledger entry)"
+              disabled={busy}
+              className="h-9"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={() => send("selected")} disabled={busy || !selected.length}>
+                {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowUUpLeft size={13} weight="bold" />}
+                {selected.length ? `Refund ${usd(planned)}` : "Refund selected"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => send("full")} disabled={busy}>
+                Refund everything ({usd(state.refundable)})
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Goes straight to the seller&apos;s wallet balance. Tick a part to refund it in full, or type an
+              amount to refund some of it.
+            </p>
+          </>
+        )}
+      </div>
+
+      {state.refunds.length > 0 && (
+        <div className="border-t border-border px-5 py-3">
+          <div className="mb-1.5 text-xs font-medium text-muted-foreground">Already refunded</div>
+          <div className="space-y-1">
+            {state.refunds.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="tabular-nums text-emerald-600">{usd(r.amount)}</span>
+                {r.part && <span>· {parts.find((p) => p.key === r.part)?.label ?? r.part}</span>}
+                {r.note && <span className="truncate">· {r.note}</span>}
+                <span className="ml-auto shrink-0">{new Date(r.at).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  )
+}

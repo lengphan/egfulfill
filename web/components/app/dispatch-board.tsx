@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, markLabelPrinted, type OrderRow } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage } from "@/lib/factory-status"
@@ -34,11 +34,11 @@ const NEXT = "working"
 
 export function DispatchBoard() {
   const role = getUser()?.role || ""
-  // Operator sees the queue but changes nothing. Dispatch stages belong to admin and
-  // warehouse — an operator needs to know what's going out today without being able to
-  // claim it went. canSetStage already refuses their writes; this makes the UI say so
-  // instead of showing controls that would silently fail.
-  const viewOnly = role === "operator"
+  // Operators work this board too — they are the ones who notice a label shouldn't go
+  // out. What they cannot do is claim a parcel LEFT: "Mark scanned" asserts physical
+  // custody and stays warehouse/admin (canSetStage refuses it server-side anyway).
+  // Everything else here — printing, and pulling a label back — is theirs.
+  const canScanOut = role !== "operator"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
@@ -89,6 +89,35 @@ export function DispatchBoard() {
     setPicked(new Set())
     if (failed.length) setErr(`Couldn't advance ${failed.length} order${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
     load()
+  }
+
+  /**
+   * Pull the chosen labels back out of the partner's pre-scan queue.
+   *
+   * Reported per order rather than as one pass/fail: the whole point is the mixed case —
+   * push 5, one gets picked, recall the other 4. Anything already picked is refused by
+   * the partner (409) because the buyer's tracking clock has started, and that refusal
+   * is correct, so it's shown as a fact rather than an error to retry.
+   */
+  const pullBack = async () => {
+    if (!chosen.length) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await cancelDispatch(chosen.map((o) => o.id))
+      if (r.error) throw new Error(r.error)
+      const results = r.results ?? []
+      const scanned = results.filter((x) => !x.ok && x.reason === "already-scanned").length
+      const other = results.filter((x) => !x.ok && x.reason !== "already-scanned")
+      const parts: string[] = []
+      if (r.cancelled) parts.push(`Pulled ${r.cancelled} back`)
+      if (scanned) parts.push(`${scanned} already picked and can't be recalled`)
+      if (other.length) parts.push(`${other.length} failed (${other[0].reason})`)
+      setErr(parts.length ? parts.join(" · ") : "Nothing to pull back.")
+      setPicked(new Set())
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't pull those labels back.")
+    } finally { setBusy(false) }
   }
 
   /** Open each label for printing. Popup blockers stop the second window onward, so say so. */
@@ -169,22 +198,24 @@ export function DispatchBoard() {
 
       <SectionCard
         title="Dispatch"
-        description={viewOnly
-          ? "Labelled and waiting to be scanned — view only; warehouse and admin scan the batch out."
-          : "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."}
+        description={canScanOut
+          ? "Labelled and waiting to be scanned. Print the batch, scan it, then move it into production."
+          : "Labelled and waiting to be scanned. You can print and pull labels back; warehouse and admin scan the batch out."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" disabled={!chosen.length} onClick={printManifest}>
               <ListChecks size={14} weight="bold" /> Print manifest
             </Button>
-            {/* Opening labels STAMPS them as printed, so it's a write — not available
-                view-only. The manifest is a pure read and stays. */}
-            {!viewOnly && (
-              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length} onClick={openLabels}>
-                <Printer size={14} weight="bold" /> Open labels
-              </Button>
-            )}
-            {!viewOnly && (
+            <Button size="sm" variant="outline" disabled={!chosenWithLabel.length} onClick={openLabels}>
+              <Printer size={14} weight="bold" /> Open labels
+            </Button>
+            {/* Pull back. The reason this exists: a batch goes to the partner, some of it
+                gets picked, and the rest shouldn't ship today. Anything already picked is
+                refused per-order by the partner (409) — the rest still come back. */}
+            <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={pullBack}>
+              <ArrowUUpLeft size={14} weight="bold" /> Pull back
+            </Button>
+            {canScanOut && (
             <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
               {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark scanned</>}
             </Button>

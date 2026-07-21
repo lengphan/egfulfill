@@ -7,6 +7,7 @@ import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { OrderRefundPanel } from "@/components/app/order-refund-panel"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -441,6 +442,10 @@ export default function OrderDetailPage() {
               ) : null}
             </dl>
           </SectionCard>
+
+          {/* Sits under Summary: what was charged, then what can be sent back. Renders
+              nothing for sellers and for staff without the permission. */}
+          <OrderRefundPanel orderId={id} />
         </div>
       </div>
 
