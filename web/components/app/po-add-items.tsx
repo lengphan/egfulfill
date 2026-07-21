@@ -134,6 +134,13 @@ export function POAddItems({
    * many distinct products matched. A style is what a person is looking for; the colour
    * and size are how they narrow it once found.
    */
+  /** Style hits that AREN'T already covered by a local result — the rest of the range. */
+  const extraStyleHits = useMemo(() => {
+    if (!ssStyleHits) return []
+    const have = new Set((ss ?? []).map((p) => String(p.style_id ?? "")))
+    return ssStyleHits.filter((st) => !have.has(String(st.styleID)))
+  }, [ssStyleHits, ss])
+
   const ssStyles = useMemo(() => {
     const g = new Map<string, { key: string; title: string; brand: string | null; styleNo: string | null; image: string | null; priceLo: number; priceHi: number; rows: SsProduct[] }>()
     for (const p of ss ?? []) {
@@ -172,9 +179,11 @@ export function POAddItems({
     getSsProducts({ search: q, limit: 200 }).then((r) => {
       const found = r?.products ?? []
       setSs(found)
-      // Nothing locally? Ask the STYLE list, which is cached whole and covers everything
-      // S&S sell. The style is what a person knows; its skus are fetched when opened.
-      if (!found.length && q) {
+      // ALWAYS ask the style list too, not only when the local table came back empty.
+      // Firing it only on zero results meant one synced style hid every other style S&S
+      // sell under the same word — searching "comfort" returned the two Comfort Colors
+      // rows already synced and silently suppressed the rest of the range.
+      if (q) {
         getSsStylesAll({ search: q, limit: 120 }).then((sr) => setSsStyleHits(sr?.styles ?? [])).catch(() => setSsStyleHits([]))
       } else setSsStyleHits(null)
     }).catch(() => setSs([]))
@@ -238,6 +247,52 @@ export function POAddItems({
   const chosen = Object.values(picked)
   const commit = () => { if (chosen.length) onAdd(chosen); onClose() }
 
+  /** One already-synced style, expandable to the variants we hold locally. */
+  const renderLocalStyle = (g: { key: string; title: string; brand: string | null; styleNo: string | null; image: string | null; priceLo: number; priceHi: number; rows: SsProduct[] }) => {
+
+                  const open = openSsStyle === g.key
+                  const chosen = g.rows.filter((r) => picked[r.sku]).length
+                  return (
+                    <div key={g.key}>
+                      {/* One row per product. The count is the useful part — "42 colours
+                          & sizes" says at a glance whether this is the thing you want. */}
+                      <button type="button" onClick={() => setOpenSsStyle((s2) => (s2 === g.key ? null : g.key))}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+                        {g.image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={g.image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+                          : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{g.title}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {g.styleNo ? `Style ${g.styleNo} · ` : ""}{g.rows.length} colour{g.rows.length === 1 ? "" : "s"} &amp; size{g.rows.length === 1 ? "" : "s"}
+                            {chosen > 0 ? ` · ${chosen} picked` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {g.priceHi > 0
+                            ? (g.priceLo === g.priceHi ? money(g.priceHi) : `${money(g.priceLo)}–${money(g.priceHi)}`)
+                            : ""}
+                        </span>
+                        <Plus size={13} weight="bold" className={"shrink-0 transition-transform " + (open ? "rotate-45" : "")} />
+                      </button>
+                      {open && (
+                        <div className="border-t border-border bg-muted/30 pl-6">
+                          {g.rows.map((p) => (
+                            <PickRow key={p.sku}
+                              line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
+                              image={p.image ?? null}
+                              title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
+                              meta={[{ k: "SKU", v: p.sku }]}
+                              right={money(p.price)}
+                              on={!!picked[p.sku]} onToggle={toggle} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+  }
+
   return (
     <Dialog open={!!po} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="sm:max-w-3xl">
@@ -286,11 +341,19 @@ export function POAddItems({
 
           {tab === "ss" && (
             ss === null ? <Loading />
-              : ss.length === 0 && ssStyleHits && ssStyleHits.length > 0 ? (
-                // Not synced, but S&S DO sell it. Open a style to pull its skus live —
-                // they're cached on the way through, so it's searchable from then on.
+              : (ss.length > 0 || extraStyleHits.length > 0) ? (
+                // Synced styles first, then the rest of the range. Gating the style search
+                // on "no local results" meant one synced style hid every other style S&S
+                // sell under the same word.
                 <>
-                  {ssStyleHits.map((st) => (
+                  {/* Already-synced styles, expandable to the variants we hold. */}
+                  {ssStyles.map(renderLocalStyle)}
+                  {extraStyleHits.length > 0 && ss.length > 0 && (
+                    <div className="border-y border-border bg-muted/40 px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                      More from S&amp;S — open one to load its colours and sizes
+                    </div>
+                  )}
+                  {extraStyleHits.map((st) => (
                     <div key={st.styleID}>
                       <button type="button" onClick={() => expandSs(String(st.styleID))}
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
@@ -325,50 +388,7 @@ export function POAddItems({
                   ))}
                 </>
               )
-              : ss.length === 0 ? <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
-                : ssStyles.map((g) => {
-                  const open = openSsStyle === g.key
-                  const chosen = g.rows.filter((r) => picked[r.sku]).length
-                  return (
-                    <div key={g.key}>
-                      {/* One row per product. The count is the useful part — "42 colours
-                          & sizes" says at a glance whether this is the thing you want. */}
-                      <button type="button" onClick={() => setOpenSsStyle((s2) => (s2 === g.key ? null : g.key))}
-                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
-                        {g.image
-                          // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={g.image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
-                          : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{g.title}</span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {g.styleNo ? `Style ${g.styleNo} · ` : ""}{g.rows.length} colour{g.rows.length === 1 ? "" : "s"} &amp; size{g.rows.length === 1 ? "" : "s"}
-                            {chosen > 0 ? ` · ${chosen} picked` : ""}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {g.priceHi > 0
-                            ? (g.priceLo === g.priceHi ? money(g.priceHi) : `${money(g.priceLo)}–${money(g.priceHi)}`)
-                            : ""}
-                        </span>
-                        <Plus size={13} weight="bold" className={"shrink-0 transition-transform " + (open ? "rotate-45" : "")} />
-                      </button>
-                      {open && (
-                        <div className="border-t border-border bg-muted/30 pl-6">
-                          {g.rows.map((p) => (
-                            <PickRow key={p.sku}
-                              line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
-                              image={p.image ?? null}
-                              title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
-                              meta={[{ k: "SKU", v: p.sku }]}
-                              right={money(p.price)}
-                              on={!!picked[p.sku]} onToggle={toggle} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
+              : <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
           )}
 
           {tab === "otto" && (
