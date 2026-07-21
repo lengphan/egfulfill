@@ -80,6 +80,84 @@ async function pink(path, init = {}) {
 // that. Same rule as the dispatch partner.
 const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500;
 
+
+/**
+ * Send one line item out for design. Returns a plain result — no reply object — because
+ * two very different callers need it: the staff-initiated push route, and the automatic
+ * routing that fires when a DTG/DTF line enters the design stage.
+ *
+ * The artwork has to be reachable by THEM, so this requires a stored URL — a design still
+ * inline as base64 has no address. Rather than fail vaguely, it says exactly that.
+ */
+export async function pushToPink({ orderId, sku, boardId: wantBoard, description, productType, designType }) {
+  if (!pinkEnabled()) return { error: 'Design partner not configured (PINKDESIGN_API_KEY).', status: 400 };
+  const oid = String(orderId || '');
+  const isku = sku != null ? String(sku) : null;
+  if (!oid || !isku) return { error: 'orderId and sku required', status: 400 };
+
+  // Board: explicit wins, else the configured one, else — when the account has exactly
+  // ONE board — just use it. Making someone copy an id they have no choice about is a
+  // config step that can only be got wrong.
+  let board = String(wantBoard || boardId() || '');
+  if (!board) {
+    const bl = await pink('/board_list');
+    const list = (bl.ok && (Array.isArray(bl.data) ? bl.data : bl.data?.data)) || [];
+    if (list.length === 1) board = String(list[0].id ?? list[0].board_id ?? list[0]._id ?? '');
+    else if (list.length > 1) {
+      return { error: 'Several boards exist — choose one (Settings › Integrations, PINKDESIGN_BOARD_ID).', status: 400,
+               boards: list.map((x) => ({ id: x.id ?? x.board_id, name: x.name ?? x.title })) };
+    }
+  }
+  if (!board) return { error: 'No board available from Pink Design — check /api/pinkdesign/status.', status: 400 };
+
+  const item = (await q(
+    `select i.sku, i.name, i.qty, i.print_type, o.id as order_id
+       from order_items i join orders o on o.id = i.order_id
+      where i.order_id=$1 and i.sku=$2 limit 1`, [oid, isku]
+  )).rows[0];
+  if (!item) return { error: 'Line item not found', status: 404 };
+
+  const design = (await q(
+    'select storage_key, data from order_designs where order_id=$1 and sku=$2 limit 1', [oid, isku]
+  )).rows[0];
+  if (!design) return { error: 'No artwork on this line yet — nothing to send.', status: 400 };
+  const { presignGet, storageEnabled, designUrlTtlDays, publicUrl } = await import('../storage.js');
+  if (!design.storage_key) {
+    return { status: 400, error: storageEnabled()
+      ? 'This artwork predates object storage, so it has no URL. Re-upload it on the order and push again.'
+      : 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.' };
+  }
+  const imageUrl = designUrlTtlDays() > 0 ? presignGet(design.storage_key) : publicUrl(design.storage_key);
+
+  const payload = {
+    title: `${item.name || item.sku} · order ${oid}`,
+    qty: Number(item.qty) || 1,
+    board_id: board,
+    description: description || `Print method: ${item.print_type || 'DTG'}. Order ${oid}, SKU ${item.sku}.`,
+    images: [imageUrl],
+    ...(productType ? { product_type: productType } : {}),
+    ...(designType ? { design_type: designType } : {}),
+  };
+  const r = await pink('/create_task', { method: 'POST', body: JSON.stringify(payload) });
+  if (!r.ok) {
+    const msg = (r.data && (r.data.message || r.data.error)) || r.error || `create_task failed (${r.status})`;
+    // Their words verbatim — with no documented error codes this is the only diagnostic.
+    return { error: msg, status: 502, retryable: isRetryable(r) };
+  }
+  const refId = r.data && (r.data.ref_id ?? r.data.refId ?? r.data.id);
+
+  // Track it as a design card marked OUTSOURCED, so it shows on the board with the
+  // partner badge, can't be claimed by one of our designers, and never pays one.
+  await q(
+    `insert into design_cards (order_id, sku, title, col, type, product, vendor, vendor_ref, payment, pay_status)
+     values ($1,$2,$3,'inprogress',$4,$5,'pinkdesign',$6,0,'na')
+     on conflict do nothing`,
+    [oid, item.sku, payload.title, item.print_type || null, item.name || null, String(refId)]
+  ).catch(() => {});
+
+  return { ok: true, refId, board };
+}
+
 export function pinkDesignRoutes(app, requireAuth, requireStaff) {
   /**
    * Is the key live, and what can we send to? Doubles as the "verify my key" check and as
@@ -111,88 +189,13 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     };
   });
 
-  /**
-   * Send one line item out for design.
-   *
-   * The artwork has to be reachable by THEM, so this requires a stored URL — a design
-   * still inline as base64 has no address. Rather than fail vaguely, say exactly that.
-   */
   app.post('/api/pinkdesign/push', { preHandler: requireStaff }, async (req, reply) => {
-    if (!pinkEnabled()) { reply.code(400); return { error: 'Design partner not configured (PINKDESIGN_API_KEY).' }; }
-    const b = req.body || {};
-    const orderId = String(b.orderId || '');
-    const sku = b.sku != null ? String(b.sku) : null;
-    if (!orderId || !sku) { reply.code(400); return { error: 'orderId and sku required' }; }
-    // Board: explicit wins, else the configured one, else — when the account has exactly
-    // ONE board — just use it. Making someone copy an id they have no choice about is a
-    // config step that can only be got wrong.
-    let board = String(b.boardId || boardId() || '');
-    if (!board) {
-      const bl = await pink('/board_list');
-      const list = (bl.ok && (Array.isArray(bl.data) ? bl.data : bl.data?.data)) || [];
-      if (list.length === 1) board = String(list[0].id ?? list[0].board_id ?? list[0]._id ?? '');
-      else if (list.length > 1) {
-        reply.code(400);
-        return { error: 'Several boards exist — choose one (Settings › Integrations, PINKDESIGN_BOARD_ID).',
-                 boards: list.map((x) => ({ id: x.id ?? x.board_id, name: x.name ?? x.title })) };
-      }
-    }
-    if (!board) { reply.code(400); return { error: 'No board available from Pink Design — check /api/pinkdesign/status.' }; }
-
-    const item = (await q(
-      `select i.sku, i.name, i.qty, i.print_type, o.id as order_id
-         from order_items i join orders o on o.id = i.order_id
-        where i.order_id=$1 and i.sku=$2 limit 1`, [orderId, sku]
-    )).rows[0];
-    if (!item) { reply.code(404); return { error: 'Line item not found' }; }
-
-    // The artwork URL. designUrlOf lives in orders.js, so read the row and resolve here —
-    // storage_key present means it's in object storage and can be signed for them.
-    const design = (await q(
-      'select storage_key, data from order_designs where order_id=$1 and sku=$2 limit 1', [orderId, sku]
-    )).rows[0];
-    if (!design) { reply.code(400); return { error: 'No artwork on this line yet — nothing to send.' }; }
-    const { presignGet, storageEnabled, designUrlTtlDays, publicUrl } = await import('../storage.js');
-    if (!design.storage_key) {
-      reply.code(400);
-      return {
-        error: storageEnabled()
-          ? 'This artwork predates object storage, so it has no URL. Re-upload it on the order and push again.'
-          : 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.',
-      };
-    }
-    const imageUrl = designUrlTtlDays() > 0 ? presignGet(design.storage_key) : publicUrl(design.storage_key);
-
-    const payload = {
-      title: `${item.name || item.sku} · order ${orderId}`,
-      qty: Number(item.qty) || 1,
-      board_id: board,
-      description: b.description || `Print method: ${item.print_type || 'DTG'}. Order ${orderId}, SKU ${item.sku}.`,
-      images: [imageUrl],
-      ...(b.productType ? { product_type: b.productType } : {}),
-      ...(b.designType ? { design_type: b.designType } : {}),
-    };
-    const r = await pink('/create_task', { method: 'POST', body: JSON.stringify(payload) });
-    if (!r.ok) {
-      const msg = (r.data && (r.data.message || r.data.error)) || r.error || `create_task failed (${r.status})`;
-      reply.code(502);
-      // Their words verbatim — with no documented error codes this is the only diagnostic.
-      return { error: msg, retryable: isRetryable(r) };
-    }
-    const refId = r.data && (r.data.ref_id ?? r.data.refId ?? r.data.id);
-
-    // Track it as a design card marked OUTSOURCED, so it shows on the board with the
-    // partner badge, can't be claimed by one of our designers, and never pays one.
-    await q(
-      `insert into design_cards (order_id, sku, title, col, type, product, vendor, vendor_ref, payment, pay_status)
-       values ($1,$2,$3,'inprogress',$4,$5,'pinkdesign',$6,0,'na')
-       on conflict do nothing`,
-      [orderId, item.sku, payload.title, item.print_type || null, item.name || null, String(refId)]
-    ).catch(() => {});
-
-    audit(req, 'design.outsourced', { entityType: 'order', entityId: orderId, after: { sku, vendor: 'pinkdesign', ref: refId } });
+    const out = await pushToPink({ ...(req.body || {}), by: req.user && req.user.sub });
+    if (out.error) { reply.code(out.status || 400); return out; }
+    audit(req, 'design.outsourced', { entityType: 'order', entityId: String((req.body || {}).orderId || ''),
+      after: { sku: (req.body || {}).sku, vendor: 'pinkdesign', ref: out.refId } });
     egBroadcast({ type: 'design-cards' });
-    return { ok: true, refId, board };
+    return out;
   });
 
   /**
