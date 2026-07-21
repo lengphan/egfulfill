@@ -21,10 +21,18 @@ const suggestQty = (it: InventoryItem) => Math.max(1, (it.reorder_at ?? 25) * 2 
 const supKey = (s?: string | null) => (s || "Unassigned")
 const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
 // Which supplier API (if any) can place this PO automatically.
+//
+// Matched on WORD boundaries. A bare `includes("ss")` sent every "Unassigned" PO down
+// the S&S path — "unassigned" contains "ss" — so a PO with no supplier at all was being
+// handed to a real supplier's API.
+//
+// "Unassigned" is the placeholder supKey() uses for a null supplier, not a company, so it
+// resolves to no API: a PO nobody has assigned can only be placed by hand.
 const placer = (supplier?: string | null): "ss" | "otto" | null => {
-  const s = (supplier || "").toLowerCase()
-  if (s.includes("otto")) return "otto"
-  if (s.includes("s&s") || s.includes("ss") || s.includes("activewear")) return "ss"
+  const s = (supplier || "").trim().toLowerCase()
+  if (!s || s === "unassigned") return null
+  if (/\botto\b|ottocap/.test(s)) return "otto"
+  if (/s&s|\bss\b|activewear/.test(s)) return "ss"
   return null
 }
 
@@ -103,16 +111,19 @@ export function PurchaseView() {
       : [...target.items, { sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty) || 1, price: l.price }])
     putSaved(saved.filter((s) => s.sku !== l.sku))
   }
-  /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
-  const addLines = (po: PurchaseOrder, lines: POLine[]) => {
-    const next = po.items.map((l) => ({ ...l }))
-    for (const l of lines) {
+  /** Merge lines into an existing set, combining quantities on a repeated sku. Pure, so
+   *  the "add items" path and the reorder path can't drift apart. */
+  const mergeLines = (existing: POLine[], add: POLine[]): POLine[] => {
+    const next = existing.map((l) => ({ ...l }))
+    for (const l of add) {
       const hit = next.find((x) => x.sku === l.sku)
       if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
       else next.push({ ...l, qty: num(l.qty) || 1 })
     }
-    patchPO(po, next)
+    return next
   }
+  /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
+  const addLines = (po: PurchaseOrder, lines: POLine[]) => patchPO(po, mergeLines(po.items, lines))
 
   const place = async (po: PurchaseOrder) => {
     const lines = po.items.filter((l) => num(l.qty) > 0).map((l) => ({ sku: l.sku, qty: num(l.qty) }))
@@ -185,16 +196,25 @@ export function PurchaseView() {
     setBusy(po.num); setMsg(null)
     try {
       if (target) {
-        addLines(target, lines)
+        // Await it: this used to fire and forget, so a failed merge reported success and
+        // the line silently wasn't on the draft anyone was about to place.
+        const merged = mergeLines(target.items, lines)
+        await savePurchaseOrder({ ...target, items: merged })
+        setPos((prev) => (prev ?? []).map((p) => (p.num === target.num ? { ...p, items: merged } : p)))
         setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
       } else {
         const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
-        await savePurchaseOrder(draft)
+        const r = await savePurchaseOrder(draft)
+        // savePurchaseOrder resolves with {error} for some refusals rather than throwing,
+        // so checking only for a thrown error reported a failure as a success.
+        if (r?.error) throw new Error(r.error)
         setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
         load()
       }
-    } catch {
-      setMsg({ ok: false, text: "Couldn't create the reorder draft." })
+    } catch (e) {
+      // Say what actually went wrong. The generic message here hid the server's reason,
+      // which is the only thing that makes this fixable rather than mysterious.
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't create the reorder draft." })
     } finally { setBusy(null) }
   }
 

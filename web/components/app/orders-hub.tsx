@@ -575,19 +575,26 @@ export function OrdersHub() {
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* Selection only where it means something: an order with no label has
-                            nothing to scan. Shown ONLY on rows that can actually be
-                            dispatched — a disabled box was tried and is worse: greyed out
-                            with the reason hidden behind a hover reads as "locked", which
-                            is a question rather than an answer. The Tracking column
-                            already says why: no tracking, no dispatch. */}
-                        {dispatchOn && dispatchable(o) && (
+                        {/* A box on EVERY row, disabled where it can't be used.
+                            Rendering it only on dispatchable rows was tried, and reads as
+                            a half-built feature: most orders have no label yet, so most
+                            rows had no box, and a column that appears on a minority of
+                            rows looks broken rather than selective. Disabled-with-a-reason
+                            says "not this one, and here's why"; absent says nothing. */}
+                        {dispatchOn && (
                           <input
                             type="checkbox"
                             checked={selected.has(o.id)}
+                            disabled={!dispatchable(o)}
                             onChange={() => toggleOne(o.id)}
-                            aria-label={`Select ${numOf(o)} for dispatch`}
-                            className="size-4 shrink-0 rounded border-input accent-primary"
+                            aria-label={dispatchable(o)
+                              ? `Select ${numOf(o)} for dispatch`
+                              : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : "no label bought yet"}`}
+                            title={dispatchable(o) ? undefined
+                              : o.label_scanned_at
+                                ? "Already pre-scanned — its tracking is live."
+                                : "No label bought yet, so there's nothing for the partner to scan."}
+                            className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
                           />
                         )}
                         <button

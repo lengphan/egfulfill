@@ -9,11 +9,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getDesignCards, saveDesignCards, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
+import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
 // Board lanes — a linear left-to-right pipeline. Approving a card credits the designer
 // once (no separate Paid lane; the credit is idempotent per card).
+// The partner lane is a DESTINATION, not a status: dropping a card here means "send this
+// out". It's appended rather than inserted so existing lane order is untouched, and it's
+// hidden entirely from designers — sending work out spends money and gives away a job
+// they'd otherwise do.
+const PARTNER_COL = { id: "partner", label: "Design partner", accent: "bg-amber-500" } as const
+const canOutsource = () => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" }
+
 const COLS = [
   { id: "incoming", label: "Incoming", accent: "bg-slate-400" },
   { id: "inprogress", label: "In progress", accent: "bg-violet-500" },
@@ -43,14 +51,21 @@ export function DesignerBoard() {
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
   const me = getUser()?.name || "Designer"
 
+  // Reload the board from the server. Named because a partner push writes the card on the
+  // SERVER (vendor badge + their task ref), so the local list has to be re-read rather
+  // than patched — the row that matters afterwards isn't the one we were holding.
+  const load = useCallback(() => {
+    if (!getToken()) { setCards([]); return }
+    getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
+  }, [])
+
   useEffect(() => {
     const id = setTimeout(() => {
-      if (!getToken()) { setCards([]); return }
-      getDesignCards().then((r) => setCards(r ?? [])).catch(() => setCards([]))
+      load()
       getFactorySettings().then((s) => setDesignFee(Number(s.design_fee) || 0)).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
-  }, [])
+  }, [load])
 
   // Optimistic update + whole-board persist (POST replaces the board).
   const persist = useCallback((next: DesignCard[]) => {
@@ -101,9 +116,18 @@ export function DesignerBoard() {
     setOverCol(null)
     if (dragId == null) return
     const card = (cards ?? []).find((c) => c.id === dragId)
-    if (card) moveCard(card, col)
     setDragId(null)
+    if (!card) return
+    // Dropping on the partner lane OPENS the send window rather than sending. A drag is
+    // easy to do by accident and this one spends money and hands the job to someone
+    // outside the building — so the drop proposes it and a person confirms.
+    if (col === PARTNER_COL.id) { setPushCard(card); return }
+    moveCard(card, col)
   }
+
+  // The card a drop (or the toolbar button) has proposed sending out. Null = window shut.
+  const [pushCard, setPushCard] = useState<DesignCard | null>(null)
+  const showPartner = canOutsource()
 
   const openCard = (cards ?? []).find((c) => c.id === openId) ?? null
 
@@ -132,13 +156,27 @@ export function DesignerBoard() {
         <StatCard label="Credited" value={money(stats.credited)} sub="paid to designers" tone={stats.credited ? "pos" : undefined} />
       </StatGrid>
 
+      {/* One window serves the row menu, the toolbar button and the lane drop. A card
+          with an order sends that line; one without sends the artwork on its own. */}
+      <PushToPartnerDialog
+        open={!!pushCard}
+        onOpenChange={(v) => { if (!v) setPushCard(null) }}
+        cardId={pushCard ? String(pushCard.id) : undefined}
+        orderId={pushCard?.order_id ? String(pushCard.order_id) : undefined}
+        sku={pushCard?.sku ? String(pushCard.sku) : undefined}
+        itemName={pushCard?.title}
+        printType={pushCard?.type}
+        artworkUrl={pushCard?.thumb ? String(pushCard.thumb) : null}
+        onPushed={() => { setPushCard(null); load() }}
+      />
+
       {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "list" ? (
         <DesignerList cards={cards} onOpen={setOpenId} />
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {COLS.map((col) => {
+          {[...COLS, ...(showPartner ? [PARTNER_COL] : [])].map((col) => {
             const list = grouped[col.id] ?? []
             return (
               <div

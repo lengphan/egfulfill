@@ -160,12 +160,12 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
     // nothing further.
     if (ids.length) {
       const approved = await q(
-        `select order_id, sku, vendor from design_cards
-          where id = any($1::bigint[]) and col='approved' and vendor is not null and order_id is not null`,
+        `select id, order_id, sku, vendor from design_cards
+          where id = any($1::bigint[]) and col='approved' and vendor is not null`,
         [ids]
       ).catch(() => ({ rows: [] }));
       for (const c of approved.rows) {
-        await bookDesignCost({ orderId: c.order_id, sku: c.sku, vendor: c.vendor }).catch(() => {});
+        await bookDesignCost({ orderId: c.order_id, sku: c.sku, cardId: c.id, vendor: c.vendor }).catch(() => {});
       }
     }
     return { ok: true, count: rows.length };

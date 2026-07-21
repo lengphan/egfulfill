@@ -35,6 +35,10 @@ const webhookSecret = () => (process.env.PINKDESIGN_WEBHOOK_SECRET || '').trim()
 
 export function pinkEnabled() { return !!apiKey(); }
 
+// Who may send work to a partner. Everyone on the factory side EXCEPT designers: it
+// spends money and gives away a job they would otherwise do themselves.
+const canOutsource = (u) => !!u && ['admin', 'warehouse', 'operator'].includes(u.role);
+
 /**
  * Book what an outsourced design costs us — at APPROVAL, not at push.
  *
@@ -47,11 +51,18 @@ export function pinkEnabled() { return !!apiKey(); }
  * and both call this. The ledger's (account,type,ref) unique index collapses them to one
  * charge no matter how many times, or how many routes, arrive at approved.
  */
-export async function bookDesignCost({ orderId, sku, vendor }) {
-  if (!vendor || !orderId) return { ok: false, skipped: true };
+export async function bookDesignCost({ orderId, sku, vendor, cardId }) {
+  if (!vendor) return { ok: false, skipped: true };
+  // Speculative work has no order but costs exactly the same, so it books against the
+  // CARD instead. Skipping it would make order-less design look free in the P&L, which
+  // is the one place a cost is most likely to go unnoticed.
+  const ref = orderId ? `design-${orderId}-${sku}` : cardId ? `design-card-${cardId}` : null;
+  if (!ref) return { ok: false, skipped: true };
   const cfg = await readSettings().catch(() => ({}));
-  return recordCost('design', Number(cfg.design_partner_cost ?? 0), `design-${orderId}-${sku}`,
-    `Design partner task · order ${orderId} · ${sku}`, { orderId });
+  return recordCost('design', Number(cfg.design_partner_cost ?? 0), ref,
+    orderId ? `Design partner task · order ${orderId} · ${sku}`
+            : `Design partner task · card ${cardId} (no order)`,
+    orderId ? { orderId } : {});
 }
 
 async function pink(path, init = {}) {
@@ -89,12 +100,19 @@ const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500
  * The artwork has to be reachable by THEM, so this requires a stored URL — a design still
  * inline as base64 has no address. Rather than fail vaguely, it says exactly that.
  */
-export async function pushToPink({ orderId, sku, boardId: wantBoard, description, productType, designType,
+export async function pushToPink({ orderId, sku, cardId, imageUrl: directImage,
+                                   boardId: wantBoard, description, productType, designType,
                                    title: wantTitle, qty: wantQty, extraImages }) {
   if (!pinkEnabled()) return { error: 'Design partner not configured (PINKDESIGN_API_KEY).', status: 400 };
   const oid = String(orderId || '');
   const isku = sku != null ? String(sku) : null;
-  if (!oid || !isku) return { error: 'orderId and sku required', status: 400 };
+  // Three ways in, because not every design belongs to an order: a line item, an existing
+  // board card, or a bare image URL for speculative work (a mockup for a listing that
+  // doesn't exist yet). Only one of them is required.
+  if (!oid && !cardId && !directImage) {
+    return { error: 'Nothing to send — give a line item, a board card, or an image.', status: 400 };
+  }
+  if (oid && !isku) return { error: 'sku required when sending a line item', status: 400 };
 
   // Board: explicit wins, else the configured one, else — when the account has exactly
   // ONE board — just use it. Making someone copy an id they have no choice about is a
@@ -111,24 +129,51 @@ export async function pushToPink({ orderId, sku, boardId: wantBoard, description
   }
   if (!board) return { error: 'No board available from Pink Design — check /api/pinkdesign/status.', status: 400 };
 
-  const item = (await q(
-    `select i.sku, i.name, i.qty, i.print_type, o.id as order_id
-       from order_items i join orders o on o.id = i.order_id
-      where i.order_id=$1 and i.sku=$2 limit 1`, [oid, isku]
-  )).rows[0];
-  if (!item) return { error: 'Line item not found', status: 404 };
-
-  const design = (await q(
-    'select storage_key, data from order_designs where order_id=$1 and sku=$2 limit 1', [oid, isku]
-  )).rows[0];
-  if (!design) return { error: 'No artwork on this line yet — nothing to send.', status: 400 };
   const { presignGet, storageEnabled, designUrlTtlDays, publicUrl } = await import('../storage.js');
-  if (!design.storage_key) {
-    return { status: 400, error: storageEnabled()
-      ? 'This artwork predates object storage, so it has no URL. Re-upload it on the order and push again.'
-      : 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.' };
+  const urlFor = (key) => (designUrlTtlDays() > 0 ? presignGet(key) : publicUrl(key));
+
+  // Resolve the subject: what we're sending, and what to call it. Most specific source
+  // first, so an explicit image always wins over anything inferred.
+  let item = null;          // the line, when there is one
+  let card = null;          // the existing board card, when there is one
+  let imageUrl = null;
+
+  if (cardId) {
+    card = (await q('select id, order_id, sku, title, type, thumb, vendor from design_cards where id=$1::bigint limit 1',
+      [String(cardId)])).rows[0] || null;
+    if (!card) return { error: 'Card not found', status: 404 };
+    if (card.vendor) return { error: `This card is already with ${card.vendor}.`, status: 400 };
   }
-  const imageUrl = designUrlTtlDays() > 0 ? presignGet(design.storage_key) : publicUrl(design.storage_key);
+
+  const useOrder = oid || (card && card.order_id);
+  const useSku = isku ?? (card ? card.sku : null);
+
+  if (useOrder && useSku) {
+    item = (await q(
+      `select i.sku, i.name, i.qty, i.print_type, o.id as order_id
+         from order_items i join orders o on o.id = i.order_id
+        where i.order_id=$1 and i.sku=$2 limit 1`, [String(useOrder), String(useSku)]
+    )).rows[0] || null;
+    if (!item && oid) return { error: 'Line item not found', status: 404 };
+    const design = (await q(
+      'select storage_key, data from order_designs where order_id=$1 and sku=$2 limit 1',
+      [String(useOrder), String(useSku)]
+    )).rows[0];
+    if (design && design.storage_key) imageUrl = urlFor(design.storage_key);
+  }
+
+  // An explicit image beats everything — it's what someone just picked. Then a card's own
+  // thumb, but ONLY when it's a real URL: a base64 thumb has no address to give them.
+  if (directImage && /^https?:\/\//i.test(String(directImage))) imageUrl = String(directImage);
+  else if (!imageUrl && card && /^https?:\/\//i.test(String(card.thumb || ''))) imageUrl = String(card.thumb);
+
+  if (!imageUrl) {
+    return { status: 400, error: !storageEnabled()
+      ? 'Object storage is not configured, so the artwork has no URL — and Pink Design accepts URLs only. Set SPACES_* first.'
+      : useOrder
+        ? 'No stored artwork on this line, so there is no URL to send. Upload it on the order, or attach an image here, and push again.'
+        : 'This design has no stored image, so there is no URL to send. Attach one and push again.' };
+  }
 
   // Reference material beyond the artwork itself — a mockup, a spec sheet, a marked-up
   // screenshot of what's wrong. URLs only, same constraint as the artwork, and the
@@ -136,11 +181,21 @@ export async function pushToPink({ orderId, sku, boardId: wantBoard, description
   const extras = (Array.isArray(extraImages) ? extraImages : [])
     .map(String).filter((u) => /^https?:\/\//i.test(u));
 
+  // Fall back through what we actually know. A speculative design has no line and no
+  // order, so the defaults have to degrade to something a human still recognises on
+  // their board rather than "undefined · order ".
+  const subject = item?.name || item?.sku || card?.title || 'Design';
+  const method = item?.print_type || card?.type || null;
+  const where = useOrder ? ` · order ${useOrder}` : '';
+
   const payload = {
-    title: String(wantTitle || '').trim() || `${item.name || item.sku} · order ${oid}`,
-    qty: Math.max(1, parseInt(wantQty, 10) || Number(item.qty) || 1),
+    title: String(wantTitle || '').trim() || `${subject}${where}`,
+    qty: Math.max(1, parseInt(wantQty, 10) || Number(item?.qty) || 1),
     board_id: board,
-    description: description || `Print method: ${item.print_type || 'DTG'}. Order ${oid}, SKU ${item.sku}.`,
+    description: description || [
+      method ? `Print method: ${method}.` : null,
+      useOrder ? `Order ${useOrder}${useSku ? `, SKU ${useSku}` : ''}.` : 'Not tied to an order.',
+    ].filter(Boolean).join(' '),
     images: [imageUrl, ...extras],
     ...(productType ? { product_type: productType } : {}),
     ...(designType ? { design_type: designType } : {}),
@@ -155,14 +210,25 @@ export async function pushToPink({ orderId, sku, boardId: wantBoard, description
 
   // Track it as a design card marked OUTSOURCED, so it shows on the board with the
   // partner badge, can't be claimed by one of our designers, and never pays one.
-  await q(
-    `insert into design_cards (order_id, sku, title, col, type, product, vendor, vendor_ref, payment, pay_status)
-     values ($1,$2,$3,'inprogress',$4,$5,'pinkdesign',$6,0,'na')
-     on conflict do nothing`,
-    [oid, item.sku, payload.title, item.print_type || null, item.name || null, String(refId)]
-  ).catch(() => {});
+  //
+  // An EXISTING card is updated rather than duplicated — dragging a card to the partner
+  // lane must not leave the original sitting in Incoming looking like unclaimed work.
+  let cardOut = card ? String(card.id) : null;
+  if (card) {
+    await q(`update design_cards set vendor='pinkdesign', vendor_ref=$2, col='inprogress',
+                    thumb=coalesce(thumb,$3), updated_at=now() where id=$1::bigint`,
+      [String(card.id), String(refId), imageUrl]).catch(() => {});
+  } else {
+    const ins = await q(
+      `insert into design_cards (order_id, sku, title, col, type, product, thumb, vendor, vendor_ref, payment, pay_status)
+       values ($1,$2,$3,'inprogress',$4,$5,$6,'pinkdesign',$7,0,'na')
+       returning id`,
+      [useOrder || null, useSku || null, payload.title, method, item?.name || null, imageUrl, String(refId)]
+    ).catch(() => ({ rows: [] }));
+    cardOut = ins.rows[0] ? String(ins.rows[0].id) : null;
+  }
 
-  return { ok: true, refId, board };
+  return { ok: true, refId, board, cardId: cardOut, orderId: useOrder || null };
 }
 
 export function pinkDesignRoutes(app, requireAuth, requireStaff) {
@@ -197,10 +263,20 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
   });
 
   app.post('/api/pinkdesign/push', { preHandler: requireStaff }, async (req, reply) => {
-    const out = await pushToPink({ ...(req.body || {}), by: req.user && req.user.sub });
+    // Designers are staff, but sending work OUT is not theirs to decide — it spends money
+    // and it hands away a job they'd otherwise do. Same boundary the board draws by
+    // refusing to let a designer claim a vendor card.
+    if (!canOutsource(req.user)) {
+      reply.code(403);
+      return { error: 'Only admin, warehouse or an operator can send work to a design partner.' };
+    }
+    const out = await pushToPink(req.body || {});
     if (out.error) { reply.code(out.status || 400); return out; }
-    audit(req, 'design.outsourced', { entityType: 'order', entityId: String((req.body || {}).orderId || ''),
-      after: { sku: (req.body || {}).sku, vendor: 'pinkdesign', ref: out.refId } });
+    audit(req, 'design.outsourced', {
+      entityType: out.orderId ? 'order' : 'design_card',
+      entityId: String(out.orderId || out.cardId || ''),
+      after: { sku: (req.body || {}).sku || null, vendor: 'pinkdesign', ref: out.refId, cardId: out.cardId },
+    });
     egBroadcast({ type: 'design-cards' });
     return out;
   });
@@ -323,7 +399,7 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
     // "done" on their side is an approval on ours, so the cost falls due here too — not
     // only when a human drags the card. Idempotent, so whichever path lands first wins
     // and the other is a no-op.
-    if (col === 'approved') await bookDesignCost({ orderId: card.order_id, sku: card.sku, vendor: 'pinkdesign' }).catch(() => {});
+    if (col === 'approved') await bookDesignCost({ orderId: card.order_id, sku: card.sku, cardId: card.id, vendor: 'pinkdesign' }).catch(() => {});
 
     // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
     // our production files hostage to someone else's retention policy — a link that dies

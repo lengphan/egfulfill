@@ -45,12 +45,15 @@ const readFile = (f: File) => new Promise<string>((res, rej) => {
  * notice you're sending the wrong file is before, not after.
  */
 export function PushToPartnerDialog({
-  open, onOpenChange, orderId, sku, itemName, qty, printType, artworkUrl, onPushed,
+  open, onOpenChange, orderId, sku, cardId, itemName, qty, printType, artworkUrl, onPushed,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
-  orderId: string
-  sku: string
+  // All three optional: a send can be anchored to a line item, to an existing board card,
+  // or to nothing at all (speculative artwork with no order behind it yet).
+  orderId?: string
+  sku?: string
+  cardId?: string
   itemName?: string | null
   qty?: number | null
   printType?: string | null
@@ -89,9 +92,12 @@ export function PushToPartnerDialog({
     if (!open) return
     const t = setTimeout(() => {
       load()
-      setTitle(`${itemName || sku} · order ${orderId}`)
+      setTitle(orderId ? `${itemName || sku || "Design"} · order ${orderId}` : (itemName || sku || "Design"))
       setCount(String(qty || 1))
-      setDesc(`Print method: ${printType || "DTG"}. Order ${orderId}, SKU ${sku}.`)
+      setDesc([
+        printType ? `Print method: ${printType}.` : null,
+        orderId ? `Order ${orderId}${sku ? `, SKU ${sku}` : ""}.` : "Not tied to an order.",
+      ].filter(Boolean).join(" "))
       setMsg(null)
       setExtras([])
     }, 0)
@@ -119,7 +125,7 @@ export function PushToPartnerDialog({
     setBusy(true); setMsg(null)
     try {
       const r = await pushToPink({
-        orderId, sku,
+        orderId, sku, cardId,
         title: title.trim() || undefined,
         qty: Number(count) || undefined,
         description: desc.trim() || undefined,
@@ -163,8 +169,10 @@ export function PushToPartnerDialog({
               : <div className="flex size-full items-center justify-center px-2 text-center text-[11px] text-muted-foreground">No artwork on this line</div>}
           </div>
           <div className="min-w-0 flex-1 space-y-1 text-sm">
-            <div className="truncate font-medium">{itemName || sku}</div>
-            <div className="truncate text-xs text-muted-foreground">{sku}{printType ? ` · ${printType}` : ""}</div>
+            <div className="truncate font-medium">{itemName || sku || "Untitled design"}</div>
+            <div className="truncate text-xs text-muted-foreground">
+              {sku || (orderId ? "" : "No order — speculative work")}{printType ? ` · ${printType}` : ""}
+            </div>
             {!artworkUrl && (
               <p className="text-xs text-destructive">
                 They accept URLs only, so a line with no stored artwork can&apos;t be sent.

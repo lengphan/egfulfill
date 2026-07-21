@@ -845,6 +845,17 @@ export type ChatEntry = {
   ts?: number
   system?: boolean
   attachment?: unknown
+  // Which order the message is about. Channels no longer fan out per order — an
+  // @mention in the body sets this, and the order page filters on it.
+  orderRef?: string
+  // Staff-only (AI order briefings, internal notes). The server never sends these
+  // to a seller; this flag only drives how staff see them.
+  internal?: boolean
+}
+export type SellerMatch = { seller_id: string; channel: string; name: string; email: string }
+// Staff-only seller directory — start a channel with a seller who hasn't written in.
+export function searchSellers(term: string) {
+  return api<SellerMatch[]>(`/api/support/sellers?q=${encodeURIComponent(term)}`)
 }
 export function getOrderMessages(id: string) {
   return api<ChatEntry[]>(`/api/orders/${encodeURIComponent(id)}/messages`)
@@ -1520,10 +1531,14 @@ export function getPinkStatus() {
 /** Push one line item out for design. `extraImages` are reference URLs (see
  *  uploadPinkAttachment); the artwork itself is resolved server-side and always leads. */
 export function pushToPink(body: {
-  orderId: string; sku: string; title?: string; qty?: number; description?: string
+  // One of orderId+sku, cardId, or imageUrl — a send can be anchored to a line item, an
+  // existing board card, or nothing at all (speculative artwork with no order yet).
+  orderId?: string; sku?: string; cardId?: string; imageUrl?: string
+  title?: string; qty?: number; description?: string
   productType?: string; designType?: string; boardId?: string; extraImages?: string[]
 }) {
-  return api<{ ok?: boolean; refId?: string; board?: string; error?: string; retryable?: boolean }>(
+  return api<{ ok?: boolean; refId?: string; board?: string; cardId?: string | null
+               orderId?: string | null; error?: string; retryable?: boolean }>(
     `/api/pinkdesign/push`, { method: "POST", body: JSON.stringify(body) })
 }
 /** Store a reference file and get a URL back — Pink Design accepts URLs only. */
