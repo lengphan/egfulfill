@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Sparkle } from "@phosphor-icons/react"
+import { Sparkle, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { RevenueChart } from "@/components/app/revenue-chart"
@@ -32,6 +32,9 @@ const DEMO: OrderRow[] = [
 export function ReportsView() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [isDemo, setIsDemo] = useState(false)
+  // A failed read must not render as "Fulfillment rate 0%" and "No revenue yet" — those
+  // are claims. Signed in, a failure leaves `orders` null and reports itself instead.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [now, setNow] = useState(0)
 
   const load = useCallback(() => {
@@ -39,10 +42,14 @@ export function ReportsView() {
     const signedIn = !!getToken()
     getOrders()
       .then((rows) => {
+        setLoadErr(null)
         if (rows && rows.length) { setOrders(rows); setIsDemo(false) }
         else { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) }
       })
-      .catch(() => { setOrders(signedIn ? [] : DEMO); setIsDemo(!signedIn) })
+      .catch((e) => {
+        if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
+        setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.")
+      })
   }, [])
   useEffect(() => {
     const id = setTimeout(() => { setNow(Date.now()); load() }, 0)
@@ -82,11 +89,31 @@ export function ReportsView() {
         </div>
       )}
 
-      <RevenueChart data={series} />
+      {loadErr && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+          <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
+          <span>Couldn&apos;t load your orders, so these analytics are unavailable — not zero. {loadErr}</span>
+        </div>
+      )}
+
+      {/* Same rule as the dashboard: an all-zero chart asserts zero revenue. */}
+      {orders === null && loadErr ? (
+        <SectionCard title="Revenue" description="Gross revenue across your stores">
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
+            No revenue data to chart — your orders couldn&apos;t be loaded.
+          </div>
+        </SectionCard>
+      ) : (
+        <RevenueChart data={series} />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="Revenue by channel" description="Across your stores" bodyClassName="space-y-4 p-5">
-          {channels.length === 0 ? (
+          {orders === null && loadErr ? (
+            // "No revenue yet" is a statement about the business. Only make it when the
+            // orders were actually read.
+            <div className="text-sm text-muted-foreground">Couldn&apos;t load this.</div>
+          ) : channels.length === 0 ? (
             <div className="text-sm text-muted-foreground">No revenue yet.</div>
           ) : (
             channels.map((c, i) => (
@@ -104,7 +131,9 @@ export function ReportsView() {
         </SectionCard>
 
         <SectionCard title="Top products" description="By revenue">
-          {top.length === 0 ? (
+          {orders === null && loadErr ? (
+            <div className="p-5 text-sm text-muted-foreground">Couldn&apos;t load this.</div>
+          ) : top.length === 0 ? (
             <div className="p-5 text-sm text-muted-foreground">No product sales yet.</div>
           ) : (
             <Table>

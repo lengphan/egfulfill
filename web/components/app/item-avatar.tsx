@@ -42,6 +42,17 @@ export type ItemAvatarProps = {
   /** Renders the composite alone — no click, no swap, no preview. For decorative stacks
    *  (a row's 3-up thumbnail cluster) where a control per thumb would be noise. */
   readOnly?: boolean
+  /** Show the buyer's LISTING photo on the thumbnail, and put the artwork behind a click.
+   *
+   *  For the row-level photo strip. At 32px a composite is unreadable anyway — you get a
+   *  smudge of artwork over a smudge of blank — whereas the listing photo is the shot that
+   *  was styled to be legible small, so it's the better row-scanning image. The production
+   *  view isn't lost, it moves one click away: the preview opens on the DESIGN when there
+   *  is one, which is where you'd actually inspect placement.
+   *
+   *  Falls back to the composite when a line has no listing photo, so a manual order still
+   *  shows something real rather than an empty tile. */
+  listingFirst?: boolean
   /** Accept artwork dropped straight onto the thumb. Passed wherever a design can be
    *  attached — one handler here covers every surface that renders an item. */
   onDropImage?: (dataUrl: string, file: File) => void
@@ -54,7 +65,7 @@ function blankOf(item: OrderItem, catalog?: CatalogProduct[]): string {
   return bestMockup(p, item.color, item.img || "")
 }
 
-export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, onDropImage, className }: ItemAvatarProps) {
+export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly, listingFirst, onDropImage, className }: ItemAvatarProps) {
   const [preview, setPreview] = useState(false)
   const [showListing, setShowListing] = useState(false)
   const [over, setOver] = useState(false)
@@ -85,7 +96,18 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
   // Only worth offering the swap when the two views actually differ.
   const canSwap = !!(art && listing && listing !== blank)
 
-  const open = () => { if (onEdit) onEdit(); else setPreview(true) }
+  const open = () => {
+    if (onEdit) { onEdit(); return }
+    // Opening from a listing-first thumb lands on the DESIGN when there is one — that's
+    // the thing worth inspecting at size, and it's why you clicked. No artwork attached
+    // yet → there is nothing to show but the listing, so stay on it.
+    if (listingFirst) setShowListing(!art)
+    setPreview(true)
+  }
+
+  // What the THUMBNAIL shows. `listingFirst` prefers the buyer's photo and falls back to
+  // the composite when a line has none; otherwise the composite, as before.
+  const thumbShowsListing = listingFirst ? !!listing : showListing
 
   if (readOnly) {
     return (
@@ -93,7 +115,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
         className={"relative block shrink-0 overflow-hidden rounded-md border border-border bg-muted " + (className ?? "")}
         style={{ width: size, height: size }}
       >
-        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={false} alt={item.name || item.sku || "Item"} />
+        <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
       </span>
     )
   }
@@ -111,7 +133,7 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           title={onEdit ? "Edit the design" : "View larger"}
           className="eg-tap size-full overflow-hidden rounded-md border border-border bg-muted transition-colors hover:border-foreground/25"
         >
-          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={showListing} alt={item.name || item.sku || "Item"} />
+          <Composite blank={blank} art={art} pos={design?.pos} listing={listing} showListing={thumbShowsListing} alt={item.name || item.sku || "Item"} />
           {/* Affordance only where there's something to do — and only on hover, so the
               row stays quiet until you're actually pointing at it. */}
           <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-md bg-black/45 text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 sm:flex">
@@ -119,7 +141,10 @@ export function ItemAvatar({ item, designs, catalog, size = 44, onEdit, readOnly
           </span>
         </button>
 
-        {canSwap && (
+        {/* No corner swap on a listing-first thumb: the row shows the listing, and the
+            design lives one click away in the detail view rather than behind a 16px
+            control on a 32px image. */}
+        {canSwap && !listingFirst && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setShowListing((v) => !v) }}

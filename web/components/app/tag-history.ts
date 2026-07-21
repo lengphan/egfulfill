@@ -56,5 +56,9 @@ export const EMPTY_HINT: Record<TagId, string> = {
 export const DONE_NO_HISTORY: Record<TagId, string> = {
   label: "Label exists, but no recorded history for how it was created.",
   scan: "Already past the scan, but no recorded history for that step.",
-  design: "A design exists, but no recorded history for how it got here.",
+  // This one used to fire constantly on ordinary marketplace orders, because the tag
+  // counted the buyer's personalization upload as a design — so it announced a design
+  // that had never existed and then couldn't explain it. The tag no longer makes that
+  // claim (see readiness-dots.tsx), so reaching this text now means a genuine gap.
+  design: "Artwork is attached, but no recorded history for how it got here.",
 }

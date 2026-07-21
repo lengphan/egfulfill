@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { SquaresFour, Package, PenNib, Storefront, ShieldCheck, ArrowRight, CircleNotch, Tag } from "@phosphor-icons/react"
+import { SquaresFour, Package, PenNib, Storefront, ShieldCheck, ArrowRight, CircleNotch, Tag, Warning } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
@@ -27,10 +27,16 @@ export function StaffDashboard() {
   const isAdmin = role === "admin"
   const isWarehouse = role === "warehouse"
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
+  // Leaving orders null on failure keeps every tile at "—" instead of asserting a factory
+  // with nothing in it. A staff dashboard reading all-zeros during an outage is how a
+  // backlog gets missed.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
 
   const load = useCallback(() => {
-    if (!getToken()) { setOrders([]); return }
-    getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
+    if (!getToken()) { setLoadErr("You're signed out."); return }
+    getOrders()
+      .then((r) => { setOrders(r ?? []); setLoadErr(null) })
+      .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
@@ -92,9 +98,17 @@ export function StaffDashboard() {
         </div>
       </div>
 
+      {loadErr && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+          <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
+          <span>Couldn&apos;t load orders, so these counts are unavailable — they are not zero. {loadErr}</span>
+        </div>
+      )}
+
       <StatGrid>
         {cards.map((c) => (
-          <StatCard key={c.label} label={c.label} value={String(c.value)} sub={c.sub} tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined} />
+          // orders===null means "not read yet / failed", so show — rather than 0.
+          <StatCard key={c.label} label={c.label} value={orders === null ? "—" : String(c.value)} sub={c.sub} tone={c.pos ? "pos" : c.neg && c.value ? "neg" : undefined} />
         ))}
       </StatGrid>
 

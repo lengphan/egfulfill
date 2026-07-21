@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CircleNotch } from "@phosphor-icons/react"
 import { postItemSetup, type CatalogProduct, type OrderItem } from "@/lib/api"
 import { resolveProduct, colorsOf, methodsOf, sizesOf } from "@/lib/variant-resolve"
 import { VariantField } from "@/components/app/variant-field"
@@ -82,10 +81,15 @@ export function VariantPicker({
         />
       </div>
 
-      {(busy || err) && (
+      {/* Errors only — no transient "Saving…" line.
+          That row was mounted on `busy`, so every single pick grew the item by its height
+          and then shrank it again the moment the save landed: the row jumped on each
+          selection. The feedback was redundant anyway — the field being saved is passed
+          `disabled` and visibly dims, which already says "working" without moving
+          anything. An error still takes space, because a failed save has to be seen. */}
+      {err && (
         <div className="mt-2 flex items-center gap-1.5 text-xs">
-          {busy && <span className="flex items-center gap-1.5 text-muted-foreground"><CircleNotch size={13} className="animate-spin" /> Saving…</span>}
-          {err && <span className="text-destructive">{err}</span>}
+          <span className="text-destructive">{err}</span>
         </div>
       )}
     </div>

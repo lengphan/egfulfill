@@ -29,10 +29,28 @@ async function recordTopup(app, user, amount, txnId, note) {
     if (ex.rows[0]) return ex.rows[0].ref;
     const seqRow = await q("insert into settings (key,value,updated_at) values ('topup_seq','1',now()) on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value");
     ref = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
-    await q(
-      "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,$5,'received',$6, now())",
+    const ins = await q(
+      "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,$5,'received',$6, now()) returning id",
       [user.sub, user.email || null, amount, ref, note || 'Card top-up', txnId]
     );
+    // CREDIT THE WALLET. This row is the whole point and it was missing: balance is
+    // SUM(delta) over wallet_ledger, and recordTopup only ever wrote topup_requests — so
+    // Stripe charged the card, the UI showed +$X from a client-side optimistic credit,
+    // and a refresh put the balance back where it started. The money was taken and never
+    // landed. An admin could not even repair it by hand, because /api/topups/:id/confirm
+    // only matches status='pending' and this row is written straight to 'received'.
+    //
+    // Same shape as the confirm path in topups.js so a top-up credits exactly one way:
+    // ref = the topup_requests id, idempotent by (account,type,ref) with `on conflict do
+    // nothing`, so a retried capture or a replayed webhook cannot double-credit.
+    const topupId = ins.rows[0] && ins.rows[0].id;
+    if (topupId && user.sub) {
+      await q(
+        `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+         values ($1,$2,'topup',$3,$4,$5) on conflict do nothing`,
+        [user.sub, Number(amount) || 0, String(topupId), note || 'Card top-up', user.sub]
+      );
+    }
   } catch (e) { app.log.error('stripe topup record failed: ' + e.message); }
   return ref;
 }

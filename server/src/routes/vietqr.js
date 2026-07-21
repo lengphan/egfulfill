@@ -110,17 +110,59 @@ export function vietqrRoutes(app, requireAuth) {
         // content, AND credit that seller's wallet — a direct status flip alone left
         // the balance untouched (the credit only lived in the admin-confirm route),
         // so real VietQR payments were never recorded. Idempotent by (account,type,ref).
-        const appr = await q(
-          "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where status='pending' and ref is not null and ref <> '' and $1 ilike '%'||ref||'%' returning *",
-          [content, bankRef]
-        ).catch(() => ({ rows: [] }));
-        for (const rec of (appr.rows || [])) {
-          if (!rec.seller_id) continue;
-          await q(
-            `insert into wallet_ledger (account, delta, type, ref, note, created_by)
-             values ($1,$2,'topup',$3,$4,null) on conflict do nothing`,
-            [rec.seller_id, Number(rec.amount_usd) || 0, String(rec.id), (rec.method ? rec.method + ' top-up' : 'VietQR top-up')]
-          ).catch(() => {});
+        // Auto-approval is now bounded by what the bank ACTUALLY sent.
+        //
+        // This used to be a blanket UPDATE that flipped every pending row whose ref was a
+        // substring of the transfer content, then credited `rec.amount_usd` — the figure
+        // the SELLER typed when creating the request. The received amount was stored and
+        // never compared, so declaring a $5,000 top-up and wiring 10,000₫ (~$0.39) with
+        // the right note credited the full $5,000 in spendable balance. Two more holes
+        // rode along: a very short ref substring-matched a STRANGER's transfer, and
+        // `returning *` over an unfiltered UPDATE let ONE transfer approve MANY pending
+        // rows at once.
+        //
+        // Rules now: candidates are read first (not blind-updated), the ref must be a
+        // meaningful length, the received amount must cover the declared amount, and at
+        // most ONE request is settled per transaction — the closest match by amount.
+        // Anything short, ambiguous, or unmatched stays pending for a human, which is the
+        // same "suggest, a human confirms" line the rest of the system draws around money.
+        const received = Number(b.amount) || 0;
+        const cands = (await q(
+          `select * from topup_requests
+             where status='pending' and ref is not null and length(ref) >= 6
+               and $1 ilike '%'||ref||'%'
+             order by created_at asc`, [content]
+        ).catch(() => ({ rows: [] }))).rows || [];
+        // Tolerance for bank rounding / fees, not for underpayment: 1% or 2,000₫.
+        const covers = (rec) => {
+          const want = Number(rec.vnd) || 0;
+          if (!want) return false;                       // no declared VND → cannot verify
+          return received >= want - Math.max(2000, want * 0.01);
+        };
+        const eligible = cands.filter(covers);
+        const rec = eligible.length
+          ? eligible.reduce((best, r) =>
+              Math.abs(received - Number(r.vnd)) < Math.abs(received - Number(best.vnd)) ? r : best)
+          : null;
+        if (rec) {
+          const upd = await q(
+            "update topup_requests set status='received', confirmed_at=now(), txn_id=$2 where id=$1 and status='pending' returning *",
+            [rec.id, bankRef]
+          ).catch(() => ({ rows: [] }));
+          const row = (upd.rows || [])[0];
+          if (row && row.seller_id) {
+            await q(
+              `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+               values ($1,$2,'topup',$3,$4,null) on conflict do nothing`,
+              [row.seller_id, Number(row.amount_usd) || 0, String(row.id), (row.method ? row.method + ' top-up' : 'VietQR top-up')]
+            ).catch(() => {});
+          }
+        } else if (cands.length) {
+          // Matched a reference but the money doesn't cover it. Deliberately left pending
+          // and logged rather than part-credited: a human decides whether it was a
+          // partial payment, a fee, or someone probing.
+          app.log.warn({ received, refs: cands.map((c) => c.ref), candidates: cands.length },
+            'vietqr: transfer matched a pending top-up but did not cover the declared amount — left for manual review');
         }
       }
       return { error: false, errorReason: null, toastMessage: 'OK', object: { reftransactionid: txid } };

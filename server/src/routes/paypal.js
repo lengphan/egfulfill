@@ -112,10 +112,22 @@ export function paypalRoutes(app, requireAuth) {
         else {
           const seqRow = await q("insert into settings (key,value,updated_at) values ('topup_seq','1',now()) on conflict (key) do update set value=(settings.value::int + 1)::text, updated_at=now() returning value");
           ref = 'EG' + String(parseInt(seqRow.rows[0].value, 10)).padStart(6, '0');
-          await q(
-            "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,'PayPal top-up','received',$5, now())",
+          const ins = await q(
+            "insert into topup_requests (seller_id, seller_email, amount_usd, ref, note, status, txn_id, confirmed_at) values ($1,$2,$3,$4,'PayPal top-up','received',$5, now()) returning id",
             [req.user.sub, req.user.email || null, amount, ref, cap.id]
           );
+          // Credit the wallet — same omission and same fix as stripe.js recordTopup. The
+          // capture succeeded, so the money is real; without this row the balance never
+          // moves, because balance is SUM(delta) over wallet_ledger and nothing here
+          // wrote to it. Idempotent by (account,type,ref) with ref = the topup id.
+          const topupId = ins.rows[0] && ins.rows[0].id;
+          if (topupId && req.user.sub) {
+            await q(
+              `insert into wallet_ledger (account, delta, type, ref, note, created_by)
+               values ($1,$2,'topup',$3,'PayPal top-up',$4) on conflict do nothing`,
+              [req.user.sub, Number(amount) || 0, String(topupId), req.user.sub]
+            );
+          }
         }
       } catch (e) { app.log.error('paypal topup record failed: ' + e.message); }
       return { ok: true, amount, captureId: cap.id, status: d.status, ref, txnId: cap.id };
