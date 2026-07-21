@@ -157,7 +157,14 @@ export function OrdersHub() {
    */
   const artworkFor = useCallback((o: OrderRow, it: OrderItem): string => {
     const placed = it.sku ? designs[o.id]?.[it.sku]?.data : undefined
-    return placed || it.design_src || ""
+    if (placed) return placed
+    // design_src is whatever the marketplace put in an upload-looking variation, and
+    // Etsy's match is loose enough to catch the LISTING photo (see etsy.js — any http
+    // URL under a variation named /upload|logo|file|image|photo|art|design/). A product
+    // shot is not artwork: there is nothing in it to digitise, and pushing one creates a
+    // designer card that looks ready but has no file behind it.
+    const src = it.design_src || ""
+    return src && src !== (it.img || "") ? src : ""
   }, [designs])
 
   // The line whose artwork is open in the editor. Operator/admin only — warehouse verifies.

@@ -62,6 +62,28 @@ export function PurchaseView() {
   const history = (pos ?? []).filter((p) => p.status !== "draft")
   const pagedHistory = usePaged(history, 20)
 
+  /**
+   * Start an empty PO and open the picker on it.
+   *
+   * Drafts could previously only be born from a low-stock suggestion, so with nothing
+   * below its reorder point there was no draft, and with no draft there was no "Add
+   * items" button — the supplier catalogs were unreachable even though the picker
+   * searches them. Restocking ahead of a season, or buying a blank never stocked before,
+   * had no entry point at all.
+   */
+  const startBlankDraft = async () => {
+    setBusy("new"); setMsg(null)
+    const po: PurchaseOrder = { num: nextNum(), supplier: null, items: [], status: "draft" }
+    try {
+      const r = await savePurchaseOrder(po)
+      if (r?.error) throw new Error(r.error)
+      setPos((prev) => [po, ...(prev ?? [])])
+      setAddTo(po)          // straight into the picker — an empty PO is not the goal
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't start a new purchase order." })
+    } finally { setBusy(null) }
+  }
+
   const createDraft = async (supplier: string, items: InventoryItem[]) => {
     setBusy("new"); setMsg(null)
     const lines: POLine[] = items.map((it) => ({ sku: it.sku, name: it.name || undefined, variant: it.variant || undefined, qty: suggestQty(it), price: 0 }))
@@ -278,6 +300,13 @@ export function PurchaseView() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
           <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
         </div>
+      </div>
+
+      <div className="flex items-center justify-end">
+        <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
+          {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
+          New purchase order
+        </Button>
       </div>
 
       <StatGrid>
