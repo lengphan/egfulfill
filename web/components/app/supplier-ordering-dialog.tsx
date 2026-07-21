@@ -119,6 +119,9 @@ export function SupplierOrderingDialog({
         order_email: ssEmail || ottoEmail,
       })
       setMsg({ ok: true, text: "Saved — these apply to the next order placed." })
+      // Re-read: the S&S cards are looked up from the SAVED email, so a new address only
+      // takes effect after this. Without it the Payment tab looked broken.
+      load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." })
     } finally { setBusy(false) }
@@ -154,10 +157,11 @@ export function SupplierOrderingDialog({
                   it pay?" are asked one at a time across both suppliers; the old layout
                   answered them twice each, once per supplier, so comparing S&S's shipping
                   to Otto's meant scrolling past everything else. */}
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="delivery">Delivery</TabsTrigger>
                 <TabsTrigger value="payment">Payment</TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
+                <TabsTrigger value="keys">API keys</TabsTrigger>
               </TabsList>
 
               {/* ── DELIVERY ─────────────────────────────────────────────────── */}
@@ -216,7 +220,11 @@ export function SupplierOrderingDialog({
                     <Field label="Shipping method">
                       <select value={ottoShip} onChange={(e) => setOttoShip(e.target.value)} disabled={busy}
                         className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
-                        <option value="">— their default —</option>
+                        <option value="">
+                          {ottoShipOpts.length
+                            ? `Otto's default (${ottoShipOpts[0].label})`
+                            : "Otto's default"}
+                        </option>
                         {ottoShipOpts.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
                     </Field>
@@ -278,26 +286,41 @@ export function SupplierOrderingDialog({
                     emails, and S&S look payment profiles up BY EMAIL — so a single shared
                     field would fetch the wrong person's cards, or none at all. */}
                 <section className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">
-                    S&amp;S Activewear
-                    {opts.keys?.ss?.set
-                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
-                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
-                  </h3>
+                  <h3 className="text-sm font-semibold">S&amp;S Activewear</h3>
                   <Field label="Account email">
                     <Input value={ssEmail} onChange={(e) => setSsEmail(e.target.value)} disabled={busy}
                            placeholder="the address this S&S account is registered to" className="h-9" />
                   </Field>
                   <p className="text-xs text-muted-foreground">
                     Also decides whose saved cards appear under <strong>Payment</strong> — S&amp;S profiles belong to a
-                    person on the account, so without this there is nobody whose cards to look up.
+                    person on the account. <strong>Save</strong> after changing it; the cards are looked up server-side.
                   </p>
-                  {opts.keys?.ss?.set && (
-                    <p className="text-xs text-muted-foreground">
-                      Account <span className="font-mono">{opts.keys.ss.account ?? "—"}</span>
-                      {" · "}key <span className="font-mono">{opts.keys.ss.masked}</span>
-                    </p>
-                  )}
+                </section>
+
+                <section className="space-y-2 border-t border-border pt-4">
+                  <h3 className="text-sm font-semibold">Otto Cap</h3>
+                  <Field label="Account email">
+                    <Input value={ottoEmail} onChange={(e) => setOttoEmail(e.target.value)} disabled={busy}
+                           placeholder="the address this Otto account is registered to" className="h-9" />
+                  </Field>
+                </section>
+              </TabsContent>
+
+              {/* ── API KEYS ─────────────────────────────────────────────────── */}
+              <TabsContent value="keys" className="mt-4 space-y-5">
+                <section className="space-y-2">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    S&amp;S Activewear
+                    {opts.keys?.ss?.set
+                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
+                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
+                  </h3>
+                  <dl className="space-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Account number</dt>
+                      <dd className="font-mono">{opts.keys?.ss?.account ?? "—"}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">API key</dt>
+                      <dd className="font-mono">{opts.keys?.ss?.masked ?? "not set"}</dd></div>
+                  </dl>
                 </section>
 
                 <section className="space-y-2 border-t border-border pt-4">
@@ -307,23 +330,19 @@ export function SupplierOrderingDialog({
                       ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">connected</span>
                       : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">no key</span>}
                   </h3>
-                  <Field label="Account email">
-                    <Input value={ottoEmail} onChange={(e) => setOttoEmail(e.target.value)} disabled={busy}
-                           placeholder="the address this Otto account is registered to" className="h-9" />
-                  </Field>
-                  {opts.keys?.otto?.set && (
-                    <p className="text-xs text-muted-foreground">
-                      User <span className="font-mono">{opts.keys.otto.user ?? "—"}</span>
-                      {" · "}secret <span className="font-mono">{opts.keys.otto.masked}</span>
-                    </p>
-                  )}
+                  <dl className="space-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Username</dt>
+                      <dd className="font-mono">{opts.keys?.otto?.user ?? "—"}</dd></div>
+                    <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Client secret</dt>
+                      <dd className="font-mono">{opts.keys?.otto?.masked ?? "not set"}</dd></div>
+                  </dl>
                 </section>
 
-                {/* Shown, never editable. This window is for checking a connection at a
-                    glance; changing a credential stays in Integrations, where it belongs
-                    with the audit trail. */}
+                {/* Shown, never editable. Checking a connection belongs next to the order
+                    you're about to place; CHANGING a credential belongs in Integrations,
+                    with its audit trail. */}
                 <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-                  Keys are shown masked for reference only — change them in Settings › Integrations.
+                  Masked, for reference only — change them in Settings › Integrations.
                 </p>
               </TabsContent>
 
