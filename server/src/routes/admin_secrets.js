@@ -55,10 +55,22 @@ const SECRET_DEFS = [
 function maskSecret(v) {
   const s = String(v || '');
   if (!s) return null;
-  if (s.length <= 16) return '•'.repeat(Math.max(8, s.length));
-  const head = s.slice(0, 12);
-  const tail = s.slice(-8);
-  return `${head}${'•'.repeat(6)}${tail}`;
+  // Last 4 only. This used to return the first 12 AND last 8 characters, which for the
+  // shorter credentials here (SS_API_KEY, OTTOCAP_CLIENT_SECRET, PINKDESIGN_API_KEY,
+  // VIETQR_API_PASSWORD — typically 24-32 chars) handed ~20 of them to any operator or
+  // designer, since this route is requireStaff while the write path below is admin-only.
+  // The docstring's real goal — telling a live key from a test one — is served by the
+  // separate `mode` field, which reports the prefix's meaning without printing it.
+  return `${'•'.repeat(8)}${s.slice(-4)}`;
+}
+
+/** live vs test, derived server-side so the prefix itself never has to be shown. */
+function keyMode(v) {
+  const s = String(v || '');
+  if (!s) return null;
+  if (/(^|_)test(_|$)|sk_test|pk_test|sandbox/i.test(s)) return 'test';
+  if (/(^|_)live(_|$)|sk_live|pk_live/i.test(s)) return 'live';
+  return null;
 }
 
 export function adminSecretsRoutes(app, requireStaff) {
@@ -68,7 +80,7 @@ export function adminSecretsRoutes(app, requireStaff) {
       const editable = SECRET_NAMES.includes(d.name);
       // `last4` stays for older clients; `masked` is the preview to show.
       return { name: d.name, label: d.label, integration: d.integration, set: !!v,
-               masked: maskSecret(v), last4: v ? v.slice(-4) : null, editable };
+               masked: maskSecret(v), last4: v ? v.slice(-4) : null, mode: keyMode(v), editable };
     }),
   }));
 

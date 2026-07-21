@@ -118,6 +118,30 @@ export async function login({ email, username, password }) {
 export const isStaff = (user) => !!user && ['operator', 'admin', 'warehouse', 'designer'].includes(user.role);
 
 /**
+ * Who may act ON another user's account — set a password, deactivate, promote.
+ *
+ * Deliberately NARROWER than isStaff, which admits operator and designer. Anything that
+ * writes users.password_hash is an account takeover in one call, so it has to be gated
+ * on this rather than on "is staff": /api/auth/forgot is public and will happily open a
+ * pending reset row for an admin, so a resolve route open to every staff role turned the
+ * lowest one into admin. Warehouse is included because it shares the day-to-day chores
+ * (someone forgot a password), but callers must still refuse an admin TARGET unless the
+ * caller is admin — see requireNotAdminTarget in users.js/password-reset.js.
+ */
+export const canManageUsers = (user) => !!user && (user.role === 'admin' || user.role === 'warehouse');
+
+/**
+ * Who may move money — arbitrary ledger writes, transfers, refunds, pricing.
+ *
+ * Same membership as canManageUsers today but a SEPARATE policy, so one can be widened
+ * without silently widening the other. Kept here because private copies of this exact
+ * predicate had already appeared in order_refunds.js (canRefund) and design_files.js
+ * (canPrice), while wallet.js gated on the much broader isStaff — which is how operator
+ * and designer ended up able to credit any account.
+ */
+export const canMoveMoney = (user) => !!user && (user.role === 'admin' || user.role === 'warehouse');
+
+/**
  * Entitlements a user actually has, INCLUDING ones inherited from their team leader.
  *
  * A team member's own row is always 'starter' with no add-ons — they never buy anything;

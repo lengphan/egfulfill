@@ -10,7 +10,7 @@
 // /api/auth/forgot never reveals whether an email exists (same response either way).
 import crypto from 'crypto';
 import { q } from '../db.js';
-import { hashPassword } from '../auth.js';
+import { hashPassword, canManageUsers } from '../auth.js';
 
 // The REACT app — email links must land where the /reset-password route exists.
 const APP_URL = (process.env.APP_URL || 'https://app.egful.store').replace(/\/+$/, '');
@@ -45,6 +45,26 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
        resolved_by uuid)`).catch(() => {});
 
   const GENERIC = "If an account exists for that email, a reset has been started — check your email for a link, or you'll be contacted with a new password shortly.";
+
+  // The reset-request trio writes users.password_hash, so it follows the /api/users rule
+  // rather than the broader requireStaff it used to carry. requireStaff admits operator
+  // and designer, which made this a two-call escalation from the lowest staff role:
+  // POST /api/auth/forgot {admin email} (public) → GET reset-requests → resolve → log in
+  // as admin. users.js was already written to block exactly this; this file was a second
+  // door around it into the same column.
+  const requireUserManager = async (req, reply) => {
+    if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin or warehouse only' }); }
+  };
+  /** Warehouse shares the chores but must not be able to take an admin account. */
+  const adminTargetBlocked = async (req, reply, userId) => {
+    if (req.user.role === 'admin') return false;
+    const target = await q('select role from users where id=$1', [userId]).then((r) => r.rows[0]);
+    if (target && target.role === 'admin') {
+      reply.code(403); reply.send({ error: 'Only an admin can reset an admin account' });
+      return true;
+    }
+    return false;
+  };
 
   // PUBLIC: request a reset. Records a row (admin path) + emails a link (if SMTP on).
   app.post('/api/auth/forgot', async (req, reply) => {
@@ -96,18 +116,19 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
   });
 
   // STAFF: pending reset requests for the admin-mediated flow.
-  app.get('/api/auth/reset-requests', { preHandler: requireStaff }, async () => {
+  app.get('/api/auth/reset-requests', { preHandler: requireUserManager }, async () => {
     const r = await q("select id, email, status, created_at from password_resets where status='pending' order by created_at desc limit 100");
     return r.rows;
   });
 
   // STAFF: set a new password for a request's user + mark resolved.
-  app.post('/api/auth/reset-requests/:id/resolve', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/auth/reset-requests/:id/resolve', { preHandler: requireUserManager }, async (req, reply) => {
     const password = String((req.body || {}).password || '');
     if (password.length < 6) { reply.code(400); return { error: 'Password must be at least 6 characters' }; }
     const r = await q("select * from password_resets where id=$1 and status='pending' limit 1", [req.params.id]);
     const row = r.rows[0];
     if (!row) { reply.code(404); return { error: 'Not found or already handled' }; }
+    if (await adminTargetBlocked(req, reply, row.user_id)) return;
     const hash = await hashPassword(password);
     await q('update users set password_hash=$1 where id=$2', [hash, row.user_id]);
     await q("update password_resets set status='resolved', resolved_at=now(), resolved_by=$2 where id=$1", [req.params.id, req.user.sub]);
@@ -115,7 +136,7 @@ export function passwordResetRoutes(app, requireAuth, requireStaff) {
   });
 
   // STAFF: dismiss a request (e.g. spurious).
-  app.post('/api/auth/reset-requests/:id/reject', { preHandler: requireStaff }, async (req, reply) => {
+  app.post('/api/auth/reset-requests/:id/reject', { preHandler: requireUserManager }, async (req, reply) => {
     const r = await q("update password_resets set status='rejected', resolved_at=now(), resolved_by=$2 where id=$1 and status='pending' returning id", [req.params.id, req.user.sub]);
     if (!r.rows[0]) { reply.code(404); return { error: 'Not found or already handled' }; }
     return { ok: true };

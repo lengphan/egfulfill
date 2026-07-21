@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { ordersHomeFor } from "@/lib/staff-nav"
 import { numOf } from "@/lib/order-format"
 import { getUser } from "@/lib/auth"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Package, MapPin, Truck, Clock, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
+import { getOrderDesignStatus, type OrderDesignStatus } from "@/lib/api"
 import { OrderRefundPanel } from "@/components/app/order-refund-panel"
+import { ItemDesignActions } from "@/components/app/item-design-actions"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { ItemAvatar } from "@/components/app/item-avatar"
@@ -67,6 +69,15 @@ export default function OrderDetailPage() {
   const [messages, setMessages] = useState<ChatEntry[]>([])
   const [msg, setMsg] = useState("")
   const [customize, setCustomize] = useState<OrderItem | null>(null)
+  // Design-partner state per line. Read separately from the order so a failure costs the
+  // chip, not the page — and it 403s for sellers, which is exactly the intended result:
+  // null means "no partner UI here", not "broken".
+  const [designStatus, setDesignStatus] = useState<OrderDesignStatus | null>(null)
+  const loadDesignStatus = useCallback(() => {
+    if (!id) return
+    getOrderDesignStatus(id).then(setDesignStatus).catch(() => setDesignStatus(null))
+  }, [id])
+  useEffect(() => { const t = setTimeout(loadDesignStatus, 0); return () => clearTimeout(t) }, [loadDesignStatus])
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   const [quote, setQuote] = useState<OrderQuote | null>(null)
 
@@ -279,7 +290,22 @@ export default function OrderDetailPage() {
                         )}
 
                         {it.sku && (
-                          <div className="mt-3 flex justify-end">
+                          <div className="mt-3 flex items-center justify-end gap-2">
+                            {/* Partner chip + the tucked-away send action. Staff only —
+                                it renders nothing when design-status can't be read, which
+                                is what a seller gets. */}
+                            {designStatus && (
+                              <ItemDesignActions
+                                orderId={id}
+                                sku={String(it.sku)}
+                                itemName={it.name}
+                                qty={qty}
+                                printType={it.print_type}
+                                artworkUrl={artwork}
+                                state={designStatus.bySku[String(it.sku)]}
+                                onChanged={loadDesignStatus}
+                              />
+                            )}
                             <Button size="sm" variant="outline" onClick={() => setCustomize(it)}>
                               <PenNib size={13} weight="bold" /> {artwork ? "Edit design" : "Customize"}
                             </Button>

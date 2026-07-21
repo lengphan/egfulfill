@@ -17,7 +17,11 @@ function ensure() {
     created_at  timestamptz not null default now(),
     primary key (seller_id, listing_id)
   )`)
-    .then(() => q(`create table if not exists settings (key text primary key, value text, updated_at timestamptz default now())`))
+    // jsonb, matching schema.sql. Five route files declare this table and four of them
+    // said `value text`; `create table if not exists` makes all of them no-ops on any
+    // existing database, so the real column is jsonb and the `text` spellings were a lie
+    // that readers here trusted. See readSetting() below.
+    .then(() => q(`create table if not exists settings (key text primary key, value jsonb, updated_at timestamptz default now())`))
     .then(() => q(`create table if not exists spydeck_analysis (
       seller_id  text primary key,
       shop_id    text,
@@ -27,6 +31,21 @@ function ensure() {
     .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
+
+/**
+ * Read a `settings` value that may arrive as jsonb (already parsed by node-pg) or as a
+ * text column on an older database.
+ *
+ * Both call sites here did a bare JSON.parse(row.value), which on the real jsonb column
+ * receives an OBJECT, stringifies it to "[object Object]" and throws SyntaxError. In
+ * /trending that throw was swallowed by a rebuild-on-miss catch, so the day-cache NEVER
+ * hit: every single request ran the full 16-search Etsy fan-out the cache exists to
+ * avoid. In /listing/:id/detail there is no fallback, so it 500'd every time.
+ */
+const readSetting = (row) => {
+  if (!row || row.value == null) return null;
+  return typeof row.value === 'string' ? JSON.parse(row.value || '{}') : row.value;
+};
 
 // Estimate model — ported VERBATIM from the client (eg-scout _est) so a listing
 // scores identically on the server and on the card. NO AI involved: this is
@@ -224,7 +243,7 @@ export function spydeckRoutes(app, requireAuth) {
     await ensure();
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
-      const v = cached.rows[0] ? JSON.parse(cached.rows[0].value || '{}') : null;
+      const v = readSetting(cached.rows[0]);
       const hit = Array.isArray(v && v.products)
         ? v.products.find((l) => String(l.listing_id) === String(req.params.id))
         : null;
@@ -250,7 +269,7 @@ export function spydeckRoutes(app, requireAuth) {
     try {
       const cached = await q("select value from settings where key='spydeck_trending'");
       if (cached.rows[0]) {
-        const v = JSON.parse(cached.rows[0].value || '{}');
+        const v = readSetting(cached.rows[0]) || {};
         // `_sold24` guards against a cache written by the OLD builder, which stripped
         // the computed fields — without them every row would look un-trending and
         // staff would get an empty feed until tomorrow.

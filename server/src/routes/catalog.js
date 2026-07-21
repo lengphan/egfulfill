@@ -30,8 +30,19 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   });
 
   // Full-list upsert: insert/update everything sent, then drop products removed locally.
-  app.post('/api/catalog_products', { preHandler: requireStaff }, async (req) => {
+  app.post('/api/catalog_products', { preHandler: requireStaff }, async (req, reply) => {
     const products = Array.isArray(req.body) ? req.body : [];
+    // An empty list used to mean "delete every product", which is never what a full-list
+    // sync intends — it's what a caller sends when it has nothing to send. The client
+    // seeds this from localStorage, and the store deliberately clears the catalog cache
+    // under quota pressure, so a cleared cache became: POST [] → the shared catalog every
+    // seller browses is destroyed, taking base_price (which bills orders) with it. The
+    // read path already refuses to treat "empty" as "none" for the same reason; this is
+    // the write side of that guard. Deleting the last product is a per-id DELETE.
+    if (!products.length) {
+      reply.code(400);
+      return { error: 'Refusing to replace the catalog with an empty list. To remove products, delete them individually.' };
+    }
     const keep = [];
     // Snapshot the prices BEFORE the upsert, so a change can be reported as
     // before → after rather than just "something was edited".
@@ -77,10 +88,11 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
         ]
       );
     }
+    // Same reasoning as the empty-body guard: a payload whose every entry lacked an id
+    // leaves `keep` empty, and pruning against an empty keep-list is a full wipe. Prune
+    // only when we actually know what to keep.
     if (keep.length) {
       await q(`delete from catalog_products where id <> all($1::text[])`, [keep]);
-    } else {
-      await q('delete from catalog_products');
     }
     // Operators building products is intended; changing what sellers are charged is
     // the part that needs an owner's eyes. One notification per save, naming the

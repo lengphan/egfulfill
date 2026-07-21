@@ -13,7 +13,7 @@
 // re-pushing the same charge / top-up / refund (retry, double-click, two boards)
 // never double-counts.
 import { q } from '../db.js';
-import { isStaff } from '../auth.js';
+import { isStaff, canMoveMoney } from '../auth.js';
 import { audit } from '../audit.js';
 
 // Balance of one account = SUM(delta) over the append-only ledger. Exported so every
@@ -98,7 +98,14 @@ export async function moveFunds({ from, to, amount, type = 'transfer', ref = nul
 }
 
 export function walletRoutes(app, requireAuth) {
-  q(`create table if not exists wallet_ledger (
+  // CHAINED, not fired in parallel. These were separate bare q() calls, and a bare q()
+  // takes whatever pool connection is free — so the CREATE INDEX could reach the server
+  // before the CREATE TABLE and fail with "relation does not exist", straight into a
+  // .catch(() => {}). That is not theoretical: on a fresh database it lost, leaving the
+  // table WITHOUT wallet_ledger_dedupe, which silently turned every `on conflict do
+  // nothing` in the money paths into "always insert". Concurrent retries with the same
+  // ref then double-credited. Awaiting each step in order is what makes idempotency real.
+  const walletReady = q(`create table if not exists wallet_ledger (
        id bigserial primary key,
        account     text not null,
        delta       numeric(12,2) not null,
@@ -107,19 +114,30 @@ export function walletRoutes(app, requireAuth) {
        note        text,
        created_by  text,
        created_at  timestamptz not null default now()
-     )`).catch(() => {});
-  // WHO the money is with, when it isn't us. Neither the dispatch partner nor the design
-  // partner has a billing API we can charge or credit against — both settle by invoice —
-  // so their costs only ever exist on OUR ledger. Without a column naming them you can
-  // only guess from the `type` string, which makes "what do we owe byeastside this month"
-  // a manual sift. Null for ordinary seller movements.
-  q('alter table wallet_ledger add column if not exists partner text').catch(() => {});
-  q('create index if not exists wallet_ledger_partner on wallet_ledger (partner, created_at desc)').catch(() => {});
-  // De-dupe key: same (account,type,ref) can only land once. Partial index so
-  // many ref-less manual adjustments are still allowed.
-  q(`create unique index if not exists wallet_ledger_dedupe
-       on wallet_ledger (account, type, ref) where ref is not null and ref <> ''`).catch(() => {});
-  q(`create index if not exists wallet_ledger_account on wallet_ledger (account, created_at desc)`).catch(() => {});
+     )`)
+    // WHO the money is with, when it isn't us. Neither the dispatch partner nor the design
+    // partner has a billing API we can charge or credit against — both settle by invoice —
+    // so their costs only ever exist on OUR ledger. Without a column naming them you can
+    // only guess from the `type` string, which makes "what do we owe byeastside this month"
+    // a manual sift. Null for ordinary seller movements.
+    .then(() => q('alter table wallet_ledger add column if not exists partner text'))
+    // Which order a cost belongs to. costs.js exports ensureCostColumns() to add this and
+    // nothing ever called it, so the column was absent everywhere — and order_refunds.js
+    // sets order_id and refund_part in ONE statement, so the missing column threw and took
+    // refund_part down with it. Every refund then read back as unattributed and was
+    // re-spread top-down across parts, making per-part refund caps wrong.
+    .then(() => q('alter table wallet_ledger add column if not exists order_id text'))
+    .then(() => q('alter table wallet_ledger add column if not exists refund_part text'))
+    .then(() => q('create index if not exists wallet_ledger_partner on wallet_ledger (partner, created_at desc)'))
+    .then(() => q('create index if not exists wallet_ledger_order on wallet_ledger (order_id)'))
+    // De-dupe key: same (account,type,ref) can only land once. Partial index so
+    // many ref-less manual adjustments are still allowed.
+    .then(() => q(`create unique index if not exists wallet_ledger_dedupe
+       on wallet_ledger (account, type, ref) where ref is not null and ref <> ''`))
+    .then(() => q(`create index if not exists wallet_ledger_account on wallet_ledger (account, created_at desc)`))
+    .catch(() => {});
+  // Exported on the app so money routes can await the schema rather than assume it.
+  app.decorate('walletReady', walletReady);
 
   // Withdrawal requests — a PENDING payout a seller/staff asks for. It does NOT
   // debit the wallet on create (mirrors the top-up flow: money only moves once an
@@ -266,7 +284,12 @@ export function walletRoutes(app, requireAuth) {
   });
 
   app.post('/api/wallet/ledger', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    // canMoveMoney, not isStaff: isStaff admits operator and designer, so this route let
+    // either write an arbitrary delta onto ANY account — the seller-credits-themselves
+    // hole closed, reopened one role down. Every neighbouring money path already draws
+    // the line here (order_refunds canRefund, design_files canPrice, the cancel/refund
+    // stages in orders.js), and CLAUDE.md puts wallet-affecting writes at admin/warehouse.
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
     const b = req.body || {};
     const account = b.account ? String(b.account) : req.user.sub;
     if (!canAccess(req.user, account)) { reply.code(403); return { error: 'forbidden' }; }
@@ -302,7 +325,9 @@ export function walletRoutes(app, requireAuth) {
   // `amount` may be signed: +ve moves from→to, −ve reverses (debits the seller).
   // Idempotent by `ref` (same ref + same pair = one move, never doubled).
   app.post('/api/wallet/transfer', { preHandler: requireAuth }, async (req, reply) => {
-    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
+    // Same narrowing as /ledger above — this moves real money between accounts, including
+    // out of `factory`, and an operator or designer has no business doing that.
+    if (!canMoveMoney(req.user)) { reply.code(403); return { error: 'Admin or warehouse only' }; }
     const b = req.body || {};
     const amount = parseFloat(b.amount);
     if (!isFinite(amount) || amount === 0) { reply.code(400); return { error: 'amount must be a non-zero number' }; }

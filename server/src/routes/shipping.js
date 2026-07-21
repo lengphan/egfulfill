@@ -11,6 +11,7 @@
 //   POST /api/shipping/rates  {to,from,parcel}            → merged rate list
 //   POST /api/shipping/label  {rateToken} | {to,from,parcel} → buy (specific or cheapest)
 //   GET  /api/shipping/track?provider=&carrier=&tracking=  → status
+import { q } from '../db.js';
 import { readShipFrom } from './factory_settings.js';
 
 // Read at CALL time, not import time. Saving a credential in Settings › Integrations
@@ -385,8 +386,10 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
   });
 
   app.get('/api/shipping/track', guard, async (req, reply) => {
-    const q = req.query || {};
-    const provider = q.provider, carrier = q.carrier, tracking = q.tracking;
+    // Named qs, not q — `q` is the db helper imported at the top of this file, and
+    // shadowing it here is how three handlers below ended up calling an undefined q().
+    const qs = req.query || {};
+    const provider = qs.provider, carrier = qs.carrier, tracking = qs.tracking;
     if (!tracking) { reply.code(400); return { error: 'tracking required' }; }
     try {
       if (provider === 'shippo') {

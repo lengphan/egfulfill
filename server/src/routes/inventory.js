@@ -39,7 +39,7 @@ async function consignedScan(sku, delta, direction, qty, req, b) {
 
   const after = (await q('select qty_received, qty_reserved, location from consignment_lines where id=$1', [line.id])).rows[0] || {};
   await q('insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5)',
-    [sku, direction, qty, b.order_ref || null, req.user?.id || null]).catch(() => {});
+    [sku, direction, qty, b.order_ref || null, req.user?.sub || null]).catch(() => {});
 
   // Same shape the inventory path returns, so the scan station needs no special case —
   // plus whose it is and where it lives, which is what matters at the shelf.
@@ -101,9 +101,19 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
          (r.reorder_at == null ? 25 : r.reorder_at), r.category || null, r.supplier || null]
       );
     }
+    // Pruning is OPT-IN. This used to delete every sku absent from the body, which made
+    // any short payload a shelf wipe — and the Purchase board builds its payload from a
+    // GET whose .catch() yields [], so a failed inventory fetch looked exactly like an
+    // empty factory and the next "Receive" deleted everything not on that PO. A caller
+    // that genuinely means "this list is now the whole inventory" says so explicitly.
     const skus = rows.map((r) => r.sku).filter(Boolean);
-    if (skus.length) await q('delete from inventory where sku <> all($1)', [skus]); // drop removed SKUs
-    return { ok: true, count: rows.length };
+    const prune = String((req.query || {}).prune || '') === '1';
+    let removed = 0;
+    if (prune && skus.length) {
+      const del = await q('delete from inventory where sku <> all($1)', [skus]);
+      removed = del.rowCount || 0;
+    }
+    return { ok: true, count: rows.length, removed, pruned: prune };
   });
 
   // Partial update of ONE sku. Prefer this over the whole-list POST above: that
@@ -111,7 +121,11 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
   // field (say reorder_at) writes back a stale in_stock and silently erases any
   // stock scanned in since the page loaded. Here only the named fields move.
   const PATCHABLE = ['name', 'variant', 'in_stock', 'reserved', 'reorder_at', 'category', 'supplier'];
-  app.patch('/api/inventory/:sku', { preHandler: requireStaff }, async (req, reply) => {
+  // requireWarehouse, not requireStaff: in_stock is PATCHABLE, and a stock level is a
+  // claim about physical custody (see the header note above). Every sibling write here
+  // is warehouse/admin; this route was the one gap, letting an operator set any stock to
+  // any number while bypassing the scan audit trail entirely.
+  app.patch('/api/inventory/:sku', { preHandler: requireWarehouse }, async (req, reply) => {
     const sku = String(req.params.sku || '');
     const b = req.body || {};
     const sets = [], vals = [];
@@ -177,7 +191,7 @@ export function inventoryRoutes(app, requireStaff, requireWarehouse) {
 
     const hist = await q(
       'insert into scan_history (sku, direction, qty, order_ref, by_id) values ($1,$2,$3,$4,$5) returning id, created_at',
-      [sku, direction, qty, b.order_ref || null, req.user?.id || null]
+      [sku, direction, qty, b.order_ref || null, req.user?.sub || null]
     );
     return { ok: true, item: upd.rows[0], scan: { id: hist.rows[0].id, sku, direction, qty, order_ref: b.order_ref || null, created_at: hist.rows[0].created_at, by_name: req.user?.name || null } };
   });

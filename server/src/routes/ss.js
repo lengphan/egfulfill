@@ -190,9 +190,19 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
        style_id text primary key,
        brand text, style_name text, category text, image text,
        data jsonb,
-       created_by integer,
+       created_by uuid,
        created_at timestamptz default now()
      )`).catch(() => {});
+  // created_by was declared `integer` against a uuid users.id, so it could never have
+  // stored a value — and the insert wrote req.user.id, which the JWT doesn't carry
+  // (it signs `sub`), so it was always NULL anyway. Converting is therefore lossless.
+  // Guarded on the current type so it can't touch a column that is already uuid.
+  q(`do $$ begin
+       if exists (select 1 from information_schema.columns
+                   where table_name='ss_favorites' and column_name='created_by' and data_type='integer') then
+         alter table ss_favorites alter column created_by type uuid using null::uuid;
+       end if;
+     end $$;`).catch(() => {});
 
   // ── Status: is it configured, and what's synced? ────────────────────────────
   app.get('/api/ss/status', { preHandler: requireStaff }, async () => {
@@ -507,7 +517,7 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
          values ($1,$2,$3,$4,$5,$6)
          on conflict (style_id) do update set brand=excluded.brand, style_name=excluded.style_name,
            category=excluded.category, image=excluded.image`,
-        [id, b.brand || null, b.title || b.style_name || null, b.category || null, b.image || null, req.user?.id || null]
+        [id, b.brand || null, b.title || b.style_name || null, b.category || null, b.image || null, req.user?.sub || null]
       );
       return { ok: true, styleID: id, favorited: true };
     } catch (e) { reply.code(500); return { error: e.message }; }

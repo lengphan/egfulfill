@@ -137,7 +137,10 @@ export function vietqrRoutes(app, requireAuth) {
   // Poll: has a credit transaction matching this order/reference arrived?
   app.get('/api/vietqr/status', { preHandler: requireAuth }, async (req) => {
     const ref = String((req.query && req.query.ref) || '').trim();
-    if (!ref) return { paid: false };
+    // A short ref substring-matches half the table, so this poll used to hand any seller
+    // someone else's transfer (and its bank account) just by asking for ref=1. Refs are
+    // EG + 6 digits; anything shorter cannot be a real one, so refuse rather than guess.
+    if (ref.length < 6) return { paid: false };
     // Match an order (matched_order/order_id) OR a top-up reference embedded in the
     // transfer content (addInfo) — wallet top-ups carry a code, not an order id.
     const r = await q(
@@ -145,10 +148,20 @@ export function vietqrRoutes(app, requireAuth) {
       [ref]
     );
     const t = r.rows[0];
-    return { paid: !!t, transaction: t || null };
+    // Only the fields the poll actually needs. `select *` handed the caller the payer's
+    // bank account number and reference number, which is nobody's business but the
+    // account holder's and staff's — and the ref match is a substring, so a near-miss
+    // could surface a stranger's row.
+    return {
+      paid: !!t,
+      transaction: t ? { amount: t.amount, created_at: t.created_at, matched_order: t.matched_order } : null,
+    };
   });
-  // Recent transactions for an admin payments view.
-  app.get('/api/vietqr/transactions', { preHandler: requireAuth }, async () => {
+  // Recent transactions for an admin payments view. STAFF ONLY — this returns other
+  // sellers' bank account numbers, amounts and transfer memos, and was reachable by any
+  // signed-in seller despite the comment saying "admin".
+  app.get('/api/vietqr/transactions', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const r = await q('select transactionid, referencenumber, bankaccount, amount, trans_type, content, matched_order, created_at from vietqr_transactions order by created_at desc limit 100');
     return r.rows;
   });

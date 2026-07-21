@@ -13,6 +13,7 @@
 import { q, withLock } from '../db.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { audit } from '../audit.js';
+import { canMoveMoney } from '../auth.js';
 
 // Which part of an order a refund row paid back. Added idempotently at load, like the
 // other late columns in this codebase — schema.sql only runs on a first DB init, so an
@@ -20,7 +21,10 @@ import { audit } from '../audit.js';
 q('alter table wallet_ledger add column if not exists refund_part text').catch(() => {});
 
 const money = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const canRefund = (u) => !!u && (u.role === 'admin' || u.role === 'warehouse');
+// One shared predicate in auth.js — this was a private copy of the same rule wallet.js
+// and design_files.js each also kept, and the three had already drifted (wallet.js was
+// gating on the much broader isStaff).
+const canRefund = canMoveMoney;
 
 /**
  * Every charge type that bills a SELLER for an order, with the ref shape it uses.
@@ -288,6 +292,36 @@ export async function refundOrder({ orderId, amount, select, full, note, by, cli
 }
 
 export function orderRefundRoutes(app, requireAuth) {
+  /**
+   * Design-partner state for one order's lines: who has each line's artwork and where it
+   * is on their side.
+   *
+   * A SEPARATE read rather than a join into the order query. Attaching it there would put
+   * a lateral join into the path behind every order page and every board, so a mistake in
+   * it takes out order detail entirely — where a mistake here costs a badge. The state is
+   * decoration; the order is not.
+   *
+   * Keyed by sku because that's what design_cards stores. Two lines of the same sku
+   * therefore share one card — a limitation of that table (line_id is the real line
+   * identity everywhere else), so this reports "the card for this sku" rather than
+   * pretending to be per line.
+   */
+  app.get('/api/orders/:id/design-status', { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    const r = await q(
+      `select distinct on (coalesce(sku,'')) coalesce(sku,'') as sku, id, vendor, vendor_ref, col, updated_at
+         from design_cards where order_id = $1
+        order by coalesce(sku,''), id desc`,
+      [String(req.params.id)]
+    ).catch(() => ({ rows: [] }));
+    return {
+      bySku: Object.fromEntries(r.rows.map((c) => [c.sku, {
+        cardId: String(c.id), vendor: c.vendor || null, vendorRef: c.vendor_ref || null,
+        col: c.col || null, updatedAt: c.updated_at,
+      }])),
+    };
+  });
+
   // Itemised charges for one order. Staff-readable — an operator seeing what an order
   // cost is harmless and useful; only ISSUING money is restricted.
   app.get('/api/orders/:id/charges', { preHandler: requireAuth }, async (req, reply) => {

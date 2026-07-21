@@ -4,7 +4,7 @@
 // design id (DL-…/DSN-…). Access-controlled: staff any; a seller only their OWN files (seller_id,
 // resolved from the order the design belongs to; a seller's active team member counts as the owner).
 import { q } from '../db.js';
-import { isStaff } from '../auth.js';
+import { isStaff, canMoveMoney } from '../auth.js';
 import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
@@ -50,7 +50,7 @@ export function designFilesRoutes(app, requireAuth) {
   }
   // Only admin + warehouse may set what a seller pays. Operators and designers are
   // staff but must NOT be able to price a deliverable.
-  const canPrice = (u) => !!u && (u.role === 'admin' || u.role === 'warehouse');
+  const canPrice = canMoveMoney;   // shared predicate — see auth.js
 
   // Effective owner for a request (a team member acts as the owner; a plain seller is themselves).
   async function effectiveSeller(user) {

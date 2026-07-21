@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, PaperPlaneTilt } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getDesignCards, saveDesignCards, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
-import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
 
@@ -333,7 +332,6 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
   const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [pushOpen, setPushOpen] = useState(false)
   const col = colOf(card)
 
   const move = (to: string, extra?: Partial<DesignCard>) => onMove(card, to, extra)
@@ -419,18 +417,10 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
               Being designed by {vendorLabel(card.vendor)}
             </span>
           ) : (
-            <>
-              <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>
-              {/* The manual route out. Most artwork arrives print-ready, so this is a
-                  decision someone makes about a specific file — never automatic. Only
-                  offered on a card with an order behind it, since the partner is sent a
-                  line item, not a loose card. */}
-              {card.order_id && (
-                <Button size="sm" variant="outline" onClick={() => setPushOpen(true)}>
-                  <PaperPlaneTilt size={14} weight="bold" /> Send to design partner
-                </Button>
-              )}
-            </>
+            // Sending out lives on the ORDER's item row, not here: the decision is made
+            // while looking at the line and its artwork, and a designer opening a card to
+            // claim it is not the person deciding to outsource it.
+            <Button size="sm" onClick={() => move("inprogress", { claimed_by: me })}><Hand size={14} weight="bold" /> Claim</Button>
           ))}
           {col === "inprogress" && <Button size="sm" onClick={() => move("review")}><ArrowRight size={14} weight="bold" /> Send for review</Button>}
           {col === "review" && (
@@ -448,21 +438,6 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
           <button onClick={() => remove(card.id)} className="ml-auto text-xs font-medium text-muted-foreground hover:text-red-600">Remove card</button>
         </div>
       </DialogContent>
-      {card.order_id && (
-        <PushToPartnerDialog
-          open={pushOpen}
-          onOpenChange={setPushOpen}
-          orderId={String(card.order_id)}
-          sku={String(card.sku || "")}
-          itemName={card.title}
-          printType={card.type}
-          artworkUrl={card.thumb ? String(card.thumb) : null}
-          // The partner writes its OWN card (with their task ref and the vendor badge),
-          // so close out of this one rather than patching it — the row that matters after
-          // a push is theirs, and the board reloads to pick it up.
-          onPushed={() => { setPushOpen(false); onClose() }}
-        />
-      )}
     </Dialog>
   )
 }

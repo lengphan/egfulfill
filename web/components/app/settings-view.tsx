@@ -810,6 +810,13 @@ function PlatformPanel() {
   // blank COSTS us, and the sell price follows from one number instead of a hand-typed
   // price per size per product.
   const [baseMarkup, setBaseMarkup] = useState("")
+  // Partner rates. Neither the dispatch partner nor the design partner has a billing API
+  // we can query, so what they cost us is a FIXED figure we set here and book per job.
+  // Until it's set the rate is 0 — and recordCost skips anything <= 0, so no partner cost
+  // is recorded at all and their Billing statement reads as though they did no work.
+  const [expediteFee, setExpediteFee] = useState("")
+  const [expediteCost, setExpediteCost] = useState("")
+  const [designPartnerCost, setDesignPartnerCost] = useState("")
   const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
@@ -839,6 +846,9 @@ function PlatformPanel() {
       setLoaded(r)
       setDesignFee(r.design_fee != null ? String(r.design_fee) : "")
       setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
+      setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
+      setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
+      setDesignPartnerCost(r.design_partner_cost != null ? String(r.design_partner_cost) : "")
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
@@ -859,6 +869,9 @@ function PlatformPanel() {
       const r = await setFactorySettings({
         design_fee: designFee === "" ? undefined : Number(designFee),
         base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
+        expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
+        expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
+        design_partner_cost: designPartnerCost === "" ? undefined : Number(designPartnerCost),
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
@@ -918,6 +931,33 @@ function PlatformPanel() {
       {/* Product types. The default mockup is the labour-saver: set one 2D outline per
           category and every product in it inherits a blank for the Design Maker, instead
           of an upload per product. A product's own mockup still wins. */}
+      <Fold title="Partner rates" hint="what outside partners cost us, per job">
+
+        <p className="mb-3 text-xs text-muted-foreground">
+          Neither partner can be billed through an API — byeastside and Pink Design both
+          settle by invoice — so what they cost us is a fixed figure set here and booked
+          against every job as it happens. <strong>A rate of 0 records nothing</strong>, so
+          their statement on the Billing page will be empty until these are set.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MoneyField
+            label="Dispatch — what byeastside charges us"
+            hint="Per label they pick. Booked as expedite-cost when a label is pushed."
+            value={expediteCost} onChange={setExpediteCost}
+          />
+          <MoneyField
+            label="Dispatch — what we charge the seller"
+            hint="Per expedited order. Charged to the seller's wallet at push time."
+            value={expediteFee} onChange={setExpediteFee}
+          />
+          <MoneyField
+            label="Design — what Pink Design charges us"
+            hint="Per outsourced task. Booked when the card is approved."
+            value={designPartnerCost} onChange={setDesignPartnerCost}
+          />
+        </div>
+      </Fold>
+
       <Fold title="Embroidery threads" hint="the cones you actually stock">
 
         <p className="mb-3 text-xs text-muted-foreground">

@@ -1,7 +1,7 @@
 // User management API — ADMIN ONLY. Backs the "Users" admin screen so you
 // add/promote/reset/delete accounts from the app instead of editing the DB.
 import { q } from '../db.js';
-import { hashPassword, isStaff } from '../auth.js';
+import { hashPassword, isStaff, canManageUsers } from '../auth.js';
 import { audit } from '../audit.js';
 
 const ROLES = ['seller', 'operator', 'admin', 'warehouse', 'designer'];
@@ -12,7 +12,9 @@ export function usersRoutes(app, requireAdmin, requireAuth) {
   // left) but must NOT be able to escalate: it cannot change roles or plans, and cannot
   // touch an admin account at all. Otherwise a warehouse login could set an admin's
   // password and take the whole system. Deleting stays admin-only — it's irreversible.
-  const canManageUsers = (u) => !!u && (u.role === 'admin' || u.role === 'warehouse');
+  // canManageUsers lives in auth.js so password-reset.js gates on the SAME predicate —
+  // it used to carry requireStaff, which was a second door into password_hash around
+  // every check in this file.
   const requireUserManager = async (req, reply) => {
     if (!canManageUsers(req.user)) { reply.code(403); return reply.send({ error: 'Admin or warehouse only' }); }
   };

@@ -315,18 +315,24 @@ export function ordersRoutes(app, requireAuth) {
   // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
   // the moment a seller uploads a few images → "Browser storage is full"). One row
   // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
+  // Chained from the CREATE onward. The ALTERs used to be bare q() calls sitting beside
+  // it, and a bare q() takes whatever pool connection is free — so on a fresh database
+  // they raced the CREATE, lost, and every failure went into a .catch(() => {}). The
+  // result was a live server whose order_designs had only the six original columns, so
+  // every POST /api/orders/:id/designs died on `column "storage_key" does not exist`.
+  // It self-healed on the next boot (the table existed by then), which is exactly what
+  // made it hard to see: broken on fresh deploys only.
   q(`create table if not exists order_designs (
        order_id text not null, sku text not null, kind text not null default 'raster',
        data text, name text, updated_at timestamptz default now(),
-       primary key (order_id, sku, kind))`).catch(() => {});
-  // Placement (%-coords {x,y,w,h,r}) saved by the seller's order customizer — kept
-  // here (seller-writable via canSeeOrder) because order_items.design_pos is staff-only.
-  q('alter table order_designs add column if not exists pos jsonb').catch(() => {});
-  // Artwork fingerprints, so "we have already digitised this" is answerable. art_hash is
-  // exact and computed here; art_phash is fuzzy and comes from the browser (see
-  // fingerprint.js). Chained, not fired in parallel — two bare q() calls can land on
-  // different pool connections and run out of order.
-  q('alter table order_designs add column if not exists art_hash text')
+       primary key (order_id, sku, kind))`)
+    // Placement (%-coords {x,y,w,h,r}) saved by the seller's order customizer — kept
+    // here (seller-writable via canSeeOrder) because order_items.design_pos is staff-only.
+    .then(() => q('alter table order_designs add column if not exists pos jsonb'))
+    // Artwork fingerprints, so "we have already digitised this" is answerable. art_hash is
+    // exact and computed here; art_phash is fuzzy and comes from the browser (see
+    // fingerprint.js).
+    .then(() => q('alter table order_designs add column if not exists art_hash text'))
     .then(() => q('alter table order_designs add column if not exists art_phash text'))
     // Object-storage URL for the artwork. When set, `data` is null — the bytes live in
     // storage, not Postgres. Readers take url ?? data.

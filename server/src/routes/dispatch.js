@@ -21,6 +21,7 @@
 // Dormant until BYEASTSIDE_API_KEY is set: every route answers honestly and nothing
 // throws, exactly like the storage and mail integrations.
 import { q } from '../db.js';
+import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
 import { moveFunds, balanceOf } from './wallet.js';
@@ -266,7 +267,11 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   app.post('/api/dispatch/sync', { preHandler: requireWarehouse }, async () => syncScans());
 
   // What's configured + what's outstanding, for the UI and for diagnosing quietly-off setups.
-  app.get('/api/dispatch/status', { preHandler: requireAuth }, async () => {
+  // Staff only: the counts are factory-WIDE (every seller's orders), so on requireAuth any
+  // signed-in seller could poll total throughput and backlog. Every other dispatch route
+  // is canDispatch or requireWarehouse; this one was the gap.
+  app.get('/api/dispatch/status', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'staff only' }; }
     const counts = (await q(
       `select count(*) filter (where dispatch_pdf_id is not null and label_scanned_at is null)::int as awaiting_scan,
               count(*) filter (where label_scanned_at is not null and factory_status <> 'shipped')::int as prescanned_not_shipped,

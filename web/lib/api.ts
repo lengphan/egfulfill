@@ -1536,3 +1536,15 @@ export function pinkRequestFix(body: { cardId: string | number; message: string;
   return api<{ ok?: boolean; cardId?: number; col?: string; error?: string; commented?: boolean }>(
     `/api/pinkdesign/fix`, { method: "POST", body: JSON.stringify(body) })
 }
+
+/** Design-partner state for one order's lines, keyed by SKU. Read separately from the
+ *  order itself so a failure here costs a badge, not the order page. */
+export type OrderDesignStatus = {
+  bySku: Record<string, {
+    cardId: string; vendor: string | null; vendorRef: string | null
+    col: string | null; updatedAt?: string
+  }>
+}
+export function getOrderDesignStatus(id: string) {
+  return api<OrderDesignStatus>(`/api/orders/${encodeURIComponent(id)}/design-status`)
+}
