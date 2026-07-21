@@ -73,31 +73,41 @@ const faqs = [
   },
 ]
 
+/* Hover: a soft lift, a brand-tinted border, and a glow the same hue as the accent.
+   Kept to one definition so the feature cards can't drift apart, and to transform +
+   shadow only — animating those doesn't force layout on every frame the way animating
+   size or margin would. */
+const CARD_HOVER =
+  "group transition-all duration-200 hover:-translate-y-0.5 " +
+  "hover:border-primary/40 hover:shadow-[0_14px_40px_-20px_var(--primary)]"
+
 export default function MarketingHome() {
   return (
     <>
       {/* ── Hero ── */}
       <section className="eg-hero relative isolate overflow-hidden">
-        {/* The dithered photo plate was removed at the user's request. The surface stays
-            dark because the headline and nav are light-on-dark — that's a brand surface
-            in BOTH themes, not a themed one, so it must not invert to white. */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[#0b0b0c]">
-          {/* One restrained wash of brand colour, so the section isn't purely monotone. */}
+        {/* Light surface, at the user's request — so it is a THEMED section now, not a
+            fixed brand plate. It uses bg-background rather than a hard white so dark mode
+            still inverts with the rest of the site instead of staying stuck white. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-background">
+          {/* One restrained wash of brand colour, so the section isn't purely monotone.
+              Weaker than on the old black plate: the same opacity that read as a glow on
+              near-black reads as a smudge on white. */}
           <div
-            className="absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-[130px] opacity-30"
+            className="absolute left-1/2 top-[-10%] h-[520px] w-[820px] -translate-x-1/2 rounded-full blur-[130px] opacity-[0.18]"
             style={{ background: "radial-gradient(circle at center, oklch(0.55 0.19 285 / 0.55), transparent 70%)" }}
           />
         </div>
 
         <div className="mx-auto max-w-6xl px-6 pb-20 pt-20 text-center sm:pt-28">
           <Reveal delay={0}>
-            <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance text-white sm:text-7xl">
-              What if every order <span className="italic text-[oklch(0.72_0.17_285)]">printed itself?</span>
+            <h1 className="mx-auto max-w-4xl font-display text-6xl font-semibold leading-[1.02] tracking-tight text-balance text-foreground sm:text-7xl">
+              What if every order <span className="italic text-primary">printed itself?</span>
             </h1>
           </Reveal>
 
           <Reveal delay={0.08}>
-            <p className="mx-auto mt-7 max-w-2xl text-lg text-white/70 text-pretty">
+            <p className="mx-auto mt-7 max-w-2xl text-lg text-muted-foreground text-pretty">
               Etsy, Shopify & TikTok orders sync into one queue, print on a vetted network, and ship with
               tracking pushed back — completely hands off.
             </p>
@@ -108,12 +118,9 @@ export default function MarketingHome() {
               <Link href="/login" className={buttonVariants({ size: "lg" })}>
                 Start for free <ArrowRight size={16} weight="bold" />
               </Link>
-              {/* Outline variant is themed for a light surface — on the black hero it
-                  renders a white slab. Overridden to a glass outline instead. */}
-              <Link
-                href="/how-it-works"
-                className={buttonVariants({ variant: "outline", size: "lg" }) + " border-white/25 bg-white/5 text-white hover:bg-white/10 hover:text-white"}
-              >
+              {/* No override any more: the outline variant is themed for a light surface,
+                  which is what this now is. */}
+              <Link href="/how-it-works" className={buttonVariants({ variant: "outline", size: "lg" })}>
                 See how it works
               </Link>
             </div>
@@ -122,16 +129,16 @@ export default function MarketingHome() {
           {/* integration row */}
           <Reveal delay={0.32}>
             <div className="mt-12 flex flex-col items-center gap-3">
-              <span className="text-xs font-medium uppercase tracking-widest text-white/45">
+              <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 Works with
               </span>
-              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-lg font-semibold text-white/70">
+              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-lg font-semibold text-foreground/70">
                 <span>Etsy</span>
-                <span className="text-white/25">·</span>
+                <span className="text-foreground/25">·</span>
                 <span>Shopify</span>
-                <span className="text-white/25">·</span>
+                <span className="text-foreground/25">·</span>
                 <span>TikTok Shop</span>
-                <span className="text-white/25">·</span>
+                <span className="text-foreground/25">·</span>
                 <span>WooCommerce</span>
               </div>
             </div>
@@ -165,8 +172,8 @@ export default function MarketingHome() {
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           {/* wide */}
           <Reveal delay={0} className="md:col-span-2">
-          <Card className="gap-3 p-7">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Card className={"gap-3 p-7 " + CARD_HOVER}>
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <PlugsConnected size={22} weight="duotone" />
             </span>
             <div className="text-lg font-semibold">Every store, one queue</div>
@@ -185,8 +192,8 @@ export default function MarketingHome() {
           </Reveal>
           {/* narrow */}
           <Reveal delay={0.08}>
-          <Card className="gap-3 p-7">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Card className={"gap-3 p-7 " + CARD_HOVER}>
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Printer size={22} weight="duotone" />
             </span>
             <div className="text-lg font-semibold">Vetted print network</div>
@@ -197,8 +204,8 @@ export default function MarketingHome() {
           </Reveal>
           {/* narrow */}
           <Reveal delay={0.16}>
-          <Card className="gap-3 p-7">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Card className={"gap-3 p-7 " + CARD_HOVER}>
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Truck size={22} weight="duotone" />
             </span>
             <div className="text-lg font-semibold">Tracking, automatic</div>
@@ -209,8 +216,8 @@ export default function MarketingHome() {
           </Reveal>
           {/* wide */}
           <Reveal delay={0.24} className="md:col-span-2">
-          <Card className="gap-3 p-7">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Card className={"gap-3 p-7 " + CARD_HOVER}>
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
               <Wallet size={22} weight="duotone" />
             </span>
             <div className="text-lg font-semibold">Transparent wallet</div>

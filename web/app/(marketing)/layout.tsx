@@ -1,7 +1,4 @@
-"use client"
-
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { buttonVariants } from "@/components/ui/button"
 
 const nav = [
@@ -9,24 +6,17 @@ const nav = [
   { label: "Features", href: "/features" },
   { label: "How it works", href: "/how-it-works" },
   { label: "Pricing", href: "/pricing" },
+  { label: "API", href: "/docs" },
 ]
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
-  // The home hero is a black brand surface. A light nav bar sitting on top of it
-  // draws a hard white line across the design, so on "/" ONLY the header goes
-  // transparent and light-on-dark and lets the hero run underneath it. Every other
-  // marketing page is a light surface and keeps the normal header.
-  const onDarkHero = usePathname() === "/"
+  // The home hero used to be a black brand plate, so the header inverted to
+  // light-on-dark on "/" only. The hero is a themed light surface now, so that special
+  // case is gone — one header everywhere, which also means it can't be half-inverted
+  // during a theme switch.
   return (
     <div className="flex min-h-svh flex-col bg-background">
-      <header
-        className={
-          "sticky top-0 z-30 " +
-          (onDarkHero
-            ? "border-b border-white/10 bg-[#0b0b0c]/60 text-white backdrop-blur"
-            : "border-b border-border bg-background/80 backdrop-blur")
-        }
-      >
+      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-6">
           <Link href="/" className="font-display text-2xl font-semibold tracking-tight">
             egfulfill
@@ -36,10 +26,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <Link
                 key={n.label}
                 href={n.href}
-                className={
-                  "text-sm font-medium transition-colors " +
-                  (onDarkHero ? "text-white/70 hover:text-white" : "text-muted-foreground hover:text-foreground")
-                }
+                className="rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 {n.label}
               </Link>
@@ -48,7 +35,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/login"
-              className={buttonVariants({ variant: "ghost", size: "sm" }) + (onDarkHero ? " text-white hover:bg-white/10 hover:text-white" : "")}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               Log in
             </Link>
@@ -72,6 +59,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
             <Link href="/how-it-works" className="hover:text-foreground">How it works</Link>
             <Link href="/features" className="hover:text-foreground">Features</Link>
+            <Link href="/docs" className="hover:text-foreground">API</Link>
             <Link href="/login" className="hover:text-foreground">Log in</Link>
             <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground">Terms</Link>
