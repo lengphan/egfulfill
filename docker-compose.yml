@@ -44,6 +44,23 @@ services:
       SS_ACCOUNT_NUMBER: ${SS_ACCOUNT_NUMBER:-}
       SS_API_KEY: ${SS_API_KEY:-}
       SS_API_BASE: ${SS_API_BASE:-https://api.ssactivewear.com/v2}
+      # Otto Cap (headwear supplier) — OAuth password grant, so all four are required;
+      # ocConfigured() is false unless every one is present. These were set in .env but
+      # never listed HERE, and this file passes variables through by name — so the
+      # container never saw them and Otto reported itself unconfigured with the
+      # credentials sitting right there.
+      OTTOCAP_USERNAME: ${OTTOCAP_USERNAME:-}
+      OTTOCAP_PASSWORD: ${OTTOCAP_PASSWORD:-}
+      OTTOCAP_CLIENT_ID: ${OTTOCAP_CLIENT_ID:-}
+      OTTOCAP_CLIENT_SECRET: ${OTTOCAP_CLIENT_SECRET:-}
+      # Defaults to the SANDBOX host. Point at production only when the payloads have
+      # been accepted by a real account.
+      OTTOCAP_API_BASE: ${OTTOCAP_API_BASE:-https://sandbox-api.ottocap.com}
+      # The live-order gates. Absent = dry run, which is the intended default: both
+      # payloads are unverified against a real account. Set to 1 deliberately, one
+      # supplier at a time, and place a single cheap line first.
+      OTTOCAP_ORDER_LIVE: ${OTTOCAP_ORDER_LIVE:-}
+      SS_ORDER_LIVE: ${SS_ORDER_LIVE:-}
       # USPS Labels — values come from .env. Defaults to the TEM test environment
       # (watermarked labels, no postage charged); set USPS_BASE=https://apis.usps.com
       # only when going live.

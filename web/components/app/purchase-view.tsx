@@ -7,12 +7,15 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList,
-  ssOrder, ottoOrder, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
+  getFactoryList, saveFactoryList, creditPoReturn, type PoReturn,
+  ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
+import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
+import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -20,27 +23,16 @@ const isLow = (it: InventoryItem) => num(it.in_stock) <= (it.reorder_at ?? 25)
 const suggestQty = (it: InventoryItem) => Math.max(1, (it.reorder_at ?? 25) * 2 - num(it.in_stock))
 const supKey = (s?: string | null) => (s || "Unassigned")
 const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
-// Which supplier API (if any) can place this PO automatically.
-//
-// Matched on WORD boundaries. A bare `includes("ss")` sent every "Unassigned" PO down
-// the S&S path — "unassigned" contains "ss" — so a PO with no supplier at all was being
-// handed to a real supplier's API.
-//
-// "Unassigned" is the placeholder supKey() uses for a null supplier, not a company, so it
-// resolves to no API: a PO nobody has assigned can only be placed by hand.
-const placer = (supplier?: string | null): "ss" | "otto" | null => {
-  const s = (supplier || "").trim().toLowerCase()
-  if (!s || s === "unassigned") return null
-  if (/\botto\b|ottocap/.test(s)) return "otto"
-  if (/s&s|\bss\b|activewear/.test(s)) return "ss"
-  return null
-}
+// NOTE: there is deliberately no supplier-name matcher here any more. Guessing an API
+// from a typed name is what sent every "Unassigned" PO to S&S ("unassigned" contains
+// "ss"). The supplier is a property of the PRODUCT, resolved server-side from the synced
+// catalogs — see resolveSuppliers / place().
 
 export function PurchaseView() {
   const [inv, setInv] = useState<InventoryItem[] | null>(null)
   const [pos, setPos] = useState<PurchaseOrder[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string; tone?: "warn" } | null>(null)
 
   // Lines pulled out of a draft but kept for a later order. Factory-global (staff
   // share one list), so it survives the browser that removed the line.
@@ -49,6 +41,8 @@ export function PurchaseView() {
   // Which history rows are expanded. A set, not a single id — comparing two past POs
   // side by side is the normal reason to open them.
   const [open, setOpen] = useState<Set<string>>(new Set())
+  const [supplierCfg, setSupplierCfg] = useState(false)
+  const [returning, setReturning] = useState<PurchaseOrder | null>(null)
 
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
@@ -67,11 +61,38 @@ export function PurchaseView() {
   }, [inv])
 
   const drafts = (pos ?? []).filter((p) => p.status === "draft")
+  // In flight: placed and waiting on the supplier. These belong with the drafts, not in
+  // history — an order you're still expecting is something to act on, and burying it
+  // under every PO ever received is how a late delivery goes unnoticed.
+  const placed = (pos ?? []).filter((p) => p.status === "placed")
   // History grows forever — every PO ever placed — so it pages. Drafts are the working
   // set and stay whole; there are never many, and hiding one behind a page would mean
   // missing something you're mid-way through.
-  const history = (pos ?? []).filter((p) => p.status !== "draft")
+  // Settled: received or cancelled. Nothing further is expected from these.
+  const history = (pos ?? []).filter((p) => p.status === "received" || p.status === "cancelled")
   const pagedHistory = usePaged(history, 20)
+
+  /**
+   * Start an empty PO and open the picker on it.
+   *
+   * Drafts could previously only be born from a low-stock suggestion, so with nothing
+   * below its reorder point there was no draft, and with no draft there was no "Add
+   * items" button — the supplier catalogs were unreachable even though the picker
+   * searches them. Restocking ahead of a season, or buying a blank never stocked before,
+   * had no entry point at all.
+   */
+  const startBlankDraft = async () => {
+    setBusy("new"); setMsg(null)
+    const po: PurchaseOrder = { num: nextNum(), supplier: null, items: [], status: "draft" }
+    try {
+      const r = await savePurchaseOrder(po)
+      if (r?.error) throw new Error(r.error)
+      setPos((prev) => [po, ...(prev ?? [])])
+      setAddTo(po)          // straight into the picker — an empty PO is not the goal
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't start a new purchase order." })
+    } finally { setBusy(null) }
+  }
 
   const createDraft = async (supplier: string, items: InventoryItem[]) => {
     setBusy("new"); setMsg(null)
@@ -125,17 +146,117 @@ export function PurchaseView() {
   /** Add picked supplier-catalog / inventory lines onto a draft, merging by sku. */
   const addLines = (po: PurchaseOrder, lines: POLine[]) => patchPO(po, mergeLines(po.items, lines))
 
+  /**
+   * Place a PO — split by the SUPPLIER EACH LINE ACTUALLY COMES FROM.
+   *
+   * A draft is assembled from whatever was low, so one PO routinely holds blanks from
+   * two suppliers. Sending it as a single order meant everything went to whichever
+   * supplier the PO's NAME matched — the other supplier's lines included, ordered from a
+   * company that doesn't stock them.
+   *
+   * So: resolve every line's supplier from the catalogs (server-side — the sku is either
+   * in S&S's catalog or it isn't, which beats matching a typed name), group the lines,
+   * and place one order per supplier. Each group becomes its own PO so what was ordered
+   * from whom is recorded separately — a single receipt covering two suppliers can't
+   * later answer "what did S&S actually send us".
+   *
+   * Lines whose supplier can't be resolved are NOT sent anywhere. They stay behind on a
+   * draft to be handled by hand, because the failure mode of guessing here is a real
+   * order placed with the wrong company.
+   */
   const place = async (po: PurchaseOrder) => {
-    const lines = po.items.filter((l) => num(l.qty) > 0).map((l) => ({ sku: l.sku, qty: num(l.qty) }))
+    const lines = po.items.filter((l) => num(l.qty) > 0)
     if (!lines.length) { setMsg({ ok: false, text: "Add at least one item with a quantity." }); return }
     setBusy(po.num); setMsg(null)
     try {
-      const p = placer(po.supplier)
-      let resp: unknown = { manual: true }
-      if (p === "otto") { const r = await ottoOrder(lines); if (r.error) throw new Error(r.error); resp = r }
-      else if (p === "ss") { const r = await ssOrder(lines); if (r.error) throw new Error(r.error); resp = r }
-      await savePurchaseOrder({ ...po, status: "placed", meta: { response: resp, placedAt: new Date().toISOString() } })
-      setMsg({ ok: true, text: p ? `Sent to ${po.supplier} (test/dry-run — set live keys to place for real).` : "Marked placed (no supplier API — record manually)." })
+      const [{ bySku }, opts] = await Promise.all([
+        resolveSuppliers(lines.map((l) => l.sku)),
+        getSupplierOptions(),
+      ])
+
+      // No delivery address means the supplier has nowhere to send the blanks. Refuse
+      // rather than place an order that arrives nowhere — this is the one field a
+      // purchase order genuinely cannot be completed without.
+      if (!opts.shipToComplete) {
+        setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Supplier ordering." })
+        return
+      }
+
+      // Group by the API that can place it; unresolved lines are kept aside, not sent.
+      const groups = new Map<string, { api: "ss" | "otto" | null; supplier: string | null; lines: POLine[] }>()
+      for (const l of lines) {
+        const r = bySku[l.sku] ?? { api: null, supplier: null, source: "unknown" }
+        // Key on the API when there is one, else on the supplier name, so two hand-ordered
+        // suppliers don't collapse into one pile.
+        const key = r.api ?? `manual:${r.supplier ?? "unassigned"}`
+        if (!groups.has(key)) groups.set(key, { api: r.api, supplier: r.supplier, lines: [] })
+        groups.get(key)!.lines.push(l)
+      }
+
+      const parts = [...groups.values()]
+      const placedAt = new Date().toISOString()
+      const results: string[] = []
+
+      for (const [i, g] of parts.entries()) {
+        const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) }))
+        let resp: unknown = { manual: true }
+        let placedOk = true
+        try {
+          // The rest of what a purchase order needs: where it goes, how it ships, how it
+          // pays, and a PO number that ties their confirmation back to this row.
+          if (g.api === "otto") {
+            const r = await ottoOrder(payload, {
+              shipping_address: opts.shipTo,
+              shipping_method: opts.defaults.otto_shipping_method || undefined,
+              payment_method: opts.defaults.otto_payment_method || undefined,
+              customer_po: po.num,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          } else if (g.api === "ss") {
+            const r = await ssOrder(payload, {
+              shippingAddress: opts.shipTo,
+              shippingMethod: opts.defaults.ss_shipping_method || undefined,
+              email: opts.defaults.order_email || undefined,
+              poNumber: po.num,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          }
+        } catch (e) {
+          placedOk = false
+          resp = { error: e instanceof Error ? e.message : "failed" }
+        }
+
+        // One PO per supplier. The original keeps its number when there's only one group,
+        // so the common single-supplier case doesn't gain a confusing suffix.
+        const numFor = parts.length === 1 ? po.num : `${po.num}-${(g.supplier || "MANUAL").replace(/[^A-Za-z0-9]+/g, "").slice(0, 6).toUpperCase() || String(i + 1)}`
+        await savePurchaseOrder({
+          ...po,
+          num: numFor,
+          supplier: g.supplier ?? po.supplier ?? null,
+          items: g.lines,
+          status: placedOk && g.api ? "placed" : placedOk ? "placed" : "draft",
+          meta: { ...(po.meta || {}), response: resp, placedAt, api: g.api, splitFrom: parts.length > 1 ? po.num : undefined },
+        })
+        results.push(
+          !placedOk ? `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`
+            : g.api ? `${g.supplier}: sent (test/dry-run — set live keys to place for real)`
+              : `${g.supplier ?? "Unassigned"}: marked placed, order it manually (no supplier API for these SKUs)`
+        )
+      }
+
+      // The original is superseded by its parts; leaving it would double-count the spend.
+      if (parts.length > 1) await deletePurchaseOrder(po.num).catch(() => {})
+
+      // A mixed result is neither. Reporting "S&S sent, Otto failed" in red reads as
+      // nothing having happened — and the S&S half really was placed, so acting on that
+      // belief means placing it twice.
+      const anyFailed = results.some((r) => r.includes("failed"))
+      const anySent = results.some((r) => !r.includes("failed"))
+      setMsg({
+        ok: !anyFailed,
+        tone: anyFailed && anySent ? "warn" : undefined,
+        text: (anyFailed && anySent ? "Partly placed. " : "") + results.join(" · "),
+      })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place the order." })
@@ -159,9 +280,94 @@ export function PurchaseView() {
     } catch { setMsg({ ok: false, text: "Couldn't receive." }) } finally { setBusy(null) }
   }
 
+  /** The supplier's own order number, dug out of whatever shape their response took. */
+  const supplierOrderNo = (po: PurchaseOrder): string | null => {
+    const m = (po.meta || {}) as Record<string, unknown>
+    const r = (m.response ?? {}) as Record<string, unknown>
+    const nested = ((r.ssResponse ?? r.ottoResponse ?? {}) as Record<string, unknown>)
+    const pick = (o: Record<string, unknown>) =>
+      o.orderNumber ?? o.order_number ?? o.orderNo ?? o.salesOrderNumber ?? o.id
+    const v = pick(nested) ?? pick(r)
+    return v == null ? null : String(v)
+  }
+  const trackingOf = (po: PurchaseOrder): string =>
+    String(((po.meta || {}) as Record<string, string>).tracking ?? "")
+
+  /** Record a carrier tracking number against a PO, so an inbound box can be chased. */
+  const setTracking = async (po: PurchaseOrder, tracking: string) => {
+    const meta = { ...(po.meta || {}), tracking: tracking.trim() || undefined }
+    setPos((prev) => (prev ?? []).map((p) => (p.num === po.num ? { ...p, meta } : p)))
+    await savePurchaseOrder({ ...po, meta }).catch(() => {})
+  }
+
+  /**
+   * Cancel a PO.
+   *
+   * This cancels OUR record. It does NOT reach the supplier: neither S&S's nor Otto's
+   * cancel endpoint has been wired or verified, and quietly marking a live order
+   * cancelled while the goods are still on a truck is the worst outcome available —
+   * stock arrives that nothing expects, against an order the system says never existed.
+   *
+   * So a placed PO says so plainly and asks for confirmation. A draft was never sent
+   * anywhere, so it just goes.
+   */
+  const cancelPO = async (po: PurchaseOrder) => {
+    const wasPlaced = po.status === "placed"
+    if (wasPlaced && !window.confirm(
+      `Cancel ${po.num}?\n\nThis marks OUR record cancelled. It does NOT cancel the order with ${po.supplier || "the supplier"} — contact them directly if the goods haven't shipped.`
+    )) return
+    setBusy(po.num); setMsg(null)
+    try {
+      const r = await savePurchaseOrder({
+        ...po, status: "cancelled",
+        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString() },
+      })
+      if (r?.error) throw new Error(r.error)
+      setMsg({ ok: true, text: wasPlaced
+        ? `${po.num} marked cancelled here — contact ${po.supplier || "the supplier"} to stop the actual order.`
+        : `${po.num} cancelled.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
+    } finally { setBusy(null) }
+  }
+
+  const returnsOf = (po: PurchaseOrder): PoReturn[] => {
+    const r = ((po.meta || {}) as { returns?: PoReturn[] }).returns
+    return Array.isArray(r) ? r : []
+  }
+
+  /**
+   * Confirm a supplier credit landed. Asks for the amount rather than assuming the
+   * estimate: restocking fees and partial credits mean what arrives is often not what
+   * was expected, and a booked figure that was never received is worse than none.
+   */
+  const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
+    const typed = window.prompt(`How much did ${po.supplier || "the supplier"} actually credit?`, String(r.credit || ""))
+    if (typed == null) return
+    const amount = Number(typed)
+    if (!isFinite(amount) || amount <= 0) { setMsg({ ok: false, text: "A credit needs an amount greater than zero." }); return }
+    setBusy(po.num); setMsg(null)
+    try {
+      const res = await creditPoReturn(po.num, r.id, amount)
+      if (res.error) throw new Error(res.error)
+      setMsg({ ok: true, text: `${usd(amount)} credit recorded against ${po.num}.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't record that credit." })
+    } finally { setBusy(null) }
+  }
+
   const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
 
   const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
+  /** What this PO COSTS. Distinct from poTotal, which counts units — the two were easy to
+   *  confuse when only one was ever shown, and only one of them is money. */
+  const poMoney = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.price) * num(l.qty), 0)
+  const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+  /** True when nothing on the PO carries a price. Lines drafted from low stock have no
+   *  price until someone fills one in, and a confident "$0.00" would read as free. */
+  const unpriced = (po: PurchaseOrder) => po.items.length > 0 && po.items.every((l) => !num(l.price))
 
   /** When a past PO actually happened — received beats placed, both beat the row's birth. */
   const poDate = (po: PurchaseOrder) => {
@@ -218,106 +424,12 @@ export function PurchaseView() {
     } finally { setBusy(null) }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
-          <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
-        </div>
-      </div>
-
-      <StatGrid>
-        <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
-        <StatCard label="Draft POs" value={String(drafts.length)} sub="awaiting review" />
-        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
-        <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
-      </StatGrid>
-
-      {msg && <div className={"rounded-lg border px-4 py-2 text-sm " + (msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>}
-
-      {/* Reorder suggestions */}
-      <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
-        {inv === null ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-        ) : Object.keys(suggestions).length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">Everything is above its reorder point.</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {Object.entries(suggestions).map(([sup, items]) => (
-              <div key={sup} className="flex flex-wrap items-center gap-2 px-5 py-3">
-                <span className="font-medium">{sup}</span>
-                <span className="text-sm text-muted-foreground">{items.length} item{items.length > 1 ? "s" : ""} low</span>
-                <Button size="sm" className="ml-auto" onClick={() => createDraft(sup, items)} disabled={busy === "new"}>
-                  {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />} Draft PO
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Draft POs */}
-      {drafts.map((po) => (
-        <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
-          actions={<div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{poTotal(po)} units</span>
-            <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
-            <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
-            <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
-          </div>}>
-          <div className="divide-y divide-border">
-            {po.items.map((l) => (
-              <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                  <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
-                </div>
-                <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
-                {/* Two distinct exits: park it for the next order, or drop it for good.
-                    One button doing both would make "not now" indistinguishable from
-                    "never" — and the parked list is how a short blank survives a PO
-                    that gets placed without it. */}
-                <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
-                <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      ))}
-
-      {/* Saved for later — only shown when it has something in it, so it never sits
-          on the page as an empty card competing with the drafts. */}
-      {saved.length > 0 && (
-        <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
-          <div className="divide-y divide-border">
-            {saved.map((l) => (
-              <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                  <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
-                </div>
-                <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
-                <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
-                <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      {/* History — one row per PO, collapsed to a summary. The lines are the reason you
-          open a past order at all ("what exactly did we buy last time"), so they're one
-          click away rather than on a separate page. */}
-      <SectionCard title="Order history" description="Past POs — open one to see its items, or reorder it onto a new draft">
-        {pos === null ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-        ) : history.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">No placed orders yet.</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {pagedHistory.pageItems.map((po) => {
+  /**
+   * One collapsible PO row. Shared by both tabs — an in-flight order and a settled one
+   * want the same summary and the same expanded detail, and two copies would drift the
+   * moment either gained a field.
+   */
+  const poRow = (po: PurchaseOrder) => {
               const isOpen = open.has(po.num)
               return (
                 <div key={po.num}>
@@ -328,23 +440,85 @@ export function PurchaseView() {
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
                       <span className="font-mono text-sm font-medium">{po.num}</span>
                       <span className="truncate text-sm text-muted-foreground">
-                        {supKey(po.supplier)} · {poTotal(po)} units · {po.items.length} line{po.items.length === 1 ? "" : "s"}
+                        {supKey(po.supplier)} · {poTotal(po)} units · {unpriced(po) ? "unpriced" : usd(poMoney(po))}
                         {poDate(po) ? " · " + poDate(po) : ""}
                       </span>
                     </button>
                     {po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
-                      : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+                      : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
+                        : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       <ArrowClockwise size={13} weight="bold" /> Reorder
                     </Button>
-                    {po.status === "placed" && (
-                      <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
-                        {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
+                    {po.status === "received" && (
+                      <Button size="sm" variant="outline" onClick={() => setReturning(po)} disabled={busy === po.num}>
+                        <ArrowUUpLeft size={13} weight="bold" /> Return
                       </Button>
+                    )}
+                    {po.status === "placed" && (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
+                          {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
+                        </Button>
+                        <button onClick={() => cancelPO(po)} disabled={busy === po.num}
+                          className="text-xs font-medium text-muted-foreground hover:text-red-600"
+                          title="Cancel our record of this order">Cancel</button>
+                      </>
                     )}
                   </div>
                   {isOpen && (
                     <div className="border-t border-border bg-muted/30 px-5 py-1">
+                      {/* How to chase this order: their reference, and the carrier number
+                          for the box coming back. Kept on the PO because "where are my
+                          blanks" is asked of the PO, not of a shipment record elsewhere. */}
+                      {po.status !== "cancelled" && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border py-2.5 text-xs">
+                          <span className="text-muted-foreground">
+                            Supplier order{" "}
+                            <span className="font-mono text-foreground">{supplierOrderNo(po) ?? "—"}</span>
+                          </span>
+                          <label className="flex items-center gap-1.5 text-muted-foreground">
+                            Tracking
+                            <Input
+                              defaultValue={trackingOf(po)}
+                              onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
+                              placeholder="paste carrier number"
+                              className="h-7 w-48 font-mono text-xs"
+                            />
+                          </label>
+                        </div>
+                      )}
+                      {returnsOf(po).length > 0 && (
+                        <div className="border-b border-border py-2.5">
+                          <div className="mb-1 text-xs font-medium text-muted-foreground">Returns</div>
+                          {returnsOf(po).map((r) => (
+                            <div key={r.id} className="flex flex-wrap items-center gap-2 py-1 text-xs">
+                              <span className="text-muted-foreground">
+                                {r.lines.reduce((a, l) => a + num(l.qty), 0)} units
+                                {r.rma ? ` · RMA ${r.rma}` : ""}
+                                {r.note ? ` · ${r.note}` : ""}
+                              </span>
+                              {r.status === "credited" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                  <CheckCircle size={10} weight="fill" /> {usd(r.credit)} credited
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                                    {usd(r.credit)} expected
+                                  </span>
+                                  {/* Confirmed separately, because a credit lands when the
+                                      supplier says so — not when the box went back. */}
+                                  <button onClick={() => confirmCredit(po, r)} disabled={busy === po.num}
+                                    className="font-medium text-primary hover:underline">
+                                    Credit received
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       {po.items.length === 0 ? (
                         <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
                       ) : po.items.map((l) => (
@@ -356,6 +530,9 @@ export function PurchaseView() {
                           {/* A single line can be re-ordered on its own — restocking one
                               short blank shouldn't drag the whole past PO along with it. */}
                           <span className="text-muted-foreground">×{num(l.qty)}</span>
+                          <span className="w-20 text-right tabular-nums text-muted-foreground">
+                            {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
+                          </span>
                           <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title="Reorder just this line">
                             <ArrowClockwise size={14} />
                           </button>
@@ -365,15 +542,163 @@ export function PurchaseView() {
                   )}
                 </div>
               )
-            })}
-          </div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
+          <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
+          <Truck size={13} weight="bold" /> Supplier ordering
+        </Button>
+        <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
+          {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
+          New purchase order
+        </Button>
+      </div>
+
+      <StatGrid>
+        <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
+        <StatCard label="Draft POs" value={String(drafts.length)} sub="awaiting review" />
+        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
+        <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
+      </StatGrid>
+
+      {msg && (
+        <div className={"rounded-lg border px-4 py-2 text-sm " + (
+          msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
+            : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
+      )}
+
+      {/* Reorder suggestions */}
+      <Tabs defaultValue="active">
+        <TabsList>
+          <TabsTrigger value="active">Active{drafts.length + placed.length ? ` (${drafts.length + placed.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="history">History{history.length ? ` (${history.length})` : ""}</TabsTrigger>
+        </TabsList>
+
+        {/* ACTIVE — everything still owed something: a draft to finish, or an order to
+            arrive. Split from history because these are the ones that need doing, and a
+            working set buried under every PO ever received stops being read. */}
+        <TabsContent value="active" className="mt-4 space-y-4">
+        <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
+          {inv === null ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+          ) : Object.keys(suggestions).length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Everything is above its reorder point.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {Object.entries(suggestions).map(([sup, items]) => (
+                <div key={sup} className="flex flex-wrap items-center gap-2 px-5 py-3">
+                  <span className="font-medium">{sup}</span>
+                  <span className="text-sm text-muted-foreground">{items.length} item{items.length > 1 ? "s" : ""} low</span>
+                  <Button size="sm" className="ml-auto" onClick={() => createDraft(sup, items)} disabled={busy === "new"}>
+                    {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />} Draft PO
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Draft POs */}
+        {drafts.map((po) => (
+          <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
+            actions={<div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {poTotal(po)} units · {unpriced(po) ? "no prices yet" : usd(poMoney(po))}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
+              <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
+              <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
+            </div>}>
+            <div className="divide-y divide-border">
+              {po.items.map((l) => (
+                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                    <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                  </div>
+                  <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
+                  {/* Two distinct exits: park it for the next order, or drop it for good.
+                      One button doing both would make "not now" indistinguishable from
+                      "never" — and the parked list is how a short blank survives a PO
+                      that gets placed without it. */}
+                  <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
+                  <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        ))}
+
+        {/* Saved for later — only shown when it has something in it, so it never sits
+            on the page as an empty card competing with the drafts. */}
+        {saved.length > 0 && (
+          <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
+            <div className="divide-y divide-border">
+              {saved.map((l) => (
+                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                    <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
+                  <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
+                  <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
         )}
+
+        {/* History — one row per PO, collapsed to a summary. The lines are the reason you
+            open a past order at all ("what exactly did we buy last time"), so they're one
+            click away rather than on a separate page. */}
+          {placed.length > 0 && (
+            <SectionCard title="On order" description="Placed and waiting on the supplier — open one for its tracking, lines and invoice">
+              <div className="divide-y divide-border">{placed.map(poRow)}</div>
+            </SectionCard>
+          )}
+          {pos !== null && drafts.length === 0 && placed.length === 0 && (
+            <SectionCard title="Nothing on order">
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                No drafts, nothing in flight. Start one with <strong>New purchase order</strong>, or from a reorder suggestion above.
+              </div>
+            </SectionCard>
+          )}
+        </TabsContent>
+
+        {/* HISTORY — settled: received or cancelled. Nothing further is expected. */}
+        <TabsContent value="history" className="mt-4 space-y-4">
+          <SectionCard title="Purchase history" description="Received and cancelled POs — open one to see its items, or reorder it onto a new draft">
+            {pos === null ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+            ) : history.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">Nothing received or cancelled yet.</div>
+            ) : (
+              <div className="divide-y divide-border">{pagedHistory.pageItems.map(poRow)}</div>
+            )}
             {history.length > 20 && (
               <Pagination page={pagedHistory.page} pageCount={pagedHistory.pageCount} perPage={pagedHistory.perPage}
                 total={pagedHistory.total} start={pagedHistory.start}
                 onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
             )}
-      </SectionCard>
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
+
+      <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
+
+      <PoReturnDialog po={returning} onClose={() => setReturning(null)} onDone={load} />
 
       <POAddItems
         key={addTo?.num ?? "none"}

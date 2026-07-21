@@ -33,8 +33,9 @@ export function ensureNotifications() {
   return _ready;
 }
 
-// Who should hear about a factory-side event? Staff roles, minus anyone opted out.
-async function staffIds(roles) {
+// Everyone holding one of these roles. Usually staff roles for a factory-side event,
+// but ['seller'] is a legitimate audience too — that's how an announcement fans out.
+async function roleIds(roles) {
   const r = await q(
     `select id from users where active is not false and role = any($1::text[])`,
     [roles]
@@ -44,15 +45,18 @@ async function staffIds(roles) {
 
 /**
  * Create notifications and push them live.
- *   notify({ userIds | roles, type, title, body, href, entityId })
+ *   notify({ userIds | roles, type, title, body, href, entityId, excludeUserId })
  * Never throws — callers use it fire-and-forget.
  */
-export async function notify({ userIds, roles, type, title, body, href, entityId }) {
+export async function notify({ userIds, roles, type, title, body, href, entityId, excludeUserId }) {
   try {
     await ensureNotifications();
     let ids = Array.isArray(userIds) ? userIds.filter(Boolean) : [];
-    if (roles && roles.length) ids = ids.concat(await staffIds(roles));
+    if (roles && roles.length) ids = ids.concat(await roleIds(roles));
     ids = Array.from(new Set(ids.map(String))).filter(Boolean);
+    // Don't ring your own bell. Matters most in shared rooms, where a role fan-out
+    // would otherwise notify the author along with everyone else.
+    if (excludeUserId) ids = ids.filter((x) => x !== String(excludeUserId));
     if (!ids.length) return;
 
     await q(

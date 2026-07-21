@@ -15,8 +15,12 @@ type Tab = "inventory" | "ss" | "otto"
 // Defined at module scope, not inside the component: a component created during
 // render gets a new identity every pass, so React unmounts and remounts the whole
 // list on each keystroke (and eslint's react-hooks/static-components rejects it).
-function PickRow({ line, title, sub, right, on, onToggle }: {
+function PickRow({ line, title, sub, right, meta, on, onToggle }: {
   line: POLine; title: string; sub?: string; right?: string
+  /** Labelled identifiers (Style / SKU). Labelled because a bare number leaves you
+   *  guessing which of a supplier's two ids you're looking at — and they're ordered by
+   *  one and discussed by the other. */
+  meta?: { k: string; v: string }[]
   on: boolean; onToggle: (l: POLine) => void
 }) {
   return (
@@ -31,6 +35,15 @@ function PickRow({ line, title, sub, right, on, onToggle }: {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{title}</span>
         {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
+        {meta && meta.length > 0 && (
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            {meta.map((m) => (
+              <span key={m.k} className="text-[11px] text-muted-foreground">
+                {m.k} <span className="font-mono text-foreground/70">{m.v}</span>
+              </span>
+            ))}
+          </span>
+        )}
       </span>
       {right && <span className="shrink-0 text-xs text-muted-foreground">{right}</span>}
     </button>
@@ -44,6 +57,22 @@ const Loading = () => (
 )
 
 const num = (v: unknown) => Number(v) || 0
+
+/**
+ * An S&S product's display name, without the doubled brand.
+ *
+ * The style sync already prepends the brand when it builds `title` (ss.js), so
+ * `style_name` usually arrives as "Gildan Gildan Unisex DryBlend..." once the picker
+ * prepends `brand` a second time. Only add the brand when the name doesn't already
+ * start with it.
+ */
+function ssTitle(p: { brand?: string | null; style_name?: string | null }): string | undefined {
+  const brand = (p.brand ?? "").trim()
+  const name = (p.style_name ?? "").trim()
+  if (!name) return brand || undefined
+  if (!brand) return name
+  return name.toLowerCase().startsWith(brand.toLowerCase()) ? name : `${brand} ${name}`
+}
 const money = (v: unknown) => {
   const n = Number(v)
   return Number.isFinite(n) && n > 0 ? `$${n.toFixed(2)}` : ""
@@ -186,9 +215,17 @@ export function POAddItems({
               : ss.length === 0 ? <Empty>{q ? "No S&S products match." : "Sync the S&S catalog first, or search for a style."}</Empty>
                 : ss.map((p) => (
                   <PickRow key={p.sku}
-                    line={{ sku: p.sku, name: p.style_name ?? undefined, variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
-                    title={[p.brand, p.style_name].filter(Boolean).join(" ") || p.sku}
-                    sub={[[p.color, p.size].filter(Boolean).join(" / "), p.sku].filter(Boolean).join(" · ")}
+                    line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
+                    title={ssTitle(p) || p.sku}
+                    sub={[p.color, p.size].filter(Boolean).join(" / ")}
+                    // The two numbers that identify an S&S line, LABELLED. The sku is what
+                    // actually gets ordered; the style is what a person recognises and what
+                    // every S&S page and invoice is organised by. Showing one bare number
+                    // meant guessing which of the two it was.
+                    meta={[
+                      p.style_id ? { k: "Style", v: String(p.style_id) } : null,
+                      { k: "SKU", v: p.sku },
+                    ].filter(Boolean) as { k: string; v: string }[]}
                     right={money(p.price)}
                     on={!!picked[p.sku]} onToggle={toggle} />
                 ))

@@ -6,6 +6,7 @@ import { hashOf, isPhash } from '../fingerprint.js';
 import { isStaff } from '../auth.js';
 import { egBroadcast } from '../events.js';
 import { notify } from './notifications.js';
+import { aiComplete } from './support_ai.js';
 import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
@@ -892,6 +893,142 @@ export function ordersRoutes(app, requireAuth) {
   // chat messages silently failed (the bubble "flashed and reverted"). Drop the FK.
   q(`alter table order_messages drop constraint if exists order_messages_order_id_fkey`).catch(() => {});
 
+  // ── Channel unification ────────────────────────────────────────────────────
+  // Channels used to fan out per ORDER: every order carried a seller↔factory thread
+  // and a `design-<orderId>` artwork thread, so a busy shop buried the rail under
+  // dozens of near-empty rooms and the same conversation happened in three places.
+  //
+  // One rule now: the ONLY dimension a channel fans out on is seller identity.
+  //   support-<sellerId>  seller ↔ non-designer staff (+ AI)
+  //   staff-general       every staff role, designers included
+  //   announce            admin → all sellers, read-only downstream
+  //
+  // Per-order context isn't lost — it moves from the channel id into meta.order_ref,
+  // which the order page filters on. That also makes this migration REVERSIBLE: the
+  // original order_id is preserved in order_ref, never discarded.
+  q(`create index if not exists order_messages_order_ref
+       on order_messages ((meta->>'order_ref')) where meta ? 'order_ref'`).catch(() => {});
+  async function foldChannels() {
+    // Don't depend on the unawaited ALTER above having landed: factory_order is added
+    // fire-and-forget at route load, so racing it made this whole migration silently
+    // no-op on a fresh database (the catch swallowed "column does not exist").
+    await q('alter table orders add column if not exists factory_order boolean not null default false');
+    // Artwork threads → the one factory room.
+    await q(`update order_messages
+                set order_id = 'staff-general',
+                    meta = coalesce(meta,'{}'::jsonb)
+                           || jsonb_build_object('order_ref', replace(order_id,'design-',''))
+              where order_id like 'design-%'`);
+    // Seller↔factory order threads → that seller's channel. A thread on a factory
+    // order (no seller) has no seller channel to go to, so it joins the staff room
+    // rather than being dropped.
+    await q(`update order_messages m
+                set order_id = 'support-' || o.seller_id,
+                    meta = coalesce(m.meta,'{}'::jsonb) || jsonb_build_object('order_ref', m.order_id)
+               from orders o
+              where o.id = m.order_id and o.seller_id is not null and o.factory_order is not true`);
+    await q(`update order_messages m
+                set order_id = 'staff-general',
+                    meta = coalesce(m.meta,'{}'::jsonb) || jsonb_build_object('order_ref', m.order_id)
+               from orders o
+              where o.id = m.order_id`);
+  }
+  foldChannels().catch(() => {});
+
+  // ── @order mentions ────────────────────────────────────────────────────────
+  // A seller writes "@4099" (or "@etsy-abc123") and that message becomes *about*
+  // that order. This is what makes one channel per seller workable: the order
+  // reference moved out of the channel id and into the message.
+  //
+  // Resolution is SCOPED to the channel's seller. Without that, a seller could
+  // mention arbitrary ids and use whether an order surfaces as an oracle for
+  // another shop's order numbers.
+  async function resolveMention(text, sellerId) {
+    const toks = [];
+    // The @ must start a word, or "bob@shop.com" reads as a mention of "shop".
+    const re = /(?:^|\s)@#?([A-Za-z0-9][A-Za-z0-9_-]{2,63})/g;
+    let m;
+    while ((m = re.exec(String(text || ''))) && toks.length < 5) toks.push(m[1]);
+    if (!toks.length) return null;
+    // o.id ≠ o.num: marketplace orders are `etsy-abc`, but a seller reads #4099 off
+    // the board. Match either. seq is an int column, so only digit tokens go to it.
+    const nums = toks.filter((t) => /^\d+$/.test(t)).map(Number);
+    const r = await q(
+      `select id from orders
+        where ($2::uuid is null or seller_id = $2)
+          and (id = any($1::text[]) or (seq is not null and seq = any($3::int[])))
+        order by created_at desc limit 1`,
+      [toks, sellerId || null, nums]);
+    return r.rows[0]?.id || null;
+  }
+
+  // Staff-only order briefing, posted into the channel as an INTERNAL message.
+  // The point: when a seller asks about an order, whoever answers should already
+  // see the full internal picture — factory stage, gates, tracking — without
+  // leaving the conversation to go read the board.
+  //
+  // The seller must never see this. Two independent guards: meta.internal is
+  // stripped from non-staff reads (see GET), and the summary is generated from
+  // internal columns a seller's own view would never include.
+  async function postOrderBriefing(channel, orderId) {
+    try {
+      // Don't re-brief the same order every message — a back-and-forth about one
+      // order would otherwise cost an AI call per line.
+      const recent = await q(
+        `select 1 from order_messages
+          where order_id=$1 and meta->>'order_ref'=$2 and coalesce((meta->>'summary')::boolean,false)
+            and created_at > now() - interval '10 minutes' limit 1`, [channel, orderId]);
+      if (recent.rows.length) return;
+
+      const o = (await q(
+        `select id, seq, source, store, status, factory_status, gates, tracking, carrier,
+                service, delivery, est_delivery, total, customer, timeline, created_at
+           from orders where id=$1`, [orderId])).rows[0];
+      if (!o) return;
+      const items = (await q(
+        `select sku, name, qty, print_type, variant from order_items where order_id=$1`, [orderId])).rows;
+
+      const facts = JSON.stringify({ order: o, items }).slice(0, 12000);
+      const text = await aiComplete({
+        system:
+          'You brief print-on-demand factory staff on one order so they can answer the seller. ' +
+          'Reply with 4-7 terse markdown bullets, no preamble and no closing line. Cover: where the order ' +
+          'actually is in production, anything blocking it, shipping/tracking state, and what to tell the ' +
+          'seller. Quote real values from the data. If a field is missing say so plainly — never guess a ' +
+          'stage or a date.',
+        messages: [{ role: 'user', content: `Order data:\n${facts}` }],
+        maxTokens: 500,
+      });
+      if (!text) return;
+      await q(
+        `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+         values ($1, null, 'assistant', $2, $3)`,
+        [channel, text, JSON.stringify({
+          by: `Order brief · ${o.seq ? '#' + o.seq : o.id}`,
+          internal: true, summary: true, order_ref: orderId,
+        })]);
+      egBroadcast({ type: 'order-message' });
+    } catch (e) {
+      // A failed briefing must never fail the message that triggered it.
+    }
+  }
+
+  // Map an incoming :id onto (channel, orderRef). Real order ids and legacy
+  // `design-<id>` links keep working — they resolve to the channel that absorbed
+  // them and filter to that order — so old bookmarks and the order page's chat
+  // panel don't 404.
+  async function resolveChannel(id) {
+    const s = String(id);
+    if (s === 'staff-general' || s === 'announce' || s.indexOf('support-') === 0) {
+      return { channel: s, orderRef: null };
+    }
+    if (s.indexOf('design-') === 0) return { channel: 'staff-general', orderRef: s.slice(7) };
+    const o = (await q('select seller_id, factory_order from orders where id=$1', [s])).rows[0];
+    if (!o) return { channel: s, orderRef: null };
+    const seller = !o.factory_order && o.seller_id;
+    return { channel: seller ? 'support-' + o.seller_id : 'staff-general', orderRef: s };
+  }
+
   // A seller who is an ACTIVE team member of an owner acts on the OWNER's board. Returns the effective
   // seller id (owner for a member, else self) + the member's permission surfaces (perms=null means a
   // full owner, not a team member). Staff → own id, not a member. This is what enforces the "team
@@ -914,19 +1051,24 @@ export function ordersRoutes(app, requireAuth) {
   // designer's own work. This governs who may read/write a CONVERSATION.
   //
   // Designers don't deal with sellers — they work artwork for the factory. So they are
-  // out of both seller-facing channels (the seller's support thread and the seller↔
-  // factory order thread) and get `design-<orderId>` instead, which the seller can't see.
-  function canSeeThread(user, channelId) {
+  // out of the seller channels entirely and work in staff-general, where artwork talk
+  // now lives alongside the rest of production.
+  //
+  // Takes a RESOLVED channel id (see resolveChannel) — never a raw order id.
+  async function canSeeThread(user, channelId) {
     const id = String(channelId);
     const role = user?.role;
-    if (id.indexOf('design-') === 0) return isStaff(user);          // staff-only, never the seller
     if (id === 'staff-general') return isStaff(user);               // internal room — designers included
+    if (id === 'announce') return true;                             // everyone reads; writes gated separately
     if (id.indexOf('support-') === 0) {
       if (isStaff(user)) return role !== 'designer';
+      // A seller sees only their OWN channel. Deliberately NOT resolveSeller(): a team
+      // member acts on the owner's board for orders, but the owner's conversation with
+      // EGFULFILL can cover billing and account matters the owner never delegated. The
+      // member gets their own channel instead. Same rule as before this refactor.
       return id === ('support-' + user.sub);
     }
-    if (role === 'designer') return false;                          // seller↔factory order thread
-    return canSeeOrder(user, channelId);
+    return false;
   }
 
   async function canSeeOrder(user, orderId) {
@@ -977,65 +1119,116 @@ export function ordersRoutes(app, requireAuth) {
     }));
   });
 
+  // Staff-only: find a seller by name or email to open a channel with them.
+  // /api/support/threads only lists sellers who already wrote in, so without this
+  // there was no way to START a conversation — and the cases that most need one
+  // (unvalidated address, missing artwork) are always factory-initiated.
+  app.get('/api/support/sellers', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user) || req.user.role === 'designer') { reply.code(403); return { error: 'forbidden' }; }
+    const term = String(req.query?.q || '').trim();
+    if (term.length < 2) return [];
+    const like = `%${term.replace(/[%_]/g, (c) => '\\' + c)}%`;
+    const r = await q(
+      `select id, coalesce(nullif(name,''), email) as name, email
+         from users
+        where role = 'seller' and active is not false
+          and (name ilike $1 or email ilike $1)
+        order by name limit 12`, [like]);
+    return r.rows.map((x) => ({ seller_id: x.id, channel: `support-${x.id}`, name: x.name, email: x.email }));
+  });
+
   app.post('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await canSeeThread(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const { channel, orderRef } = await resolveChannel(req.params.id);
+    if (!(await canSeeThread(req.user, channel))) { reply.code(403); return { error: 'forbidden' }; }
+    // Announcements are a broadcast, not a conversation: admin writes, sellers read.
+    if (channel === 'announce' && req.user?.role !== 'admin') { reply.code(403); return { error: 'forbidden' }; }
     const b = req.body || {};
     // `escalated` is what makes "Talk to a human" mean something. Without it every
     // support message looked identical to staff, so an explicit request for help was
     // indistinguishable from small talk. Only a SELLER can raise one.
     const escalated = !!b.escalated && !isStaff(req.user);
+    // order_ref is what replaced the per-order channel: it keeps "which order is this
+    // about" without giving the order its own room.
+    // Explicit order id in the URL wins; otherwise an @mention in the body decides
+    // what this message is about.
+    const channelSeller = channel.indexOf('support-') === 0 ? channel.slice(8) : null;
+    const ref = orderRef || (b.orderRef ? String(b.orderRef) : null)
+      || (await resolveMention(b.text, channelSeller));
     const meta = { by: b.by || null, system: !!b.system, internal: !!b.internal, ts: b.ts || null, escalated };
+    if (ref) meta.order_ref = ref;
     await q(
       `insert into order_messages (order_id, sender_id, sender_role, body, attachment, meta, client_id)
        values ($1,$2,$3,$4,$5,$6,$7) on conflict (client_id) where client_id is not null do nothing`,
-      [req.params.id, req.user.sub, b.role || 'seller', b.text || '',
+      [channel, req.user.sub, b.role || 'seller', b.text || '',
        (b.attachment && typeof b.attachment === 'object') ? b.attachment : null,
        JSON.stringify(meta), b.clientId || null]);
     egBroadcast({ type: 'order-message' });
 
     // Tell somebody. A message that only lands in a table nobody is watching is how
     // "Talk to a human" used to disappear silently.
-    const isSupport = String(req.params.id).startsWith('support-');
-    const isDesign = String(req.params.id).startsWith('design-');
-    const fromSeller = !isStaff(req.user);
-    if (isDesign) {
-      // Artwork thread — designer ↔ factory. The seller is not part of this channel.
+    // Three channels, so three notification flows. Each excludes the sender — a bell
+    // for your own message was noise that made the real ones easier to miss.
+    const body = String(b.text || '').slice(0, 140);
+    // "on #4099" reads better than a bare uuid, and only costs a lookup when there's a ref.
+    let about = '';
+    if (ref) {
+      const o = (await q('select seq from orders where id=$1', [ref])).rows[0];
+      about = ` on ${o?.seq ? '#' + o.seq : ref}`;
+    }
+    if (channel === 'staff-general') {
       notify({
-        roles: ['admin', 'operator', 'warehouse', 'designer'],
-        type: 'design-message',
-        title: `Artwork note on ${String(req.params.id).replace('design-', '')}`,
-        body: String(b.text || '').slice(0, 140),
-        href: '/designer',
-        entityId: req.params.id,
+        roles: ['admin', 'operator', 'warehouse', 'designer'], excludeUserId: req.user.sub,
+        type: 'staff-message', title: `${b.by || 'A teammate'} posted in the factory channel${about}`,
+        body, href: '/chat', entityId: ref || channel,
       });
-    } else if (isSupport && fromSeller) {
-      // Seller wrote in their support thread → alert the staff who answer it. An
-      // escalation gets its own type + wording so it stands out from ordinary chatter.
+    } else if (channel === 'announce') {
       notify({
-        roles: ['admin', 'operator', 'warehouse'],
-        type: escalated ? 'support-escalation' : 'support-message',
-        title: escalated ? `${b.by || 'A seller'} asked for a human` : `${b.by || 'A seller'} sent a message`,
-        body: String(b.text || '').slice(0, 140),
-        href: '/chat',
-        entityId: req.params.id,
+        roles: ['seller'], excludeUserId: req.user.sub,
+        type: 'announcement', title: b.by ? `Announcement from ${b.by}` : 'Announcement',
+        body, href: '/chat', entityId: channel,
       });
-    } else if (!isSupport) {
-      // Order thread: notify the other side (seller ↔ factory).
-      const o = (await q('select seller_id, seq from orders where id=$1', [req.params.id])).rows[0];
-      if (o) {
-        const num = o.seq ? `#${o.seq}` : req.params.id;
-        if (fromSeller) notify({ roles: ['admin', 'operator', 'warehouse'], type: 'order-message', title: `New message on ${num}`, body: String(b.text || '').slice(0, 140), href: '/operator', entityId: req.params.id });
-        else if (o.seller_id) notify({ userIds: [o.seller_id], type: 'order-message', title: `Reply on ${num}`, body: String(b.text || '').slice(0, 140), href: `/orders/${req.params.id}`, entityId: req.params.id });
+    }
+    // Whoever answers should see the internal picture before they reply. Fire-and-
+    // forget: the message is already saved, the brief catches up a moment later.
+    if (ref && channel !== 'announce') postOrderBriefing(channel, ref);
+
+    if (channel.indexOf('support-') === 0) {
+      const fromSeller = !isStaff(req.user);
+      if (fromSeller) {
+        // An escalation gets its own type + wording so an explicit request for help
+        // stands out from ordinary chatter.
+        notify({
+          roles: ['admin', 'operator', 'warehouse'], excludeUserId: req.user.sub,
+          type: escalated ? 'support-escalation' : 'support-message',
+          title: escalated ? `${b.by || 'A seller'} asked for a human` : `${b.by || 'A seller'} sent a message${about}`,
+          body, href: '/chat', entityId: ref || channel,
+        });
+      } else {
+        notify({
+          userIds: [channel.slice(8)], excludeUserId: req.user.sub,
+          type: 'support-message', title: `EGFULFILL replied${about}`,
+          body, href: ref ? `/orders/${ref}` : '/chat', entityId: ref || channel,
+        });
       }
     }
     return { ok: true };
   });
 
   app.get('/api/orders/:id/messages', { preHandler: requireAuth }, async (req, reply) => {
-    if (!(await canSeeThread(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
+    const { channel, orderRef } = await resolveChannel(req.params.id);
+    if (!(await canSeeThread(req.user, channel))) { reply.code(403); return { error: 'forbidden' }; }
+    // Asking by order id gives the order's slice of the channel; asking by channel id
+    // gives the whole conversation. Same table, two views.
+    // Internal messages — staff order briefings and internal notes — live in the
+    // SAME channel as the seller conversation, so they must be filtered out on the
+    // way to a seller. Doing it in SQL, not in the client, is the point: this is the
+    // only read path, and a seller must never receive the row at all.
     const r = await q(
       `select id, sender_role, body, attachment, meta, client_id, created_at
-         from order_messages where order_id=$1 order by created_at asc, id asc`, [req.params.id]);
+         from order_messages where order_id=$1
+           and ($2::text is null or meta->>'order_ref' = $2)
+           and ($3::boolean or not coalesce((meta->>'internal')::boolean, false))
+         order by created_at asc, id asc`, [channel, orderRef, isStaff(req.user)]);
     // Reconstruct the client entry shape so getOrderChat round-trips unchanged.
     return r.rows.map((m) => {
       const meta = m.meta || {};
@@ -1044,6 +1237,8 @@ export function ordersRoutes(app, requireAuth) {
         ts: meta.ts || (m.created_at ? new Date(m.created_at).getTime() : 0), system: !!meta.system };
       if (m.attachment) e.attachment = m.attachment;
       if (meta.internal) e.internal = true;
+      // Which order this message is about, now that orders don't own channels.
+      if (meta.order_ref) e.orderRef = String(meta.order_ref);
       return e;
     });
   });
