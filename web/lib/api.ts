@@ -845,6 +845,17 @@ export type ChatEntry = {
   ts?: number
   system?: boolean
   attachment?: unknown
+  // Which order the message is about. Channels no longer fan out per order — an
+  // @mention in the body sets this, and the order page filters on it.
+  orderRef?: string
+  // Staff-only (AI order briefings, internal notes). The server never sends these
+  // to a seller; this flag only drives how staff see them.
+  internal?: boolean
+}
+export type SellerMatch = { seller_id: string; channel: string; name: string; email: string }
+// Staff-only seller directory — start a channel with a seller who hasn't written in.
+export function searchSellers(term: string) {
+  return api<SellerMatch[]>(`/api/support/sellers?q=${encodeURIComponent(term)}`)
 }
 export function getOrderMessages(id: string) {
   return api<ChatEntry[]>(`/api/orders/${encodeURIComponent(id)}/messages`)

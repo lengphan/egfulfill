@@ -21,10 +21,18 @@ const suggestQty = (it: InventoryItem) => Math.max(1, (it.reorder_at ?? 25) * 2 
 const supKey = (s?: string | null) => (s || "Unassigned")
 const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
 // Which supplier API (if any) can place this PO automatically.
+//
+// Matched on WORD boundaries. A bare `includes("ss")` sent every "Unassigned" PO down
+// the S&S path — "unassigned" contains "ss" — so a PO with no supplier at all was being
+// handed to a real supplier's API.
+//
+// "Unassigned" is the placeholder supKey() uses for a null supplier, not a company, so it
+// resolves to no API: a PO nobody has assigned can only be placed by hand.
 const placer = (supplier?: string | null): "ss" | "otto" | null => {
-  const s = (supplier || "").toLowerCase()
-  if (s.includes("otto")) return "otto"
-  if (s.includes("s&s") || s.includes("ss") || s.includes("activewear")) return "ss"
+  const s = (supplier || "").trim().toLowerCase()
+  if (!s || s === "unassigned") return null
+  if (/\botto\b|ottocap/.test(s)) return "otto"
+  if (/s&s|\bss\b|activewear/.test(s)) return "ss"
   return null
 }
 

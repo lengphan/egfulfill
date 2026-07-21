@@ -1,10 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle } from "@phosphor-icons/react"
+import { PaperPlaneTilt, Headset, CircleNotch, Package, Sparkle, UsersThree, Megaphone } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getOrders, getSupportThreads, aiDraft, type ChatEntry, type OrderRow, type SupportThread } from "@/lib/api"
+import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, type ChatEntry, type SellerMatch, type SupportThread } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
 
@@ -22,16 +22,30 @@ const SUGGESTIONS = [
   "How do I connect my Etsy shop?",
 ]
 
-// A conversation in the left rail — Support (AI + team), a per-order thread, or the
-// internal staff-only Factory channel.
-type Convo = { id: string; kind: "support" | "order" | "staff" | "inbox" | "design"; title: string; sub: string; escalated?: boolean }
+// A conversation in the left rail. Channels fan out on ONE dimension — seller identity.
+// Everything else is a single room, so the rail has a fixed height no matter how many
+// orders are open. Per-order talk now rides inside a channel as an order_ref chip; it
+// used to spawn a room per order (plus a second `design-<id>` room), which buried the
+// real conversations under dozens of empty ones.
+type Convo = { id: string; kind: "support" | "staff" | "inbox" | "announce"; title: string; sub: string; escalated?: boolean }
 const STAFF_CHANNEL = "staff-general"
+const ANNOUNCE_CHANNEL = "announce"
+
+// Module scope, not a component defined in render (react-hooks/static-components).
+const convoIcon = (kind: Convo["kind"] | undefined, size = 16) => {
+  if (kind === "support") return <Headset size={size + 1} weight="duotone" />
+  if (kind === "staff") return <UsersThree size={size} weight="duotone" />
+  if (kind === "announce") return <Megaphone size={size} weight="duotone" />
+  return <Package size={size} weight="duotone" /> // inbox: a seller's channel
+}
 
 export default function ChatPage() {
   const [supportId, setSupportId] = useState<string | null>(null)
   const [signedOut, setSignedOut] = useState(false)
-  const [orders, setOrders] = useState<OrderRow[]>([])
   const [inbox, setInbox] = useState<SupportThread[]>([]) // staff: seller support threads
+  const [search, setSearch] = useState("")
+  const [found, setFound] = useState<SellerMatch[]>([])  // staff: sellers with no thread yet
+  const [opened, setOpened] = useState<Convo[]>([])      // channels started from the directory
   const [drafting, setDrafting] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatEntry[] | null>(null)
@@ -46,6 +60,7 @@ export default function ChatPage() {
   const cidSeq = useRef(0)
   const myName = getUser()?.name || "You"
   const isStaffUser = (() => { const r = getUser()?.role; return !!r && r !== "seller" })()
+  const isAdmin = getUser()?.role === "admin"
   // Designers work artwork for the factory and aren't part of seller conversations, so
   // they get the artwork threads instead of the seller support inbox (which 403s).
   const isDesigner = getUser()?.role === "designer"
@@ -71,8 +86,6 @@ export default function ChatPage() {
       } else {
         setSignedOut(true)
       }
-      // Staff need orders too now — each one carries an artwork thread.
-      getOrders().then((rows) => alive && setOrders(rows ?? [])).catch(() => {})
       if (isStaffUser && !isDesigner) getSupportThreads().then((rows) => alive && setInbox(rows ?? [])).catch(() => {})
     }, 0)
     return () => { alive = false; clearTimeout(id) }
@@ -80,8 +93,10 @@ export default function ChatPage() {
 
   const convos = useMemo<Convo[]>(() => {
     const list: Convo[] = []
-    if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "Internal team chat" })
+    if (isStaffUser) list.push({ id: STAFF_CHANNEL, kind: "staff", title: "Factory channel", sub: "All boards — production & artwork" })
     if (supportId) list.push({ id: supportId, kind: "support", title: "EGFULFILL Support", sub: isStaffUser ? "Ask EGFULFILL" : "Assistant + team" })
+    // Admin writes, everyone else reads. Designers aren't part of seller-facing comms.
+    if (!isDesigner) list.push({ id: ANNOUNCE_CHANNEL, kind: "announce", title: "Announcements", sub: isAdmin ? "Broadcast to all sellers" : "From EGFULFILL" })
     // Threads with an unanswered "talk to a human" sort above the rest — an explicit
     // request for help shouldn't be buried under newer small talk.
     if (isStaffUser) for (const t of [...inbox].sort((a, b) => Number(!!b.escalated) - Number(!!a.escalated))) {
@@ -91,20 +106,49 @@ export default function ChatPage() {
         sub: t.last ? t.last.slice(0, 40) : "Support request", escalated: !!t.escalated,
       })
     }
-    if (!isStaffUser) for (const o of orders.slice(0, 30)) {
-      list.push({ id: o.id, kind: "order", title: `#${o.seq ?? o.id}`, sub: o.customer?.name || (o.source ? `${o.source}` : "Order") })
-    }
-    // Artwork threads (design-<orderId>) — designer <-> factory, never visible to the
-    // seller. Capped so the list stays navigable on a busy shop.
-    if (isStaffUser) for (const o of orders.slice(0, 20)) {
-      list.push({ id: `design-${o.id}`, kind: "design", title: `Artwork · #${o.seq ?? o.id}`, sub: "Designer & factory" })
-    }
+    // Channels opened from the directory that have no messages yet, so they don't
+    // vanish from the rail the moment you click one.
+    for (const c of opened) if (!list.some((x) => x.id === c.id)) list.push(c)
     return list
-  }, [isStaffUser, supportId, orders, inbox])
+  }, [isStaffUser, isDesigner, isAdmin, supportId, inbox, opened])
+
+  // Filtered rail. Searching only narrows what's already there; sellers who have
+  // never written in come from the directory below, not from this list.
+  const shown = useMemo(() => {
+    const t = search.trim().toLowerCase()
+    if (!t) return convos
+    return convos.filter((c) => c.title.toLowerCase().includes(t) || c.sub.toLowerCase().includes(t))
+  }, [convos, search])
+
+  // Staff: look up sellers by name/email so a conversation can be started from our
+  // side — "your address didn't validate", "this order has no artwork".
+  useEffect(() => {
+    if (!isStaffUser || isDesigner) return
+    const t = search.trim()
+    // Clearing runs inside the timeout too, not in the effect body — a synchronous
+    // setState here trips react-hooks/set-state-in-effect.
+    const id = setTimeout(() => {
+      if (t.length < 2) { setFound([]); return }
+      searchSellers(t)
+        .then((rows) => setFound(rows ?? []))
+        .catch(() => setFound([]))
+    }, t.length < 2 ? 0 : 250) // debounce: this hits the DB on every keystroke otherwise
+    return () => clearTimeout(id)
+  }, [search, isStaffUser, isDesigner])
+
+  const openSeller = (s: SellerMatch) => {
+    setOpened((prev) => prev.some((c) => c.id === s.channel) ? prev
+      : [...prev, { id: s.channel, kind: "inbox", title: s.name, sub: s.email }])
+    setActiveId(s.channel)
+    setSearch("")
+  }
 
   const active = useMemo(() => convos.find((c) => c.id === activeId) ?? null, [convos, activeId])
   const isSupport = active?.kind === "support" // AI auto-reply only on the seller support thread
   const isInbox = active?.kind === "inbox" // staff answering a seller's support thread
+  // Announcements are a broadcast, not a conversation — the server 403s a non-admin
+  // write, so the composer must say so rather than letting the send fail silently.
+  const readOnly = active?.kind === "announce" && !isAdmin
 
   // Fetch WITHOUT touching state, so a caller can decide when to commit. The reveal
   // path needs that: it has to swap the typewriter bubble for the persisted message
@@ -242,20 +286,31 @@ export default function ChatPage() {
       {/* conversation rail */}
       <aside className="hidden w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card md:flex">
         <div className="border-b border-border px-4 py-3 font-semibold">Conversations</div>
+        {!signedOut && (
+          <div className="border-b border-border p-2">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={isStaffUser && !isDesigner ? "Search or find a seller…" : "Search conversations…"}
+              className="h-9"
+              aria-label="Search conversations"
+            />
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {signedOut ? (
             <div className="p-4 text-sm text-muted-foreground">Sign in to see your conversations.</div>
           ) : convos.length === 0 ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground"><CircleNotch size={20} className="animate-spin" /></div>
           ) : (
-            convos.map((c) => (
+            shown.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setActiveId(c.id)}
                 className={"flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent " + (c.id === activeId ? "bg-accent" : "")}
               >
                 <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (c.kind === "support" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                  {c.kind === "support" ? <Headset size={17} weight="duotone" /> : <Package size={16} weight="duotone" />}
+                  {convoIcon(c.kind)}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
@@ -271,6 +326,38 @@ export default function ChatPage() {
               </button>
             ))
           )}
+
+          {/* Seller directory — only sellers who aren't already in the rail above,
+              so the same person never appears twice. */}
+          {!signedOut && found.filter((s) => !shown.some((c) => c.id === s.channel)).length > 0 && (
+            <>
+              <div className="border-b border-border bg-muted/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Start a conversation
+              </div>
+              {found.filter((s) => !shown.some((c) => c.id === s.channel)).map((s) => (
+                <button
+                  key={s.channel}
+                  onClick={() => openSeller(s)}
+                  className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-accent"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <Package size={16} weight="duotone" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{s.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{s.email}</span>
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* A search that finds nothing must not look like a broken rail. */}
+          {!signedOut && search.trim() && shown.length === 0 && found.length === 0 && (
+            <div className="p-4 text-sm text-muted-foreground">
+              No conversations{isStaffUser && !isDesigner ? " or sellers" : ""} match “{search.trim()}”.
+            </div>
+          )}
         </div>
       </aside>
 
@@ -279,11 +366,11 @@ export default function ChatPage() {
         {/* header — also the mobile conversation switcher */}
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <span className={"flex size-9 shrink-0 items-center justify-center rounded-full " + (isSupport ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-            {isSupport ? <Headset size={18} weight="duotone" /> : <Package size={16} weight="duotone" />}
+            {convoIcon(active?.kind, 17)}
           </span>
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{active?.title || "Chat"}</div>
-            <div className="truncate text-xs text-muted-foreground">{isSupport ? "Assistant replies instantly; the team follows up" : active?.sub || "Order thread"}</div>
+            <div className="truncate text-xs text-muted-foreground">{isSupport ? "Assistant replies instantly; the team follows up" : active?.sub || "Conversation"}</div>
           </div>
           {convos.length > 1 && (
             <select
@@ -306,11 +393,14 @@ export default function ChatPage() {
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <span className="flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                {isSupport ? <Headset size={22} weight="duotone" /> : <Package size={20} weight="duotone" />}
+                {convoIcon(active?.kind, 21)}
               </span>
-              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "Factory channel" : `Chat about order ${active?.title ?? ""}`}</div>
+              <div className="font-medium">{isSupport ? "How can we help?" : active?.kind === "staff" ? "Factory channel" : active?.kind === "announce" ? "Announcements" : `Chat with ${active?.title ?? "this seller"}`}</div>
               <div className="max-w-xs text-sm text-muted-foreground">
-                {isSupport ? "Ask about an order, billing, integrations — our assistant answers from your account, and a teammate follows up when needed." : active?.kind === "staff" ? "Internal team chat — coordinate production, designs, and orders with the rest of the factory." : "Message the fulfillment team about this order — questions, changes, or artwork."}
+                {isSupport ? "Ask about an order, billing, integrations — mention an order with @ to pull it in. Our assistant answers from your account, and a teammate follows up when needed."
+                  : active?.kind === "staff" ? "Internal team chat — production, artwork, and orders in one room. Mention an order with @ to pull it in."
+                  : active?.kind === "announce" ? "Product news and service updates from EGFULFILL."
+                  : "Everything this seller has asked about, in one thread."}
               </div>
               {isSupport && (
                 <div className="mt-1 flex max-w-md flex-wrap justify-center gap-2">
@@ -326,6 +416,20 @@ export default function ChatPage() {
             <>
               {messages.map((m) => {
                 const mine = (m.role ?? "seller") === "seller"
+                // The AI order brief. Only staff ever receive it (the server filters
+                // internal messages out of a seller's read), and it's styled as a
+                // note rather than a bubble so nobody mistakes it for something the
+                // seller can see.
+                if (m.internal) return (
+                  <div key={String(m.id)} className="rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] p-3">
+                    <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      <Sparkle size={12} weight="fill" />
+                      {m.by || "Order brief"}
+                      <span className="ml-auto font-normal normal-case tracking-normal text-muted-foreground">Staff only — not shown to the seller</span>
+                    </div>
+                    <div className="text-sm [&_ul]:my-0 [&_ul]:pl-4"><Markdown>{m.text ?? ""}</Markdown></div>
+                  </div>
+                )
                 return (
                   <div key={String(m.id)} className={"flex flex-col " + (mine ? "items-end" : "items-start")}>
                     <div className={"max-w-[75%] rounded-2xl px-3.5 py-2 text-sm " + (mine ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "bg-muted")}>
@@ -334,9 +438,18 @@ export default function ChatPage() {
                           verbatim — a seller typing *asterisks* meant them. */}
                       {mine ? m.text : <Markdown>{m.text ?? ""}</Markdown>}
                     </div>
-                    <span className="mt-0.5 px-1 text-[10px] text-muted-foreground">
-                      {!mine ? `${m.by || (isSupport ? "Support" : "Factory")} · ` : ""}
-                      {fmtTime(m.ts)}
+                    <span className="mt-0.5 flex items-center gap-1.5 px-1 text-[10px] text-muted-foreground">
+                      {m.orderRef && (
+                        // Which order this is about — the context the per-order
+                        // channels used to carry in their name.
+                        <a href={`/orders/${m.orderRef}`} className="rounded-full bg-muted px-1.5 py-0.5 font-medium hover:underline">
+                          <Package size={9} weight="duotone" className="mr-0.5 inline" />{m.orderRef}
+                        </a>
+                      )}
+                      <span>
+                        {!mine ? `${m.by || (isSupport ? "Support" : "Factory")} · ` : ""}
+                        {fmtTime(m.ts)}
+                      </span>
                     </span>
                   </div>
                 )
@@ -389,11 +502,11 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send() } }}
-            placeholder={signedOut ? "Sign in to send a message" : "Type a message…  (Enter to send)"}
-            disabled={signedOut || !activeId}
+            placeholder={signedOut ? "Sign in to send a message" : readOnly ? "Only EGFULFILL can post announcements" : "Type a message…  @4099 to tag an order"}
+            disabled={signedOut || !activeId || readOnly}
             className="h-10"
           />
-          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || !input.trim() || sending}>
+          <Button size="icon" className="size-10" onClick={send} disabled={signedOut || !activeId || readOnly || !input.trim() || sending}>
             <PaperPlaneTilt size={16} weight="fill" />
           </Button>
         </div>
