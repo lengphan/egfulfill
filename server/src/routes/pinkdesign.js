@@ -218,21 +218,47 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
         : 'review';
     await q('update design_cards set col=$1, updated_at=now() where id=$2', [col, card.id]).catch(() => {});
 
-    // Finished files come back as URLs. Store the reference against the order so the
-    // floor can open what the partner produced.
+    // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
+    // our production files hostage to someone else's retention policy — a link that dies
+    // when they tidy up old tasks, or when the account lapses, takes the print file with
+    // it, and the floor may need that file weeks after the design was approved.
+    //
+    // So copy it into OUR storage and keep our own key. If the copy fails we still record
+    // their URL: degraded, but a working link beats nothing, and it can be re-ingested.
     const files = Array.isArray(b.design_files) ? b.design_files
       : Array.isArray(b.designs) ? b.designs : [];
+    const { storageEnabled, putObject, designUrlTtlDays } = await import('../storage.js');
+    const { createHash } = await import('crypto');
+    let copied = 0;
     for (const f of files) {
       const url = typeof f === 'string' ? f : (f && (f.url || f.file_url));
       if (!url) continue;
+      let storageKey = null;
+      if (storageEnabled()) {
+        try {
+          const dl = await fetch(url, { signal: AbortSignal.timeout(25000) });
+          if (dl.ok) {
+            const buf = Buffer.from(await dl.arrayBuffer());
+            const mime = dl.headers.get('content-type') || 'application/octet-stream';
+            const ext = (url.split('?')[0].match(/\.[a-z0-9]{2,5}$/i) || [''])[0];
+            // Content-hash key, same scheme as seller artwork: identical deliverables
+            // collapse to one object instead of a copy per webhook retry.
+            const hash = createHash('sha256').update(buf).digest('hex').slice(0, 32);
+            storageKey = `partner-designs/${hash}${ext}`;
+            await putObject(storageKey, buf, mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
+            copied++;
+          }
+        } catch { storageKey = null; }   // fall through to storing their URL
+      }
       await q(
-        `insert into order_designs (order_id, sku, kind, data, name, updated_at)
-         values ($1,$2,'partner',$3,$4, now())
-         on conflict (order_id, sku, kind) do update set data=excluded.data, name=excluded.name, updated_at=now()`,
-        [card.order_id, card.sku, url, 'Pink Design deliverable']
+        `insert into order_designs (order_id, sku, kind, data, storage_key, name, updated_at)
+         values ($1,$2,'partner',$3,$4,$5, now())
+         on conflict (order_id, sku, kind) do update set
+           data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, updated_at=now()`,
+        [card.order_id, card.sku, storageKey ? null : url, storageKey, 'Pink Design deliverable']
       ).catch(() => {});
     }
     egBroadcast({ type: 'design-cards' });
-    return { ok: true, card: card.id, col, files: files.length };
+    return { ok: true, card: card.id, col, files: files.length, copied };
   });
 }
