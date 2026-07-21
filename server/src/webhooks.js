@@ -154,25 +154,34 @@ export function emitWebhook(sellerId, event, payload) {
  * `authKey` is injected rather than imported: sandbox.js already imports emitWebhook from
  * this module, so importing it back would close a cycle.
  */
-export function webhookRoutes(app, requireAuth, authKey) {
+export function webhookRoutes(app, requireAuth, authKey, allows) {
   ensureWebhookTables();
 
-  // Resolve the caller to a seller id from whichever credential they presented.
+  // Resolve the caller to a seller id from whichever credential they presented, and carry
+  // the key through so scope can be checked. A dashboard JWT is the account owner and is
+  // not scope-limited; scopes constrain the credential you hand to someone else.
   const sellerOf = async (req) => {
-    if (req.user && req.user.sub) return String(req.user.sub);
+    if (req.user && req.user.sub) return { id: String(req.user.sub), key: null };
     if (typeof authKey === 'function') {
       const k = await authKey(req).catch(() => null);
-      if (k && k.seller_id) return String(k.seller_id);
+      if (k && k.seller_id) return { id: String(k.seller_id), key: k };
     }
-    return null;
+    return { id: null, key: null };
   };
-  const requireSeller = async (req, reply) => {
-    const id = await sellerOf(req);
+  /** `scope` is enforced only for API keys — see above. */
+  const seller = (scope) => async (req, reply) => {
+    const { id, key } = await sellerOf(req);
     if (!id) { reply.code(401).send({ error: 'Sign in or send an API key (X-API-Key).' }); return; }
+    if (key && scope && typeof allows === 'function' && !allows(key, scope)) {
+      reply.code(403).send({ error: `This API key is not allowed to ${scope}.`, code: 'insufficient_scope',
+        required: scope, granted: key.scopes || [] });
+      return;
+    }
     req._sellerId = id;
   };
+  const requireSeller = seller(null);
 
-  app.get('/api/webhooks', { preHandler: requireSeller }, async (req) => {
+  app.get('/api/webhooks', { preHandler: seller('webhooks.read') }, async (req) => {
     await ensureWebhookTables();
     const r = await q(
       'select id, url, events, active, created_at from webhook_endpoints where seller_id=$1 order by created_at desc',
@@ -183,7 +192,7 @@ export function webhookRoutes(app, requireAuth, authKey) {
     return r.rows;
   });
 
-  app.post('/api/webhooks', { preHandler: requireSeller }, async (req, reply) => {
+  app.post('/api/webhooks', { preHandler: seller('webhooks.write') }, async (req, reply) => {
     await ensureWebhookTables();
     const b = req.body || {};
     const bad = validateWebhookUrl(b.url);
@@ -199,14 +208,14 @@ export function webhookRoutes(app, requireAuth, authKey) {
     return { ...r.rows[0], secret, _note: 'Store this secret now — it is not shown again. Verify deliveries with HMAC-SHA256 over the raw body.' };
   });
 
-  app.delete('/api/webhooks/:id', { preHandler: requireSeller }, async (req) => {
+  app.delete('/api/webhooks/:id', { preHandler: seller('webhooks.write') }, async (req) => {
     await ensureWebhookTables();
     await q('delete from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, req._sellerId]);
     return { ok: true };
   });
 
   // Recent attempts, so "we never got it" is answerable.
-  app.get('/api/webhooks/:id/deliveries', { preHandler: requireSeller }, async (req, reply) => {
+  app.get('/api/webhooks/:id/deliveries', { preHandler: seller('webhooks.read') }, async (req, reply) => {
     await ensureWebhookTables();
     const own = await q('select id from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, req._sellerId]);
     if (!own.rows.length) { reply.code(404); return { error: 'No such endpoint.' }; }
@@ -229,7 +238,7 @@ export function webhookRoutes(app, requireAuth, authKey) {
    * point of a test is finding out that it failed, which fire-and-forget can't tell you.
    * The payload is stamped test:true so a receiver can't mistake it for a real shipment.
    */
-  app.post('/api/webhooks/:id/test', { preHandler: requireSeller }, async (req, reply) => {
+  app.post('/api/webhooks/:id/test', { preHandler: seller('webhooks.write') }, async (req, reply) => {
     await ensureWebhookTables();
     const r = await q('select id, seller_id, url, secret from webhook_endpoints where id=$1 and seller_id=$2',
       [Number(req.params.id) || 0, req._sellerId]);

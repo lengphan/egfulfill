@@ -27,6 +27,15 @@ const EVENTS: { name: string; when: string }[] = [
   { name: "order.cancelled", when: "It was cancelled or refunded." },
 ]
 
+// Mirrors API_SCOPES in server/src/routes/sandbox.js — keep the two in step.
+const SCOPES: { name: string; allows: string }[] = [
+  { name: "orders.write", allows: "Create orders." },
+  { name: "orders.read", allows: "Read an order's status and tracking." },
+  { name: "products.read", allows: "List the blanks you can order." },
+  { name: "webhooks.read", allows: "List endpoints and their delivery history." },
+  { name: "webhooks.write", allows: "Add, remove and test endpoints." },
+]
+
 const LIMITS: { scope: string; limit: string }[] = [
   { scope: "All endpoints", limit: "600 requests / minute / key" },
   { scope: "Order creation", limit: "60 requests / minute / key" },
@@ -93,6 +102,32 @@ export default function DocsPage() {
           </ul>
           <p className="text-sm text-muted-foreground">
             The full key is shown once, at creation, and never again. We store only a hash.
+          </p>
+
+          <h3 className="pt-2 font-medium">Scopes</h3>
+          <p className="text-muted-foreground">
+            A key can be limited to what an integration actually needs. Grant the narrowest set
+            that works — this is a credential you are handing to someone else.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-2 font-medium">Scope</th><th className="py-2 font-medium">Allows</th>
+              </tr></thead>
+              <tbody>
+                {SCOPES.map((s) => (
+                  <tr key={s.name} className="border-b border-border/60 align-top">
+                    <td className="py-2 pr-4 font-mono text-xs">{s.name}</td>
+                    <td className="py-2 text-muted-foreground">{s.allows}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            A call outside a key&apos;s scopes returns <Code>403</Code> with <Code>insufficient_scope</Code>
+            and names what was required. A key created without any scopes has full access, which keeps
+            older integrations working — but new keys should name theirs.
           </p>
         </Section>
 

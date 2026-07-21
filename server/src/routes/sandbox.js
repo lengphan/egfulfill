@@ -37,6 +37,11 @@ function ensure() {
     last_used_at timestamptz,
     revoked_at   timestamptz
   )`).then(() => q(`create index if not exists api_keys_seller_idx on api_keys(seller_id)`))
+     // What this key is allowed to do. Added after keys already existed, so it is
+     // idempotent and EXISTING KEYS KEEP FULL ACCESS: an empty array means "everything",
+     // because silently narrowing a key a partner is already using would break their
+     // integration at deploy time with no warning. New keys are granted explicitly.
+     .then(() => q(`alter table api_keys add column if not exists scopes text[] not null default '{}'`))
      .catch((e) => { _ready = null; throw e; });
   return _ready;
 }
@@ -76,28 +81,53 @@ function sandboxRates() {
 
 const bad = (reply, msg, fields) => { reply.code(400); return { error: msg, mode: 'test', ...(fields ? { missing: fields } : {}) }; };
 
+// ── Scopes ────────────────────────────────────────────────────────────────────
+// A key used to be all-or-nothing: a partner who only needed to push orders held one
+// that could also read the whole catalogue and manage webhooks. Least privilege matters
+// most for the credential you hand to someone else.
+export const API_SCOPES = ['orders.read', 'orders.write', 'products.read', 'webhooks.read', 'webhooks.write'];
+
+/**
+ * Does this key carry `scope`?
+ *
+ * An EMPTY scopes array means full access. That is deliberate: the column was added to a
+ * table that already had keys in it, and defaulting those to "nothing" would have revoked
+ * every live integration the moment this deployed. Keys created from now on name their
+ * scopes, so the permissive case shrinks to zero on its own.
+ */
+export const keyAllows = (k, scope) => !k || !Array.isArray(k.scopes) || k.scopes.length === 0 || k.scopes.includes(scope);
+
 export function sandboxRoutes(app, requireAuth) {
   // ─────────────────────────  KEY MANAGEMENT  (session-authed)  ─────────────────────────
   app.get('/api/keys', { preHandler: requireAuth }, async (req) => {
     await ensure();
     const r = await q(
-      `select id, label, prefix, mode, created_at, last_used_at, revoked_at
+      `select id, label, prefix, mode, scopes, created_at, last_used_at, revoked_at
          from api_keys where seller_id=$1 order by created_at desc`, [String(req.user.sub)]);
-    return { keys: r.rows };
+    return { keys: r.rows, all_scopes: API_SCOPES };
   });
 
-  app.post('/api/keys', { preHandler: requireAuth }, async (req) => {
+  app.post('/api/keys', { preHandler: requireAuth }, async (req, reply) => {
     await ensure();
     const mode   = (req.body && req.body.mode === 'live') ? 'live' : 'test';
     const label  = ((req.body && req.body.label) || (mode === 'live' ? 'Live key' : 'Test key')).toString().slice(0, 60);
     const full   = genKey(mode);
     const prefix = full.slice(0, (mode === 'live' ? LIVE_PREFIX : PREFIX).length + 4) + '…';
+    // Scopes are opt-in per key. Sending none keeps today's behaviour (full access), so
+    // the existing "Generate test key" button doesn't silently start issuing keys that
+    // can't do anything — but a caller that names scopes gets exactly those.
+    const asked = Array.isArray(req.body && req.body.scopes) ? req.body.scopes.map(String) : [];
+    const scopes = asked.filter((s) => API_SCOPES.includes(s));
+    if (asked.length && !scopes.length) {
+      reply.code(400);
+      return { error: 'No recognised scopes.', supported: API_SCOPES };
+    }
     const r = await q(
-      `insert into api_keys(seller_id, label, prefix, key_hash, mode)
-       values($1,$2,$3,$4,$5) returning id, created_at`,
-      [String(req.user.sub), label, prefix, hashKey(full), mode]);
+      `insert into api_keys(seller_id, label, prefix, key_hash, mode, scopes)
+       values($1,$2,$3,$4,$5,$6) returning id, created_at`,
+      [String(req.user.sub), label, prefix, hashKey(full), mode, scopes]);
     // The full key is returned ONCE here and never again — the UI must tell the user to copy it.
-    return { id: r.rows[0].id, key: full, prefix, label, mode, created_at: r.rows[0].created_at };
+    return { id: r.rows[0].id, key: full, prefix, label, mode, scopes, created_at: r.rows[0].created_at };
   });
 
   app.delete('/api/keys/:id', { preHandler: requireAuth }, async (req) => {
@@ -119,12 +149,21 @@ export function sandboxRoutes(app, requireAuth) {
    * `orderLimit` gives the expensive paths a tighter ceiling — creating an order writes
    * rows and fires webhooks, so it shouldn't share a budget with cheap catalogue reads.
    */
-  const requireKey = async (req, reply, orderLimit = false) => {
+  const requireKey = async (req, reply, opts = {}) => {
+    const { orderLimit = false, scope = null } = typeof opts === 'boolean' ? { orderLimit: opts } : opts;
     const k = await authKey(req);
     if (!k) {
       reply.code(401);
       return { error: 'Invalid or missing API key', mode: 'test',
         hint: 'Send your test key in the X-API-Key header (or Authorization: Bearer egk_test_…). Generate one in the API Playground.' };
+    }
+    // Scope before rate limit: a call the key may never make shouldn't consume the
+    // budget of one it may.
+    if (scope && !keyAllows(k, scope)) {
+      reply.code(403);
+      return { error: `This API key is not allowed to ${scope}.`, code: 'insufficient_scope',
+        required: scope, granted: k.scopes || [],
+        hint: 'Create a key with this scope in Settings → API keys.' };
     }
     const over = limited(reply, `k:${k.id}`, LIMITS.global);
     if (over) return over;
@@ -325,7 +364,7 @@ export function sandboxRoutes(app, requireAuth) {
   // is worse than no catalogue. Nothing here is sensitive: it's the same blank list a
   // signed-in seller browses, and supplier cost is not among these columns.
   app.get('/api/v1/products', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
+    const k = await requireKey(req, reply, { scope: 'products.read' }); if (k.error) return k;
     try {
       const r = await q('select id, sku, name, type, method, price, base_price from catalog_products order by name limit 200');
       return { object: 'list', mode: k.mode, data: r.rows, count: r.rowCount };
@@ -333,7 +372,7 @@ export function sandboxRoutes(app, requireAuth) {
   });
 
   app.post('/api/v1/orders', async (req, reply) => {
-    const k = await requireKey(req, reply, true); if (k.error) return k;
+    const k = await requireKey(req, reply, { orderLimit: true, scope: 'orders.write' }); if (k.error) return k;
     const b = req.body || {};
     const items = Array.isArray(b.items) ? b.items : null;
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
@@ -393,7 +432,7 @@ export function sandboxRoutes(app, requireAuth) {
   });
 
   app.get('/api/v1/orders/:id', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
+    const k = await requireKey(req, reply, { scope: 'orders.read' }); if (k.error) return k;
     if (k.mode === 'live') {
       try {
         const r = await q('select id, seq, status, factory_status, total, tracking, carrier, created_at from orders where id=$1 and seller_id=$2',
