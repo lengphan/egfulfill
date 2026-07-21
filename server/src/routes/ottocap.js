@@ -63,6 +63,22 @@ async function passthru(reply, path) {
   catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
 }
 
+/**
+ * Route an Otto image through our supplier proxy.
+ *
+ * Same problem S&S has: the sync stores the supplier's own URL, and a browser loading it
+ * from our origin gets blocked or 403'd — it renders as a broken image and never reaches
+ * a proxy, so nothing is logged and it looks like "no images" rather than a blocked fetch.
+ * Normalising on READ fixes rows already synced, without anyone re-running an import.
+ */
+function ottoImg(u) {
+  if (!u) return null;
+  const s = String(u);
+  if (s.startsWith('/api/')) return s;              // already proxied
+  if (!/^https?:/i.test(s)) return s;               // relative/unknown — leave it alone
+  return '/api/ss/img?u=' + encodeURIComponent(s);  // shared supplier proxy
+}
+
 export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // Config + live-token check (never leaks the secrets).
   app.get('/api/otto/status', { preHandler: requireStaff }, async () => {
@@ -125,7 +141,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
        created_by text, created_at timestamptz default now()
      )`).catch(() => {});
   app.get('/api/otto/favorites', { preHandler: requireStaff }, async () => {
-    try { const r = await q('select style, name, image, price from otto_favorites order by created_at desc'); return { favorites: r.rows }; }
+    try { const r = await q('select style, name, image, price from otto_favorites order by created_at desc'); return { favorites: r.rows.map((x) => ({ ...x, image: ottoImg(x.image) })) }; }
     catch { return { favorites: [] }; }
   });
   app.post('/api/otto/favorites', { preHandler: requireStaff }, async (req, reply) => {
@@ -182,7 +198,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       const colors = [], sizes = [];
       let price = null, name = null, description = null, category = null;
       for (const r of rows) {
-        if (r.color && !(r.color in colorImages)) colorImages[r.color] = r.image || '';
+        if (r.color && !(r.color in colorImages)) colorImages[r.color] = ottoImg(r.image) || '';
         if (r.color && !colors.includes(r.color)) colors.push(r.color);
         if (r.size && !sizes.includes(r.size)) sizes.push(r.size);
         if (price == null && r.price != null) price = Number(r.price);
@@ -191,7 +207,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       return {
         style, name: name || style, description, price, category,
         colors, sizes, colorImages,
-        image: rows.find((r) => r.image)?.image || null,
+        image: ottoImg(rows.find((r) => r.image)?.image || null),
         skus: rows.map((r) => r.sku),
       };
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e) }; }

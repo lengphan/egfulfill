@@ -40,7 +40,10 @@ export function ssImgSize(u, size = 'fs') {
 
 function ssImg(u) {
   if (!u) return null;
-  const abs = /^https?:/i.test(u) ? u : SS_CDN + String(u).replace(/^\//, '');
+  const str = String(u);
+  // Already proxied — don't wrap it twice.
+  if (str.startsWith('/api/ss/img')) return str;
+  const abs = /^https?:/i.test(str) ? str : SS_CDN + str.replace(/^\//, '');
   return '/api/ss/img?u=' + encodeURIComponent(abs);
 }
 
@@ -169,8 +172,13 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     // Their docs give image URLs as https://www.ssactivewear.com/{Image}; our sync built
     // cdn.ssactivewear.com. Accept BOTH rather than bet on one — a wrong host shows up as
     // a broken <img>, which is the hardest kind of failure to notice.
-    if (!/^https:\/\/(cdn|www)\.ssactivewear\.com\/[\w./%-]+$/i.test(u)) {
-      reply.code(400); return { error: 'only S&S image hosts may be proxied' };
+    // Allowlisted supplier hosts only — this endpoint fetches whatever URL it's given, so
+    // an open list would make it a server-side request forgery tool pointed at our own
+    // network. Otto is included because its product images have the same problem S&S's do
+    // and there is no second proxy.
+    if (!/^https:\/\/([\w-]+\.)?(ssactivewear|ottocap)\.com\/[\w./%-]+$/i.test(u)) {
+      console.error(`[ss/img] refused non-supplier host: ${u.slice(0, 120)}`);
+      reply.code(400); return { error: 'only supplier image hosts may be proxied' };
     }
 
     const { storageEnabled, putObject, getObject } = await import('../storage.js');
@@ -711,7 +719,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       args.push(limit); args.push(offset);
       const r = await q(`select sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, synced_at
                          from ss_products ${wc} order by brand, style_name, size limit $${args.length - 1} offset $${args.length}`, args);
-      return { total: cnt.rows[0]?.n || 0, products: r.rows };
+      // Route every image through OUR proxy at read time. Rows synced before the proxy
+      // existed hold the raw cdn.ssactivewear.com URL, which a browser can't load from our
+      // origin — it renders as a broken image and never reaches the proxy, so nothing is
+      // ever logged and the failure looks like "no images" rather than a blocked fetch.
+      // Normalising here fixes existing rows without anyone re-syncing.
+      return { total: cnt.rows[0]?.n || 0, products: r.rows.map((p) => ({ ...p, image: ssImg(p.image) })) };
     } catch (e) { reply.code(500); return { error: e.message }; }
   });
 
