@@ -619,7 +619,10 @@ export function ssOrder(
 export function ottoOrder(
   items: { sku: string; qty: number }[],
   extra: { shipping_address?: unknown; billing_address?: unknown; shipping_method?: string
-           payment_method?: string; customer_po?: string; customer?: string; contact?: string } = {}
+           payment_method?: string; customer_po?: string; customer?: string; contact?: string
+           /** Otto have no saved cards — the card travels on every credit-card order. The
+            *  server strips it from anything it echoes back, so it never reaches storage. */
+           card_details?: { name: string; card_number: string; cvv: string; exp_date: string } } = {}
 ) {
   return api<{ ok?: boolean; dryRun?: boolean; error?: string; ottoResponse?: unknown }>(
     `/api/otto/order`, { method: "POST", body: JSON.stringify({ items, ...extra }) })

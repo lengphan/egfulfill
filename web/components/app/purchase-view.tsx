@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
 import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
+import { CardEntryDialog, type CardDetails } from "@/components/app/card-entry-dialog"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -126,6 +127,9 @@ export function PurchaseView() {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [supplierCfg, setSupplierCfg] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
+  // Otto have no saved cards, so a card order needs one typed at placement. Held here only
+  // for the moment between entry and send — never stored, never written to a PO.
+  const [needCard, setNeedCard] = useState(false)
   const [returning, setReturning] = useState<PurchaseOrder | null>(null)
   // S&S tracking, keyed by PO number. Fetched on demand rather than stored: a shipment in
   // transit changes, and a number cached at receipt time would stop being true the moment
@@ -535,7 +539,7 @@ export function PurchaseView() {
    * Lines that go out leave the pool; anything that FAILED stays, so a retry re-sends
    * only what didn't make it rather than duplicating what did.
    */
-  const placeAllGroups = async () => {
+  const placeAllGroups = async (card?: CardDetails) => {
     if (!saved.length) return
     const opts = await getSupplierOptions().catch(() => null)
     if (!opts?.shipToComplete) {
@@ -547,6 +551,13 @@ export function PurchaseView() {
     // California is not a valid choice" is a better message than nothing, but a refusal
     // that names the setting to change is better still.
     const needsOtto = toOrderGroups.some((g) => g.api === "otto")
+    // Otto want the card on the REQUEST — they have no saved-card API — so ask for it
+    // before sending rather than letting their "card_details is required" come back.
+    const payMethod = String(opts.defaults.otto_payment_method || "").toLowerCase().replace(/[^a-z]/g, "")
+    if (needsOtto && payMethod === "creditcard" && !card) {
+      setNeedCard(true)
+      return
+    }
     if (needsOtto && !(opts.defaults.otto_customer && opts.defaults.otto_contact)) {
       setMsg({ ok: false, text: "Otto require a customer and contact on every order. Set them in Order settings › Payment — they come from your Otto account." })
       return
@@ -572,6 +583,9 @@ export function PurchaseView() {
               payment_method: opts.defaults.otto_payment_method || undefined,
               customer: opts.defaults.otto_customer || undefined,
               contact: opts.defaults.otto_contact || undefined,
+              // Sent, never saved: the server strips it from anything it echoes back, so
+              // it can't reach purchase_orders.meta.
+              card_details: card,
               customer_po: poNum,
             })
             if (r.error) throw new Error(r.error); resp = r
@@ -1010,7 +1024,7 @@ export function PurchaseView() {
               <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
                 <Plus size={13} weight="bold" /> Add items
               </Button>
-              <Button size="sm" onClick={placeAllGroups} disabled={!saved.length || busy === "place-all"}>
+              <Button size="sm" onClick={() => void placeAllGroups()} disabled={!saved.length || busy === "place-all"}>
                 {busy === "place-all" ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} weight="bold" />}
                 {toOrderGroups.length > 1 ? `Place ${toOrderGroups.length} orders` : "Place order"}
               </Button>
@@ -1108,6 +1122,14 @@ export function PurchaseView() {
       <ImageZoom img={zoom} onClose={() => setZoom(null)} />
 
       <ReceiveScanDialog open={scanOpen} onOpenChange={setScanOpen} onReceived={load} />
+
+      <CardEntryDialog
+        open={needCard}
+        onOpenChange={setNeedCard}
+        amount={toOrderGroups.filter((g) => g.api === "otto").reduce((s2, g) => s2 + g.total, 0)}
+        // Straight on to placing with the card in hand. It exists only for this call.
+        onSubmit={(c) => { setNeedCard(false); void placeAllGroups(c) }}
+      />
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
 
