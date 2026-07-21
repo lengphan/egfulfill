@@ -156,7 +156,22 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
    * the buyer's clock, which is a timing decision a person makes, not something software
    * should guess at.
    */
-  app.post('/api/dispatch/push', { preHandler: requireWarehouse }, async (req, reply) => {
+  /**
+   * Sending a label to the pre-scan queue is part of moving an order along, not a claim
+   * about physical custody — the partner's floor is what actually scans it. So operators
+   * can push and un-push. What stays warehouse/admin is everything that asserts custody
+   * or costs money: /sync (writes label_scanned_at) and /billing.
+   */
+  const canDispatch = (req, reply, done) => {
+    const role = req.user && req.user.role;
+    if (role !== 'admin' && role !== 'warehouse' && role !== 'operator') {
+      reply.code(403).send({ error: 'Operator, warehouse or admin only' });
+      return;
+    }
+    done();
+  };
+
+  app.post('/api/dispatch/push', { preHandler: canDispatch }, async (req, reply) => {
     if (!dispatchEnabled()) { reply.code(400); return { error: 'Dispatch partner not configured (BYEASTSIDE_API_KEY).' }; }
     const ids = Array.isArray((req.body || {}).orderIds) ? (req.body.orderIds).map(String).filter(Boolean) : [];
     if (!ids.length) { reply.code(400); return { error: 'orderIds required' }; }
@@ -199,6 +214,53 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     if (scanned) egBroadcast({ type: 'orders' });
     return { ok: true, checked: pending.length, scanned };
   }
+
+  /**
+   * Un-push labels — "we sent 10, we're only shipping 5 today".
+   *
+   * Possible per-order because we upload ONE PDF per order (see pushOne: the file is
+   * named after the order id), so their DELETE /customer/pdfs/:id targets exactly one
+   * label. A batched PDF would have made this all-or-nothing.
+   *
+   * Their API returns 409 once a label is scanned or completed, and that refusal is
+   * correct: the buyer's tracking clock has already started, so the parcel is committed
+   * whatever we think. Those are reported back per order rather than failing the batch —
+   * cancelling 5 where 1 has already been picked should still cancel the other 4.
+   */
+  app.post('/api/dispatch/cancel', { preHandler: canDispatch }, async (req, reply) => {
+    if (!dispatchEnabled()) { reply.code(400); return { error: 'Dispatch partner not configured (BYEASTSIDE_API_KEY).' }; }
+    const ids = Array.isArray((req.body || {}).orderIds) ? req.body.orderIds.map(String).filter(Boolean) : [];
+    if (!ids.length) { reply.code(400); return { error: 'orderIds required' }; }
+
+    const rows = (await q(
+      'select id, dispatch_pdf_id, label_scanned_at, tracking from orders where id = any($1)', [ids]
+    )).rows;
+
+    const results = [];
+    for (const o of rows) {
+      if (!o.dispatch_pdf_id) { results.push({ id: o.id, ok: false, reason: 'not-pushed' }); continue; }
+      if (o.label_scanned_at) { results.push({ id: o.id, ok: false, reason: 'already-scanned' }); continue; }
+      const r = await bes(`/customer/pdfs/${encodeURIComponent(o.dispatch_pdf_id)}`, { method: 'DELETE' });
+      if (r.status === 409) {
+        // They scanned it between our check and this call. Record the scan rather than
+        // pretending it's still cancellable.
+        await q('update orders set label_scanned_at=coalesce(label_scanned_at, now()) where id=$1', [o.id]).catch(() => {});
+        results.push({ id: o.id, ok: false, reason: 'already-scanned' });
+        continue;
+      }
+      if (!r.ok && r.status !== 404) {   // 404 = already gone their side; treat as cancelled
+        results.push({ id: o.id, ok: false, reason: (r.data && (r.data.message || r.data.error)) || `partner error (${r.status})` });
+        continue;
+      }
+      await q('update orders set dispatch_pdf_id=null where id=$1', [o.id]).catch(() => {});
+      results.push({ id: o.id, ok: true });
+    }
+
+    const cancelled = results.filter((x) => x.ok).length;
+    audit(req, 'dispatch.cancel', { entityType: 'order', after: { requested: ids.length, cancelled } });
+    if (cancelled) egBroadcast({ type: 'orders' });
+    return { ok: true, cancelled, results };
+  });
 
   // Manual "check now", and the same call the timer makes.
   app.post('/api/dispatch/sync', { preHandler: requireWarehouse }, async () => syncScans());
