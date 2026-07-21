@@ -1148,7 +1148,17 @@ export type EtsyConfig = {
  *  back on the buyer's order line, which is how a variant resolves after the seller
  *  renames it on the marketplace. `variant_skus` must be saved onto the catalog product
  *  so the returned sku matches something. */
-export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string }) {
+/**
+ * Publish a draft listing.
+ *
+ * The `blank`/`design*`/`printType`/`color`/`size` fields are what make the resulting
+ * ORDER produceable: the server records them on published_listings, and order sync reads
+ * that row back to attach the artwork and name the blank. They were absent here while the
+ * server read them all, so every published listing stored NULLs and its orders arrived
+ * anonymous — priced only by luck (variant sku match) and unable to reach the Design
+ * board at all, because a line with no artwork can't be sent to a designer.
+ */
+export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string }) {
   return api<{ listing_id?: number; url?: string; error?: string; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {
@@ -1210,6 +1220,28 @@ export function saveSpydeckListing(listing: EtsyListing) {
 }
 export function unsaveSpydeckListing(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/saves/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
+}
+
+// Research listings already turned into a draft of our own — the Uploaded tab. Held on
+// the server, not in React state: a refresh used to empty the tab and offer "Make
+// product" again for something already published, which is how a shop collects
+// duplicate drafts.
+export type UploadedListing = EtsyListing & { uploaded_at?: string; our_listing_id?: string; our_url?: string }
+export function getSpydeckUploads() {
+  return api<UploadedListing[]>(`/api/spydeck/uploads`)
+}
+export function recordSpydeckUpload(listing: EtsyListing, our?: { listing_id?: number | string; url?: string }) {
+  return api<{ ok?: boolean; error?: string }>(`/api/spydeck/uploads`, {
+    method: "POST",
+    body: JSON.stringify({
+      listing_id: String(listing.listing_id), data: listing,
+      our_listing_id: our?.listing_id != null ? String(our.listing_id) : undefined,
+      url: our?.url,
+    }),
+  })
+}
+export function deleteSpydeckUpload(listingId: number | string) {
+  return api<{ ok?: boolean }>(`/api/spydeck/uploads/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }
 
 export type EtsySearchOpts = { sort?: string; sortOrder?: string; limit?: number; taxonomyId?: string | number; minPrice?: number; maxPrice?: number }

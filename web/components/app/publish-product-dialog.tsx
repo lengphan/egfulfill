@@ -82,6 +82,11 @@ export type PublishPrefill = {
   images?: string[]
   /** Catalog product to produce this on. Sets the cost side of the margin. */
   blank?: CatalogProduct | null
+  /** The ARTWORK, not the composite in `images`. This is what gets attached to the order
+   *  when one arrives, and what makes the line sendable to the Design board. */
+  designUrl?: string
+  designPos?: unknown
+  designId?: string | number
 }
 
 /**
@@ -241,6 +246,20 @@ export function PublishProductDialog({
         colors: blank ? pickedColors : [],
         sizes: blank ? pickedSizes : [],
         sku_base: blank?.sku ?? undefined,
+        // What the factory needs when this listing sells. The server records these on
+        // published_listings and order sync reads them back — without them the order
+        // arrives with no blank and no artwork, and can't be sent to a designer.
+        blank: blank?.sku ?? undefined,
+        printType: method || undefined,
+        designId: prefill?.designId,
+        designUrl: prefill?.designUrl,
+        designPos: prefill?.designPos,
+        // Only when unambiguous. Order sync applies these solely if the buyer's variant
+        // text contains them, so sending one of five colours would just never match —
+        // but it would also be a claim we can't support. The variant SKU is the real
+        // resolution path when there's more than one.
+        color: pickedColors.length === 1 ? pickedColors[0] : undefined,
+        size: pickedSizes.length === 1 ? pickedSizes[0] : undefined,
       })
       if (r.error) throw new Error(r.error)
 
@@ -416,7 +435,15 @@ export function PublishProductDialog({
                   for whichever size the old picker happened to be set to. */}
               <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">
                 {!blank ? (
-                  <p className="text-xs text-muted-foreground">Pick a base product to see your cost and margin.</p>
+                  // Not just a missing margin readout: with no blank there is no sku_base,
+                  // so variants publish under a fallback prefix that matches no catalog
+                  // product, and the order it eventually produces can't be priced. Worth
+                  // more than a neutral hint — this is the SpyDeck default path.
+                  <p className="text-xs text-amber-700">
+                    Pick a base product. Without one this publishes with no cost, no margin
+                    and no variant SKUs we recognise — the order it creates won&apos;t price
+                    or reach the factory.
+                  </p>
                 ) : sizeRows.length > 0 ? (
                   <div className="space-y-2">
                     <div className="overflow-x-auto">

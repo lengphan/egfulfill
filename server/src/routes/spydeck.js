@@ -17,6 +17,17 @@ function ensure() {
     created_at  timestamptz not null default now(),
     primary key (seller_id, listing_id)
   )`)
+    // Researched listings already turned into a draft of our own — the Uploaded tab.
+    // Same shape as saves plus the draft we created, so the tab can link straight to it.
+    .then(() => q(`create table if not exists spydeck_uploads (
+      seller_id       text not null,
+      listing_id      text not null,
+      our_listing_id  text,
+      url             text,
+      data            jsonb,
+      created_at      timestamptz not null default now(),
+      primary key (seller_id, listing_id)
+    )`))
     // jsonb, matching schema.sql. Five route files declare this table and four of them
     // said `value text`; `create table if not exists` makes all of them no-ops on any
     // existing database, so the real column is jsonb and the `text` spellings were a lie
@@ -391,6 +402,53 @@ export function spydeckRoutes(app, requireAuth) {
   app.delete('/api/spydeck/saves/:listingId', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
     await ensure();
     await q('delete from spydeck_saves where seller_id=$1 and listing_id=$2', [String(req.user.sub), String(req.params.listingId)]);
+    return { ok: true };
+  });
+
+  // ── Uploaded ───────────────────────────────────────────────────────────────
+  // Which researched listings you've already turned into a draft of your own.
+  //
+  // This lived in React state, so it survived exactly as long as the tab did: a
+  // refresh and the Uploaded tab was empty again, with every card back to offering
+  // "Make product" for something already published — the fastest way to end up with
+  // duplicate drafts in a shop. Server-side and keyed by seller, like saves.
+  //
+  // `our_listing_id` is the draft WE created; published_listings records the reverse
+  // direction (our listing → what it was built from) but nothing linked the source
+  // research listing to it, so there was no way to answer "did I already make this?".
+  app.get('/api/spydeck/uploads', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
+    await ensure();
+    const r = await q(
+      'select listing_id, our_listing_id, url, data, created_at from spydeck_uploads where seller_id=$1 order by created_at desc limit 500',
+      [String(req.user.sub)]
+    );
+    return r.rows.map((row) => ({
+      ...(row.data || {}), listing_id: row.listing_id,
+      our_listing_id: row.our_listing_id, our_url: row.url, uploaded_at: row.created_at,
+    }));
+  });
+
+  app.post('/api/spydeck/uploads', { preHandler: [requireAuth, requireSpydeck] }, async (req, reply) => {
+    await ensure();
+    const b = req.body || {};
+    const listingId = String(b.listing_id ?? b.listingId ?? '').trim();
+    if (!listingId) { reply.code(400); return { error: 'listing_id required' }; }
+    await q(
+      `insert into spydeck_uploads (seller_id, listing_id, our_listing_id, url, data)
+       values ($1,$2,$3,$4,$5)
+       on conflict (seller_id, listing_id) do update set
+         our_listing_id=excluded.our_listing_id, url=excluded.url, data=excluded.data`,
+      [String(req.user.sub), listingId,
+       b.our_listing_id != null ? String(b.our_listing_id) : null,
+       b.url ? String(b.url) : null,
+       b.data ? JSON.stringify(b.data) : JSON.stringify(b)]
+    );
+    return { ok: true };
+  });
+
+  app.delete('/api/spydeck/uploads/:listingId', { preHandler: [requireAuth, requireSpydeck] }, async (req) => {
+    await ensure();
+    await q('delete from spydeck_uploads where seller_id=$1 and listing_id=$2', [String(req.user.sub), String(req.params.listingId)]);
     return { ok: true };
   });
 }

@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, ApiError, type EtsyListing, type SavedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
+import { searchEtsy, getSpydeckSaves, saveSpydeckListing, unsaveSpydeckListing, getSpydeckTrending, getEtsyCategories, getSpydeckUploads, recordSpydeckUpload, ApiError, type EtsyListing, type SavedListing, type UploadedListing, type EtsyCategory, getSpydeckListingDetail } from "@/lib/api"
 import { getSpydeckConfig } from "@/lib/plans"
 import { getUser } from "@/lib/auth"
 import { detectTrademarks } from "@/lib/trademarks"
@@ -302,12 +302,16 @@ export function SpyDeckView() {
     }, 0)
     return () => { alive = false; clearTimeout(id) }
   }, [makeListing])
-  const [uploaded, setUploaded] = useState<EtsyListing[]>([])
+  const [uploaded, setUploaded] = useState<UploadedListing[]>([])
   const [uploadedIds, setUploadedIds] = useState<Set<string>>(new Set())
-  const onPublished = (l: EtsyListing) => {
+  // Optimistic locally, then persisted — the draft already exists in the shop by this
+  // point, so the record of it must outlive the tab. A failed write is logged rather
+  // than surfaced: the publish itself succeeded, and re-publishing is the worse outcome.
+  const onPublished = (l: EtsyListing, our?: { listing_id?: number | string; url?: string }) => {
     const k = String(l.listing_id)
     setUploadedIds((prev) => new Set(prev).add(k))
-    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l }, ...prev]))
+    setUploaded((prev) => (prev.some((x) => String(x.listing_id) === k) ? prev : [{ ...l, our_url: our?.url }, ...prev]))
+    recordSpydeckUpload(l, our).catch(() => {})
   }
   // `keywords` still comes back from the trending endpoint; it's just not rendered
   // here any more (the Search tab's keyword cloud covers it).
@@ -382,6 +386,23 @@ export function SpyDeckView() {
           const list = rows ?? []
           setSaved(list)
           setSavedIds(new Set(list.map((l) => String(l.listing_id))))
+        })
+        .catch(() => {})
+    }, 0)
+    return () => clearTimeout(id)
+  }, [entitled])
+
+  // Same for what's already been turned into a draft. Without this the Uploaded tab was
+  // empty on every refresh and each card offered "Make product" again for something
+  // already published — duplicate drafts in the shop.
+  useEffect(() => {
+    if (!entitled) return
+    const id = setTimeout(() => {
+      getSpydeckUploads()
+        .then((rows) => {
+          const list = rows ?? []
+          setUploaded(list)
+          setUploadedIds(new Set(list.map((l) => String(l.listing_id))))
         })
         .catch(() => {})
     }, 0)
@@ -704,7 +725,7 @@ export function SpyDeckView() {
           tags: makeListing.tags ?? [],
           images: ((makeDetail?.images?.length ? makeDetail.images : makeListing.images?.length ? makeListing.images : makeListing.image ? [makeListing.image] : []) as string[]).filter(Boolean),
         } : null}
-        onPublished={() => { if (makeListing) onPublished(makeListing) }}
+        onPublished={(url) => { if (makeListing) onPublished(makeListing, { url }) }}
         title="Make product"
       />
     </div>

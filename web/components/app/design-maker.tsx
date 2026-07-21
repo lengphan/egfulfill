@@ -349,7 +349,10 @@ export function DesignMaker() {
               className="w-full"
               onClick={async () => {
                 const composed = await composeDesign(designUrl, pos, texts, 1200)
-                setPubPrefill({ title: name, images: composed ? [composed] : [], blank: product })
+                // images[] is the composite the BUYER sees; designUrl is the artwork the
+                // FACTORY needs. Sending only the composite is why published listings
+                // produced orders with nothing to digitise.
+                setPubPrefill({ title: name, images: composed ? [composed] : [], blank: product, designUrl, designPos: pos })
                 setPubOpen(true)
               }}
               disabled={!designUrl && texts.length === 0}
