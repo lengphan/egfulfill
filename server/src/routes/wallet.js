@@ -32,6 +32,19 @@ export async function balanceOf(account) {
 // Two rows share one `ref` under distinct types ('<type>-out' debits from, '<type>-in'
 // credits to) so each side de-dupes independently against the (account,type,ref) unique
 // index. Re-charging the same order id is therefore a no-op, not a double charge.
+/**
+ * HOUSE accounts — ours, not a customer's. These MAY go negative, and that's the point:
+ * the factory wallet going below zero is how a loss becomes visible (a partner cost
+ * booked before the revenue lands, a refund issued before a top-up clears). A house
+ * balance is a P&L line.
+ *
+ * A SELLER wallet is prepaid and must never go negative. There's no credit relationship,
+ * no invoicing and no collections — a negative seller balance is just an unrecoverable
+ * debt that looks like a number.
+ */
+const HOUSE_ACCOUNTS = new Set(['factory', 'designer']);
+export const isHouseAccount = (a) => HOUSE_ACCOUNTS.has(String(a));
+
 export async function moveFunds({ from, to, amount, type = 'transfer', ref = null, note = null, by = null }) {
   const amt = parseFloat(amount);
   if (!isFinite(amt) || amt === 0) throw new Error('amount must be a non-zero number');
@@ -41,6 +54,35 @@ export async function moveFunds({ from, to, amount, type = 'transfer', ref = nul
     { account: String(from), delta: -amt, type: type + '-out' },
     { account: String(to), delta: amt, type: type + '-in' },
   ];
+
+  // Already applied? Then this is a retry, and re-checking the balance would refuse a
+  // move that has in fact already happened.
+  if (r) {
+    const applied = await q(
+      'select count(*)::int as n from wallet_ledger where ref=$1 and type = any($2)',
+      [r, rows.map((x) => x.type)]
+    ).then((x) => x.rows[0]?.n || 0).catch(() => 0);
+    if (applied >= rows.length) return { fromBalance: await balanceOf(from), toBalance: await balanceOf(to), duplicate: true };
+  }
+
+  // Overdraft guard, enforced HERE rather than in each caller — callers checking by
+  // convention is how a new code path eventually forgets. `amount` may be signed (the
+  // transfer route documents a negative as a reversal), so the payer is whichever side
+  // actually loses money.
+  const payer = amt > 0 ? String(from) : String(to);
+  if (!isHouseAccount(payer)) {
+    const need = Math.abs(amt);
+    const bal = await balanceOf(payer);
+    if (bal < need) {
+      const err = new Error(`Not enough balance — this costs $${need.toFixed(2)} and the wallet holds $${bal.toFixed(2)}.`);
+      err.code = 'INSUFFICIENT_FUNDS';
+      err.balance = bal;
+      err.required = need;
+      err.shortfall = Math.round((need - bal) * 100) / 100;
+      throw err;
+    }
+  }
+
   for (const row of rows) {
     if (r) {
       const dup = await q('select 1 from wallet_ledger where account=$1 and type=$2 and ref=$3', [row.account, row.type, r]);
