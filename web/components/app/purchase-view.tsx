@@ -10,13 +10,15 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, type PoReturn, type SsShipment,
+  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsInventory, getSsDaysInTransit, type PoReturn, type SsShipment,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
 import { PoReturnDialog } from "@/components/app/po-return-dialog"
+import { StockSplitWarning } from "@/components/app/stock-split-warning"
+import { warehouseEta, fmtEta } from "@/lib/warehouse-eta"
 import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
 import { CardEntryDialog, type CardDetails } from "@/components/app/card-entry-dialog"
 import { getToken } from "@/lib/auth"
@@ -499,6 +501,12 @@ export function PurchaseView() {
     const id = setInterval(() => setNow(Date.now()), 30000)
     return () => { clearTimeout(first); clearInterval(id) }
   }, [])
+  // Per-warehouse stock for the lines about to be ordered, and how long each warehouse
+  // takes to reach us. Together they answer what the blank space was leaving unsaid: not
+  // "is there stock" but WHERE, and whether pulling from there costs a day.
+  const [stock, setStock] = useState<Record<string, { total: number; warehouses: { abbr: string; qty: number }[] }>>({})
+  const [transit, setTransit] = useState<Record<string, { days: number | null; cutOff: string }>>({})
+
   const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
   useEffect(() => {
     const skus = saved.map((l) => l.sku).filter(Boolean)
@@ -508,6 +516,22 @@ export function PurchaseView() {
     }, 0)
     return () => clearTimeout(t)
   }, [saved])
+
+  // Stock + transit for the S&S lines in the pool. S&S only: Otto's inventory endpoint
+  // takes one sku per call, which would be a request per line.
+  useEffect(() => {
+    const ssSkus = saved.filter((l) => supByS[l.sku]?.api === "ss").map((l) => l.sku)
+    if (!ssSkus.length) return
+    const t = setTimeout(() => {
+      getSsInventory(ssSkus)
+        .then((r) => setStock(Object.fromEntries((r.items ?? []).map((i) => [i.sku, { total: i.total, warehouses: i.warehouses }]))))
+        .catch(() => {})
+      getSsDaysInTransit()
+        .then((r) => setTransit(Object.fromEntries((r.warehouses ?? []).map((w) => [w.warehouse, { days: w.days, cutOff: w.cutOff }]))))
+        .catch(() => {})
+    }, 0)
+    return () => clearTimeout(t)
+  }, [saved, supByS])
 
   const toOrderGroups = useMemo(() => {
     const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
@@ -1054,7 +1078,7 @@ export function PurchaseView() {
                     </span>
                   </div>
                   {g.lines.map((l) => (
-                    <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                    <div key={l.sku} className="flex items-start gap-3 px-5 py-2.5">
                       <LineThumb src={l.image ?? supByS[l.sku]?.image} onZoom={(src, label) => setZoom({ src, label })}
                         label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                       <div className="min-w-0 flex-1">
@@ -1064,11 +1088,47 @@ export function PurchaseView() {
                           <span className="ml-1.5 font-mono opacity-70">{l.sku}</span>
                         </div>
                         <SourceTags line={l} />
+                        {/* WHERE the stock is, nearest first. S&S split a line across
+                            warehouses when one can't fill it, so "in stock" can mean three
+                            boxes on three days — green marks a warehouse that can send the
+                            whole line in one. */}
+                        {g.api === "ss" && stock[l.sku] && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            {stock[l.sku].warehouses.filter((w) => w.qty > 0).length === 0 ? (
+                              <span className="text-[11px] font-medium text-destructive">No stock in any warehouse</span>
+                            ) : stock[l.sku].warehouses
+                              .filter((w) => w.qty > 0)
+                              .sort((a, b) => (transit[a.abbr]?.days ?? 99) - (transit[b.abbr]?.days ?? 99))
+                              .slice(0, 5)
+                              .map((w) => {
+                                const t = transit[w.abbr]
+                                const eta = warehouseEta(t?.days ?? null, t?.cutOff ?? null, new Date(now || Date.now()))
+                                const covers = w.qty >= num(l.qty)
+                                return (
+                                  <span key={w.abbr}
+                                    title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
+                                    className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] " + (
+                                      covers ? "bg-emerald-50 text-emerald-800" : "bg-muted text-muted-foreground")}>
+                                    <span className="font-medium">{w.abbr}</span>
+                                    <span className="tabular-nums">{w.qty}</span>
+                                    {eta.deliveryAt && <span className="opacity-70">{fmtEta(eta.deliveryAt)}</span>}
+                                  </span>
+                                )
+                              })}
+                          </div>
+                        )}
+                        {g.api === "ss" && stock[l.sku] && (
+                          <StockSplitWarning
+                            qty={num(l.qty)} stock={stock[l.sku]} transit={transit} now={now || Date.now()}
+                            onReduce={(q) => setSavedQty(l.sku, q)}
+                            onSaveForLater={() => putSaved(saved.filter((x) => x.sku !== l.sku))}
+                          />
+                        )}
                       </div>
                       <Input
                         value={String(num(l.qty))}
                         onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
-                        inputMode="numeric" className="h-8 w-20 text-center"
+                        inputMode="numeric" className="h-8 w-20 self-start text-center"
                         aria-label={`Quantity of ${l.sku}`}
                       />
                       <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
