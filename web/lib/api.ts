@@ -469,8 +469,13 @@ export function downloadDesignFile(designId: string) {
 
 // ── Notifications ──
 export type Notification = { id: number | string; type: string; title: string; body?: string | null; href?: string | null; entity_id?: string | null; read_at?: string | null; created_at: string }
-export function getNotifications(limit = 20) {
-  return api<{ unread: number; notifications: Notification[] }>(`/api/notifications?limit=${limit}`)
+/** The bell reads the top of this; the /notifications page pages through all of it —
+ *  one channel per user, two views, so a role-targeted announcement lands in one place. */
+export function getNotifications(limit = 20, opts?: { offset?: number; unreadOnly?: boolean }) {
+  const s = new URLSearchParams({ limit: String(limit) })
+  if (opts?.offset) s.set("offset", String(opts.offset))
+  if (opts?.unreadOnly) s.set("unread", "1")
+  return api<{ unread: number; total: number; notifications: Notification[] }>(`/api/notifications?${s}`)
 }
 export function markNotificationsRead(id?: number | string) {
   return api<{ ok: boolean; unread: number }>(`/api/notifications/read`, { method: "POST", body: JSON.stringify(id ? { id } : {}) })

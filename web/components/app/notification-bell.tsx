@@ -53,6 +53,7 @@ function chime() {
 
 export function NotificationBell() {
   const router = useRouter()
+  // The notifications PAGE marks things read too — listen so the badge follows.
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
   const prevUnread = useRef(0)
@@ -78,7 +79,12 @@ export function NotificationBell() {
       soundOn.current = getUser()?.notify_sound !== false
       load(false)
     }, 0)
-    return () => clearTimeout(id)
+    // The /notifications page marks things read as well. Without this the badge kept
+    // its old count until the next poll, so the page said "0 unread" while the bell
+    // still showed a number.
+    const sync = () => load(false)
+    window.addEventListener("eg-notifications-changed", sync)
+    return () => { clearTimeout(id); window.removeEventListener("eg-notifications-changed", sync) }
   }, [load])
 
   // Keep the sound pref live when it's toggled in Settings.
@@ -170,6 +176,16 @@ export function NotificationBell() {
             ))}
           </div>
         )}
+        {/* The dropdown truncates every body to one line — fine for a nudge, useless for
+            anything you need to read or act on later. This is the way to the full
+            channel, and it's always offered, including when the dropdown is empty:
+            "nothing recent" and "nothing ever" are different questions. */}
+        <button
+          onClick={() => router.push("/notifications")}
+          className="w-full border-t border-border px-3 py-2 text-center text-xs font-medium text-primary hover:bg-accent"
+        >
+          See all notifications
+        </button>
       </DropdownMenuContent>
     </DropdownMenu>
   )

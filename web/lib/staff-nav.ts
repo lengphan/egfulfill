@@ -71,7 +71,7 @@ export function staffTools(role?: string | null): StaffNavItem[] {
 // exactly /orders is redirected away for staff — see ordersHomeFor. Two different
 // "Orders" pages in the same shell reads as the app switching between a seller and a
 // factory design, which is exactly what it looks like.
-const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help"]
+const STAFF_SHARED_PATHS = ["/chat", "/settings", "/help", "/notifications"]
 // Order routes are for roles that actually handle orders. A designer works the artwork
 // board and nothing else, so opening an order — let alone creating one — isn't theirs.
 const ORDER_ROLES = ["operator", "warehouse", "admin"]
@@ -100,7 +100,7 @@ export function staffNav(role?: string | null): StaffNavItem[] {
 // (Products/SpyDeck/Design Lab/Stores/Wallet/…) AND the shared pages — not just
 // STAFF_ITEMS, so a detail route like /products/16468 shows "Products" instead of falling
 // through to the bare "EGFULFILL" brand. Longest-prefix wins so /products/x beats /.
-const SHARED_TITLES: Record<string, string> = { "/chat": "Chat", "/settings": "Settings", "/help": "Help", "/orders": "Orders" }
+const SHARED_TITLES: Record<string, string> = { "/chat": "Chat", "/settings": "Settings", "/help": "Help", "/orders": "Orders", "/notifications": "Notifications" }
 export function staffNavTitle(pathname: string): string {
   const all = [...STAFF_ITEMS, ...STAFF_TOOLS, ...Object.entries(SHARED_TITLES).map(([href, label]) => ({ href, label }))]
   let best = ""; let bestLen = -1
