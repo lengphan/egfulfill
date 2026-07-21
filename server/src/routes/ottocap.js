@@ -80,7 +80,12 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
   q(`alter table otto_products add column if not exists brand text`).catch(() => {});
 
   // Import a parsed catalog (array of normalized rows). Admin-only, whole-batch upsert by sku.
-  app.post('/api/otto/import', { preHandler: requireAdmin }, async (req, reply) => {
+  // Populates otto_products — supplier REFERENCE data, the same class of thing
+  // /api/ss/sync does, which is requireStaff. It spends nothing, touches no inventory
+  // and adds nothing sellable; the catalogue it fills is what someone then builds a
+  // product FROM. Admin-only here was inconsistent and blocked operators from the
+  // supplier work they do most. Placing an actual supplier ORDER stays warehouse/admin.
+  app.post('/api/otto/import', { preHandler: requireStaff }, async (req, reply) => {
     const rows = Array.isArray(req.body?.products) ? req.body.products : [];
     if (!rows.length) { reply.code(400); return { error: 'No products in the payload.' }; }
     let n = 0;
