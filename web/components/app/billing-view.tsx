@@ -1,0 +1,174 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import { Receipt, CircleNotch, DownloadSimple } from "@phosphor-icons/react"
+import { SectionCard } from "@/components/app/section-card"
+import { StatCard, StatGrid } from "@/components/app/stat-card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { getLedgerPartners, getLedgerExport, ledgerExportUrl, type LedgerRowOut, type PartnerTotal } from "@/lib/api"
+import { getToken } from "@/lib/auth"
+
+const usd = (n: number) => `${n < 0 ? "−" : ""}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** Partner keys are internal; these are what a human calls them. */
+const PARTNER_LABEL: Record<string, string> = {
+  byeastside: "byeastside (dispatch)",
+  pinkdesign: "Pink Design",
+  carrier: "Carriers (postage)",
+  suppliers: "Suppliers (blanks)",
+}
+const label = (p: string) => PARTNER_LABEL[p] ?? p
+
+/** First and last day of the current month, as yyyy-mm-dd. */
+function thisMonth() {
+  const d = new Date()
+  const first = new Date(d.getFullYear(), d.getMonth(), 1)
+  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`
+  return { from: iso(first), to: iso(d) }
+}
+
+/**
+ * Partner billing — what we owe, and the rows behind it.
+ *
+ * Neither partner has a billing API we can charge or credit against: byeastside and
+ * Pink Design both settle by INVOICE. So this ledger is the only record their bill gets
+ * checked against, which is why the export matters more than the summary — the figures
+ * have to be able to sit next to what they sent us.
+ *
+ * Amounts are signed from OUR side: negative means we paid out or owe.
+ */
+export function BillingView() {
+  const [partners, setPartners] = useState<PartnerTotal[] | null>(null)
+  const [rows, setRows] = useState<LedgerRowOut[] | null>(null)
+  const [total, setTotal] = useState(0)
+  const [partner, setPartner] = useState("")
+  const [range, setRange] = useState(thisMonth())
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!getToken()) { setPartners([]); return }
+      getLedgerPartners().then((r) => setPartners(r ?? [])).catch(() => setPartners([]))
+    }, 0)
+    return () => clearTimeout(id)
+  }, [])
+
+  const load = useCallback(() => {
+    if (!getToken()) { setRows([]); return }
+    setRows(null)
+    getLedgerExport({ partner: partner || undefined, from: range.from, to: range.to })
+      .then((r) => { setRows(r.rows ?? []); setTotal(r.total ?? 0) })
+      .catch(() => setRows([]))
+  }, [partner, range])
+
+  useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+
+  const filters = { partner: partner || undefined, from: range.from, to: range.to }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Receipt size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Billing</h1>
+          <p className="truncate text-sm text-muted-foreground">What each partner is owed, and the rows behind it.</p>
+        </div>
+      </div>
+
+      {/* One card per partner. Totals are all-time — the table below is what's filtered,
+          because a partner's LIFETIME position and this month's invoice are different
+          questions and collapsing them hides one. */}
+      <StatGrid>
+        {(partners ?? []).slice(0, 4).map((p) => (
+          <StatCard
+            key={p.partner}
+            label={label(p.partner)}
+            value={usd(p.total)}
+            sub={`${p.entries} entr${p.entries === 1 ? "y" : "ies"} · all time`}
+            tone={p.total < 0 ? "neg" : "pos"}
+          />
+        ))}
+        {partners !== null && partners.length === 0 && (
+          <StatCard label="No partner costs yet" value="—" sub="nothing has been booked" />
+        )}
+      </StatGrid>
+
+      <SectionCard
+        title="Ledger"
+        description="Signed from our side — negative means we paid out or owe it"
+        actions={
+          <a href={ledgerExportUrl(filters)} download>
+            <Button size="sm" variant="outline" disabled={!rows?.length}>
+              <DownloadSimple size={14} weight="bold" /> Export CSV
+            </Button>
+          </a>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-2 border-b border-border px-5 py-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">Partner</span>
+            <select
+              value={partner}
+              onChange={(e) => setPartner(e.target.value)}
+              className="eg-select h-9 rounded-md border border-border bg-card px-2 text-sm"
+            >
+              <option value="">All partners</option>
+              {(partners ?? []).map((p) => <option key={p.partner} value={p.partner}>{label(p.partner)}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">From</span>
+            <Input type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="h-9 w-40" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">To</span>
+            <Input type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="h-9 w-40" />
+          </label>
+          <span className="ml-auto text-sm">
+            <span className="text-muted-foreground">Period total </span>
+            <span className={"font-semibold tabular-nums " + (total < 0 ? "text-destructive" : "text-emerald-600")}>{usd(total)}</span>
+          </span>
+        </div>
+
+        {rows === null ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+        ) : rows.length === 0 ? (
+          <div className="py-16 text-center text-sm text-muted-foreground">
+            Nothing booked in this period{partner ? ` for ${label(partner)}` : ""}.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-5 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Partner</th>
+                  <th className="px-3 py-2 font-medium">Type</th>
+                  <th className="px-3 py-2 font-medium">Reference</th>
+                  <th className="px-3 py-2 font-medium">Note</th>
+                  <th className="px-5 py-2 text-right font-medium">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((r) => (
+                  <tr key={String(r.id)}>
+                    <td className="whitespace-nowrap px-5 py-2 text-muted-foreground">
+                      {new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}
+                    </td>
+                    <td className="px-3 py-2">{r.partner ? label(r.partner) : "—"}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.type}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.ref || "—"}</td>
+                    <td className="max-w-xs truncate px-3 py-2 text-muted-foreground">{r.note || "—"}</td>
+                    <td className={"whitespace-nowrap px-5 py-2 text-right font-semibold tabular-nums " + (r.delta < 0 ? "text-destructive" : "text-emerald-600")}>
+                      {usd(r.delta)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  )
+}

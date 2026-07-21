@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -18,6 +18,9 @@ const STAFF_ITEMS: StaffNavItem[] = [
   { label: "Inventory", href: "/inventory", icon: Package, roles: ["operator", "warehouse", "admin"] },
   { label: "Purchase", href: "/purchase", icon: ShoppingBag, roles: ["operator", "warehouse", "admin"] },
   { label: "Suppliers", href: "/suppliers", icon: Storefront, roles: ["operator", "warehouse", "admin"] },
+  // Partner billing — what byeastside / Pink Design / carriers / suppliers are owed.
+  // Money, so warehouse and admin only, matching every other spend boundary.
+  { label: "Billing", href: "/billing", icon: Receipt, roles: ["warehouse", "admin"] },
   // Campaigns is HIDDEN until Meta/Google connections exist — there are no settings to
   // connect an ad account yet, so the page can only show an empty shell. The route and
   // component are intact; restore the roles here to bring it back.

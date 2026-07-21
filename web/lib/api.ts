@@ -783,6 +783,30 @@ export type DispatchCancelResult = {
   results?: { id: string; ok: boolean; reason?: string }[]
   error?: string
 }
+// ── Partner billing ───────────────────────────────────────────────────────────
+// Neither partner can be charged through an API — both settle by invoice — so our
+// ledger is what their bill gets reconciled against.
+export type LedgerRowOut = {
+  id: number | string; created_at: string; account: string
+  partner: string | null; type: string; delta: number; ref: string | null; note: string | null
+}
+export type PartnerTotal = { partner: string; entries: number; total: number }
+
+export function getLedgerPartners() {
+  return api<PartnerTotal[]>(`/api/wallet/partners`)
+}
+export function getLedgerExport(p: { partner?: string; account?: string; type?: string; from?: string; to?: string }) {
+  const s = new URLSearchParams()
+  for (const [k, v] of Object.entries(p)) if (v) s.set(k, v)
+  return api<{ count: number; total: number; rows: LedgerRowOut[] }>(`/api/wallet/export?${s}`)
+}
+/** CSV comes back as a file, so it bypasses the JSON client and downloads directly. */
+export function ledgerExportUrl(p: { partner?: string; account?: string; type?: string; from?: string; to?: string }) {
+  const s = new URLSearchParams({ format: "csv" })
+  for (const [k, v] of Object.entries(p)) if (v) s.set(k, v)
+  return `${API_BASE}/api/wallet/export?${s}`
+}
+
 export function cancelDispatch(orderIds: string[]) {
   return api<DispatchCancelResult>(`/api/dispatch/cancel`, { method: "POST", body: JSON.stringify({ orderIds }) })
 }
