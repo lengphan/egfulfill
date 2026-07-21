@@ -634,6 +634,9 @@ export type OrderRow = {
   tracking_label_url?: string | null
   /** When the label was actually put on paper — distinct from having bought one. */
   label_printed_at?: string | null
+  /** Pre-scanned at dispatch — tracking is LIVE for the buyer even though the parcel may
+   *  still be in production. Separate from factory_status on purpose; see orders.js. */
+  label_scanned_at?: string | null
   /** The CARRIER's status, separate from factory_status. Ours ends at 'shipped'; this is
    *  what happens to the parcel afterwards. */
   delivery_status?: string | null

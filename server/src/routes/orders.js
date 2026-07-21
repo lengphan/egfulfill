@@ -336,6 +336,13 @@ export function ordersRoutes(app, requireAuth) {
   // label sits in the system until someone puts it on paper, and "we have a label" vs
   // "the label is on the parcel" are different answers to "can this go out?".
   q('alter table orders add column if not exists label_printed_at timestamptz').catch(() => {});
+  // When the label was PRE-SCANNED at dispatch (byeastside flips a label NEW → PICKED).
+  // Deliberately a timestamp, NOT a pipeline stage: pre-scan starts the carrier/marketplace
+  // clock, which is INDEPENDENT of how far the physical work has got — an order can be
+  // pre-scanned and still being made, and a stage can only hold one of those facts. It's
+  // also per-ORDER (one parcel, one label) while factory_status is per-item.
+  // Keeping it separate is what makes "pre-scanned but not shipped" a findable queue.
+  q('alter table orders add column if not exists label_scanned_at timestamptz').catch(() => {});
   // Carrier delivery status, kept SEPARATE from factory_status on purpose.
   //
   // factory_status is what WE claim about the order — it drives permissions, the ship

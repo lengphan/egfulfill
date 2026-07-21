@@ -45,7 +45,7 @@ function Tag({ id, label, state, title, orderId }: { id: TagId; label: string; s
     <Popover onOpenChange={load}>
       <PopoverTrigger
         title={title}
-        className={"eg-tap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors " + cls}
+        className={"eg-tap rounded-md px-2.5 py-1 text-xs font-semibold transition-colors " + cls}
       >
         {label}
       </PopoverTrigger>
@@ -100,8 +100,23 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
     ? `Label ${order.label_printed_at ? "printed" : "created"} · ${order.tracking}`
     : hasAddr ? "No label bought yet" : "No address yet — a label can't be created without one"
 
-  // Scanned = past the scan queue. Nothing else records that the batch went out.
-  const scanned = ["working", "printed", "shipped"].includes(stage)
+  // SCAN = the label was pre-scanned at dispatch, which is what starts the carrier /
+  // marketplace clock. Read from label_scanned_at — the actual recorded fact — rather
+  // than inferred from the pipeline stage, which was only ever a proxy and went "done"
+  // for orders whose label had never been scanned at all.
+  //
+  // NO stage fallback. Inferring "scanned" from working/printed/shipped marked orders
+  // done that had never been scanned at all — this component's own rule is that a done
+  // tag must never contradict itself, because that's what teaches people to distrust the
+  // board. An order with no recorded pre-scan reads as not pre-scanned, which is simply
+  // true: we have no evidence it was. Orders predating this field read the same way, and
+  // that's honest rather than flattering.
+  const preScanned = !!order.label_scanned_at
+  const scanTitle = preScanned
+    ? `Pre-scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} — tracking is live for the buyer. The parcel may still be in production.`
+    : order.tracking
+      ? "Label exists but hasn't been pre-scanned — the buyer's tracking has not started"
+      : "No label yet, so nothing to scan"
 
   const list = items ?? order.items ?? []
   const decorated = list.filter((it) => String(it.print_type || "").trim())
@@ -123,9 +138,9 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
         : `${decorated.length - withArt.length} of ${decorated.length} lines still need artwork`
 
   return (
-    <span className={"inline-flex items-center gap-1 " + (className ?? "")}>
+    <span className={"inline-flex items-center gap-1.5 " + (className ?? "")}>
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"} title={labelTitle} />
-      <Tag id="scan" orderId={order.id} label="Scan" state={scanned ? "done" : "todo"} title={scanned ? "Scanned out of dispatch" : "Waiting on the scan"} />
+      <Tag id="scan" orderId={order.id} label={preScanned ? "Pre-scanned" : "Scan"} state={preScanned ? "done" : "todo"} title={scanTitle} />
       <Tag id="design" orderId={order.id} label={designLabel} state={designState} title={designTitle} />
     </span>
   )
