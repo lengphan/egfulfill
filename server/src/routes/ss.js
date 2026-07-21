@@ -172,11 +172,16 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     // Their docs give image URLs as https://www.ssactivewear.com/{Image}; our sync built
     // cdn.ssactivewear.com. Accept BOTH rather than bet on one — a wrong host shows up as
     // a broken <img>, which is the hardest kind of failure to notice.
-    // Allowlisted supplier hosts only — this endpoint fetches whatever URL it's given, so
-    // an open list would make it a server-side request forgery tool pointed at our own
-    // network. Otto is included because its product images have the same problem S&S's do
-    // and there is no second proxy.
-    if (!/^https:\/\/([\w-]+\.)?(ssactivewear|ottocap)\.com\/[\w./%-]+$/i.test(u)) {
+    // Allowlisted hosts only. This endpoint fetches whatever URL it's handed, so an open
+    // list would make it a request-forgery tool aimed at our own network.
+    //
+    // Google Drive is here because Otto's catalogue was imported from a spreadsheet whose
+    // image column holds Drive share links — that's where those pictures actually live,
+    // and refusing the host means Otto simply has no images. Note the query string: the
+    // previous pattern ended at [\w./%-]+ and couldn't match "?id=...", so Drive URLs were
+    // rejected on shape before the host was even considered.
+    const ALLOWED_IMG_HOSTS = /^https:\/\/([\w-]+\.)?(ssactivewear\.com|ottocap\.com|googleusercontent\.com|drive\.google\.com|usercontent\.google\.com)\//i;
+    if (!ALLOWED_IMG_HOSTS.test(u)) {
       console.error(`[ss/img] refused non-supplier host: ${u.slice(0, 120)}`);
       reply.code(400); return { error: 'only supplier image hosts may be proxied' };
     }
@@ -225,6 +230,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         reply.code(502); return { error: 'upstream returned ' + type + ', not an image', url: u };
       }
       const buf = Buffer.from(await r.arrayBuffer());
+      // A thumbnail is small. Anything multi-megabyte is either the wrong asset or an
+      // interstitial page, and caching it would make the list slower for good.
+      if (buf.length > 6 * 1024 * 1024) {
+        console.error(`[ss/img] refusing ${buf.length} bytes from ${u}`);
+        reply.code(502); return { error: 'image too large to proxy', bytes: buf.length };
+      }
       // Best-effort store: a caching failure must never cost the picture we just fetched.
       if (storageEnabled()) putObject(key, buf, type, 'private').catch(() => {});
       reply.header('Content-Type', type);
@@ -885,6 +896,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         return { error: r.status === 404 ? 'No invoice found for that reference.' : 'S&S refused the invoice request', status: r.status, detail: t.slice(0, 300) };
       }
       const buf = Buffer.from(await r.arrayBuffer());
+      // A thumbnail is small. Anything multi-megabyte is either the wrong asset or an
+      // interstitial page, and caching it would make the list slower for good.
+      if (buf.length > 6 * 1024 * 1024) {
+        console.error(`[ss/img] refusing ${buf.length} bytes from ${u}`);
+        reply.code(502); return { error: 'image too large to proxy', bytes: buf.length };
+      }
       const name = `S-S_Invoice_${invoice || orderNumber || guid}.pdf`;
       reply.header('Content-Type', 'application/pdf');
       reply.header('Content-Disposition', `inline; filename="${name}"`);
