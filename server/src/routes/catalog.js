@@ -3,6 +3,7 @@
 // Products carry image data URLs, so we store the whole product object in a
 // `data` jsonb column (lossless round-trip) plus a few typed columns for TablePlus.
 import { q } from '../db.js';
+import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
@@ -24,9 +25,29 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
     return quoteSpec({ blank: qy.blank, sku: qy.sku, size: qy.size, printType: qy.printType });
   });
 
-  app.get('/api/catalog_products', { preHandler: requireAuth }, async () => {
+  // What a SELLER may not see: what the blank costs US. `productCost` and each size
+  // tier's `cost` are supplier prices — the seller's own number is the base price, which
+  // is productCost + markup (see unitCostOf in pricing.js). Handing back the raw blob let
+  // any signed-in seller read our supplier cost AND derive the markup from it, on a route
+  // every seller-facing page already calls. Stripped on the way out rather than at each
+  // call site, so a new consumer can't reintroduce the leak.
+  const sellerSafe = (data) => {
+    if (!data || typeof data !== 'object') return data;
+    const { productCost, product_cost, ...rest } = data;
+    if (Array.isArray(rest.sizePrices)) {
+      rest.sizePrices = rest.sizePrices.map((t) => {
+        if (!t || typeof t !== 'object') return t;
+        const { cost, ...tier } = t;
+        return tier;
+      });
+    }
+    return rest;
+  };
+
+  app.get('/api/catalog_products', { preHandler: requireAuth }, async (req) => {
     const r = await q('select data from catalog_products order by created_at desc');
-    return r.rows.map((row) => row.data).filter(Boolean);
+    const rows = r.rows.map((row) => row.data).filter(Boolean);
+    return isStaff(req.user) ? rows : rows.map(sellerSafe);
   });
 
   // Full-list upsert: insert/update everything sent, then drop products removed locally.
