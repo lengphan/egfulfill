@@ -14,6 +14,7 @@ import {
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
 import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { getToken } from "@/lib/auth"
@@ -51,10 +52,46 @@ const POOL: PurchaseOrder = { num: "__pool__", supplier: null, items: [], status
  * picture is what makes a wrong pick obvious before it's ordered instead of when the box
  * arrives. A dashed square means "no picture", never "still loading".
  */
-function LineThumb({ src }: { src?: string | null }) {
-  if (!src) return <span className="size-9 shrink-0 rounded border border-dashed border-border" aria-hidden />
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" loading="lazy" className="size-9 shrink-0 rounded border border-border bg-white object-contain" />
+function LineThumb({ src, onZoom, label }: { src?: string | null; onZoom?: (src: string, label: string) => void; label?: string }) {
+  if (!src) return <span className="size-11 shrink-0 rounded border border-dashed border-border" aria-hidden />
+  return (
+    <button type="button" onClick={() => onZoom?.(src, label ?? "")}
+      title="Click to enlarge" aria-label={`Enlarge ${label || "product image"}`}
+      className="shrink-0 rounded border border-border bg-white transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" loading="lazy" className="size-11 rounded object-contain" />
+    </button>
+  )
+}
+
+/**
+ * Enlarged product image.
+ *
+ * A 44px thumbnail is enough to tell two garments apart; it is not enough to tell two
+ * COLOURWAYS apart, and picking the wrong shade of navy is a whole order reprinted. S&S
+ * publish a large variant by filename suffix, so the zoom asks for that rather than
+ * scaling the thumbnail up into mush.
+ */
+function ImageZoom({ img, onClose }: { img: { src: string; label: string } | null; onClose: () => void }) {
+  if (!img) return null
+  const big = img.src.replace(/_(fs|fm)(\.[a-z]+)/i, "_fl$2")
+  return (
+    <Dialog open onOpenChange={(o: boolean) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="truncate text-base">{img.label || "Product image"}</DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center justify-center rounded-lg border border-border bg-white p-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={big} alt={img.label}
+            // Fall back to the size we already have if the large variant doesn't exist —
+            // a smaller picture beats a broken one.
+            onError={(e) => { const t = e.currentTarget; if (t.src !== img.src) t.src = img.src }}
+            className="max-h-[65vh] w-auto object-contain" />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 function SourceTags({ line }: { line: POLine }) {
@@ -240,7 +277,7 @@ export function PurchaseView() {
       // rather than place an order that arrives nowhere — this is the one field a
       // purchase order genuinely cannot be completed without.
       if (!opts.shipToComplete) {
-        setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Supplier ordering." })
+        setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Settings › Ship-from address, or via Order settings." })
         return
       }
 
@@ -402,6 +439,7 @@ export function PurchaseView() {
   // so they're resolved by sku when a row is expanded — not on load, since most rows are
   // never opened and a lookup per PO would cost a query for nothing.
   const [poImgs, setPoImgs] = useState<Record<string, string>>({})
+  const [zoom, setZoom] = useState<{ src: string; label: string } | null>(null)
   const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
   useEffect(() => {
     const skus = saved.map((l) => l.sku).filter(Boolean)
@@ -443,7 +481,7 @@ export function PurchaseView() {
     if (!saved.length) return
     const opts = await getSupplierOptions().catch(() => null)
     if (!opts?.shipToComplete) {
-      setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Supplier ordering." })
+      setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Order settings." })
       return
     }
     setBusy("place-all"); setMsg(null)
@@ -541,25 +579,29 @@ export function PurchaseView() {
     return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
   }
 
-  const toggle = (n: string) => setOpen((prev) => {
-    const next = new Set(prev)
-    if (!next.delete(n)) {
-      next.add(n)
-      // Fill in pictures for the lines about to be shown, for skus we don't have yet.
-      const po = (pos ?? []).find((p) => p.num === n)
-      const want = (po?.items ?? []).map((l) => l.sku).filter((s2) => s2 && !poImgs[s2])
-      if (want.length) {
-        resolveSuppliers(want)
-          .then((r) => setPoImgs((m) => {
-            const add: Record<string, string> = {}
-            for (const [sku, v] of Object.entries(r.bySku ?? {})) if (v.image) add[sku] = v.image
-            return Object.keys(add).length ? { ...m, ...add } : m
-          }))
-          .catch(() => {})
-      }
-    }
-    return next
-  })
+  const toggle = (n: string) => {
+    const opening = !open.has(n)
+    setOpen((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(n)) next.add(n)
+      return next
+    })
+    if (!opening) return
+
+    // Fetch OUTSIDE the state updater. An updater must be pure — React may call it more
+    // than once, or not when you expect — so a network call in there is unreliable as
+    // well as wrong, which is why these thumbnails never appeared.
+    const po = (pos ?? []).find((p) => p.num === n)
+    const want = [...new Set((po?.items ?? []).map((l) => l.sku).filter((sku) => sku && !poImgs[sku]))]
+    if (!want.length) return
+    resolveSuppliers(want)
+      .then((r) => setPoImgs((m) => {
+        const add: Record<string, string> = {}
+        for (const [sku, v] of Object.entries(r.bySku ?? {})) if (v.image) add[sku] = v.image
+        return Object.keys(add).length ? { ...m, ...add } : m
+      }))
+      .catch(() => { /* a missing thumbnail is not worth an error banner */ })
+  }
 
   /**
    * Buy a past PO again — the whole thing, or one line of it.
@@ -736,7 +778,8 @@ export function PurchaseView() {
                         <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
                       ) : po.items.map((l) => (
                         <div key={l.sku} className="flex items-center gap-3 py-2 text-sm">
-                          <LineThumb src={l.image ?? poImgs[l.sku]} />
+                          <LineThumb src={l.image ?? poImgs[l.sku]} onZoom={(src, label) => setZoom({ src, label })}
+                            label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                           <div className="min-w-0 flex-1">
                             <div className="truncate font-medium">{l.name || l.sku}</div>
                             <div className="truncate text-xs text-muted-foreground">
@@ -774,7 +817,7 @@ export function PurchaseView() {
 
       <div className="flex items-center justify-end gap-2">
         <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
-          <Truck size={13} weight="bold" /> Supplier ordering
+          <Truck size={13} weight="bold" /> Order settings
         </Button>
         <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
           {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
@@ -855,7 +898,8 @@ export function PurchaseView() {
                   </div>
                   {g.lines.map((l) => (
                     <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                      <LineThumb src={l.image ?? supByS[l.sku]?.image} />
+                      <LineThumb src={l.image ?? supByS[l.sku]?.image} onZoom={(src, label) => setZoom({ src, label })}
+                        label={[l.name || l.sku, l.variant].filter(Boolean).join(" · ")} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
                         <div className="truncate text-xs text-muted-foreground">
@@ -917,6 +961,8 @@ export function PurchaseView() {
           </SectionCard>
         </TabsContent>
       </Tabs>
+
+      <ImageZoom img={zoom} onClose={() => setZoom(null)} />
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
 

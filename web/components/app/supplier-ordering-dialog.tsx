@@ -33,7 +33,7 @@ function toOptions(raw: unknown): { value: string; label: string; group?: string
 }
 
 /**
- * Supplier ordering — the fields a real purchase order needs beyond sku and quantity.
+ * Order settings — the fields a real purchase order needs beyond sku and quantity.
  *
  * Both supplier APIs have always accepted an address, a PO number and shipping/payment
  * methods; the board simply never sent them, so orders were correctly routed and still
@@ -111,7 +111,7 @@ export function SupplierOrderingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Supplier ordering</DialogTitle>
+          <DialogTitle>Order settings</DialogTitle>
           <DialogDescription>
             Where blanks are delivered, and how each supplier is paid. Applied to every order placed from this board.
           </DialogDescription>
