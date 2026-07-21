@@ -28,6 +28,7 @@ const FEE_KEYS = [
   'ship_cap', 'ship_heavy', 'ship_garment',
   'method_dtg', 'method_dtf', 'method_emb', 'method_apl', 'method_lsr',
   'method_scr', 'method_sub', 'method_vnl',
+  'base_markup',
 ];
 export async function feeSettings() {
   const out = { ...FALLBACK, ...SETTING_DEFAULTS };
@@ -106,11 +107,27 @@ function tierFor(d, size) {
 // the seller — if these two disagree, the quote lies about the price on screen.
 function unitCostOf(row, item, fees) {
   const d = row.data || {};
-  let base = null;
+  const markup = num(fees && fees.base_markup) || 0;
+  // BASE COST is what the seller pays before the print-method surcharge. It comes from
+  // the first of these that answers, most specific first:
+  //
+  //   1. the size's own base cost      — typed by hand, always wins
+  //   2. the size's PRODUCT cost + markup — what we pay the supplier, plus our margin
+  //   3. the product's base cost       — one price for every size
+  //   4. the product's product cost + markup
+  //
+  // Steps 2 and 4 exist so a supplier sync (S&S/Otto) only has to fill in what the
+  // blank costs us; the sell price follows from one number in settings instead of
+  // someone retyping a price per size per product.
   const tier = tierFor(d, item.size);
+  let base = null;
   if (tier && tier.price != null) { const p = num(tier.price); if (p != null && p > 0) base = p; }
+  if (base == null && tier && tier.cost != null) { const c = num(tier.cost); if (c != null && c > 0) base = c + markup; }
   if (base == null) base = num(d.basePrice ?? d.base_price ?? row.base_price);
+  if (base == null) { const c = num(d.productCost ?? d.product_cost); if (c != null && c > 0) base = c + markup; }
   if (base == null) return null;
+  // The method surcharge sits ON TOP of the base cost, never inside it — so changing
+  // the markup never silently changes what embroidery adds.
   return base + methodAddOn(d, item.print_type, fees);
 }
 

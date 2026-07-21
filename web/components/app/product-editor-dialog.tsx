@@ -27,7 +27,7 @@ const num = (v: unknown) => (v == null || v === "" ? NaN : Number(v))
 
 // The stored sizePrices ARRAY ([{size, price, shipping}] — the canonical shape from
 // eg-products.js) → editable strings keyed by size, for the inputs below.
-type Tier = { price: string; shipping: string }
+type Tier = { price: string; shipping: string; cost: string }
 function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
   const out: Record<string, Tier> = {}
   if (!Array.isArray(v)) return out
@@ -36,6 +36,7 @@ function tiersToStr(v: CatalogProduct["sizePrices"]): Record<string, Tier> {
     out[String(t.size)] = {
       price: t.price != null && isFinite(Number(t.price)) ? String(Number(t.price)) : "",
       shipping: t.shipping != null && isFinite(Number(t.shipping)) ? String(Number(t.shipping)) : "",
+      cost: t.cost != null && isFinite(Number(t.cost)) ? String(Number(t.cost)) : "",
     }
   }
   return out
@@ -50,9 +51,19 @@ function strToTiers(map: Record<string, Tier>, keep: string[]): CatalogProduct["
     const t = map[size]
     if (!t) continue
     const price = Number(t.price)
-    if (t.price.trim() === "" || !isFinite(price) || price <= 0) continue
+    const cost = Number(t.cost)
+    const hasPrice = t.price.trim() !== "" && isFinite(price) && price > 0
+    const hasCost = t.cost.trim() !== "" && isFinite(cost) && cost > 0
+    // A tier now exists if EITHER number is present: product cost alone is enough,
+    // because pricing derives the base cost from it plus the markup.
+    if (!hasPrice && !hasCost) continue
     const ship = t.shipping.trim() === "" ? null : Number(t.shipping)
-    out.push({ size, price, shipping: ship != null && isFinite(ship) && ship >= 0 ? ship : null })
+    out.push({
+      size,
+      price: hasPrice ? price : 0,
+      cost: hasCost ? cost : null,
+      shipping: ship != null && isFinite(ship) && ship >= 0 ? ship : null,
+    })
   }
   return out.length ? out : undefined
 }
@@ -168,6 +179,9 @@ export function ProductEditorDialog({
   // so the editor can PREFILL a sensible retail price rather than leaving the seller to
   // work out cost + surcharge in their head.
   const [fees, setFees] = useState<FactorySettings | null>(null)
+  // The markup that turns a supplier's product cost into the base cost we charge.
+  // Same number pricing.js uses, so the preview in the size table matches the quote.
+  const markup = Number(fees?.base_markup) || 0
   useEffect(() => {
     const id = setTimeout(() => { getFactorySettings().then(setFees).catch(() => {}) }, 0)
     return () => clearTimeout(id)
@@ -307,28 +321,47 @@ export function ProductEditorDialog({
                     <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear</button>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">Leave a size blank to use the base cost and shipping fee above.</p>
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr] gap-2 text-[11px] text-muted-foreground">
-                  <span /><span>Base cost ($)</span><span>Shipping ($)</span>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <strong>Product cost</strong> is what the blank costs you from the supplier.
+                  <strong> Base cost</strong> is what the seller pays — leave it blank and it&apos;s
+                  computed as product cost {markup > 0 ? `+ $${markup.toFixed(2)}` : "+ your markup"}
+                  {" "}(set in Settings → Platform). The print-method surcharge is added on top.
+                </p>
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr] gap-2 text-[11px] text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span>
                 </div>
                 <div className="mt-1 space-y-1.5">
-                  {sizes.map((s) => (
-                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr] items-center gap-2">
+                  {sizes.map((s) => {
+                    const t = tiers[s]
+                    const costN = Number(t?.cost)
+                    // What pricing will actually charge if Base cost is left blank.
+                    const derived = t?.cost?.trim() && isFinite(costN) && costN > 0 ? (costN + markup).toFixed(2) : ""
+                    const patch = (k: keyof Tier, v: string) =>
+                      setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
+                    return (
+                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
-                        value={tiers[s]?.price ?? ""}
-                        onChange={(e) => setTiers((p) => ({ ...p, [s]: { shipping: p[s]?.shipping ?? "", price: e.target.value.replace(/[^0-9.]/g, "") } }))}
-                        placeholder={basePrice.trim() === "" ? "cost" : basePrice}
+                        value={t?.cost ?? ""}
+                        onChange={(e) => patch("cost", e.target.value)}
+                        placeholder="supplier"
+                        className="h-8 text-xs" inputMode="decimal" aria-label={`Product cost for size ${s}`}
+                      />
+                      <Input
+                        value={t?.price ?? ""}
+                        onChange={(e) => patch("price", e.target.value)}
+                        placeholder={derived || (basePrice.trim() === "" ? "auto" : basePrice)}
+                        title={derived ? `Auto: ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}` : undefined}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
                       />
                       <Input
-                        value={tiers[s]?.shipping ?? ""}
-                        onChange={(e) => setTiers((p) => ({ ...p, [s]: { price: p[s]?.price ?? "", shipping: e.target.value.replace(/[^0-9.]/g, "") } }))}
+                        value={t?.shipping ?? ""}
+                        onChange={(e) => patch("shipping", e.target.value)}
                         placeholder={shipping.trim() === "" ? "default" : shipping}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             )}

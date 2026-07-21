@@ -768,6 +768,10 @@ function Fold({ title, hint, children }: { title: string; hint?: string; childre
 function PlatformPanel() {
   const [loaded, setLoaded] = useState<FactorySettings | null>(null)
   const [designFee, setDesignFee] = useState("")
+  // base cost = supplier product cost + this. Lets a supplier sync fill in only what a
+  // blank COSTS us, and the sell price follows from one number instead of a hand-typed
+  // price per size per product.
+  const [baseMarkup, setBaseMarkup] = useState("")
   const [shipFirst, setShipFirst] = useState("")
   const [shipExtra, setShipExtra] = useState("")
   const [embPrice, setEmbPrice] = useState("")
@@ -796,6 +800,7 @@ function PlatformPanel() {
     getFactorySettings().then((r) => {
       setLoaded(r)
       setDesignFee(r.design_fee != null ? String(r.design_fee) : "")
+      setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
       setShipFirst(r.ship_first != null ? String(r.ship_first) : "")
       setShipExtra(r.ship_extra != null ? String(r.ship_extra) : "")
       setEmbPrice(r.emb_price != null ? String(r.emb_price) : "")
@@ -815,6 +820,7 @@ function PlatformPanel() {
     try {
       const r = await setFactorySettings({
         design_fee: designFee === "" ? undefined : Number(designFee),
+        base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
         ship_first: shipFirst === "" ? undefined : Number(shipFirst),
         ship_extra: shipExtra === "" ? undefined : Number(shipExtra),
         emb_price: embPrice === "" ? undefined : Number(embPrice),
@@ -862,6 +868,12 @@ function PlatformPanel() {
       </Fold>
       <Fold title="Fees" hint="design payout, file price, default shipping">
         <MoneyField label="Design fee" hint="Default payout credited to a designer per approved design" value={designFee} onChange={setDesignFee} />
+        <MoneyField
+          label="Base cost markup"
+          hint="Added to a supplier's product cost to get the base cost sellers pay. A base cost typed on the product always wins. Print-method surcharges are added on top of this."
+          value={baseMarkup}
+          onChange={setBaseMarkup}
+        />
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />

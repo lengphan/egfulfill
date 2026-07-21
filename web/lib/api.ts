@@ -207,7 +207,14 @@ export type CatalogProduct = {
   // an ARRAY of {size, price, shipping}, not a keyed map. `shipping: null` means "no
   // override — use shippingFee". A 3XL costs more to buy AND to ship; colour changes
   // neither, which is why tiers key on size alone. Priced by server/src/pricing.js.
-  sizePrices?: { size: string; price: number; shipping: number | null }[]
+  //
+  // `cost` is the PRODUCT cost — what the blank costs US from the supplier (filled by
+  // S&S/Otto syncs). `price` is the BASE COST charged to the seller. Leave `price` blank
+  // and pricing computes it as cost + the `base_markup` setting, so a supplier sync only
+  // has to supply what it paid. A typed `price` always wins.
+  sizePrices?: { size: string; price: number; shipping: number | null; cost?: number | null }[]
+  /** Product cost for the whole product, when sizes don't differ. Same role as tier.cost. */
+  productCost?: number | string | null
   // Print-method surcharge, e.g. { DTG: 3, EMB: 5 } — EMB stitches cost more than ink.
   methodPrices?: Record<string, number>
   // This product's own extra-item shipping, overriding the platform's ship_extra.

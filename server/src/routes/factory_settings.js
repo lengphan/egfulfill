@@ -18,6 +18,10 @@ const KEYS = [
   // a key that didn't exist ('method_screen print') and returned 0, so screen-print,
   // sublimation and vinyl work carried NO surcharge at all.
   'method_scr', 'method_sub', 'method_vnl',
+  // Markup added to a supplier's PRODUCT COST to get the base cost we charge sellers.
+  // Supplier syncs (S&S, Otto) fill in product cost; this turns it into a sell price
+  // without anyone retyping a number per size.
+  'base_markup',
 ];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
@@ -34,6 +38,7 @@ export const SETTING_DEFAULTS = {
   method_scr: 2,      // screen print — setup per colour
   method_sub: 1,      // sublimation
   method_vnl: 2,      // heat-transfer vinyl, cut + weed
+  base_markup: 0,     // 0 = base cost equals product cost until someone sets a margin
 };
 
 /**
