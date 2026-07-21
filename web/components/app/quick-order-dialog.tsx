@@ -117,15 +117,15 @@ export function QuickOrderDialog({
 
   return (
     <Dialog open={!!product} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Quick order</DialogTitle>
           <DialogDescription>{product.name}</DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[55vh] space-y-1 overflow-y-auto py-2">
+        <div className="max-h-[62vh] space-y-1 overflow-y-auto py-2">
           <div className="flex items-center gap-2 pb-1 text-[11px] font-medium text-muted-foreground">
-            <span className="w-10 shrink-0" aria-hidden />
+            <span className="w-16 shrink-0" aria-hidden />
             <span className="flex-1">Colour / size</span>
             <span className="w-16 text-center">Qty</span>
             <span className="w-24 text-right">Unit price</span>
@@ -147,10 +147,10 @@ export function QuickOrderDialog({
                   against "H.Pnk" is a guess until you see them side by side. */}
               {s.image
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={s.image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
-                : <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                ? <img src={s.image} alt="" loading="lazy" className="size-16 shrink-0 rounded border border-border bg-white object-contain" />
+                : <span className="size-16 shrink-0 rounded border border-dashed border-border" aria-hidden />}
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{s.size}</div>
+                <div className="text-sm font-medium">{s.size}</div>
                 {s.sku
                   ? <div className="truncate font-mono text-[10px] text-muted-foreground">{s.sku}</div>
                   : <div className="truncate text-[10px] text-amber-700">no supplier sku — can&apos;t be ordered</div>}
