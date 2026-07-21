@@ -14,6 +14,31 @@ import { orderCharges, refundOrder } from './order_refunds.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
 import { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
+import { emitWebhook } from '../webhooks.js';
+
+/**
+ * Tell the order's owner's webhook endpoints that something happened to it.
+ *
+ * Resolves the seller and the current tracking itself rather than trusting the caller:
+ * every emit site would otherwise have to remember to include them, and an order.shipped
+ * without a tracking code is the one payload a partner cannot use.
+ *
+ * Swallows everything. A notification is downstream of work already committed.
+ */
+function notifyOrderEvent(orderId, event, extra) {
+  (async () => {
+    const r = await q('select id, seq, seller_id, status, factory_status, carrier, tracking, total from orders where id=$1', [orderId]);
+    const o = r.rows[0];
+    if (!o || !o.seller_id) return;
+    emitWebhook(o.seller_id, event, {
+      id: o.id, number: o.seq ?? null,
+      status: o.factory_status || o.status || null,
+      tracking: { carrier: o.carrier || null, code: o.tracking || null },
+      total: o.total ?? null,
+      ...(extra || {}),
+    });
+  })().catch(() => {});
+}
 
 // ── Stage vocabulary ───────────────────────────────────────────────────────────
 // Mirrors normalizeStage in web/lib/factory-status.ts — keep the two in sync. The
@@ -685,6 +710,15 @@ export function ordersRoutes(app, requireAuth) {
     if (_refunded) audit(req, 'order.refunded', { entityType: 'order', entityId: req.params.id, after: { amount: _refunded } });
     egBroadcast({ type: 'orders' });
     if (_charged || _refunded) egBroadcast({ type: 'wallet' });
+    // Tracking arriving IS the shipment as far as a partner is concerned — a label
+    // purchase writes tracking and 'shipped' together, so key off that rather than the
+    // status word, which can also be set by hand without a parcel existing.
+    {
+      const stage = normalizeStage(String(body.factoryStatus ?? body.status ?? ''));
+      if (body.tracking !== undefined || stage === 'shipped') notifyOrderEvent(req.params.id, 'order.shipped');
+      else if (stage === 'cancelled' || stage === 'refunded') notifyOrderEvent(req.params.id, 'order.cancelled');
+      else if (stage) notifyOrderEvent(req.params.id, 'order.status_changed');
+    }
     return { ok: true, charged: _charged || undefined, refunded: _refunded || undefined };
   });
 
@@ -751,6 +785,10 @@ export function ordersRoutes(app, requireAuth) {
       [status || '', req.params.id, val]);
     audit(req, 'item.status', { entityType: 'order', entityId: req.params.id,
       before: { sku, status: (pre.rows[0] && pre.rows[0].factory_status) || '' }, after: { sku, status: status || '' } });
+    // Tell whoever pushed this order that it moved. Fire and forget — a partner's
+    // endpoint being down must never fail the floor's status write.
+    notifyOrderEvent(req.params.id, normalizeStage(status) === 'shipped' ? 'order.shipped' : 'order.status_changed',
+      { line: { sku, line_id: lineId || null }, status: normalizeStage(status) || null });
     // Entering the design stage hands the line to a designer — so do it automatically,
     // and report what was HELD BACK. Silence would be wrong here: "nothing happened"
     // and "we already have that file" look identical from the board.

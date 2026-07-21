@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { emitWebhook } from '../webhooks.js';
 
 const PREFIX = 'egk_test_';
 const LIVE_PREFIX = 'egk_live_';
@@ -248,6 +249,11 @@ export function sandboxRoutes(app, requireAuth) {
                values ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [id, l.sku, l.product, l.quantity, l.color, l.size, l.unit_price, l.method]).catch(() => {});
     }
+    // Confirm intake to the pusher's own endpoints. Sounds redundant — they just made
+    // this call — but a partner fanning orders across several fulfillers uses it as the
+    // acknowledgement that it landed HERE, and it's the delivery that proves their
+    // webhook wiring works before a real shipment depends on it.
+    emitWebhook(sellerId, 'order.received', { id, total, items: priced, shipping_address: b.shipping_address ?? null });
     return { id, total, items: priced };
   }
 
@@ -301,34 +307,37 @@ export function sandboxRoutes(app, requireAuth) {
       tracking: { carrier: 'USPS', code: null, url: null }, _note: 'Simulated lookup.' };
   });
 
-  // Shipping (v1) — simulated for both modes for now; live USPS-direct label buying is
-  // enabled per-account (it moves real money), so it stays a sandbox response here.
+  // ── Shipping (v1) ──────────────────────────────────────────────────────────
+  // NOT IMPLEMENTED, and it must say so.
+  //
+  // These returned a 200 with invented data in BOTH modes: a fabricated tracking code
+  // (EGTEST…), a hardcoded rate, and a label_url under sandbox.egfulfill.com. A partner
+  // integrating against the LIVE namespace had no way to tell that apart from a real
+  // purchase — and a fake tracking code is not a harmless placeholder. It reaches a
+  // buyer, who watches a number that will never move.
+  //
+  // A 501 costs an integrator ten minutes. A fake tracking number costs them a customer.
+  // The /api/test/* twins keep returning samples: simulated is what a test key is FOR,
+  // and they are named so nobody mistakes them for a purchase.
+  const notImplemented = (reply, what) => {
+    reply.code(501);
+    return {
+      error: `${what} is not available through the API yet.`,
+      code: 'not_implemented',
+      detail: 'EGFULFILL buys carrier labels internally when it ships your order; it does not resell label purchasing. Fulfilment orders placed via POST /api/v1/orders are shipped and tracked for you — read tracking back from GET /api/v1/orders/{id}.',
+      sandbox: 'The /api/test/ equivalents return sample payloads if you are building against the shape.',
+    };
+  };
   app.post('/api/v1/shipping-rates', async (req, reply) => {
     const k = await requireKey(req, reply); if (k.error) return k;
-    if (!(req.body || {}).to_address) return bad(reply, 'A rate request needs a "to_address" object.', ['to_address']);
-    return { object: 'rate_list', mode: k.mode, rates: sandboxRates(),
-      _note: k.mode === 'live' ? 'Sample rates — live USPS-direct label buying is enabled per-account.' : 'Simulated rates.' };
+    return notImplemented(reply, 'Shipping rate shopping');
   });
   app.post('/api/v1/shipping-labels/domestics', async (req, reply) => {
     const k = await requireKey(req, reply); if (k.error) return k;
-    const b = req.body || {}; const miss = ['to_address', 'from_address', 'parcel'].filter((f) => !b[f]);
-    if (miss.length) return bad(reply, 'A domestic label needs to_address, from_address and parcel.', miss);
-    const chosen = sandboxRates()[0]; const id = rid('lbl');
-    return { object: 'label', mode: k.mode, id, carrier: 'USPS', service: b.service || chosen.service,
-      tracking_code: 'EGTEST' + crypto.randomBytes(5).toString('hex').toUpperCase(),
-      rate: { amount: chosen.amount, currency: 'USD' },
-      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`, tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
-      created: nowISO(), _note: k.mode === 'live' ? 'Sample label — live USPS-direct buying is enabled per-account.' : 'Simulated — no label purchased.' };
+    return notImplemented(reply, 'Domestic label purchasing');
   });
   app.post('/api/v1/shipping-labels/internationals', async (req, reply) => {
     const k = await requireKey(req, reply); if (k.error) return k;
-    const b = req.body || {}; const miss = ['to_address', 'from_address', 'parcel', 'customs_items'].filter((f) => !b[f]);
-    if (miss.length) return bad(reply, 'An international label needs to_address, from_address, parcel and customs_items.', miss);
-    const id = rid('lbl');
-    return { object: 'label', mode: k.mode, id, carrier: 'USPS', service: b.service || 'Priority Mail International',
-      tracking_code: 'LZ' + crypto.randomBytes(5).toString('hex').toUpperCase() + 'US', rate: { amount: 28.40, currency: 'USD' },
-      customs: { contents_type: 'merchandise', items: b.customs_items },
-      label_url: `https://sandbox.egfulfill.com/labels/${id}.pdf`, tracking_url: `https://sandbox.egfulfill.com/track/${id}`,
-      created: nowISO(), _note: k.mode === 'live' ? 'Sample label — live USPS-direct buying is enabled per-account.' : 'Simulated — no label purchased.' };
+    return notImplemented(reply, 'International label purchasing');
   });
 }
