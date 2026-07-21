@@ -1443,14 +1443,24 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             const property_values = [];
             if (c) property_values.push({ property_id: 513, property_name: 'Color', values: [String(c).slice(0, 45)] });
             if (z) property_values.push({ property_id: 514, property_name: 'Size', values: [String(z).slice(0, 45)] });
-            products.push({
-              sku,
-              property_values,
-              offerings: [{ price, quantity: Number(b.quantity) || 999, is_enabled: true }],
-            });
+            // Etsy requires a readiness state (processing profile) on EVERY offering, not
+            // only on the listing — the listing-level id does NOT cascade to variants. Sent
+            // without it, the PUT is rejected ("all offerings need readiness state") and the
+            // draft is left flat with its variants dropped, which is exactly what a listing
+            // that published but has no colours/sizes looks like. We already resolved a
+            // valid id for this shop when creating the draft above; reuse it.
+            const offering = { price, quantity: Number(b.quantity) || 999, is_enabled: true };
+            const rid = Number(readinessId);
+            if (Number.isFinite(rid) && rid > 0) offering.readiness_state_id = rid;
+            products.push({ sku, property_values, offerings: [offering] });
           }
         }
         try {
+          // No profile means every offering would be rejected. Say which shop setting is
+          // missing rather than surfacing Etsy's opaque 400.
+          if (!Number.isFinite(Number(readinessId)) || Number(readinessId) <= 0) {
+            throw new Error('This Etsy shop has no processing profile, which Etsy now requires on every variant. Create one in Shop Manager → Settings → Shipping (or publish one listing manually so we can reuse its profile), then republish.');
+          }
           await etsyFetch(conn, `/listings/${listingId}/inventory`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
