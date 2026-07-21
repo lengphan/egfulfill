@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { setActivePalette } from "@/lib/thread-match"
-import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight } from "@phosphor-icons/react"
+import { Key, Copy, Check, Trash, Plus, Warning, CurrencyDollar, CircleNotch, UserPlus, SpeakerHigh, SpeakerSlash, MagnifyingGlass, DotsThree, CaretRight, X } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { SectionCard } from "@/components/app/section-card"
@@ -1118,35 +1118,54 @@ function PlatformPanel() {
                   {sides.map((sd) => {
                     const url = t.mockups?.[sd] || (sd === "front" ? t.mockup ?? "" : "")
                     return (
-                      <label key={sd} className="relative size-16 cursor-pointer overflow-hidden rounded-md border border-border bg-muted" title={`${sd} outline`}>
-                        {url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt="" className="size-full object-contain" />
-                        ) : (
-                          <span className="flex size-full flex-col items-center justify-center gap-0.5 text-muted-foreground">
-                            <Plus size={12} />
-                            <span className="text-[9px] capitalize">{sd}</span>
-                          </span>
-                        )}
-                        <input
-                          type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0]; if (!f) return
+                      /* Bigger (64px → 96px) with the side named UNDERNEATH rather than
+                         inside the empty state — an outline is a drawing you have to
+                         actually recognise, and a 9px label that vanished the moment an
+                         image loaded meant a filled row of six was unlabelled. Accepts a
+                         dropped file as well as a click, matching the product dialog. */
+                      <div key={sd} className="group/tile flex w-24 flex-col gap-1">
+                        <label
+                          className="relative block size-24 cursor-pointer overflow-hidden rounded-lg border-2 border-border bg-muted transition-colors hover:border-primary/50"
+                          title={`${sd} outline — click or drop an image`}
+                          onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault() }}
+                          onDrop={(e) => {
+                            const f = Array.from(e.dataTransfer.files).find((x) => x.type.startsWith("image/"))
+                            if (!f) return
+                            e.preventDefault()
                             const rd = new FileReader()
                             rd.onload = () => setType({ mockups: { ...(t.mockups ?? {}), [sd]: String(rd.result) } })
                             rd.readAsDataURL(f)
                           }}
-                        />
-                        {url && (
-                          <button
-                            onClick={(e) => { e.preventDefault(); const m = { ...(t.mockups ?? {}) }; delete m[sd]; setType({ mockups: m }) }}
-                            className="absolute right-0 top-0 grid size-4 place-items-center bg-background/85 text-[10px] text-muted-foreground hover:text-red-600"
-                            aria-label={`Clear ${sd} outline`}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </label>
+                        >
+                          {url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={url} alt="" className="size-full object-contain" />
+                          ) : (
+                            <span className="flex size-full items-center justify-center text-muted-foreground">
+                              <Plus size={18} />
+                            </span>
+                          )}
+                          <input
+                            type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0]; if (!f) return
+                              const rd = new FileReader()
+                              rd.onload = () => setType({ mockups: { ...(t.mockups ?? {}), [sd]: String(rd.result) } })
+                              rd.readAsDataURL(f)
+                            }}
+                          />
+                          {url && (
+                            <button
+                              onClick={(e) => { e.preventDefault(); const m = { ...(t.mockups ?? {}) }; delete m[sd]; setType({ mockups: m }) }}
+                              className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full bg-foreground/75 text-background opacity-0 transition-opacity group-hover/tile:opacity-100 focus-visible:opacity-100"
+                              aria-label={`Clear ${sd} outline`}
+                            >
+                              <X size={12} weight="bold" />
+                            </button>
+                          )}
+                        </label>
+                        <span className="truncate text-xs font-medium capitalize">{sd}</span>
+                      </div>
                     )
                   })}
                 </div>
