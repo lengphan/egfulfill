@@ -464,6 +464,16 @@ export function PurchaseView() {
   // never opened and a lookup per PO would cost a query for nothing.
   const [poImgs, setPoImgs] = useState<Record<string, string>>({})
   const [zoom, setZoom] = useState<{ src: string; label: string } | null>(null)
+  // A ticking clock, so the S&S 10-minute cancellation window counts down on screen
+  // instead of freezing at whatever it was when the page rendered.
+  const [now, setNow] = useState(0)
+  useEffect(() => {
+    // Deferred, not synchronous: setting state directly in an effect body cascades a
+    // second render immediately. The pattern used across the app pages here.
+    const first = setTimeout(() => setNow(Date.now()), 0)
+    const id = setInterval(() => setNow(Date.now()), 30000)
+    return () => { clearTimeout(first); clearInterval(id) }
+  }, [])
   const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null; image?: string | null; variant?: string | null }>>({})
   useEffect(() => {
     const skus = saved.map((l) => l.sku).filter(Boolean)
@@ -599,7 +609,10 @@ export function PurchaseView() {
   const minutesSincePlaced = (po: PurchaseOrder) => {
     const at = ((po.meta || {}) as { placedAt?: string }).placedAt
     if (!at) return null
-    const ms = Date.now() - new Date(at).getTime()
+    // `now` is state, refreshed on a timer — reading the clock during render is impure,
+    // and a countdown computed that way updates only when something else happens to
+    // re-render, which is exactly when it would be wrong.
+    const ms = now - new Date(at).getTime()
     return isFinite(ms) ? Math.floor(ms / 60000) : null
   }
 
