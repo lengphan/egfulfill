@@ -16,6 +16,17 @@ function ensure() {
   return _ready;
 }
 
+/**
+ * A credential preview — enough to tell WHICH key is configured, never enough to use it.
+ * Short values are masked entirely: revealing half of a 12-character secret is most of it.
+ */
+function maskKey(v) {
+  const s = String(v || '').trim();
+  if (!s) return null;
+  if (s.length < 12) return '••••••••';
+  return s.slice(0, 4) + '••••••' + s.slice(-4);
+}
+
 export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse) {
   app.get('/api/purchase', { preHandler: requireStaff }, async () => {
     await ensure();
@@ -139,7 +150,8 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
     // full number is ever returned by their API or stored by us.
     let ssProfiles = { available: false, reason: null, profiles: [] };
     try {
-      const email = String(cfg.order_email || '').trim();
+      // S&S's own address first — their profiles belong to the person who registered.
+      const email = String(cfg.ss_order_email || cfg.order_email || '').trim();
       if (!email) {
         ssProfiles.reason = 'Set an order confirmation email — S&S payment profiles belong to a person on the account, not the account itself.';
       } else {
@@ -153,7 +165,22 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       ssProfiles = { available: false, reason: `Couldn't read S&S payment profiles — ${e.message}`, profiles: [] };
     }
 
+    // Masked credential previews, so "is S&S actually connected" is answerable here
+    // rather than by navigating to Integrations. Read-only and never full values — this
+    // endpoint has no business handing out a key it only needs to confirm the shape of.
+    let keys = {};
+    try {
+      const r = await q("select key, value from settings where key like 'secret:%'").catch(() => ({ rows: [] }));
+      void r;
+      keys = {
+        ss: { set: !!process.env.SS_API_KEY, masked: maskKey(process.env.SS_API_KEY), account: process.env.SS_ACCOUNT_NUMBER || null },
+        otto: { set: !!(process.env.OTTOCAP_CLIENT_ID && process.env.OTTOCAP_CLIENT_SECRET),
+                masked: maskKey(process.env.OTTOCAP_CLIENT_SECRET), user: process.env.OTTOCAP_USERNAME || null },
+      };
+    } catch { keys = {}; }
+
     return {
+      keys,
       shipTo: shipFrom || {},
       shipToComplete: shipFromComplete(shipFrom || {}),
       suppliers: {
@@ -173,6 +200,8 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       defaults: {
         ss_shipping_method: cfg.ss_shipping_method ?? '1',
         ss_payment_profile: cfg.ss_payment_profile ?? '',
+        ss_order_email: cfg.ss_order_email ?? '',
+        otto_order_email: cfg.otto_order_email ?? '',
         otto_payment_method: cfg.otto_payment_method ?? 'net30',
         otto_shipping_method: cfg.otto_shipping_method ?? '',
         order_email: cfg.order_email ?? '',

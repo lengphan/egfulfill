@@ -315,7 +315,7 @@ export function PurchaseView() {
             const r = await ssOrder(payload, {
               shippingAddress: opts.shipTo,
               shippingMethod: opts.defaults.ss_shipping_method || undefined,
-              email: opts.defaults.order_email || undefined,
+              email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
               poNumber: po.num,
             })
             if (r.error) throw new Error(r.error); resp = r
@@ -507,11 +507,14 @@ export function PurchaseView() {
           } else if (g.api === "ss") {
             const r = await ssOrder(payload, {
               shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
-              email: opts.defaults.order_email || undefined, poNumber: poNum,
+              // S&S's OWN registered address — the accounts use different emails, and
+              // the payment profile is looked up against this one.
+              email: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
+              poNumber: poNum,
               // Which saved card pays. Omitted entirely when unset, so the account's own
               // terms apply rather than an empty profile being sent.
               paymentProfileId: opts.defaults.ss_payment_profile || undefined,
-              paymentProfileEmail: opts.defaults.order_email || undefined,
+              paymentProfileEmail: opts.defaults.ss_order_email || opts.defaults.order_email || undefined,
             })
             if (r.error) throw new Error(r.error); resp = r
           }

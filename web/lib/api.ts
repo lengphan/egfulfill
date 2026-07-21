@@ -1601,6 +1601,10 @@ export function resolveSuppliers(skus: string[]) {
 
 // ── Supplier ordering (address / payment / shipping) ───────────────────────────
 export type SupplierOptions = {
+  /** Masked credential previews — enough to tell WHICH key is configured, never enough
+   *  to use it. Saves a trip to Integrations just to check a connection. */
+  keys?: { ss?: { set: boolean; masked: string | null; account: string | null }
+           otto?: { set: boolean; masked: string | null; user: string | null } }
   shipTo: Record<string, string>
   shipToComplete: boolean
   suppliers: {
@@ -1613,6 +1617,7 @@ export type SupplierOptions = {
   defaults: {
     ss_shipping_method: string; otto_payment_method: string
     otto_shipping_method: string; order_email: string; ss_payment_profile: string
+    ss_order_email: string; otto_order_email: string
   }
 }
 /** Where supplier orders ship, how they pay, how they move. Otto's methods are read LIVE
