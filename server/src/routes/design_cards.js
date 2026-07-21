@@ -14,6 +14,12 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
   // vendor_ref holds the partner's own task id, so their webhooks can find the card.
   q('alter table design_cards add column if not exists vendor text').catch(() => {});
   q('alter table design_cards add column if not exists vendor_ref text').catch(() => {});
+  // Which ORDER LINE this card is for. The client has always sent it (orders-hub builds
+  // every card with line_id) but no column existed, so it was dropped on every save and
+  // read back as null. That broke the "already has a card" check, which falls back to
+  // matching on sku alone — and two lines of the same sku are different jobs, so a second
+  // line either silently reused the first card or duplicated it. See CLAUDE.md §5.
+  q('alter table design_cards add column if not exists line_id text').catch(() => {});
 
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
     if (isStaff(req.user)) {
@@ -122,8 +128,8 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
         `insert into design_cards
            (id, order_id, sku, design_id, title, col, type, product, priority, due,
             assignee, claimed_by, payment, pay_status, is_emb, emb_file_name, thumb,
-            thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+            thumb_ref, files, specs, notes, history, checklist, vendor, vendor_ref, line_id)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
          on conflict (id) do update set
            order_id=excluded.order_id, sku=excluded.sku, design_id=excluded.design_id,
            title=excluded.title, col=excluded.col, type=excluded.type, product=excluded.product,
@@ -132,7 +138,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
            is_emb=excluded.is_emb, emb_file_name=excluded.emb_file_name, thumb=excluded.thumb,
            thumb_ref=excluded.thumb_ref, files=excluded.files, specs=excluded.specs,
            notes=excluded.notes, history=excluded.history, checklist=excluded.checklist,
-           vendor=excluded.vendor, vendor_ref=excluded.vendor_ref,
+           vendor=excluded.vendor, vendor_ref=excluded.vendor_ref, line_id=excluded.line_id,
            updated_at=now()`,
         [c.id, c.order_id || null, c.sku || null, c.design_id || null, c.title || null,
          c.col || 'incoming', c.type || null, c.product || null, c.priority || 'normal', c.due || null,
@@ -140,7 +146,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
          !!c.is_emb, c.emb_file_name || null, c.thumb || null, c.thumb_ref || null,
          JSON.stringify(c.files || []), JSON.stringify(c.specs || {}), JSON.stringify(c.notes || []),
          JSON.stringify(c.history || []), JSON.stringify(c.checklist || []),
-         c.vendor || null, c.vendor_ref || null]
+         c.vendor || null, c.vendor_ref || null, c.line_id || null]
       );
     }
     // Cast explicitly. design_cards.id is bigint, but node-pg returns bigint as a STRING,

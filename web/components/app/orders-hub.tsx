@@ -685,7 +685,7 @@ export function OrdersHub() {
                           window on the attached design. */}
                       {isCollapsed && items.length > 0 && (
                         <div className="mt-2">
-                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} />
+                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} size={56} max={4} overlap={false} />
                         </div>
                       )}
                     </div>

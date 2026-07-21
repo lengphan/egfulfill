@@ -19,7 +19,11 @@ import { cn } from "@/lib/utils"
  * can't drift from the real tab bars in Settings and Wallet.
  */
 const TABS = [
-  { key: "library", label: "Library", href: "/design", icon: PenNib },
+  // ?tab=library rather than a bare /design: navigating from ?tab=templates to a URL with
+  // NO search params left useSearchParams() holding the old value, so the hook kept
+  // reporting "templates" and clicking Library re-rendered the Templates panel. Both hrefs
+  // carrying a param makes it a value change, which the hook does track.
+  { key: "library", label: "Library", href: "/design?tab=library", icon: PenNib },
   { key: "templates", label: "Templates", href: "/design?tab=templates", icon: Stack },
   { key: "maker", label: "Design maker", href: "/design/maker", icon: Sparkle },
 ] as const
