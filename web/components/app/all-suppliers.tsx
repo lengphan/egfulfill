@@ -157,28 +157,41 @@ export function AllSuppliers() {
    * time, and they carry no image because nothing in the catalogue matches them. Otto's
    * real variant skus live on the style detail, so fetch them.
    */
+  /**
+   * S&S variants for one style, live.
+   *
+   * Returns the REASON on failure rather than an empty list. Swallowing the error made a
+   * broken lookup indistinguishable from a product that genuinely has no sizes — the
+   * dialog then said "this product lists no sizes" about a cap with forty, which sends
+   * you looking at the product instead of the request.
+   */
   const loadSsVariants = async (styleId: string) => {
     try {
       const d = await getSsStyleSkus(styleId)
-      return (d?.products ?? []).map((p) => ({
+      if (d?.error) return { sizes: [], error: d.error }
+      const sizes = (d?.products ?? []).map((p) => ({
         size: [p.color, p.size].filter(Boolean).join(" / ") || p.sku,
         sku: p.sku, price: typeof p.price === "number" ? p.price : Number(p.price) || null,
         image: p.image ?? null,
       }))
-    } catch { return [] }
+      return { sizes, error: sizes.length ? null : "S&S returned no orderable skus for this style." }
+    } catch (e) {
+      return { sizes: [], error: e instanceof Error ? e.message : "Couldn't reach S&S." }
+    }
   }
 
   const loadOttoVariants = async (style: string) => {
     try {
       const d = await getOttoStyle(style)
       const vs = Array.isArray(d?.variants) ? d.variants : []
-      return vs.map((v) => ({
+      const sizes = vs.map((v) => ({
         // Otto colour names arrive as supplier codes ("S.Pnk/Blk/H.Pnk"); tidy them so a
         // row reads as a colour rather than an abbreviation nobody says out loud.
         size: [prettyColor(v.color), v.size].filter(Boolean).join(" / ") || v.sku,
         sku: v.sku, price: v.price ?? null, image: driveImg(v.image) || null,
       }))
-    } catch { return [] }
+      return { sizes, error: sizes.length ? null : "Otto returned no variants for this style." }
+    } catch (e) { return { sizes: [], error: e instanceof Error ? e.message : "Couldn't reach Otto Cap." } }
   }
 
   const quickOrderFor = (it: Item): QuickOrderProduct => {
@@ -365,10 +378,10 @@ export function AllSuppliers() {
                     // BOTH suppliers need their real variants fetched: an S&S card only
                     // has sizes once it's been expanded, so quick-ordering an unexpanded
                     // one showed "this product lists no sizes" for a product that has 40.
-                    const sizes = it.supplier === "otto"
+                    const r = it.supplier === "otto"
                       ? await loadOttoVariants(it.id)
                       : await loadSsVariants(it.id)
-                    setQuickOrder(sizes.length ? { ...base, sizes } : base)
+                    setQuickOrder(r.sizes.length ? { ...base, sizes: r.sizes } : { ...base, loadError: r.error ?? undefined })
                   }}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}

@@ -22,6 +22,9 @@ export type QuickOrderProduct = {
    *  against the style for someone to resolve, rather than dropped. */
   sizes: { size: string; sku?: string | null; price?: number | null; image?: string | null }[]
   defaultPrice?: number | null
+  /** Why the variant lookup came back empty. Distinguishes a failed request from a
+   *  product that genuinely has no sizes — they are not the same fact. */
+  loadError?: string
 }
 
 /**
@@ -128,8 +131,15 @@ export function QuickOrderDialog({
             <span className="w-24 text-right">Unit price</span>
           </div>
           {product.sizes.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              This product lists no sizes, so there&apos;s nothing to order against.
+            <div className="space-y-2 py-8 text-center text-sm">
+              <p className="text-muted-foreground">
+                {product.loadError
+                  ? "Couldn't load this product's sizes."
+                  : "This product lists no sizes, so there's nothing to order against."}
+              </p>
+              {product.loadError && (
+                <p className="mx-auto max-w-sm text-xs text-destructive">{product.loadError}</p>
+              )}
             </div>
           ) : product.sizes.map((s) => (
             <div key={s.size} className="flex items-center gap-2 py-1.5">
