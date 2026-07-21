@@ -6,7 +6,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, type OrderRow } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage } from "@/lib/factory-status"
@@ -79,6 +79,16 @@ export function DispatchBoard() {
     const failed: string[] = []
     for (const o of chosen) {
       try {
+        // RECORD THE SCAN ITSELF, not just the stage move. These are two different facts
+        // and only one of them was being written: label_scanned_at means "the buyer's
+        // tracking is live", while factory_status means "where the work has got to". The
+        // stage was advancing and the scan was never recorded, so the readiness pill —
+        // which reads label_scanned_at, correctly — stayed dark on orders the floor had
+        // just scanned.
+        //
+        // Best-effort: an order whose scan won't record must still advance, because the
+        // parcel has physically been scanned either way.
+        await markScannedInHouse(o.id).catch(() => {})
         for (const it of o.items ?? []) {
           if (it.sku || it.line_id) await postItemStatus(o.id, it.sku ?? "", NEXT, it.line_id)
         }
