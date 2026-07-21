@@ -39,9 +39,9 @@ function PickRow({ line, title, sub, right, meta, image, on, onToggle }: {
       </span>
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
+        <img src={image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
       ) : (
-        <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />
+        <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{title}</span>
@@ -210,7 +210,7 @@ export function POAddItems({
 
   return (
     <Dialog open={!!po} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Add items{po?.supplier ? ` · ${po.supplier}` : ""}</DialogTitle>
         </DialogHeader>
@@ -238,7 +238,7 @@ export function POAddItems({
           />
         </div>
 
-        <div className="max-h-[46vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
+        <div className="max-h-[60vh] min-h-[24rem] divide-y divide-border overflow-y-auto rounded-lg border border-border">
           {tab === "inventory" && (
             invRows.length === 0
               ? <Empty>{q ? "Nothing matches that." : "No inventory yet."}</Empty>
@@ -269,8 +269,8 @@ export function POAddItems({
                         className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
                         {st.image
                           // eslint-disable-next-line @next/next/no-img-element
-                          ? <img src={st.image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
-                          : <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                          ? <img src={st.image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+                          : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{st.title || st.styleID}</span>
                           <span className="block truncate text-xs text-muted-foreground">
@@ -325,6 +325,10 @@ export function POAddItems({
                   <div key={s.style}>
                     {/* A style isn't orderable — expand it to its skus and pick one. */}
                     <button type="button" onClick={() => expand(s.style)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+                      {driveImg(s.image)
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={driveImg(s.image)} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+                        : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{s.name || s.style}</span>
                         <span className="block truncate text-xs text-muted-foreground">{s.style}</span>
