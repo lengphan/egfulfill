@@ -34,7 +34,10 @@ const KEYS = [
 // look payment profiles up BY EMAIL — so one shared field would fetch the wrong person's
 // cards, or none. `order_email` stays as the fallback for anything not set per supplier.
 const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_method',
-                   'order_email', 'ss_order_email', 'otto_order_email', 'ss_payment_profile'];
+                   'order_email', 'ss_order_email', 'otto_order_email', 'ss_payment_profile',
+                   // Otto require BOTH on every order, and they come from their Customer
+                   // API rather than anything we hold.
+                   'otto_customer', 'otto_contact'];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.

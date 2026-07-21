@@ -72,6 +72,8 @@ export function SupplierOrderingDialog({
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [ssShip, setSsShip] = useState("")
   const [ssCard, setSsCard] = useState("")
+  const [ottoCust, setOttoCust] = useState("")
+  const [ottoContact, setOttoContact] = useState("")
   // Editing a credential is admin-only server-side; the input is hidden for everyone else
   // rather than offered and then refused.
   const isAdmin = getUser()?.role === "admin"
@@ -96,6 +98,8 @@ export function SupplierOrderingDialog({
       setOpts(o)
       setSsShip(o.defaults.ss_shipping_method || "1")
       setSsCard(o.defaults.ss_payment_profile || "")
+      setOttoCust(o.defaults.otto_customer || "")
+      setOttoContact(o.defaults.otto_contact || "")
       setOttoPay(o.defaults.otto_payment_method || "net30")
       setOttoShip(o.defaults.otto_shipping_method || "")
       // Fall back to the shared address so an account configured before the split keeps
@@ -119,6 +123,8 @@ export function SupplierOrderingDialog({
       await setFactorySettings({
         ss_shipping_method: ssShip,
         ss_payment_profile: ssCard,
+        otto_customer: ottoCust,
+        otto_contact: ottoContact,
         otto_payment_method: ottoPay,
         otto_shipping_method: ottoShip,
         ss_order_email: ssEmail,
@@ -292,6 +298,28 @@ export function SupplierOrderingDialog({
                       <p className="text-xs text-muted-foreground">
                         Billing terms from your Otto account — they expose no saved cards.
                       </p>
+                      {/* Otto REQUIRE both on every order and they come from their
+                          Customer API, so they're picked here rather than typed. */}
+                      <Field label="Order as">
+                        <select value={ottoCust} onChange={(e) => { setOttoCust(e.target.value); setOttoContact("") }}
+                          disabled={busy} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                          <option value="">— choose a customer —</option>
+                          {(opts.ottoCustomers ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Contact">
+                        <select value={ottoContact} onChange={(e) => setOttoContact(e.target.value)}
+                          disabled={busy || !ottoCust} className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                          <option value="">— choose a contact —</option>
+                          {((opts.ottoCustomers ?? []).find((c) => c.id === ottoCust)?.contacts ?? [])
+                            .map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                        </select>
+                      </Field>
+                      {!(opts.ottoCustomers ?? []).length && (
+                        <p className="text-xs text-amber-700">
+                          Otto returned no customers — orders will be rejected until this is set.
+                        </p>
+                      )}
                     </>
                   )}
                 </section>

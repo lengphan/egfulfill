@@ -610,7 +610,7 @@ export function deletePurchaseOrder(num: string) {
 export function ssOrder(
   lines: { sku: string; qty: number }[],
   extra: { shippingAddress?: unknown; shippingMethod?: string; email?: string; poNumber?: string
-           paymentProfileId?: string; paymentProfileEmail?: string } = {},
+           paymentProfileId?: string; paymentProfileEmail?: string; requirePaymentProfile?: boolean } = {},
   live = false
 ) {
   return api<{ ok?: boolean; testOrder?: boolean; dryRun?: boolean; error?: string; detail?: unknown }>(
@@ -618,7 +618,8 @@ export function ssOrder(
 }
 export function ottoOrder(
   items: { sku: string; qty: number }[],
-  extra: { shipping_address?: unknown; shipping_method?: string; payment_method?: string; customer_po?: string } = {}
+  extra: { shipping_address?: unknown; billing_address?: unknown; shipping_method?: string
+           payment_method?: string; customer_po?: string; customer?: string; contact?: string } = {}
 ) {
   return api<{ ok?: boolean; dryRun?: boolean; error?: string; ottoResponse?: unknown }>(
     `/api/otto/order`, { method: "POST", body: JSON.stringify({ items, ...extra }) })
@@ -1643,6 +1644,9 @@ export type SupplierOptions = {
    *  to use it. Saves a trip to Integrations just to check a connection. */
   keys?: { ss?: { set: boolean; masked: string | null; account: string | null }
            otto?: { set: boolean; masked: string | null; user: string | null } }
+  /** Otto's customers and their contacts. Required on every Otto order and obtainable
+   *  only from them, so this is offered as a choice rather than a GUID to paste. */
+  ottoCustomers?: { id: string; name: string; contacts: { id: string; name: string }[] }[]
   shipTo: Record<string, string>
   shipToComplete: boolean
   suppliers: {
@@ -1656,6 +1660,8 @@ export type SupplierOptions = {
     ss_shipping_method: string; otto_payment_method: string
     otto_shipping_method: string; order_email: string; ss_payment_profile: string
     ss_order_email: string; otto_order_email: string
+    /** Otto require both on every order; they come from their Customer API. */
+    otto_customer: string; otto_contact: string
   }
 }
 /** Where supplier orders ship, how they pay, how they move. Otto's methods are read LIVE

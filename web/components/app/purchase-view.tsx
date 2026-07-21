@@ -511,6 +511,16 @@ export function PurchaseView() {
       setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Order settings." })
       return
     }
+    // Check what each supplier REQUIRES before sending. Their rejections are accurate but
+    // name their own fields, and arrive one round trip later — "shipping_address.state:
+    // California is not a valid choice" is a better message than nothing, but a refusal
+    // that names the setting to change is better still.
+    const needsOtto = toOrderGroups.some((g) => g.api === "otto")
+    if (needsOtto && !(opts.defaults.otto_customer && opts.defaults.otto_contact)) {
+      setMsg({ ok: false, text: "Otto require a customer and contact on every order. Set them in Order settings › Payment — they come from your Otto account." })
+      return
+    }
+
     setBusy("place-all"); setMsg(null)
     const results: string[] = []
     const placedSkus = new Set<string>()
@@ -524,8 +534,14 @@ export function PurchaseView() {
         try {
           if (g.api === "otto") {
             const r = await ottoOrder(payload, {
-              shipping_address: opts.shipTo, shipping_method: opts.defaults.otto_shipping_method || undefined,
-              payment_method: opts.defaults.otto_payment_method || undefined, customer_po: poNum,
+              shipping_address: opts.shipTo,
+              // Otto require billing too, and it's the same warehouse.
+              billing_address: opts.shipTo,
+              shipping_method: opts.defaults.otto_shipping_method || undefined,
+              payment_method: opts.defaults.otto_payment_method || undefined,
+              customer: opts.defaults.otto_customer || undefined,
+              contact: opts.defaults.otto_contact || undefined,
+              customer_po: poNum,
             })
             if (r.error) throw new Error(r.error); resp = r
           } else if (g.api === "ss") {

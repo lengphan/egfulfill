@@ -71,6 +71,67 @@ async function passthru(reply, path) {
  * a proxy, so nothing is logged and it looks like "no images" rather than a blocked fetch.
  * Normalising on READ fixes rows already synced, without anyone re-running an import.
  */
+/**
+ * Our ship-from address → Otto's shape.
+ *
+ * Theirs is NOT ours: address_1/address_2 rather than street/street2, is_residential
+ * required, and state_text only for non-US. Sending our own field names meant Otto
+ * received an address with nothing it recognised, which is why every order came back
+ * rejected.
+ *
+ * Returns null when it can't build a valid one, so the caller refuses rather than sending
+ * an order with nowhere to be delivered.
+ */
+// US state name → USPS code. `slice(0,2)` on a full name happens to give "CA" for
+// California and "MD" for Maryland, and the WRONG answer for most others — "Texas"
+// becomes "TE". Otto reject an invalid code outright, which is the good outcome; a
+// plausible-but-wrong one would ship to the wrong state.
+const US_STATES = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS',
+  kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA',
+  michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT',
+  nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND',
+  ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI',
+  'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT',
+  vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+  wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC', 'puerto rico': 'PR',
+};
+function usStateCode(v) {
+  const s2 = String(v || '').trim();
+  if (/^[A-Za-z]{2}$/.test(s2)) return s2.toUpperCase();
+  return US_STATES[s2.toLowerCase()] || null;
+}
+
+function toOttoAddress(a) {
+  if (!a || typeof a !== 'object') return null;
+  const country = String(a.country || 'US').toUpperCase().slice(0, 2);
+  const isUS = country === 'US';
+  const state = String(a.state || '').trim();
+  const line1 = String(a.street || a.address_1 || '').trim();
+  if (!line1 || !a.city || !state || !a.zip) return null;
+  // A US address with an unmappable state is refused rather than guessed at.
+  if (isUS && !usStateCode(state)) return null;
+  return {
+    name: String(a.name || a.company || '').slice(0, 100),
+    company_name: String(a.company || a.name || '').slice(0, 100),
+    email: String(a.email || ''),
+    phone: String(a.phone || ''),
+    country,
+    city: String(a.city),
+    // Two-letter code for the US; the full name goes in state_text for anywhere else.
+    state: isUS ? (usStateCode(state) || '') : '',
+    state_text: isUS ? '' : state,
+    zip: String(a.zip).trim(),
+    address_1: line1,
+    address_2: String(a.street2 || a.address_2 || ''),
+    // A warehouse is not a house — and residential delivery costs more.
+    is_residential: false,
+  };
+}
+
 function ottoImg(u) {
   if (!u) return null;
   const s = String(u);
@@ -252,16 +313,44 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       .map((it) => ({ sku: String(it.sku || '').trim(), qty: String(parseInt(it.qty, 10) || 0), supplier: OC_SUPPLIER }))
       .filter((it) => it.sku && parseInt(it.qty, 10) > 0);
     if (!items.length) { reply.code(400); return { error: 'No items — each needs a sku + qty.' }; }
+    // Their address shape, not ours. Refuse rather than send a malformed one.
+    const ship = toOttoAddress(b.shipping_address);
+    if (b.shipping_address && !ship) {
+      reply.code(400);
+      return { error: 'The warehouse address is incomplete for Otto — it needs a street, city, state and ZIP.' };
+    }
+    // customer and contact are REQUIRED by their doc and come from GET /customers. Without
+    // them Otto rejects the order, so say which is missing rather than letting it fail
+    // there with no explanation.
+    let shipMethod = b.shipping_method || '';
+    if (!shipMethod) {
+      // Required. Fall back to Otto's own first listed method so a missing setting
+      // doesn't fail the order — and say which was chosen in the response.
+      const sm = await ocGet('/shipping_methods').catch(() => null);
+      const first = sm && sm.ok && Array.isArray(sm.data) ? sm.data.find((x) => x && x.id) : null;
+      if (first) shipMethod = String(first.id);
+    }
+    if (!shipMethod) {
+      reply.code(400);
+      return { error: 'Otto require a shipping method and none is set — choose one in Order settings › Delivery.' };
+    }
+    if (!b.customer || !b.contact) {
+      reply.code(400);
+      return { error: 'Otto needs a customer and contact id on every order. Pick them in Order settings — they come from your Otto account, not from us.',
+               needs: { customer: !b.customer, contact: !b.contact } };
+    }
+
     const payload = {
       payment_method: b.payment_method || 'net30',
-      customer: b.customer || undefined,
-      contact: b.contact || undefined,
-      shipping_method: b.shipping_method || undefined,
+      customer: b.customer,
+      contact: b.contact,
+      shipping_method: shipMethod,
       third_party_shipping_account_number: b.third_party_shipping_account_number || undefined,
       order_comment: b.order_comment || undefined,
       customer_po: b.customer_po || ('EG-' + Date.now()),
-      billing_address: b.billing_address || undefined,
-      shipping_address: b.shipping_address || undefined,
+      // Billing defaults to the same address — one warehouse, one account.
+      billing_address: toOttoAddress(b.billing_address) || ship || undefined,
+      shipping_address: ship || undefined,
       items,
       card_details: b.card_details || undefined
     };
@@ -286,7 +375,17 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
   });
 
+  /**
+   * Shipping details — tracking numbers PER PACKAGE.  GET /orders/{n}/shipments
+   *
+   * A split shipment has a number per box, and their response nests the items inside each
+   * package, so which box holds what is answerable rather than inferred.
+   */
+  app.get('/api/otto/order/:num/shipments', { preHandler: requireStaff }, async (req, reply) => {
+    const g = guard(reply); if (g) return g;
+    return passthru(reply, '/orders/' + encodeURIComponent(req.params.num) + '/shipments');
+  });
+
   // Order tracking.
   app.get('/api/otto/order/:num/status', { preHandler: requireStaff }, async (req, reply) => { const g = guard(reply); if (g) return g; return passthru(reply, '/orders/' + encodeURIComponent(req.params.num) + '/status'); });
-  app.get('/api/otto/order/:num/shipments', { preHandler: requireStaff }, async (req, reply) => { const g = guard(reply); if (g) return g; return passthru(reply, '/orders/' + encodeURIComponent(req.params.num) + '/shipments'); });
 }

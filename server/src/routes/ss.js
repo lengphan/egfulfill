@@ -1457,6 +1457,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       return { error: 'The warehouse address is incomplete or malformed for S&S — it needs a street, city, 2-letter state and 5-digit ZIP.' };
     }
 
+    // Some S&S accounts REQUIRE a saved payment profile — theirs answers
+    // "PaymentProfile required for this account (credit card or bank)". Catching it here
+    // names the fix; letting it through returns their message with no route to acting on it.
+    if (b.requirePaymentProfile && !(b.paymentProfileId && b.paymentProfileEmail)) {
+      reply.code(400);
+      return { error: 'This S&S account requires a saved card or bank account on every order. Pick one in Order settings › Payment.' };
+    }
+
     const payload = {
       testOrder: !wantLive,                          // S&S Test mode unless the caller explicitly asks for a live order
       poNumber: b.poNumber || ('EG-' + Date.now()),

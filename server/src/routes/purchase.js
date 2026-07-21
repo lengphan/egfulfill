@@ -213,8 +213,30 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       };
     } catch { keys = {}; }
 
+    // Otto's customers + their contacts. Required on every order and only obtainable from
+    // them, so the settings window offers a choice rather than expecting someone to paste
+    // a GUID.
+    let ottoCustomers = [];
+    try {
+      const { ottoEnabled, ottoGet } = await import('./ottocap.js');
+      if (ottoEnabled()) {
+        const c = await ottoGet('/customers').catch(() => null);
+        if (c && c.ok && Array.isArray(c.data)) {
+          ottoCustomers = c.data.map((x) => ({
+            id: String(x.id || ''),
+            name: x.company_name || [x.first_name, x.last_name].filter(Boolean).join(' ') || x.email || x.id,
+            contacts: (Array.isArray(x.contacts) ? x.contacts : []).map((k) => ({
+              id: String(k.id || ''),
+              name: [k.first_name, k.last_name].filter(Boolean).join(' ') || k.email || k.id,
+            })).filter((k) => k.id),
+          })).filter((x) => x.id);
+        }
+      }
+    } catch { ottoCustomers = []; }
+
     return {
       keys,
+      ottoCustomers,
       shipTo: shipFrom || {},
       shipToComplete: shipFromComplete(shipFrom || {}),
       suppliers: {
@@ -236,6 +258,8 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
         ss_payment_profile: cfg.ss_payment_profile ?? '',
         ss_order_email: cfg.ss_order_email ?? '',
         otto_order_email: cfg.otto_order_email ?? '',
+        otto_customer: cfg.otto_customer ?? '',
+        otto_contact: cfg.otto_contact ?? '',
         otto_payment_method: cfg.otto_payment_method ?? 'net30',
         otto_shipping_method: cfg.otto_shipping_method ?? '',
         order_email: cfg.order_email ?? '',
