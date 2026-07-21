@@ -1481,3 +1481,34 @@ export function refundOrder(
     { method: "POST", body: JSON.stringify(body) }
   )
 }
+
+// ── Design partner (Pink Design) ───────────────────────────────────────────────
+// Sending a line out for design is always a MANUAL act — sellers usually upload
+// print-ready artwork, so most jobs need no outsourced design and auto-sending would open
+// a paid task for every one of them. These power the "Send to design partner" window.
+export type PinkStatus = {
+  configured: boolean; ok?: boolean; base?: string; boardId?: string | null
+  boards?: unknown; productTypes?: unknown; error?: string
+}
+export function getPinkStatus() {
+  return api<PinkStatus>(`/api/pinkdesign/status`)
+}
+/** Push one line item out for design. `extraImages` are reference URLs (see
+ *  uploadPinkAttachment); the artwork itself is resolved server-side and always leads. */
+export function pushToPink(body: {
+  orderId: string; sku: string; title?: string; qty?: number; description?: string
+  productType?: string; designType?: string; boardId?: string; extraImages?: string[]
+}) {
+  return api<{ ok?: boolean; refId?: string; board?: string; error?: string; retryable?: boolean }>(
+    `/api/pinkdesign/push`, { method: "POST", body: JSON.stringify(body) })
+}
+/** Store a reference file and get a URL back — Pink Design accepts URLs only. */
+export function uploadPinkAttachment(body: { data: string; name?: string }) {
+  return api<{ ok?: boolean; url?: string; name?: string | null; error?: string }>(
+    `/api/pinkdesign/attachment`, { method: "POST", body: JSON.stringify(body) })
+}
+/** Send a card back for revision: a note (and optional images) plus a status flip. */
+export function pinkRequestFix(body: { cardId: string | number; message: string; images?: string[] }) {
+  return api<{ ok?: boolean; cardId?: number; col?: string; error?: string; commented?: boolean }>(
+    `/api/pinkdesign/fix`, { method: "POST", body: JSON.stringify(body) })
+}

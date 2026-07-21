@@ -10,8 +10,6 @@ import { audit } from '../audit.js';
 import { quoteOrder, freezeQuote } from '../pricing.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { orderCharges, refundOrder } from './order_refunds.js';
-import { printRoute } from '../print-route.js';
-import { pushToPink, pinkEnabled } from './pinkdesign.js';
 import { reserveConsigned, releaseConsigned } from './consignment.js';
 import { autoReplenish } from '../replenish.js';
 import { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } from '../storage.js';
@@ -163,26 +161,11 @@ async function autoPushDesigns(orderId, lineId, sku) {
     if (existing) return { pushed: false, reason: 'file-exists', designId: existing.design_id };
   }
 
-  // \u2500\u2500 Which bench? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  // Flat-print work goes to the design partner; stitch work stays in house. Without
-  // this every card landed in our designers' queue looking like stitch work, and a DTF
-  // job was only distinguishable by reading the method off the card.
-  //
-  // When the partner takes it we let THEM create the card (pushToPink writes it with the
-  // vendor badge and their task ref), so there's exactly one card and it's never briefly
-  // claimable. A failed push falls through to an internal card rather than dropping the
-  // line: an unrouted job someone can see beats a correctly-routed job that vanished.
-  let routeNote = null;
-  if (printRoute(it.print_type) === 'partner' && pinkEnabled()) {
-    const sent = await pushToPink({ orderId, sku: it.sku }).catch((e) => ({ error: e.message }));
-    if (sent && sent.ok) return { pushed: true, vendor: 'pinkdesign', ref: sent.refId };
-    // Record why, on the card we're about to make, so the floor isn't left guessing why
-    // a DTF job is sitting with the embroiderers.
-    routeNote = sent && sent.error ? `Partner push failed: ${sent.error}` : null;
-  } else if (printRoute(it.print_type) === 'partner') {
-    routeNote = 'This is flat-print work and normally goes to the design partner, which isn\'t connected.';
-  }
-
+  // Cards are NOT auto-sent to the design partner. Sellers generally upload print-ready
+  // artwork, so most flat-print jobs need no outsourced design at all — auto-pushing
+  // would open, and pay for, a task for every one of them. The partner is an escape
+  // hatch for when a file genuinely does need work, so sending is a human decision:
+  // the board's "Send to design partner" button.
   const id = Date.now() + Math.floor(Math.random() * 1000);
   const product = [it.color, it.size, it.print_type].filter(Boolean).join(' \u00b7 ');
   // The card thumb is the ARTWORK — the customer's synced upload, or what we placed
@@ -196,7 +179,7 @@ async function autoPushDesigns(orderId, lineId, sku) {
      on conflict (id) do nothing`,
     [id, orderId, it.sku || null, it.name || it.sku || 'Design', it.print_type || null, product,
      /emb/i.test(it.print_type || ''), thumb,
-     JSON.stringify(routeNote ? [{ text: routeNote, at: new Date().toISOString(), system: true }] : [])]).catch(() => {});
+     JSON.stringify([])]).catch(() => {});
   return { pushed: true, cardId: id };
 }
 

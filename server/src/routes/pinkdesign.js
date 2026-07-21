@@ -89,7 +89,8 @@ const isRetryable = (r) => r.status === 0 || r.status === 429 || r.status >= 500
  * The artwork has to be reachable by THEM, so this requires a stored URL — a design still
  * inline as base64 has no address. Rather than fail vaguely, it says exactly that.
  */
-export async function pushToPink({ orderId, sku, boardId: wantBoard, description, productType, designType }) {
+export async function pushToPink({ orderId, sku, boardId: wantBoard, description, productType, designType,
+                                   title: wantTitle, qty: wantQty, extraImages }) {
   if (!pinkEnabled()) return { error: 'Design partner not configured (PINKDESIGN_API_KEY).', status: 400 };
   const oid = String(orderId || '');
   const isku = sku != null ? String(sku) : null;
@@ -129,12 +130,18 @@ export async function pushToPink({ orderId, sku, boardId: wantBoard, description
   }
   const imageUrl = designUrlTtlDays() > 0 ? presignGet(design.storage_key) : publicUrl(design.storage_key);
 
+  // Reference material beyond the artwork itself — a mockup, a spec sheet, a marked-up
+  // screenshot of what's wrong. URLs only, same constraint as the artwork, and the
+  // artwork always leads so their designer opens the file being worked on first.
+  const extras = (Array.isArray(extraImages) ? extraImages : [])
+    .map(String).filter((u) => /^https?:\/\//i.test(u));
+
   const payload = {
-    title: `${item.name || item.sku} · order ${oid}`,
-    qty: Number(item.qty) || 1,
+    title: String(wantTitle || '').trim() || `${item.name || item.sku} · order ${oid}`,
+    qty: Math.max(1, parseInt(wantQty, 10) || Number(item.qty) || 1),
     board_id: board,
     description: description || `Print method: ${item.print_type || 'DTG'}. Order ${oid}, SKU ${item.sku}.`,
-    images: [imageUrl],
+    images: [imageUrl, ...extras],
     ...(productType ? { product_type: productType } : {}),
     ...(designType ? { design_type: designType } : {}),
   };
@@ -196,6 +203,35 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       after: { sku: (req.body || {}).sku, vendor: 'pinkdesign', ref: out.refId } });
     egBroadcast({ type: 'design-cards' });
     return out;
+  });
+
+  /**
+   * Park an extra reference file in our storage and hand back a URL.
+   *
+   * Pink Design accepts URLs only, so anything dragged into the push window — a mockup, a
+   * spec sheet, a marked-up screenshot — needs an address before it can be sent. Kept
+   * separate from order_designs on purpose: these are notes FOR the designer, not the
+   * artwork being printed, and mixing them would put a screenshot in the production file
+   * list where someone could print it.
+   */
+  app.post('/api/pinkdesign/attachment', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const { storageEnabled, putObject, fromDataUrl, presignGet, publicUrl, designUrlTtlDays } = await import('../storage.js');
+    if (!storageEnabled()) { reply.code(400); return { error: 'Object storage isn\'t configured, so there\'s nowhere to put the file.' }; }
+    const parsed = fromDataUrl(b.data);
+    if (!parsed) { reply.code(400); return { error: 'Couldn\'t read that file.' }; }
+    const { createHash } = await import('crypto');
+    // Content hash, like every other object here: re-dragging the same file collapses to
+    // one object rather than a copy per attempt.
+    const hash = createHash('sha256').update(parsed.buffer).digest('hex').slice(0, 32);
+    const ext = (String(b.name || '').match(/\.[a-z0-9]{2,5}$/i) || [''])[0];
+    const key = `partner-refs/${hash}${ext}`;
+    try {
+      await putObject(key, parsed.buffer, parsed.mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
+    } catch (e) {
+      reply.code(502); return { error: `Couldn't store the file: ${e.message}` };
+    }
+    return { ok: true, url: designUrlTtlDays() > 0 ? presignGet(key) : publicUrl(key), key, name: b.name || null };
   });
 
   /**
