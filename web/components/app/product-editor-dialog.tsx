@@ -19,6 +19,8 @@ const METHODS = PRODUCT_METHODS.map((m) => m.label)
 // load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
 const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
+/** Seeded on a NEW product — the standard run, S through 3XL. Deletable per product. */
+const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"]
 const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
 
 const imageOf = (p: CatalogProduct) => p.img || p.image || p.hero || p.images?.[0] || (p.colorImages ? Object.values(p.colorImages).find(Boolean) || "" : "") || ""
@@ -156,7 +158,11 @@ export function ProductEditorDialog({
       // Supplier feeds send HTML fragments (<p><strong>95% Cotton…</strong></p>), which
       // rendered as literal tags in this textarea. Flatten to one feature per line.
       setDesc(looksLikeHtml(p?.description) ? descriptionToText(p?.description) : (p?.description ?? ""))
-      setSizes(p?.sizes ?? [])
+      // A NEW product starts with the standard run seeded, so the per-size pricing table
+      // is there to fill in rather than something you have to discover by adding sizes
+      // first. Editing an EXISTING product keeps exactly what it has — seeding there
+      // would silently re-add sizes someone had deliberately removed.
+      setSizes(p ? (p.sizes ?? []) : DEFAULT_SIZES)
       setTiers(tiersToStr(p?.sizePrices))
       setColors(p?.colorImages ? Object.keys(p.colorImages) : p?.mainColor ? [p.mainColor] : [])
       // Collect every image we know about — hero, gallery, per-colour — de-duped, so
@@ -360,8 +366,8 @@ export function ProductEditorDialog({
                   computed as product cost {markup > 0 ? `+ $${markup.toFixed(2)}` : "+ your markup"}
                   {" "}(set in Settings → Platform). The print-method surcharge is added on top.
                 </p>
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span>
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem] gap-2 text-xs text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span className="text-right">Margin</span>
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -372,7 +378,7 @@ export function ProductEditorDialog({
                     const patch = (k: keyof Tier, v: string) =>
                       setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
                     return (
-                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr] items-center gap-2">
+                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
                         value={t?.cost ?? ""}
@@ -393,6 +399,27 @@ export function ProductEditorDialog({
                         placeholder={shipping.trim() === "" ? "default" : shipping}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
+                      {/* Margin for THIS size, at the end of its own row. Retail is the
+                          product's retail price (there is one per product, not per size);
+                          the base cost is this row's if set, otherwise the derived
+                          cost + markup, otherwise the product-level base. Without this
+                          the only margin shown was the product-level one, which is wrong
+                          the moment a 3XL costs more to buy or to ship. */}
+                      {(() => {
+                        const retailN = Number(price)
+                        const baseN = t?.price?.trim() ? Number(t.price)
+                          : derived ? Number(derived)
+                          : Number(basePrice)
+                        const m = retailN - baseN
+                        return (
+                          <span
+                            className={"text-right text-xs font-semibold tabular-nums " + (!isFinite(m) ? "text-muted-foreground" : m >= 0 ? "text-emerald-600" : "text-destructive")}
+                            title={isFinite(m) ? `Retail ${retailN.toFixed(2)} − base ${baseN.toFixed(2)}` : "Enter a retail price and a cost"}
+                          >
+                            {isFinite(m) ? `$${m.toFixed(2)}` : "—"}
+                          </span>
+                        )
+                      })()}
                     </div>
                   )})}
                 </div>
