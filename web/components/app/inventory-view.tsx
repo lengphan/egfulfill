@@ -32,6 +32,7 @@ export function InventoryView() {
   // Label printing: pick the variants you actually need, and how many of each.
   // Printing the whole filtered list one-each wasted a roll every time.
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [zoomSku, setZoomSku] = useState<string | null>(null)
   const [copies, setCopies] = useState<Record<string, number>>({})
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -197,7 +198,22 @@ export function InventoryView() {
                           }}
                         />
                       </td>
-                      <td className="px-4 py-2"><div className="flex flex-col gap-0.5"><span className="font-mono text-xs font-medium">{it.sku}</span><Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} className="max-w-[120px]" /></div></td>
+                      <td className="px-4 py-2">
+                        {/* Tap to enlarge. The inline code is a thumbnail — at 22px tall
+                            with 1px bars nothing can read it off a phone screen, which is
+                            what "the barcode won't scan" actually was. `fit` matters as
+                            much as the size: without it JsBarcode writes a fixed pixel
+                            width and no viewBox, so max-w clipped the bars outright. */}
+                        <button
+                          type="button"
+                          onClick={() => setZoomSku(it.sku)}
+                          title="Tap to enlarge for scanning"
+                          className="flex w-full flex-col gap-0.5 text-left transition-opacity hover:opacity-70"
+                        >
+                          <span className="font-mono text-xs font-medium">{it.sku}</span>
+                          <Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} fit className="w-[120px]" />
+                        </button>
+                      </td>
                       <td className="px-4 py-2"><div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>{it.variant && <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant}</div>}</td>
                       <td className="px-2 py-2 text-center">
                         {/* How many stickers for THIS variant. Only meaningful once it's
@@ -251,7 +267,42 @@ export function InventoryView() {
           sku: i.sku, name: i.name, variant: i.variant, copies: copies[i.sku] ?? 1,
         }))}
       />
+      <BarcodeZoom sku={zoomSku} onClose={() => setZoomSku(null)} />
     </div>
+  )
+}
+
+/**
+ * One SKU's barcode, big enough to scan off the screen.
+ *
+ * The scrim is dark so the phone's exposure settles on the code instead of a bright
+ * page, but the barcode itself stays BLACK ON WHITE. Inverting it — light bars on a
+ * dark field — is what breaks scanning: BarcodeDetector and ZXing both expect dark
+ * bars on a light quiet zone, and most handheld guns won't read an inverted code at
+ * all. So: dark room, white card.
+ */
+function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void }) {
+  return (
+    <Dialog open={!!sku} onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="border-none bg-black/90 sm:max-w-xl">
+        <DialogHeader><DialogTitle className="text-white">Scan this code</DialogTitle></DialogHeader>
+        {sku && (
+          <div className="space-y-3 pb-2">
+            {/* Generous white padding IS the quiet zone — Code-128 needs a clear margin
+                either side or the scanner can't find the start/stop guards. */}
+            <div className="rounded-xl bg-white px-6 py-8">
+              {/* No in-SVG text: the SKU is rendered below in a larger face, and the
+                  baked-in label competes with the quiet zone for viewBox space. */}
+              <Barcode value={sku} height={130} width={3} fontSize={0} displayValue={false} fit />
+            </div>
+            <p className="text-center font-mono text-sm text-white/70">{sku}</p>
+            <p className="text-center text-xs text-white/50">
+              Hold the phone 15–25cm away. Turn screen brightness up if it won&apos;t read.
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
