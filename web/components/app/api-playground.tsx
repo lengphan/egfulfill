@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, CaretRight } from "@phosphor-icons/react"
+import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, CaretRight, BellRinging } from "@phosphor-icons/react"
+import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +18,42 @@ const methodTone: Record<string, string> = {
   POST: "bg-sky-100 text-sky-700",
 }
 
+type DevTab = "api" | "webhooks"
+
+/**
+ * The two halves of an integration, kept apart.
+ *
+ * The Webhooks panel first shipped inside the endpoint browser's right-hand column, so
+ * it re-rendered under whichever endpoint you had selected — a live management surface
+ * stapled to the bottom of every doc page. They're different jobs: one is "calls you
+ * make to us", the other is "calls we make to you".
+ *
+ * Module scope, not defined during render (react-hooks/static-components).
+ */
+function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
+  const items: { id: DevTab; label: string; icon: typeof Lightning }[] = [
+    { id: "api", label: "API playground", icon: Lightning },
+    { id: "webhooks", label: "Webhooks", icon: BellRinging },
+  ]
+  return (
+    <nav aria-label="Developer sections" className={cn(tabsListVariants(), "h-8 w-fit")}>
+      {items.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          type="button"
+          aria-current={tab === id ? "page" : undefined}
+          onClick={() => onTab(id)}
+          className={cn(tabsTriggerVariants({ active: tab === id }), "px-3")}
+        >
+          <Icon size={14} weight="bold" /> {label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 export function ApiPlayground() {
+  const [tab, setTab] = useState<DevTab>("api")
   const [env, setEnv] = useState<"test" | "live">("test")
   const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
   const apiKey = keys[env]
@@ -90,8 +127,18 @@ export function ApiPlayground() {
     }
   }
 
+  if (tab === "webhooks") {
+    return (
+      <div className="space-y-4">
+        <DevTabs tab={tab} onTab={setTab} />
+        <WebhooksPanel />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
+      <DevTabs tab={tab} onTab={setTab} />
       {/* Getting started — collapsed by default so the test key is the focus */}
       <details className="group rounded-2xl border border-border bg-card">
         <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-semibold">
@@ -238,10 +285,6 @@ export function ApiPlayground() {
             </SectionCard>
           )}
 
-          {/* The other half of an integration: these endpoints are what YOU call, webhooks
-              are what we call back. Registering and testing one used to mean curl with a
-              hand-substituted id and key, which is how you end up testing endpoint "ID". */}
-          <WebhooksPanel />
         </div>
       </div>
     </div>
