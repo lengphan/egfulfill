@@ -130,6 +130,27 @@ export async function putObject(key, buffer, contentType = 'application/octet-st
   return (CDN ? `${CDN}/${key}` : `https://${host}${uri}`);
 }
 
+/**
+ * Read an object back. Signed GET rather than a presigned URL because the caller wants
+ * the BYTES — it's re-serving them — and a redirect to a signed URL would send the
+ * browser to the storage host, reintroducing exactly the cross-origin problem the
+ * supplier-image proxy exists to avoid.
+ *
+ * Returns null when the object isn't there (a 404 is an answer, not a failure).
+ */
+export async function getObject(key) {
+  if (!storageEnabled()) return null;
+  const { host, uri } = _hostAndUri(key);
+  const { amzDate, dateStamp } = _stamps();
+  const payloadHash = sha256hex('');
+  const headers = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate };
+  const authorization = signV4({ method: 'GET', host, canonicalUri: uri, payloadHash, headers, amzDate, dateStamp });
+  const res = await fetch(`https://${host}${uri}`, { method: 'GET', headers: { ...headers, Authorization: authorization } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('storage GET failed: ' + res.status);
+  return { body: Buffer.from(await res.arrayBuffer()), contentType: res.headers.get('content-type') || null };
+}
+
 export async function deleteObject(key) {
   if (!storageEnabled()) return;
   const { host, uri } = _hostAndUri(key);

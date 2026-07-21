@@ -148,24 +148,57 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // server-side and re-serve it same-origin. No auth (an <img> can't send one), but locked
   // to the S&S CDN host + image paths only, with a timeout + content-type check, so it can't
   // be used as an open/SSRF proxy.
+  /**
+   * Supplier image proxy, cached into OUR storage.
+   *
+   * Why proxy at all: the sync stores a URL, not a picture, so the catalogue costs nothing
+   * to keep — but S&S's CDN sets Cross-Origin-Resource-Policy and 403s obvious bots, so a
+   * browser can't load their URL directly from our origin. It has to come through us.
+   *
+   * Why CACHE: re-fetching their CDN on every render makes every product list depend on
+   * someone else's rate limit and bot rules, and this path has never been proven to work
+   * from the VPS (the old app never displayed these images at all). Fetched once, stored,
+   * and served from our own bucket afterwards, a blocked or slow upstream stops mattering
+   * from the second view onward.
+   *
+   * Keyed by a hash of the SOURCE URL — which is per sku and colour, so each variant keeps
+   * its own picture and an identical image fetched twice collapses to one object.
+   */
   app.get('/api/ss/img', async (req, reply) => {
     const u = String((req.query && req.query.u) || '');
     // Their docs give image URLs as https://www.ssactivewear.com/{Image}; our sync built
-    // cdn.ssactivewear.com. Accept BOTH rather than bet on one — a wrong host is an
-    // invisible failure (a broken <img>), which is the hardest kind to notice.
+    // cdn.ssactivewear.com. Accept BOTH rather than bet on one — a wrong host shows up as
+    // a broken <img>, which is the hardest kind of failure to notice.
     if (!/^https:\/\/(cdn|www)\.ssactivewear\.com\/[\w./%-]+$/i.test(u)) {
       reply.code(400); return { error: 'only S&S image hosts may be proxied' };
     }
+
+    const { storageEnabled, putObject, getObject } = await import('../storage.js');
+    const { createHash } = await import('crypto');
+    const ext = (u.split('?')[0].match(/\.[a-z0-9]{2,5}$/i) || ['.jpg'])[0];
+    const key = `supplier-img/${createHash('sha256').update(u).digest('hex').slice(0, 32)}${ext}`;
+
+    // Served from our bucket if we already have it.
+    if (storageEnabled()) {
+      try {
+        const hit = await getObject(key);
+        if (hit && hit.body && hit.body.length) {
+          reply.header('Content-Type', hit.contentType || 'image/jpeg');
+          reply.header('Cache-Control', 'public, max-age=604800, immutable');
+          return reply.send(hit.body);
+        }
+      } catch { /* not cached yet — fetch below */ }
+    }
+
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
-      // A browser-ish User-Agent: their CDN 403s obvious bots, which is what a bare
-      // 'egfulfill/1.0' looks like.
+      // A browser-ish User-Agent + Referer: their CDN 403s anything that looks like a bot,
+      // which a bare 'egfulfill/1.0' does.
       const UA = 'Mozilla/5.0 (compatible; egfulfill/1.0)';
       const get = (url) => fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA, Accept: 'image/*', Referer: 'https://www.ssactivewear.com/' } });
       let r = await get(u);
-      // Self-heal a missing size variant: fall back to _fm (what they actually return in
-      // the feed) and then to the other host, instead of serving a broken image.
+      // Self-heal: a missing size variant or the wrong host shouldn't mean no picture.
       if (!r.ok) {
         const alts = [u.replace(/_(fs|fl)(\.[a-z]+)$/i, '_fm$2'), u.replace('//cdn.', '//www.'), u.replace('//www.', '//cdn.')]
           .filter((x, i, a) => x !== u && a.indexOf(x) === i);
@@ -173,19 +206,26 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       }
       clearTimeout(timer);
       if (!r.ok) {
-        // Say so in the log. A broken <img> tells nobody anything, and this failing
-        // silently is exactly why nobody noticed the pictures never worked.
+        // Say so in the log. A broken <img> tells nobody anything, and silence here is why
+        // nobody noticed these never worked.
         console.error(`[ss/img] upstream ${r.status} for ${u}`);
         reply.code(r.status); return { error: 'upstream ' + r.status, url: u };
       }
-      const ct = r.headers.get('content-type') || 'image/jpeg';
-      if (!/^image\//i.test(ct)) { reply.code(415); return { error: 'not an image' }; }
+      const type = r.headers.get('content-type') || 'image/jpeg';
+      if (!/^image\//i.test(type)) {
+        console.error(`[ss/img] non-image content-type "${type}" for ${u}`);
+        reply.code(502); return { error: 'upstream returned ' + type + ', not an image', url: u };
+      }
       const buf = Buffer.from(await r.arrayBuffer());
-      reply.header('Content-Type', ct);
-      reply.header('Cache-Control', 'public, max-age=86400, immutable');
-      reply.header('Cross-Origin-Resource-Policy', 'cross-origin');
+      // Best-effort store: a caching failure must never cost the picture we just fetched.
+      if (storageEnabled()) putObject(key, buf, type, 'private').catch(() => {});
+      reply.header('Content-Type', type);
+      reply.header('Cache-Control', 'public, max-age=604800, immutable');
       return reply.send(buf);
-    } catch (e) { reply.code(502); return { error: 'proxy failed: ' + (e && e.message ? e.message : 'error') }; }
+    } catch (e) {
+      console.error(`[ss/img] fetch error for ${u}: ${e.message}`);
+      reply.code(502); return { error: 'image fetch failed: ' + e.message };
+    }
   });
 
   // Synced blanks live in their own table (created idempotently at load, like the other integrations).
