@@ -75,3 +75,41 @@ export async function ensureCostColumns() {
   await q('alter table wallet_ledger add column if not exists order_id text').catch(() => {});
   await q('create index if not exists wallet_ledger_order on wallet_ledger (order_id)').catch(() => {});
 }
+
+/**
+ * Reverse an external cost — a supplier credit, a refunded label, a task we were not
+ * charged for after all.
+ *
+ * A separate POSITIVE row rather than deleting or editing the original. The ledger is
+ * append-only for the same reason a paper one is: "we spent $400 and got $120 back" and
+ * "we spent $280" are different facts, and only the first survives an audit. Netting them
+ * at write time throws away the history that explains the number.
+ *
+ * Idempotent on its own ref, so a credit confirmed twice lands once.
+ *
+ * @param {'label'|'dispatch'|'design'|'blanks'} kind  what the credit reverses
+ * @param {number} amount   positive; what came BACK (stored as a positive delta)
+ * @param {string} ref      stable id for the credit, e.g. `po-return-PO-123-1`
+ */
+export async function recordCredit(kind, amount, ref, note = null, meta = {}) {
+  const type = COST_TYPES[kind];
+  const amt = Number(amount);
+  if (!type || !isFinite(amt) || amt <= 0 || !ref) return { ok: false, skipped: true };
+  try {
+    await q(
+      `insert into wallet_ledger (account, delta, type, ref, note)
+       values ($1, $2, $3, $4, $5)
+       on conflict do nothing`,
+      [HOUSE, Math.abs(amt), type + '-credit', String(ref), note || null]
+    );
+    if (meta.orderId) {
+      await q(
+        `update wallet_ledger set order_id=$1 where ref=$2 and type=$3 and order_id is null`,
+        [String(meta.orderId), String(ref), type + '-credit']
+      ).catch(() => {});
+    }
+    return { ok: true, type: type + '-credit', amount: amt };
+  } catch {
+    return { ok: false };
+  }
+}

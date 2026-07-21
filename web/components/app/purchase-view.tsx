@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList,
+  getFactoryList, saveFactoryList, creditPoReturn, type PoReturn,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
 import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
+import { PoReturnDialog } from "@/components/app/po-return-dialog"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -40,6 +41,7 @@ export function PurchaseView() {
   // side by side is the normal reason to open them.
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [supplierCfg, setSupplierCfg] = useState(false)
+  const [returning, setReturning] = useState<PurchaseOrder | null>(null)
 
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
@@ -324,6 +326,32 @@ export function PurchaseView() {
     } finally { setBusy(null) }
   }
 
+  const returnsOf = (po: PurchaseOrder): PoReturn[] => {
+    const r = ((po.meta || {}) as { returns?: PoReturn[] }).returns
+    return Array.isArray(r) ? r : []
+  }
+
+  /**
+   * Confirm a supplier credit landed. Asks for the amount rather than assuming the
+   * estimate: restocking fees and partial credits mean what arrives is often not what
+   * was expected, and a booked figure that was never received is worse than none.
+   */
+  const confirmCredit = async (po: PurchaseOrder, r: PoReturn) => {
+    const typed = window.prompt(`How much did ${po.supplier || "the supplier"} actually credit?`, String(r.credit || ""))
+    if (typed == null) return
+    const amount = Number(typed)
+    if (!isFinite(amount) || amount <= 0) { setMsg({ ok: false, text: "A credit needs an amount greater than zero." }); return }
+    setBusy(po.num); setMsg(null)
+    try {
+      const res = await creditPoReturn(po.num, r.id, amount)
+      if (res.error) throw new Error(res.error)
+      setMsg({ ok: true, text: `${usd(amount)} credit recorded against ${po.num}.` })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't record that credit." })
+    } finally { setBusy(null) }
+  }
+
   const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
 
   const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
@@ -527,6 +555,11 @@ export function PurchaseView() {
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
                       <ArrowClockwise size={13} weight="bold" /> Reorder
                     </Button>
+                    {po.status === "received" && (
+                      <Button size="sm" variant="outline" onClick={() => setReturning(po)} disabled={busy === po.num}>
+                        <ArrowUUpLeft size={13} weight="bold" /> Return
+                      </Button>
+                    )}
                     {po.status === "placed" && (
                       <>
                         <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
@@ -558,6 +591,37 @@ export function PurchaseView() {
                               className="h-7 w-48 font-mono text-xs"
                             />
                           </label>
+                        </div>
+                      )}
+                      {returnsOf(po).length > 0 && (
+                        <div className="border-b border-border py-2.5">
+                          <div className="mb-1 text-xs font-medium text-muted-foreground">Returns</div>
+                          {returnsOf(po).map((r) => (
+                            <div key={r.id} className="flex flex-wrap items-center gap-2 py-1 text-xs">
+                              <span className="text-muted-foreground">
+                                {r.lines.reduce((a, l) => a + num(l.qty), 0)} units
+                                {r.rma ? ` · RMA ${r.rma}` : ""}
+                                {r.note ? ` · ${r.note}` : ""}
+                              </span>
+                              {r.status === "credited" ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                  <CheckCircle size={10} weight="fill" /> {usd(r.credit)} credited
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+                                    {usd(r.credit)} expected
+                                  </span>
+                                  {/* Confirmed separately, because a credit lands when the
+                                      supplier says so — not when the box went back. */}
+                                  <button onClick={() => confirmCredit(po, r)} disabled={busy === po.num}
+                                    className="font-medium text-primary hover:underline">
+                                    Credit received
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                       {po.items.length === 0 ? (
@@ -594,6 +658,8 @@ export function PurchaseView() {
       </SectionCard>
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
+
+      <PoReturnDialog po={returning} onClose={() => setReturning(null)} onDone={load} />
 
       <POAddItems
         key={addTo?.num ?? "none"}

@@ -1604,3 +1604,26 @@ export type SupplierOptions = {
 export function getSupplierOptions() {
   return api<SupplierOptions>(`/api/purchase/supplier-options`)
 }
+
+// ── Supplier returns ───────────────────────────────────────────────────────────
+// The PO equivalent of a refund, and deliberately two steps: goods go back now, the
+// credit lands when the supplier decides it does. Booking the credit at return time would
+// put money in the P&L that hasn't arrived.
+export type PoReturn = {
+  id: string; at: string; by?: string | null; note?: string | null; rma?: string | null
+  lines: { sku: string; qty: number; credit: number }[]
+  credit: number; status: "pending" | "credited"; creditedAt?: string
+}
+export function returnPoLines(num: string, body: {
+  lines: { sku: string; qty: number; credit?: number }[]; note?: string; rma?: string
+}) {
+  return api<{ ok?: boolean; return?: PoReturn; error?: string }>(
+    `/api/purchase/${encodeURIComponent(num)}/return`, { method: "POST", body: JSON.stringify(body) })
+}
+/** Confirm the credit arrived. `amount` overrides the estimate — restocking fees and
+ *  partial credits mean what lands often isn't what was expected. */
+export function creditPoReturn(num: string, id: string, amount?: number) {
+  return api<{ ok?: boolean; return?: PoReturn; error?: string }>(
+    `/api/purchase/${encodeURIComponent(num)}/return/${encodeURIComponent(id)}/credit`,
+    { method: "POST", body: JSON.stringify({ amount }) })
+}

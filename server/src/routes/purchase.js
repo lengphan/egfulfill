@@ -3,7 +3,7 @@
 // received (quantities added back into inventory). Whole-object upsert by `num`.
 
 import { q, softQ } from '../db.js';
-import { recordCost } from '../costs.js';
+import { recordCost, recordCredit } from '../costs.js';
 
 let _ready = null;
 function ensure() {
@@ -179,6 +179,100 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
         `Blanks · ${b.supplier || 'unassigned supplier'} · PO ${num}`);
     }
     return { ok: true, num };
+  });
+
+  /**
+   * Send stock back to a supplier.
+   *
+   * The purchase-order equivalent of a refund, and deliberately a two-step: goods go back
+   * now, the credit lands whenever the supplier decides it does. Booking the credit at
+   * return time would put money in the P&L that hasn't arrived — the same mistake as
+   * marking an order Refunded without refunding it.
+   *
+   * NOTE: this does NOT tell the supplier anything. Neither S&S's nor Otto's API has a
+   * documented return endpoint in anything we hold, so the RMA is raised with them the
+   * usual way; this records what left and what is owed back.
+   */
+  app.post('/api/purchase/:num/return', { preHandler: requireWarehouse }, async (req, reply) => {
+    await ensure();
+    const num = String(req.params.num);
+    const b = req.body || {};
+    const po = (await q('select num, supplier, items, status, meta from purchase_orders where num=$1', [num])).rows[0];
+    if (!po) { reply.code(404); return { error: 'Purchase order not found' }; }
+    if (po.status !== 'received') {
+      reply.code(409);
+      return { error: 'Only a received order can be returned — nothing has arrived on this one yet.' };
+    }
+
+    const onPo = new Map((Array.isArray(po.items) ? po.items : []).map((l) => [String(l.sku), l]));
+    const lines = (Array.isArray(b.lines) ? b.lines : [])
+      .map((l) => ({ sku: String(l.sku || '').trim(), qty: parseInt(l.qty, 10) || 0, credit: Number(l.credit) || 0 }))
+      .filter((l) => l.sku && l.qty > 0 && onPo.has(l.sku));
+    if (!lines.length) { reply.code(400); return { error: 'Pick at least one line to return.' }; }
+
+    // Never return more than arrived. A return larger than the receipt would pull stock
+    // that was never on the shelf and claim a credit larger than the purchase.
+    for (const l of lines) {
+      const had = parseInt(onPo.get(l.sku).qty, 10) || 0;
+      if (l.qty > had) {
+        reply.code(400);
+        return { error: `Can't return ${l.qty} of ${l.sku} — only ${had} were received.` };
+      }
+    }
+
+    const meta = (po.meta && typeof po.meta === 'object') ? po.meta : {};
+    const returns = Array.isArray(meta.returns) ? meta.returns : [];
+    const entry = {
+      id: String(returns.length + 1),
+      at: new Date().toISOString(),
+      by: req.user && req.user.sub ? String(req.user.sub) : null,
+      note: b.note ? String(b.note).slice(0, 500) : null,
+      rma: b.rma ? String(b.rma).slice(0, 120) : null,
+      lines,
+      credit: Math.round(lines.reduce((s, l) => s + l.credit, 0) * 100) / 100,
+      status: 'pending',
+    };
+
+    // Stock leaves the shelf NOW — the goods are physically going back, whatever the
+    // supplier decides about the money.
+    for (const l of lines) {
+      await q('update inventory set in_stock = greatest(0, coalesce(in_stock,0) - $2) where sku=$1', [l.sku, l.qty])
+        .catch(() => {});
+    }
+
+    await q('update purchase_orders set meta=$2 where num=$1',
+      [num, JSON.stringify({ ...meta, returns: [...returns, entry] })]);
+    return { ok: true, return: entry };
+  });
+
+  /**
+   * The credit actually landed. Books it as a positive row against the blanks cost —
+   * append-only, so "spent $400, got $120 back" stays two facts rather than one net $280.
+   */
+  app.post('/api/purchase/:num/return/:id/credit', { preHandler: requireWarehouse }, async (req, reply) => {
+    await ensure();
+    const num = String(req.params.num);
+    const po = (await q('select num, supplier, meta from purchase_orders where num=$1', [num])).rows[0];
+    if (!po) { reply.code(404); return { error: 'Purchase order not found' }; }
+    const meta = (po.meta && typeof po.meta === 'object') ? po.meta : {};
+    const returns = Array.isArray(meta.returns) ? meta.returns : [];
+    const idx = returns.findIndex((r) => String(r.id) === String(req.params.id));
+    if (idx < 0) { reply.code(404); return { error: 'Return not found' }; }
+    if (returns[idx].status === 'credited') return { ok: true, already: true, return: returns[idx] };
+
+    // The amount that actually arrived can differ from what was expected — restocking
+    // fees, a partial credit — so the confirmed figure wins over the estimate.
+    const amount = req.body && req.body.amount != null
+      ? Math.max(0, Number(req.body.amount) || 0)
+      : Number(returns[idx].credit) || 0;
+    if (amount <= 0) { reply.code(400); return { error: 'A credit needs an amount greater than zero.' }; }
+
+    await recordCredit('blanks', amount, `po-return-${num}-${returns[idx].id}`,
+      `Supplier credit · ${po.supplier || 'unassigned supplier'} · PO ${num}`);
+
+    returns[idx] = { ...returns[idx], status: 'credited', creditedAt: new Date().toISOString(), credit: amount };
+    await q('update purchase_orders set meta=$2 where num=$1', [num, JSON.stringify({ ...meta, returns })]);
+    return { ok: true, return: returns[idx] };
   });
 
   app.delete('/api/purchase/:num', { preHandler: requireWarehouse }, async (req) => {
