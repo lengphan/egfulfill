@@ -382,14 +382,27 @@ export function PurchaseView() {
   }
 
   /** The supplier's own order number, dug out of whatever shape their response took. */
+  /**
+   * The supplier's own order number, out of whatever shape their response took.
+   *
+   * This missed the successful case entirely. A placed S&S order comes back as
+   * `{ orders: [{ orderNumber }], ssResponse: [...] }` — the number is one level down
+   * inside an ARRAY, and reading only the top level returned null. Cancel then skipped
+   * the supplier call without a word and cancelled our record alone, which is exactly
+   * the failure the warning text was trying to prevent.
+   */
   const supplierOrderNo = (po: PurchaseOrder): string | null => {
     const m = (po.meta || {}) as Record<string, unknown>
     const r = (m.response ?? {}) as Record<string, unknown>
-    const nested = ((r.ssResponse ?? r.ottoResponse ?? {}) as Record<string, unknown>)
-    const pick = (o: Record<string, unknown>) =>
-      o.orderNumber ?? o.order_number ?? o.orderNo ?? o.salesOrderNumber ?? o.id
-    const v = pick(nested) ?? pick(r)
-    return v == null ? null : String(v)
+    const pick = (o: unknown): string | null => {
+      if (!o || typeof o !== "object") return null
+      // Their responses are arrays as often as objects — one entry per warehouse.
+      if (Array.isArray(o)) { for (const x of o) { const v = pick(x); if (v) return v } return null }
+      const rec = o as Record<string, unknown>
+      const v = rec.orderNumber ?? rec.order_number ?? rec.orderNo ?? rec.salesOrderNumber
+      return v == null || v === "" ? null : String(v)
+    }
+    return pick(r.orders) ?? pick(r.ssResponse) ?? pick(r.ottoResponse) ?? pick(r)
   }
   const trackingOf = (po: PurchaseOrder): string =>
     String(((po.meta || {}) as Record<string, string>).tracking ?? "")
@@ -429,6 +442,12 @@ export function PurchaseView() {
       let supplierMsg = ""
       const orderNo = supplierOrderNo(po)
       const isSs = /s&s|activewear/i.test(po.supplier || "")
+      // No order number means we CAN'T ask them, which is different from choosing not to.
+      // Saying so beats cancelling our record and letting the goods arrive anyway.
+      if (sent && isSs && !orderNo) {
+        setMsg({ ok: false, text: `${po.num} has no S&S order number recorded, so their API can't be told. Cancel it in the S&S portal, then mark this cancelled again.` })
+        return
+      }
       if (sent && isSs && orderNo) {
         const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
         if ("error" in c && c.error) {
