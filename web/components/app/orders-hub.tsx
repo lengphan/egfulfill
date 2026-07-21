@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, pushToDispatch, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -417,22 +417,31 @@ export function OrdersHub() {
   // no button here on purpose — this bar is deliberately just "what's selected" and "the
   // action". It wants a home that isn't a bulk toolbar; the Scan readiness chip on each
   // row is the obvious one, since that's where the fact is already displayed.
+  /**
+   * Stage the selection on the DISPATCH BOARD. Doesn't send it anywhere yet.
+   *
+   * This used to push straight to byeastside — a paid, external action taken from a list
+   * you might only have been browsing, with no step in between. The board is where the two
+   * routes are chosen (partner or in-house), so the decision belongs there, beside the
+   * queue, rather than here beside a filter.
+   */
   const doPush = async () => {
     if (!selected.size) return
     setPushing(true); setPushMsg(null)
     try {
-      const r = await pushToDispatch([...selected])
-      if (r.error) throw new Error(r.error)
-      const failed = (r.results ?? []).filter((x) => !x.ok)
+      const ids = [...selected]
+      const results = await Promise.all(ids.map((id) =>
+        updateOrder(id, { factoryStatus: "awaiting_scan" })
+          .then(() => ({ ok: true, error: "" }))
+          .catch((e: unknown) => ({ ok: false, error: e instanceof Error ? e.message : "failed" }))))
+      const failed = results.filter((x) => !x.ok)
       setPushMsg(failed.length
-        // Name the first real reason rather than a count — their errors aren't documented,
-        // so the message they sent back is the only thing that helps.
-        ? { tone: "err", text: `${r.pushed ?? 0} pushed, ${failed.length} failed — ${failed[0].error ?? "unknown error"}` }
-        : { tone: "ok", text: `${r.pushed ?? 0} pushed to dispatch${r.skipped ? `, ${r.skipped} already there` : ""}.` })
+        ? { tone: "err", text: `${ids.length - failed.length} sent · ${failed.length} failed — ${failed[0].error}` }
+        : { tone: "ok", text: `${ids.length} sent to the dispatch board — pick the scan route there.` })
       setSelected(new Set())
       load()
     } catch (e) {
-      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Push failed." })
+      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't send those to the board." })
     } finally { setPushing(false) }
   }
 
@@ -574,7 +583,7 @@ export function OrdersHub() {
               <span className="text-sm text-muted-foreground">{selected.size} selected</span>
               <Button size="sm" onClick={doPush} disabled={pushing}>
                 {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
-                {pushing ? "Pushing…" : `Push ${selected.size} to dispatch`}
+                {pushing ? "Sending…" : `Send ${selected.size} to dispatch board`}
               </Button>
               {/* Unlabelled ×: without it there's no way out of a selection except
                   unticking every row. */}

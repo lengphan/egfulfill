@@ -1860,3 +1860,33 @@ export function markScannedInHouse(orderId: string, undo = false) {
   return api<{ ok?: boolean; scanned?: boolean; already?: boolean; via?: string; error?: string }>(
     `/api/orders/${encodeURIComponent(orderId)}/scanned`, { method: "POST", body: JSON.stringify({ undo }) })
 }
+
+// ── Dispatch history + shipments ───────────────────────────────────────────────
+export type DispatchScanRow = {
+  id: string; num: string; customer: string | null
+  tracking: string | null; carrier: string | null
+  scannedAt: string; via: string | null; by: string | null
+  stage: string | null; delivery: string | null
+}
+export function getDispatchHistory(p: { days?: number; search?: string } = {}) {
+  const s = new URLSearchParams()
+  if (p.days) s.set("days", String(p.days))
+  if (p.search) s.set("search", p.search)
+  return api<{ scans: DispatchScanRow[] }>(`/api/dispatch/history?${s.toString()}`)
+}
+
+export type ShipmentRow = {
+  id: string; num: string; customer: string | null; state: string | null
+  tracking: string; carrier: string | null; labelUrl: string | null
+  stage: string | null
+  /** What the CARRIER says, as distinct from `stage` which is what the floor says. When
+   *  they disagree, which one is wrong is the thing being worked out. */
+  delivery: string | null; deliveryDetail: string | null; deliveryCheckedAt: string | null
+  scannedAt: string | null; scannedVia: string | null; createdAt: string
+}
+export function getShipments(p: { search?: string; limit?: number } = {}) {
+  const s = new URLSearchParams()
+  if (p.search) s.set("search", p.search)
+  if (p.limit) s.set("limit", String(p.limit))
+  return api<{ shipments: ShipmentRow[] }>(`/api/shipments?${s.toString()}`)
+}

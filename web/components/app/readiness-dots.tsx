@@ -38,11 +38,19 @@ function Tag({ id, label, state, title, orderId, status, files }: {
   status?: string
   files?: TagFile[]
 }) {
+  // Three states, three colours — grey → amber → violet. "Doing" was a paler violet,
+  // which meant the difference between in-progress and done was a shade of the same hue:
+  // legible one row at a time, invisible down a column, which is how a board is actually
+  // read. A distinct hue makes "sent but not back yet" scannable.
+  //
+  // Amber is used here deliberately despite meaning "problem" elsewhere in the app. In
+  // THIS column it isn't an alarm — the tags are a progress track, and a middle state is
+  // exactly what amber reads as anywhere else it appears on a timeline.
   const cls =
     state === "done"
       ? "bg-primary/10 text-primary hover:bg-primary/15"
       : state === "doing"
-        ? "bg-primary/5 text-primary/70 hover:bg-primary/10"
+        ? "bg-amber-100 text-amber-800 hover:bg-amber-200/70"
         : "bg-muted text-muted-foreground/70 hover:bg-muted/80"
   const [rows, setRows] = useState<AuditRow[] | null>(null)
 
@@ -189,7 +197,13 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   // true: we have no evidence it was. Orders predating this field read the same way, and
   // that's honest rather than flattering.
   const preScanned = !!order.label_scanned_at
-  const scanTitle = preScanned
+  // Sent to the partner's queue but not yet scanned back — previously indistinguishable
+  // from "nothing has happened", which is the state you most want to tell apart when
+  // chasing a parcel.
+  const scanPending = !preScanned && !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
+  const scanTitle = scanPending && !preScanned
+    ? "With the dispatch partner — pushed to their queue, not scanned back yet."
+    : preScanned
     ? `Pre-scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} — tracking is live for the buyer. The parcel may still be in production.`
     : order.tracking
       ? "Label exists but hasn't been pre-scanned — the buyer's tracking has not started"
@@ -262,7 +276,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
       {/* Names are fixed. Colour carries progress; the words live in each popover. */}
       <Tag id="label" orderId={order.id} label="Label" state={hasLabel ? "done" : "todo"}
            title={labelTitle} status={labelTitle} files={labelFile} />
-      <Tag id="scan" orderId={order.id} label="Scan" state={preScanned ? "done" : "todo"}
+      <Tag id="scan" orderId={order.id} label="Scan" state={preScanned ? "done" : scanPending ? "doing" : "todo"}
            title={scanTitle} status={scanTitle} files={labelFile} />
       <Tag id="design" orderId={order.id} label="Design" state={designState}
            title={designTitle} status={designStatus} files={designFiles} />

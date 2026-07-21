@@ -20,7 +20,7 @@
 //
 // Dormant until BYEASTSIDE_API_KEY is set: every route answers honestly and nothing
 // throws, exactly like the storage and mail integrations.
-import { q } from '../db.js';
+import { q, softQ } from '../db.js';
 import { isStaff } from '../auth.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
@@ -153,6 +153,100 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   }
 
   /**
+   * Shipment history — every order that has ever had a tracking number.
+   *
+   * Scattered across the boards until now: a parcel's number lived on its order, and an
+   * order leaves the board once it ships, so "where is 9300120845500000367870" had no
+   * answer short of remembering which order it belonged to. That question is asked by
+   * whoever is on the phone to a buyer, and it is asked by the tracking number, because
+   * that is the only thing the buyer has.
+   *
+   * Searchable by tracking, order id, customer name or carrier — all four are things
+   * someone might arrive holding.
+   */
+  app.get('/api/shipments', { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    const search = String((req.query && req.query.search) || '').trim().toLowerCase();
+    const limit = Math.min(500, Math.max(1, parseInt((req.query && req.query.limit) || '200', 10) || 200));
+    const args = [];
+    let where = "where coalesce(o.tracking,'') <> ''";
+    if (search) {
+      args.push('%' + search + '%');
+      where += ` and (lower(o.tracking) like $1 or lower(o.id) like $1
+                      or lower(coalesce(o.carrier,'')) like $1
+                      or lower(coalesce(o.customer->>'name','')) like $1)`;
+    }
+    args.push(limit);
+    const r = await softQ('shipments',
+      `select o.id, o.seq, o.tracking, o.carrier, o.tracking_label_url,
+              o.factory_status, o.delivery_status, o.delivery_detail, o.delivery_checked_at,
+              o.label_scanned_at, o.scanned_via, o.created_at,
+              o.customer->>'name' as customer, o.address->>'state' as state
+         from orders o
+         ${where}
+        order by coalesce(o.label_scanned_at, o.created_at) desc
+        limit $${args.length}`, args);
+    return {
+      shipments: r.rows.map((x) => ({
+        id: x.id, num: x.seq ? '#' + x.seq : x.id,
+        customer: x.customer || null, state: x.state || null,
+        tracking: x.tracking, carrier: x.carrier || null,
+        labelUrl: x.tracking_label_url || null,
+        stage: x.factory_status || null,
+        // Two DIFFERENT facts, kept apart on purpose: `stage` is what the floor says,
+        // `delivery` is what the carrier says. They disagree, and which one is wrong is
+        // exactly what someone is trying to work out.
+        delivery: x.delivery_status || null,
+        deliveryDetail: x.delivery_detail || null,
+        deliveryCheckedAt: x.delivery_checked_at,
+        scannedAt: x.label_scanned_at, scannedVia: x.scanned_via || null,
+        createdAt: x.created_at,
+      })),
+    };
+  });
+
+  /**
+   * Scan history — what was scanned, when, by whom, and by which route.
+   *
+   * The awaiting-scan queue answers "what's left". This answers "what happened", which is
+   * the question asked when a carrier says a parcel never arrived: a scan with a time and
+   * a name against it settles that, and a queue that has simply emptied does not.
+   */
+  app.get('/api/dispatch/history', { preHandler: requireAuth }, async (req, reply) => {
+    if (!req.user || req.user.role === 'seller') { reply.code(403); return { error: 'Staff only' }; }
+    const days = Math.min(365, Math.max(1, parseInt((req.query && req.query.days) || '30', 10) || 30));
+    const search = String((req.query && req.query.search) || '').trim().toLowerCase();
+    const args = [String(days)];
+    let where = `where o.label_scanned_at is not null and o.label_scanned_at > now() - ($1 || ' days')::interval`;
+    if (search) {
+      args.push('%' + search + '%');
+      where += ` and (lower(o.id) like $2 or lower(coalesce(o.tracking,'')) like $2
+                      or lower(coalesce(o.customer->>'name','')) like $2)`;
+    }
+    const r = await softQ('dispatch history',
+      `select o.id, o.seq, o.tracking, o.carrier, o.label_scanned_at, o.scanned_by, o.scanned_via,
+              o.factory_status, o.delivery_status, o.customer->>'name' as customer
+         from orders o
+         ${where}
+        order by o.label_scanned_at desc
+        limit 500`, args);
+    return {
+      scans: r.rows.map((x) => ({
+        id: x.id, num: x.seq ? '#' + x.seq : x.id,
+        customer: x.customer || null,
+        tracking: x.tracking || null, carrier: x.carrier || null,
+        scannedAt: x.label_scanned_at,
+        // 'in-house' or 'partner'. Null means it predates the distinction being recorded,
+        // which is stated rather than guessed at.
+        via: x.scanned_via || null,
+        by: x.scanned_by || null,
+        stage: x.factory_status || null,
+        delivery: x.delivery_status || null,
+      })),
+    };
+  });
+
+  /**
    * Mark a label scanned IN-HOUSE — the warehouse did it themselves.
    *
    * Pre-scanning exists to start the buyer's tracking clock, and the dispatch partner is
@@ -261,7 +355,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         && (!o.tracking || String(l.trackingNumber || '') === String(o.tracking)));
       if (!hit) continue;
       // Their pickedAt is the true scan time; fall back to now if they omit it.
-      await q('update orders set label_scanned_at=coalesce($1::timestamptz, now()) where id=$2 and label_scanned_at is null',
+      await q("update orders set label_scanned_at=coalesce($1::timestamptz, now()), scanned_via=coalesce(scanned_via,'partner') where id=$2 and label_scanned_at is null",
         [hit.pickedAt || null, o.id]).catch(() => {});
       scanned++;
     }
@@ -298,7 +392,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       if (r.status === 409) {
         // They scanned it between our check and this call. Record the scan rather than
         // pretending it's still cancellable.
-        await q('update orders set label_scanned_at=coalesce(label_scanned_at, now()) where id=$1', [o.id]).catch(() => {});
+        await q("update orders set label_scanned_at=coalesce(label_scanned_at, now()), scanned_via=coalesce(scanned_via,'partner') where id=$1", [o.id]).catch(() => {});
         results.push({ id: o.id, ok: false, reason: 'already-scanned' });
         continue;
       }
