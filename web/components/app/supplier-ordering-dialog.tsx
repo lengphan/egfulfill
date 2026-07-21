@@ -9,6 +9,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSupplierOptions, setFactorySettings, getSsDaysInTransit, type SupplierOptions } from "@/lib/api"
 
+/**
+ * Show a payment profile safely.
+ *
+ * Suppliers return LABELS, not numbers — "BMO Harris Bank 1234 (John Doe)" — so the last
+ * four are already the only digits present. This masks anything longer anyway: a label is
+ * free text on someone else's system, and the day one contains a full number is not the
+ * day to discover we printed it verbatim.
+ */
+function maskCard(name?: string | null): string {
+  if (!name) return "Saved card"
+  return name.replace(/\d{5,}/g, (d) => "•••• " + d.slice(-4))
+}
+
 /** Their lists come back loosely shaped — an array of strings, or of objects with any of
  *  several id/label spellings. Read defensively rather than assume one. */
 function toOptions(raw: unknown): { value: string; label: string; group?: string }[] {
@@ -56,6 +69,7 @@ export function SupplierOrderingDialog({
   const [opts, setOpts] = useState<SupplierOptions | null>(null)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [ssShip, setSsShip] = useState("")
+  const [ssCard, setSsCard] = useState("")
   const [ottoPay, setOttoPay] = useState("")
   const [ottoShip, setOttoShip] = useState("")
   const [email, setEmail] = useState("")
@@ -72,6 +86,7 @@ export function SupplierOrderingDialog({
     getSupplierOptions().then((o) => {
       setOpts(o)
       setSsShip(o.defaults.ss_shipping_method || "1")
+      setSsCard(o.defaults.ss_payment_profile || "")
       setOttoPay(o.defaults.otto_payment_method || "net30")
       setOttoShip(o.defaults.otto_shipping_method || "")
       setEmail(o.defaults.order_email || "")
@@ -91,6 +106,7 @@ export function SupplierOrderingDialog({
     try {
       await setFactorySettings({
         ss_shipping_method: ssShip,
+        ss_payment_profile: ssCard,
         otto_payment_method: ottoPay,
         otto_shipping_method: ottoShip,
         order_email: email,
@@ -153,6 +169,27 @@ export function SupplierOrderingDialog({
                   S&amp;S Activewear
                   <LiveChip live={opts.suppliers.ss.live} />
                 </h3>
+                {/* WHICH CARD PAYS. Their profile name already carries the last four
+                    ("BMO Harris Bank 1234"), and no full number exists in their API — so
+                    there is nothing here to mask, and nothing stored that could leak. */}
+                <Field label="Pays with">
+                  {opts.suppliers.ss.paymentProfiles?.available ? (
+                    <select value={ssCard} onChange={(e) => setSsCard(e.target.value)} disabled={busy}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                      <option value="">Account terms (no card)</option>
+                      {opts.suppliers.ss.paymentProfiles.profiles.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {maskCard(p.name)}{p.type ? ` · ${p.type}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      {opts.suppliers.ss.paymentProfiles?.reason
+                        ?? "No saved cards found — S&S will bill the account on file."}
+                    </p>
+                  )}
+                </Field>
                 <Field label="Shipping method">
                   <select value={ssShip} onChange={(e) => setSsShip(e.target.value)} disabled={busy}
                     className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
@@ -174,7 +211,6 @@ export function SupplierOrderingDialog({
                     </div>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">{opts.suppliers.ss.paymentNote}</p>
               </section>
 
               {/* Otto */}

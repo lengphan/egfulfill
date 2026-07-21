@@ -505,6 +505,10 @@ export function PurchaseView() {
             const r = await ssOrder(payload, {
               shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
               email: opts.defaults.order_email || undefined, poNumber: poNum,
+              // Which saved card pays. Omitted entirely when unset, so the account's own
+              // terms apply rather than an empty profile being sent.
+              paymentProfileId: opts.defaults.ss_payment_profile || undefined,
+              paymentProfileEmail: opts.defaults.order_email || undefined,
             })
             if (r.error) throw new Error(r.error); resp = r
           }
@@ -888,9 +892,12 @@ export function PurchaseView() {
                 <div key={g.key}>
                   <div className="flex flex-wrap items-center gap-2 bg-muted/40 px-5 py-2">
                     <span className="text-sm font-semibold">{g.supplier ?? "Unassigned"}</span>
-                    {g.api
-                      ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">orders via API</span>
-                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">order by hand</span>}
+                    {/* Only the exception is worth a chip. "Orders via API" was on the
+                        majority of rows saying nothing actionable; "order by hand" is the
+                        one that changes what you do next. */}
+                    {!g.api && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">order by hand</span>
+                    )}
                     <span className="ml-auto text-xs text-muted-foreground">
                       {g.lines.length} line{g.lines.length === 1 ? "" : "s"} · {g.lines.reduce((s, l) => s + num(l.qty), 0)} units
                       {g.total > 0 ? ` · ${usd(g.total)}` : ""}

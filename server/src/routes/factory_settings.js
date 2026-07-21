@@ -29,7 +29,7 @@ const KEYS = [
 // Supplier-ordering defaults. Kept OUT of KEYS because those are all numbers coerced with
 // Number() — these are identifiers ('net30', a method id) and an email, which that
 // coercion would turn into NaN.
-const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_method', 'order_email'];
+const TEXT_KEYS = ['ss_shipping_method', 'otto_payment_method', 'otto_shipping_method', 'order_email', 'ss_payment_profile'];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
 // product editor agree on the starting numbers instead of each hardcoding its own.

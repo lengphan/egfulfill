@@ -40,6 +40,35 @@ export function ssImgSize(u, size = 'fs') {
 
 export const ssImgUrl = (u) => ssImg(u);
 
+/**
+ * S&S payment profiles for one person on the account.
+ *
+ * Returns their LABELS only — "BMO Harris Bank 1234 (John Doe)" — because that's all
+ * their API gives and all anyone needs: which card is paying. No full number exists in
+ * the response, so none is stored or logged here either.
+ */
+export async function ssPaymentProfiles(email) {
+  if (!creds()) return { error: 'S&S not configured.' };
+  if (!email) return { error: 'An email is required — profiles belong to a person on the account.' };
+  try {
+    const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+    const r = await fetch(SS_BASE + '/paymentprofiles/?email=' + encodeURIComponent(email) + '&mediatype=json',
+      { headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
+    const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = null; }
+    if (!r.ok) return { error: `S&S refused the request (${r.status})` };
+    const flat = Array.isArray(data) ? data.flat(2).filter((x) => x && typeof x === 'object') : [];
+    return {
+      profiles: flat.map((p) => ({
+        id: String(p.profileID ?? p.profileId ?? ''),
+        // Their field table misspells this as "profyleType" while the example uses the
+        // correct spelling — accept both rather than bet on which one ships.
+        type: p.profileType ?? p.profyleType ?? null,
+        name: p.name ?? null,
+      })).filter((p) => p.id),
+    };
+  } catch (e) { return { error: e.message }; }
+}
+
 function ssImg(u) {
   if (!u) return null;
   const str = String(u);

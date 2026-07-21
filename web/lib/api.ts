@@ -603,7 +603,8 @@ export function deletePurchaseOrder(num: string) {
  *  always accepted them; sending only lines is what made the orders incomplete. */
 export function ssOrder(
   lines: { sku: string; qty: number }[],
-  extra: { shippingAddress?: unknown; shippingMethod?: string; email?: string; poNumber?: string } = {},
+  extra: { shippingAddress?: unknown; shippingMethod?: string; email?: string; poNumber?: string
+           paymentProfileId?: string; paymentProfileEmail?: string } = {},
   live = false
 ) {
   return api<{ ok?: boolean; testOrder?: boolean; dryRun?: boolean; error?: string; detail?: unknown }>(
@@ -1604,13 +1605,14 @@ export type SupplierOptions = {
   shipToComplete: boolean
   suppliers: {
     ss: { live: boolean; paymentMethods: null; paymentNote: string
-          shippingMethods: { id: string; label: string }[]; shippingNote: string }
+          shippingMethods: { id: string; label: string }[]; shippingNote: string
+          paymentProfiles?: { available: boolean; reason: string | null; profiles: PaymentProfile[] } }
     otto: { live: boolean; available: boolean; reason: string | null
             paymentMethods: unknown[]; shippingMethods: unknown[] }
   }
   defaults: {
     ss_shipping_method: string; otto_payment_method: string
-    otto_shipping_method: string; order_email: string
+    otto_shipping_method: string; order_email: string; ss_payment_profile: string
   }
 }
 /** Where supplier orders ship, how they pay, how they move. Otto's methods are read LIVE
@@ -1725,3 +1727,7 @@ export function getSsStyleSkus(styleId: string) {
 /** Otto style detail — full variant rows (sku + colour + size + price + per-colour image),
  *  not the bare sku list it used to return. */
 export type OttoVariant = { sku: string; color: string | null; size: string | null; price: number | null; image: string | null }
+
+/** A payment profile label from a supplier — never a full number. S&S return a name like
+ *  "BMO Harris Bank 1234 (John Doe)", which already carries the last four. */
+export type PaymentProfile = { id: string; type: string | null; name: string | null }

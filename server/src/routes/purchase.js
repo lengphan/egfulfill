@@ -133,11 +133,32 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       otto = { available: false, reason: `Couldn't reach Otto Cap — ${e.message}`, paymentMethods: [], shippingMethods: [] };
     }
 
+    // S&S payment profiles — the stored cards and bank accounts on the account. Read here
+    // so the settings window can show WHICH card pays each supplier: their `name` already
+    // carries the last four ("BMO Harris Bank 1234"), which is the useful part, and no
+    // full number is ever returned by their API or stored by us.
+    let ssProfiles = { available: false, reason: null, profiles: [] };
+    try {
+      const email = String(cfg.order_email || '').trim();
+      if (!email) {
+        ssProfiles.reason = 'Set an order confirmation email — S&S payment profiles belong to a person on the account, not the account itself.';
+      } else {
+        const { ssPaymentProfiles } = await import('./ss.js');
+        const r = await ssPaymentProfiles(email);
+        ssProfiles = r.error
+          ? { available: false, reason: r.error, profiles: [] }
+          : { available: true, reason: null, profiles: r.profiles || [] };
+      }
+    } catch (e) {
+      ssProfiles = { available: false, reason: `Couldn't read S&S payment profiles — ${e.message}`, profiles: [] };
+    }
+
     return {
       shipTo: shipFrom || {},
       shipToComplete: shipFromComplete(shipFrom || {}),
       suppliers: {
         ss: {
+          paymentProfiles: ssProfiles,
           // S&S numbers its shipping methods; 1 is ground. Their API has no method list to
           // read, so this is the documented set rather than a live one — flagged as such
           // so nobody assumes it reflects the account.
@@ -151,6 +172,7 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
       },
       defaults: {
         ss_shipping_method: cfg.ss_shipping_method ?? '1',
+        ss_payment_profile: cfg.ss_payment_profile ?? '',
         otto_payment_method: cfg.otto_payment_method ?? 'net30',
         otto_shipping_method: cfg.otto_shipping_method ?? '',
         order_email: cfg.order_email ?? '',
