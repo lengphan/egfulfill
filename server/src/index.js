@@ -40,6 +40,7 @@ import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
 import { addClient } from './events.js';
+import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designUrlTtlDays } from './storage.js';
 
 // Catalog products embed base64 image data URLs (mockups, color images), so the
 // default 1MB body limit is far too small. Bounded by the browser's localStorage
@@ -100,6 +101,44 @@ function requireAdmin(req, reply, done) {
 }
 
 app.get('/health', async () => ({ ok: true }));
+
+/**
+ * Object-storage self-test. Writes a tiny object, signs a link for it, fetches it back,
+ * then deletes it — so a pass means credentials, signing AND retrieval all really work,
+ * not just that some env vars are set.
+ *
+ * This exists because the failure mode is SILENT: if storage is misconfigured, design
+ * uploads quietly fall back to inline base64 with nothing but a log line, and everything
+ * looks fine until an outside partner needs a URL that was never created.
+ */
+app.get('/api/admin/storage-diag', { preHandler: requireStaff }, async () => {
+  const cfg = {
+    configured: storageEnabled(),
+    bucket: process.env.SPACES_BUCKET || null,
+    endpoint: process.env.SPACES_ENDPOINT || null,
+    region: process.env.SPACES_REGION || null,
+    linkTtlDays: designUrlTtlDays(),
+    mode: designUrlTtlDays() > 0 ? 'private + signed links' : 'public-read + permanent links',
+  };
+  if (!cfg.configured) {
+    return { ...cfg, ok: false, error: 'Not configured — design uploads stay inline base64. Set SPACES_ENDPOINT / SPACES_BUCKET / SPACES_KEY / SPACES_SECRET.' };
+  }
+  const key = `_diag/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`;
+  const probe = 'egfulfill storage check';
+  try {
+    await putObject(key, Buffer.from(probe), 'text/plain', cfg.linkTtlDays > 0 ? 'private' : 'public-read');
+    const url = cfg.linkTtlDays > 0 ? presignGet(key, 300) : publicUrl(key);
+    const res = await fetch(url);
+    const body = res.ok ? (await res.text()).trim() : null;
+    await deleteObject(key).catch(() => {});
+    if (!res.ok) return { ...cfg, ok: false, wrote: true, readStatus: res.status, error: `Upload worked but the link returned ${res.status} — check the token has Object Read as well as Write.` };
+    if (body !== probe) return { ...cfg, ok: false, wrote: true, error: 'Fetched object did not match what was written.' };
+    return { ...cfg, ok: true, wrote: true, read: true, note: 'Uploads now go to object storage; Postgres keeps only the key.' };
+  } catch (e) {
+    await deleteObject(key).catch(() => {});
+    return { ...cfg, ok: false, error: e.message };
+  }
+});
 
 // ── Auth ──
 app.post('/api/auth/signup', async (req, reply) => {
