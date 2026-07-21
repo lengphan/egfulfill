@@ -140,6 +140,46 @@ function toOttoAddress(a) {
  * technically shows the reason, but it shows it as JSON — and the field name is the most
  * useful part, so it belongs in front of the message rather than buried in braces.
  */
+/**
+ * A payload safe to hand back, log, or store.
+ *
+ * Otto have no saved-card concept — their API wants the full PAN, CVV and expiry on
+ * EVERY credit-card order. That is fine in flight and unacceptable at rest, and both the
+ * dry-run and error paths echo the payload straight back, where the client writes it into
+ * purchase_orders.meta. One card number in Postgres would put the whole database in PCI
+ * scope, so the card is replaced with a summary here, at the only point every response
+ * passes through.
+ *
+ * The CVV is dropped entirely rather than masked: card networks prohibit storing it in
+ * any form, so there is no version of it that belongs in a response.
+ */
+/** Luhn check — catches a mistyped digit before it becomes a supplier rejection. */
+function luhnOk(n) {
+  let sum = 0, alt = false;
+  for (let i = n.length - 1; i >= 0; i--) {
+    let d = parseInt(n[i], 10);
+    if (alt) { d *= 2; if (d > 9) d -= 9; }
+    sum += d; alt = !alt;
+  }
+  return n.length > 0 && sum % 10 === 0;
+}
+
+function safePayload(p) {
+  if (!p || typeof p !== 'object') return p;
+  const { card_details, ...rest } = p;
+  if (!card_details) return rest;
+  const n = String(card_details.card_number || '').replace(/\D/g, '');
+  return {
+    ...rest,
+    card_details: {
+      name: card_details.name || null,
+      card_number: n ? '•••• ' + n.slice(-4) : null,
+      exp_date: card_details.exp_date || null,
+      // cvv deliberately absent.
+    },
+  };
+}
+
 function describeOttoError(d, prefix = '') {
   if (d == null) return 'no detail returned';
   if (typeof d === 'string') return d.slice(0, 400);
@@ -363,6 +403,26 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     // Otto restrict payment methods PER CUSTOMER — "This payment method is not allowed
     // for this Customer." Defaulting to net30 guessed on their behalf and failed at their
     // end; making it explicit fails here, where the message can name the setting.
+    // Card orders carry the card on the REQUEST. Validate here so an obvious typo fails
+    // in a form the person is looking at, rather than as a rejection from Otto.
+    let card;
+    if (String(b.payment_method || '').toLowerCase().replace(/[^a-z]/g, '') === 'creditcard') {
+      const c = b.card_details || {};
+      const number = String(c.card_number || '').replace(/\D/g, '');
+      const cvv = String(c.cvv || '').replace(/\D/g, '');
+      const exp = String(c.exp_date || '').trim();
+      const problems = [];
+      if (!c.name) problems.push('the name on the card');
+      if (number.length < 13 || number.length > 19 || !luhnOk(number)) problems.push('a valid card number');
+      if (cvv.length < 3 || cvv.length > 4) problems.push('a 3 or 4 digit CVV');
+      if (!/^\d{2}\/\d{2,4}$/.test(exp)) problems.push('an expiry as MM/YY or MM/YYYY');
+      if (problems.length) {
+        reply.code(400);
+        return { error: `Otto need ${problems.join(', ')} for a credit-card order.` };
+      }
+      card = { name: String(c.name), card_number: number, cvv, exp_date: exp };
+    }
+
     if (!b.payment_method) {
       reply.code(400);
       return { error: 'Otto need a payment method, and which ones are allowed depends on the customer. Choose one in Order settings › Payment.' };
@@ -385,10 +445,10 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       billing_address: toOttoAddress(b.billing_address) || ship || undefined,
       shipping_address: ship || undefined,
       items,
-      card_details: b.card_details || undefined
+      card_details: card || undefined
     };
     if (String(process.env.OTTOCAP_ORDER_LIVE || '') !== '1') {
-      return { dryRun: true, sandbox: isSandbox(), note: 'OTTOCAP_ORDER_LIVE!=1 → NOT sent to Otto. Review the payload; set OTTOCAP_ORDER_LIVE=1 (with the sandbox base) to place a real SANDBOX test order.', payload };
+      return { dryRun: true, sandbox: isSandbox(), note: 'OTTOCAP_ORDER_LIVE!=1 → NOT sent to Otto. Review the payload; set OTTOCAP_ORDER_LIVE=1 (with the sandbox base) to place a real SANDBOX test order.', payload: safePayload(payload) };
     }
     try {
       const r = await ocPost('/orders/', payload);
@@ -398,7 +458,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
         // tells nobody which field was wrong.
         const d = r.data;
         const why = describeOttoError(d);
-        return { error: `Otto rejected the order (${r.status}): ${why}`, status: r.status, detail: d, payload };
+        return { error: `Otto rejected the order (${r.status}): ${why}`, status: r.status, detail: d, payload: safePayload(payload) };
       }
       return { ok: true, sandbox: isSandbox(), ottoResponse: r.data };
     }

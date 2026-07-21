@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { CircleNotch, Barcode, Warning, CheckCircle, Package } from "@phosphor-icons/react"
+import { CircleNotch, Barcode, Warning, CheckCircle, Package, Camera } from "@phosphor-icons/react"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { getSsBox, getInventory, saveInventory, type SsBox, type InventoryItem } from "@/lib/api"
+import { BarcodeCamera } from "@/components/app/barcode-camera"
 
 const num = (v: unknown) => Number(v) || 0
 
@@ -35,6 +36,7 @@ export function ReceiveScanDialog({
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  const [cam, setCam] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -116,10 +118,24 @@ export function ReceiveScanDialog({
               className="h-10 font-mono"
               disabled={busy || saving}
             />
+            {/* Phone camera, for a bench without a handheld scanner. */}
+            <Button size="sm" variant="outline" onClick={() => setCam((v) => !v)} disabled={busy || saving}
+              title="Scan with the camera">
+              <Camera size={14} weight="bold" />
+            </Button>
             <Button size="sm" onClick={() => lookup()} disabled={busy || saving || !code.trim()}>
               {busy ? <CircleNotch size={14} className="animate-spin" /> : "Look up"}
             </Button>
           </div>
+
+          {cam && (
+            <BarcodeCamera
+              onClose={() => setCam(false)}
+              // Straight through to the lookup — a scan that stops to be confirmed is
+              // slower than typing, which defeats the point of scanning.
+              onScan={(v) => { setCam(false); setCode(v); void lookup(v) }}
+            />
+          )}
 
           {err && (
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">

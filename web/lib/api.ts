@@ -1841,3 +1841,12 @@ export type SsBox = {
 export function getSsBox(barcode: string) {
   return api<SsBox>(`/api/ss/box?barcode=${encodeURIComponent(barcode)}`)
 }
+
+/** Per-warehouse stock for a batch of SKUs. Total is the sum across warehouses — which is
+ *  NOT the same as "can ship in one box", the distinction the picker exists to show. */
+export function getSsInventory(skus: string[]) {
+  return api<{ items: { sku: string; styleId: string | null; total: number
+                        warehouses: { abbr: string; qty: number }[] }[]
+               notFound: string[]; discontinued?: boolean }>(
+    `/api/ss/inventory?skus=${encodeURIComponent(skus.join(","))}`)
+}
