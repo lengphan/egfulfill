@@ -25,6 +25,7 @@ import { DeliveryBadge } from "@/components/app/delivery-badge"
 import { ImportOrdersDialog } from "@/components/app/import-orders-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ItemAvatar } from "@/components/app/item-avatar"
+import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 
 const nowId = () => Date.now()
@@ -424,10 +425,35 @@ export function OrdersHub() {
     } finally { setPushing(false) }
   }
 
-  // Threads, machine files and placed artwork for the orders actually OPEN. Scoped to
-  // expansion rather than the page: rows start closed, so fetching the whole page would
-  // be ~3 requests each for detail nobody is looking at. Loaded once per order, so
-  // re-opening a row is free.
+  // Artwork for EVERY row on the page, not only the open ones — the collapsed row now
+  // carries a photo strip, and a strip of bare blanks on a production board is a picture
+  // of the wrong thing (a plain hoodie where the job is a printed hoodie).
+  //
+  // Deliberately narrower than the expansion fetch below: designs ONLY, not threads or
+  // machine files, so this is one request per order rather than the three that scoping to
+  // expansion was avoiding. Deduped in its own ref and keyed by the page's ids, so paging
+  // back and forth is free and the expansion effect skips whatever this already loaded.
+  const pageIds = paged.pageItems.map((o) => o.id).join(",")
+  const designsRef = useRef<Record<string, boolean>>({})
+  const loadDesigns = useCallback((oid: string) => {
+    if (designsRef.current[oid]) return
+    designsRef.current[oid] = true
+    getOrderDesigns(oid).then((r) => {
+      const list = Array.isArray(r) ? r : (r?.designs ?? [])
+      const bySku: Record<string, OrderDesign> = {}
+      for (const d of list) if (d?.sku) bySku[d.sku] = d
+      setDesigns((p) => ({ ...p, [oid]: bySku }))
+    }).catch(() => {})
+  }, [])
+  useEffect(() => {
+    const id = setTimeout(() => {
+      for (const oid of pageIds ? pageIds.split(",") : []) loadDesigns(oid)
+    }, 0)
+    return () => clearTimeout(id)
+  }, [pageIds, loadDesigns])
+
+  // Threads and machine files for the orders actually OPEN. Still scoped to expansion:
+  // these are the heavy two, and nobody is looking at them on a closed row.
   const visibleIds = paged.pageItems.filter((o) => expandedIds.has(o.id)).map((o) => o.id).join(",")
   useEffect(() => {
     const id = setTimeout(() => {
@@ -436,16 +462,13 @@ export function OrdersHub() {
         threadsRef.current[oid] = true
         getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
         getDesignFiles(oid).then((r) => setDfiles((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
-        getOrderDesigns(oid).then((r) => {
-          const list = Array.isArray(r) ? r : (r?.designs ?? [])
-          const bySku: Record<string, OrderDesign> = {}
-          for (const d of list) if (d?.sku) bySku[d.sku] = d
-          setDesigns((p) => ({ ...p, [oid]: bySku }))
-        }).catch(() => {})
+        // Designs are fetched by the page-level effect above and deduped in its own ref,
+        // so expanding a row no longer re-requests them.
+        loadDesigns(oid)
       }
     }, 0)
     return () => clearTimeout(id)
-  }, [visibleIds])
+  }, [visibleIds, loadDesigns])
 
   const subtitle = isAdmin
     ? "Every order across the team — production to shipping."
@@ -644,6 +667,20 @@ export function OrdersHub() {
                           </a>
                         )}
                       </div>
+
+                      {/* Photos on the COLLAPSED row only. Expanding already shows a
+                          64px avatar per line, so rendering the strip there too would say
+                          the same thing twice; collapsed, the row was text-only and you
+                          had to open an order to see what was in it.
+                          Same PhotoStack the seller table uses, so the two surfaces can't
+                          drift. Thumbs lead with the listing photo (it reads better at
+                          32px than a composite does) and clicking one opens the detail
+                          window on the attached design. */}
+                      {isCollapsed && items.length > 0 && (
+                        <div className="mt-2">
+                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} />
+                        </div>
+                      )}
                     </div>
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a

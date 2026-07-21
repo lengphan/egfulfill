@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table"
 import { getOrders, getCatalogProducts, getOrderDesigns, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
+import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
 import { getToken } from "@/lib/auth"
 import { sellerStatus, matchesFilter, SELLER_FILTERS, type SellerFilter } from "@/lib/order-status"
@@ -30,29 +31,8 @@ import { usd, numOf, totalOf, customerOf, storeOf, itemsLabel, unitsOf, lineTota
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { ORDER_COLS, loadColOrder, saveColOrder, loadHiddenCols, saveHiddenCols, DEFAULT_ORDER_COLS, type OrderColId } from "@/lib/order-columns"
 
-/** Overlapping thumbnails of an order's items — the photos the flat table was missing. */
-function PhotoStack({ items, designs, catalog }: { items: OrderItem[]; designs?: Record<string, OrderDesign>; catalog?: CatalogProduct[] }) {
-  const shown = items.slice(0, 3)
-  const extra = items.length - shown.length
-  return (
-    <div className="flex shrink-0 items-center">
-      {shown.map((it, i) => (
-        <span
-          key={it.sku ?? i}
-          className={"relative " + (i ? "-ml-2.5" : "")}
-          style={{ zIndex: shown.length - i }}
-        >
-          <ItemAvatar item={it} designs={designs} catalog={catalog} size={32} readOnly className="border-background ring-1 ring-border" />
-        </span>
-      ))}
-      {extra > 0 && (
-        <span className="-ml-2.5 flex size-8 items-center justify-center rounded-md border border-background bg-muted text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
-          +{extra}
-        </span>
-      )}
-    </div>
-  )
-}
+// PhotoStack moved to components/app/photo-stack.tsx so the factory boards render the
+// identical strip instead of growing a second copy (CLAUDE.md §5).
 
 // Demo fallback (no session / standalone dev).
 const DEMO: OrderRow[] = [
