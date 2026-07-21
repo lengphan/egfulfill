@@ -20,6 +20,12 @@ const PARTNER_LABEL: Record<string, string> = {
 }
 const label = (p: string) => PARTNER_LABEL[p] ?? p
 
+// Every partner we book costs against, whether or not anything has been booked YET.
+// The filter used to list only partners already present in the ledger, so before the
+// first cost is recorded it was empty — which reads as "the filter is broken" rather
+// than "nothing has been spent". Keys match the mapping in wallet.js.
+const KNOWN_PARTNERS = ["byeastside", "pinkdesign", "carrier", "suppliers"]
+
 /** First and last day of the current month, as yyyy-mm-dd. */
 function thisMonth() {
   const d = new Date()
@@ -43,12 +49,18 @@ export function BillingView() {
   const [rows, setRows] = useState<LedgerRowOut[] | null>(null)
   const [total, setTotal] = useState(0)
   const [partner, setPartner] = useState("")
+  // Why the partner list is empty, when it is. Swallowing this would make a failed
+  // request look identical to "nothing booked yet" — the same trap that hid a broken
+  // team query for months.
+  const [partnersErr, setPartnersErr] = useState<string | null>(null)
   const [range, setRange] = useState(thisMonth())
 
   useEffect(() => {
     const id = setTimeout(() => {
       if (!getToken()) { setPartners([]); return }
-      getLedgerPartners().then((r) => setPartners(r ?? [])).catch(() => setPartners([]))
+      getLedgerPartners()
+        .then((r) => { setPartners(r ?? []); setPartnersErr(null) })
+        .catch((e) => { setPartners([]); setPartnersErr(e instanceof Error ? e.message : "Couldn't load partners") })
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -64,6 +76,10 @@ export function BillingView() {
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
 
   const filters = { partner: partner || undefined, from: range.from, to: range.to }
+  // Known partners first (stable order), then anything unexpected the ledger contains —
+  // a partner key we don't recognise should surface, not be quietly dropped.
+  const seen = new Map((partners ?? []).map((p) => [p.partner, p]))
+  const options = [...KNOWN_PARTNERS, ...[...seen.keys()].filter((k) => !KNOWN_PARTNERS.includes(k))]
 
   return (
     <div className="space-y-4">
@@ -89,7 +105,12 @@ export function BillingView() {
           />
         ))}
         {partners !== null && partners.length === 0 && (
-          <StatCard label="No partner costs yet" value="—" sub="nothing has been booked" />
+          <StatCard
+            label={partnersErr ? "Couldn't load partners" : "No partner costs yet"}
+            value="—"
+            sub={partnersErr ?? "Set the rates in Settings → Platform → Partner rates"}
+            tone={partnersErr ? "neg" : undefined}
+          />
         )}
       </StatGrid>
 
@@ -113,7 +134,11 @@ export function BillingView() {
               className="eg-select h-9 rounded-md border border-border bg-card px-2 text-sm"
             >
               <option value="">All partners</option>
-              {(partners ?? []).map((p) => <option key={p.partner} value={p.partner}>{label(p.partner)}</option>)}
+              {options.map((k) => (
+                <option key={k} value={k}>
+                  {label(k)}{seen.has(k) ? "" : " — nothing booked yet"}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">

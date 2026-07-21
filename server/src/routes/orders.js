@@ -632,6 +632,42 @@ export function ordersRoutes(app, requireAuth) {
         const blockers = await shipBlockers(req.params.id);
         if (blockers.length) { reply.code(409); return { error: `Can't mark shipped — ${blockers.join('; and ')}.`, blockers }; }
       }
+
+      // ── 'Refunded' is a CLAIM ABOUT MONEY, so it has to match the ledger ────────
+      // Setting it from the dropdown moved nothing: the money loop only ever ran on the
+      // seller's own cancel path, so an admin marking an order Refunded got the word and
+      // none of the money. The seller sees "Refunded", their balance never changes, and
+      // the only trace is a status nobody can distinguish from a real one.
+      //
+      // The status doesn't move money either — deliberately. Paying money out of a
+      // dropdown is not something that should be one mis-click away; the Refund panel
+      // exists so an amount is chosen and recorded. This just refuses to let the label
+      // assert something the ledger contradicts.
+      if (want === 'refunded') {
+        const state = await orderCharges(req.params.id).catch(() => null);
+        if (state && state.charged > 0 && state.refunded <= 0) {
+          reply.code(409);
+          return {
+            error: `Nothing has been refunded on this order yet, so it can't be marked Refunded. Use the Refund panel on the order to send money back — the status follows from that.`,
+            needsRefund: true, charged: state.charged,
+          };
+        }
+      }
+
+      // Cancelling an order the floor hasn't started gives the money back, exactly as it
+      // does when the seller cancels it themselves. Same act, same consequence — the only
+      // difference being who clicked, which shouldn't decide whether a seller is repaid.
+      if (want === 'cancelled') {
+        // Read the CURRENT row rather than the audit snapshot: `before` only holds the
+        // columns this request happens to be changing, and is null when none are.
+        const row = await q('select seller_id, factory_status from orders where id=$1', [req.params.id])
+          .then((r) => r.rows[0]).catch(() => null);
+        const cur = normalizeStage(String(row?.factory_status || ''));
+        const startedNow = !['', 'in_review'].includes(cur);
+        if (row && row.seller_id && !startedNow) {
+          await refundForCancel(req.params.id, row.seller_id, req.user.sub).catch(() => {});
+        }
+      }
     }
     if (sets.length) {
       let where = `id=$${n}`; vals.push(req.params.id);
