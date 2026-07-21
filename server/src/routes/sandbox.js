@@ -13,6 +13,7 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { quoteSpec } from '../pricing.js';
+import { limited, LIMITS } from '../ratelimit.js';
 import { emitWebhook } from '../webhooks.js';
 
 const PREFIX = 'egk_test_';
@@ -108,12 +109,28 @@ export function sandboxRoutes(app, requireAuth) {
 
   // ─────────────────────────  SANDBOX  (/api/test/*, API-KEY-authed)  ────────────────────
   // Every response carries mode:'test' and simulates — nothing here creates real records.
-  const requireKey = async (req, reply) => {
+  /**
+   * Resolve the key, then charge the request against that key's rate limit.
+   *
+   * Limiting by KEY, not by IP: a partner behind one NAT would otherwise share a budget
+   * with everyone else there, and an attacker rotating IPs would dodge it entirely. The
+   * key is the thing we actually bill and revoke, so it is the thing to meter.
+   *
+   * `orderLimit` gives the expensive paths a tighter ceiling — creating an order writes
+   * rows and fires webhooks, so it shouldn't share a budget with cheap catalogue reads.
+   */
+  const requireKey = async (req, reply, orderLimit = false) => {
     const k = await authKey(req);
     if (!k) {
       reply.code(401);
       return { error: 'Invalid or missing API key', mode: 'test',
         hint: 'Send your test key in the X-API-Key header (or Authorization: Bearer egk_test_…). Generate one in the API Playground.' };
+    }
+    const over = limited(reply, `k:${k.id}`, LIMITS.global);
+    if (over) return over;
+    if (orderLimit) {
+      const overOrders = limited(reply, `ko:${k.id}`, LIMITS.orders);
+      if (overOrders) return overOrders;
     }
     return k;
   };
@@ -132,7 +149,7 @@ export function sandboxRoutes(app, requireAuth) {
 
   // Create an order (simulated).
   app.post('/api/test/orders', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
+    const k = await requireKey(req, reply, true); if (k.error) return k;
     const b = req.body || {};
     const items = Array.isArray(b.items) ? b.items : null;
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
@@ -316,7 +333,7 @@ export function sandboxRoutes(app, requireAuth) {
   });
 
   app.post('/api/v1/orders', async (req, reply) => {
-    const k = await requireKey(req, reply); if (k.error) return k;
+    const k = await requireKey(req, reply, true); if (k.error) return k;
     const b = req.body || {};
     const items = Array.isArray(b.items) ? b.items : null;
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
