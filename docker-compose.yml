@@ -112,6 +112,9 @@ services:
       # Object storage for design artwork (S3-compatible). Unset = inline base64 in
       # Postgres, which also means no URL to give an outside design partner. See
       # .env.example for the setup and for DESIGN_URL_TTL_DAYS (link expiry).
+      # Dispatch partner (byeastside) — label pre-scan. See .env.example.
+      BYEASTSIDE_API_KEY: ${BYEASTSIDE_API_KEY:-}
+      BYEASTSIDE_API_BASE: ${BYEASTSIDE_API_BASE:-https://api.byeastside.uk/api}
       SPACES_ENDPOINT: ${SPACES_ENDPOINT:-}
       SPACES_REGION: ${SPACES_REGION:-nyc3}
       SPACES_BUCKET: ${SPACES_BUCKET:-}
