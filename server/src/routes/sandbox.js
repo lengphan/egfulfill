@@ -302,14 +302,17 @@ export function sandboxRoutes(app, requireAuth) {
       message: k.mode === 'live' ? 'Live API reachable — calls create real records.' : 'Sandbox reachable — your test key is valid.' };
   });
 
+  // The REAL catalogue in both modes. A test key used to get four demo products while
+  // orders are priced from the real one — so a partner would read this list, order
+  // gild-64000 from it, and be told it doesn't exist. A catalogue you can't order from
+  // is worse than no catalogue. Nothing here is sensitive: it's the same blank list a
+  // signed-in seller browses, and supplier cost is not among these columns.
   app.get('/api/v1/products', async (req, reply) => {
     const k = await requireKey(req, reply); if (k.error) return k;
-    if (k.mode === 'live') {
-      try { const r = await q('select id, name, type, method, price, base_price from catalog_products order by name limit 200');
-        return { object: 'list', mode: 'live', data: r.rows, count: r.rowCount }; }
-      catch { return { object: 'list', mode: 'live', data: [], count: 0 }; }
-    }
-    return { object: 'list', mode: 'test', data: SANDBOX_PRODUCTS, count: SANDBOX_PRODUCTS.length };
+    try {
+      const r = await q('select id, sku, name, type, method, price, base_price from catalog_products order by name limit 200');
+      return { object: 'list', mode: k.mode, data: r.rows, count: r.rowCount };
+    } catch { return { object: 'list', mode: k.mode, data: [], count: 0 }; }
   });
 
   app.post('/api/v1/orders', async (req, reply) => {
@@ -335,11 +338,27 @@ export function sandboxRoutes(app, requireAuth) {
       return { object: 'order', mode: 'live', id: o.id, status: 'received', items: o.items,
         shipping_address: b.shipping_address, totals: { items: o.total, currency: 'USD' }, created: nowISO() };
     }
-    const priced = priceLines(items);
+    // SANDBOX — simulated, but it must REACH THE SAME VERDICT as live.
+    //
+    // The whole promise of this sandbox is that a partner builds against it and then
+    // flips one key (see the note above priceLines). Pricing live from the catalogue
+    // while the sandbox still honoured a caller-supplied unit_price and accepted any SKU
+    // broke exactly that: you would integrate cleanly in test and collect 400s in
+    // production, which is the one failure a sandbox exists to prevent.
+    //
+    // So the same rules run here — catalogue pricing, caller price ignored, unknown SKU
+    // refused. The ONLY difference is that nothing is written and no webhook fires.
+    const { priced, unpriced } = await priceLiveLines(items);
+    if (unpriced.length) {
+      reply.code(400);
+      return { error: 'Some lines have no catalogue match, so they cannot be priced or produced.',
+        code: 'unpriceable_lines', mode: 'test', unpriced,
+        detail: 'Every line must match a catalogue product. Check the sku, size and print method against GET /api/v1/products. Live keys are refused the same way.' };
+    }
     const itemsTotal = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
     return { object: 'order', mode: 'test', id: rid('ord'), status: 'received', items: priced,
       shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
-      created: nowISO(), _note: 'Simulated — send a live key (egk_live_…) to create a real order.' };
+      created: nowISO(), _note: 'Simulated — nothing was created and no webhook fired. Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
   });
 
   app.get('/api/v1/orders/:id', async (req, reply) => {
