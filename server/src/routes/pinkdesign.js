@@ -19,12 +19,19 @@
 import { q } from '../db.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
+import { recordCost } from '../costs.js';
+import { readAll as readSettings } from './factory_settings.js';
 
 // Read at CALL time so a key set from Settings › Integrations takes effect without a
 // restart (see the same note in dispatch.js).
 const apiKey = () => (process.env.PINKDESIGN_API_KEY || '').trim();
 const apiBase = () => (process.env.PINKDESIGN_API_BASE || 'https://hub.pinkdesign.io/api').replace(/\/+$/, '');
 const boardId = () => (process.env.PINKDESIGN_BOARD_ID || '').trim();
+// The secret Pink Design sends WITH each webhook (their "API Key" field in Webhook
+// settings). Separate from PINKDESIGN_API_KEY, which is what WE send THEM — one is our
+// credential to their API, the other is theirs to ours, and conflating them means
+// rotating one silently breaks the other.
+const webhookSecret = () => (process.env.PINKDESIGN_WEBHOOK_SECRET || '').trim();
 
 export function pinkEnabled() { return !!apiKey(); }
 
@@ -164,6 +171,13 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       [orderId, item.sku, payload.title, item.print_type || null, item.name || null, String(refId)]
     ).catch(() => {});
 
+    // Book what the task costs us. Fixed per task from Settings — they invoice
+    // separately, so this is our best contemporaneous record rather than a quoted price,
+    // and it's what stops outsourced work looking free in the P&L.
+    const cfg = await readSettings().catch(() => ({}));
+    await recordCost('design', Number(cfg.design_partner_cost ?? 0), `design-${orderId}-${item.sku}`,
+      `Design partner task · order ${orderId} · ${item.sku}`, { orderId });
+
     audit(req, 'design.outsourced', { entityType: 'order', entityId: orderId, after: { sku, vendor: 'pinkdesign', ref: refId } });
     egBroadcast({ type: 'design-cards' });
     return { ok: true, refId, board };
@@ -175,7 +189,20 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
    * secret-ish handle, and we only ever ACT on a ref we already created — an unknown ref
    * is acknowledged and ignored rather than trusted.
    */
-  app.post('/api/webhooks/pinkdesign', async (req) => {
+  app.post('/api/webhooks/pinkdesign', async (req, reply) => {
+    // Verify it's really them. They don't document WHERE the key travels, so accept the
+    // three conventional places rather than guessing one and silently rejecting
+    // everything. When no secret is configured we fall back to the ref-must-be-known
+    // check below — permissive, but this endpoint can only ever advance a task we
+    // ourselves created, so the blast radius is a wrong lane on an existing card.
+    const want = webhookSecret();
+    if (want) {
+      const h = req.headers || {};
+      const bearer = String(h.authorization || '').replace(/^Bearer\s+/i, '').trim();
+      const got = bearer || String(h['x-api-key'] || h['x-webhook-key'] || h['api-key'] || '').trim()
+        || String((req.body || {}).api_key || (req.body || {}).apiKey || '').trim();
+      if (got !== want) { reply.code(401); return { error: 'bad webhook key' }; }
+    }
     const b = req.body || {};
     const ref = String(b.ref_id ?? b.refId ?? b.id ?? '');
     const status = String(b.status || '').toLowerCase();

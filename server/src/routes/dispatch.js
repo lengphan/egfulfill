@@ -25,6 +25,7 @@ import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll as readSettings } from './factory_settings.js';
+import { recordCost } from '../costs.js';
 
 // Read at CALL time, not module load: the key can be set from Settings › Integrations
 // (secrets.js overlays app_secrets onto process.env), and a module-load capture would
@@ -101,15 +102,9 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
         out.owed = fee;   // surfaced on the order; the parcel still goes
       }
     }
-    if (cost > 0) {
-      // The partner isn't a wallet holder, so this is a one-sided factory debit: it makes
-      // the cost real in the ledger rather than a number living only in Settings.
-      await q(
-        `insert into wallet_ledger (account, delta, type, ref, note)
-         values ('factory', $1, 'expedite-cost', $2, $3) on conflict do nothing`,
-        [-cost, ref, `Dispatch partner label · order ${order.id}`]
-      ).catch(() => {});
-    }
+    // One-sided house debit through the shared recorder, so every external cost is
+    // booked the same way and the billing view can group them without special cases.
+    await recordCost('dispatch', cost, ref, `Dispatch partner label · order ${order.id}`, { orderId: order.id });
     return out;
   }
 

@@ -23,7 +23,7 @@ const KEYS = [
   // without anyone retyping a number per size.
   'base_markup',
   // Expedited dispatch: what the seller pays vs what the partner costs us.
-  'expedite_fee', 'expedite_cost',
+  'expedite_fee', 'expedite_cost', 'design_partner_cost',
 ];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
@@ -47,6 +47,7 @@ export const SETTING_DEFAULTS = {
   // move is exactly where margin erodes unnoticed.
   expedite_fee: 2,    // charged to the seller, per order
   expedite_cost: 0.5, // what the dispatch partner charges us, per label
+  design_partner_cost: 0, // what the outsourced design partner costs us, per task
 };
 
 /**

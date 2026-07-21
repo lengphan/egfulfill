@@ -13,6 +13,7 @@
 //   USPS_CRID=...   USPS_MID=...   USPS_ACCOUNT_NUMBER=...   (EPS account)
 //   USPS_ACCOUNT_TYPE=EPS
 import { q } from '../db.js';
+import { recordCost } from '../costs.js';
 import { readShipFrom } from './factory_settings.js';
 import { shippingEnabled, aggregatorBuyCheapest, aggregatorVerifyAddress } from './shipping.js';
 import { missingArtwork } from './orders.js';
@@ -271,8 +272,13 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
  */
 const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'in_queue', 'queued', 'prescan'];
 
-async function recordLabel(orderId, tracking, carrier, labelUrl) {
+async function recordLabel(orderId, tracking, carrier, labelUrl, cost) {
   if (!orderId) return { shipped: false };
+  // Book the postage as it's bought. The carrier tells us the price exactly once, in the
+  // buy response — if we don't write it down here it's gone, and no report can recover
+  // what a label cost. Idempotent on the order, so a re-buy doesn't double-count.
+  recordCost('label', cost, `label-${orderId}`, `Postage · ${carrier || 'USPS'} · order ${orderId}`, { orderId })
+    .catch(() => {});
   const cur = await q('select factory_status from orders where id=$1', [orderId])
     .then((r) => String((r.rows[0] || {}).factory_status || '').toLowerCase()).catch(() => '');
   const advance = PRE_SCAN.includes(cur);
@@ -306,7 +312,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl) {
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502);

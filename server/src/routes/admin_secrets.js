@@ -30,6 +30,7 @@ const SECRET_DEFS = [
   { name: 'BYEASTSIDE_API_KEY',    label: 'API key',          integration: 'dispatch' },
   { name: 'PINKDESIGN_API_KEY',    label: 'API key',          integration: 'pinkdesign' },
   { name: 'PINKDESIGN_BOARD_ID',   label: 'Board ID',         integration: 'pinkdesign' },
+  { name: 'PINKDESIGN_WEBHOOK_SECRET', label: 'Webhook key',  integration: 'pinkdesign' },
   { name: 'META_APP_ID',           label: 'App ID',           integration: 'meta_ads' },
   { name: 'META_APP_SECRET',       label: 'App secret',       integration: 'meta_ads' },
   { name: 'GOOGLE_ADS_CLIENT_ID',     label: 'Client ID',        integration: 'google_ads' },

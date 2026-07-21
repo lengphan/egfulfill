@@ -115,6 +115,7 @@ services:
       # Design partner (Pink Design) — outsourced DTG/DTF artwork. See .env.example.
       PINKDESIGN_API_KEY: ${PINKDESIGN_API_KEY:-}
       PINKDESIGN_BOARD_ID: ${PINKDESIGN_BOARD_ID:-}
+      PINKDESIGN_WEBHOOK_SECRET: ${PINKDESIGN_WEBHOOK_SECRET:-}
       PINKDESIGN_API_BASE: ${PINKDESIGN_API_BASE:-https://hub.pinkdesign.io/api}
       # Dispatch partner (byeastside) — label pre-scan. See .env.example.
       BYEASTSIDE_API_KEY: ${BYEASTSIDE_API_KEY:-}
