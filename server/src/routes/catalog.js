@@ -4,6 +4,14 @@
 // `data` jsonb column (lossless round-trip) plus a few typed columns for TablePlus.
 import { q } from '../db.js';
 import { quoteSpec } from '../pricing.js';
+import { notify } from './notifications.js';
+import { audit } from '../audit.js';
+
+// Roles that OWN pricing. A change by anyone else is legitimate — operators build
+// products, and that is the point — but it should not happen unseen, because a base
+// cost is what every seller is charged.
+const PRICE_OWNERS = new Set(['admin', 'warehouse']);
+const money = (v) => Number(v || 0);
 
 export function catalogRoutes(app, requireAuth, requireStaff) {
   // Add the lossless `data` column if an older schema doesn't have it (idempotent).
@@ -25,10 +33,36 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   app.post('/api/catalog_products', { preHandler: requireStaff }, async (req) => {
     const products = Array.isArray(req.body) ? req.body : [];
     const keep = [];
+    // Snapshot the prices BEFORE the upsert, so a change can be reported as
+    // before → after rather than just "something was edited".
+    const actorOwnsPricing = PRICE_OWNERS.has(req.user && req.user.role);
+    let before = new Map();
+    if (!actorOwnsPricing) {
+      try {
+        const r = await q('select id, name, base_price, price from catalog_products');
+        before = new Map(r.rows.map((x) => [String(x.id), x]));
+      } catch (e) { req.log?.warn?.({ err: String(e) }, 'catalog price snapshot failed'); }
+    }
+    const priceChanges = [];
+
     for (const p of products) {
       const id = String(p.id != null ? p.id : '');
       if (!id) continue;
       keep.push(id);
+      if (!actorOwnsPricing) {
+        const was = before.get(id);
+        if (was) {
+          const newBase = money(p.basePrice ?? p.base_price ?? 0);
+          const newRetail = money(p.price ?? 0);
+          if (money(was.base_price) !== newBase || money(was.price) !== newRetail) {
+            priceChanges.push({
+              id, name: p.name || was.name || id,
+              baseFrom: money(was.base_price), baseTo: newBase,
+              priceFrom: money(was.price), priceTo: newRetail,
+            });
+          }
+        }
+      }
       await q(
         `insert into catalog_products (id, name, sku, type, method, status, base_price, price, main_color, data, updated_at)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
@@ -48,6 +82,27 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
     } else {
       await q('delete from catalog_products');
     }
-    return { ok: true, count: keep.length };
+    // Operators building products is intended; changing what sellers are charged is
+    // the part that needs an owner's eyes. One notification per save, naming the
+    // products and the movement — not one per product, which would bury it.
+    if (priceChanges.length) {
+      const who = (req.user && (req.user.email || req.user.sub)) || 'a staff member';
+      const first = priceChanges[0];
+      const more = priceChanges.length - 1;
+      const fmt = (n) => '$' + Number(n).toFixed(2);
+      notify({
+        roles: ['admin'],
+        type: 'price-changed',
+        title: `Price changed by ${req.user?.role || 'staff'}`,
+        body: `${who} changed ${first.name}: base ${fmt(first.baseFrom)} → ${fmt(first.baseTo)}`
+          + (first.priceFrom !== first.priceTo ? `, retail ${fmt(first.priceFrom)} → ${fmt(first.priceTo)}` : '')
+          + (more > 0 ? ` (and ${more} other product${more === 1 ? '' : 's'})` : ''),
+        href: '/products',
+      }).catch(() => {});
+      audit(req, 'product.price', { entityType: 'catalog_product', entityId: first.id,
+        before: priceChanges.map((c) => ({ id: c.id, base: c.baseFrom, price: c.priceFrom })),
+        after: priceChanges.map((c) => ({ id: c.id, base: c.baseTo, price: c.priceTo })) });
+    }
+    return { ok: true, count: keep.length, priceChanges: priceChanges.length };
   });
 }
