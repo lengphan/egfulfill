@@ -655,17 +655,189 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // Placing a supplier order SPENDS REAL MONEY the moment the LIVE flag is set.
   // requireStaff included operator, which contradicts every other spend boundary.
   /**
-   * Cancel an order with S&S.
+   * Tracking.  GET /v2/TrackingDataByOrderNum/{n,n}  |  ByInvoice  |  ByTrackingNum
    *
-   * UNVERIFIED. Their docs list a DELETE Orders operation, but api.ssactivewear.com
-   * returns 403 to anything that isn't a browser, so the exact path and response shape
-   * have not been read — only inferred from the REST pattern the other endpoints follow.
+   * Turns the PO's tracking field from something someone pastes into something that fills
+   * itself — and a number nobody has to type is a number nobody mistypes.
    *
-   * So it is built exactly like placing: DEFAULT IS A DRY RUN that returns the request it
-   * WOULD send. Review that against the real doc, confirm the path, then set
-   * SS_ORDER_LIVE=1. Guessing a cancel endpoint is worse than guessing an order one — a
-   * wrong POST fails loudly, a wrong DELETE can silently no-op and leave you believing an
-   * order was stopped when it is still on a truck.
+   * Batched (comma-separated), so the whole board refreshes in one call rather than one
+   * per order. `?Boxes=true` is passed through because a split shipment has a tracking
+   * number PER BOX, and one number standing for four boxes is how three go missing
+   * without anyone noticing.
+   *
+   * Their response nests an array inside an array, like paymentprofiles — flattened here.
+   */
+  app.get('/api/ss/tracking', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const q2 = req.query || {};
+    const list = (v) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
+    const orders = list(q2.orderNumbers);
+    const invoices = list(q2.invoiceNumbers);
+    const numbers = list(q2.trackingNumbers);
+    const path = orders.length ? '/TrackingDataByOrderNum/' + encodeURIComponent(orders.join(','))
+      : invoices.length ? '/TrackingDataByInvoice/' + encodeURIComponent(invoices.join(','))
+        : numbers.length ? '/TrackingDataByTrackingNum/' + encodeURIComponent(numbers.join(',')) : null;
+    if (!path) { reply.code(400); return { error: 'Pass ?orderNumbers=, ?invoiceNumbers= or ?trackingNumbers=' }; }
+    try {
+      const r = await ssGet(path + '?Boxes=true&mediatype=json');
+      if (r.status === 404) return { shipments: [] };      // nothing shipped yet is an answer
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S tracking lookup failed', status: r.status, detail: r.data }; }
+      const rows = Array.isArray(r.data) ? r.data.flat(2).filter((x) => x && typeof x === 'object') : [];
+      return {
+        shipments: rows.map((t) => ({
+          carrier: t.carrierName || null,
+          tracking: t.trackingNumber || null,
+          box: t.boxNumber != null ? String(t.boxNumber) : null,
+          origin: t.origin || null,
+          orderNumber: t.orderNumber != null ? String(t.orderNumber) : null,
+          invoiceNumber: t.invoiceNumber != null ? String(t.invoiceNumber) : null,
+          deliveredAt: t.actualDeliveryDateTime || null,
+          signedBy: t.signedBy || null,
+          // Their latest checkpoint arrives as separate date/time/location strings; joined
+          // into one line because that's how it reads on screen anyway.
+          lastUpdate: t.latestCheckpoint ? {
+            at: [t.latestCheckpoint.checkpointDate, t.latestCheckpoint.checkpointTime].filter(Boolean).join(' ') || null,
+            where: t.latestCheckpoint.checkpointLocation || null,
+            status: t.latestCheckpoint.checkpointStatusMessage || null,
+          } : null,
+        })).filter((t) => t.tracking),
+      };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
+   * Batch stock check.  GET /v2/inventory/{sku,sku,sku}
+   *
+   * The existing /api/ss/live/:sku asks /products/ for ONE sku. This is the dedicated
+   * inventory resource and takes a comma-separated list, so a whole PO can be checked in
+   * one call instead of one per line — which is the difference between "is this order
+   * fillable" being a click and being twenty.
+   *
+   * Per-warehouse quantities, because a total of 400 spread across four warehouses is not
+   * the same as 400 in one: a split shipment costs more and arrives twice.
+   */
+  app.get('/api/ss/inventory', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const skus = String((req.query && req.query.skus) || '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (!skus.length) { reply.code(400); return { error: 'Pass ?skus=A,B,C' }; }
+    try {
+      const r = await ssGet('/inventory/' + encodeURIComponent(skus.join(',')) + '?mediatype=json');
+      // 404 is THEIR "not found or discontinued", which is an answer about the skus, not a
+      // failure of the request — a discontinued blank is exactly what someone needs told.
+      if (r.status === 404) return { items: [], notFound: skus, discontinued: true };
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S inventory lookup failed', status: r.status, detail: r.data }; }
+      const rows = Array.isArray(r.data) ? r.data : [r.data].filter(Boolean);
+      const items = rows.map((p) => {
+        const warehouses = Array.isArray(p.warehouses) ? p.warehouses : [];
+        return {
+          sku: p.sku,
+          styleId: p.styleID != null ? String(p.styleID) : null,
+          total: warehouses.reduce((a, w) => a + (parseInt(w.qty, 10) || 0), 0),
+          warehouses: warehouses.map((w) => ({ abbr: w.warehouseAbbr, qty: parseInt(w.qty, 10) || 0 })),
+        };
+      });
+      const found = new Set(items.map((i) => String(i.sku)));
+      return { items, notFound: skus.filter((x) => !found.has(x)) };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
+   * Invoice PDF.  GET /v2/Invoices/{invoiceNumber}  |  ?OrderNumber=  |  ?Guid=
+   *
+   * Proxied rather than linked: the URL needs our Basic credentials, so handing the
+   * browser a direct link would mean putting the API key in it. Bytes come back as a PDF
+   * with a filename, so it opens or saves like any other document.
+   *
+   * By ORDER number their doc returns every invoice for that order in one document, which
+   * is usually what's wanted — a split shipment invoices more than once.
+   */
+  app.get('/api/ss/invoice', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const q2 = req.query || {};
+    const invoice = String(q2.invoice || '').trim();
+    const orderNumber = String(q2.orderNumber || '').trim();
+    const guid = String(q2.guid || '').trim();
+    const path = invoice ? '/Invoices/' + encodeURIComponent(invoice)
+      : orderNumber ? '/Invoices/?OrderNumber=' + encodeURIComponent(orderNumber)
+        : guid ? '/Invoices/?Guid=' + encodeURIComponent(guid) : null;
+    if (!path) { reply.code(400); return { error: 'Pass ?invoice=, ?orderNumber= or ?guid=' }; }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(SS_BASE + path, { headers: { Authorization: 'Basic ' + auth, Accept: 'application/pdf' } });
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        reply.code(r.status === 404 ? 404 : 502);
+        return { error: r.status === 404 ? 'No invoice found for that reference.' : 'S&S refused the invoice request', status: r.status, detail: t.slice(0, 300) };
+      }
+      const buf = Buffer.from(await r.arrayBuffer());
+      const name = `S-S_Invoice_${invoice || orderNumber || guid}.pdf`;
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Disposition', `inline; filename="${name}"`);
+      return reply.send(buf);
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
+   * S&S payment profiles.  GET /v2/paymentprofiles/?email={email}
+   *
+   * Their stored cards and bank accounts. `profileID` is what POST Orders takes, so
+   * without this an order can only ever go on the account's default terms — which is
+   * what the purchase board was doing, and what I had wrongly documented as S&S's only
+   * option.
+   *
+   * Keyed by EMAIL, not account: profiles belong to a person on the account, so the
+   * address book differs per user. The email is the one saved in factory settings
+   * (order_email), falling back to whatever the caller passes.
+   *
+   * Their response nests one level deeper than the other endpoints — an array containing
+   * an array of profiles — so it's flattened here rather than in every caller.
+   */
+  app.get('/api/ss/payment_profiles', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    let email = String((req.query && req.query.email) || '').trim();
+    if (!email) {
+      const { readAll } = await import('./factory_settings.js');
+      email = String((await readAll().catch(() => ({}))).order_email || '').trim();
+    }
+    if (!email) {
+      reply.code(400);
+      return { error: 'An email is required — S&S payment profiles belong to a person on the account. Set one in Supplier ordering.' };
+    }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(SS_BASE + '/paymentprofiles/?email=' + encodeURIComponent(email) + '&mediatype=json',
+        { headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
+      const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
+      if (!r.ok) { reply.code(502); return { error: 'S&S refused the request', status: r.status, detail: data }; }
+      const flat = Array.isArray(data) ? data.flat(2).filter((x) => x && typeof x === 'object') : [];
+      return {
+        email,
+        profiles: flat.map((p) => ({
+          // Their doc misspells it "profyleType" in the field table while the example uses
+          // "profileType" — accept both rather than betting on which one ships.
+          id: String(p.profileID ?? p.profileId ?? ''),
+          type: p.profileType ?? p.profyleType ?? null,
+          name: p.name ?? null,
+        })).filter((p) => p.id),
+      };
+    } catch (e) {
+      reply.code(502); return { error: String((e && e.message) || e) };
+    }
+  });
+
+  /**
+   * Cancel an order with S&S.  DELETE /v2/orders/{OrderNumber}
+   *
+   * Their doc says it "TRIES to cancel the specified order number" — and that word is the
+   * whole design of this route. A 2xx does not mean cancelled; an order already picked or
+   * shipped comes back 200 with its unchanged status. So the HTTP code is ignored as a
+   * verdict and `orderStatus` in the response body is what's believed.
+   *
+   * Anything other than "Cancelled" is reported as a FAILURE with the real status, because
+   * the dangerous outcome here isn't an error — it's being told an order stopped when it
+   * is still on a truck, and only finding out when the boxes arrive.
+   *
+   * Their response is an ARRAY of order objects; the order is the first element.
    */
   app.delete('/api/ss/order/:num', { preHandler: requireWarehouse }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
@@ -674,25 +846,36 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
     const url = SS_BASE + '/orders/' + encodeURIComponent(num);
 
     if (String(process.env.SS_ORDER_LIVE || '') !== '1') {
-      return {
-        dryRun: true,
-        method: 'DELETE',
-        url,
-        note: 'SS_ORDER_LIVE!=1 → nothing sent. This is the request that WOULD go. The DELETE path is inferred from their REST pattern, not read from the doc — confirm it before enabling.',
-      };
+      return { dryRun: true, method: 'DELETE', url,
+               note: 'SS_ORDER_LIVE!=1 → nothing sent. This is the request that would go.' };
     }
     try {
       const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
-      const r = await fetch(url, {
-        method: 'DELETE',
-        headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' },
-      });
+      const r = await fetch(url, { method: 'DELETE', headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
       if (!r.ok) { reply.code(502); return { error: 'S&S refused the cancellation', status: r.status, detail: data }; }
-      // A 2xx is NOT proof it cancelled — some APIs accept a delete for an order already
-      // in picking and simply do nothing. Their response is returned verbatim so a human
-      // can tell the difference.
-      return { ok: true, ssResponse: data, verify: 'Confirm in the S&S portal — a 2xx here does not guarantee the order was stopped.' };
+
+      const row = Array.isArray(data) ? data[0] : data;
+      const status = String((row && row.orderStatus) || '').trim();
+      const cancelled = status.toLowerCase() === 'cancelled';
+      // A restock fee means they've charged us for the attempt — worth surfacing rather
+      // than leaving buried in the payload, since it's money either way.
+      const restockFee = Number(row && row.restockFee) || 0;
+
+      if (!cancelled) {
+        reply.code(409);
+        return {
+          error: status
+            ? `S&S did not cancel it — the order is "${status}". Too late to stop it through the API; call them if it hasn't shipped.`
+            : 'S&S accepted the request but did not report the order as cancelled. Check the portal before assuming it stopped.',
+          cancelled: false, orderStatus: status || null, orderNumber: (row && row.orderNumber) || num, detail: row,
+        };
+      }
+      return {
+        ok: true, cancelled: true, orderStatus: status,
+        orderNumber: row.orderNumber, invoiceNumber: row.invoiceNumber || null,
+        restockFee, total: Number(row.total) || 0, detail: row,
+      };
     } catch (e) {
       reply.code(502); return { error: String((e && e.message) || e) };
     }
@@ -713,6 +896,12 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
       warehouseAbbr: b.warehouseAbbr || undefined,   // pickup DC (optional)
       shippingAddress: b.shippingAddress || undefined,
       emailConfirmation: b.email || undefined,
+      // Which stored card/bank pays. NOTE: the profile LIST endpoint is documented and
+      // its field confirmed; the name this takes on POST Orders is not — their doc says
+      // profileID is "used in POST - Orders" without naming the field. Sent under the
+      // conventional spelling, and visible in the dry-run payload for confirmation
+      // against the Orders doc before SS_ORDER_LIVE=1.
+      paymentProfileId: b.paymentProfileId || undefined,
       lines
     };
     // GATE 1 — never contact S&S unless SS_ORDER_LIVE='1'. Default = DRY RUN (return the payload only).
