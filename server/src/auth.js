@@ -1,7 +1,7 @@
 // Auth: bcrypt password hashing + JWT tokens. Replaces Supabase Auth.
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { q } from './db.js';
+import { q, softQ } from './db.js';
 
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -100,9 +100,9 @@ export async function login({ email, username, password }) {
   // with no '@' cannot collide with a valid address, so the fallback costs nothing.
   let r = looksLikeEmail(id)
     ? await q('select * from users where lower(email)=$1', [id])
-    : await q('select * from users where lower(username)=$1', [id]).catch(() => ({ rows: [] }));
+    : await softQ('login by username', 'select * from users where lower(username)=$1', [id]);
   if (!r.rows[0] && !looksLikeEmail(id)) {
-    r = await q('select * from users where lower(email)=$1', [id]).catch(() => ({ rows: [] }));
+    r = await softQ('login by email (username fallback)', 'select * from users where lower(email)=$1', [id]);
   }
   const u = r.rows[0];
   if (!u || !(await bcrypt.compare(password || '', u.password_hash))) {

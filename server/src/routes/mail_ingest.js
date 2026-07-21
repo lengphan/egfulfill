@@ -19,7 +19,7 @@
 //   5. every write is audited
 // The last three are the same guards the CSV import uses, so a compromised pipe can do
 // no more than a mistyped spreadsheet.
-import { q } from '../db.js';
+import { q, softQ } from '../db.js';
 import crypto from 'crypto';
 
 const SECRET = process.env.MAIL_INGEST_SECRET || '';
@@ -256,9 +256,9 @@ export function mailIngestRoutes(app, requireAuth) {
   });
 
   app.get('/api/mail/forwarders', { preHandler: requireAuth }, async (req) => {
-    const own = await q('select email from mail_forwarders where user_id=$1 order by email', [req.user.sub]).catch(() => ({ rows: [] }));
+    const own = await softQ('mail forwarders (own)', 'select email from mail_forwarders where user_id=$1 order by email', [req.user.sub]);
     const acct = (await q('select email from users where id=$1', [req.user.sub])).rows[0] || {};
-    const shop = await q('select seller_email from platform_connections where connected_by=$1 and seller_email is not null', [req.user.sub]).catch(() => ({ rows: [] }));
+    const shop = await softQ('mail forwarders (shop emails)', 'select seller_email from platform_connections where connected_by=$1 and seller_email is not null', [req.user.sub]);
     return {
       account: acct.email || null,
       shop: shop.rows.map((r) => r.seller_email),
@@ -269,7 +269,18 @@ export function mailIngestRoutes(app, requireAuth) {
   app.post('/api/mail/forwarders', { preHandler: requireAuth }, async (req, reply) => {
     const email = String((req.body || {}).email || '').trim().toLowerCase();
     if (!/^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(email)) { reply.code(400); return { error: 'That does not look like an email address.' }; }
-    const taken = (await q('select user_id from mail_forwarders where email=$1', [email]).catch(() => ({ rows: [] }))).rows[0];
+    // This check must NOT fail open. Swallowing the error left `taken` undefined, the
+    // guard passed, and the upsert below ('on conflict do update set user_id') then
+    // REASSIGNED another account's forwarding address to the caller. A query failure
+    // has to refuse the write, not wave it through.
+    let taken;
+    try {
+      taken = (await q('select user_id from mail_forwarders where email=$1', [email])).rows[0];
+    } catch (e) {
+      req.log.error({ err: e }, 'mail forwarder ownership check failed');
+      reply.code(503);
+      return { error: "Couldn't verify that address right now — please try again." };
+    }
     if (taken && String(taken.user_id) !== String(req.user.sub)) {
       reply.code(409); return { error: 'That address is already linked to another account.' };
     }

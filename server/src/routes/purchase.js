@@ -2,7 +2,7 @@
 // moves draft → placed (sent to S&S/Otto via their order APIs, done from the client) →
 // received (quantities added back into inventory). Whole-object upsert by `num`.
 
-import { q } from '../db.js';
+import { q, softQ } from '../db.js';
 
 let _ready = null;
 function ensure() {
@@ -18,8 +18,12 @@ function ensure() {
 export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse) {
   app.get('/api/purchase', { preHandler: requireStaff }, async () => {
     await ensure();
-    try { const r = await q('select num, supplier, items, status, total, meta, created_at from purchase_orders order by created_at desc'); return r.rows; }
-    catch { return []; }
+    // A failed query used to return [] — "no purchase orders", which is exactly what a
+    // warehouse with nothing on order also sees. Log it and keep the fallback so the
+    // page still renders, but the reason is now in the API log instead of nowhere.
+    const r = await softQ('purchase orders list',
+      'select num, supplier, items, status, total, meta, created_at from purchase_orders order by created_at desc');
+    return r.rows;
   });
 
   // Create/update one PO (draft edits, or status/meta after placing/receiving).
