@@ -24,7 +24,7 @@ const EVENTS: { name: string; when: string }[] = [
   { name: "order.received", when: "We accepted an order you pushed." },
   { name: "order.status_changed", when: "It moved along the production pipeline." },
   { name: "order.shipped", when: "Tracking exists. This is the one most integrations care about." },
-  { name: "order.cancelled", when: "It was cancelled or refunded." },
+  { name: "order.cancelled", when: "It was cancelled or refunded — or we refused it. Carries reason and rejected_by." },
 ]
 
 // Mirrors API_SCOPES in server/src/routes/sandbox.js — keep the two in step.
@@ -305,6 +305,29 @@ app.post("/hooks/egfulfill", express.raw({ type: "application/json" }), (req, re
             Every line of an order must resolve to a product in our catalogue. We refuse an order we
             cannot price rather than inventing a number and producing it — check your SKUs against{" "}
             <Code>GET /api/v1/products</Code>.
+          </p>
+
+          <h3 className="pt-2 font-medium">If we refuse an order after accepting it</h3>
+          <p className="text-muted-foreground">
+            Some things are only discovered on the floor — a blank out of stock in one colour, artwork
+            that cannot be produced at the size ordered. When that happens the order is cancelled and
+            you are told why, both on the <Code>order.cancelled</Code> event and on the order itself,
+            so a webhook you missed is not a reason you never learn.
+          </p>
+          <Block>{`GET /api/v1/orders/API-9F2C1A
+
+{
+  "object": "order",
+  "id": "API-9F2C1A",
+  "status": "cancelled",
+  "reason": "Blank out of stock in Navy 2XL",
+  "rejected_by": "factory",
+  "rejected_at": "2026-07-21T17:04:11.882Z"
+}`}</Block>
+          <p className="text-sm text-muted-foreground">
+            <Code>rejected_by</Code> is <Code>factory</Code> when we refused it and <Code>seller</Code>{" "}
+            when it was cancelled from your side — they are the same event otherwise, and you almost
+            certainly want to treat them differently.
           </p>
         </Section>
       </div>

@@ -508,12 +508,17 @@ export function sandboxRoutes(app, requireAuth) {
     const k = await requireKey(req, reply, { scope: 'orders.read' }); if (k.error) return k;
     if (k.mode === 'live') {
       try {
-        const r = await q('select id, seq, status, factory_status, total, tracking, carrier, created_at from orders where id=$1 and seller_id=$2',
+        const r = await q('select id, seq, status, factory_status, total, tracking, carrier, created_at, meta from orders where id=$1 and seller_id=$2',
           [req.params.id, String(k.seller_id)]);
         if (!r.rows.length) { reply.code(404); return { error: 'Order not found', mode: 'live' }; }
         const o = r.rows[0];
+        // A cancelled order without a reason makes the partner phone someone. Polling is
+        // also how they'd learn about a refusal if their webhook was down, so it has to
+        // be readable here and not only in the event.
+        const rej = (o.meta && o.meta.rejection) || null;
         return { object: 'order', mode: 'live', id: o.id, status: o.factory_status || o.status || 'received',
-          tracking: { carrier: o.carrier || null, code: o.tracking || null }, total: o.total, created: o.created_at };
+          tracking: { carrier: o.carrier || null, code: o.tracking || null }, total: o.total, created: o.created_at,
+          ...(rej ? { reason: rej.reason || null, rejected_by: rej.by || 'factory', rejected_at: rej.at || null } : {}) };
       } catch (e) { reply.code(500); return { error: String((e && e.message) || e), mode: 'live' }; }
     }
     return { object: 'order', mode: 'test', id: req.params.id, status: 'in_production',

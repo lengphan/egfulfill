@@ -27,14 +27,19 @@ import { emitWebhook } from '../webhooks.js';
  */
 function notifyOrderEvent(orderId, event, extra) {
   (async () => {
-    const r = await q('select id, seq, seller_id, status, factory_status, carrier, tracking, total from orders where id=$1', [orderId]);
+    const r = await q('select id, seq, seller_id, status, factory_status, carrier, tracking, total, meta from orders where id=$1', [orderId]);
     const o = r.rows[0];
     if (!o || !o.seller_id) return;
+    // Why it was refused, when it was. A cancellation with no reason forces the partner
+    // to ask a human, which is the thing an API is supposed to remove — and "we can't
+    // make this" and "you cancelled it" are the same event to them otherwise.
+    const rej = (o.meta && o.meta.rejection) || null;
     emitWebhook(o.seller_id, event, {
       id: o.id, number: o.seq ?? null,
       status: o.factory_status || o.status || null,
       tracking: { carrier: o.carrier || null, code: o.tracking || null },
       total: o.total ?? null,
+      ...(rej ? { reason: rej.reason || null, rejected_by: rej.by || 'factory', rejected_at: rej.at || null } : {}),
       ...(extra || {}),
     });
   })().catch(() => {});
@@ -715,6 +720,20 @@ export function ordersRoutes(app, requireAuth) {
     // status word, which can also be set by hand without a parcel existing.
     {
       const stage = normalizeStage(String(body.factoryStatus ?? body.status ?? ''));
+      // A refusal needs a REASON, and it has to be stored before the webhook reads it
+      // back — awaiting the merge rather than firing and hoping is the difference
+      // between a partner learning "we can't print that colour" and learning nothing.
+      // Merged into meta rather than assigned, so cancelling never clobbers external_id.
+      if (stage === 'cancelled' && typeof body.reason === 'string' && body.reason.trim()) {
+        await q(
+          `update orders set meta = coalesce(meta,'{}'::jsonb) || $2::jsonb where id=$1`,
+          [req.params.id, JSON.stringify({ rejection: {
+            reason: body.reason.trim().slice(0, 500),
+            by: isStaff(req.user) ? 'factory' : 'seller',
+            at: new Date().toISOString(),
+          } })]
+        ).catch(() => {});
+      }
       if (body.tracking !== undefined || stage === 'shipped') notifyOrderEvent(req.params.id, 'order.shipped');
       else if (stage === 'cancelled' || stage === 'refunded') notifyOrderEvent(req.params.id, 'order.cancelled');
       else if (stage) notifyOrderEvent(req.params.id, 'order.status_changed');
