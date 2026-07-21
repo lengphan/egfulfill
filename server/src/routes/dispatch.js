@@ -26,19 +26,23 @@ import { egBroadcast } from '../events.js';
 import { moveFunds, balanceOf } from './wallet.js';
 import { readAll as readSettings } from './factory_settings.js';
 
-const KEY = (process.env.BYEASTSIDE_API_KEY || '').trim();
-const BASE = (process.env.BYEASTSIDE_API_BASE || 'https://api.byeastside.uk/api').replace(/\/+$/, '');
+// Read at CALL time, not module load: the key can be set from Settings › Integrations
+// (secrets.js overlays app_secrets onto process.env), and a module-load capture would
+// keep using the old value until someone restarted the API — which defeats storing it in
+// the DB in the first place.
+const apiKey = () => (process.env.BYEASTSIDE_API_KEY || '').trim();
+const apiBase = () => (process.env.BYEASTSIDE_API_BASE || 'https://api.byeastside.uk/api').replace(/\/+$/, '');
 const MAX_PDF = 50 * 1024 * 1024;   // their documented limit
 
-export function dispatchEnabled() { return !!KEY; }
+export function dispatchEnabled() { return !!apiKey(); }
 
 async function bes(path, init = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const r = await fetch(BASE + path, {
+    const r = await fetch(apiBase() + path, {
       ...init,
-      headers: { Authorization: `Bearer ${KEY}`, ...(init.headers || {}) },
+      headers: { Authorization: `Bearer ${apiKey()}`, ...(init.headers || {}) },
       signal: ctrl.signal,
     });
     const text = await r.text();
@@ -212,7 +216,52 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
               count(*) filter (where dispatch_error is not null)::int as errored
          from orders`
     ).catch(() => ({ rows: [{}] }))).rows[0] || {};
-    return { configured: dispatchEnabled(), base: BASE, ...counts };
+    return { configured: dispatchEnabled(), base: apiBase(), ...counts };
+  });
+
+  /**
+   * Expedited-dispatch billing. Both sides of every push are already in the ledger, so
+   * this is a read over what's there rather than a second set of books — one source of
+   * truth, and the summary can't drift from the money.
+   *
+   *   expedite-in   → what sellers paid us (credited to factory)
+   *   expedite-cost → what the partner charged us (debited from factory)
+   *   margin        → the difference, which is the number worth watching: the sell price
+   *                   is fixed in Settings while the partner's cost can move under it.
+   */
+  app.get('/api/dispatch/billing', { preHandler: requireWarehouse }, async (req) => {
+    const days = Math.min(365, Math.max(1, parseInt((req.query || {}).days, 10) || 30));
+    const since = `now() - interval '${days} days'`;
+    const sum = (await q(
+      `select
+         coalesce(sum(delta) filter (where type='expedite-in'), 0)::float   as revenue,
+         coalesce(sum(-delta) filter (where type='expedite-cost'), 0)::float as cost,
+         count(*) filter (where type='expedite-cost')::int                   as labels
+       from wallet_ledger
+       where account='factory' and created_at >= ${since}`
+    ).catch(() => ({ rows: [{}] }))).rows[0] || {};
+    const revenue = Number(sum.revenue) || 0;
+    const cost = Number(sum.cost) || 0;
+    // Recent movements, newest first — the audit trail for "why is the margin off".
+    const history = (await q(
+      `select created_at, type, delta::float as delta, ref, note
+         from wallet_ledger
+        where account='factory' and type in ('expedite-in','expedite-cost')
+          and created_at >= ${since}
+        order by created_at desc limit 100`
+    ).catch(() => ({ rows: [] }))).rows;
+    // Fees we dispatched but couldn't collect (wallet was short at push time).
+    const unpaid = (await q(
+      `select count(*)::int as n from orders where dispatch_error like 'Dispatched, but the%'`
+    ).catch(() => ({ rows: [{}] }))).rows[0]?.n || 0;
+    return {
+      days, labels: Number(sum.labels) || 0,
+      revenue, cost,
+      margin: Math.round((revenue - cost) * 100) / 100,
+      perLabel: sum.labels ? Math.round(((revenue - cost) / sum.labels) * 100) / 100 : 0,
+      unpaidFees: unpaid,
+      history,
+    };
   });
 
   // Poll on a timer. Same single-instance guard as the other background jobs so a hot

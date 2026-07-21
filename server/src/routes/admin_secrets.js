@@ -27,6 +27,7 @@ const SECRET_DEFS = [
   { name: 'OTTOCAP_CLIENT_ID',     label: 'Client ID',        integration: 'otto' },
   { name: 'OTTOCAP_CLIENT_SECRET', label: 'Client secret',    integration: 'otto' },
   { name: 'GOOGLE_SHEETS_API_KEY', label: 'API key',          integration: 'sheets' },
+  { name: 'BYEASTSIDE_API_KEY',    label: 'API key',          integration: 'dispatch' },
   { name: 'META_APP_ID',           label: 'App ID',           integration: 'meta_ads' },
   { name: 'META_APP_SECRET',       label: 'App secret',       integration: 'meta_ads' },
   { name: 'GOOGLE_ADS_CLIENT_ID',     label: 'Client ID',        integration: 'google_ads' },
