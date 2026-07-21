@@ -352,22 +352,18 @@ export function ProductEditorDialog({
                 Keyed by SIZE, not colour: a 3XL costs more to buy and to ship, while Navy
                 vs White is the same parcel. Blank = use the numbers above. A tier needs a
                 cost to exist (matching npmCollectPriceTiers), so shipping alone is ignored. */}
-            {sizes.length > 0 && (
-              <div className="mt-3 border-t border-border pt-3">
+            {/* Always rendered — this table is now the size list itself, so gating it on
+                sizes.length meant deleting the last size removed the only way to add one
+                back. */}
+            <div className="mt-3 border-t border-border pt-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium">Per-size pricing</span>
+                  <span className="text-xs font-medium">Sizes &amp; pricing</span>
                   {Object.keys(tiers).length > 0 && (
-                    <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear</button>
+                    <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear pricing</button>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  <strong>Product cost</strong> is what the blank costs you from the supplier.
-                  <strong> Base cost</strong> is what the seller pays — leave it blank and it&apos;s
-                  computed as product cost {markup > 0 ? `+ $${markup.toFixed(2)}` : "+ your markup"}
-                  {" "}(set in Settings → Platform). The print-method surcharge is added on top.
-                </p>
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem] gap-2 text-xs text-muted-foreground">
-                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span className="text-right">Margin</span>
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem_1.5rem] gap-2 text-xs text-muted-foreground">
+                  <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span><span className="text-right">Margin</span><span />
                 </div>
                 <div className="mt-1 space-y-1.5">
                   {sizes.map((s) => {
@@ -378,7 +374,7 @@ export function ProductEditorDialog({
                     const patch = (k: keyof Tier, v: string) =>
                       setTiers((p) => ({ ...p, [s]: { ...{ price: "", shipping: "", cost: "" }, ...p[s], [k]: v.replace(/[^0-9.]/g, "") } }))
                     return (
-                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem] items-center gap-2">
+                    <div key={s} className="grid grid-cols-[3rem_1fr_1fr_1fr_4.5rem_1.5rem] items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">{s}</span>
                       <Input
                         value={t?.cost ?? ""}
@@ -420,11 +416,49 @@ export function ProductEditorDialog({
                           </span>
                         )
                       })()}
+                      {/* Delete the size here — this table IS the size list now, so the
+                          row you're looking at is the thing you remove. Drops its pricing
+                          with it; a tier for a size the product no longer offers is a trap. */}
+                      <button
+                        type="button"
+                        aria-label={`Remove size ${s}`}
+                        title={`Remove ${s}`}
+                        onClick={() => {
+                          setSizes((p) => p.filter((x) => x !== s))
+                          setTiers((p) => { const n = { ...p }; delete n[s]; return n })
+                        }}
+                        className="grid size-5 place-items-center rounded text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <X size={11} weight="bold" />
+                      </button>
                     </div>
                   )})}
                 </div>
+
+                {/* Add a size back. Replaces the separate Sizes chip section, which was a
+                    second list of the same thing sitting further down the dialog. */}
+                {/* sizeSuggestions, not the static list — it also carries sizes the
+                    SUPPLIER sent (e.g. "OSFM - Adult"), which a hardcoded S–3XL list
+                    would make unaddable. */}
+                {sizeSuggestions.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> Add:</span>
+                    {sizeSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSizes((p) => [...p, s])}
+                        className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                      >
+                        + {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {sizes.length === 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">No sizes yet — add one above to price it.</p>
+                )}
               </div>
-            )}
           </div>
 
           {/* ── Images ──────────────────────────────────────────────────────────────
@@ -633,29 +667,9 @@ export function ProductEditorDialog({
             )}
           </div>
 
-          {/* Sizes — toggle chips + suggested */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Sizes</span>
-              {sizes.length > 0 && <button onClick={() => setSizes([])} className="text-xs font-medium text-primary hover:underline">Clear</button>}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {sizes.map((s) => (
-                <span key={s} className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 py-1 pl-2.5 pr-1 text-xs font-medium text-primary">
-                  {s}
-                  <button onClick={() => setSizes((p) => p.filter((x) => x !== s))} className="flex size-4 items-center justify-center rounded hover:bg-primary/20"><X size={9} weight="bold" /></button>
-                </span>
-              ))}
-            </div>
-            {sizeSuggestions.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
-                {sizeSuggestions.map((s) => (
-                  <button key={s} onClick={() => setSizes((p) => [...p, s])} className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {s}</button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* (The Sizes chip section lived here. It was a second list of the same thing
+              the pricing table above already shows, so a size could be added in one place
+              and priced in another. Sizes are now added and removed on their own row.) */}
 
           {/* Description */}
           <label className="flex flex-col gap-1">
