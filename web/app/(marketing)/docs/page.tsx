@@ -20,6 +20,17 @@ export const metadata: Metadata = {
  */
 const BASE = "https://api.egful.store"
 
+// One list drives the sidebar; every id here must match a Section below.
+const SECTIONS: [string, string][] = [
+  ["auth", "Authentication"],
+  ["limits", "Rate limits"],
+  ["endpoints", "Endpoints"],
+  ["billing", "Billing"],
+  ["webhooks", "Webhooks"],
+  ["verify", "Verifying signatures"],
+  ["errors", "Errors"],
+]
+
 const EVENTS: { name: string; when: string }[] = [
   { name: "order.received", when: "We accepted an order you pushed." },
   { name: "order.status_changed", when: "It moved along the production pipeline." },
@@ -65,7 +76,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 
 export default function DocsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
+    <div className="mx-auto max-w-5xl px-6 py-16">
       <header className="space-y-3 pb-10">
         <p className="text-xs font-semibold uppercase tracking-widest text-primary">Developers</p>
         <h1 className="font-display text-4xl font-semibold tracking-tight">The EGFULFILL API</h1>
@@ -75,17 +86,24 @@ export default function DocsPage() {
         </p>
       </header>
 
-      <nav aria-label="Contents" className="mb-12 flex flex-wrap gap-x-4 gap-y-1 border-y border-border py-3 text-sm">
-        {[
-          ["auth", "Authentication"], ["limits", "Rate limits"], ["endpoints", "Endpoints"],
-          ["billing", "Billing"], ["webhooks", "Webhooks"], ["verify", "Verifying signatures"],
-          ["errors", "Errors"],
-        ].map(([id, label]) => (
-          <a key={id} href={`#${id}`} className="text-muted-foreground transition-colors hover:text-foreground">{label}</a>
-        ))}
-      </nav>
+      <div className="grid gap-12 lg:grid-cols-[200px_1fr]">
+        {/* Sticky contents. `self-start` matters: a grid child stretches to the row
+            height by default, and a full-height sticky box has nothing left to travel. */}
+        <nav aria-label="Contents" className="hidden self-start lg:sticky lg:top-24 lg:block">
+          <div className="space-y-1 border-l border-border">
+            {SECTIONS.map(([id, label]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                className="-ml-px block border-l border-transparent py-1 pl-4 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+              >
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
 
-      <div className="space-y-14">
+        <div className="min-w-0 space-y-14">
         <Section id="auth" title="Authentication">
           <p className="text-muted-foreground">
             Every request carries an API key in the <Code>X-API-Key</Code> header. Generate one in
@@ -173,7 +191,18 @@ export default function DocsPage() {
                   <span className="ml-auto text-sm font-medium">{e.title}</span>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">{e.description}</p>
-                {e.body && <div className="mt-3"><Block>{e.body}</Block></div>}
+                {e.body && (
+                  <div className="mt-3">
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Request</div>
+                    <Block>{e.body}</Block>
+                  </div>
+                )}
+                {e.response && (
+                  <div className="mt-3">
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Response</div>
+                    <Block>{e.response}</Block>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -330,6 +359,7 @@ app.post("/hooks/egfulfill", express.raw({ type: "application/json" }), (req, re
             certainly want to treat them differently.
           </p>
         </Section>
+        </div>
       </div>
 
       <footer className="mt-16 border-t border-border pt-6 text-sm text-muted-foreground">
