@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { q } from '../db.js';
+import { quoteSpec } from '../pricing.js';
 import { emitWebhook } from '../webhooks.js';
 
 const PREFIX = 'egk_test_';
@@ -234,9 +235,47 @@ export function sandboxRoutes(app, requireAuth) {
       unit_price: +unit.toFixed(2), line_total: +(unit * qty).toFixed(2) };
   });
 
+  /**
+   * Price a LIVE order line from the real catalogue — the same path that bills every
+   * other order in the system.
+   *
+   * priceLines() above is for the SANDBOX: it looks SKUs up in SANDBOX_PRODUCTS (four demo
+   * items) and falls back to a flat 12.00. That is fine for a simulation and was very much
+   * not fine here — a partner pushing any real SKU created a genuine order in the factory
+   * queue at an invented price, and the floor made it.
+   *
+   * A partner-supplied unit_price is IGNORED. What they pay is ours to compute; letting the
+   * caller name our cost means a line arrives at 0.01 and gets produced.
+   *
+   * No catalogue match means no cost, and no cost means we cannot accept the line —
+   * charging 0 fulfils it for free, silently, forever. Same rule quoteOrder() applies to
+   * every other order (see `unpriced` in pricing.js).
+   */
+  async function priceLiveLines(items) {
+    const out = [];
+    const unpriced = [];
+    for (const [i, it] of (items || []).entries()) {
+      const qty = Math.max(1, parseInt(it.quantity, 10) || 1);
+      const sku = it.product_id || it.sku || null;
+      const quote = await quoteSpec({ blank: it.blank || it.product || null, sku, size: it.size, printType: it.method })
+        .catch(() => null);
+      const unit = quote && quote.unitCost != null ? Number(quote.unitCost) : null;
+      if (unit == null) { unpriced.push({ line: i + 1, sku, size: it.size || null, method: it.method || null }); continue; }
+      out.push({ line: i + 1, sku, product: (quote.matched && quote.matched.name) || it.name || 'Item',
+        color: it.color || null, size: it.size || null, method: it.method || null, quantity: qty,
+        unit_price: +unit.toFixed(2), line_total: +(unit * qty).toFixed(2) });
+    }
+    return { priced: out, unpriced };
+  }
+
   // Insert a REAL order (live keys) for the key's seller, straight into the fulfillment queue.
   async function createRealOrder(sellerId, b) {
-    const priced = priceLines(b.items);
+    const { priced, unpriced } = await priceLiveLines(b.items);
+    if (unpriced.length) {
+      const e = new Error('Some lines have no catalogue match, so they cannot be priced or produced.');
+      e.unpriced = unpriced;
+      throw e;
+    }
     const total = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
     const id = 'API-' + crypto.randomBytes(6).toString('hex').toUpperCase();
     const customer = b.customer || (b.shipping_address ? { name: b.shipping_address.name || null } : {});
@@ -280,7 +319,19 @@ export function sandboxRoutes(app, requireAuth) {
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
     if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address']);
     if (k.mode === 'live') {
-      const o = await createRealOrder(k.seller_id, b);
+      // An unpriceable line is a 400 the partner can act on, not a 500. Naming the exact
+      // lines matters: "order failed" sends them hunting, and the usual cause is a SKU
+      // that exists in their catalogue and not in ours.
+      let o;
+      try { o = await createRealOrder(k.seller_id, b); }
+      catch (e) {
+        if (e && e.unpriced) {
+          reply.code(400);
+          return { error: e.message, code: 'unpriceable_lines', unpriced: e.unpriced,
+            detail: 'Every line must match a catalogue product. Check the sku, size and print method against GET /api/v1/products.' };
+        }
+        throw e;
+      }
       return { object: 'order', mode: 'live', id: o.id, status: 'received', items: o.items,
         shipping_address: b.shipping_address, totals: { items: o.total, currency: 'USD' }, created: nowISO() };
     }
