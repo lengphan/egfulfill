@@ -650,9 +650,15 @@ export function ProductEditorDialog({
                         )}
                         {/* Says "this one is ours", so the absence of a tag means it's
                             following the type — the common case stays silent. */}
-                        {override && (
+                        {override ? (
                           <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-primary/90 py-0.5 text-center text-xs font-medium text-primary-foreground">Custom</span>
-                        )}
+                        ) : shown ? (
+                          /* Says WHERE the picture came from. Without it an inherited
+                             outline looks identical to one set on this product, which is
+                             why the missing X read as a bug rather than as "there is
+                             nothing of yours here to remove". */
+                          <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-background/85 py-0.5 text-center text-xs text-muted-foreground">From {type}</span>
+                        ) : null}
                         {/* A real select, visually hidden — keeps keyboard and screen-reader
                             behaviour while the tile is what you actually click. */}
                         <select
