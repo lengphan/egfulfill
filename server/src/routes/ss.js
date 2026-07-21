@@ -416,6 +416,206 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // create-product modal needs to prefill: distinct colors/sizes, a min price, an image
   // and a description (fetched from /styles/:id when the field is available).
   /**
+   * Order status.  GET /v2/orders/{orderNumber}?lines=true
+   *
+   * Until now the only thing known about a placed order was whatever the POST response
+   * said at the instant it was created — a snapshot that stops being true immediately.
+   * This is what lets "On order" report where an order actually IS.
+   *
+   * `qtyShipped` per line is the valuable part: S&S can ship a line SHORT, and an order
+   * that reads "Shipped" while two of twelve tees never came is exactly the discovery you
+   * want to make now rather than when the floor opens the box.
+   */
+  app.get('/api/ss/order/:num', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const num = String(req.params.num || '').trim();
+    if (!num) { reply.code(400); return { error: 'An order number is required.' }; }
+    try {
+      // Identifier accepts PO number, order number, invoice number or GUID — so whichever
+      // reference someone has to hand works, rather than only the one we happened to store.
+      const r = await ssGet('/orders/' + encodeURIComponent(num) + '?lines=true&mediatype=json');
+      if (r.status === 404) { reply.code(404); return { error: 'S&S has no order with that reference.' }; }
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S order lookup failed', status: r.status, detail: r.data }; }
+      const rows = Array.isArray(r.data) ? r.data : [r.data].filter(Boolean);
+      return {
+        orders: rows.map((o) => ({
+          orderNumber: String(o.orderNumber ?? ''), guid: o.guid || null,
+          invoiceNumber: o.invoiceNumber ? String(o.invoiceNumber) : null,
+          poNumber: o.poNumber || null, warehouse: o.warehouseAbbr || null,
+          status: o.orderStatus || null, deliveryStatus: o.deliveryStatus || null,
+          carrier: o.shippingCarrier || null, shippingMethod: o.shippingMethod || null,
+          tracking: o.trackingNumber || null,
+          orderedAt: o.orderDate || null, shippedAt: o.shipDate || null, invoicedAt: o.invoiceDate || null,
+          total: Number(o.total) || 0, shipping: Number(o.shipping) || 0, restockFee: Number(o.restockFee) || 0,
+          lines: (Array.isArray(o.lines) ? o.lines : []).map((l) => ({
+            sku: l.sku, yourSku: l.yourSku || null, title: l.title || null,
+            color: l.colorName || null, size: l.sizeName || null,
+            ordered: Number(l.qtyOrdered) || 0,
+            // Absent until it ships; null means "not yet", which is different from zero.
+            shipped: l.qtyShipped == null ? null : Number(l.qtyShipped) || 0,
+            price: Number(l.price) || 0, returnable: !!l.returnable,
+          })),
+        })),
+      };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
+   * Raise a RETURN with S&S.  POST /v2/returns/
+   *
+   * Replaces the local-only return that had to admit, in the UI, that it didn't tell the
+   * supplier anything. Their response carries an RA number and a return SHIPPING LABEL —
+   * the two things that actually make a return happen — so both are surfaced rather than
+   * left in the payload.
+   *
+   * Gated behind SS_ORDER_LIVE like every other write to a supplier, and testOrder
+   * mirrors it: a return raised by accident is a credit note you have to unpick.
+   */
+  app.post('/api/ss/return', { preHandler: requireWarehouse }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const b = req.body || {};
+    const lines = (Array.isArray(b.lines) ? b.lines : []).map((l) => ({
+      invoiceNumber: String(l.invoiceNumber || '').trim(),
+      identifier: String(l.sku || l.identifier || '').trim(),
+      qty: parseInt(l.qty, 10) || 0,
+      returnReason: String(l.returnReason || '').trim(),
+      isReplace: l.isReplace === true,
+      returnReasonComment: l.returnReasonComment ? String(l.returnReasonComment) : undefined,
+    })).filter((l) => l.identifier && l.qty > 0);
+    if (!lines.length) { reply.code(400); return { error: 'Nothing to return — each line needs a sku and a quantity.' }; }
+
+    for (const l of lines) {
+      if (!l.invoiceNumber) {
+        return reply.code(400).send({ error: `Line ${l.identifier} needs the INVOICE number it was billed on. S&S key returns to the invoice, not the order — fetch the order first if you don't have it.` });
+      }
+      if (!VALID_RETURN_REASONS.has(l.returnReason)) {
+        return reply.code(400).send({ error: `Line ${l.identifier} needs a return reason. Options: ${[...VALID_RETURN_REASONS].join(', ')}.`, reasons: RETURN_REASONS });
+      }
+      // Their rule, enforced here so the refusal names the field rather than arriving as
+      // an opaque 400 from S&S.
+      if (l.isReplace && (l.returnReason === '2' || l.returnReason === '6') && !l.returnReasonComment) {
+        return reply.code(400).send({ error: `A replacement for reason ${l.returnReason} (${RETURN_REASONS[l.returnReason]}) requires a comment explaining it.` });
+      }
+    }
+
+    const wantLive = b.live === true;
+    const payload = {
+      emailConfirmation: b.email || undefined,
+      shippingLabelRequired: b.shippingLabelRequired !== false,
+      testOrder: !wantLive,
+      showBoxes: true,
+      lines,
+    };
+    if (String(process.env.SS_ORDER_LIVE || '') !== '1') {
+      return { dryRun: true, note: 'SS_ORDER_LIVE!=1 → NOT sent to S&S. This is the payload that would go.', payload };
+    }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(SS_BASE + '/returns/', {
+        method: 'POST',
+        headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch { data = txt; }
+      if (!r.ok) { reply.code(502); return { error: 'S&S rejected the return', status: r.status, testOrder: payload.testOrder, detail: data }; }
+      // A return can come back as TWO orders — a Credit and a Replacement — so both are
+      // reported. Treating the first as "the" result would hide the replacement entirely.
+      const rows = Array.isArray(data) ? data : [data].filter(Boolean);
+      return {
+        ok: true, testOrder: payload.testOrder,
+        returns: rows.map((o) => ({
+          type: o.orderType || null, status: o.orderStatus || null,
+          orderNumber: String(o.orderNumber ?? ''), guid: o.guid || null,
+          raNumber: o.returnInformation?.raNumber || null,
+          originalInvoice: o.returnInformation?.originalInvoice || null,
+          reason: o.returnInformation?.returnReason || null,
+          // The label is the point of the whole exercise — without it the box can't go back.
+          labelUrl: o.returnInformation?.shippingLabelURL || null,
+          returnTo: o.returnInformation?.returnToAddress || null,
+          total: Number(o.total) || 0,
+          boxes: (Array.isArray(o.boxes) ? o.boxes : []).map((x) => ({
+            box: x.boxNumber, tracking: x.trackingNumber || null,
+            labelPng: x.returnInformation?.shippingLabelPNG || null,
+          })),
+        })),
+        ssResponse: data,
+      };
+    } catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
+  });
+
+  /**
+   * Cross-reference OUR sku to THEIRS.  GET /v2/crossref/  ·  PUT /v2/crossref/{yourSku}
+   *
+   * Registers our own code against an S&S sku on THEIR side, so their order and inventory
+   * responses carry `yourSku` back to us. That removes a mapping we'd otherwise maintain
+   * ourselves and which would drift the first time a blank was renamed.
+   */
+  app.get('/api/ss/crossref', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
+    const yourSku = String((req.query && req.query.yourSku) || '').trim();
+    try {
+      const r = await ssGet('/crossref/' + (yourSku ? encodeURIComponent(yourSku) : '') + '?mediatype=json');
+      if (r.status === 404) return { crossRefs: [] };
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S crossref lookup failed', status: r.status }; }
+      const rows = Array.isArray(r.data) ? r.data : [r.data].filter(Boolean);
+      return { crossRefs: rows.map((x) => ({ yourSku: x.yourSku, sku: x.sku, gtin: x.gtin || null,
+        brand: x.brandName || null, style: x.styleName || null, color: x.colorName || null, size: x.sizeName || null })) };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  app.put('/api/ss/crossref', { preHandler: requireWarehouse }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
+    const b = req.body || {};
+    const yourSku = String(b.yourSku || '').trim();
+    const identifier = String(b.sku || b.identifier || '').trim();
+    if (!yourSku || !identifier) { reply.code(400); return { error: 'yourSku and sku are both required.' }; }
+    // Their documented character limit. Rejecting here names the problem; sending it
+    // would come back as an opaque failure.
+    if (!/^[A-Za-z0-9_ -]+$/.test(yourSku)) {
+      reply.code(400);
+      return { error: 'yourSku may only contain letters, numbers, spaces, hyphens and underscores.' };
+    }
+    try {
+      const auth = Buffer.from(SS_ACCOUNT + ':' + SS_KEY).toString('base64');
+      const r = await fetch(SS_BASE + '/crossref/' + encodeURIComponent(yourSku) + '?Identifier=' + encodeURIComponent(identifier),
+        { method: 'PUT', headers: { Authorization: 'Basic ' + auth, Accept: 'application/json' } });
+      if (!r.ok) { reply.code(502); return { error: 'S&S rejected the cross-reference', status: r.status, detail: (await r.text()).slice(0, 300) }; }
+      // 201 = created, 200 = updated. Reported because "already mapped" and "newly mapped"
+      // are different answers to whoever asked.
+      return { ok: true, created: r.status === 201, updated: r.status === 200, yourSku, sku: identifier };
+    } catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
+  });
+
+  /**
+   * Delivery time per warehouse.  GET /v2/daysintransit/{zip}
+   *
+   * Matters because autoselectWarehouse splits an order across warehouses: this is what
+   * says whether that split costs a day. The cut-off time is the other half — an order
+   * placed at 4:30 ships tomorrow, which no quantity of urgency changes.
+   */
+  app.get('/api/ss/days-in-transit', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
+    let zip = String((req.query && req.query.zip) || '').replace(/[^0-9]/g, '').slice(0, 5);
+    if (!zip) {
+      // Default to where blanks actually get delivered, so the common call needs no args.
+      const { readShipFrom } = await import('./factory_settings.js');
+      zip = String((await readShipFrom().catch(() => ({})))?.zip || '').replace(/[^0-9]/g, '').slice(0, 5);
+    }
+    if (zip.length !== 5) { reply.code(400); return { error: 'A 5-digit ZIP is required — set your warehouse address, or pass ?zip=' }; }
+    try {
+      const r = await ssGet('/daysintransit/' + zip + '?mediatype=json');
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S transit lookup failed', status: r.status }; }
+      const row = (Array.isArray(r.data) ? r.data[0] : r.data) || {};
+      const list = Array.isArray(row.warehouses) ? row.warehouses : [];
+      return {
+        zip,
+        warehouses: list.map((w) => ({ warehouse: w.warehouseAbbr, cutOff: w.cutOffTime, days: Number(w.daysInTransit) || null }))
+          .sort((a, b) => (a.days ?? 99) - (b.days ?? 99)),
+      };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
    * Orderable SKUs for ONE style, fetched LIVE from S&S.
    *
    * The picker searches ss_products, which only holds what's been synced — so a style

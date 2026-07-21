@@ -5,6 +5,7 @@ import { CircleNotch, MagnifyingGlass, Plus, Check } from "@phosphor-icons/react
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { driveImg } from "@/lib/supplier-catalog"
 import {
   getSsProducts, getOttoProducts, getOttoStyle,
   type InventoryItem, type PurchaseOrder, type POLine, type SsProduct, type OttoStyle,
@@ -263,7 +264,7 @@ export function POAddItems({
                         {styleSkus[s.style] === undefined ? <Loading />
                           : styleSkus[s.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
                             : styleSkus[s.style].map((sku) => (
-                              <PickRow key={sku} line={{ sku, name: s.name ?? undefined, qty: 1, price: num(s.price) }} title={sku} sub={s.name ?? undefined} image={s.image ?? null}
+                              <PickRow key={sku} line={{ sku, name: s.name ?? undefined, qty: 1, price: num(s.price) }} title={sku} sub={s.name ?? undefined} image={driveImg(s.image) || null}
                                 on={!!picked[sku]} onToggle={toggle} />
                             ))}
                       </div>
