@@ -415,6 +415,38 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // Hits S&S directly (per-style product feed is small). Returns everything the
   // create-product modal needs to prefill: distinct colors/sizes, a min price, an image
   // and a description (fetched from /styles/:id when the field is available).
+  /**
+   * Orderable SKUs for ONE style, fetched LIVE from S&S.
+   *
+   * The picker searches ss_products, which only holds what's been synced — so a style
+   * nobody had synced was simply unfindable, and typing its name returned "no products
+   * match" as though it didn't exist. That's the difference between an empty result and
+   * an unanswered question, and the picker had no way to tell them apart.
+   *
+   * Fetching per style keeps this viable on a small box: the STYLE list is small and
+   * already cached whole, so every style is searchable; the sku rows behind one style are
+   * pulled only when someone actually opens it.
+   */
+  app.get('/api/ss/style-skus/:id', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
+    const id = String(req.params.id || '').trim();
+    if (!id) { reply.code(400); return { error: 'styleID required' }; }
+    try {
+      const r = await ssGet('/products/?style=' + encodeURIComponent(id) + '&fields=' + PRODUCT_FIELDS);
+      if (!r.ok || !Array.isArray(r.data)) { reply.code(r.status || 502); return { error: 'S&S style fetch failed (' + r.status + ')' }; }
+      const styleMeta = (await fetchStyles().catch(() => [])).find((x) => String(x.styleID) === id) || null;
+      const products = r.data.map((raw) => {
+        const p = mapProduct(raw, styleMeta || { styleID: id });
+        if (p.style_id == null) p.style_id = id;
+        return p;
+      }).filter((p) => p.sku);
+      // Cache what we just fetched, so opening a style once makes it searchable from then
+      // on — the catalogue fills in around what people actually use.
+      for (const p of products) await upsertProduct(p).catch(() => {});
+      return { total: products.length, products, live: true };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
   app.get('/api/ss/style/:id', { preHandler: requireStaff }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
     const id = String(req.params.id || '').trim();
@@ -560,6 +592,104 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // ── Catalog PRE-WARM — resolve EVERY style's thumbnail + colours into ss_style_images so New In
   // loads from our DB instead of live S&S (near-instant, no per-browse S&S calls). Staff-triggered,
   // runs in the BACKGROUND; poll /api/ss/warm/status. POST /api/ss/warm/stop to cancel.
+  /** Upsert one mapped product. Shared by both syncs so they can't write differently. */
+  async function upsertProduct(p) {
+    if (!p || !p.sku) return false;
+    await q(
+      `insert into ss_products (sku, style_id, brand, style_name, color, color_code, size, price, map_price, qty, warehouses, image, category, data, synced_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, now())
+       on conflict (sku) do update set
+         style_id=excluded.style_id, brand=excluded.brand, style_name=excluded.style_name,
+         color=excluded.color, color_code=excluded.color_code, size=excluded.size,
+         price=excluded.price, map_price=excluded.map_price, qty=excluded.qty,
+         warehouses=excluded.warehouses, image=excluded.image, category=excluded.category,
+         data=excluded.data, synced_at=now()`,
+      [p.sku, p.style_id, p.brand, p.style_name, p.color, p.color_code, p.size,
+       p.price, p.map_price, p.qty, p.warehouses, p.image, p.category, p.data]
+    );
+    return true;
+  }
+
+  /**
+   * Sync the WHOLE S&S catalogue, in the background.
+   *
+   * /api/ss/sync exists but demands styleIds or brands and caps at 300, so "everything"
+   * was never reachable — the picker could only ever find the handful of styles someone
+   * had thought to name, which is not a catalogue.
+   *
+   * The old objection was memory: pulling the entire product feed in one response OOMs a
+   * 1GB box. That's a fetch problem, not a capacity one — the loop already goes style by
+   * style, so nothing large is ever held at once. The real limit is S&S's 60 requests a
+   * minute, which makes this a slow job rather than an impossible one.
+   *
+   * Resumable: progress is written to the DB after every style, so a restart mid-run
+   * picks up where it stopped instead of starting the hour again. Already-synced styles
+   * are skipped unless `refresh` is set, which is what makes re-running it cheap.
+   */
+  let _full = { running: false, total: 0, done: 0, skipped: 0, products: 0, startedAt: 0, error: null, stopped: false };
+
+  app.get('/api/ss/sync-all/status', { preHandler: requireStaff }, async () => {
+    const have = await q('select count(distinct style_id)::int as n, count(*)::int as p from ss_products')
+      .then((r) => r.rows[0]).catch(() => ({ n: 0, p: 0 }));
+    return { ..._full, stylesInDb: have.n || 0, productsInDb: have.p || 0 };
+  });
+  app.post('/api/ss/sync-all/stop', { preHandler: requireStaff }, async () => {
+    _full.stopped = true; _full.running = false; return { ok: true };
+  });
+
+  app.post('/api/ss/sync-all', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured — set SS_ACCOUNT_NUMBER and SS_API_KEY.' }; }
+    if (_full.running) return { ok: true, already: true, ..._full };
+    const refresh = !!(req.body && req.body.refresh);
+
+    _full = { running: true, total: 0, done: 0, skipped: 0, products: 0, startedAt: Date.now(), error: null, stopped: false };
+    // Fire and forget: this takes the better part of an hour, so the request returns now
+    // and progress is polled. Holding the connection open would just time out.
+    (async () => {
+      try {
+        const styles = await fetchStyles();
+        _full.total = styles.length;
+
+        // Which styles are already in the table — skipped unless refreshing, so a second
+        // run costs minutes instead of the full hour.
+        const done = new Set();
+        if (!refresh) {
+          const r = await q('select distinct style_id from ss_products where style_id is not null').catch(() => ({ rows: [] }));
+          for (const row of r.rows) done.add(String(row.style_id));
+        }
+
+        // ONE style at a time. Their limit is 60/min and the whole point is that this runs
+        // for an hour in the background without starving live browsing — going wider would
+        // trip the limit and finish no sooner.
+        for (const st of styles) {
+          if (_full.stopped) break;
+          const sid = String(st.styleID);
+          if (done.has(sid)) { _full.skipped++; _full.done++; continue; }
+          try {
+            const r = await ssGet('/products/?style=' + encodeURIComponent(sid) + '&fields=' + PRODUCT_FIELDS);
+            const prods = (r.ok && Array.isArray(r.data)) ? r.data : [];
+            for (const raw of prods) {
+              const p = mapProduct(raw, st);
+              if (p.style_id == null) p.style_id = sid;
+              await upsertProduct(p).catch(() => {});
+              _full.products++;
+            }
+          } catch (e) { /* one style failing must not end the run */ }
+          _full.done++;
+          // Pace to stay under 60/min with room for anyone browsing at the same time.
+          await new Promise((r2) => setTimeout(r2, 1100));
+        }
+      } catch (e) {
+        _full.error = String((e && e.message) || e);
+      } finally {
+        _full.running = false;
+      }
+    })();
+
+    return { ok: true, started: true, total: _full.total || null,
+             note: 'Runs in the background — poll /api/ss/sync-all/status. Safe to leave; already-synced styles are skipped.' };
+  });
+
   let _warm = { running: false, total: 0, done: 0, startedAt: 0, error: null };
   app.post('/api/ss/warm', { preHandler: requireStaff }, async (req, reply) => {
     if (!creds()) { reply.code(400); return { error: 'S&S not configured' }; }

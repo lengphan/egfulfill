@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
+import { QuickOrderDialog, type QuickOrderProduct } from "@/components/app/quick-order-dialog"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { Loading } from "@/components/app/loading"
@@ -136,6 +137,29 @@ export function AllSuppliers() {
     : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
+
+  // ── Quick order ────────────────────────────────────────────────────────────
+  // Buying is not the same act as listing. "Add to catalog" decides what we SELL;
+  // this decides what we BUY, and it goes to the to-order list without importing
+  // anything — needing six of a blank shouldn't put it on the shop.
+  const [quickOrder, setQuickOrder] = useState<QuickOrderProduct | null>(null)
+  const quickOrderFor = (it: Item): QuickOrderProduct => {
+    const d = cardData(it)
+    // S&S sizes are only loaded once a card has been expanded; Otto ships them with the
+    // style. Either way an empty list is shown honestly rather than guessed at.
+    const sizes = (d.sizes ?? []).map((sz: unknown) => {
+      const o = (typeof sz === "string" ? { size: sz } : (sz ?? {})) as { size?: string; name?: string; sku?: string | null; price?: number | null }
+      return { size: String(o.size ?? o.name ?? sz), sku: o.sku ?? null, price: o.price ?? null }
+    })
+    return {
+      style: String(d.id),
+      name: d.title || String(d.id),
+      supplier: it.supplier === "ss" ? "S&S Activewear" : "Otto Cap",
+      image: d.image ?? null,
+      sizes,
+      defaultPrice: typeof d.price === "number" ? d.price : Number(d.price) || null,
+    }
+  }
 
   // Step 1 — resolve the supplier style into our catalog shape and STAGE it. Nothing is
   // written yet; the editor below is the confirm step.
@@ -286,6 +310,7 @@ export function AllSuppliers() {
                   adding={addingId === keyOf(it)}
                   onAdd={() => addToCatalog(it)}
                   onEditVariants={() => addToCatalog(it)}
+                  onQuickOrder={() => setQuickOrder(quickOrderFor(it))}
                   onFavorite={(on) => favorite(it, on)}
                   loadColors={loadColors(it)}
                 />
@@ -319,6 +344,11 @@ export function AllSuppliers() {
         newIdSeed={0}
         title="Review before adding"
         ctaLabel="Add to catalog"
+      />
+      <QuickOrderDialog
+        product={quickOrder}
+        onClose={() => setQuickOrder(null)}
+        onAdded={() => setMsg("Added to the order list — review and place it on the Purchase page.")}
       />
     </SectionCard>
   )

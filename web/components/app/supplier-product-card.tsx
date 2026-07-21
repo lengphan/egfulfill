@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { SupplierFlag } from "@/components/app/supplier-flag"
-import { Heart, Plus, CheckCircle, CircleNotch } from "@phosphor-icons/react"
+import { Heart, Plus, CheckCircle, CircleNotch, ShoppingCart } from "@phosphor-icons/react"
 import { swatchBg } from "@/lib/color-swatch"
 import { prettyColorName } from "@/lib/color-name"
 
@@ -28,7 +28,7 @@ export type SupplierCardData = {
 }
 
 export function SupplierProductCard({
-  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onEditVariants,
+  data, added, adding, onAdd, onFavorite, loadColors, supplierLabel, onEditVariants, onQuickOrder,
 }: {
   data: SupplierCardData
   added: boolean
@@ -39,6 +39,11 @@ export function SupplierProductCard({
   supplierLabel?: string // e.g. "S&S" / "Otto" — shown as a badge when browsing both at once
   /** Click the colour/size rows to edit the variant set before importing. */
   onEditVariants?: () => void
+  /** Order this straight from the browse grid, without importing it to the catalogue
+   *  first. Separate from onAdd on purpose: adding to the CATALOGUE is about what we
+   *  sell, ordering is about what we buy, and conflating them is how a blank ends up
+   *  listed for sale because someone needed six of it. */
+  onQuickOrder?: () => void
 }) {
   const [img, setImg] = useState<string | null>(data.image ?? null)
   const [activeColor, setActiveColor] = useState<string | null>(null)
@@ -168,9 +173,15 @@ export function SupplierProductCard({
           </button>
         )}
 
-        <div className="mt-auto pt-3">
+        <div className="mt-auto flex items-center gap-2 pt-3">
+          {onQuickOrder && (
+            <button onClick={onQuickOrder} title="Order this — quantities and prices per size"
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent">
+              <ShoppingCart size={13} weight="bold" /> Order
+            </button>
+          )}
           <button onClick={onAdd} disabled={added || adding}
-            className={"flex w-full items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (added ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}>
+            className={"flex flex-1 items-center justify-center gap-1.5 rounded-full py-1.5 text-xs font-semibold transition-colors " + (added ? "bg-emerald-100 text-emerald-700" : "bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground")}>
             {adding ? <CircleNotch size={13} className="animate-spin" /> : added ? <><CheckCircle size={13} weight="fill" /> Added</> : <><Plus size={13} weight="bold" /> Add to catalog</>}
           </button>
         </div>

@@ -17,6 +17,10 @@ import type { OrderItem, OrderDesign, CatalogProduct } from "@/lib/api"
  * listing photo fall back to the composite so nothing renders empty.
  *
  * Pass `readOnly` for a purely decorative strip (no click, no preview).
+ *
+ * `overlap` defaults to true (the dense stack a flat table row wants). Pass false where
+ * the thumbs are the point rather than a hint: overlapping hides ~a third of every image
+ * behind the next one, which no amount of extra size buys back.
  */
 export function PhotoStack({
   items,
@@ -25,6 +29,7 @@ export function PhotoStack({
   max = 3,
   size = 32,
   readOnly,
+  overlap = true,
 }: {
   items: OrderItem[]
   designs?: Record<string, OrderDesign> | null
@@ -33,18 +38,20 @@ export function PhotoStack({
   max?: number
   size?: number
   readOnly?: boolean
+  /** Tuck each thumb under the previous one. False lays them out edge to edge. */
+  overlap?: boolean
 }) {
   const shown = items.slice(0, max)
   const extra = items.length - shown.length
   return (
-    <div className="flex shrink-0 items-center">
+    <div className={"flex shrink-0 items-center" + (overlap ? "" : " gap-1.5")}>
       {shown.map((it, i) => (
         <span
           // line_id first: two lines of the same SKU are different jobs, and keying on
           // sku alone gave duplicate React keys on identical-SKU siblings — which lets
           // React reuse the wrong node when the list reorders.
           key={it.line_id ?? it.sku ?? i}
-          className={"relative " + (i ? "-ml-2.5" : "")}
+          className={"relative " + (i && overlap ? "-ml-2.5" : "")}
           style={{ zIndex: shown.length - i }}
         >
           <ItemAvatar
@@ -60,7 +67,7 @@ export function PhotoStack({
       ))}
       {extra > 0 && (
         <span
-          className="-ml-2.5 flex items-center justify-center rounded-md border border-background bg-muted text-[10px] font-semibold text-muted-foreground ring-1 ring-border"
+          className={(overlap ? "-ml-2.5 " : "") + "flex items-center justify-center rounded-md border border-background bg-muted text-xs font-semibold text-muted-foreground ring-1 ring-border"}
           style={{ width: size, height: size }}
         >
           +{extra}
