@@ -31,7 +31,7 @@ import { sheetsRoutes } from './routes/sheets.js';
 import { walletRoutes } from './routes/wallet.js';
 import { factoryListsRoutes } from './routes/factory_lists.js';
 import { teamRoutes } from './routes/team.js';
-import { sandboxRoutes } from './routes/sandbox.js';
+import { sandboxRoutes, authKey } from './routes/sandbox.js';
 import { webhookRoutes } from './webhooks.js';
 import { adminSecretsRoutes } from './routes/admin_secrets.js';
 import { auditRoutes } from './audit.js';
@@ -273,7 +273,7 @@ walletRoutes(app, requireAuth);                        // SERVER-authoritative w
 factoryListsRoutes(app, requireAuth);                  // shared factory queues (backorders + purchase orders) — staff-only, whole-array blobs
 teamRoutes(app, requireAuth);                          // seller team members + per-member access surfaces (drives nav-hiding); auth/login untouched
 sandboxRoutes(app, requireAuth);                       // seller API keys (/api/keys) + safe /api/test/* sandbox (simulated, no side effects) — isolated key-auth, global hook untouched
-webhookRoutes(app, requireAuth);                       // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only
+webhookRoutes(app, requireAuth, authKey);              // outbound webhooks (/api/webhooks) — what makes the public API push instead of poll-only; JWT *or* X-API-Key, since registering one is a partner action
 adminSecretsRoutes(app, requireStaff);                 // READ-ONLY masked last-4 of integration credentials (staff) — powers Settings › Integrations last-4 display; no plaintext/write
 auditRoutes(app, requireAdmin, requireAuth);                        // admin-only Activity log read API (GET /api/audit) — the audit() writer is called inline from routes
 supportAiRoutes(app, requireAuth, requireStaff);       // account-aware AI auto-reply for the seller Support chat + admin AI key/model config (Settings › Integrations)

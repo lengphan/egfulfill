@@ -42,7 +42,7 @@ function ensure() {
 // Resolve the presented API key → the api_keys row (or null). Accepts the key in either
 // the X-API-Key header or `Authorization: Bearer egk_…` (the global hook already tried to
 // verify() that Bearer as a JWT and got null — harmless; we re-read the raw header here).
-async function authKey(req) {
+export async function authKey(req) {
   const hdr  = (req.headers['x-api-key'] || '').toString().trim();
   const bear = (req.headers.authorization || '').match(/^Bearer\s+(egk_[A-Za-z0-9_-]+)\s*$/);
   const key  = hdr.startsWith('egk_') ? hdr : (bear ? bear[1] : '');

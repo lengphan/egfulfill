@@ -142,22 +142,47 @@ export function emitWebhook(sellerId, event, payload) {
   })().catch(() => {});
 }
 
-/** Seller-facing management. Mounted under /api/webhooks with the normal JWT. */
-export function webhookRoutes(app, requireAuth) {
+/**
+ * Seller-facing management.
+ *
+ * Authenticates with EITHER the dashboard JWT or an API key. Registering a webhook is a
+ * partner action — the whole point is that their server talks to ours — so requiring a
+ * human to log into a dashboard to do it would make the feature unusable programmatically,
+ * and would 401 the API Playground, which sends X-API-Key.
+ *
+ * `authKey` is injected rather than imported: sandbox.js already imports emitWebhook from
+ * this module, so importing it back would close a cycle.
+ */
+export function webhookRoutes(app, requireAuth, authKey) {
   ensureWebhookTables();
 
-  app.get('/api/webhooks', { preHandler: requireAuth }, async (req) => {
+  // Resolve the caller to a seller id from whichever credential they presented.
+  const sellerOf = async (req) => {
+    if (req.user && req.user.sub) return String(req.user.sub);
+    if (typeof authKey === 'function') {
+      const k = await authKey(req).catch(() => null);
+      if (k && k.seller_id) return String(k.seller_id);
+    }
+    return null;
+  };
+  const requireSeller = async (req, reply) => {
+    const id = await sellerOf(req);
+    if (!id) { reply.code(401).send({ error: 'Sign in or send an API key (X-API-Key).' }); return; }
+    req._sellerId = id;
+  };
+
+  app.get('/api/webhooks', { preHandler: requireSeller }, async (req) => {
     await ensureWebhookTables();
     const r = await q(
       'select id, url, events, active, created_at from webhook_endpoints where seller_id=$1 order by created_at desc',
-      [String(req.user.sub)]
+      [req._sellerId]
     );
     // The secret is shown ONCE, at creation. Listing it back would make every read of
     // this page a place to steal signing keys.
     return r.rows;
   });
 
-  app.post('/api/webhooks', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/api/webhooks', { preHandler: requireSeller }, async (req, reply) => {
     await ensureWebhookTables();
     const b = req.body || {};
     const bad = validateWebhookUrl(b.url);
@@ -168,21 +193,21 @@ export function webhookRoutes(app, requireAuth) {
     const r = await q(
       `insert into webhook_endpoints (seller_id, url, secret, events) values ($1,$2,$3,$4)
        returning id, url, events, active, created_at`,
-      [String(req.user.sub), String(b.url), secret, events]
+      [req._sellerId, String(b.url), secret, events]
     );
     return { ...r.rows[0], secret, _note: 'Store this secret now — it is not shown again. Verify deliveries with HMAC-SHA256 over the raw body.' };
   });
 
-  app.delete('/api/webhooks/:id', { preHandler: requireAuth }, async (req) => {
+  app.delete('/api/webhooks/:id', { preHandler: requireSeller }, async (req) => {
     await ensureWebhookTables();
-    await q('delete from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, String(req.user.sub)]);
+    await q('delete from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, req._sellerId]);
     return { ok: true };
   });
 
   // Recent attempts, so "we never got it" is answerable.
-  app.get('/api/webhooks/:id/deliveries', { preHandler: requireAuth }, async (req, reply) => {
+  app.get('/api/webhooks/:id/deliveries', { preHandler: requireSeller }, async (req, reply) => {
     await ensureWebhookTables();
-    const own = await q('select id from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, String(req.user.sub)]);
+    const own = await q('select id from webhook_endpoints where id=$1 and seller_id=$2', [Number(req.params.id) || 0, req._sellerId]);
     if (!own.rows.length) { reply.code(404); return { error: 'No such endpoint.' }; }
     const r = await q(
       'select id, event, status_code, error, attempts, created_at from webhook_deliveries where endpoint_id=$1 order by created_at desc limit 100',
@@ -191,5 +216,5 @@ export function webhookRoutes(app, requireAuth) {
     return r.rows;
   });
 
-  app.get('/api/webhooks/events', { preHandler: requireAuth }, async () => ({ events: WEBHOOK_EVENTS }));
+  app.get('/api/webhooks/events', { preHandler: requireSeller }, async () => ({ events: WEBHOOK_EVENTS }));
 }

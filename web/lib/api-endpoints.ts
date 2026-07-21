@@ -1,5 +1,12 @@
-// Sandbox endpoint catalog for the API Playground — mirrors server/src/routes/sandbox.js
-// (/api/v1/*, API-KEY-authed, fully simulated: no real orders/labels/charges).
+// Endpoint catalog for the API Playground — mirrors server/src/routes/sandbox.js
+// (/api/v1/*, API-KEY-authed) and server/src/webhooks.js.
+//
+// A test key (egk_test_…) simulates everything. A LIVE key creates real orders against
+// your account — /api/v1/orders is not a sandbox on a live key.
+//
+// Keep this list honest: it is the only description of the API a partner ever reads, and
+// an entry here is a promise that the route works. Nothing may be listed that the server
+// answers with 501.
 export type ApiEndpoint = {
   id: string
   method: "GET" | "POST"
@@ -56,55 +63,43 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     description: "Looks up an order by id (any well-formed id resolves in the sandbox).",
     param: { name: "id", placeholder: "ord_test123" },
   },
+  // Label buying and rate shopping USED to be listed here. They were removed rather than
+  // marked "coming soon": the server returns 501 for all three, and before that they
+  // returned a 200 carrying an invented tracking code. Documenting an endpoint that
+  // cannot work is how an integrator builds against it and discovers the gap in
+  // production. EGFULFILL buys carrier labels internally when it ships an order —
+  // tracking is read back from Retrieve order, or pushed by the order.shipped webhook.
   {
-    id: "rates",
+    id: "webhooks-list",
+    method: "GET",
+    path: "/api/webhooks",
+    title: "List webhooks",
+    description:
+      "Your registered endpoints. Secrets are never returned here — they're shown once, when the endpoint is created.",
+  },
+  {
+    id: "webhooks-create",
     method: "POST",
-    path: "/api/v1/shipping-rates",
-    title: "Rate-shop shipment",
-    description: "Returns simulated carrier rates for a shipment. Needs a to_address.",
+    path: "/api/webhooks",
+    title: "Add a webhook",
+    description:
+      "Register an https endpoint to be notified on. Returns a signing secret ONCE — store it. Omit `events` to receive all of them. Every delivery carries X-EG-Event and X-EG-Signature (sha256=<hex>), an HMAC-SHA256 of the raw body using that secret; compare it in constant time before trusting a payload.",
     body: JSON.stringify(
       {
-        to_address: { name: "Ava Brodeur", street1: "43 Calumet Rd", city: "Fairhaven", state: "MA", zip: "02719", country: "US" },
-        from_address: { name: "EG Fulfill", city: "Los Angeles", state: "CA", zip: "90021", country: "US" },
-        parcel: { length: 12, width: 9, height: 2, weight_oz: 6 },
+        url: "https://your-app.example.com/hooks/egfulfill",
+        events: ["order.received", "order.status_changed", "order.shipped", "order.cancelled"],
       },
       null,
       2
     ),
   },
   {
-    id: "label-domestic",
-    method: "POST",
-    path: "/api/v1/shipping-labels/domestics",
-    title: "Buy domestic label",
-    description: "Simulates buying a US label. Needs to_address, from_address and parcel (no wallet charge).",
-    body: JSON.stringify(
-      {
-        service: "Ground Advantage",
-        to_address: { name: "Ava Brodeur", street1: "43 Calumet Rd", city: "Fairhaven", state: "MA", zip: "02719", country: "US" },
-        from_address: { name: "EG Fulfill", street1: "1500 Newton St", city: "Los Angeles", state: "CA", zip: "90021", country: "US" },
-        parcel: { length: 12, width: 9, height: 2, weight_oz: 6 },
-      },
-      null,
-      2
-    ),
-  },
-  {
-    id: "label-international",
-    method: "POST",
-    path: "/api/v1/shipping-labels/internationals",
-    title: "Buy international label",
-    description: "Simulates an international label with customs. Adds customs_items to the domestic fields.",
-    body: JSON.stringify(
-      {
-        service: "Priority Mail International",
-        to_address: { name: "Liam Byrne", street1: "12 Abbey St", city: "Dublin", state: "D01", zip: "D01X2P3", country: "IE" },
-        from_address: { name: "EG Fulfill", street1: "1500 Newton St", city: "Los Angeles", state: "CA", zip: "90021", country: "US" },
-        parcel: { length: 12, width: 9, height: 2, weight_oz: 6 },
-        customs_items: [{ description: "Cotton T-Shirt", quantity: 2, value: 18.0, weight_oz: 6, hs_tariff: "610910", origin_country: "US" }],
-      },
-      null,
-      2
-    ),
+    id: "webhooks-deliveries",
+    method: "GET",
+    path: "/api/webhooks/:id/deliveries",
+    title: "Delivery attempts",
+    description:
+      "The last 100 attempts for one endpoint — status code, error and attempt count. Deliveries retry three times with backoff and give up on a non-retryable 4xx, so this is where a missed notification is explained.",
+    param: { name: "id", placeholder: "1" },
   },
 ]
