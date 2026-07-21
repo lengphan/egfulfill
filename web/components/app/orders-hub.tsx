@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, pushToDispatch, markScannedInHouse, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, pushToDispatch, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -413,24 +413,10 @@ export function OrdersHub() {
   // "All matching this filter" — not just the page, since a warehouse thinks in runs.
   const selectAllFiltered = () => setSelected(new Set(filtered.filter(dispatchable).map((o) => o.id)))
 
-  /** Record an in-house scan for the selection — no partner, no fee. */
-  const scanHere = async () => {
-    if (!selected.size) return
-    setPushing(true); setPushMsg(null)
-    try {
-      const ids = [...selected]
-      const results = await Promise.all(ids.map((id) => markScannedInHouse(id).catch((e: unknown) => ({ error: e instanceof Error ? e.message : "failed" }))))
-      const failed = results.filter((r: unknown) => !!(r as { error?: string })?.error)
-      setPushMsg(failed.length
-        ? { tone: "err", text: `${ids.length - failed.length} marked scanned · ${failed.length} failed — ${(failed[0] as { error?: string }).error}` }
-        : { tone: "ok", text: `${ids.length} marked scanned here.` })
-      setSelected(new Set())
-      load()
-    } catch (e) {
-      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Couldn't mark those scanned." })
-    } finally { setPushing(false) }
-  }
-
+  // NOTE: the in-house scan (POST /api/orders/:id/scanned) is live on the server and has
+  // no button here on purpose — this bar is deliberately just "what's selected" and "the
+  // action". It wants a home that isn't a bulk toolbar; the Scan readiness chip on each
+  // row is the obvious one, since that's where the fact is already displayed.
   const doPush = async () => {
     if (!selected.size) return
     setPushing(true); setPushMsg(null)
@@ -578,39 +564,24 @@ export function OrdersHub() {
                 selectable, so a board with nothing ticked still showed "Select page (1)"
                 and "Select all 7 in this filter", which reads as a selection you didn't
                 make. Rows carry their own checkbox, so this is not the only way in. */}
+          {/* Stripped to the two things that matter: what's selected, and the action.
+              It previously carried five controls — a page checkbox, "select page (2)",
+              "select all 8 in this filter", the in-house scan and Clear — which is a
+              paragraph of options above a list you were already looking at. Rows carry
+              their own checkbox, so bulk selection was never the only way in. */}
           {dispatchOn && selected.size > 0 && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5">
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
-                <input type="checkbox" checked={allOnPageSelected} onChange={togglePage}
-                  className="size-4 rounded border-input accent-primary" aria-label="Select every dispatchable order on this page" />
-                <span className="text-muted-foreground">
-                  {selected.size} selected
-                  {!allOnPageSelected && selectableOnPage.length > selected.size && ` · select page (${selectableOnPage.length})`}
-                </span>
-              </label>
-              {filtered.filter(dispatchable).length > selectableOnPage.length && (
-                <button onClick={selectAllFiltered} className="text-sm font-medium text-primary hover:underline">
-                  Select all {filtered.filter(dispatchable).length} in this filter
-                </button>
-              )}
-              {/* Scanning in-house is the OTHER way to start the tracking clock. Same
-                  fact, no partner, no per-label fee — and it was previously unrecordable,
-                  so an order the floor scanned itself looked permanently unscanned. */}
-              {selected.size > 0 && (
-                <button onClick={scanHere} disabled={pushing}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-60">
-                  Mark {selected.size} scanned here
-                </button>
-              )}
-              {selected.size > 0 && (
-                <>
-                  <Button size="sm" onClick={doPush} disabled={pushing}>
-                    {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
-                    {pushing ? "Pushing…" : `Push ${selected.size} to dispatch`}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
-                </>
-              )}
+            <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-5 py-2.5">
+              <span className="text-sm text-muted-foreground">{selected.size} selected</span>
+              <Button size="sm" onClick={doPush} disabled={pushing}>
+                {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
+                {pushing ? "Pushing…" : `Push ${selected.size} to dispatch`}
+              </Button>
+              {/* Unlabelled ×: without it there's no way out of a selection except
+                  unticking every row. */}
+              <button onClick={() => setSelected(new Set())}
+                className="text-muted-foreground hover:text-foreground" aria-label="Clear selection">
+                <X size={14} weight="bold" />
+              </button>
               {pushMsg && (
                 <span className={"text-xs font-medium " + (pushMsg.tone === "ok" ? "text-emerald-600" : "text-destructive")}>
                   {pushMsg.text}
