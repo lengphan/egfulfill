@@ -23,6 +23,10 @@ const isLow = (it: InventoryItem) => num(it.in_stock) <= (it.reorder_at ?? 25)
 const suggestQty = (it: InventoryItem) => Math.max(1, (it.reorder_at ?? 25) * 2 - num(it.in_stock))
 const supKey = (s?: string | null) => (s || "Unassigned")
 const nextNum = () => "PO-" + Date.now().toString(36).toUpperCase()
+// A stand-in for the picker to attach to. There is no draft PO any more: items picked
+// from a catalogue go into the to-order pool, and a purchase order only comes into
+// existence at the moment one is placed.
+const POOL: PurchaseOrder = { num: "__pool__", supplier: null, items: [], status: "pool" }
 // NOTE: there is deliberately no supplier-name matcher here any more. Guessing an API
 // from a typed name is what sent every "Unassigned" PO to S&S ("unassigned" contains
 // "ss"). The supplier is a property of the PRODUCT, resolved server-side from the synced
@@ -376,6 +380,103 @@ export function PurchaseView() {
     } finally { setBusy(null) }
   }
 
+  // ── The "to order" pool, split by supplier ─────────────────────────────────
+  // Suppliers are resolved SERVER-side from the synced catalogues — a sku is either in
+  // S&S's or it isn't — never guessed from a typed name. That guess is what once sent
+  // every "Unassigned" PO to S&S, because "unassigned" contains "ss".
+  const [supByS, setSupByS] = useState<Record<string, { api: "ss" | "otto" | null; supplier: string | null }>>({})
+  useEffect(() => {
+    const skus = saved.map((l) => l.sku).filter(Boolean)
+    if (!skus.length) return
+    const t = setTimeout(() => {
+      resolveSuppliers(skus).then((r) => setSupByS(r.bySku ?? {})).catch(() => {})
+    }, 0)
+    return () => clearTimeout(t)
+  }, [saved])
+
+  const toOrderGroups = useMemo(() => {
+    const g = new Map<string, { key: string; api: "ss" | "otto" | null; supplier: string | null; lines: SavedPOLine[]; total: number }>()
+    for (const l of saved) {
+      const r = supByS[l.sku] ?? { api: null, supplier: l.supplier ?? null }
+      const key = r.api ?? `manual:${r.supplier ?? l.supplier ?? "unassigned"}`
+      if (!g.has(key)) g.set(key, { key, api: r.api, supplier: r.supplier ?? l.supplier ?? null, lines: [], total: 0 })
+      const grp = g.get(key)!
+      grp.lines.push(l)
+      grp.total += num(l.price) * num(l.qty)
+    }
+    return [...g.values()]
+  }, [saved, supByS])
+  const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+
+  const setSavedQty = (sku: string, qty: number) =>
+    putSaved(saved.map((l) => (l.sku === sku ? { ...l, qty } : l)))
+
+  /**
+   * Place every group — one purchase order per supplier, in one action.
+   *
+   * The split is already on screen, so this holds no surprises: what you saw grouped is
+   * what gets sent, as separate orders, because one receipt covering two suppliers can't
+   * later answer "what did S&S actually send us".
+   *
+   * Lines that go out leave the pool; anything that FAILED stays, so a retry re-sends
+   * only what didn't make it rather than duplicating what did.
+   */
+  const placeAllGroups = async () => {
+    if (!saved.length) return
+    const opts = await getSupplierOptions().catch(() => null)
+    if (!opts?.shipToComplete) {
+      setMsg({ ok: false, text: "Your warehouse address is incomplete, so there's nowhere for the blanks to be delivered. Set it in Supplier ordering." })
+      return
+    }
+    setBusy("place-all"); setMsg(null)
+    const results: string[] = []
+    const placedSkus = new Set<string>()
+    try {
+      for (const g of toOrderGroups) {
+        const poNum = nextNum()
+        const payload = g.lines.map((l) => ({ sku: l.sku, qty: num(l.qty) })).filter((l) => l.qty > 0)
+        if (!payload.length) continue
+        let resp: unknown = { manual: true }
+        let ok = true
+        try {
+          if (g.api === "otto") {
+            const r = await ottoOrder(payload, {
+              shipping_address: opts.shipTo, shipping_method: opts.defaults.otto_shipping_method || undefined,
+              payment_method: opts.defaults.otto_payment_method || undefined, customer_po: poNum,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          } else if (g.api === "ss") {
+            const r = await ssOrder(payload, {
+              shippingAddress: opts.shipTo, shippingMethod: opts.defaults.ss_shipping_method || undefined,
+              email: opts.defaults.order_email || undefined, poNumber: poNum,
+            })
+            if (r.error) throw new Error(r.error); resp = r
+          }
+        } catch (e) {
+          ok = false
+          resp = { error: e instanceof Error ? e.message : "failed" }
+        }
+        // The PO record is created HERE, at the moment of placing — never before. That
+        // document existing beforehand is exactly what "draft PO" was.
+        await savePurchaseOrder({
+          num: poNum, supplier: g.supplier ?? null, items: g.lines, status: ok ? "placed" : "draft",
+          meta: { response: resp, placedAt: new Date().toISOString(), api: g.api },
+        }).catch(() => {})
+        if (ok) g.lines.forEach((l) => placedSkus.add(l.sku))
+        results.push(ok
+          ? `${g.supplier ?? "Unassigned"}: ${g.api ? "sent (test/dry-run)" : "recorded — order it by hand"}`
+          : `${g.supplier ?? "Unassigned"}: failed — ${(resp as { error?: string }).error}`)
+      }
+      if (placedSkus.size) putSaved(saved.filter((l) => !placedSkus.has(l.sku)))
+      const anyFailed = results.some((r) => r.includes("failed"))
+      setMsg({ ok: !anyFailed, tone: anyFailed && placedSkus.size ? "warn" : undefined,
+               text: (anyFailed && placedSkus.size ? "Partly placed. " : "") + results.join(" · ") })
+      load()
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
+    } finally { setBusy(null) }
+  }
+
   const returnsOf = (po: PurchaseOrder): PoReturn[] => {
     const r = ((po.meta || {}) as { returns?: PoReturn[] }).returns
     return Array.isArray(r) ? r : []
@@ -670,82 +771,80 @@ export function PurchaseView() {
             arrive. Split from history because these are the ones that need doing, and a
             working set buried under every PO ever received stops being read. */}
         <TabsContent value="active" className="mt-4 space-y-4">
-        <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
-          {inv === null ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-          ) : Object.keys(suggestions).length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">Everything is above its reorder point.</div>
+
+        {/* ── TO ORDER ─────────────────────────────────────────────────────────
+            One panel, always open. This is the working surface, and something you're
+            mid-way through deciding shouldn't sit behind a click.
+
+            Grouped by the supplier each line ACTUALLY comes from, so the split is
+            visible BEFORE placing rather than being a surprise after. Nothing here is
+            a "draft PO": no purchase order exists until you place one. Until then this
+            is a list of what's short, which is the only honest description of it. */}
+        <SectionCard
+          title="To order"
+          description="Everything short or set aside, grouped by the supplier it comes from"
+          actions={
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {saved.reduce((s, l) => s + num(l.qty), 0)} units{toOrderTotal > 0 ? ` · ${usd(toOrderTotal)}` : ""}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setAddTo(POOL)}>
+                <Plus size={13} weight="bold" /> Add items
+              </Button>
+              <Button size="sm" onClick={placeAllGroups} disabled={!saved.length || busy === "place-all"}>
+                {busy === "place-all" ? <CircleNotch size={14} className="animate-spin" /> : <PaperPlaneTilt size={14} weight="bold" />}
+                {toOrderGroups.length > 1 ? `Place ${toOrderGroups.length} orders` : "Place order"}
+              </Button>
+            </div>
+          }
+        >
+          {saved.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Nothing waiting to be ordered. Items land here when an order runs stock short,
+              or add them yourself with <strong>Add items</strong>.
+            </div>
           ) : (
             <div className="divide-y divide-border">
-              {Object.entries(suggestions).map(([sup, items]) => (
-                <div key={sup} className="flex flex-wrap items-center gap-2 px-5 py-3">
-                  <span className="font-medium">{sup}</span>
-                  <span className="text-sm text-muted-foreground">{items.length} item{items.length > 1 ? "s" : ""} low</span>
-                  <Button size="sm" className="ml-auto" onClick={() => createDraft(sup, items)} disabled={busy === "new"}>
-                    {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />} Draft PO
-                  </Button>
+              {toOrderGroups.map((g) => (
+                <div key={g.key}>
+                  <div className="flex flex-wrap items-center gap-2 bg-muted/40 px-5 py-2">
+                    <span className="text-sm font-semibold">{g.supplier ?? "Unassigned"}</span>
+                    {g.api
+                      ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">orders via API</span>
+                      : <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">order by hand</span>}
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {g.lines.length} line{g.lines.length === 1 ? "" : "s"} · {g.lines.reduce((s, l) => s + num(l.qty), 0)} units
+                      {g.total > 0 ? ` · ${usd(g.total)}` : ""}
+                    </span>
+                  </div>
+                  {g.lines.map((l) => (
+                    <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                        <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                        <SourceTags line={l} />
+                      </div>
+                      <Input
+                        value={String(num(l.qty))}
+                        onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                        inputMode="numeric" className="h-8 w-20 text-center"
+                        aria-label={`Quantity of ${l.sku}`}
+                      />
+                      <span className="w-20 text-right text-xs tabular-nums text-muted-foreground">
+                        {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
+                      </span>
+                      <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))}
+                        className="text-muted-foreground hover:text-red-600" title="Drop — not ordering this">
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
           )}
         </SectionCard>
 
-        {/* Draft POs */}
-        {drafts.map((po) => (
-          <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
-            actions={<div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {poTotal(po)} units · {unpriced(po) ? "no prices yet" : usd(poMoney(po))}
-              </span>
-              <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
-              <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
-              <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
-            </div>}>
-            <div className="divide-y divide-border">
-              {po.items.map((l) => (
-                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                    <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
-                    <SourceTags line={l} />
-                  </div>
-                  <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
-                  {/* Two distinct exits: park it for the next order, or drop it for good.
-                      One button doing both would make "not now" indistinguishable from
-                      "never" — and the parked list is how a short blank survives a PO
-                      that gets placed without it. */}
-                  <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
-                  <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        ))}
-
-        {/* Saved for later — only shown when it has something in it, so it never sits
-            on the page as an empty card competing with the drafts. */}
-        {saved.length > 0 && (
-          <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
-            <div className="divide-y divide-border">
-              {saved.map((l) => (
-                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                    <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
-                    <SourceTags line={l} />
-                  </div>
-                  <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
-                  <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
-                  <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        )}
-
-        {/* History — one row per PO, collapsed to a summary. The lines are the reason you
-            open a past order at all ("what exactly did we buy last time"), so they're one
-            click away rather than on a separate page. */}
           {placed.length > 0 && (
             <SectionCard title="On order" description="Placed and waiting on the supplier — open one for its tracking, lines and invoice">
               <div className="divide-y divide-border">{placed.map(poRow)}</div>
@@ -788,7 +887,17 @@ export function PurchaseView() {
         po={addTo}
         onClose={() => setAddTo(null)}
         inventory={inv ?? []}
-        onAdd={(lines) => { if (addTo) addLines(addTo, lines) }}
+        // Picked items go into the POOL, merged by sku — the same merge the shortage
+        // path uses, so something both short and hand-picked doesn't appear twice.
+        onAdd={(lines) => {
+          const next = saved.map((l) => ({ ...l }))
+          for (const l of lines) {
+            const hit = next.find((x) => x.sku === l.sku)
+            if (hit) hit.qty = num(hit.qty) + (num(l.qty) || 1)
+            else next.push({ ...l, qty: num(l.qty) || 1, savedAt: new Date().toISOString() })
+          }
+          putSaved(next)
+        }}
       />
     </div>
   )

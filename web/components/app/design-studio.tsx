@@ -57,7 +57,7 @@ export function DesignStudioDialog({ open, onOpenChange, onSaved }: { open: bool
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v) }}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>New design</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add artwork</DialogTitle></DialogHeader>
 
         <div className="mx-auto w-full max-w-sm">
           <DesignStage className="w-full" mockup={mockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} />

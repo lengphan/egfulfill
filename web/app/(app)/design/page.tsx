@@ -57,7 +57,7 @@ function DesignLab() {
           description="Artwork you've uploaded — drop any of it onto an order"
           actions={
             <Button size="sm" onClick={() => setStudioOpen(true)} disabled={signedOut}>
-              <Plus size={14} weight="bold" /> Quick design
+              <Plus size={14} weight="bold" /> Add artwork
             </Button>
           }
         >
@@ -76,7 +76,7 @@ function DesignLab() {
               </div>
               {!signedOut && (
                 <Button size="sm" className="mt-1" onClick={() => setStudioOpen(true)}>
-                  <Plus size={14} weight="bold" /> New design
+                  <Plus size={14} weight="bold" /> Add artwork
                 </Button>
               )}
             </div>

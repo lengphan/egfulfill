@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Stack, Trash, PenNib, CircleNotch } from "@phosphor-icons/react"
+import { Stack, Trash, PenNib, CircleNotch, Plus } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { getTemplates, deleteTemplate, type ProductTemplate } from "@/lib/api"
@@ -40,6 +40,11 @@ export function TemplatesPanel() {
     <SectionCard
       title="Product templates"
       description="A saved blank + artwork setup — reopen it instead of starting over"
+      actions={
+        <Button size="sm" onClick={() => router.push("/design/maker")}>
+          <Plus size={14} weight="bold" /> Make a template
+        </Button>
+      }
     >
       {items === null ? (
         <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
@@ -50,8 +55,11 @@ export function TemplatesPanel() {
           <Stack size={26} weight="duotone" className="text-muted-foreground/50" />
           <div className="text-sm font-medium">No templates yet</div>
           <div className="max-w-xs text-sm text-muted-foreground">
-            Save one from the design maker and it&apos;ll appear here, ready to reopen.
+            Build a blank + artwork setup in the design maker and save it — it&apos;ll appear here, ready to reopen.
           </div>
+          <Button size="sm" className="mt-1" onClick={() => router.push("/design/maker")}>
+            <Plus size={14} weight="bold" /> Make a template
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4">
