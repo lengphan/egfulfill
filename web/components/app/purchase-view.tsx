@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, type PoReturn, type SsShipment,
+  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, type PoReturn, type SsShipment,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
@@ -421,14 +421,34 @@ export function PurchaseView() {
     )) return
     setBusy(po.num); setMsg(null)
     try {
+      // Ask the SUPPLIER first, where we can. Marking our record cancelled while their
+      // order stands is the failure that costs money — stock arrives against an order the
+      // system says doesn't exist.
+      let supplierMsg = ""
+      const orderNo = supplierOrderNo(po)
+      const isSs = /s&s|activewear/i.test(po.supplier || "")
+      if (sent && isSs && orderNo) {
+        const c = await cancelSsOrder(orderNo).catch((e) => ({ error: e instanceof Error ? e.message : "failed" }))
+        if ("error" in c && c.error) {
+          // Their refusal is the whole answer — stop rather than record a cancellation
+          // that only exists here.
+          setMsg({ ok: false, text: `S&S wouldn't cancel ${orderNo}: ${c.error}` })
+          return
+        }
+        supplierMsg = ` S&S confirmed it cancelled (${(c as { orderStatus?: string }).orderStatus ?? "Cancelled"}).`
+      }
+
       const r = await savePurchaseOrder({
         ...po, status: "cancelled",
-        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString() },
+        meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString(), supplierCancelled: !!supplierMsg },
       })
       if (r?.error) throw new Error(r.error)
-      setMsg({ ok: true, text: wasPlaced && sent
-        ? `${po.num} marked cancelled here — contact ${po.supplier || "the supplier"} to stop the actual order.`
-        : `${po.num} cancelled. It was never sent to ${po.supplier || "the supplier"}, so there is nothing to cancel with them.` })
+      setMsg({ ok: true, text: !wasPlaced || !sent
+        ? `${po.num} cancelled. It was never sent to ${po.supplier || "the supplier"}, so there is nothing to cancel with them.`
+        : supplierMsg
+          ? `${po.num} cancelled.${supplierMsg}`
+          // Otto document no cancel endpoint, so theirs is still a phone call.
+          : `${po.num} marked cancelled here — ${po.supplier || "the supplier"} has no cancel API, so contact them directly to stop the actual order.` })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })

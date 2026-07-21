@@ -1782,3 +1782,12 @@ export function getCatalogFilters() {
   return api<{ brands: string[]; categories: string[]; priceMin: number | null; priceMax: number | null }>(
     `/api/purchase/catalog-filters`)
 }
+
+/** Ask S&S to cancel a real order. Their doc says it "TRIES to cancel" — an order already
+ *  picked comes back 200 with its status unchanged — so the server trusts `orderStatus`,
+ *  not the HTTP code, and reports a refusal as a failure naming the real status. */
+export function cancelSsOrder(orderNumber: string) {
+  return api<{ ok?: boolean; cancelled?: boolean; orderStatus?: string | null
+               orderNumber?: string; restockFee?: number; dryRun?: boolean; error?: string }>(
+    `/api/ss/order/${encodeURIComponent(orderNumber)}`, { method: "DELETE" })
+}
