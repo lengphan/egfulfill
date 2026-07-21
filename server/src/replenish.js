@@ -28,7 +28,7 @@ const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, '');
 const blankOf = (r) => stripMethod(r.blank || r.sku).toUpperCase();
 
 /**
- * Append this order's short blanks to their supplier's draft PO.
+ * Park this order's short blanks in the shared saved-for-later list.
  * Returns { ordered: [{sku, qty, supplier, po}], short: [...], skipped: [...] } — or
  * null if there was nothing to do. Never throws into the caller's path.
  */
@@ -88,53 +88,44 @@ export async function autoReplenish(orderId) {
   }
   if (!bySupplier.size) return { ordered: [], skipped, po: null };
 
-  for (const [supplier, items] of bySupplier) {
-    // Find this supplier's OPEN draft. Once a draft is placed it's a real supplier
-    // order and is immutable to us — we roll to a new number rather than appending.
-    // Writing to the placed one under the same `num` would have silently rewritten
-    // the line items of an order already sent out.
-    const base = AUTO_PO(supplier);
-    let num = base, cur = null;
-    for (let n = 0; n < 50; n++) {
-      const candidate = n === 0 ? base : `${base}-${n + 1}`;
-      const row = (await q(
-        `select items, meta, status from purchase_orders where num=$1`, [candidate]
-      ).catch(() => ({ rows: [] }))).rows[0];
-      if (!row || (row.status || 'draft') === 'draft') { num = candidate; cur = row || null; break; }
-    }
-    const existing = Array.isArray(cur?.items) ? cur.items : [];
-    const meta = cur?.meta || {};
-    // Idempotency: an order that re-enters awaiting_scan must not add its quantities
-    // twice. We record which orders this draft already counted.
-    const seen = new Set(Array.isArray(meta.orders) ? meta.orders : []);
-    if (seen.has(orderId)) { skipped.push({ sku: items.map((i) => i.sku).join(', '), reason: 'already on ' + num }); continue; }
+  // ── Park the shortfall; do NOT create a purchase order ───────────────────────
+  // This used to open (or append to) a draft PO by itself. That put quantities on a
+  // document nobody had chosen to create, from orders nobody could see — and committed
+  // spend is not something software should decide. It also assumed the money was there.
+  //
+  // So shortages land in the shared "saved for later" list with the ORDER that needs
+  // them, and a human turns them into a PO when they're ready and funded.
+  const savedKey = 'po_saved';
+  // Columns are k/v, not key/value — the wrong names would have thrown into the catch
+  // and silently parked nothing.
+  const cur = (await q('select v from factory_lists where k=$1', [savedKey])
+    .catch(() => ({ rows: [] }))).rows[0];
+  const list = Array.isArray(cur?.v) ? cur.v : [];
 
-    const merged = existing.map((l) => ({ ...l }));
+  for (const [supplier, items] of bySupplier) {
     for (const it of items) {
-      const hit = merged.find((l) => String(l.sku || '').toUpperCase() === it.sku);
-      // WHICH ORDER drove this quantity, per LINE. The PO already recorded which orders
-      // it had counted (meta.orders, for idempotency), but that's the whole document —
-      // so a line reading "×150" gave whoever placed it no way to know where 150 came
-      // from, or whether it was one urgent order or thirty small ones. A line nobody can
-      // trace is a line nobody can defend when the invoice arrives.
+      const hit = list.find((x) => String(x.sku || '').toUpperCase() === it.sku);
       const src = { order: String(orderId), qty: it.qty };
       if (hit) {
+        // Same blank needed by another order: raise the quantity and record who for,
+        // rather than a second row saying the same thing with no context.
+        const seen = Array.isArray(hit.sources) ? hit.sources : [];
+        if (seen.some((x) => String(x.order) === String(orderId))) continue;   // idempotent
         hit.qty = (Number(hit.qty) || 0) + it.qty;
-        hit.sources = [...(Array.isArray(hit.sources) ? hit.sources : []), src];
+        hit.sources = [...seen, src];
       } else {
-        merged.push({ sku: it.sku, qty: it.qty, price: 0, auto: true, sources: [src] });
+        list.push({ sku: it.sku, qty: it.qty, price: 0, supplier, auto: true,
+                    sources: [src], savedAt: new Date().toISOString() });
       }
-      ordered.push({ sku: it.sku, qty: it.qty, supplier, po: num, have: it.have, promised: it.promised });
+      ordered.push({ sku: it.sku, qty: it.qty, supplier, saved: true, have: it.have, promised: it.promised });
     }
-    seen.add(orderId);
-    const total = merged.reduce((s, l) => s + (Number(l.price) || 0) * (Number(l.qty) || 0), 0);
-    await q(
-      `insert into purchase_orders (num, supplier, items, status, total, meta)
-         values ($1,$2,$3,'draft',$4,$5)
-       on conflict (num) do update set items=excluded.items, total=excluded.total,
-         meta=excluded.meta, supplier=excluded.supplier`,
-      [num, supplier, JSON.stringify(merged), total, JSON.stringify({ ...meta, orders: [...seen], auto: true })]
-    ).catch(() => {});
   }
-  return { ordered, skipped, po: ordered[0]?.po || null };
+
+  await q(
+    `insert into factory_lists (k, v, updated_at) values ($1,$2::jsonb, now())
+     on conflict (k) do update set v=excluded.v, updated_at=now()`,
+    [savedKey, JSON.stringify(list)]
+  ).catch(() => {});
+
+  return { ordered, skipped, saved: ordered.length, po: null };
 }

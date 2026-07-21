@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, type PoReturn,
+  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, type PoReturn, type SsShipment,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
@@ -70,6 +70,23 @@ export function PurchaseView() {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [supplierCfg, setSupplierCfg] = useState(false)
   const [returning, setReturning] = useState<PurchaseOrder | null>(null)
+  // S&S tracking, keyed by PO number. Fetched on demand rather than stored: a shipment in
+  // transit changes, and a number cached at receipt time would stop being true the moment
+  // it moved.
+  const [tracking, setTrackingData] = useState<Record<string, SsShipment[] | "loading" | "none">>({})
+
+  /** Pull tracking from S&S for a PO, using the order number they gave us back. */
+  const fetchTracking = async (po: PurchaseOrder) => {
+    const orderNo = supplierOrderNo(po)
+    if (!orderNo) return
+    setTrackingData((p) => ({ ...p, [po.num]: "loading" }))
+    try {
+      const r = await getSsTracking({ orderNumbers: [orderNo] })
+      setTrackingData((p) => ({ ...p, [po.num]: r.shipments?.length ? r.shipments : "none" }))
+    } catch {
+      setTrackingData((p) => ({ ...p, [po.num]: "none" }))
+    }
+  }
 
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
@@ -504,15 +521,51 @@ export function PurchaseView() {
                             Supplier order{" "}
                             <span className="font-mono text-foreground">{supplierOrderNo(po) ?? "—"}</span>
                           </span>
-                          <label className="flex items-center gap-1.5 text-muted-foreground">
-                            Tracking
-                            <Input
-                              defaultValue={trackingOf(po)}
-                              onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
-                              placeholder="paste carrier number"
-                              className="h-7 w-48 font-mono text-xs"
-                            />
-                          </label>
+                          {/* S&S know their own tracking, so ask them rather than making
+                              someone copy it across. Manual entry stays for suppliers with
+                              no API — an Otto or hand-placed order still needs a box
+                              chased. */}
+                          {supplierOrderNo(po) && /s&s|activewear/i.test(po.supplier || "") ? (
+                            <button onClick={() => fetchTracking(po)} disabled={tracking[po.num] === "loading"}
+                              className="font-medium text-primary hover:underline disabled:opacity-60">
+                              {tracking[po.num] === "loading" ? "Checking S&S…" : "Get tracking from S&S"}
+                            </button>
+                          ) : (
+                            <label className="flex items-center gap-1.5 text-muted-foreground">
+                              Tracking
+                              <Input
+                                defaultValue={trackingOf(po)}
+                                onBlur={(e) => { if (e.target.value !== trackingOf(po)) setTracking(po, e.target.value) }}
+                                placeholder="paste carrier number"
+                                className="h-7 w-48 font-mono text-xs"
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
+                      {Array.isArray(tracking[po.num]) && (
+                        <div className="border-b border-border py-2 text-xs">
+                          {(tracking[po.num] as SsShipment[]).map((t, i) => (
+                            <div key={i} className="flex flex-wrap items-center gap-2 py-1">
+                              <span className="font-medium">{t.carrier}</span>
+                              <span className="font-mono text-foreground">{t.tracking}</span>
+                              {/* A box number only appears on split shipments — which is
+                                  exactly when you need to know there's more than one. */}
+                              {t.box && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">box {t.box}</span>}
+                              {t.deliveredAt
+                                ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                                    <CheckCircle size={10} weight="fill" /> delivered
+                                  </span>
+                                : t.lastUpdate?.status
+                                  ? <span className="truncate text-muted-foreground">{t.lastUpdate.status}</span>
+                                  : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {tracking[po.num] === "none" && (
+                        <div className="border-b border-border py-2 text-xs text-muted-foreground">
+                          S&amp;S have no tracking for this order yet — it hasn&apos;t shipped.
                         </div>
                       )}
                       {returnsOf(po).length > 0 && (

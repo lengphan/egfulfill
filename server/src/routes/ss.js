@@ -132,7 +132,10 @@ function mapProduct(p, meta) {
     map_price: num(p.mapPrice),
     qty: int(p.qty),
     warehouses: JSON.stringify(Array.isArray(p.warehouses) ? p.warehouses : []),
-    image: ssImg(ssImgSize(p.colorFrontImage || p.colorSwatchImage, 'fs')),   // SMALL variant: list rows, not hero shots
+    // NOT resized. The doc promises _fs/_fm/_fl for brandImage and styleImage only —
+    // colour images are undocumented, and asking for a variant that may not exist trades
+    // a working picture for a broken one to save a few KB.
+    image: ssImg(p.colorFrontImage || p.colorSwatchImage),
     category: (meta && meta.category) || p.baseCategory || null,
     data: p,
   };
@@ -147,13 +150,34 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // be used as an open/SSRF proxy.
   app.get('/api/ss/img', async (req, reply) => {
     const u = String((req.query && req.query.u) || '');
-    if (!/^https:\/\/cdn\.ssactivewear\.com\/[\w./%-]+$/i.test(u)) { reply.code(400); return { error: 'only S&S CDN images may be proxied' }; }
+    // Their docs give image URLs as https://www.ssactivewear.com/{Image}; our sync built
+    // cdn.ssactivewear.com. Accept BOTH rather than bet on one — a wrong host is an
+    // invisible failure (a broken <img>), which is the hardest kind to notice.
+    if (!/^https:\/\/(cdn|www)\.ssactivewear\.com\/[\w./%-]+$/i.test(u)) {
+      reply.code(400); return { error: 'only S&S image hosts may be proxied' };
+    }
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
-      const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'egfulfill/1.0', Accept: 'image/*' } });
+      // A browser-ish User-Agent: their CDN 403s obvious bots, which is what a bare
+      // 'egfulfill/1.0' looks like.
+      const UA = 'Mozilla/5.0 (compatible; egfulfill/1.0)';
+      const get = (url) => fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA, Accept: 'image/*', Referer: 'https://www.ssactivewear.com/' } });
+      let r = await get(u);
+      // Self-heal a missing size variant: fall back to _fm (what they actually return in
+      // the feed) and then to the other host, instead of serving a broken image.
+      if (!r.ok) {
+        const alts = [u.replace(/_(fs|fl)(\.[a-z]+)$/i, '_fm$2'), u.replace('//cdn.', '//www.'), u.replace('//www.', '//cdn.')]
+          .filter((x, i, a) => x !== u && a.indexOf(x) === i);
+        for (const alt of alts) { const rr = await get(alt); if (rr.ok) { r = rr; break; } }
+      }
       clearTimeout(timer);
-      if (!r.ok) { reply.code(r.status); return { error: 'upstream ' + r.status }; }
+      if (!r.ok) {
+        // Say so in the log. A broken <img> tells nobody anything, and this failing
+        // silently is exactly why nobody noticed the pictures never worked.
+        console.error(`[ss/img] upstream ${r.status} for ${u}`);
+        reply.code(r.status); return { error: 'upstream ' + r.status, url: u };
+      }
       const ct = r.headers.get('content-type') || 'image/jpeg';
       if (!/^image\//i.test(ct)) { reply.code(415); return { error: 'not an image' }; }
       const buf = Buffer.from(await r.arrayBuffer());

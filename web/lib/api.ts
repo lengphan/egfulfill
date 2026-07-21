@@ -1634,3 +1634,18 @@ export function creditPoReturn(num: string, id: string, amount?: number) {
     `/api/purchase/${encodeURIComponent(num)}/return/${encodeURIComponent(id)}/credit`,
     { method: "POST", body: JSON.stringify({ amount }) })
 }
+
+/** Tracking straight from S&S, by their order number. Boxed: a split shipment has a
+ *  number PER BOX, and one number standing for four is how three go missing unnoticed. */
+export type SsShipment = {
+  carrier: string | null; tracking: string | null; box: string | null; origin: string | null
+  orderNumber: string | null; invoiceNumber: string | null
+  deliveredAt: string | null; signedBy: string | null
+  lastUpdate: { at: string | null; where: string | null; status: string | null } | null
+}
+export function getSsTracking(p: { orderNumbers?: string[]; invoiceNumbers?: string[] }) {
+  const s = new URLSearchParams()
+  if (p.orderNumbers?.length) s.set("orderNumbers", p.orderNumbers.join(","))
+  if (p.invoiceNumbers?.length) s.set("invoiceNumbers", p.invoiceNumbers.join(","))
+  return api<{ shipments: SsShipment[]; error?: string }>(`/api/ss/tracking?${s.toString()}`)
+}
