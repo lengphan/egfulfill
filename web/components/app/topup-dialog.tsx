@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StripeCardForm } from "@/components/app/stripe-card-form"
-import { createVietqrPayment, vietqrStatus, createTopupRequest, type VietqrPayment } from "@/lib/api"
+import { createVietqrPayment, vietqrStatus, createTopupRequest, VN_BANK_NAMES, type VietqrPayment } from "@/lib/api"
 
 const vnd = (n: number) => `${n.toLocaleString("en-US")}₫`
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -87,9 +87,32 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
           <div className="flex size-56 items-center justify-center rounded-xl border border-border"><CircleNotch size={28} className="animate-spin text-muted-foreground" /></div>
         )}
         {payment && (
-          <div className="text-center">
-            <div className="text-lg font-semibold tabular-nums">{vnd(Number(payment.amount) || 0)}</div>
-            <div className="font-mono text-xs text-muted-foreground">Ref {payment.note}</div>
+          <div className="w-full space-y-3">
+            <div className="text-center">
+              <div className="text-lg font-semibold tabular-nums">{vnd(Number(payment.amount) || 0)}</div>
+            </div>
+
+            {/* Who the money is going to, so the payer can check it against their banking
+                app BEFORE sending. A QR alone asks people to trust an opaque image. */}
+            <dl className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              <Detail label="Receiver" value={payment.name} missing="Receiver name not returned" />
+              <Detail
+                label="Bank"
+                value={payment.bankCode ? (VN_BANK_NAMES[payment.bankCode.toUpperCase()] ?? payment.bankCode) : ""}
+                missing="Bank not returned"
+              />
+              <Detail label="Account" value={payment.vaAccount || payment.account} mono missing="Account not returned" />
+              {/* The FULL description, not just our ref. VietQR wraps our EG-code in a
+                  virtual-account prefix, so the bank shows something longer — which is
+                  why this never matched what you saw on the VietQR side. Our ref is
+                  inside it, and that substring is what the poll reconciles on. */}
+              <Detail label="Description" value={payment.content || payment.note} mono missing="Description not returned" />
+              {payment.content && payment.note && payment.content !== payment.note && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Send the description exactly as shown. Our reference <span className="font-mono">{payment.note}</span>{" "}sits inside it — that&apos;s what matches the payment to your wallet.
+                </p>
+              )}
+            </dl>
           </div>
         )}
         <div className="flex items-center gap-2 text-sm text-muted-foreground"><CircleNotch size={15} className="animate-spin" /> Waiting for payment…</div>
@@ -107,8 +130,25 @@ function VietqrTopUp({ onFunded, onClose }: { onFunded: () => void; onClose: () 
         <Input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="100000" />
       </label>
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <Button className="w-full" onClick={start}>Generate VietQR</Button>
+      <Button className="w-full" onClick={start}>Generate QR Code</Button>
       <p className="text-center text-xs text-muted-foreground">Scan with any VN banking app. Balance updates automatically once paid.</p>
+    </div>
+  )
+}
+
+/**
+ * One receiver field. A MISSING value is called out rather than rendered blank —
+ * these come from VIETQR_* env vars with hardcoded fallbacks on the server, so a
+ * silent gap here could show someone the wrong account to pay.
+ */
+function Detail({ label, value, mono, missing }: { label: string; value?: string | null; mono?: boolean; missing: string }) {
+  const ok = !!(value && String(value).trim())
+  return (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dd className={"min-w-0 break-all text-right text-xs font-medium " + (ok ? (mono ? "font-mono" : "") : "text-amber-600")}>
+        {ok ? value : missing}
+      </dd>
     </div>
   )
 }

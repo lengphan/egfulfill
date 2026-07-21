@@ -68,10 +68,27 @@ export type VietqrPayment = {
   ok?: boolean
   qrCode?: string
   qrLink?: string
+  /** OUR short reference (EG000007) — what the wallet poll matches on. */
   note?: string
+  /** The FULL transfer description as it reaches the bank. VietQR wraps our ref in a
+   *  virtual-account prefix, so this is what the payer actually sees — showing `note`
+   *  alone is why the description here didn't match the VietQR side. */
   content?: string
   amount?: number
+  /** Receiver, for the payer to check against their banking app before sending. */
+  name?: string
+  bankCode?: string
+  account?: string
+  vaAccount?: string
   error?: string
+}
+
+/** VN bank codes → display names. Falls back to the raw code rather than inventing one. */
+export const VN_BANK_NAMES: Record<string, string> = {
+  BIDV: "BIDV", MB: "MB Bank", VCB: "Vietcombank", TCB: "Techcombank", ACB: "ACB",
+  VPB: "VPBank", TPB: "TPBank", VIB: "VIB", STB: "Sacombank", HDB: "HDBank",
+  MSB: "MSB", SHB: "SHB", OCB: "OCB", SEAB: "SeABank", EIB: "Eximbank",
+  VBA: "Agribank", ICB: "VietinBank", NAB: "Nam A Bank", ABB: "ABBANK",
 }
 export function createVietqrPayment(amount: number) {
   return api<VietqrPayment>(`/api/vietqr/create-payment`, {
