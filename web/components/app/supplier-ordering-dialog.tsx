@@ -11,7 +11,7 @@ import { getSupplierOptions, setFactorySettings, type SupplierOptions } from "@/
 
 /** Their lists come back loosely shaped — an array of strings, or of objects with any of
  *  several id/label spellings. Read defensively rather than assume one. */
-function toOptions(raw: unknown): { value: string; label: string }[] {
+function toOptions(raw: unknown): { value: string; label: string; group?: string }[] {
   const arr = Array.isArray(raw) ? raw
     : (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown[] }).data))
       ? (raw as { data: unknown[] }).data : []
@@ -19,8 +19,16 @@ function toOptions(raw: unknown): { value: string; label: string }[] {
     if (typeof x === "string") return { value: x, label: x }
     const o = (x ?? {}) as Record<string, unknown>
     const value = String(o.id ?? o.code ?? o.key ?? o.value ?? o.name ?? "")
-    const label = String(o.label ?? o.name ?? o.description ?? o.title ?? value)
-    return { value, label }
+    // `code` FIRST among the human fields. Otto returns {id, code, type} — the readable
+    // name is in `code` ("UPS Ground", "USPS Priority Mail") and it wasn't in this chain
+    // at all, so every label fell through to `value`, which is `id`: a raw UUID. The whole
+    // shipping dropdown read as 40 GUIDs. It stays after `label`/`name` so a supplier that
+    // does send a proper display field still wins.
+    const label = String(o.label ?? o.name ?? o.code ?? o.description ?? o.title ?? value)
+    // normal vs third_party decides whether the third-party account number below is
+    // required — picking a "… Third Party" method without one is rejected by Otto.
+    const group = typeof o.type === "string" ? o.type : undefined
+    return { value, label, group }
   }).filter((o) => o.value)
 }
 
@@ -174,7 +182,22 @@ export function SupplierOrderingDialog({
                       <select value={ottoShip} onChange={(e) => setOttoShip(e.target.value)} disabled={busy}
                         className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
                         <option value="">— their default —</option>
-                        {ottoShipOpts.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        {/* Split by Otto's `type`. A "… Third Party" method bills someone
+                            else's carrier account, so it needs the account number field
+                            below — mixing the two in one flat list invites picking a
+                            third-party method with nothing to bill it to. */}
+                        {ottoShipOpts.some((m) => m.group === "third_party") ? (
+                          <>
+                            <optgroup label="Billed to us">
+                              {ottoShipOpts.filter((m) => m.group !== "third_party").map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </optgroup>
+                            <optgroup label="Third-party account">
+                              {ottoShipOpts.filter((m) => m.group === "third_party").map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </optgroup>
+                          </>
+                        ) : (
+                          ottoShipOpts.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)
+                        )}
                       </select>
                     </Field>
                     <p className="text-xs text-muted-foreground">Read live from your Otto account, so these are your terms — not a copied list.</p>
