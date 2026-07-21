@@ -124,6 +124,24 @@ export function ProductEditorDialog({
   const [status, setStatus] = useState("Active")
   const [img, setImg] = useState("")
   const [err, setErr] = useState<string | null>(null)
+  /** Highlight the well while a file is over it — without feedback a drop target is
+   *  indistinguishable from dead space, which is how this read before it accepted drops. */
+  const [dropping, setDropping] = useState(false)
+  /** Index being dragged while reordering the gallery. */
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+
+  /** One path for every way an image arrives — drop, paste, or the file input. Non-images
+   *  are ignored rather than erroring, because dragging a folder or a PDF onto a picture
+   *  well is a slip, not a request. */
+  const addImageFiles = (files: File[]) => {
+    const imgs = files.filter((f) => f.type.startsWith("image/"))
+    if (!imgs.length) return
+    imgs.forEach((f) => readImageFile(f, (u) => {
+      setGallery((g) => (g.includes(u) ? g : [...g, u]))
+      // First picture in becomes the main one, so the commonest case needs no extra click.
+      setImg((cur) => cur || u)
+    }, setErr))
+  }
 
   useEffect(() => {
     if (!open) return
@@ -247,11 +265,14 @@ export function ProductEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      {/* Wider than it was (2xl → 4xl) so the two-column layout below has somewhere to go.
+          The dialog was ~770px and scrolled regardless; the images were the thing being
+          squeezed for a width that wasn't buying anything. */}
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <DialogHeader className="border-b border-border px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             {title ?? (product ? "Edit product" : "New product")}
-            {supplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"><Tag size={11} weight="fill" /> {supplier}</span>}
+            {supplier && <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"><Tag size={11} weight="fill" /> {supplier}</span>}
           </DialogTitle>
         </DialogHeader>
 
@@ -266,7 +287,7 @@ export function ProductEditorDialog({
                   <button type="button" onClick={(e) => { e.preventDefault(); setImg("") }} className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-foreground/70 text-background"><X size={11} weight="bold" /></button>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-1 text-muted-foreground"><ImageIcon size={22} weight="duotone" /><span className="text-[10px]">Mockup</span></div>
+                <div className="flex flex-col items-center gap-1 text-muted-foreground"><ImageIcon size={22} weight="duotone" /><span className="text-xs">Mockup</span></div>
               )}
               <input
                 type="file" accept="image/*" className="hidden"
@@ -274,12 +295,12 @@ export function ProductEditorDialog({
               />
             </label>
             <div className="flex-1 space-y-2">
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Name</span><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Heavyweight Hoodie" className="h-9" /></label>
               <div className="grid grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Type</span>
+                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
                   <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
-                <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Method</span>
+                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Method</span>
                   <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
                 </label>
               </div>
@@ -293,9 +314,9 @@ export function ProductEditorDialog({
           {/* Pricing + live margin */}
           <div className="rounded-xl border border-border p-4">
             <div className="grid grid-cols-3 gap-3">
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value.replace(/[^0-9.]/g, "")) }} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
-              <label className="flex flex-col gap-1"><span className="text-xs text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={bandFee != null ? `default ${bandFee}` : "default"} className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Retail price ($)</span><Input value={price} onChange={(e) => { setPriceTouched(true); setPrice(e.target.value.replace(/[^0-9.]/g, "")) }} placeholder="42.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Base cost ($)</span><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="18.00" className="h-9" inputMode="decimal" /></label>
+              <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Shipping fee ($)</span><Input value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={bandFee != null ? `default ${bandFee}` : "default"} className="h-9" inputMode="decimal" /></label>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
               <span className="text-muted-foreground">Margin per unit</span>
@@ -307,7 +328,7 @@ export function ProductEditorDialog({
                 </span>
               )}
             </div>
-            {shipping.trim() === "" && <p className="mt-1 text-[11px] text-muted-foreground">Leave shipping blank to use the platform default at fulfillment.</p>}
+            {shipping.trim() === "" && <p className="mt-1 text-xs text-muted-foreground">Leave shipping blank to use the platform default at fulfillment.</p>}
 
             {/* Per-size price tiers — the canonical sizePrices [{size, price, shipping}].
                 Keyed by SIZE, not colour: a 3XL costs more to buy and to ship, while Navy
@@ -321,13 +342,13 @@ export function ProductEditorDialog({
                     <button onClick={() => setTiers({})} className="text-xs font-medium text-primary hover:underline">Clear</button>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   <strong>Product cost</strong> is what the blank costs you from the supplier.
                   <strong> Base cost</strong> is what the seller pays — leave it blank and it&apos;s
                   computed as product cost {markup > 0 ? `+ $${markup.toFixed(2)}` : "+ your markup"}
                   {" "}(set in Settings → Platform). The print-method surcharge is added on top.
                 </p>
-                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr] gap-2 text-[11px] text-muted-foreground">
+                <div className="mt-2 grid grid-cols-[3rem_1fr_1fr_1fr] gap-2 text-xs text-muted-foreground">
                   <span /><span>Product cost ($)</span><span>Base cost ($)</span><span>Shipping ($)</span>
                 </div>
                 <div className="mt-1 space-y-1.5">
@@ -372,24 +393,68 @@ export function ProductEditorDialog({
               per-colour shots used to be fetched and discarded because the editor had a
               single file input; now nothing is lost on import. One image is the HERO
               (what the catalog shows); the rest are available to assign to a colour. */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* Images carries the card treatment that used to sit only on pricing. This is a
+              media-first job — the mockup is what makes the product usable in the Design
+              Maker, as the hint above says — so giving three numeric fields the visual
+              weight and the pictures a single 64px tile had the hierarchy backwards. */}
+          <div
+            className={"rounded-xl border p-4 transition-colors " + (dropping ? "border-primary bg-primary/5" : "border-border")}
+            onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDropping(true) } }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false) }}
+            onDrop={(e) => {
+              if (!e.dataTransfer.types.includes("Files")) return
+              e.preventDefault(); setDropping(false)
+              addImageFiles(Array.from(e.dataTransfer.files))
+            }}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData?.files ?? [])
+              if (files.length) { e.preventDefault(); addImageFiles(files) }
+            }}
+          >
+            <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-medium">Images</span>
-              <span className="text-xs text-muted-foreground">{gallery.length} held · click one to make it the main image</span>
+              <span className="text-xs text-muted-foreground">
+                {gallery.length ? `${gallery.length} held · drag to reorder` : "Drag images in, paste, or browse"}
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {gallery.map((u) => (
-                <div key={u} className="group relative">
+
+            <div className="flex flex-wrap gap-2.5">
+              {gallery.map((u, i) => (
+                <div
+                  key={u}
+                  className="group relative"
+                  // Reordering is drag-and-drop on the tiles themselves. First tile is the
+                  // main image, so ordering IS a decision, not just tidiness.
+                  draggable
+                  onDragStart={(e) => { setDragIdx(i); e.dataTransfer.effectAllowed = "move" }}
+                  onDragEnd={() => setDragIdx(null)}
+                  onDragOver={(e) => { if (dragIdx !== null) e.preventDefault() }}
+                  onDrop={(e) => {
+                    if (dragIdx === null) return
+                    e.preventDefault(); e.stopPropagation()
+                    setGallery((g) => {
+                      const next = [...g]
+                      const [moved] = next.splice(dragIdx, 1)
+                      next.splice(i, 0, moved)
+                      return next
+                    })
+                    setDragIdx(null)
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => setImg(u)}
                     title={u === img ? "Main image" : "Make this the main image"}
-                    className={"relative block size-16 overflow-hidden rounded-lg border-2 transition-colors " + (u === img ? "border-primary" : "border-border hover:border-primary/50")}
+                    className={
+                      "relative block size-28 overflow-hidden rounded-lg border-2 transition-colors " +
+                      (u === img ? "border-primary" : "border-border hover:border-primary/50") +
+                      (dragIdx === i ? " opacity-40" : "")
+                    }
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={u} alt="" className="size-full object-cover" />
+                    <img src={u} alt="" className="size-full object-cover" draggable={false} />
                     {u === img && (
-                      <span className="absolute inset-x-0 bottom-0 bg-primary py-0.5 text-center text-[9px] font-semibold text-primary-foreground">Main</span>
+                      <span className="absolute inset-x-0 bottom-0 bg-primary py-0.5 text-center text-xs font-semibold text-primary-foreground">Main</span>
                     )}
                   </button>
                   <button
@@ -403,23 +468,28 @@ export function ProductEditorDialog({
                       setColorImgs((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
                       setSideMockups((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== u)))
                     }}
-                    className="absolute -right-1 -top-1 hidden size-4 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
+                    className="absolute -right-1.5 -top-1.5 hidden size-6 place-items-center rounded-full bg-foreground/75 text-background group-hover:grid"
                   >
-                    <X size={9} weight="bold" />
+                    <X size={12} weight="bold" />
                   </button>
                 </div>
               ))}
-              <label className="grid size-16 cursor-pointer place-items-center rounded-lg border border-dashed border-border bg-muted/40 text-muted-foreground hover:bg-accent">
-                <Plus size={16} />
+
+              <label className="grid size-28 cursor-pointer place-items-center gap-1 rounded-lg border-2 border-dashed border-border bg-muted/40 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent">
+                <span className="flex flex-col items-center gap-1">
+                  <Plus size={20} />
+                  <span className="text-xs font-medium">Add</span>
+                </span>
                 <input
                   type="file" accept="image/*" multiple className="hidden"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files ?? [])
-                    files.forEach((f) => readImageFile(f, (u) => setGallery((g) => (g.includes(u) ? g : [...g, u])), setErr))
-                  }}
+                  onChange={(e) => { addImageFiles(Array.from(e.target.files ?? [])); e.target.value = "" }}
                 />
               </label>
             </div>
+
+            <p className="mt-3 text-xs text-muted-foreground">
+              The first image is the main one — click any tile to promote it, or drag to reorder.
+            </p>
           </div>
 
           {/* ── Print sides ─────────────────────────────────────────────────────────
@@ -441,7 +511,7 @@ export function ProductEditorDialog({
                   const shown = override || inherited
                   return (
                     <div key={sd} className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-1">
-                      <span className="w-14 truncate text-[11px] font-medium capitalize">{sd}</span>
+                      <span className="w-14 truncate text-xs font-medium capitalize">{sd}</span>
                       {shown ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={shown} alt="" className={"size-8 rounded border object-contain " + (override ? "border-primary" : "border-border opacity-70")} />
@@ -455,7 +525,7 @@ export function ProductEditorDialog({
                           if (e.target.value) next[sd] = e.target.value; else delete next[sd]
                           return next
                         })}
-                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-[11px] transition-colors hover:border-primary/40"
+                        className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
                       >
                         <option value="">{inherited ? "Use settings" : "None set"}</option>
                         {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
@@ -479,11 +549,11 @@ export function ProductEditorDialog({
               <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/30 p-2">
                 {colors.map((c) => (
                   <div key={c} className="flex items-center gap-1.5 rounded-md bg-card px-1.5 py-1">
-                    <span className="max-w-[110px] truncate text-[11px] font-medium">{prettyColorName(c)}</span>
+                    <span className="max-w-[110px] truncate text-xs font-medium">{prettyColorName(c)}</span>
                     <select
                       value={colorImgs[c] ?? ""}
                       onChange={(e) => setColorImgs((m) => ({ ...m, [c]: e.target.value }))}
-                      className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-[11px] transition-colors hover:border-primary/40"
+                      className="eg-select h-7 rounded-lg border border-border bg-card px-1.5 text-xs transition-colors hover:border-primary/40"
                     >
                       <option value="">Main image</option>
                       {gallery.map((u, i) => <option key={u} value={u}>Image {i + 1}</option>)}
@@ -512,9 +582,9 @@ export function ProductEditorDialog({
             </div>
             {colorSuggestions.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
                 {colorSuggestions.map((c) => (
-                  <button key={c} title={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
+                  <button key={c} title={c} onClick={() => addColor(c)} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {prettyColorName(c)}</button>
                 ))}
               </div>
             )}
@@ -536,9 +606,9 @@ export function ProductEditorDialog({
             </div>
             {sizeSuggestions.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Sparkle size={11} weight="fill" /> {supplier ? "From supplier" : "Suggested"}:</span>
                 {sizeSuggestions.map((s) => (
-                  <button key={s} onClick={() => setSizes((p) => [...p, s])} className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {s}</button>
+                  <button key={s} onClick={() => setSizes((p) => [...p, s])} className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary">+ {s}</button>
                 ))}
               </div>
             )}
