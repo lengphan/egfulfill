@@ -1,12 +1,12 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, type OrderRow } from "@/lib/api"
+import { getOrders, postItemStatus, updateOrder, markLabelPrinted, cancelDispatch, markScannedInHouse, pushToDispatch, getDispatchStatus, type OrderRow } from "@/lib/api"
 import { getUser } from "@/lib/auth"
 import { numOf, platformOf, customerOf, unitsOf, addrLine } from "@/lib/order-format"
 import { canSetStage } from "@/lib/factory-status"
@@ -64,6 +64,14 @@ export function DispatchBoard() {
   const withLabel = queue.filter((o) => !!o.tracking)
   const noLabel = queue.filter((o) => !o.tracking)
 
+  // Is byeastside configured? Offering a route that can't work is worse than offering
+  // one route, because the failure only shows after the click.
+  const [dispatchOn, setDispatchOn] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => { getDispatchStatus().then((d) => setDispatchOn(!!d.configured)).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
   const chosen = queue.filter((o) => picked.has(o.id))
   const chosenWithLabel = chosen.filter((o) => !!o.tracking)
 
@@ -73,6 +81,33 @@ export function DispatchBoard() {
     setPicked((p) => (p.size === withLabel.length ? new Set() : new Set(withLabel.map((o) => o.id))))
 
   /** Advance a whole batch once it's been scanned. Per-order so one failure can't strand the rest. */
+  /**
+   * Hand these labels to byeastside for pre-scanning.
+   *
+   * The other half of the choice this board exists to offer. It does NOT advance the
+   * stage: the partner scans on their own schedule and their sync writes
+   * label_scanned_at when they actually do — claiming the work moved because we asked
+   * them to would be asserting a fact about someone else's warehouse.
+   */
+  const sendToPartner = async () => {
+    if (!chosenWithLabel.length) return
+    setBusy(true); setErr(null)
+    try {
+      const r = await pushToDispatch(chosenWithLabel.map((o) => o.id))
+      if (r.error) throw new Error(r.error)
+      const failed = (r.results ?? []).filter((x) => !x.ok)
+      setErr(failed.length
+        // Their words: byeastside don't document error codes, so what they sent back is
+        // the only thing that helps.
+        ? `${r.pushed ?? 0} sent · ${failed.length} failed — ${failed[0].error ?? "unknown error"}`
+        : null)
+      setPicked(new Set())
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't send those to byeastside.")
+    } finally { setBusy(false) }
+  }
+
   const markScanned = async () => {
     if (!chosen.length) return
     setBusy(true); setErr(null)
@@ -242,9 +277,20 @@ export function DispatchBoard() {
             <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={pullBack}>
               <ArrowUUpLeft size={14} weight="bold" /> Pull back
             </Button>
+            {/* THE TWO ROUTES, side by side, because this is where the choice is made.
+                Both start the buyer's tracking clock; they differ in who does it and what
+                it costs. Sending to the partner was previously only reachable from the
+                orders hub — which meant staging an order here left no way to reach them
+                at all. */}
+            {dispatchOn && (
+              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={sendToPartner}
+                title="Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label">
+                {busy ? <CircleNotch size={14} className="animate-spin" /> : <><TrayArrowDown size={14} weight="bold" /> Send to byeastside</>}
+              </Button>
+            )}
             {canScanOut && (
             <Button size="sm" disabled={!chosen.length || busy || !canAdvance} onClick={markScanned} title={canAdvance ? undefined : "Your role can't move orders past this stage"}>
-              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Mark scanned</>}
+              {busy ? <CircleNotch size={14} className="animate-spin" /> : <><CheckCircle size={14} weight="bold" /> Scanned here</>}
             </Button>
             )}
           </div>

@@ -292,7 +292,24 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
       return { ok: true, already: true, scannedAt: row.label_scanned_at };
     }
 
-    await q(`update orders set label_scanned_at=now(), scanned_by=$2, scanned_via='in-house' where id=$1`,
+    // Two writes, deliberately. The SCAN is the fact that matters — the tag, the buyer's
+    // tracking, everything downstream reads label_scanned_at — so it goes first, alone,
+    // and its failure is reported rather than swallowed.
+    //
+    // This was one statement setting all three columns with .catch(() => {}) after it. If
+    // scanned_by/scanned_via weren't present (the idempotent ALTERs run at route load and
+    // are themselves best-effort), the whole update threw, was swallowed, and the endpoint
+    // returned { ok: true, scanned: true } having written nothing. The tag stayed grey and
+    // nothing anywhere said why.
+    try {
+      await q('update orders set label_scanned_at = now() where id = $1', [id]);
+    } catch (e) {
+      reply.code(500);
+      return { error: `Couldn't record the scan: ${e.message}` };
+    }
+    // Provenance is worth having and not worth losing a scan over, so it's separate and
+    // may fail quietly — the scan itself is already safely recorded above.
+    await q(`update orders set scanned_by=$2, scanned_via='in-house' where id=$1`,
       [id, String((req.user && req.user.sub) || '')]).catch(() => {});
     audit(req, 'order.scan', { entityType: 'order', entityId: id, after: { via: 'in-house' } });
     egBroadcast({ type: 'order-scanned', id });
