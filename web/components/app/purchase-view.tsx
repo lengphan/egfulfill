@@ -412,7 +412,11 @@ export function PurchaseView() {
    */
   const cancelPO = async (po: PurchaseOrder) => {
     const wasPlaced = po.status === "placed"
-    if (wasPlaced && !window.confirm(
+    const sent = reallySent(po)
+    // Only warn about phoning the supplier when there IS an order at the supplier.
+    // Telling someone to chase a dry run sends them looking for something that was never
+    // there — which is exactly what happened.
+    if (wasPlaced && sent && !window.confirm(
       `Cancel ${po.num}?\n\nThis marks OUR record cancelled. It does NOT cancel the order with ${po.supplier || "the supplier"} — contact them directly if the goods haven't shipped.`
     )) return
     setBusy(po.num); setMsg(null)
@@ -422,9 +426,9 @@ export function PurchaseView() {
         meta: { ...(po.meta || {}), cancelledAt: new Date().toISOString() },
       })
       if (r?.error) throw new Error(r.error)
-      setMsg({ ok: true, text: wasPlaced
+      setMsg({ ok: true, text: wasPlaced && sent
         ? `${po.num} marked cancelled here — contact ${po.supplier || "the supplier"} to stop the actual order.`
-        : `${po.num} cancelled.` })
+        : `${po.num} cancelled. It was never sent to ${po.supplier || "the supplier"}, so there is nothing to cancel with them.` })
       load()
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't cancel that purchase order." })
@@ -541,6 +545,23 @@ export function PurchaseView() {
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't place these orders." })
     } finally { setBusy(null) }
+  }
+
+  /**
+   * Did this order actually REACH the supplier?
+   *
+   * With the live gate off, placing builds the payload and returns it without sending —
+   * so the PO reads "Placed" while nothing exists at the supplier. That's the same order
+   * of mistake as marking an order Refunded without refunding it: a status asserting
+   * something that never happened.
+   */
+  const reallySent = (po: PurchaseOrder) => {
+    const m = (po.meta || {}) as Record<string, unknown>
+    const r = (m.response ?? {}) as Record<string, unknown>
+    if (r.dryRun === true) return false
+    if (r.manual === true) return false          // no supplier API — recorded, never sent
+    if (r.error) return false
+    return !!m.api                                // an api was involved and it didn't dry-run
   }
 
   const returnsOf = (po: PurchaseOrder): PoReturn[] => {
@@ -673,7 +694,12 @@ export function PurchaseView() {
                         {poDate(po) ? " · " + poDate(po) : ""}
                       </span>
                     </button>
-                    {po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
+                    {po.status === "placed" && !reallySent(po)
+                      ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                              title="Built and recorded, but never transmitted — the supplier's live-order gate is off">
+                          Not sent
+                        </span>
+                      : po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
                       : po.status === "cancelled" ? <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Cancelled</span>
                         : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
                     <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
