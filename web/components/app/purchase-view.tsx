@@ -7,6 +7,7 @@ import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
   getFactoryList, saveFactoryList, creditPoReturn, type PoReturn,
@@ -60,10 +61,15 @@ export function PurchaseView() {
   }, [inv])
 
   const drafts = (pos ?? []).filter((p) => p.status === "draft")
+  // In flight: placed and waiting on the supplier. These belong with the drafts, not in
+  // history — an order you're still expecting is something to act on, and burying it
+  // under every PO ever received is how a late delivery goes unnoticed.
+  const placed = (pos ?? []).filter((p) => p.status === "placed")
   // History grows forever — every PO ever placed — so it pages. Drafts are the working
   // set and stay whole; there are never many, and hiding one behind a page would mean
   // missing something you're mid-way through.
-  const history = (pos ?? []).filter((p) => p.status !== "draft")
+  // Settled: received or cancelled. Nothing further is expected from these.
+  const history = (pos ?? []).filter((p) => p.status === "received" || p.status === "cancelled")
   const pagedHistory = usePaged(history, 20)
 
   /**
@@ -418,123 +424,12 @@ export function PurchaseView() {
     } finally { setBusy(null) }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 md:hidden">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
-          <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
-          <Truck size={13} weight="bold" /> Supplier ordering
-        </Button>
-        <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
-          {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
-          New purchase order
-        </Button>
-      </div>
-
-      <StatGrid>
-        <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
-        <StatCard label="Draft POs" value={String(drafts.length)} sub="awaiting review" />
-        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
-        <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
-      </StatGrid>
-
-      {msg && (
-        <div className={"rounded-lg border px-4 py-2 text-sm " + (
-          msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
-            : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
-      )}
-
-      {/* Reorder suggestions */}
-      <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
-        {inv === null ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-        ) : Object.keys(suggestions).length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">Everything is above its reorder point.</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {Object.entries(suggestions).map(([sup, items]) => (
-              <div key={sup} className="flex flex-wrap items-center gap-2 px-5 py-3">
-                <span className="font-medium">{sup}</span>
-                <span className="text-sm text-muted-foreground">{items.length} item{items.length > 1 ? "s" : ""} low</span>
-                <Button size="sm" className="ml-auto" onClick={() => createDraft(sup, items)} disabled={busy === "new"}>
-                  {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />} Draft PO
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
-
-      {/* Draft POs */}
-      {drafts.map((po) => (
-        <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
-          actions={<div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {poTotal(po)} units · {unpriced(po) ? "no prices yet" : usd(poMoney(po))}
-            </span>
-            <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
-            <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
-            <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
-          </div>}>
-          <div className="divide-y divide-border">
-            {po.items.map((l) => (
-              <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                  <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
-                </div>
-                <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
-                {/* Two distinct exits: park it for the next order, or drop it for good.
-                    One button doing both would make "not now" indistinguishable from
-                    "never" — and the parked list is how a short blank survives a PO
-                    that gets placed without it. */}
-                <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
-                <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      ))}
-
-      {/* Saved for later — only shown when it has something in it, so it never sits
-          on the page as an empty card competing with the drafts. */}
-      {saved.length > 0 && (
-        <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
-          <div className="divide-y divide-border">
-            {saved.map((l) => (
-              <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
-                  <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
-                </div>
-                <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
-                <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
-                <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      )}
-
-      {/* History — one row per PO, collapsed to a summary. The lines are the reason you
-          open a past order at all ("what exactly did we buy last time"), so they're one
-          click away rather than on a separate page. */}
-      <SectionCard title="Order history" description="Past POs — open one to see its items, or reorder it onto a new draft">
-        {pos === null ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
-        ) : history.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">No placed orders yet.</div>
-        ) : (
-          <div className="divide-y divide-border">
-            {pagedHistory.pageItems.map((po) => {
+  /**
+   * One collapsible PO row. Shared by both tabs — an in-flight order and a settled one
+   * want the same summary and the same expanded detail, and two copies would drift the
+   * moment either gained a field.
+   */
+  const poRow = (po: PurchaseOrder) => {
               const isOpen = open.has(po.num)
               return (
                 <div key={po.num}>
@@ -647,15 +542,159 @@ export function PurchaseView() {
                   )}
                 </div>
               )
-            })}
-          </div>
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 md:hidden">
+        <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShoppingCart size={18} weight="fill" /></span>
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">Purchase</h1>
+          <p className="truncate text-sm text-muted-foreground">Restock low inventory — draft POs per supplier, place via S&amp;S / Otto, receive into stock.</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
+          <Truck size={13} weight="bold" /> Supplier ordering
+        </Button>
+        <Button size="sm" onClick={startBlankDraft} disabled={busy === "new"}>
+          {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />}
+          New purchase order
+        </Button>
+      </div>
+
+      <StatGrid>
+        <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
+        <StatCard label="Draft POs" value={String(drafts.length)} sub="awaiting review" />
+        <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
+        <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
+      </StatGrid>
+
+      {msg && (
+        <div className={"rounded-lg border px-4 py-2 text-sm " + (
+          msg.tone === "warn" ? "border-amber-200 bg-amber-50 text-amber-800"
+            : msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-destructive/30 bg-destructive/10 text-destructive")}>{msg.text}</div>
+      )}
+
+      {/* Reorder suggestions */}
+      <Tabs defaultValue="active">
+        <TabsList>
+          <TabsTrigger value="active">Active{drafts.length + placed.length ? ` (${drafts.length + placed.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="history">History{history.length ? ` (${history.length})` : ""}</TabsTrigger>
+        </TabsList>
+
+        {/* ACTIVE — everything still owed something: a draft to finish, or an order to
+            arrive. Split from history because these are the ones that need doing, and a
+            working set buried under every PO ever received stops being read. */}
+        <TabsContent value="active" className="mt-4 space-y-4">
+        <SectionCard title="Reorder suggestions" description="Low/out-of-stock items grouped by supplier">
+          {inv === null ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+          ) : Object.keys(suggestions).length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">Everything is above its reorder point.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {Object.entries(suggestions).map(([sup, items]) => (
+                <div key={sup} className="flex flex-wrap items-center gap-2 px-5 py-3">
+                  <span className="font-medium">{sup}</span>
+                  <span className="text-sm text-muted-foreground">{items.length} item{items.length > 1 ? "s" : ""} low</span>
+                  <Button size="sm" className="ml-auto" onClick={() => createDraft(sup, items)} disabled={busy === "new"}>
+                    {busy === "new" ? <CircleNotch size={13} className="animate-spin" /> : <Plus size={13} weight="bold" />} Draft PO
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        {/* Draft POs */}
+        {drafts.map((po) => (
+          <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
+            actions={<div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {poTotal(po)} units · {unpriced(po) ? "no prices yet" : usd(poMoney(po))}
+              </span>
+              <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
+              <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
+              <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
+            </div>}>
+            <div className="divide-y divide-border">
+              {po.items.map((l) => (
+                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                    <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                  </div>
+                  <Input value={String(num(l.qty))} onChange={(e) => setLineQty(po, l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" className="h-8 w-20 text-center" />
+                  {/* Two distinct exits: park it for the next order, or drop it for good.
+                      One button doing both would make "not now" indistinguishable from
+                      "never" — and the parked list is how a short blank survives a PO
+                      that gets placed without it. */}
+                  <button onClick={() => saveForLater(po, l)} className="text-muted-foreground hover:text-foreground" title="Save for later — keep it out of this PO but don't lose it"><BookmarkSimple size={15} /></button>
+                  <button onClick={() => removeLine(po, l.sku)} className="text-muted-foreground hover:text-red-600" title="Remove from this PO"><Trash size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        ))}
+
+        {/* Saved for later — only shown when it has something in it, so it never sits
+            on the page as an empty card competing with the drafts. */}
+        {saved.length > 0 && (
+          <SectionCard title="Saved for later" description="Pulled off a PO but not dropped — restore onto a draft when you're ready">
+            <div className="divide-y divide-border">
+              {saved.map((l) => (
+                <div key={l.sku} className="flex items-center gap-3 px-5 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{l.name || l.sku}</div>
+                    <div className="truncate text-xs text-muted-foreground">{[l.variant || l.sku, l.supplier].filter(Boolean).join(" · ")}</div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">×{num(l.qty)}</span>
+                  <Button size="sm" variant="outline" onClick={() => restore(l)}><ArrowUUpLeft size={13} weight="bold" /> Restore</Button>
+                  <button onClick={() => putSaved(saved.filter((s) => s.sku !== l.sku))} className="text-muted-foreground hover:text-red-600" title="Drop for good"><Trash size={14} /></button>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
         )}
+
+        {/* History — one row per PO, collapsed to a summary. The lines are the reason you
+            open a past order at all ("what exactly did we buy last time"), so they're one
+            click away rather than on a separate page. */}
+          {placed.length > 0 && (
+            <SectionCard title="On order" description="Placed and waiting on the supplier — open one for its tracking, lines and invoice">
+              <div className="divide-y divide-border">{placed.map(poRow)}</div>
+            </SectionCard>
+          )}
+          {pos !== null && drafts.length === 0 && placed.length === 0 && (
+            <SectionCard title="Nothing on order">
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                No drafts, nothing in flight. Start one with <strong>New purchase order</strong>, or from a reorder suggestion above.
+              </div>
+            </SectionCard>
+          )}
+        </TabsContent>
+
+        {/* HISTORY — settled: received or cancelled. Nothing further is expected. */}
+        <TabsContent value="history" className="mt-4 space-y-4">
+          <SectionCard title="Purchase history" description="Received and cancelled POs — open one to see its items, or reorder it onto a new draft">
+            {pos === null ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
+            ) : history.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">Nothing received or cancelled yet.</div>
+            ) : (
+              <div className="divide-y divide-border">{pagedHistory.pageItems.map(poRow)}</div>
+            )}
             {history.length > 20 && (
               <Pagination page={pagedHistory.page} pageCount={pagedHistory.pageCount} perPage={pagedHistory.perPage}
                 total={pagedHistory.total} start={pagedHistory.start}
                 onPage={pagedHistory.setPage} onPerPage={pagedHistory.setPerPage} perPageOptions={[20, 50, 100]} />
             )}
-      </SectionCard>
+          </SectionCard>
+        </TabsContent>
+      </Tabs>
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
 
