@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -38,6 +38,9 @@ export function PurchaseView() {
   // share one list), so it survives the browser that removed the line.
   const [saved, setSaved] = useState<SavedPOLine[]>([])
   const [addTo, setAddTo] = useState<PurchaseOrder | null>(null)
+  // Which history rows are expanded. A set, not a single id — comparing two past POs
+  // side by side is the normal reason to open them.
+  const [open, setOpen] = useState<Set<string>>(new Set())
 
   const load = useCallback(() => {
     if (!getToken()) { setInv([]); setPos([]); return }
@@ -149,6 +152,52 @@ export function PurchaseView() {
 
   const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
 
+  /** When a past PO actually happened — received beats placed, both beat the row's birth. */
+  const poDate = (po: PurchaseOrder) => {
+    const m = (po.meta || {}) as Record<string, unknown>
+    const raw = (m.receivedAt || m.placedAt || po.created_at) as string | undefined
+    if (!raw) return ""
+    const d = new Date(raw)
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+  }
+
+  const toggle = (n: string) => setOpen((prev) => {
+    const next = new Set(prev)
+    if (!next.delete(n)) next.add(n)
+    return next
+  })
+
+  /**
+   * Buy a past PO again — the whole thing, or one line of it.
+   *
+   * Merges into the supplier's existing draft when there is one rather than opening a
+   * second: two drafts for the same supplier get placed as two orders, which splits a
+   * shipment and forfeits whatever break the combined quantity would have earned.
+   * Quantities are copied as they were, since "the same order again" is the request —
+   * the draft is editable before it goes anywhere.
+   */
+  const reorder = async (po: PurchaseOrder, only?: POLine) => {
+    const src = (only ? [only] : po.items).filter((l) => num(l.qty) > 0)
+    if (!src.length) { setMsg({ ok: false, text: "Nothing on that order to reorder." }); return }
+    const lines: POLine[] = src.map((l) => ({ sku: l.sku, name: l.name, variant: l.variant, qty: num(l.qty), price: l.price }))
+
+    const target = drafts.find((p) => supKey(p.supplier) === supKey(po.supplier))
+    setBusy(po.num); setMsg(null)
+    try {
+      if (target) {
+        addLines(target, lines)
+        setMsg({ ok: true, text: `Added ${lines.length} line${lines.length === 1 ? "" : "s"} to the open draft ${target.num} — review the quantities before placing.` })
+      } else {
+        const draft: PurchaseOrder = { num: nextNum(), supplier: po.supplier ?? null, items: lines, status: "draft" }
+        await savePurchaseOrder(draft)
+        setMsg({ ok: true, text: `Drafted ${draft.num} from ${po.num} — review the quantities before placing.` })
+        load()
+      }
+    } catch {
+      setMsg({ ok: false, text: "Couldn't create the reorder draft." })
+    } finally { setBusy(null) }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 md:hidden">
@@ -238,27 +287,65 @@ export function PurchaseView() {
         </SectionCard>
       )}
 
-      {/* History */}
-      <SectionCard title="Order history">
+      {/* History — one row per PO, collapsed to a summary. The lines are the reason you
+          open a past order at all ("what exactly did we buy last time"), so they're one
+          click away rather than on a separate page. */}
+      <SectionCard title="Order history" description="Past POs — open one to see its items, or reorder it onto a new draft">
         {pos === null ? (
           <div className="flex items-center justify-center py-12 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
         ) : history.length === 0 ? (
           <div className="py-12 text-center text-sm text-muted-foreground">No placed orders yet.</div>
         ) : (
           <div className="divide-y divide-border">
-            {pagedHistory.pageItems.map((po) => (
-              <div key={po.num} className="flex flex-wrap items-center gap-2 px-5 py-3">
-                <span className="font-mono text-sm font-medium">{po.num}</span>
-                <span className="text-sm text-muted-foreground">{po.supplier} · {poTotal(po)} units</span>
-                {po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
-                  : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
-                {po.status === "placed" && (
-                  <Button size="sm" variant="outline" className="ml-auto" onClick={() => receive(po)} disabled={busy === po.num}>
-                    {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
-                  </Button>
-                )}
-              </div>
-            ))}
+            {pagedHistory.pageItems.map((po) => {
+              const isOpen = open.has(po.num)
+              return (
+                <div key={po.num}>
+                  <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+                    {/* The whole summary toggles — a caret-sized hit target on a row this
+                        wide is a miss waiting to happen. */}
+                    <button onClick={() => toggle(po.num)} className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={isOpen}>
+                      <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
+                      <span className="font-mono text-sm font-medium">{po.num}</span>
+                      <span className="truncate text-sm text-muted-foreground">
+                        {supKey(po.supplier)} · {poTotal(po)} units · {po.items.length} line{po.items.length === 1 ? "" : "s"}
+                        {poDate(po) ? " · " + poDate(po) : ""}
+                      </span>
+                    </button>
+                    {po.status === "placed" ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">Placed</span>
+                      : <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700"><CheckCircle size={11} weight="fill" /> Received</span>}
+                    <Button size="sm" variant="outline" onClick={() => reorder(po)} disabled={busy === po.num} title="Copy these items onto a new draft PO">
+                      <ArrowClockwise size={13} weight="bold" /> Reorder
+                    </Button>
+                    {po.status === "placed" && (
+                      <Button size="sm" variant="outline" onClick={() => receive(po)} disabled={busy === po.num}>
+                        {busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <Truck size={13} weight="bold" />} Receive into stock
+                      </Button>
+                    )}
+                  </div>
+                  {isOpen && (
+                    <div className="border-t border-border bg-muted/30 px-5 py-1">
+                      {po.items.length === 0 ? (
+                        <div className="py-3 text-sm text-muted-foreground">No lines on this PO.</div>
+                      ) : po.items.map((l) => (
+                        <div key={l.sku} className="flex items-center gap-3 py-2 text-sm">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate font-medium">{l.name || l.sku}</div>
+                            <div className="truncate text-xs text-muted-foreground">{l.variant || l.sku}</div>
+                          </div>
+                          {/* A single line can be re-ordered on its own — restocking one
+                              short blank shouldn't drag the whole past PO along with it. */}
+                          <span className="text-muted-foreground">×{num(l.qty)}</span>
+                          <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title="Reorder just this line">
+                            <ArrowClockwise size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
             {history.length > 20 && (
