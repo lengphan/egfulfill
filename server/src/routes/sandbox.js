@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import { q } from '../db.js';
 import { quoteSpec } from '../pricing.js';
 import { limited, LIMITS } from '../ratelimit.js';
+import { stripMethod } from '../replenish.js';
 import { emitWebhook } from '../webhooks.js';
 
 const PREFIX = 'egk_test_';
@@ -429,6 +430,45 @@ export function sandboxRoutes(app, requireAuth) {
     return { object: 'order', mode: 'test', id: testId, status: 'received', items: priced,
       shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
       created: nowISO(), _note: 'Simulated — nothing was created in the factory, but order.received WAS delivered to your webhooks (test:true). Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
+  });
+
+  // ── Stock ──────────────────────────────────────────────────────────────────
+  // What we can actually make right now. A network routes work by capacity, so without
+  // this a partner either sends orders we cannot fill or does not send them at all.
+  //
+  // We publish AVAILABLE only — not in_stock and reserved separately. Available is what
+  // a partner needs to decide whether to route; the split between held and committed
+  // would also tell them how much work we are carrying, which is our business volume and
+  // none of theirs.
+  //
+  // Keyed by BLANK sku with the print-method suffix stripped, using the same helper
+  // replenishment uses: the shelf holds LA6, an order line is LA6-EMB. Two copies of that
+  // rule drifting is how a partner gets told a full shelf is empty.
+  app.get('/api/v1/stock', async (req, reply) => {
+    const k = await requireKey(req, reply, { scope: 'products.read' }); if (k.error) return k;
+    const want = String((req.query || {}).sku || '').trim();
+    try {
+      const params = [];
+      let where = '';
+      if (want) { params.push(stripMethod(want).toUpperCase()); where = 'where upper(sku) = $1'; }
+      const r = await q(
+        `select sku, name, variant, in_stock, reserved, reorder_at, category
+           from inventory ${where} order by sku limit 1000`, params);
+      const data = r.rows.map((row) => {
+        const available = Math.max(0, (Number(row.in_stock) || 0) - (Number(row.reserved) || 0));
+        const reorderAt = Number(row.reorder_at) || 0;
+        return {
+          sku: row.sku, name: row.name || null, variant: row.variant || null,
+          category: row.category || null,
+          available,
+          // Banded as well as numeric: "12 left" means nothing without knowing where the
+          // reorder point sits, and the band is what a routing decision actually keys on.
+          status: available <= 0 ? 'out_of_stock' : (reorderAt > 0 && available <= reorderAt ? 'low' : 'in_stock'),
+        };
+      });
+      return { object: 'list', mode: k.mode, data, count: data.length,
+        _note: 'available = on hand minus already committed. Stock is held per BLANK sku; a print-method suffix (-EMB, -DTG, …) is stripped before matching.' };
+    } catch (e) { reply.code(500); return { error: 'Could not read stock.' }; }
   });
 
   // ── Billing ────────────────────────────────────────────────────────────────

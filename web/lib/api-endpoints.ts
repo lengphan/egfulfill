@@ -70,6 +70,29 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
   // production. EGFULFILL buys carrier labels internally when it ships an order —
   // tracking is read back from Retrieve order, or pushed by the order.shipped webhook.
   {
+    id: "stock",
+    method: "GET",
+    path: "/api/v1/stock",
+    title: "Check stock",
+    description:
+      "What we can make right now. Returns available quantity per blank sku plus a status band (in_stock / low / out_of_stock). Pass ?sku= to check one. Available is on-hand minus already committed; stock is held per BLANK, so a print-method suffix (-EMB, -DTG, …) is stripped before matching.",
+  },
+  {
+    id: "balance",
+    method: "GET",
+    path: "/api/v1/balance",
+    title: "Account balance",
+    description: "What is currently on account. Negative means charges exceed funds. Needs the billing.read scope.",
+  },
+  {
+    id: "statement",
+    method: "GET",
+    path: "/api/v1/statement",
+    title: "Statement",
+    description:
+      "Every movement in a period with a running balance, defaulting to the current calendar month. Pass ?from=YYYY-MM-DD&to=YYYY-MM-DD. opening_balance + totals.net always equals closing_balance. Needs billing.read.",
+  },
+  {
     id: "webhooks-list",
     method: "GET",
     path: "/api/webhooks",

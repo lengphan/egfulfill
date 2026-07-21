@@ -22,7 +22,10 @@ const AUTO_PO = (supplier) => 'PO-AUTO-' + String(supplier || 'UNASSIGNED').toUp
 // reportDesignPush — without it every embroidery line looks like an unstocked SKU
 // and files a shortage against blanks we actually hold plenty of.
 const METHOD_SUFFIX = /-(EMB|DTG|DTF|APL|LSR|SUB|SCR)$/i;
-const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, '');
+/** Exported so the public stock feed strips suffixes the SAME way replenishment does —
+ *  two copies of this rule drifting is how a partner is told a blank is out of stock
+ *  while the shelf is full. */
+export const stripMethod = (s) => String(s || '').trim().replace(METHOD_SUFFIX, '');
 
 /** The blank a line consumes: the chosen blank, else the line's own sku, method stripped. */
 const blankOf = (r) => stripMethod(r.blank || r.sku).toUpperCase();
