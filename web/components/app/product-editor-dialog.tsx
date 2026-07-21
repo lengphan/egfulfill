@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag } from "@phosphor-icons/react"
+import { UploadSimple, Image as ImageIcon, X, Plus, Sparkle, Tag, Check } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,7 +9,7 @@ import { readImageFile } from "@/components/app/design-canvas"
 import { setTypeMockups, typeMockupOf } from "@/lib/variant-resolve"
 import { getFactorySettings, type CatalogProduct, type FactorySettings, type ProductType } from "@/lib/api"
 import { prettyColorName } from "@/lib/color-name"
-import { normTech, PRODUCT_METHODS } from "@/lib/print-method"
+import { normTech, normalizeMethods, PRODUCT_METHODS } from "@/lib/print-method"
 import { descriptionToText, looksLikeHtml } from "@/lib/description"
 
 // Sourced from lib/print-method.ts so the picker, the normaliser and the pricing
@@ -209,6 +209,13 @@ export function ProductEditorDialog({
   const [fees, setFees] = useState<FactorySettings | null>(null)
   // The markup that turns a supplier's product cost into the base cost we charge.
   // Same number pricing.js uses, so the preview in the size table matches the quote.
+  // The methods currently ticked, read back out of the joined `method` string through the
+  // same normaliser the rest of the app uses — so a product imported with
+  // "DTG Print / Embroidery" shows both ticked rather than neither.
+  const pickedMethods = useMemo(
+    () => normalizeMethods([method]).map((m) => m.label).filter((m) => METHODS.includes(m)),
+    [method]
+  )
   const markup = Number(fees?.base_markup) || 0
   useEffect(() => {
     const id = setTimeout(() => { getFactorySettings().then(setFees).catch(() => {}) }, 0)
@@ -322,14 +329,42 @@ export function ProductEditorDialog({
                 <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Type</span>
                   <select value={type} onChange={(e) => setType(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{typeNames.map((t) => <option key={t}>{t}</option>)}</select>
                 </label>
-                <label className="flex flex-col gap-1"><span className="text-sm text-muted-foreground">Method</span>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)} className="eg-select h-9 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{METHODS.map((m) => <option key={m}>{m}</option>)}</select>
-                </label>
+                {/* METHODS ARE MULTIPLE. A blank commonly takes several techniques — the
+                    single select forced one, which is why a product that can be embroidered
+                    AND screen printed had to lie about itself. The data already worked this
+                    way: `method` holds a multi-value string ("DTG Print / Embroidery") and
+                    normalizeMethods() splits it, which is exactly what methodsOf() reads.
+                    Only this control was single-valued. Stored in the same joined format,
+                    so nothing downstream changes. */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm text-muted-foreground">Methods</span>
+                  <div className="flex flex-wrap gap-1.5 rounded-2xl border border-border bg-card px-2 py-2">
+                    {METHODS.map((m) => {
+                      const on = pickedMethods.includes(m)
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => {
+                            const next = on ? pickedMethods.filter((x) => x !== m) : [...pickedMethods, m]
+                            setMethod(next.join(" / "))
+                          }}
+                          className={"rounded-md border px-2 py-0.5 text-xs font-medium transition-colors " +
+                            (on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground")}
+                        >
+                          {on && <Check size={10} weight="bold" className="mr-1 inline" />}{m}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <UploadSimple size={13} /> The mockup becomes the blank in the Design Maker.
-                {typeMockup && !img && <span className="ml-1">Using the {type} default — upload one here to override it.</span>}
-              </div>
+              {typeMockup && !img && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <UploadSimple size={13} /> Using the {type} default — add an image below to override it.
+                </div>
+              )}
             </div>
           </div>
 
