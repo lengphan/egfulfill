@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Plus, ArrowLineDown, DownloadSimple, Bank } from "@phosphor-icons/react"
 import { TopUpDialog } from "@/components/app/topup-dialog"
 import { Card } from "@/components/ui/card"
@@ -61,9 +61,11 @@ function AdminTopups() {
   )
 }
 
-type TxType = "Deposit" | "Charge" | "Refund" | "Payout"
+type TxType = "Deposit" | "Charge" | "Refund" | "Payout" | "Rejected"
 type Row = {
   id: string
+  /** Sort key for merging non-ledger entries (rejected top-ups) into the history. */
+  at?: number
   date: string
   desc: string
   ref: string
@@ -88,6 +90,7 @@ const typeTone: Record<TxType, string> = {
   Deposit: "bg-emerald-100 text-emerald-700",
   Refund: "bg-emerald-100 text-emerald-700",
   Charge: "bg-muted text-muted-foreground",
+  Rejected: "bg-red-100 text-red-700",
   Payout: "bg-muted text-muted-foreground",
 }
 
@@ -123,6 +126,7 @@ function mapLedger(balance: number, ledger: LedgerRow[]): View {
       delta > 0 ? (l.type === "refund" ? "Refund" : "Deposit") : l.type === "withdrawal" ? "Payout" : "Charge"
     return {
       id: String(l.id),
+      at: new Date(l.created_at).getTime(),
       date: new Date(l.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
       desc: l.note || l.type,
       ref: l.ref || "",
@@ -140,6 +144,42 @@ const ZERO: View = { balance: 0, charges: 0, deposited: 0, ordersCharged: 0, avg
 export function WalletDashboard() {
   const [view, setView] = useState<View | null>(null)
   const [pending, setPending] = useState<TopupRequest[]>([])
+  // Kept so the attempt is still on the record — a rejected top-up never touches the
+  // ledger, so without this it would disappear from the app entirely once it left the
+  // banner, and "I definitely tried to pay" would have nothing behind it.
+  const [rejected, setRejected] = useState<TopupRequest[]>([])
+
+  /**
+   * History = the ledger, plus rejected top-up ATTEMPTS.
+   *
+   * A rejected top-up never credits the wallet, so it has no ledger row — it existed
+   * only in the banner above, and filtering it out of there would have erased it from
+   * the app completely. It belongs in the record: someone who paid and was refused
+   * needs to see that the attempt was seen and declined.
+   *
+   * Its amount is shown for reference but carries NO balance movement, and the running
+   * balance column repeats the balance of the row before it — inventing a balance for a
+   * transaction that never happened would make the column stop reconciling.
+   */
+  const histRows = useMemo(() => {
+    const base = view?.rows ?? []
+    if (!rejected.length) return base
+    const extra: Row[] = rejected.map((r) => ({
+      id: `rejected-${r.id}`,
+      date: new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "2-digit" }),
+      desc: `Top-up declined${r.method ? ` · ${r.method}` : ""}`,
+      ref: r.ref || "",
+      method: r.method || "—",
+      type: "Rejected" as TxType,
+      amount: Number(r.amount_usd) || 0,
+      balance: NaN,          // no movement — rendered as "—" rather than a made-up figure
+      at: new Date(r.created_at).getTime(),
+    }))
+    // Sort by REAL timestamp. An earlier version keyed ledger rows off their index,
+    // which always outranked a genuine date and pinned every rejected attempt to the
+    // bottom regardless of when it happened.
+    return [...base, ...extra].sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+  }, [view?.rows, rejected])
   const [topUpOpen, setTopUpOpen] = useState(false)
 
   const refresh = useCallback(() => {
@@ -153,7 +193,14 @@ export function WalletDashboard() {
     // Surface the seller's own top-up requests that haven't landed in the ledger yet
     // (received ones already show as ledger deposits) so a submitted top-up is visible.
     getMyTopups()
-      .then((rows) => setPending((rows ?? []).filter((r) => r.status === "pending" || r.status === "rejected")))
+      // Banner = still awaiting a decision. Rejected ones have HAD their decision, so
+      // they move into the transaction history below instead of sitting at the top
+      // under a heading that no longer describes them.
+      .then((rows) => {
+        const all = rows ?? []
+        setPending(all.filter((r) => r.status === "pending"))
+        setRejected(all.filter((r) => r.status === "rejected"))
+      })
       .catch(() => setPending([]))
   }, [])
   useEffect(() => {
@@ -284,14 +331,14 @@ export function WalletDashboard() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {view.rows.length === 0 ? (
+            {histRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   No transactions yet
                 </TableCell>
               </TableRow>
             ) : (
-              view.rows.map((t) => (
+              histRows.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell className="text-muted-foreground">{t.date}</TableCell>
                   <TableCell className="font-medium">{t.desc}</TableCell>
@@ -305,12 +352,19 @@ export function WalletDashboard() {
                   <TableCell
                     className={
                       "text-right font-semibold tabular-nums " +
-                      (t.amount >= 0 ? "text-emerald-600" : "text-foreground")
+                      (t.type === "Rejected"
+                        ? "text-muted-foreground line-through"
+                        : t.amount >= 0 ? "text-emerald-600" : "text-foreground")
                     }
                   >
-                    {usd(t.amount, true)}
+                    {/* No +/- on a declined attempt: the sign says which way money moved,
+                        and it did not move. Struck-through, unsigned, no balance. */}
+                    {usd(t.amount, t.type !== "Rejected")}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{usd(t.balance)}</TableCell>
+                  {/* No balance for a declined attempt — it never moved. */}
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {Number.isFinite(t.balance) ? usd(t.balance) : "—"}
+                  </TableCell>
                 </TableRow>
               ))
             )}
