@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { returnPoLines, type PurchaseOrder } from "@/lib/api"
+import { returnPoLines, ssReturn, SS_RETURN_REASONS, type PurchaseOrder } from "@/lib/api"
 
 const num = (v: unknown) => Number(v) || 0
 const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
@@ -31,6 +31,11 @@ export function PoReturnDialog({
   const [credit, setCredit] = useState<Record<string, string>>({})
   const [rma, setRma] = useState("")
   const [note, setNote] = useState("")
+  // S&S refuse a return without a reason code, and their codes are specific enough that
+  // free text can't substitute — "damaged" and "picking error" settle differently.
+  const [reason, setReason] = useState("1")
+  const [replace, setReplace] = useState(false)
+  const [raised, setRaised] = useState<{ ra: string | null; label: string | null }[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -49,9 +54,30 @@ export function PoReturnDialog({
     return s + (isFinite(typed) && credit[l.sku] !== "" ? typed : num(l.price) * q)
   }, 0)
 
+  // Whether this PO can be returned through the API. S&S key returns to the INVOICE, so
+  // without one we can only record it locally and let someone raise it by hand.
+  const invoiceNumber = String(((po?.meta ?? {}) as Record<string, unknown>).invoiceNumber ?? "")
+  const isSs = /s&s|activewear/i.test(po?.supplier || "")
+  const canApi = isSs && !!invoiceNumber
+
   const submit = async () => {
     setBusy(true); setErr(null)
     try {
+      // Raise it with S&S FIRST when we can. If they refuse, nothing is recorded locally —
+      // a local return that the supplier never heard of is worse than no return, because
+      // the stock is off the shelf and nobody is expecting the box.
+      if (canApi) {
+        const r = await ssReturn({
+          lines: picked.map(({ l, q }) => ({
+            invoiceNumber, sku: l.sku, qty: q, returnReason: reason,
+            isReplace: replace, returnReasonComment: note.trim() || undefined,
+          })),
+        })
+        if (r.error) { setErr(r.error); return }
+        if (r.returns?.length) {
+          setRaised(r.returns.map((x) => ({ ra: x.raNumber, label: x.labelUrl })))
+        }
+      }
       const r = await returnPoLines(po.num, {
         lines: picked.map(({ l, q }) => {
           const typed = Number(credit[l.sku])
@@ -62,7 +88,9 @@ export function PoReturnDialog({
       })
       if (r.error) { setErr(r.error); return }
       onDone()
-      onClose()
+      // Hold the dialog open when S&S gave us an RA number and a label — closing would
+      // throw away the only link to the label the box can't go back without.
+      if (!raised) onClose()
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't record that return.")
     } finally { setBusy(false) }
@@ -105,6 +133,22 @@ export function PoReturnDialog({
         </div>
 
         <div className="space-y-2 border-t border-border pt-3">
+          {isSs && (
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Reason</span>
+              <select value={reason} onChange={(e) => setReason(e.target.value)} disabled={busy}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm">
+                {Object.entries(SS_RETURN_REASONS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </label>
+          )}
+          {isSs && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)}
+                     disabled={busy} className="size-4 accent-primary" />
+              Send a replacement instead of a credit
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Input value={rma} onChange={(e) => setRma(e.target.value)} disabled={busy}
                    placeholder="RMA / reference" className="h-9" />
@@ -113,9 +157,27 @@ export function PoReturnDialog({
           </div>
           {/* Said plainly: this is our record, not a message to the supplier. */}
           <p className="text-xs text-muted-foreground">
-            Stock comes off the shelf now. This does <strong>not</strong> notify {po.supplier || "the supplier"} —
-            raise the return with them the usual way and put their reference above.
+            Stock comes off the shelf now.{" "}
+            {canApi
+              ? <>This <strong>is</strong> raised with S&amp;S — they return an RA number and a shipping label.</>
+              : isSs
+                ? <>This PO has no invoice number yet, so S&amp;S can&apos;t be told: they key returns to the invoice, not the order. Fetch the order status first, or raise it by hand and record their reference above.</>
+                : <>This does <strong>not</strong> notify {po.supplier || "the supplier"} — raise it with them the usual way and record their reference above.</>}
           </p>
+          {raised && (
+            <div className="space-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {raised.map((r, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <span>RA <strong>{r.ra ?? "—"}</strong></span>
+                  {r.label && (
+                    <a href={r.label} target="_blank" rel="noreferrer" className="font-medium underline">
+                      Return shipping label
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {err && (
             <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               <Warning size={15} weight="fill" className="mt-0.5 shrink-0" /><span>{err}</span>

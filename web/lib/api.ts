@@ -1649,3 +1649,45 @@ export function getSsTracking(p: { orderNumbers?: string[]; invoiceNumbers?: str
   if (p.invoiceNumbers?.length) s.set("invoiceNumbers", p.invoiceNumbers.join(","))
   return api<{ shipments: SsShipment[]; error?: string }>(`/api/ss/tracking?${s.toString()}`)
 }
+
+// ── S&S order status / returns / cross-ref ─────────────────────────────────────
+/** S&S return reason codes, verbatim from their Returns doc. Reason 2 or 6 combined with
+ *  a replacement REQUIRES a comment — the server enforces it and names the field. */
+export const SS_RETURN_REASONS: Record<string, string> = {
+  "1": "Do not need / ordered wrong colour, size or qty",
+  "2": "Damaged or defective",
+  "3": "Keying error (ordered X, billed and received Y)",
+  "5": "Wrong qty (ordered 10, received 2)",
+  "6": "Other",
+  "7": "Wrong qty (ordered 2, received 10)",
+  "10": "Picking error (wrong size)",
+  "11": "Picking error (wrong style or colour)",
+}
+export type SsOrderStatus = {
+  orderNumber: string; invoiceNumber: string | null; warehouse: string | null
+  status: string | null; deliveryStatus: string | null; tracking: string | null
+  carrier: string | null; shippedAt: string | null; total: number; restockFee: number
+  lines: { sku: string; title: string | null; color: string | null; size: string | null
+           ordered: number; shipped: number | null; price: number; returnable: boolean }[]
+}
+export function getSsOrder(num: string) {
+  return api<{ orders: SsOrderStatus[]; error?: string }>(`/api/ss/order/${encodeURIComponent(num)}`)
+}
+/** Raise a real return. Returns the RA number and the return shipping label — the two
+ *  things that actually make a return happen. */
+export function ssReturn(body: {
+  lines: { invoiceNumber: string; sku: string; qty: number; returnReason: string
+           isReplace?: boolean; returnReasonComment?: string }[]
+  email?: string; shippingLabelRequired?: boolean; live?: boolean
+}) {
+  return api<{
+    ok?: boolean; dryRun?: boolean; testOrder?: boolean; error?: string
+    returns?: { type: string | null; status: string | null; orderNumber: string
+                raNumber: string | null; labelUrl: string | null; total: number
+                boxes: { box: number; tracking: string | null; labelPng: string | null }[] }[]
+  }>(`/api/ss/return`, { method: "POST", body: JSON.stringify(body) })
+}
+export function getSsDaysInTransit(zip?: string) {
+  return api<{ zip: string; warehouses: { warehouse: string; cutOff: string; days: number | null }[] }>(
+    `/api/ss/days-in-transit${zip ? `?zip=${encodeURIComponent(zip)}` : ""}`)
+}
