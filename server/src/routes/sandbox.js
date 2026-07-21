@@ -356,9 +356,23 @@ export function sandboxRoutes(app, requireAuth) {
         detail: 'Every line must match a catalogue product. Check the sku, size and print method against GET /api/v1/products. Live keys are refused the same way.' };
     }
     const itemsTotal = +priced.reduce((s, l) => s + l.line_total, 0).toFixed(2);
-    return { object: 'order', mode: 'test', id: rid('ord'), status: 'received', items: priced,
+    const testId = rid('ord');
+    // Test-mode orders DO fire order.received, marked test:true.
+    //
+    // They used to fire nothing, which meant the sandbox could not exercise the one
+    // thing partners most need to get right before going live — and the only way to see
+    // a real order.received was to put an actual order through the factory. Stripe's
+    // test mode delivers webhooks for exactly this reason; the flag is what keeps it
+    // honest, not silence.
+    emitWebhook(k.seller_id, 'order.received', {
+      test: true, id: testId, status: 'received', items: priced,
+      shipping_address: b.shipping_address ?? null,
+      total: +(itemsTotal + 4.63).toFixed(2),
+      _note: 'Simulated order — nothing was created in the factory.',
+    });
+    return { object: 'order', mode: 'test', id: testId, status: 'received', items: priced,
       shipping_address: b.shipping_address, totals: { items: itemsTotal, shipping: 4.63, total: +(itemsTotal + 4.63).toFixed(2), currency: 'USD' },
-      created: nowISO(), _note: 'Simulated — nothing was created and no webhook fired. Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
+      created: nowISO(), _note: 'Simulated — nothing was created in the factory, but order.received WAS delivered to your webhooks (test:true). Prices and validation match live exactly; send a live key (egk_live_…) to create a real order.' };
   });
 
   app.get('/api/v1/orders/:id', async (req, reply) => {

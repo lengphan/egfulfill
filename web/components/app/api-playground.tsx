@@ -5,6 +5,7 @@ import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, Care
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { WebhooksPanel } from "@/components/app/webhooks-panel"
 import { createApiKey } from "@/lib/api"
 import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-endpoints"
 
@@ -236,6 +237,11 @@ export function ApiPlayground() {
               <pre className="max-h-[420px] overflow-auto rounded-b-xl bg-muted/40 p-4 font-mono text-xs leading-relaxed">{res.text}</pre>
             </SectionCard>
           )}
+
+          {/* The other half of an integration: these endpoints are what YOU call, webhooks
+              are what we call back. Registering and testing one used to mean curl with a
+              hand-substituted id and key, which is how you end up testing endpoint "ID". */}
+          <WebhooksPanel />
         </div>
       </div>
     </div>
