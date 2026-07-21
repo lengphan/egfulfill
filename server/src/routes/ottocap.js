@@ -208,6 +208,20 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
         style, name: name || style, description, price, category,
         colors, sizes, colorImages,
         image: ottoImg(rows.find((r) => r.image)?.image || null),
+        // Full variant rows. `skus` used to be a bare list of strings, which threw away
+        // the colour, size, price and picture the row already had — so the picker showed
+        // a column of identical black caps with codes under them and no way to tell which
+        // colourway you were ordering. A sku without its colour and size is not orderable
+        // information, it's an identifier.
+        variants: rows.map((r) => ({
+          sku: r.sku,
+          color: r.color || null,
+          size: r.size || null,
+          price: r.price == null ? null : Number(r.price),
+          // Per-COLOUR image, falling back to the style's. Ordering a colourway from a
+          // photo of a different colour is the mistake this prevents.
+          image: ottoImg(r.image) || ottoImg(rows.find((x) => x.color === r.color && x.image)?.image || null),
+        })),
         skus: rows.map((r) => r.sku),
       };
     } catch (e) { reply.code(500); return { error: String((e && e.message) || e) }; }

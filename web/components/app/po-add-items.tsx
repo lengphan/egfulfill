@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { driveImg } from "@/lib/supplier-catalog"
 import {
-  getSsProducts, getOttoProducts, getOttoStyle,
+  getSsProducts, getOttoProducts, getSsStyleSkus, getSsStylesAll, type SsStyle, type OttoVariant, getOttoStyle,
   type InventoryItem, type PurchaseOrder, type POLine, type SsProduct, type OttoStyle,
 } from "@/lib/api"
 
@@ -116,7 +116,15 @@ export function POAddItems({
   const [ss, setSs] = useState<SsProduct[] | null>(null)
   const [otto, setOtto] = useState<OttoStyle[] | null>(null)
   const [openStyle, setOpenStyle] = useState<string | null>(null)
-  const [styleSkus, setStyleSkus] = useState<Record<string, string[]>>({})
+  // Full variant rows per style, not bare skus. A sku on its own isn't orderable
+  // information — you can't tell which colourway you're buying from a code.
+  const [styleSkus, setStyleSkus] = useState<Record<string, OttoVariant[]>>({})
+  // S&S styles matching the search that are NOT in the local table. The picker searches
+  // what's been synced, so an unsynced style read as "no products match" — which is a
+  // different claim from "nobody has fetched that yet", and only one of them was true.
+  const [ssStyleHits, setSsStyleHits] = useState<SsStyle[] | null>(null)
+  const [ssStyleSkus, setSsStyleSkus] = useState<Record<string, SsProduct[]>>({})
+  const [openSsStyle, setOpenSsStyle] = useState<string | null>(null)
 
   // Per-PO reset is done by the PARENT keying this component on po.num, so opening a
   // different draft remounts it with fresh state. Resetting in an effect instead
@@ -131,7 +139,15 @@ export function POAddItems({
 
   const loadSs = useCallback(() => {
     setSs(null)
-    getSsProducts({ search: q, limit: 60 }).then((r) => setSs(r?.products ?? [])).catch(() => setSs([]))
+    getSsProducts({ search: q, limit: 60 }).then((r) => {
+      const found = r?.products ?? []
+      setSs(found)
+      // Nothing locally? Ask the STYLE list, which is cached whole and covers everything
+      // S&S sell. The style is what a person knows; its skus are fetched when opened.
+      if (!found.length && q) {
+        getSsStylesAll({ search: q, limit: 40 }).then((sr) => setSsStyleHits(sr?.styles ?? [])).catch(() => setSsStyleHits([]))
+      } else setSsStyleHits(null)
+    }).catch(() => setSs([]))
   }, [q])
   const loadOtto = useCallback(() => {
     setOtto(null)
@@ -165,12 +181,27 @@ export function POAddItems({
       return next
     })
 
+  /** Pull one S&S style's orderable skus live, and cache them so it's searchable after. */
+  const expandSs = async (styleId: string) => {
+    setOpenSsStyle((s) => (s === styleId ? null : styleId))
+    if (ssStyleSkus[styleId]) return
+    try {
+      const d = await getSsStyleSkus(styleId)
+      setSsStyleSkus((m) => ({ ...m, [styleId]: d?.products ?? [] }))
+    } catch { setSsStyleSkus((m) => ({ ...m, [styleId]: [] })) }
+  }
+
   const expand = async (style: string) => {
     setOpenStyle((s) => (s === style ? null : style))
     if (styleSkus[style]) return
     try {
       const d = await getOttoStyle(style)
-      setStyleSkus((m) => ({ ...m, [style]: Array.isArray(d?.skus) ? d.skus : [] }))
+      // Prefer the rich rows; fall back to bare skus so a server that predates them
+      // still lists something rather than showing an empty style.
+      const vs: OttoVariant[] = Array.isArray(d?.variants) && d.variants.length
+        ? d.variants
+        : (Array.isArray(d?.skus) ? d.skus : []).map((sku) => ({ sku, color: null, size: null, price: null, image: null }))
+      setStyleSkus((m) => ({ ...m, [style]: vs }))
     } catch { setStyleSkus((m) => ({ ...m, [style]: [] })) }
   }
 
@@ -225,7 +256,49 @@ export function POAddItems({
 
           {tab === "ss" && (
             ss === null ? <Loading />
-              : ss.length === 0 ? <Empty>{q ? "No S&S products match." : "Sync the S&S catalog first, or search for a style."}</Empty>
+              : ss.length === 0 && ssStyleHits && ssStyleHits.length > 0 ? (
+                // Not synced, but S&S DO sell it. Open a style to pull its skus live —
+                // they're cached on the way through, so it's searchable from then on.
+                <>
+                  <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                    Not in your synced catalogue yet — open a style to load its sizes and colours from S&amp;S.
+                  </div>
+                  {ssStyleHits.map((st) => (
+                    <div key={st.styleID}>
+                      <button type="button" onClick={() => expandSs(String(st.styleID))}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+                        {st.image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={st.image} alt="" loading="lazy" className="size-10 shrink-0 rounded border border-border bg-white object-contain" />
+                          : <span className="size-10 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{st.title || st.styleID}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {st.brand}{st.styleName ? ` · Style ${st.styleName}` : ""}
+                          </span>
+                        </span>
+                        <Plus size={13} weight="bold" className={"shrink-0 transition-transform " + (openSsStyle === String(st.styleID) ? "rotate-45" : "")} />
+                      </button>
+                      {openSsStyle === String(st.styleID) && (
+                        <div className="border-t border-border bg-muted/30 pl-6">
+                          {ssStyleSkus[String(st.styleID)] === undefined ? <Loading />
+                            : ssStyleSkus[String(st.styleID)].length === 0 ? <Empty>S&amp;S list no orderable skus for this style.</Empty>
+                              : ssStyleSkus[String(st.styleID)].map((p) => (
+                                <PickRow key={p.sku}
+                                  line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
+                                  image={p.image ?? null}
+                                  title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
+                                  sub={ssTitle(p)}
+                                  meta={[{ k: "SKU", v: p.sku }]}
+                                  on={!!picked[p.sku]} onToggle={toggle} />
+                              ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )
+              : ss.length === 0 ? <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
                 : ss.map((p) => (
                   <PickRow key={p.sku}
                     line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
@@ -263,9 +336,18 @@ export function POAddItems({
                       <div className="border-t border-border bg-muted/30 pl-6">
                         {styleSkus[s.style] === undefined ? <Loading />
                           : styleSkus[s.style].length === 0 ? <Empty>No skus listed for this style.</Empty>
-                            : styleSkus[s.style].map((sku) => (
-                              <PickRow key={sku} line={{ sku, name: s.name ?? undefined, qty: 1, price: num(s.price) }} title={sku} sub={s.name ?? undefined} image={driveImg(s.image) || null}
-                                on={!!picked[sku]} onToggle={toggle} />
+                            : styleSkus[s.style].map((v) => (
+                              <PickRow key={v.sku}
+                                line={{ sku: v.sku, name: s.name ?? undefined,
+                                        variant: [v.color, v.size].filter(Boolean).join(" / ") || undefined,
+                                        qty: 1, price: num(v.price ?? s.price) }}
+                                title={[v.color, v.size].filter(Boolean).join(" / ") || v.sku}
+                                sub={s.name ?? undefined}
+                                meta={[{ k: "SKU", v: v.sku }]}
+                                // Per-COLOUR picture. Ordering a colourway from a photo of
+                                // a different colour is exactly the mistake to prevent.
+                                image={driveImg(v.image || s.image) || null}
+                                on={!!picked[v.sku]} onToggle={toggle} />
                             ))}
                       </div>
                     )}

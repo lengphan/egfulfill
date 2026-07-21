@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getSupplierOptions, setFactorySettings, type SupplierOptions } from "@/lib/api"
+import { getSupplierOptions, setFactorySettings, getSsDaysInTransit, type SupplierOptions } from "@/lib/api"
 
 /** Their lists come back loosely shaped — an array of strings, or of objects with any of
  *  several id/label spellings. Read defensively rather than assume one. */
@@ -61,6 +61,11 @@ export function SupplierOrderingDialog({
   const [email, setEmail] = useState("")
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // How long each S&S warehouse takes to reach US, and the daily cut-off. Worth showing
+  // next to the shipping method because autoselectWarehouse splits an order across
+  // warehouses — this is what says whether that split costs a day. The cut-off is the
+  // other half: an order placed at 4:30 ships tomorrow, whatever the method says.
+  const [transit, setTransit] = useState<{ warehouse: string; cutOff: string; days: number | null }[] | null>(null)
 
   const load = useCallback(() => {
     setLoadErr(null)
@@ -71,6 +76,8 @@ export function SupplierOrderingDialog({
       setOttoShip(o.defaults.otto_shipping_method || "")
       setEmail(o.defaults.order_email || "")
     }).catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't load supplier options."))
+    // Best-effort: transit times are useful context, never a reason the window fails.
+    getSsDaysInTransit().then((r) => setTransit(r.warehouses ?? [])).catch(() => setTransit(null))
   }, [])
 
   useEffect(() => {
@@ -153,6 +160,20 @@ export function SupplierOrderingDialog({
                   </select>
                 </Field>
                 <p className="text-xs text-muted-foreground">{opts.suppliers.ss.shippingNote}</p>
+                {transit && transit.length > 0 && (
+                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                    <div className="mb-1 text-xs font-medium">Transit to your warehouse</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {transit.slice(0, 6).map((w) => (
+                        <span key={w.warehouse}>
+                          <span className="font-medium text-foreground">{w.warehouse}</span>{" "}
+                          {w.days != null ? `${w.days}d` : "—"}
+                          <span className="opacity-70"> · cut-off {w.cutOff}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">{opts.suppliers.ss.paymentNote}</p>
               </section>
 

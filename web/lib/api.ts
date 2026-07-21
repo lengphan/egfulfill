@@ -295,7 +295,10 @@ export type SsColor = string | { name: string; swatch: string | null }
 // store names, and anywhere a string[] is still expected.
 export const colorNames = (colors?: SsColor[] | null): string[] =>
   (colors ?? []).map((c) => (typeof c === "string" ? c : c.name)).filter(Boolean)
-export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; priceMax?: number | null; colors: SsColor[]; favorited?: boolean }
+/** `styleName` and `partNumber` are what a person actually types — "18500", "00760".
+ *  They're now fetched with the style list so a style NUMBER is searchable, not just its
+ *  marketing title. */
+export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; priceMax?: number | null; colors: SsColor[]; favorited?: boolean; styleName?: string; partNumber?: string }
 export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string }
 export function getSsStatus() {
   return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
@@ -617,7 +620,7 @@ export type OttoStyle = { style: string; brand?: string | null; name: string | n
 export function getOttoStatus() {
   return api<{ count?: number; last?: string | null }>(`/api/otto/products/status`)
 }
-export type OttoStyleDetail = { style: string; name: string; description: string | null; price: number | null; category: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; image: string | null; skus: string[]; error?: string }
+export type OttoStyleDetail = { style: string; name: string; description: string | null; price: number | null; category: string | null; colors: string[]; sizes: string[]; colorImages: Record<string, string>; image: string | null; skus: string[]; variants?: OttoVariant[]; error?: string }
 export function getOttoStyle(style: string) {
   return api<OttoStyleDetail>(`/api/otto/style/${encodeURIComponent(style)}`)
 }
@@ -1691,3 +1694,30 @@ export function getSsDaysInTransit(zip?: string) {
   return api<{ zip: string; warehouses: { warehouse: string; cutOff: string; days: number | null }[] }>(
     `/api/ss/days-in-transit${zip ? `?zip=${encodeURIComponent(zip)}` : ""}`)
 }
+
+/** Full catalogue sync — background, resumable, rate-limited to stay under S&S's 60/min.
+ *  Already-synced styles are skipped, so a re-run costs minutes rather than an hour. */
+export type SsSyncStatus = {
+  running: boolean; total: number; done: number; skipped: number; products: number
+  startedAt: number; error: string | null; stylesInDb: number; productsInDb: number
+}
+export function getSsSyncStatus() {
+  return api<SsSyncStatus>(`/api/ss/sync-all/status`)
+}
+export function startSsSyncAll(refresh = false) {
+  return api<{ ok?: boolean; started?: boolean; already?: boolean; total?: number | null; error?: string }>(
+    `/api/ss/sync-all`, { method: "POST", body: JSON.stringify({ refresh }) })
+}
+export function stopSsSyncAll() {
+  return api<{ ok?: boolean }>(`/api/ss/sync-all/stop`, { method: "POST" })
+}
+
+/** One S&S style's orderable SKUs, fetched LIVE and cached server-side. Lets the picker
+ *  reach any style without waiting for a full catalogue sync. */
+export function getSsStyleSkus(styleId: string) {
+  return api<{ total: number; products: SsProduct[]; live?: boolean; error?: string }>(
+    `/api/ss/style-skus/${encodeURIComponent(styleId)}`)
+}
+/** Otto style detail — full variant rows (sku + colour + size + price + per-colour image),
+ *  not the bare sku list it used to return. */
+export type OttoVariant = { sku: string; color: string | null; size: string | null; price: number | null; image: string | null }

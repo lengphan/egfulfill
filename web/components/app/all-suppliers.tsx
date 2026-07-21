@@ -5,6 +5,7 @@ import { MagnifyingGlass, UploadSimple, ArrowsClockwise, CircleNotch } from "@ph
 import { SectionCard } from "@/components/app/section-card"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { QuickOrderDialog, type QuickOrderProduct } from "@/components/app/quick-order-dialog"
+import { SsSyncPanel } from "@/components/app/ss-sync-panel"
 import { SupplierProductCard } from "@/components/app/supplier-product-card"
 import { ProductEditorDialog } from "@/components/app/product-editor-dialog"
 import { Loading } from "@/components/app/loading"
@@ -245,6 +246,10 @@ export function AllSuppliers() {
 
   return (
     <SectionCard title="All suppliers" description="S&S Activewear + Otto Cap in one feed — each card shows its supplier & brand">
+      {/* How much of the catalogue is actually searchable, and how to change that.
+          Sits above the search box because it's the answer to "why did my search find
+          nothing" — which is otherwise unanswerable from this screen. */}
+      <SsSyncPanel />
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="relative max-w-md flex-1">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
