@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown } from "@phosphor-icons/react"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -106,6 +106,29 @@ export function DispatchBoard() {
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Couldn't send those to byeastside.")
     } finally { setBusy(false) }
+  }
+
+  /**
+   * Take orders back off the dispatch board.
+   *
+   * They return to in_review — the stage they were staged FROM — rather than being
+   * cancelled or shipped: coming off this board means "not being scanned right now",
+   * which is a scheduling decision, not a claim about the work or the money.
+   *
+   * This existed nowhere. An order with no label couldn't even be selected, so an order
+   * staged here by mistake had nothing that could touch it and simply sat.
+   */
+  const removeFromBoard = async (ids: string[]) => {
+    if (!ids.length) return
+    setBusy(true); setErr(null)
+    const failed: string[] = []
+    for (const id of ids) {
+      try { await updateOrder(id, { factoryStatus: "in_review" }) } catch { failed.push(id) }
+    }
+    setBusy(false)
+    setPicked(new Set())
+    if (failed.length) setErr(`Couldn't remove ${failed.length} order${failed.length === 1 ? "" : "s"} — your role may not be able to move them back.`)
+    load()
   }
 
   const markScanned = async () => {
@@ -274,6 +297,11 @@ export function DispatchBoard() {
             {/* Pull back. The reason this exists: a batch goes to the partner, some of it
                 gets picked, and the rest shouldn't ship today. Anything already picked is
                 refused per-order by the partner (409) — the rest still come back. */}
+            <Button size="sm" variant="outline" disabled={!chosen.length || busy}
+              onClick={() => removeFromBoard(chosen.map((o) => o.id))}
+              title="Send these back to review — they come off the board without being scanned">
+              <X size={14} weight="bold" /> Remove from board
+            </Button>
             <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={pullBack}>
               <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
             </Button>
@@ -325,6 +353,10 @@ export function DispatchBoard() {
                   key={o.id}
                   className={"flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-accent/40 " + (ready ? "" : "opacity-70")}
                 >
+                  {/* Selectable whether or not it has a label. Only the label-dependent
+                      ACTIONS need one; tying the checkbox itself to a label left an
+                      unlabelled order impossible to select and therefore impossible to
+                      remove — stuck on the board with nothing that could touch it. */}
                   <input
                     type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)}
                     className="size-4 shrink-0 accent-primary" aria-label={`Select ${numOf(o)}`}
@@ -357,6 +389,19 @@ export function DispatchBoard() {
                       <ArrowSquareOut size={13} weight="bold" />
                     </a>
                   )}
+                  {/* Per-row remove as well as the bulk one: a single order staged by
+                      mistake shouldn't need a selection first, and this row is exactly
+                      where someone notices it doesn't belong. stopPropagation because the
+                      row is a <label> — without it, clicking this toggles the checkbox. */}
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); void removeFromBoard([o.id]) }}
+                    disabled={busy}
+                    className="eg-tap shrink-0 rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Remove ${numOf(o)} from the dispatch board`}
+                    title="Remove from board — sends it back to review, unscanned"
+                  >
+                    <X size={13} weight="bold" />
+                  </button>
                 </label>
               )
             })}
