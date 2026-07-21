@@ -126,6 +126,36 @@ export function POAddItems({
   const [ssStyleSkus, setSsStyleSkus] = useState<Record<string, SsProduct[]>>({})
   const [openSsStyle, setOpenSsStyle] = useState<string | null>(null)
 
+  /**
+   * S&S results grouped into one row per STYLE.
+   *
+   * The API returns a row per colour AND size, so searching "gildan" produced forty rows
+   * with the same name and a different swatch — unreadable, and impossible to tell how
+   * many distinct products matched. A style is what a person is looking for; the colour
+   * and size are how they narrow it once found.
+   */
+  const ssStyles = useMemo(() => {
+    const g = new Map<string, { key: string; title: string; brand: string | null; styleNo: string | null; image: string | null; priceLo: number; priceHi: number; rows: SsProduct[] }>()
+    for (const p of ss ?? []) {
+      const key = String(p.style_id ?? p.style_name ?? p.sku)
+      if (!g.has(key)) {
+        g.set(key, {
+          key, title: ssTitle(p) || p.sku, brand: p.brand ?? null,
+          styleNo: p.style_id ? String(p.style_id) : null,
+          image: p.image ?? null, priceLo: Infinity, priceHi: 0, rows: [],
+        })
+      }
+      const grp = g.get(key)!
+      grp.rows.push(p)
+      const pr = num(p.price)
+      if (pr > 0) { grp.priceLo = Math.min(grp.priceLo, pr); grp.priceHi = Math.max(grp.priceHi, pr) }
+      // First row with a picture represents the style — S&S have no single "parent"
+      // image on a product row, so the first colourway stands in.
+      if (!grp.image && p.image) grp.image = p.image
+    }
+    return [...g.values()]
+  }, [ss])
+
   // Per-PO reset is done by the PARENT keying this component on po.num, so opening a
   // different draft remounts it with fresh state. Resetting in an effect instead
   // would mean a render pass where last PO's picks are still on screen — and stale
@@ -299,23 +329,49 @@ export function POAddItems({
                 </>
               )
               : ss.length === 0 ? <Empty>{q ? "No S&S products match, and no style of that name either." : "Search a style name, number or colour — anything S&S sell is reachable."}</Empty>
-                : ss.map((p) => (
-                  <PickRow key={p.sku}
-                    line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
-                    image={p.image ?? null}
-                    title={ssTitle(p) || p.sku}
-                    sub={[p.color, p.size].filter(Boolean).join(" / ")}
-                    // The two numbers that identify an S&S line, LABELLED. The sku is what
-                    // actually gets ordered; the style is what a person recognises and what
-                    // every S&S page and invoice is organised by. Showing one bare number
-                    // meant guessing which of the two it was.
-                    meta={[
-                      p.style_id ? { k: "Style", v: String(p.style_id) } : null,
-                      { k: "SKU", v: p.sku },
-                    ].filter(Boolean) as { k: string; v: string }[]}
-                    right={money(p.price)}
-                    on={!!picked[p.sku]} onToggle={toggle} />
-                ))
+                : ssStyles.map((g) => {
+                  const open = openSsStyle === g.key
+                  const chosen = g.rows.filter((r) => picked[r.sku]).length
+                  return (
+                    <div key={g.key}>
+                      {/* One row per product. The count is the useful part — "42 colours
+                          & sizes" says at a glance whether this is the thing you want. */}
+                      <button type="button" onClick={() => setOpenSsStyle((s2) => (s2 === g.key ? null : g.key))}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50">
+                        {g.image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={g.image} alt="" loading="lazy" className="size-14 shrink-0 rounded border border-border bg-white object-contain" />
+                          : <span className="size-14 shrink-0 rounded border border-dashed border-border" aria-hidden />}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{g.title}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {g.styleNo ? `Style ${g.styleNo} · ` : ""}{g.rows.length} colour{g.rows.length === 1 ? "" : "s"} &amp; size{g.rows.length === 1 ? "" : "s"}
+                            {chosen > 0 ? ` · ${chosen} picked` : ""}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {g.priceHi > 0
+                            ? (g.priceLo === g.priceHi ? money(g.priceHi) : `${money(g.priceLo)}–${money(g.priceHi)}`)
+                            : ""}
+                        </span>
+                        <Plus size={13} weight="bold" className={"shrink-0 transition-transform " + (open ? "rotate-45" : "")} />
+                      </button>
+                      {open && (
+                        <div className="border-t border-border bg-muted/30 pl-6">
+                          {g.rows.map((p) => (
+                            <PickRow key={p.sku}
+                              line={{ sku: p.sku, name: ssTitle(p), variant: [p.color, p.size].filter(Boolean).join(" / ") || undefined, qty: 1, price: num(p.price) }}
+                              image={p.image ?? null}
+                              title={[p.color, p.size].filter(Boolean).join(" / ") || p.sku}
+                              meta={[{ k: "SKU", v: p.sku }]}
+                              right={money(p.price)}
+                              on={!!picked[p.sku]} onToggle={toggle} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
           )}
 
           {tab === "otto" && (

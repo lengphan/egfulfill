@@ -32,7 +32,9 @@ export function ProductCombobox({
   value: string
   onText: (v: string) => void
   onPick: (p: PickedProduct) => void
-  onBrowse: () => void
+  /** Opens a full browse dialog. Omit where there isn't one — the caret then just
+   *  toggles the suggestion list instead of doing nothing. */
+  onBrowse?: () => void
   placeholder?: string
 }) {
   const [products, setProducts] = useState<CatalogProduct[]>(cache ?? [])
@@ -86,7 +88,11 @@ export function ProductCombobox({
       <Input
         value={value}
         onChange={(e) => { onText(e.target.value); setOpen(true); setCursor(0) }}
-        onFocus={() => { if (value.trim()) setOpen(true) }}
+        // Open on focus even when empty. Gating this on `value.trim()` meant an untouched
+        // field showed nothing until you guessed a character — and in the publish dialog,
+        // whose caret has no browse handler, that left NO way to reach the catalog at all.
+        // An empty query already returns the full list (see `matches`).
+        onFocus={() => setOpen(true)}
         onKeyDown={(e) => {
           if (!open && (e.key === "ArrowDown" || e.key === "Enter")) { setOpen(true); return }
           if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, matches.length - 1)) }
@@ -107,9 +113,11 @@ export function ProductCombobox({
       <button
         type="button"
         tabIndex={-1}
-        aria-label="Browse all products"
-        title="Browse all products"
-        onClick={() => { setOpen(false); onBrowse() }}
+        aria-label={onBrowse ? "Browse all products" : "Show products"}
+        title={onBrowse ? "Browse all products" : "Show products"}
+        // With no browse handler the caret used to call an empty function and look broken.
+        // Fall back to toggling the list so it always does something.
+        onClick={() => { if (onBrowse) { setOpen(false); onBrowse() } else setOpen((v) => !v) }}
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
       >
         <CaretDown size={13} className="text-muted-foreground" />

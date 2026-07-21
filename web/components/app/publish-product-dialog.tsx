@@ -265,7 +265,6 @@ export function PublishProductDialog({
                   value={blankText}
                   onText={setBlankText}
                   onPick={(p) => { setBlankText(p.name); setBlank(catalogRef.current.find((x) => String(x.sku ?? "") === p.sku) ?? null) }}
-                  onBrowse={() => {}}
                   placeholder="Pick the blank to print on"
                 />
                 <p className="text-xs text-muted-foreground">
