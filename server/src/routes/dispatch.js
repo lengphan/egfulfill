@@ -23,6 +23,8 @@
 import { q } from '../db.js';
 import { audit } from '../audit.js';
 import { egBroadcast } from '../events.js';
+import { moveFunds, balanceOf } from './wallet.js';
+import { readAll as readSettings } from './factory_settings.js';
 
 const KEY = (process.env.BYEASTSIDE_API_KEY || '').trim();
 const BASE = (process.env.BYEASTSIDE_API_BASE || 'https://api.byeastside.uk/api').replace(/\/+$/, '');
@@ -64,6 +66,49 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
   q('alter table orders add column if not exists dispatch_pushed_at timestamptz').catch(() => {});
   q('alter table orders add column if not exists dispatch_error text').catch(() => {});
 
+  /**
+   * Bill the expedited dispatch, both sides.
+   *
+   *   seller  → factory   expedite_fee   (what the seller pays)
+   *   factory → partner   expedite_cost  (what byeastside invoices us)
+   *
+   * Recording BOTH leaves the real margin in the ledger instead of implied by a fixed
+   * sell price — the sell price is set once in Settings while the supplier cost can
+   * move, which is exactly where margin erodes without anyone noticing.
+   *
+   * Idempotent on the order id, so a double-click, a retry or an overlapping batch bills
+   * once. Money is never a reason to block a parcel: if the wallet is short we still
+   * dispatch and record what's owed, because holding a physical parcel over $2 costs the
+   * seller a marketplace deadline.
+   */
+  async function billExpedite(order) {
+    const cfg = await readSettings().catch(() => ({}));
+    const fee = Number(cfg.expedite_fee ?? 2) || 0;
+    const cost = Number(cfg.expedite_cost ?? 0.5) || 0;
+    const ref = `expedite-${order.id}`;
+    const out = { fee, cost, charged: false, owed: 0 };
+    if (fee > 0 && order.seller_id) {
+      const bal = await balanceOf(order.seller_id).catch(() => 0);
+      if (bal >= fee) {
+        await moveFunds({ from: order.seller_id, to: 'factory', amount: fee, type: 'expedite',
+          ref, note: `Expedited dispatch · order ${order.id}` }).catch(() => {});
+        out.charged = true;
+      } else {
+        out.owed = fee;   // surfaced on the order; the parcel still goes
+      }
+    }
+    if (cost > 0) {
+      // The partner isn't a wallet holder, so this is a one-sided factory debit: it makes
+      // the cost real in the ledger rather than a number living only in Settings.
+      await q(
+        `insert into wallet_ledger (account, delta, type, ref, note)
+         values ('factory', $1, 'expedite-cost', $2, $3) on conflict do nothing`,
+        [-cost, ref, `Dispatch partner label · order ${order.id}`]
+      ).catch(() => {});
+    }
+    return out;
+  }
+
   /** Push ONE order's label. Returns a plain result so a batch can report per order. */
   async function pushOne(order) {
     if (!order.tracking) return { id: order.id, ok: false, error: 'No label bought yet — nothing to dispatch.' };
@@ -97,7 +142,14 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const pdfId = r.data && (r.data.id ?? r.data.pdfId);
     await q('update orders set dispatch_pdf_id=$1, dispatch_pushed_at=now(), dispatch_error=null where id=$2',
       [String(pdfId), order.id]);
-    return { id: order.id, ok: true, pdfId };
+    // Bill only once the push actually succeeded — charging for a dispatch that never
+    // happened is the one failure a seller would rightly be angry about.
+    const billed = await billExpedite(order).catch(() => ({}));
+    if (billed.owed) {
+      await q('update orders set dispatch_error=$1 where id=$2',
+        [`Dispatched, but the $${billed.owed.toFixed(2)} expedite fee is unpaid — wallet was short.`, order.id]).catch(() => {});
+    }
+    return { id: order.id, ok: true, pdfId, ...billed };
   }
 
   /**
@@ -110,7 +162,7 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const ids = Array.isArray((req.body || {}).orderIds) ? (req.body.orderIds).map(String).filter(Boolean) : [];
     if (!ids.length) { reply.code(400); return { error: 'orderIds required' }; }
     const rows = (await q(
-      'select id, tracking, tracking_label_url, dispatch_pdf_id from orders where id = any($1)', [ids]
+      'select id, seller_id, tracking, tracking_label_url, dispatch_pdf_id from orders where id = any($1)', [ids]
     )).rows;
     const results = [];
     for (const o of rows) results.push(await pushOne(o));

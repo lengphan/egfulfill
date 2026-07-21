@@ -22,6 +22,8 @@ const KEYS = [
   // Supplier syncs (S&S, Otto) fill in product cost; this turns it into a sell price
   // without anyone retyping a number per size.
   'base_markup',
+  // Expedited dispatch: what the seller pays vs what the partner costs us.
+  'expedite_fee', 'expedite_cost',
 ];
 
 // Defaults applied when a key has never been set. Exported so the pricing path and the
@@ -39,6 +41,12 @@ export const SETTING_DEFAULTS = {
   method_sub: 1,      // sublimation
   method_vnl: 2,      // heat-transfer vinyl, cut + weed
   base_markup: 0,     // 0 = base cost equals product cost until someone sets a margin
+  // Expedited dispatch (label pre-scan). The seller pays expedite_fee; the partner
+  // invoices us expedite_cost per label. Both are recorded so the margin between them is
+  // visible rather than inferred — a fixed sell price against a supplier cost that can
+  // move is exactly where margin erodes unnoticed.
+  expedite_fee: 2,    // charged to the seller, per order
+  expedite_cost: 0.5, // what the dispatch partner charges us, per label
 };
 
 /**
@@ -170,7 +178,9 @@ function ensure() {
   return _ready;
 }
 
-async function readAll() {
+// Exported so other routes (dispatch billing) read the SAME numbers the admin screen
+// writes, instead of each hardcoding its own idea of a fee.
+export async function readAll() {
   const out = { ...SETTING_DEFAULTS };
   try {
     const r = await q('select key, value from settings where key = any($1)', [KEYS]);

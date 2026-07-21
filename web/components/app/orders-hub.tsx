@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -10,7 +10,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, pushToDispatch, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -377,6 +377,53 @@ export function OrdersHub() {
 
   const paged = usePaged(filtered, 25)
 
+  // Batch dispatch selection. Kept as a Set of order ids rather than a flag on the rows so
+  // it survives re-fetches and filter changes without having to reconcile anything.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [pushing, setPushing] = useState(false)
+  const [pushMsg, setPushMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null)
+  const [dispatchOn, setDispatchOn] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => { getDispatchStatus().then((d) => setDispatchOn(!!d.configured)).catch(() => {}) }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Only orders with a bought label can be dispatched — there's nothing to scan otherwise.
+  const dispatchable = (o: OrderRow) => !!o.tracking && !o.label_scanned_at
+  const selectableOnPage = paged.pageItems.filter(dispatchable)
+  const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((o) => selected.has(o.id))
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const togglePage = () =>
+    setSelected((prev) => {
+      const n = new Set(prev)
+      if (allOnPageSelected) selectableOnPage.forEach((o) => n.delete(o.id))
+      else selectableOnPage.forEach((o) => n.add(o.id))
+      return n
+    })
+  // "All matching this filter" — not just the page, since a warehouse thinks in runs.
+  const selectAllFiltered = () => setSelected(new Set(filtered.filter(dispatchable).map((o) => o.id)))
+
+  const doPush = async () => {
+    if (!selected.size) return
+    setPushing(true); setPushMsg(null)
+    try {
+      const r = await pushToDispatch([...selected])
+      if (r.error) throw new Error(r.error)
+      const failed = (r.results ?? []).filter((x) => !x.ok)
+      setPushMsg(failed.length
+        // Name the first real reason rather than a count — their errors aren't documented,
+        // so the message they sent back is the only thing that helps.
+        ? { tone: "err", text: `${r.pushed ?? 0} pushed, ${failed.length} failed — ${failed[0].error ?? "unknown error"}` }
+        : { tone: "ok", text: `${r.pushed ?? 0} pushed to dispatch${r.skipped ? `, ${r.skipped} already there` : ""}.` })
+      setSelected(new Set())
+      load()
+    } catch (e) {
+      setPushMsg({ tone: "err", text: e instanceof Error ? e.message : "Push failed." })
+    } finally { setPushing(false) }
+  }
+
   // Threads, machine files and placed artwork for the orders actually OPEN. Scoped to
   // expansion rather than the page: rows start closed, so fetching the whole page would
   // be ~3 requests each for detail nobody is looking at. Loaded once per order, so
@@ -476,6 +523,38 @@ export function OrdersHub() {
           </div>
         ) : (
           <>
+          {/* Batch dispatch bar. Only rendered when the partner is configured — an action
+              that can't work shouldn't occupy the header. */}
+          {dispatchOn && (selected.size > 0 || selectableOnPage.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-5 py-2.5">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={allOnPageSelected} onChange={togglePage}
+                  className="size-4 rounded border-input accent-primary" aria-label="Select every dispatchable order on this page" />
+                <span className="text-muted-foreground">
+                  {selected.size ? `${selected.size} selected` : `Select page (${selectableOnPage.length})`}
+                </span>
+              </label>
+              {filtered.filter(dispatchable).length > selectableOnPage.length && (
+                <button onClick={selectAllFiltered} className="text-sm font-medium text-primary hover:underline">
+                  Select all {filtered.filter(dispatchable).length} in this filter
+                </button>
+              )}
+              {selected.size > 0 && (
+                <>
+                  <Button size="sm" onClick={doPush} disabled={pushing}>
+                    {pushing ? <CircleNotch size={13} className="animate-spin" /> : <TrayArrowDown size={13} weight="bold" />}
+                    {pushing ? "Pushing…" : `Push ${selected.size} to dispatch`}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+                </>
+              )}
+              {pushMsg && (
+                <span className={"text-xs font-medium " + (pushMsg.tone === "ok" ? "text-emerald-600" : "text-destructive")}>
+                  {pushMsg.text}
+                </span>
+              )}
+            </div>
+          )}
           <div className="divide-y divide-border">
             {paged.pageItems.map((o) => {
               const items = o.items ?? []
@@ -490,6 +569,18 @@ export function OrdersHub() {
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
+                        {/* Selection only where it means something: an order with no label
+                            has nothing to scan, so it isn't offered rather than being
+                            offered-then-refused. */}
+                        {dispatchOn && dispatchable(o) && (
+                          <input
+                            type="checkbox"
+                            checked={selected.has(o.id)}
+                            onChange={() => toggleOne(o.id)}
+                            aria-label={`Select ${numOf(o)} for dispatch`}
+                            className="size-4 shrink-0 rounded border-input accent-primary"
+                          />
+                        )}
                         <button
                           onClick={() => toggleCollapse(o.id)}
                           aria-expanded={!isCollapsed}

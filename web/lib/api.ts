@@ -747,6 +747,27 @@ export function postItemSetup(id: string, body: { line_id?: string; sku?: string
   })
 }
 
+// ── Dispatch partner (byeastside) — label pre-scan ───────────────────────────
+// Manual on purpose: a pre-scan starts the BUYER's tracking clock, so when it happens is
+// a timing decision a person makes. Already-pushed orders are skipped, not re-sent.
+export type DispatchStatus = {
+  configured: boolean; base?: string
+  awaiting_scan?: number; prescanned_not_shipped?: number; errored?: number
+}
+export type DispatchPushResult = {
+  ok?: boolean; pushed?: number; skipped?: number; error?: string
+  results?: { id: string; ok: boolean; already?: boolean; error?: string }[]
+}
+export function getDispatchStatus() {
+  return api<DispatchStatus>(`/api/dispatch/status`)
+}
+export function pushToDispatch(orderIds: string[]) {
+  return api<DispatchPushResult>(`/api/dispatch/push`, { method: "POST", body: JSON.stringify({ orderIds }) })
+}
+export function syncDispatch() {
+  return api<{ ok?: boolean; checked?: number; scanned?: number }>(`/api/dispatch/sync`, { method: "POST" })
+}
+
 // Matched embroidery threads per line item, so the factory knows which cones to load.
 export type OrderThreadRow = { sku: string; threads: { code: string; name: string; hex: string }[] }
 export function getOrderThreads(id: string) {
