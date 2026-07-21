@@ -463,6 +463,9 @@ export function PurchaseView() {
     return [...g.values()]
   }, [saved, supByS])
   const toOrderTotal = toOrderGroups.reduce((s, g) => s + g.total, 0)
+  // What the Active tab actually shows: lines waiting to be ordered, plus orders in
+  // flight. Counting anything else makes the badge a claim you can't verify on screen.
+  const activeCount = saved.length + placed.length
 
   const setSavedQty = (sku: string, qty: number) =>
     putSaved(saved.map((l) => (l.sku === sku ? { ...l, qty } : l)))
@@ -831,7 +834,7 @@ export function PurchaseView() {
 
       <StatGrid>
         <StatCard label="Low stock" value={String((inv ?? []).filter(isLow).length)} sub="need reorder" tone={(inv ?? []).some(isLow) ? "neg" : undefined} />
-        <StatCard label="Draft POs" value={String(drafts.length)} sub="awaiting review" />
+        <StatCard label="To order" value={String(saved.length)} sub="waiting to be placed" />
         <StatCard label="Placed" value={String((pos ?? []).filter((p) => p.status === "placed").length)} sub="sent to suppliers" />
         <StatCard label="Received" value={String((pos ?? []).filter((p) => p.status === "received").length)} sub="into inventory" tone="pos" />
       </StatGrid>
@@ -846,8 +849,10 @@ export function PurchaseView() {
       {/* Reorder suggestions */}
       <Tabs defaultValue="active">
         <TabsList>
-          <TabsTrigger value="active">Active{drafts.length + placed.length ? ` (${drafts.length + placed.length})` : ""}</TabsTrigger>
-          <TabsTrigger value="history">History{history.length ? ` (${history.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="active">Active{activeCount ? ` (${activeCount})` : ""}</TabsTrigger>
+          {/* No count on History. It only grows — hundreds of POs eventually — and a
+              number that always climbs and never needs acting on is decoration. */}
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* ACTIVE — everything still owed something: a draft to finish, or an order to
