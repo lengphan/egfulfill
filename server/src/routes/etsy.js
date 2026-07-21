@@ -1165,13 +1165,40 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   });
 
   // ── Webhook receiver (real-time). Etsy POSTs here when an order event fires.
-  // Public (Etsy has no bearer token). Effect is read-only: an incremental sync
-  // pulls just the changed receipts — so it can't be abused to mutate anything.
-  // Register this URL in the Etsy webhooks portal: https://egful.store/api/webhooks/etsy
-  app.post('/api/webhooks/etsy', async () => {
-    const res = await syncAllEtsy({});   // incremental — picks up the event's order
-    const imported = Array.isArray(res.synced) ? res.synced.reduce((n, s) => n + (s.orders || 0), 0) : 0;
-    return { ok: true, imported };
+  // Register this URL in the Etsy webhooks portal, with ?key=<ETSY_WEBHOOK_SECRET>:
+  //   https://egful.store/api/webhooks/etsy?key=…
+  //
+  // The old comment argued this was safe unauthenticated because "the effect is
+  // read-only". That misses the threat: syncAllEtsy({}) iterates EVERY connection and
+  // spends EVERY seller's Etsy quota. Etsy's limit is per-keystring and shared across all
+  // our sellers, so anyone who learned this URL could drain the whole platform's daily
+  // quota in a loop — every seller's order sync then fails until reset, and sustained
+  // abnormal traffic on one keystring is how an app key gets throttled or reviewed.
+  // Read-only to our database is not the same as harmless.
+  //
+  // Also serialised: syncAllEtsy is not re-entrant, and concurrent runs both refresh the
+  // same OAuth token. Etsy rotates refresh tokens, so the second presents a consumed one,
+  // which providers treat as replay and can revoke the whole grant — silently
+  // disconnecting a seller's shop. One at a time; overlapping hits are told to retry.
+  let _webhookBusy = false;
+  app.post('/api/webhooks/etsy', async (req, reply) => {
+    const want = (process.env.ETSY_WEBHOOK_SECRET || '').trim();
+    if (want) {
+      const got = String((req.query && req.query.key) || req.headers['x-webhook-key'] || '');
+      if (got !== want) { reply.code(401); return { error: 'unauthorized' }; }
+    } else {
+      // Unset secret = refuse rather than run wide open. Shopify's receiver verifies HMAC
+      // before doing anything; Etsy sends no signature, so a shared key is the equivalent.
+      reply.code(503);
+      return { error: 'Webhook disabled: set ETSY_WEBHOOK_SECRET to enable it.' };
+    }
+    if (_webhookBusy) { reply.code(429); return { error: 'sync already running' }; }
+    _webhookBusy = true;
+    try {
+      const res = await syncAllEtsy({});   // incremental — picks up the event's order
+      const imported = Array.isArray(res.synced) ? res.synced.reduce((n, s) => n + (s.orders || 0), 0) : 0;
+      return { ok: true, imported };
+    } finally { _webhookBusy = false; }
   });
 
   /**
@@ -1289,8 +1316,15 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
   app.post('/api/etsy/publish', { preHandler: requireAuth }, async (req, reply) => {
     try {
       if (!SHARED_SECRET) { reply.code(400); return { error: 'Server is missing ETSY_SHARED_SECRET.' }; }
-      const conn = (await q(`select * from platform_connections where platform='etsy' order by created_at limit 1`)).rows[0];
-      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected.' }; }
+      // connectionFor(req.user), NOT the oldest row in the table. This route is
+      // requireAuth (any seller), and resolving the connection globally meant a seller
+      // publishing their design created a live listing inside whichever shop connected
+      // FIRST — usually the factory's — using that shop's OAuth token. The listing then
+      // recorded published_listings.seller_id = the caller, so a sale on it attached the
+      // caller's artwork to the wrong shop's order. Writing to a shop you don't own is
+      // exactly what §2.6 forbids.
+      const conn = await connectionFor(req.user);
+      if (!conn) { reply.code(400); return { error: 'No Etsy shop connected to your account.' }; }
       const b = req.body || {};
       const title = String(b.title || '').trim();
       const price = Number(b.price) || 0;
@@ -1452,10 +1486,26 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
     const m = String(order_id || '').match(/^etsy-(.+)$/i);
     if (!m) { reply.code(400); return { error: 'Not an Etsy order' }; }
     const receiptId = m[1];
-    const ord = (await q('select store from orders where id=$1', [order_id])).rows[0];
+    const ord = (await q('select store, seller_id from orders where id=$1', [order_id])).rows[0];
     const conns = (await q(`select * from platform_connections where platform='etsy'`)).rows;
-    const conn = conns.find((c) => c.shop_name === (ord && ord.store)) || conns[0];
-    if (!conn) { reply.code(400); return { error: 'No Etsy shop connected' }; }
+    // Bind to the order's OWNER, not to a display string. This matched on shop_name — a
+    // free-text label Etsy lets sellers rename at will — and fell back to `conns[0]` when
+    // it missed. So the moment a seller renamed their shop, every fulfilment for them was
+    // pushed through whichever shop connected first: a tracking write, and a
+    // customer-facing "your order shipped" email, against a shop we were never asked to
+    // touch. Repeated bogus fulfilment writes are also how Etsy flags an account.
+    //
+    // No fallback: if we cannot say WHICH shop this order belongs to, refuse. Guessing
+    // wrong here is not recoverable — the buyer has already been emailed.
+    const conn = conns.find((c) => ord && String(c.connected_by) === String(ord.seller_id))
+      || conns.find((c) => ord && c.shop_name && c.shop_name === ord.store)
+      || null;
+    if (!conn) {
+      reply.code(400);
+      return { error: conns.length
+        ? "Couldn't tell which connected Etsy shop this order belongs to, so nothing was sent. Reconnect the shop for this seller."
+        : 'No Etsy shop connected' };
+    }
     try {
       const token = await validToken(conn);
       const res = await fetch(`${API}/shops/${conn.shop_id}/receipts/${receiptId}/tracking`, {

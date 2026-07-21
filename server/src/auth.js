@@ -3,7 +3,21 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { q, softQ } from './db.js';
 
-const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+// FAIL CLOSED. This used to fall back to a literal 'dev-secret-change-me', which is
+// public in this repo — so a deployment that simply forgot JWT_SECRET would happily
+// verify a token anyone could mint with {sub:<any id>, role:'admin'}, and nothing logged
+// a warning. In production an unset secret must stop the process, not silently accept
+// forged admins. Development keeps a working default so `node src/index.js` still runs,
+// and says loudly which one it is.
+const SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (s && s.trim()) return s;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is not set. Refusing to start: every token would be forgeable with a secret published in this repository.');
+  }
+  console.warn('[auth] JWT_SECRET unset — using an INSECURE development default. Never run this in production.');
+  return 'dev-secret-change-me';
+})();
 
 // ── Usernames ────────────────────────────────────────────────────────────────
 // Sign-in accepts an email OR a username. The charset deliberately EXCLUDES '@',
