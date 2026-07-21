@@ -575,30 +575,19 @@ export function OrdersHub() {
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* Selection only where it means something — but SHOWN either way.
-                            Omitting the box entirely left rows with no checkbox and no
-                            explanation, which reads as the feature being broken rather
-                            than the order not being ready. A disabled box keeps the
-                            column aligned and carries the reason. */}
-                        {dispatchOn && (
+                        {/* Selection only where it means something: an order with no label has
+                            nothing to scan. Shown ONLY on rows that can actually be
+                            dispatched — a disabled box was tried and is worse: greyed out
+                            with the reason hidden behind a hover reads as "locked", which
+                            is a question rather than an answer. The Tracking column
+                            already says why: no tracking, no dispatch. */}
+                        {dispatchOn && dispatchable(o) && (
                           <input
                             type="checkbox"
                             checked={selected.has(o.id)}
                             onChange={() => toggleOne(o.id)}
-                            disabled={!dispatchable(o)}
-                            title={
-                              dispatchable(o)
-                                ? `Select ${numOf(o)} for dispatch`
-                                : o.label_scanned_at
-                                  ? "Already scanned out"
-                                  : "No shipping label yet — buy one before dispatching"
-                            }
-                            aria-label={
-                              dispatchable(o)
-                                ? `Select ${numOf(o)} for dispatch`
-                                : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already scanned out" : "no shipping label yet"}`
-                            }
-                            className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-30"
+                            aria-label={`Select ${numOf(o)} for dispatch`}
+                            className="size-4 shrink-0 rounded border-input accent-primary"
                           />
                         )}
                         <button
