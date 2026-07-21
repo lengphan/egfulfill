@@ -35,6 +35,25 @@ const webhookSecret = () => (process.env.PINKDESIGN_WEBHOOK_SECRET || '').trim()
 
 export function pinkEnabled() { return !!apiKey(); }
 
+/**
+ * Book what an outsourced design costs us — at APPROVAL, not at push.
+ *
+ * A task that gets pushed and then abandoned, rejected, or endlessly revised isn't work
+ * we've accepted, and booking on create would put a cost against every one of those.
+ * Approval is the moment we take the file and use it, so that's the moment it's owed.
+ *
+ * Idempotent on `design-<order>-<sku>`, which matters more here than usual: approval can
+ * be reached two ways — their webhook reporting "done", or a human dragging the card —
+ * and both call this. The ledger's (account,type,ref) unique index collapses them to one
+ * charge no matter how many times, or how many routes, arrive at approved.
+ */
+export async function bookDesignCost({ orderId, sku, vendor }) {
+  if (!vendor || !orderId) return { ok: false, skipped: true };
+  const cfg = await readSettings().catch(() => ({}));
+  return recordCost('design', Number(cfg.design_partner_cost ?? 0), `design-${orderId}-${sku}`,
+    `Design partner task · order ${orderId} · ${sku}`, { orderId });
+}
+
 async function pink(path, init = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 30000);
@@ -171,16 +190,61 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       [orderId, item.sku, payload.title, item.print_type || null, item.name || null, String(refId)]
     ).catch(() => {});
 
-    // Book what the task costs us. Fixed per task from Settings — they invoice
-    // separately, so this is our best contemporaneous record rather than a quoted price,
-    // and it's what stops outsourced work looking free in the P&L.
-    const cfg = await readSettings().catch(() => ({}));
-    await recordCost('design', Number(cfg.design_partner_cost ?? 0), `design-${orderId}-${item.sku}`,
-      `Design partner task · order ${orderId} · ${item.sku}`, { orderId });
-
     audit(req, 'design.outsourced', { entityType: 'order', entityId: orderId, after: { sku, vendor: 'pinkdesign', ref: refId } });
     egBroadcast({ type: 'design-cards' });
     return { ok: true, refId, board };
+  });
+
+  /**
+   * Send a card BACK for revision — our "needs fix" reaching their board.
+   *
+   * The review loop is the whole point of using a human design service, and without this
+   * it only ran one way: they could return work, but a correction had to be relayed by
+   * hand outside the system, where it isn't attached to the card, isn't audited, and is
+   * invisible to whoever picks the job up next.
+   *
+   * The comment goes first. Their status flip is what surfaces the task to a designer, so
+   * flipping before the note is attached can put the job in front of someone with nothing
+   * telling them what to change — they'd have to guess or ask. If the comment fails we
+   * stop and say so rather than moving a card nobody can action.
+   */
+  app.post('/api/pinkdesign/fix', { preHandler: requireStaff }, async (req, reply) => {
+    if (!pinkEnabled()) { reply.code(400); return { error: 'Pink Design isn\'t connected — add PINKDESIGN_API_KEY first.' }; }
+    const b = req.body || {};
+    const message = String(b.message || '').trim();
+    if (!message) { reply.code(400); return { error: 'Say what needs changing — a revision with no note is one they have to guess at.' }; }
+
+    const card = (await q('select id, order_id, sku, vendor, vendor_ref, col from design_cards where id=$1 limit 1', [b.cardId])
+      .catch(() => ({ rows: [] }))).rows[0];
+    if (!card) { reply.code(404); return { error: 'Card not found.' }; }
+    if (!card.vendor_ref) { reply.code(400); return { error: 'This card was never sent to a design partner, so there\'s nothing to send back.' }; }
+
+    // Reference images are optional — a marked-up screenshot says more than a paragraph.
+    // URLs only, same constraint as create_task.
+    const images = (Array.isArray(b.images) ? b.images : []).map(String).filter((u) => /^https?:\/\//i.test(u));
+
+    const said = await pink(`/${encodeURIComponent(card.vendor_ref)}/comment`, {
+      method: 'POST', body: JSON.stringify({ message, images }),
+    });
+    if (!said.ok) {
+      reply.code(502);
+      return { error: `Couldn't attach the revision note (${said.status}) — card left where it is.`,
+               raw: typeof said.data === 'string' ? said.data.slice(0, 300) : said.data };
+    }
+    const moved = await pink(`/${encodeURIComponent(card.vendor_ref)}/status`, {
+      method: 'POST', body: JSON.stringify({ status: 'needfix' }),
+    });
+    if (!moved.ok) {
+      reply.code(502);
+      return { error: `Note delivered, but their board wouldn't accept the status change (${moved.status}). Their designer can see the comment; chase the status manually.`,
+               commented: true };
+    }
+
+    await q(`update design_cards set col='fix', updated_at=now() where id=$1`, [card.id]).catch(() => {});
+    audit(req, 'design.revision', { entityType: 'order', entityId: card.order_id,
+      after: { sku: card.sku, ref: card.vendor_ref, message: message.slice(0, 500), images: images.length } });
+    egBroadcast('design-cards', { id: card.id, col: 'fix' });
+    return { ok: true, cardId: card.id, col: 'fix' };
   });
 
   /**
@@ -217,6 +281,10 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       : status.includes('fix') ? 'fix'
         : 'review';
     await q('update design_cards set col=$1, updated_at=now() where id=$2', [col, card.id]).catch(() => {});
+    // "done" on their side is an approval on ours, so the cost falls due here too — not
+    // only when a human drags the card. Idempotent, so whichever path lands first wins
+    // and the other is a no-op.
+    if (col === 'approved') await bookDesignCost({ orderId: card.order_id, sku: card.sku, vendor: 'pinkdesign' }).catch(() => {});
 
     // Deliverables arrive as URLs on THEIR servers. Storing the link alone would leave
     // our production files hostage to someone else's retention policy — a link that dies

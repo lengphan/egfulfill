@@ -5,6 +5,7 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
+import { bookDesignCost } from './pinkdesign.js';
 
 export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) {
   // Where this card's design work happens. null = our own designers (the default and the
@@ -149,6 +150,24 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
     // the client swallowed the error.
     const ids = rows.map((c) => String(c.id)).filter((x) => x && x !== 'null');
     if (ids.length) await q('delete from design_cards where id <> all($1::bigint[])', [ids]);
+
+    // An outsourced card reaching Approved is the moment we accept the partner's work,
+    // so it's the moment their fee is owed. Read the vendor back from the DB rather than
+    // trusting the payload — the same reason the designer guard above does.
+    //
+    // Best-effort and idempotent: this is a board save, and a bookkeeping row must never
+    // be the thing that loses someone's drag. Re-saving an already-approved board books
+    // nothing further.
+    if (ids.length) {
+      const approved = await q(
+        `select order_id, sku, vendor from design_cards
+          where id = any($1::bigint[]) and col='approved' and vendor is not null and order_id is not null`,
+        [ids]
+      ).catch(() => ({ rows: [] }));
+      for (const c of approved.rows) {
+        await bookDesignCost({ orderId: c.order_id, sku: c.sku, vendor: c.vendor }).catch(() => {});
+      }
+    }
     return { ok: true, count: rows.length };
   });
 
