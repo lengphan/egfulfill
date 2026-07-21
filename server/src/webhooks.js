@@ -123,6 +123,7 @@ async function deliver(endpoint, event, payload) {
      values ($1,$2,$3,$4,$5,$6,$7)`,
     [endpoint.id, endpoint.seller_id, event, JSON.stringify(payload ?? {}), status, error, attempts]
   ).catch(() => {});
+  return { status, error, attempts, ok: !!status && status >= 200 && status < 300 };
 }
 
 /**
@@ -214,6 +215,38 @@ export function webhookRoutes(app, requireAuth, authKey) {
       [Number(req.params.id) || 0]
     );
     return r.rows;
+  });
+
+  /**
+   * Fire a sample event at one endpoint and report what happened, synchronously.
+   *
+   * Exists because a TEST key can't exercise the real path: POST /api/v1/orders only
+   * emits from createRealOrder, which a test key never reaches — by design, since a
+   * simulated order doesn't exist and announcing one would be a lie. That left no way to
+   * check webhook wiring short of putting a real order through the factory.
+   *
+   * Unlike production emits this AWAITS delivery and returns the status code: the whole
+   * point of a test is finding out that it failed, which fire-and-forget can't tell you.
+   * The payload is stamped test:true so a receiver can't mistake it for a real shipment.
+   */
+  app.post('/api/webhooks/:id/test', { preHandler: requireSeller }, async (req, reply) => {
+    await ensureWebhookTables();
+    const r = await q('select id, seller_id, url, secret from webhook_endpoints where id=$1 and seller_id=$2',
+      [Number(req.params.id) || 0, req._sellerId]);
+    if (!r.rows.length) { reply.code(404); return { error: 'No such endpoint.' }; }
+    const event = WEBHOOK_EVENTS.includes(String((req.body || {}).event)) ? String(req.body.event) : 'order.shipped';
+    const result = await deliver(r.rows[0], event, {
+      test: true,
+      id: 'API-TESTORDER', number: null, status: 'shipped',
+      tracking: { carrier: 'USPS', code: '9400100000000000000000' },
+      total: 24.5,
+    });
+    return {
+      ok: result.ok, event, url: r.rows[0].url,
+      status_code: result.status, attempts: result.attempts, error: result.error,
+      hint: result.ok ? 'Delivered. Verify X-EG-Signature against your stored secret.'
+        : 'Not delivered — your endpoint must be public https and answer 2xx. See /api/webhooks/{id}/deliveries.',
+    };
   });
 
   app.get('/api/webhooks/events', { preHandler: requireSeller }, async () => ({ events: WEBHOOK_EVENTS }));
