@@ -175,6 +175,52 @@ function mapProduct(p, meta) {
   };
 }
 
+/**
+ * S&S shipping methods, verbatim from their Orders doc. Exported so the picker and the
+ * payload can't disagree about what a code means — a hand-written list had 2 and 3 the
+ * wrong way round, which would have upgraded every order to Next Day Air and billed for it.
+ */
+export const SS_SHIPPING_METHODS = [
+  { id: '1',  label: 'Ground (S&S picks carrier)' },
+  { id: '54', label: 'Cheapest ground (S&S optimises)' },
+  { id: '40', label: 'UPS Ground' },
+  { id: '14', label: 'FedEx Ground' },
+  { id: '16', label: 'UPS 3 Day Select' },
+  { id: '3',  label: 'UPS 2nd Day Air' },
+  { id: '2',  label: 'UPS Next Day Air' },
+  { id: '27', label: 'FedEx Next Day Standard' },
+  { id: '6',  label: 'Will Call / Pickup' },
+];
+
+/**
+ * Our ship-from address → their shippingAddress shape.
+ *
+ * Required by their doc: address, city, state, zip. `zip` must be 5 digits, so a ZIP+4 is
+ * truncated rather than rejected downstream. `customer` is the company (who the account
+ * is), `attn` the person — sending the person as `customer` puts an individual's name
+ * where a business belongs on the label.
+ *
+ * Returns null when it can't build a valid one, so the caller refuses rather than sending
+ * a partial address: an order with nowhere to be delivered can't be fixed afterwards.
+ */
+function toSsAddress(a) {
+  if (!a || typeof a !== 'object') return null;
+  const street = [a.street, a.street2].filter(Boolean).join(', ').trim();
+  const zip = String(a.zip || '').replace(/[^0-9]/g, '').slice(0, 5);
+  if (!street || !a.city || !a.state || zip.length !== 5) return null;
+  return {
+    customer: String(a.company || a.name || '').slice(0, 100),
+    attn: String(a.name || '').slice(0, 100),
+    address: street,
+    city: String(a.city),
+    state: String(a.state).toUpperCase().slice(0, 2),
+    zip,
+    // A warehouse is not a house. Their default is true, which can attach a residential
+    // surcharge to every delivery.
+    residential: false,
+  };
+}
+
 export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
   // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),
