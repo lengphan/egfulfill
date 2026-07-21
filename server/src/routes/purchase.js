@@ -3,6 +3,7 @@
 // received (quantities added back into inventory). Whole-object upsert by `num`.
 
 import { q, softQ } from '../db.js';
+import { recordCost } from '../costs.js';
 
 let _ready = null;
 function ensure() {
@@ -161,6 +162,22 @@ export function purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse)
          status=excluded.status, total=excluded.total, meta=excluded.meta`,
       [num, b.supplier || null, JSON.stringify(items), b.status || 'draft', total, b.meta ? JSON.stringify(b.meta) : null]
     );
+
+    // Blanks are the largest thing the factory buys and were the ONE external cost never
+    // reaching the ledger — costs.js has always had a category for them, but nothing ever
+    // called it. So the P&L counted every label, dispatch and design fee, and none of the
+    // stock.
+    //
+    // Booked on RECEIPT, not on placing. A placed PO can still be cancelled, and a cost
+    // recorded for goods that never arrive overstates spend. Receipt is the point the
+    // money is genuinely gone.
+    //
+    // Idempotent on the PO number, so re-saving a received PO (editing a line, pasting a
+    // tracking number) books once and only once.
+    if (String(b.status || '') === 'received' && total > 0) {
+      await recordCost('blanks', total, `po-${num}`,
+        `Blanks · ${b.supplier || 'unassigned supplier'} · PO ${num}`);
+    }
     return { ok: true, num };
   });
 

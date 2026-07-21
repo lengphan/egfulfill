@@ -327,6 +327,13 @@ export function PurchaseView() {
   const del = async (po: PurchaseOrder) => { setBusy(po.num); try { await deletePurchaseOrder(po.num); load() } catch { /* ignore */ } finally { setBusy(null) } }
 
   const poTotal = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.qty), 0)
+  /** What this PO COSTS. Distinct from poTotal, which counts units — the two were easy to
+   *  confuse when only one was ever shown, and only one of them is money. */
+  const poMoney = (po: PurchaseOrder) => po.items.reduce((s, l) => s + num(l.price) * num(l.qty), 0)
+  const usd = (n: number) => "$" + (Number(n) || 0).toFixed(2)
+  /** True when nothing on the PO carries a price. Lines drafted from low stock have no
+   *  price until someone fills one in, and a confident "$0.00" would read as free. */
+  const unpriced = (po: PurchaseOrder) => po.items.length > 0 && po.items.every((l) => !num(l.price))
 
   /** When a past PO actually happened — received beats placed, both beat the row's birth. */
   const poDate = (po: PurchaseOrder) => {
@@ -442,7 +449,9 @@ export function PurchaseView() {
       {drafts.map((po) => (
         <SectionCard key={po.num} title={<span className="flex items-center gap-2"><span className="font-mono">{po.num}</span><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">{po.supplier}</span></span>}
           actions={<div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{poTotal(po)} units</span>
+            <span className="text-xs text-muted-foreground">
+              {poTotal(po)} units · {unpriced(po) ? "no prices yet" : usd(poMoney(po))}
+            </span>
             <Button size="sm" variant="outline" onClick={() => setAddTo(po)}><Plus size={13} weight="bold" /> Add items</Button>
             <button onClick={() => del(po)} className="text-muted-foreground hover:text-red-600" title="Delete"><Trash size={15} /></button>
             <Button size="sm" onClick={() => place(po)} disabled={busy === po.num}>{busy === po.num ? <CircleNotch size={13} className="animate-spin" /> : <PaperPlaneTilt size={13} weight="bold" />} Place order</Button>
@@ -508,7 +517,7 @@ export function PurchaseView() {
                       <CaretRight size={13} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (isOpen ? "rotate-90" : "")} />
                       <span className="font-mono text-sm font-medium">{po.num}</span>
                       <span className="truncate text-sm text-muted-foreground">
-                        {supKey(po.supplier)} · {poTotal(po)} units · {po.items.length} line{po.items.length === 1 ? "" : "s"}
+                        {supKey(po.supplier)} · {poTotal(po)} units · {unpriced(po) ? "unpriced" : usd(poMoney(po))}
                         {poDate(po) ? " · " + poDate(po) : ""}
                       </span>
                     </button>
@@ -562,6 +571,9 @@ export function PurchaseView() {
                           {/* A single line can be re-ordered on its own — restocking one
                               short blank shouldn't drag the whole past PO along with it. */}
                           <span className="text-muted-foreground">×{num(l.qty)}</span>
+                          <span className="w-20 text-right tabular-nums text-muted-foreground">
+                            {num(l.price) ? usd(num(l.price) * num(l.qty)) : "—"}
+                          </span>
                           <button onClick={() => reorder(po, l)} className="text-muted-foreground hover:text-foreground" title="Reorder just this line">
                             <ArrowClockwise size={14} />
                           </button>
