@@ -40,6 +40,7 @@ import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
 import { dispatchRoutes } from './routes/dispatch.js';
+import { pinkDesignRoutes } from './routes/pinkdesign.js';
 import { addClient } from './events.js';
 import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designUrlTtlDays } from './storage.js';
 
@@ -278,6 +279,7 @@ spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorite
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
+pinkDesignRoutes(app, requireAuth, requireStaff);      // Pink Design: outsourced DTG/DTF artwork
 
 const port = Number(process.env.PORT) || 3000;
 app.listen({ port, host: '0.0.0.0' })

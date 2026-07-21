@@ -112,6 +112,10 @@ services:
       # Object storage for design artwork (S3-compatible). Unset = inline base64 in
       # Postgres, which also means no URL to give an outside design partner. See
       # .env.example for the setup and for DESIGN_URL_TTL_DAYS (link expiry).
+      # Design partner (Pink Design) — outsourced DTG/DTF artwork. See .env.example.
+      PINKDESIGN_API_KEY: ${PINKDESIGN_API_KEY:-}
+      PINKDESIGN_BOARD_ID: ${PINKDESIGN_BOARD_ID:-}
+      PINKDESIGN_API_BASE: ${PINKDESIGN_API_BASE:-https://hub.pinkdesign.io/api}
       # Dispatch partner (byeastside) — label pre-scan. See .env.example.
       BYEASTSIDE_API_KEY: ${BYEASTSIDE_API_KEY:-}
       BYEASTSIDE_API_BASE: ${BYEASTSIDE_API_BASE:-https://api.byeastside.uk/api}
