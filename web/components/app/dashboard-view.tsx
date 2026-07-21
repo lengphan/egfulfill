@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Sparkle } from "@phosphor-icons/react"
+import { Sparkle, Warning } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { SectionCard } from "@/components/app/section-card"
 import { SellerStatusBadge } from "@/components/app/seller-status-badge"
@@ -54,6 +54,11 @@ export function DashboardView() {
   const [orders, setOrders] = useState<OrderRow[] | null>(null)
   const [balance, setBalance] = useState<number | null>(null)
   const [isDemo, setIsDemo] = useState(false)
+  // "Couldn't read your orders" is not the same fact as "you have no orders", and every
+  // tile below already renders "—" while orders is null. The catch used to move state out
+  // of null into [], which defeated that guard and turned a 502 into a confident
+  // "Revenue (30d) $0 · Open orders 0" for a seller with a full pipeline.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [now, setNow] = useState(0)
 
   const load = useCallback(() => {
@@ -62,6 +67,7 @@ export function DashboardView() {
     const signedIn = !!getToken()
     getOrders()
       .then((rows) => {
+        setLoadErr(null)
         if (rows && rows.length) {
           setOrders(rows)
           setIsDemo(false)
@@ -70,9 +76,11 @@ export function DashboardView() {
           setIsDemo(!signedIn)
         }
       })
-      .catch(() => {
-        setOrders(signedIn ? [] : DEMO)
-        setIsDemo(!signedIn)
+      .catch((e) => {
+        // Signed out, the demo preview is still the right thing to show. Signed in, leave
+        // orders null so the tiles stay "—" and say why.
+        if (!signedIn) { setOrders(DEMO); setIsDemo(true); return }
+        setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server.")
       })
     getWallet()
       .then((w) => setBalance(w.balance))
@@ -116,7 +124,24 @@ export function DashboardView() {
         </div>
       )}
 
-      <RevenueChart data={series} />
+      {loadErr && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-700">
+          <Warning size={13} weight="fill" className="mt-0.5 shrink-0" />
+          <span>Couldn&apos;t load your orders, so these figures are unavailable — they are not zero. {loadErr}</span>
+        </div>
+      )}
+
+      {/* A chart of zeros is a claim about revenue. When the read failed we have no
+          series to draw, so say that instead of rendering a flat line at the axis. */}
+      {orders === null && loadErr ? (
+        <SectionCard title="Revenue" description="Gross revenue across your stores">
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
+            No revenue data to chart — your orders couldn&apos;t be loaded.
+          </div>
+        </SectionCard>
+      ) : (
+        <RevenueChart data={series} />
+      )}
 
       <SectionCard
         title="Recent orders"
@@ -127,7 +152,13 @@ export function DashboardView() {
           </Button>
         }
       >
-        {orders === null ? (
+        {orders === null && loadErr ? (
+          // Not skeletons: `orders` stays null after a failure, so a pulsing placeholder
+          // would animate forever and read as "still loading" rather than "this failed".
+          <div className="px-5 py-8 text-center text-sm text-muted-foreground">
+            Couldn&apos;t load recent orders.
+          </div>
+        ) : orders === null ? (
           <div className="space-y-2 p-5">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />

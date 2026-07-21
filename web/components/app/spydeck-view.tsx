@@ -312,6 +312,8 @@ export function SpyDeckView() {
   // `keywords` still comes back from the trending endpoint; it's just not rendered
   // here any more (the Search tab's keyword cloud covers it).
   const [trending, setTrending] = useState<{ products: EtsyListing[]; keywords: string[] } | null>(null)
+  // Carries the server's own 502 reason through to the screen instead of dropping it.
+  const [trendErr, setTrendErr] = useState<string | null>(null)
   // Filters — server-side (category/price/sort re-run the search) + client-side
   // (min sold-per-day / min favorites filter the shown cards live).
   const [categories, setCategories] = useState<EtsyCategory[]>([])
@@ -362,8 +364,11 @@ export function SpyDeckView() {
     if (!entitled) return
     const id = setTimeout(() => {
       getSpydeckTrending()
-        .then((r) => setTrending({ products: r.products ?? [], keywords: r.keywords ?? [] }))
-        .catch(() => setTrending({ products: [], keywords: [] }))
+        .then((r) => { setTrending({ products: r.products ?? [], keywords: r.keywords ?? [] }); setTrendErr(null) })
+        // The server sends a real reason on 502 ("Etsy rejected us"); throwing it away and
+        // rendering the empty state told a paying subscriber that nothing is trending,
+        // which is a different — and false — statement.
+        .catch((e) => setTrendErr(e instanceof Error ? e.message : "Couldn't load the trending feed."))
     }, 0)
     return () => clearTimeout(id)
   }, [entitled])
@@ -586,7 +591,14 @@ export function SpyDeckView() {
         {view === "account" ? (
           <ShopAnalyzer />
         ) : view === "trending" ? (
-          trending === null ? (
+          trending === null && trendErr ? (
+            // "The feed failed" and "nothing is trending" are different answers, and the
+            // second one is the product's whole value proposition. Say which.
+            <div className="py-16 text-center text-sm text-muted-foreground">
+              Couldn&apos;t load today&apos;s trending feed — this is a fetch problem, not an empty market.
+              <div className="mt-1 text-xs">{trendErr}</div>
+            </div>
+          ) : trending === null ? (
             <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[320px] animate-pulse rounded-2xl bg-muted" />)}
             </div>

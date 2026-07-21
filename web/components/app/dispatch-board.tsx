@@ -120,21 +120,38 @@ export function DispatchBoard() {
     } finally { setBusy(false) }
   }
 
-  /** Open each label for printing. Popup blockers stop the second window onward, so say so. */
-  const openLabels = () => {
+  /**
+   * Open each label for printing. Popup blockers stop the second window onward, so say so.
+   *
+   * Opening is available to operators — they print the batch. STAMPING it as printed is
+   * not: POST /api/orders/:id/label-printed is warehouse/admin, because the stamp asserts
+   * a label is on a parcel, which is a custody claim. So the stamp is only attempted by a
+   * role the server will accept, and any real failure is reported rather than swallowed.
+   * Previously every operator stamp 403'd into a .catch(() => {}), the Printed dots never
+   * filled in, and nothing on screen explained why.
+   */
+  const canStampPrinted = role === "admin" || role === "warehouse"
+  const openLabels = async () => {
     const urls = chosenWithLabel.map((o) => o.tracking_label_url).filter(Boolean) as string[]
     if (!urls.length) { setErr("None of the selected orders have a stored label file."); return }
     let blocked = 0
+    const opened: string[] = []
     for (const o of chosenWithLabel) {
       if (!o.tracking_label_url) continue
-      if (window.open(o.tracking_label_url, "_blank", "noopener")) {
-        // Stamp it as printed here rather than asking anyone to tick a box — opening the
-        // label for print IS the event, and a box nobody ticks makes the dot lie.
-        markLabelPrinted(o.id).catch(() => {})
-      } else blocked++
+      if (window.open(o.tracking_label_url, "_blank", "noopener")) opened.push(o.id)
+      else blocked++
     }
-    if (blocked) setErr(`${blocked} label${blocked === 1 ? "" : "s"} were blocked by your popup blocker — allow popups for this site to print a whole batch at once.`)
-    else load()   // refresh so the Printed dots fill in
+    const notes: string[] = []
+    if (blocked) notes.push(`${blocked} label${blocked === 1 ? "" : "s"} blocked by your popup blocker — allow popups to print a whole batch at once.`)
+    if (opened.length && canStampPrinted) {
+      const results = await Promise.allSettled(opened.map((id) => markLabelPrinted(id)))
+      const failed = results.filter((r) => r.status === "rejected").length
+      if (failed) notes.push(`${failed} couldn't be marked as printed — the labels still opened.`)
+    } else if (opened.length) {
+      notes.push("Opened for printing. Marking them printed is a warehouse/admin step, so the Printed dots won't fill in from here.")
+    }
+    setErr(notes.length ? notes.join(" · ") : null)
+    load()   // refresh so the Printed dots fill in
   }
 
   /**

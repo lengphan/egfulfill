@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CurrencyDollar, CircleNotch } from "@phosphor-icons/react"
+import { CurrencyDollar, CircleNotch, Warning } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { getWallet, type LedgerRow } from "@/lib/api"
 import { getToken } from "@/lib/auth"
@@ -12,13 +12,18 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
 // Its own page now — loads the shared 'designer' wallet directly.
 export function DesignerEarnings() {
   const [ledger, setLedger] = useState<{ balance: number; rows: LedgerRow[] } | null>(null)
+  // Telling a designer they have earned $0.00 when the ledger simply could not be read is
+  // the worst lie this page can tell, so a failure is reported rather than zeroed. Both
+  // the no-token and the request-failed paths used to resolve to a real-looking empty
+  // wallet ("Balance $0.00 · No earnings yet").
+  const [loadErr, setLoadErr] = useState<string | null>(null)
 
   useEffect(() => {
     const id = setTimeout(() => {
-      if (!getToken()) { setLedger({ balance: 0, rows: [] }); return }
+      if (!getToken()) { setLoadErr("You're signed out."); return }
       getWallet("designer")
-        .then((w) => setLedger({ balance: w.balance ?? 0, rows: w.ledger ?? [] }))
-        .catch(() => setLedger({ balance: 0, rows: [] }))
+        .then((w) => { setLedger({ balance: w.balance ?? 0, rows: w.ledger ?? [] }); setLoadErr(null) })
+        .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -41,7 +46,12 @@ export function DesignerEarnings() {
         </div>
       </div>
 
-      {ledger === null ? (
+      {ledger === null && loadErr ? (
+        <div className="flex items-start gap-2 rounded-2xl border border-border px-5 py-4 text-sm text-muted-foreground">
+          <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
+          <span>Couldn&apos;t load your earnings, so they aren&apos;t shown — this is not a zero balance. {loadErr}</span>
+        </div>
+      ) : ledger === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : (
         <>

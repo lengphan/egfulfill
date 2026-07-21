@@ -87,7 +87,17 @@ export function teamRoutes(app, requireAuth) {
       // membershipId lets the member leave the team from their own settings.
       return { member: true, membershipId: row.id, ownerId: row.owner_id, role: row.role, ownerName: row.owner_name || 'your team',
                permissions: Array.isArray(row.permissions) ? row.permissions : [] };
-    } catch (e) { return { member: false, permissions: null }; }
+    } catch (e) {
+      // FAIL CLOSED. `{member:false, permissions:null}` is the client's signal for "not a
+      // restricted member — show everything", so returning it on a DB error silently
+      // promoted a permission-limited team member to full navigation for that session.
+      // This file's own header records that a swallowed error here hid a broken query for
+      // the feature's entire life; my-invites was already changed to 500 loudly for the
+      // same reason. Server-side surface checks still hold, so this is nav only — but a
+      // read that failed must not be reported as a permission answer.
+      req.log?.error?.({ err: String(e) }, 'team my-access failed');
+      throw e;
+    }
   });
 
   // Pending invites addressed to the signed-in user (so a member sees "you've been

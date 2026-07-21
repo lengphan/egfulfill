@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SectionCard } from "@/components/app/section-card"
-import { CircleNotch, CheckCircle, XCircle } from "@phosphor-icons/react"
+import { CircleNotch, CheckCircle, XCircle, Warning } from "@phosphor-icons/react"
 import { getWallet, getMyTopups, getTopups, confirmTopup, rejectTopup, type LedgerRow, type TopupRequest } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 
@@ -139,10 +139,17 @@ function mapLedger(balance: number, ledger: LedgerRow[]): View {
   return { balance, charges, deposited, ordersCharged, avgCharge: ordersCharged ? charges / ordersCharged : 0, rows }
 }
 
-const ZERO: View = { balance: 0, charges: 0, deposited: 0, ordersCharged: 0, avgCharge: 0, rows: [] }
+// (A ZERO fallback View used to live here and was rendered whenever getWallet() threw.
+//  It is deliberately gone: a zeroed wallet and an unreadable one must not look alike.)
 
 export function WalletDashboard() {
   const [view, setView] = useState<View | null>(null)
+  // Distinguishes "couldn't read the wallet" from "this wallet is empty". Without it the
+  // catch below fell back to ZERO, which renders "Available balance $0.00" under a green
+  // "Ready for fulfillment" — pixel-identical to a genuinely new account. A seller whose
+  // API blipped mid-session was told their money was gone. Same pattern as
+  // OrderRefundPanel: a read that FAILED is reported, never rendered as a fact.
+  const [loadErr, setLoadErr] = useState<string | null>(null)
   const [pending, setPending] = useState<TopupRequest[]>([])
   // Kept so the attempt is still on the record — a rejected top-up never touches the
   // ledger, so without this it would disappear from the app entirely once it left the
@@ -188,8 +195,10 @@ export function WalletDashboard() {
     const signedIn = !!getToken()
     if (!signedIn) { setView(DEMO); return }
     getWallet()
-      .then((w) => setView(mapLedger(w.balance, w.ledger)))
-      .catch(() => setView((v) => v ?? ZERO))
+      .then((w) => { setView(mapLedger(w.balance, w.ledger)); setLoadErr(null) })
+      // Keep any balance already on screen (a failed REFRESH shouldn't blank a good
+      // reading) but never invent one where we have none — that was the $0.00 lie.
+      .catch((e) => setLoadErr(e instanceof Error ? e.message : "Couldn't reach the server."))
     // Surface the seller's own top-up requests that haven't landed in the ledger yet
     // (received ones already show as ledger deposits) so a submitted top-up is visible.
     getMyTopups()
@@ -208,6 +217,22 @@ export function WalletDashboard() {
     return () => clearTimeout(id)
   }, [refresh])
 
+  // Nothing readable AND the read failed → say so. Previously this fell through to the
+  // ZERO view and asserted a $0.00 balance, which is the one number a seller must never
+  // be told wrongly. Skeletons keep animating only while a read is genuinely in flight.
+  if (!view && loadErr) {
+    return (
+      <SectionCard title="Wallet">
+        <div className="flex items-start gap-2 px-5 py-4 text-sm text-muted-foreground">
+          <Warning size={15} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
+          <span>
+            Couldn&apos;t read your balance, so it isn&apos;t shown — this is a connection
+            problem, not a zero balance. Your money is unaffected. {loadErr}
+          </span>
+        </div>
+      </SectionCard>
+    )
+  }
   if (!view) {
     return (
       <div className="space-y-4">
