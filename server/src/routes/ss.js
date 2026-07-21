@@ -242,6 +242,33 @@ function toSsAddress(a) {
   };
 }
 
+/**
+ * Parse an S&S shipping-label barcode.
+ *
+ * Format from their guide: "12345678.001A" — eight digits of INVOICE number, a dot, three
+ * digits of BOX number (zero-padded), then one lane digit which is internal to S&S and
+ * carries no meaning for us.
+ *
+ * Scanners vary: some send the lane, some don't, some strip leading zeros, some append a
+ * newline. All of those are the same box, so all are accepted. What is NOT accepted is
+ * anything that doesn't split into invoice + box — receiving the wrong carton's contents
+ * is worse than being told to type it in.
+ */
+export function parseSsBarcode(raw) {
+  const s = String(raw || '').trim().replace(/\s+/g, '');
+  const m = s.match(/^(\d{6,10})[.\-](\d{1,4})([A-Za-z]?)$/);
+  if (!m) return null;
+  const digits = m[2];
+  // The lane is the LAST digit when four are present (001 + lane 1 → "0011"). Three or
+  // fewer digits means no lane was included.
+  const box = digits.length >= 4 ? digits.slice(0, -1) : digits;
+  return {
+    invoiceNumber: m[1],
+    boxNumber: parseInt(box, 10),
+    lane: digits.length >= 4 ? digits.slice(-1) : (m[3] || null),
+  };
+}
+
 export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
   // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),
@@ -553,6 +580,63 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
             shipped: l.qtyShipped == null ? null : Number(l.qtyShipped) || 0,
             price: Number(l.price) || 0, returnable: !!l.returnable,
           })),
+        })),
+      };
+    } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }
+  });
+
+  /**
+   * What's in this box?  Scan a label → the carton's exact contents.
+   *
+   * The label barcode encodes invoice + box number, and the Orders API can return a
+   * per-box line breakdown, so a scan answers "what am I holding" without anyone opening
+   * it and reading garments. That's the whole receiving workflow: scan, check off, put
+   * away.
+   *
+   * Looks the order up by INVOICE number, which is what the barcode carries — not the
+   * order number. Their identifier filter accepts either, which is why this works at all.
+   */
+  app.get('/api/ss/box', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured (SS_ACCOUNT_NUMBER + SS_API_KEY).' }; }
+    const parsed = parseSsBarcode((req.query && req.query.barcode) || '');
+    if (!parsed) {
+      reply.code(400);
+      return { error: 'That doesn\'t look like an S&S label barcode. They read like 42592959.0011 — invoice number, dot, box number.' };
+    }
+    try {
+      const r = await ssGet('/orders/' + encodeURIComponent(parsed.invoiceNumber) + '?boxes=true&boxlines=true&lines=true&mediatype=json');
+      if (r.status === 404) { reply.code(404); return { error: `S&S have no order for invoice ${parsed.invoiceNumber}.`, ...parsed }; }
+      if (!r.ok) { reply.code(r.status || 502); return { error: 'S&S order lookup failed', status: r.status, ...parsed }; }
+      const order = (Array.isArray(r.data) ? r.data[0] : r.data) || null;
+      if (!order) { reply.code(404); return { error: `Nothing returned for invoice ${parsed.invoiceNumber}.`, ...parsed }; }
+
+      const boxes = Array.isArray(order.boxes) ? order.boxes : [];
+      const box = boxes.find((b) => Number(b.boxNumber) === parsed.boxNumber) || null;
+      if (!box) {
+        reply.code(404);
+        return {
+          error: `Invoice ${parsed.invoiceNumber} exists, but has no box ${parsed.boxNumber}${boxes.length ? ` (it has ${boxes.length})` : ''}.`,
+          ...parsed, boxCount: boxes.length,
+        };
+      }
+      return {
+        ...parsed,
+        orderNumber: String(order.orderNumber ?? ''),
+        poNumber: order.poNumber || null,
+        warehouse: order.warehouseAbbr || null,
+        carrier: order.shippingCarrier || null,
+        tracking: box.trackingNumber || order.trackingNumber || null,
+        boxCount: boxes.length,
+        weight: Number(box.weight) || null,
+        lines: (Array.isArray(box.lines) ? box.lines : []).map((l) => ({
+          sku: l.sku, yourSku: l.yourSku || null, gtin: l.gtin || null,
+          title: l.title || null, brand: l.brandName || null, style: l.styleName || null,
+          color: l.colorName || null, size: l.sizeName || null,
+          // qtyShipped is what's actually IN the box; qtyOrdered is what was asked for,
+          // and on a short shipment they differ — which is the thing receiving exists to
+          // catch.
+          ordered: Number(l.qtyOrdered) || 0,
+          qty: l.qtyShipped == null ? (Number(l.qtyOrdered) || 0) : Number(l.qtyShipped) || 0,
         })),
       };
     } catch (e) { reply.code(502); return { error: 'S&S fetch error: ' + e.message }; }

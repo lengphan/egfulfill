@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise } from "@phosphor-icons/react"
+import { ShoppingCart, CircleNotch, Plus, Truck, CheckCircle, Trash, PaperPlaneTilt, BookmarkSimple, ArrowUUpLeft, CaretRight, ArrowClockwise, Barcode } from "@phosphor-icons/react"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -17,6 +17,7 @@ import { POAddItems } from "@/components/app/po-add-items"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SupplierOrderingDialog } from "@/components/app/supplier-ordering-dialog"
 import { PoReturnDialog } from "@/components/app/po-return-dialog"
+import { ReceiveScanDialog } from "@/components/app/receive-scan-dialog"
 import { getToken } from "@/lib/auth"
 
 const num = (v: unknown) => Number(v) || 0
@@ -124,6 +125,7 @@ export function PurchaseView() {
   // side by side is the normal reason to open them.
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [supplierCfg, setSupplierCfg] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
   const [returning, setReturning] = useState<PurchaseOrder | null>(null)
   // S&S tracking, keyed by PO number. Fetched on demand rather than stored: a shipment in
   // transit changes, and a number cached at receipt time would stop being true the moment
@@ -928,6 +930,11 @@ export function PurchaseView() {
       </div>
 
       <div className="flex items-center justify-end gap-2">
+        {/* Receiving is its own job, done at the bench with a scanner — not something
+            you reach through a purchase order. */}
+        <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
+          <Barcode size={13} weight="bold" /> Receive a box
+        </Button>
         <Button size="sm" variant="outline" onClick={() => setSupplierCfg(true)}>
           <Truck size={13} weight="bold" /> Order settings
         </Button>
@@ -1080,6 +1087,8 @@ export function PurchaseView() {
       </Tabs>
 
       <ImageZoom img={zoom} onClose={() => setZoom(null)} />
+
+      <ReceiveScanDialog open={scanOpen} onOpenChange={setScanOpen} onReceived={load} />
 
       <SupplierOrderingDialog open={supplierCfg} onOpenChange={setSupplierCfg} />
 

@@ -1229,6 +1229,34 @@ export function unsaveSpydeckListing(listingId: number | string) {
   return api<{ ok?: boolean }>(`/api/spydeck/saves/${encodeURIComponent(String(listingId))}`, { method: "DELETE" })
 }
 
+// ─────────────────── Outbound webhooks ───────────────────
+// Routes accept the dashboard JWT or an API key; from the app we use the JWT.
+export type WebhookEndpoint = { id: number; url: string; events: string[]; active: boolean; created_at?: string }
+export type WebhookDelivery = { id: number; event: string; status_code: number | null; error: string | null; attempts: number; created_at: string }
+/** The secret comes back ONCE, on create, and is never listed again. */
+export type WebhookCreated = WebhookEndpoint & { secret: string; error?: string }
+export type WebhookTestResult = { ok?: boolean; event?: string; url?: string; status_code?: number | null; attempts?: number; error?: string | null; hint?: string }
+
+export function getWebhooks() {
+  return api<WebhookEndpoint[]>(`/api/webhooks`)
+}
+export function createWebhook(url: string, events: string[]) {
+  return api<WebhookCreated>(`/api/webhooks`, { method: "POST", body: JSON.stringify({ url, events }) })
+}
+export function deleteWebhook(id: number | string) {
+  return api<{ ok?: boolean }>(`/api/webhooks/${encodeURIComponent(String(id))}`, { method: "DELETE" })
+}
+/** Fires a sample event and WAITS — the response says whether it actually landed. */
+export function testWebhook(id: number | string, event?: string) {
+  return api<WebhookTestResult>(`/api/webhooks/${encodeURIComponent(String(id))}/test`, {
+    method: "POST", body: JSON.stringify(event ? { event } : {}),
+  })
+}
+export function getWebhookDeliveries(id: number | string) {
+  return api<WebhookDelivery[]>(`/api/webhooks/${encodeURIComponent(String(id))}/deliveries`)
+}
+export const WEBHOOK_EVENTS = ["order.received", "order.status_changed", "order.shipped", "order.cancelled"] as const
+
 // Research listings already turned into a draft of our own — the Uploaded tab. Held on
 // the server, not in React state: a refresh used to empty the tab and offer "Make
 // product" again for something already published, which is how a shop collects
@@ -1796,4 +1824,20 @@ export function cancelSsOrder(orderNumber: string) {
   return api<{ ok?: boolean; cancelled?: boolean; orderStatus?: string | null
                orderNumber?: string; restockFee?: number; dryRun?: boolean; error?: string }>(
     `/api/ss/order/${encodeURIComponent(orderNumber)}`, { method: "DELETE" })
+}
+
+// ── Receiving: scan an S&S box label ───────────────────────────────────────────
+/** A scanned carton's exact contents. `qty` is what SHIPPED, `ordered` what was asked
+ *  for — on a short shipment they differ, which is what receiving exists to catch. */
+export type SsBox = {
+  invoiceNumber: string; boxNumber: number; lane: string | null
+  orderNumber: string; poNumber: string | null; warehouse: string | null
+  carrier: string | null; tracking: string | null; boxCount: number; weight: number | null
+  lines: { sku: string; yourSku: string | null; gtin: string | null; title: string | null
+           brand: string | null; style: string | null; color: string | null; size: string | null
+           ordered: number; qty: number }[]
+  error?: string
+}
+export function getSsBox(barcode: string) {
+  return api<SsBox>(`/api/ss/box?barcode=${encodeURIComponent(barcode)}`)
 }

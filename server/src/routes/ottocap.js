@@ -132,6 +132,32 @@ function toOttoAddress(a) {
   };
 }
 
+/**
+ * Flatten Otto's validation errors into a sentence.
+ *
+ * They answer in Django REST style: a map of FIELD → [messages], sometimes nested one
+ * level for an address ({"shipping_address": {"state": ["..."]}}). Printing the raw JSON
+ * technically shows the reason, but it shows it as JSON — and the field name is the most
+ * useful part, so it belongs in front of the message rather than buried in braces.
+ */
+function describeOttoError(d, prefix = '') {
+  if (d == null) return 'no detail returned';
+  if (typeof d === 'string') return d.slice(0, 400);
+  if (Array.isArray(d)) return d.map((x) => describeOttoError(x, prefix)).filter(Boolean).join('; ');
+  if (typeof d !== 'object') return String(d);
+  // Their own error envelopes, when present, win over field-by-field.
+  if (typeof d.message === 'string') return d.message;
+  if (typeof d.detail === 'string') return d.detail;
+  const parts = [];
+  for (const [field, val] of Object.entries(d)) {
+    const label = prefix ? `${prefix}.${field}` : field;
+    if (Array.isArray(val)) parts.push(`${label}: ${val.join(' ')}`);
+    else if (val && typeof val === 'object') parts.push(describeOttoError(val, label));
+    else if (val != null) parts.push(`${label}: ${val}`);
+  }
+  return parts.join(' · ').slice(0, 500) || JSON.stringify(d).slice(0, 400);
+}
+
 function ottoImg(u) {
   if (!u) return null;
   const s = String(u);
@@ -334,6 +360,13 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
       reply.code(400);
       return { error: 'Otto require a shipping method and none is set — choose one in Order settings › Delivery.' };
     }
+    // Otto restrict payment methods PER CUSTOMER — "This payment method is not allowed
+    // for this Customer." Defaulting to net30 guessed on their behalf and failed at their
+    // end; making it explicit fails here, where the message can name the setting.
+    if (!b.payment_method) {
+      reply.code(400);
+      return { error: 'Otto need a payment method, and which ones are allowed depends on the customer. Choose one in Order settings › Payment.' };
+    }
     if (!b.customer || !b.contact) {
       reply.code(400);
       return { error: 'Otto needs a customer and contact id on every order. Pick them in Order settings — they come from your Otto account, not from us.',
@@ -341,7 +374,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     }
 
     const payload = {
-      payment_method: b.payment_method || 'net30',
+      payment_method: b.payment_method,
       customer: b.customer,
       contact: b.contact,
       shipping_method: shipMethod,
@@ -364,10 +397,7 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
         // Their words, not ours. "Otto rejected the order" is a sentence we wrote and it
         // tells nobody which field was wrong.
         const d = r.data;
-        const why = !d ? 'no detail returned'
-          : typeof d === 'string' ? d.slice(0, 400)
-            : Array.isArray(d.errors) ? d.errors.map((e) => `${e.field ? e.field + ': ' : ''}${e.message || e.error || ''}`.trim()).filter(Boolean).join('; ').slice(0, 400)
-              : String(d.message || d.error || JSON.stringify(d)).slice(0, 400);
+        const why = describeOttoError(d);
         return { error: `Otto rejected the order (${r.status}): ${why}`, status: r.status, detail: d, payload };
       }
       return { ok: true, sandbox: isSandbox(), ottoResponse: r.data };
