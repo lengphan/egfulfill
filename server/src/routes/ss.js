@@ -203,6 +203,27 @@ export const SS_SHIPPING_METHODS = [
  * Returns null when it can't build a valid one, so the caller refuses rather than sending
  * a partial address: an order with nowhere to be delivered can't be fixed afterwards.
  */
+/**
+ * Pull a readable reason out of whatever S&S sent back.
+ *
+ * Their errors arrive in several shapes — an array of {field, message}, a bare string,
+ * or an object with `message`. Guessing one and ignoring the rest is how "rejected the
+ * order" ends up being all anyone ever sees.
+ */
+function describeSsError(data) {
+  if (!data) return 'no detail returned';
+  if (typeof data === 'string') return data.slice(0, 400);
+  if (Array.isArray(data)) {
+    const parts = data.map((e) => (e && (e.message || e.error)) ? `${e.field ? e.field + ': ' : ''}${e.message || e.error}` : null).filter(Boolean);
+    if (parts.length) return parts.join('; ').slice(0, 400);
+  }
+  if (Array.isArray(data.errors)) {
+    const parts = data.errors.map((e) => `${e.field ? e.field + ': ' : ''}${e.message || e.error || ''}`.trim()).filter(Boolean);
+    if (parts.length) return parts.join('; ').slice(0, 400);
+  }
+  return String(data.message || data.error || JSON.stringify(data)).slice(0, 400);
+}
+
 function toSsAddress(a) {
   if (!a || typeof a !== 'object') return null;
   const street = [a.street, a.street2].filter(Boolean).join(', ').trim();
@@ -1473,7 +1494,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         body: JSON.stringify(payload)
       });
       const txt = await r.text(); let data; try { data = JSON.parse(txt); } catch (e) { data = txt; }
-      if (!r.ok) { reply.code(502); return { error: 'S&S rejected the order', status: r.status, testOrder: payload.testOrder, detail: data }; }
+      if (!r.ok) {
+        reply.code(502);
+        // THEIR reason, in the message. "S&S rejected the order" is our sentence and says
+        // nothing actionable — the useful text is whatever they sent back, and putting it
+        // only in `detail` meant the client threw it away and showed the generic line.
+        return { error: `S&S rejected the order (${r.status}): ${describeSsError(data)}`,
+                 status: r.status, testOrder: payload.testOrder, detail: data, payload };
+      }
       // Products from multiple warehouses come back as MULTIPLE orders, and with
       // rejectLineErrors=false the body carries lineErrors alongside them. Both are
       // summarised rather than buried: "placed" hiding three unfilled lines is how a job

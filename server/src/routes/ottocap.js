@@ -268,7 +268,21 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     if (String(process.env.OTTOCAP_ORDER_LIVE || '') !== '1') {
       return { dryRun: true, sandbox: isSandbox(), note: 'OTTOCAP_ORDER_LIVE!=1 → NOT sent to Otto. Review the payload; set OTTOCAP_ORDER_LIVE=1 (with the sandbox base) to place a real SANDBOX test order.', payload };
     }
-    try { const r = await ocPost('/orders/', payload); if (!r.ok) { reply.code(502); return { error: 'Otto rejected the order', status: r.status, detail: r.data }; } return { ok: true, sandbox: isSandbox(), ottoResponse: r.data }; }
+    try {
+      const r = await ocPost('/orders/', payload);
+      if (!r.ok) {
+        reply.code(502);
+        // Their words, not ours. "Otto rejected the order" is a sentence we wrote and it
+        // tells nobody which field was wrong.
+        const d = r.data;
+        const why = !d ? 'no detail returned'
+          : typeof d === 'string' ? d.slice(0, 400)
+            : Array.isArray(d.errors) ? d.errors.map((e) => `${e.field ? e.field + ': ' : ''}${e.message || e.error || ''}`.trim()).filter(Boolean).join('; ').slice(0, 400)
+              : String(d.message || d.error || JSON.stringify(d)).slice(0, 400);
+        return { error: `Otto rejected the order (${r.status}): ${why}`, status: r.status, detail: d, payload };
+      }
+      return { ok: true, sandbox: isSandbox(), ottoResponse: r.data };
+    }
     catch (e) { reply.code(502); return { error: String((e && e.message) || e) }; }
   });
 
