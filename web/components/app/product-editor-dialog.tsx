@@ -18,7 +18,11 @@ const METHODS = PRODUCT_METHODS.map((m) => m.label)
 // Fallback only — the real list is managed in Settings → Platform. Used until settings
 // load, and if the platform has never saved a list.
 const TYPES = ["Apparel", "Headwear", "Bags", "Drinkware", "Accessories", "Other"]
-const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL"]
+// The full run we can offer, not just the common six. 4XL/5XL are real apparel sizes and
+// OS/OSFM is how headwear and one-size goods are sized — leaving them out meant a product
+// that needed one couldn't be built here at all. Sizes the SUPPLIER sent are merged in on
+// top of this (see sizeSuggestions), so an S&S or Otto style brings its own vocabulary.
+const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "OS", "OSFM - Adult", "OSFM - Youth"]
 /** Seeded on a NEW product — the standard run, S through 3XL. Deletable per product. */
 const DEFAULT_SIZES = ["S", "M", "L", "XL", "2XL", "3XL"]
 const SUGGESTED_COLORS = ["Black", "White", "Navy", "Sand", "Heather Grey", "Red", "Royal", "Forest", "Maroon", "Charcoal"]
@@ -385,14 +389,23 @@ export function ProductEditorDialog({
                       <Input
                         value={t?.price ?? ""}
                         onChange={(e) => patch("price", e.target.value)}
-                        placeholder={derived || (basePrice.trim() === "" ? "auto" : basePrice)}
-                        title={derived ? `Auto: ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}` : undefined}
+                        /* Show the NUMBER that will actually be charged, never the word
+                           "auto". A placeholder saying "auto" tells you a rule exists but
+                           not what it produced, so the only way to learn the price was to
+                           save and go look. Falls back through: this row's derived
+                           cost + markup → the product-level base → nothing known. */
+                        placeholder={derived || (basePrice.trim() !== "" ? Number(basePrice).toFixed(2) : "—")}
+                        title={derived
+                          ? `Auto: product cost ${costN.toFixed(2)} + ${markup.toFixed(2)} markup = ${derived}`
+                          : basePrice.trim() !== "" ? "Using the product-level base cost above" : "Enter a product cost to price this size"}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Base cost for size ${s}`}
                       />
                       <Input
                         value={t?.shipping ?? ""}
                         onChange={(e) => patch("shipping", e.target.value)}
-                        placeholder={shipping.trim() === "" ? "default" : shipping}
+                        /* Same rule: the real default fee, not the word "default". */
+                        placeholder={shipping.trim() !== "" ? Number(shipping).toFixed(2) : (bandFee != null ? Number(bandFee).toFixed(2) : "—")}
+                        title={shipping.trim() !== "" ? "Using the product-level shipping fee above" : (bandFee != null ? "Platform default for this weight band" : undefined)}
                         className="h-8 text-xs" inputMode="decimal" aria-label={`Shipping fee for size ${s}`}
                       />
                       {/* Margin for THIS size, at the end of its own row. Retail is the
