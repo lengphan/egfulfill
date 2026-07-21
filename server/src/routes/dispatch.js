@@ -346,7 +346,15 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     const results = [];
     for (const o of rows) results.push(await pushOne(o));
     const pushed = results.filter((r) => r.ok && !r.already).length;
-    audit(req, 'dispatch.push', { entityType: 'order', after: { requested: ids.length, pushed } });
+    // PER ORDER, with an entityId. This audited once for the whole batch and with no
+    // entity, so it belonged to no order — and the tag history, which looks up events BY
+    // order, could never find it. The hand-off to the partner simply wasn't in any
+    // order's history, which is the one place someone goes looking for it.
+    for (const r of results) {
+      if (!r.ok || r.already) continue;
+      audit(req, 'dispatch.push', { entityType: 'order', entityId: String(r.id),
+        after: { partner: 'byeastside', queued: true } });
+    }
     if (pushed) egBroadcast({ type: 'orders' });
     return { ok: true, pushed, skipped: results.filter((r) => r.already).length, results };
   });
@@ -422,7 +430,11 @@ export function dispatchRoutes(app, requireAuth, requireWarehouse) {
     }
 
     const cancelled = results.filter((x) => x.ok).length;
-    audit(req, 'dispatch.cancel', { entityType: 'order', after: { requested: ids.length, cancelled } });
+    for (const r of results) {
+      if (!r.ok) continue;
+      audit(req, 'dispatch.cancel', { entityType: 'order', entityId: String(r.id),
+        after: { partner: 'byeastside', pulledBack: true } });
+    }
     if (cancelled) egBroadcast({ type: 'orders' });
     return { ok: true, cancelled, results };
   });

@@ -12,7 +12,11 @@ export type TagId = "label" | "scan" | "design"
 
 const MATCH: Record<TagId, RegExp> = {
   label: /^label\.|^order\.(shipped|tracking)/,
-  scan: /^item\.status|^order\.stage/,
+  // Everything that moves a parcel through scanning: the stage change, the hand-off to
+  // the partner, a pull-back, and the scan itself. It matched only item.status and
+  // order.stage, so an in-house scan and both partner events were recorded and then
+  // never shown — the history looked empty for exactly the steps someone opens it to check.
+  scan: /^item\.status|^order\.stage|^order\.scan|^dispatch\./,
   design: /^design\.|^design_file\./,
 }
 
@@ -27,6 +31,13 @@ const SAID: Record<string, string> = {
   "design_file.uploaded": "Machine file uploaded",
   "item.status": "Item status changed",
   "order.stage": "Order stage changed",
+  // The scanning steps. Without these the fallback prints the raw action with the dots
+  // swapped for spaces ("dispatch push"), which reads like a debug log rather than a
+  // record of what someone did.
+  "order.scan": "Scanned here",
+  "order.scan.undo": "Scan undone",
+  "dispatch.push": "Sent to byeastside",
+  "dispatch.cancel": "Cancelled with byeastside",
 }
 
 export function sayAction(a: string): string {

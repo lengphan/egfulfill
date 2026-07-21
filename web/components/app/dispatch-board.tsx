@@ -275,7 +275,7 @@ export function DispatchBoard() {
                 gets picked, and the rest shouldn't ship today. Anything already picked is
                 refused per-order by the partner (409) — the rest still come back. */}
             <Button size="sm" variant="outline" disabled={!chosen.length || busy} onClick={pullBack}>
-              <ArrowUUpLeft size={14} weight="bold" /> Pull back
+              <ArrowUUpLeft size={14} weight="bold" /> Cancel with byeastside
             </Button>
             {/* THE TWO ROUTES, side by side, because this is where the choice is made.
                 Both start the buyer's tracking clock; they differ in who does it and what
