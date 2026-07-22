@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
 import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
@@ -197,6 +198,17 @@ export function OrdersHub() {
     getOrders().then((rows) => setOrders(rows ?? [])).catch(() => setOrders([]))
   }, [])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+  // Live refresh. Without this the readiness tags read whatever the page loaded with, so
+  // an order scanned on the floor kept an amber "not scanned yet" tag next to a history
+  // panel — fetched fresh on open — that already said "Scanned here". Two answers to the
+  // same question, in the same popover.
+  //
+  // Every one of these is a cache-invalidation ping carrying no data; the refetch goes
+  // through getOrders() as usual, so nothing here widens what this page can see.
+  useEffect(() => {
+    const off = ["orders", "order-scanned", "item-status"].map((t) => onLive(t, load))
+    return () => { for (const f of off) f() }
+  }, [load])
   // Catalog powers the variant picker on factory-owned marketplace orders (which arrive
   // with no blank chosen). Loaded once.
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])

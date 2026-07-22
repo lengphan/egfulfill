@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { onLive } from "@/lib/live"
 import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -50,6 +51,13 @@ export function DispatchBoard() {
     getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
   }, [])
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
+  // The partner scans on their own schedule, so this board goes stale on its own — an
+  // order byeastside scanned five minutes ago sits here looking unscanned until someone
+  // reloads. The scan sync broadcasts, so listen rather than poll.
+  useEffect(() => {
+    const off = ["orders", "order-scanned"].map((t) => onLive(t, load))
+    return () => { for (const f of off) f() }
+  }, [load])
 
   const queue = useMemo(() => {
     const all = (orders ?? []).filter((o) => String(o.factory_status ?? "") === STAGE)

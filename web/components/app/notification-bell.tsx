@@ -6,7 +6,7 @@ import { Bell, Package, Headset, ChatCircle, Warning } from "@phosphor-icons/rea
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getNotifications, markNotificationsRead, type Notification } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
-import { API_BASE } from "@/lib/api"
+import { onLive } from "@/lib/live"
 
 const ago = (s: string) => {
   const t = new Date(s).getTime()
@@ -94,32 +94,14 @@ export function NotificationBell() {
     return () => window.removeEventListener("eg-user-changed", sync)
   }, [])
 
-  // Live push over the SSE hub. Notification events are now addressed server-side to
-  // the recipients' own sockets, so simply receiving one means it's ours — the old
-  // client-side recipient filter was never a security boundary anyway.
-  useEffect(() => {
-    const token = getToken()
-    if (!token || typeof EventSource === "undefined") return
-    let es: EventSource | null = null
-    let poll: ReturnType<typeof setInterval> | null = null
-    try {
-      es = new EventSource(`${API_BASE}/api/events?token=${encodeURIComponent(token)}`)
-      es.onmessage = (ev) => {
-        try {
-          const d = JSON.parse(ev.data || "{}")
-          if (d.type !== "notification") return
-          load(true)
-        } catch {}
-      }
-      // If the stream dies (proxy, sleep), fall back to a slow poll so the bell
-      // still updates rather than silently freezing.
-      es.onerror = () => { if (!poll) poll = setInterval(() => load(true), 60000) }
-      es.onopen = () => { if (poll) { clearInterval(poll); poll = null } }
-    } catch {
-      poll = setInterval(() => load(true), 60000)
-    }
-    return () => { try { es?.close() } catch {}; if (poll) clearInterval(poll) }
-  }, [load])
+  // Live push over the shared SSE hub (lib/live.ts). This used to open its own
+  // EventSource; every consumer doing that burns a connection from the browser's ~6 per
+  // host, held open for the whole session, on streams carrying identical data.
+  //
+  // Notification events are addressed server-side to the recipients' own sockets, so
+  // simply receiving one means it's ours — the old client-side recipient filter was never
+  // a security boundary anyway. The hub's reconnect/poll fallback replaces the local one.
+  useEffect(() => onLive("notification", () => load(true)), [load])
 
   const open = async (n: Notification) => {
     setUnread((u) => Math.max(0, u - (n.read_at ? 0 : 1)))
