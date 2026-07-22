@@ -325,6 +325,39 @@ export function sandboxRoutes(app, requireAuth) {
     return { priced: out, unpriced };
   }
 
+  /**
+   * Has this seller already sent us this external_id?
+   *
+   * Without this, a partner whose request times out — and every HTTP client retries a
+   * timeout — creates a SECOND order. A second garment is printed, a second charge is
+   * taken, and a second parcel goes out. The partner never sees the first response, so
+   * they cannot know; the duplicate is entirely our failure to de-duplicate.
+   *
+   * Keyed on (seller, external_id) so two partners can use overlapping numbering, which
+   * they will: "1001" is everybody's first order.
+   *
+   * A supporting index is created idempotently. It is NOT unique: a unique index would be
+   * the stronger guarantee, but creating one fails outright if duplicates already exist
+   * in the table, which would take route registration down with it. The check below is
+   * therefore last-write-wins under a genuine race — two identical requests arriving in
+   * the same millisecond can still both miss. That window is milliseconds against the
+   * seconds-to-minutes of a real client retry, which is the case that actually happens.
+   */
+  q(`create index if not exists orders_external_id_idx on orders (seller_id, (meta->>'external_id'))`).catch(() => {});
+
+  async function findByExternalId(sellerId, externalId) {
+    if (!externalId) return null;
+    try {
+      const r = await q(
+        `select id, total, created_at from orders
+          where seller_id=$1 and meta->>'external_id' = $2
+          order by created_at limit 1`,
+        [String(sellerId), String(externalId)]
+      );
+      return r.rows[0] || null;
+    } catch (e) { return null; }
+  }
+
   // Insert a REAL order (live keys) for the key's seller, straight into the fulfillment queue.
   async function createRealOrder(sellerId, b) {
     const { priced, unpriced } = await priceLiveLines(b.items);
@@ -379,6 +412,17 @@ export function sandboxRoutes(app, requireAuth) {
     if (!items || !items.length) return bad(reply, 'An order needs a non-empty "items" array.', ['items']);
     if (!b.shipping_address) return bad(reply, 'An order needs a "shipping_address" object.', ['shipping_address']);
     if (k.mode === 'live') {
+      // Retry-safe. Returning the ORIGINAL order (200, not 409) is what makes this
+      // usable: a client that retried a timeout gets the same answer it would have had,
+      // and needs no special case for "already exists". `idempotent: true` is there so a
+      // partner CAN tell the difference when debugging.
+      const existing = await findByExternalId(k.seller_id, b.external_id);
+      if (existing) {
+        return { object: 'order', mode: 'live', id: existing.id, status: 'received',
+          idempotent: true, totals: { items: Number(existing.total) || 0, currency: 'USD' },
+          created: existing.created_at,
+          _note: 'An order with this external_id already exists — returning it rather than creating a duplicate.' };
+      }
       // An unpriceable line is a 400 the partner can act on, not a 500. Naming the exact
       // lines matters: "order failed" sends them hunting, and the usual cause is a SKU
       // that exists in their catalogue and not in ours.
