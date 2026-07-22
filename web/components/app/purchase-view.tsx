@@ -1142,7 +1142,12 @@ export function PurchaseView() {
                                         whole line into a manual split. Capped at what the
                                         warehouse actually holds, because asking for more
                                         than exists is a rejection S&S can only find later. */}
-                                    <input
+                                    {/* The shared Input, not a hand-rolled one. The pill
+                                        shape and the violet focus ring belong to the
+                                        primitive; copying its classes here would look
+                                        identical today and drift the first time the theme
+                                        moves. */}
+                                    <Input
                                       value={taken}
                                       onChange={(e) => {
                                         const v = e.target.value.replace(/[^0-9]/g, "")
@@ -1161,7 +1166,7 @@ export function PurchaseView() {
                                       placeholder="0"
                                       inputMode="numeric"
                                       aria-label={`Quantity to take from ${w.abbr}`}
-                                      className="h-6 w-full rounded-full border border-border bg-background px-2 text-center text-xs tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                      className="h-7 w-full px-1 text-center text-xs tabular-nums"
                                     />
                                     <span className="flex items-baseline gap-1 text-[11px] leading-none">
                                       <span className="font-medium">{w.abbr}</span>
