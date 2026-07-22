@@ -75,7 +75,7 @@ export function DesignerBoard() {
   useEffect(() => {
     const id = setTimeout(() => {
       load()
-      getFactorySettings().then((s) => setDesignFee(Number(s.design_fee) || 0)).catch(() => {})
+      getFactorySettings().then((s) => setDesignFee(Number(s.designer_payout) || 0)).catch(() => {})
     }, 0)
     return () => clearTimeout(id)
   }, [load])

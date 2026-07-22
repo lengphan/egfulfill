@@ -1005,7 +1005,7 @@ export function aiDraft(threadId: string) {
  *  admin-editable, so pricing policy changes without a deploy. The index signature keeps
  *  the method_* keys addressable by name from the settings form. */
 export type FactorySettings = {
-  design_fee?: number; ship_first?: number; ship_extra?: number; emb_price?: number
+  designer_payout?: number; ship_first?: number; ship_extra?: number; emb_price?: number
   ship_cap?: number; ship_heavy?: number; ship_garment?: number
   method_dtg?: number; method_dtf?: number; method_emb?: number; method_apl?: number; method_lsr?: number
   /** The warehouse's own return address, used as the label origin. Shared by the whole

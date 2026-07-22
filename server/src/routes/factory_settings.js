@@ -9,7 +9,11 @@ import { q } from '../db.js';
 // is a settings change, not a deploy. `emb_price` is NOT the embroidery surcharge — it's
 // the price of the embroidery FILE — hence the separate method_emb.
 const KEYS = [
-  'design_fee', 'ship_first', 'ship_extra', 'emb_price',
+  // designer_payout is what a DESIGNER earns per approved design — money going OUT.
+  // It was called design_fee, which read like something a seller pays, and a
+  // seller-facing design charge is now being added: two "design fees" meaning opposite
+  // directions is a mistake waiting to be made in a money path.
+  'designer_payout', 'ship_first', 'ship_extra', 'emb_price',
   // Flat shipping by garment class.
   'ship_cap', 'ship_heavy', 'ship_garment',
   // Print-method surcharge, keyed by the same codes pricing.js normalises to.
@@ -49,8 +53,8 @@ export const SETTING_DEFAULTS = {
   // (eg_default_shipping_fee / eg_default_addl_item_fee in schema.sql).
   ship_first: 5,       // first unit — one order is one parcel
   ship_extra: 2,       // every additional UNIT in that same parcel
-  design_fee: 2.5,     // design service, per order (legacy eg_designer_fee_rate)
-  emb_price: 0,        // default price of an embroidery FILE; per-file price overrides
+  designer_payout: 2.5, // paid TO a designer per approved design (legacy eg_designer_fee_rate)
+  emb_price: 0,        // what a SELLER pays to download an embroidery file; per-file overrides
   ship_cap: 5.99,      // caps / hats
   ship_heavy: 9.99,    // sweatshirts / hoodies / jackets
   ship_garment: 6.99,  // everything else
@@ -214,6 +218,18 @@ export async function readAll() {
   try {
     const r = await q('select key, value from settings where key = any($1)', [KEYS]);
     for (const row of r.rows) { const n = Number(row.value); if (isFinite(n)) out[row.key] = n; }
+  } catch { /* table not ready */ }
+  // CARRY THE OLD KEY FORWARD. Settings live in a table, so renaming the key in code
+  // orphans whatever was configured under the old name and silently reverts to the
+  // default — here, resetting every designer's payout rate to 2.50 with nothing said.
+  // Read design_fee only when designer_payout has never been written.
+  try {
+    const has = await q("select 1 from settings where key='designer_payout'");
+    if (!has.rowCount) {
+      const legacy = await q("select value from settings where key='design_fee'");
+      const n = legacy.rows[0] ? Number(legacy.rows[0].value) : NaN;
+      if (isFinite(n)) out.designer_payout = n;
+    }
   } catch { /* table not ready */ }
   // Text settings read separately — Number() would make NaN of every one of them.
   try {

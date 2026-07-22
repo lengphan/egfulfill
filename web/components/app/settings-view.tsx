@@ -845,7 +845,7 @@ function PlatformPanel() {
   const load = useCallback(() => {
     getFactorySettings().then((r) => {
       setLoaded(r)
-      setDesignFee(r.design_fee != null ? String(r.design_fee) : "")
+      setDesignFee(r.designer_payout != null ? String(r.designer_payout) : "")
       setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
       setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
       setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
@@ -868,7 +868,7 @@ function PlatformPanel() {
     setSaving(true); setErr(null); setSaved(false)
     try {
       const r = await setFactorySettings({
-        design_fee: designFee === "" ? undefined : Number(designFee),
+        designer_payout: designFee === "" ? undefined : Number(designFee),
         base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
         expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
         expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
@@ -922,7 +922,7 @@ function PlatformPanel() {
         {/* Design-side money together: what a designer is paid, then what a file costs
             to download. The base-cost formula sits below them because it spans the row
             and would otherwise split the pair. */}
-        <MoneyField label="Design fee" hint="Default payout credited to a designer per approved design" value={designFee} onChange={setDesignFee} />
+        <MoneyField label="Designer payout" hint="Paid TO a designer per approved design — money out, not a seller charge" value={designFee} onChange={setDesignFee} />
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
         <MarkupFormula value={baseMarkup} onChange={setBaseMarkup} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />

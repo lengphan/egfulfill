@@ -4,6 +4,7 @@
 // design id (DL-…/DSN-…). Access-controlled: staff any; a seller only their OWN files (seller_id,
 // resolved from the order the design belongs to; a seller's active team member counts as the owner).
 import { q } from '../db.js';
+import { readAll } from './factory_settings.js';
 import { isStaff, canMoveMoney } from '../auth.js';
 import { storageEnabled, putObject, fromDataUrl } from '../storage.js';
 import { notify } from './notifications.js';
@@ -169,9 +170,34 @@ export function designFilesRoutes(app, requireAuth) {
     return { ok: true, designId: newId };
   });
 
+  /**
+   * What a new file costs the seller to download.
+   *
+   * emb_price has been an editable setting all along and was never read: the insert
+   * defaulted every file to `coalesce($10, 0)`, so every deliverable we have ever produced
+   * has been free to download. The setting existed, the revenue didn't.
+   *
+   * Only DELIVERABLES get a price. A mockup or a reference image priced at the embroidery
+   * rate would put a paywall in front of the seller's own artwork.
+   *
+   * An explicit price from someone allowed to set one always wins; returning null leaves
+   * an existing file's price untouched on re-upload, which is what stops a seller replacing
+   * their own file to zero out what staff charged.
+   */
+  function priceFor(user, b, fallback) {
+    if (canPrice(user) && b.price != null) return Math.max(0, Number(b.price) || 0);
+    const kind = kindOf(b.name, b.mime);
+    if (kind !== 'pes' && kind !== 'emb') return null;
+    const n = Number(fallback);
+    return isFinite(n) && n > 0 ? n : null;
+  }
+
   app.post('/api/design_files', { preHandler: requireAuth }, async (req, reply) => {
     const b = req.body || {};
     if (!b.designId || !b.data) { reply.code(400); return { error: 'designId + data required' }; }
+    // Read at call time — a price changed in Settings must apply to the next upload, not
+    // the next redeploy.
+    const defaultPrice = await readAll().then((s) => s.emb_price).catch(() => 0);
     const seller = await ownerOfOrder(b.orderId, req.user.sub);
     // A non-staff caller may only write under their OWN order/design.
     if (!isStaff(req.user) && seller && seller !== (await effectiveSeller(req.user))) { reply.code(403); return { error: 'forbidden' }; }
@@ -196,7 +222,7 @@ export function designFilesRoutes(app, requireAuth) {
          content_hash=excluded.content_hash,
          price=coalesce($10, design_file_data.price), kind=excluded.kind, updated_at=now()`,
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
-       (canPrice(req.user) && b.price != null) ? Math.max(0, Number(b.price) || 0) : null,
+       priceFor(req.user, b, defaultPrice),
        kindOf(b.name, b.mime)]);
     // Only ping the seller about a file that is THEIRS — a factory .emb or a mockup
     // is not something they can see, so telling them about it would be noise.
