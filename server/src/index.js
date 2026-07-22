@@ -292,7 +292,7 @@ app.post('/api/auth/google', async (req, reply) => {
 ordersRoutes(app, requireAuth);
 orderRefundRoutes(app, requireAuth);                    // itemised per-order charges + partial refunds back to the seller's wallet (admin/warehouse only)
 inventoryRoutes(app, requireStaff, requireWarehouse);
-designCardsRoutes(app, requireAuth, requireStaff, requireAdmin);
+designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);
 catalogRoutes(app, requireAuth, requireStaff);
 etsyRoutes(app, requireAuth, requireStaff);
 tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)

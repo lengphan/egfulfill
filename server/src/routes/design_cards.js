@@ -7,7 +7,7 @@ import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
 import { bookDesignCost } from './pinkdesign.js';
 
-export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) {
+export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // Where this card's design work happens. null = our own designers (the default and the
   // whole history of this table). A value means it's OUTSOURCED — e.g. 'pinkdesign' —
   // because our designers are embroidery specialists and DTG/DTF goes to a partner.
@@ -175,6 +175,51 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin) 
       }
     }
     return { ok: true, count: rows.length };
+  });
+
+  /**
+   * Delete ONE card.
+   *
+   * The board previously removed a card by POSTing the entire board back minus that card
+   * and letting the server drop whatever was missing. Every card carries a base64 `thumb`,
+   * so on a busy board that payload is enormous — and if it exceeded the body limit, or
+   * any single upsert failed, the request died, the delete never ran, and the card
+   * reappeared on reload. The client swallowed the error, so it looked like nothing
+   * happened. That is why one card could survive repeated attempts.
+   *
+   * An explicit delete carries one id. It cannot be too big to send, it cannot half-apply,
+   * and it fails loudly.
+   *
+   * WAREHOUSE or ADMIN only. Removing a card destroys the record of work someone did —
+   * that is a custody decision, not a board tidy, so an operator or designer cannot make
+   * it. Deliberately narrower than the rest of this file, which is requireStaff.
+   *
+   * What was PAID survives regardless: design costs and designer credits live in
+   * wallet_ledger, which is append-only and keyed by a ref string rather than a foreign
+   * key to this table. Deleting the card frees the row and leaves the money history
+   * intact. The audit entry below records what the card was worth at the moment it went,
+   * so the ledger can still be explained afterwards.
+   */
+  app.delete('/api/design_cards/:id', { preHandler: requireWarehouse }, async (req, reply) => {
+    const id = String(req.params.id || '').trim();
+    if (!/^\d+$/.test(id)) { reply.code(400); return { error: 'Card id must be numeric.' }; }
+    const before = await q(
+      `select id, order_id, sku, title, col, payment, pay_status, claimed_by, vendor, vendor_ref
+         from design_cards where id=$1::bigint`, [id]
+    ).then((r) => r.rows[0]).catch(() => null);
+    if (!before) { reply.code(404); return { error: 'No such card.' }; }
+    const r = await q('delete from design_cards where id=$1::bigint', [id]);
+    // Record the money-bearing fields, not just "a card was deleted" — otherwise a
+    // ledger entry for a card that no longer exists has nothing to point back at.
+    audit(req, 'design_card.deleted', {
+      entityType: 'design_card', entityId: id,
+      before: {
+        order_id: before.order_id, sku: before.sku, title: before.title, col: before.col,
+        payment: before.payment, pay_status: before.pay_status,
+        claimed_by: before.claimed_by, vendor: before.vendor, vendor_ref: before.vendor_ref,
+      },
+    });
+    return { ok: true, deleted: r.rowCount, card: before };
   });
 
   // Wipe the whole Design Board (the "Clear board" action). ADMIN-only — it clears

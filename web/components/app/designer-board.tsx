@@ -6,7 +6,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
@@ -21,6 +21,12 @@ import { useConfirm } from "@/components/app/confirm-dialog"
 // they'd otherwise do.
 const PARTNER_COL = { id: "partner", label: "Design partner", accent: "bg-amber-500" } as const
 const canOutsource = () => { const r = getUser()?.role; return r === "admin" || r === "warehouse" || r === "operator" }
+/**
+ * Deleting a card destroys the record of work someone did, so it is a custody call —
+ * warehouse or admin, matching what the server enforces. An operator or designer sees no
+ * delete control at all rather than one that 403s.
+ */
+const canDeleteCard = () => { const r = getUser()?.role; return r === "admin" || r === "warehouse" }
 
 const COLS = [
   { id: "incoming", label: "Incoming", accent: "bg-slate-400" },
@@ -49,6 +55,7 @@ export function DesignerBoard() {
   const [openId, setOpenId] = useState<string | number | null>(null)
   const [view, setView] = useState<"board" | "list">("board")
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
+  const [delErr, setDelErr] = useState<string | null>(null)
   const me = getUser()?.name || "Designer"
 
   // Reload the board from the server. Named because a partner push writes the card on the
@@ -67,11 +74,34 @@ export function DesignerBoard() {
     return () => clearTimeout(id)
   }, [load])
 
-  // Optimistic update + whole-board persist (POST replaces the board).
-  const persist = useCallback((next: DesignCard[]) => {
-    setCards(next)
-    saveDesignCards(next).catch(() => {})
-  }, [])
+  // persist() is gone: its only remaining callers were the two delete paths, and
+  // "POST the whole board minus one card" is exactly what made a card undeletable.
+  // Edits still round-trip through patch() below, which sends the full list — that is
+  // fine for a field change, where a failed request loses an edit rather than silently
+  // resurrecting a row.
+  /**
+   * Delete one card through the dedicated endpoint.
+   *
+   * This used to POST the entire board minus the card and let the server drop what was
+   * missing. Every card carries a base64 thumb, so on a busy board that request is huge —
+   * and when it failed the upserts had already applied while the delete had not, so the
+   * card reappeared on reload with the error swallowed. That is how a card survives being
+   * deleted repeatedly.
+   *
+   * Optimistic, but a failure now RELOADS and says why, rather than leaving the board
+   * showing a card that is still on the server.
+   */
+  const removeCard = useCallback(async (id: string | number) => {
+    setCards((prev) => (prev ?? []).filter((c) => c.id !== id))
+    try {
+      const r = await deleteDesignCard(id)
+      if (r?.error) throw new Error(r.error)
+    } catch (e) {
+      setDelErr(e instanceof Error ? e.message : "Couldn't delete that card.")
+      load()
+    }
+  }, [load])
+
   const patch = useCallback((id: string | number, p: Partial<DesignCard>) => {
     setCards((prev) => {
       const next = (prev ?? []).map((c) => (c.id === id ? { ...c, ...p } : c))
@@ -219,8 +249,10 @@ export function DesignerBoard() {
                           {c.vendor && <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white">{vendorLabel(c.vendor)}</span>}
                           {/* Cancel the card without opening it. Hover-revealed so a full
                               column isn't a grid of delete buttons, and it confirms —
-                              removal is not undoable and these sit under a drag handle. */}
-                          <button
+                              removal is not undoable and these sit under a drag handle.
+                              Warehouse/admin only, matching the server: showing a button
+                              that always 403s is worse than showing none. */}
+                          {canDeleteCard() && <button
                             aria-label={`Cancel ${c.title || "card"}`}
                             title="Cancel this card"
                             onClick={async (e) => {
@@ -231,12 +263,12 @@ export function DesignerBoard() {
                                 confirmLabel: "Cancel card",
                                 cancelLabel: "Keep it",
                               })
-                              if (ok) persist((cards ?? []).filter((x) => x.id !== c.id))
+                              if (ok) void removeCard(c.id)
                             }}
                             className="eg-tap absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-background/85 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
                           >
                             <X size={11} weight="bold" />
-                          </button>
+                          </button>}
                         </div>
                         <div className="p-2.5">
                           <div className="truncate text-sm font-medium leading-tight">{c.title || "Design"}</div>
@@ -256,7 +288,13 @@ export function DesignerBoard() {
         </div>
       )}
 
-      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => persist((cards ?? []).filter((c) => c.id !== id))} />}
+      {delErr && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {delErr}
+          <button onClick={() => setDelErr(null)} className="ml-2 underline">dismiss</button>
+        </div>
+      )}
+      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)} />}
     </div>
   )
 }
