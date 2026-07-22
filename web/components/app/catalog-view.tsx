@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent } from "@phosphor-icons/react"
+import { CircleNotch, Warning, DownloadSimple, MagnifyingGlass, Percent, FilePdf } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { SectionCard } from "@/components/app/section-card"
@@ -9,6 +9,7 @@ import {
   getCatalogProducts, setCatalogSelection, setCatalogPrice, applyCatalogMarkup,
   catalogExportUrl, type CatalogProduct,
 } from "@/lib/api"
+import { CatalogPrint } from "@/components/app/catalog-print"
 
 const money = (n: number | string | null | undefined) =>
   n == null || n === "" ? "—" : `$${(Number(n) || 0).toFixed(2)}`
@@ -34,6 +35,7 @@ export function CatalogView() {
   const [note, setNote] = useState<string | null>(null)
   const [pct, setPct] = useState("60")
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const [printOpen, setPrintOpen] = useState(false)
 
   const load = useCallback(() => {
     getCatalogProducts()
@@ -104,12 +106,22 @@ export function CatalogView() {
       title="Published catalogue"
       description="What appears in the shop window, and what it costs there. Nothing on this page changes what a seller is billed."
       actions={
-        <a href={catalogExportUrl()} download>
-          <Button size="sm" variant="outline" disabled={!published}
-            title={published ? "Download the published catalogue as CSV" : "Publish something first — the file would be empty"}>
-            <DownloadSimple size={14} weight="bold" /> Download CSV
+        <div className="flex items-center gap-2">
+          {/* TWO FORMATS, because they are two jobs. The PDF is what you show a buyer —
+              images, colours, sizes, price, laid out. The CSV is what someone imports into
+              their own system. A spreadsheet of image URLs is not a catalogue, and a
+              lookbook is not importable. */}
+          <Button size="sm" onClick={() => setPrintOpen(true)} disabled={!published}
+            title={published ? "A printable catalogue with images — save it as PDF" : "Publish something first"}>
+            <FilePdf size={14} weight="bold" /> PDF catalogue
           </Button>
-        </a>
+          <a href={catalogExportUrl()} download>
+            <Button size="sm" variant="outline" disabled={!published}
+              title={published ? "Spreadsheet — one row per variant, for importing" : "Publish something first — the file would be empty"}>
+              <DownloadSimple size={14} weight="bold" /> CSV
+            </Button>
+          </a>
+        </div>
       }
     >
       <div className="space-y-3 px-5 py-4">
@@ -206,6 +218,7 @@ export function CatalogView() {
           </div>
         )}
       </div>
+      {printOpen && <CatalogPrint onClose={() => setPrintOpen(false)} />}
     </SectionCard>
   )
 }
