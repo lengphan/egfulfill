@@ -5,7 +5,7 @@ import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { uploadDesignFile, postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
 import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
@@ -280,6 +280,10 @@ export function readImageFile(file: File | null | undefined, onData: (url: strin
 }
 
 // ─────────────────── Order customizer (place artwork on an order item) ───────────────────
+/** Machine-file extensions, matched on NAME because browsers report no useful mime type
+ *  for them — a .emb arrives as application/octet-stream or an empty string. */
+const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
+
 export function DesignCanvasDialog({
   open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
 }: {
@@ -387,6 +391,10 @@ export function DesignCanvasDialog({
     setPicking(false)
   }
   const [err, setErr] = useState<string | null>(null)
+  // A machine file that was ATTACHED rather than placed. Separate from `err` because it is
+  // a success, and the seller needs telling that something happened — the canvas cannot
+  // show a .emb, so without a word the window looks identical to a dropped file being lost.
+  const [attached, setAttached] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
   const [over, setOver] = useState(false)
 
@@ -424,10 +432,37 @@ export function DesignCanvasDialog({
           e.preventDefault(); setOver(false)
           const f = Array.from(e.dataTransfer?.files ?? [])[0]
           if (!f) return
-          // Images only here — this designer POSITIONS artwork on a mockup, and a .pes has
-          // nothing to position. Saying so beats a file that silently does nothing.
+          // A MACHINE FILE dropped here gets ATTACHED, not refused.
+          //
+          // This designer positions artwork on a mockup and a .pes has nothing to position,
+          // so it can't be placed — but refusing it sent the seller to "the artwork panel",
+          // which sellers cannot reach at all. The message was a dead end pointing at a
+          // door that isn't there for them, and a seller who has cut their own file had no
+          // way to give it to us.
+          //
+          // The intent is unambiguous: they have a machine file and dropped it on the
+          // window that was open. So take it, file it against this line, and say which of
+          // the two things happened.
+          if (MACHINE_RE.test(f.name)) {
+            const designId = `EMB-${item.line_id ?? item.sku ?? "line"}-${f.name.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
+            const reader = new FileReader()
+            reader.onload = async () => {
+              try {
+                const r = await uploadDesignFile({
+                  designId, orderId, sku: item.sku ?? undefined,
+                  name: f.name, mime: f.type || undefined, data: String(reader.result),
+                })
+                if (r?.error) throw new Error(r.error)
+                setErr(null)
+                setAttached(`${f.name} attached to this line as your machine file. We'll check it before production — it isn't placed on the mockup because a stitch file has nothing to position.`)
+              } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
+            }
+            reader.onerror = () => setErr(`Couldn't read ${f.name}.`)
+            reader.readAsDataURL(f)
+            return
+          }
           if (!/^image\//.test(f.type)) {
-            setErr(`${f.name} isn't an image. Machine files (.emb, .pes, .dst) are attached from the artwork panel, not placed here.`)
+            setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
             return
           }
           readImageFile(f, (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)
@@ -623,6 +658,10 @@ export function DesignCanvasDialog({
               : <span className="text-xs text-muted-foreground">…or drop an image anywhere here</span>}
           </div>
           {err && <div className="text-sm text-destructive">{err}</div>}
+          {/* A machine file was filed. Green, not red, and it says what it did AND what it
+              deliberately didn't — the canvas is unchanged, which without a word reads as
+              the drop having failed. */}
+          {attached && <div className="text-sm text-emerald-700">{attached}</div>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>

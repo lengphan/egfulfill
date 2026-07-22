@@ -224,6 +224,44 @@ export function designFilesRoutes(app, requireAuth) {
       [String(b.designId), b.orderId || null, b.sku || null, seller || null, b.name || null, b.mime || null, data, url, b.hash || null,
        priceFor(req.user, b, defaultPrice),
        kindOf(b.name, b.mime)]);
+    /**
+     * A SELLER'S OWN MACHINE FILE enters the verification queue.
+     *
+     * Seller-supplied stitch files are the ones that cause problems — wrong size, wrong
+     * format, wrong machine — so somebody here opens every one. That check is what the
+     * check fee pays for, and a check nobody is queued to do is a check that doesn't
+     * happen: without a card this file would sit attached to the order, unlooked at, and
+     * the first person to see it would be whoever ran the machine.
+     *
+     * In REVIEW, not incoming: the work of making it is done, what's left is judging it.
+     * Unclaimed and unpriced, because verifying is not cutting — the payout rule pays
+     * whoever claimed a card they worked, and nobody has worked this one.
+     *
+     * The tier (and therefore the check fee) is deliberately NOT set here. Staff decide
+     * that after looking, which keeps a charge on a human's judgement rather than on a
+     * seller's upload succeeding.
+     */
+    const uploadedKind = kindOf(b.name, b.mime);
+    if (!isStaff(req.user) && b.orderId && (uploadedKind === 'emb' || uploadedKind === 'pes')) {
+      const dup = await q(
+        'select 1 from design_cards where order_id=$1 and coalesce(sku,\'\')=coalesce($2,\'\') limit 1',
+        [String(b.orderId), b.sku || null]).then((r) => r.rowCount).catch(() => 1);
+      if (!dup) {
+        await q(
+          `insert into design_cards (order_id, sku, title, col, type, payment, pay_status)
+           values ($1,$2,$3,'review',$4,0,'pending')`,
+          [String(b.orderId), b.sku || null,
+           `Seller file · ${b.name || b.designId}`, 'emb']
+        ).catch(() => {});
+        notify({
+          roles: ['operator', 'warehouse', 'admin'],
+          type: 'design-card', title: 'A seller sent their own machine file',
+          body: `${b.orderId} · ${b.sku || ''} — ${b.name || b.designId}. Needs checking before production.`,
+          href: '/designer', entityId: String(b.orderId),
+        }).catch(() => {});
+      }
+    }
+
     // Only ping the seller about a file that is THEIRS — a factory .emb or a mockup
     // is not something they can see, so telling them about it would be noise.
     if (isStaff(req.user) && seller && b.orderId && kindOf(b.name, b.mime) === 'pes') {
