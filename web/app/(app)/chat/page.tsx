@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input"
 import { getOrderMessages, postOrderMessage, requestAiReply, getMe, getSupportThreads, searchSellers, aiDraft, type ChatEntry, type SellerMatch, type SupportThread } from "@/lib/api"
 import { getUser, getToken } from "@/lib/auth"
 import { Markdown } from "@/components/app/markdown"
-import { FullBleed } from "@/components/app/full-bleed"
 
 const nowMs = () => Date.now()
 const fmtTime = (ts?: number) => {
@@ -278,7 +277,7 @@ export default function ChatPage() {
   }
 
   return (
-    <FullBleed reason="Two-pane messaging fixed to the viewport height — the thread list and conversation split the width.">
+    <>
     {/* One height for everyone: staff and sellers both render this through the same shell
         (topbar 3.5rem + main py-6 = 6.5rem, plus a little slack). The staff branch used
         to subtract only the topbar, so the pane ran 3rem taller than its space — the
@@ -514,6 +513,6 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
-    </FullBleed>
+    </>
   )
 }

@@ -49,8 +49,8 @@ export default function BoardsLayout({ children }: { children: React.ReactNode }
       <StaffSidebar />
       <div className="md:pl-60">
         <TopBar />
-        {/* eg-content caps the column at a reading width; a board that is a table opts out
-            with <FullBleed> and gets the old 1600px. See app/globals.css. */}
+        {/* eg-content is THE page container — one width and one gutter for every page,
+            no per-page opt-out. See app/globals.css. */}
         <main className="eg-content mx-auto px-4 py-5 md:px-8 md:py-6">{children}</main>
       </div>
     </div>

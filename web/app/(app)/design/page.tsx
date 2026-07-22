@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card"
 import { DesignStudioDialog } from "@/components/app/design-studio"
 import { getDesignLibrary, deleteDesignLibrary, type LibraryDesign } from "@/lib/api"
 import { getToken } from "@/lib/auth"
-import { FullBleed } from "@/components/app/full-bleed"
 
 const fmtDate = (s?: string) => {
   if (!s) return ""
@@ -135,7 +134,7 @@ export default function DesignPage() {
   // The fallback mirrors the default (Library) view — bar plus the same 8-card grid the
   // loading state uses — so the page doesn't collapse to a sliver and pop back.
   return (
-    <FullBleed reason="Design library card grid, 4-up at xl — capping it drops a column.">
+    <>
     <Suspense
       fallback={
         <div className="space-y-4">
@@ -150,6 +149,6 @@ export default function DesignPage() {
     >
       <DesignLab />
     </Suspense>
-    </FullBleed>
+    </>
   )
 }

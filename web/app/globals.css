@@ -138,21 +138,30 @@
     }
 }
 
-/* Reading-width cap for the app + board shells.
-   Non-tabular content stops being readable long before it stops fitting. A
-   `justify-between` row inside a 1600px column throws its label to the far left and its
-   value to the far right with a dead middle, so related things stop looking related —
-   and it gets WORSE on a bigger monitor, which is backwards. Cap the column at a
-   reading width and let the extra space become margin instead.
+/* THE page container for the app + board shells. Every page, no exceptions.
+   The element carries `mx-auto` to centre itself; this sets the width and the gutter.
 
-   Tables are the exception: orders, shipments, ledger and inventory genuinely want the
-   room, and capping them reintroduces horizontal scrolling — a worse bug than the one
-   this fixes. Such a page opts out by wrapping itself in <FullBleed reason="…">
-   (components/app/full-bleed.tsx), which drops a `data-full-bleed` marker into the
-   subtree; `:has()` lets the shell notice it without a prop threaded through the tree.
-   The opt-out is per page and states its reason at the call site. */
-.eg-content { max-width: 1100px; }
-.eg-content:has([data-full-bleed]) { max-width: 1600px; }
+   The first attempt at the too-wide-row problem capped non-tabular pages at a 1100px
+   reading width and let tables opt out at 1600. That traded one inconsistency for a worse
+   one: adjacent pages in the same sidebar sat at visibly different widths, so moving
+   between them shifted the whole layout sideways — and a capped page whose panels are
+   left-aligned left a large empty right-hand side that reads as broken rather than as
+   margin. Having TWO widths was the thing that looked wrong, not the number either was
+   set to.
+
+   So: one width for every page, and the extra breathing room comes from the GUTTER rather
+   than from a cap. Dense surfaces keep the pixels they need — nothing regains horizontal
+   scrolling, which was the real hazard of capping — while a wider side margin on a large
+   monitor stops content running into the chrome.
+
+   The gutter steps with the viewport instead of jumping once, so there is no single width
+   at which the margin visibly snaps. Below 1024px it is unchanged, which is why nothing on
+   a laptop moves. These set `padding-inline`, so they override the shell's `px-4 md:px-8`
+   at these widths rather than fighting it. */
+.eg-content { max-width: 1600px; }
+@media (min-width: 1024px) { .eg-content { padding-inline: 3rem; } }
+@media (min-width: 1440px) { .eg-content { padding-inline: 4rem; } }
+@media (min-width: 1800px) { .eg-content { padding-inline: 5rem; } }
 
 /* Print — only the label sheet (Inventory → Print labels, Orders → Labels).
    The sheet is portalled to <body> (see label-sheet.tsx) precisely so we can
