@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { X, Printer, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getLookbook, type LookbookStyle } from "@/lib/api"
+import { getLookbook, saveCatalogExport, getCatalogExport, type LookbookStyle } from "@/lib/api"
 
 const money = (n: number | null | undefined) =>
   n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
@@ -21,18 +21,32 @@ const money = (n: number | null | undefined) =>
  * fetching. The browser has both, has the images cached, and Save as PDF produces a real
  * file. The label sheet prints the same way, so the print CSS already exists.
  */
-export function CatalogPrint({ onClose }: { onClose: () => void }) {
+export function CatalogPrint({ onClose, exportId }: { onClose: () => void; exportId?: string }) {
   const [rows, setRows] = useState<LookbookStyle[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
+  const [title, setTitle] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => {
-      getLookbook()
-        .then((r) => setRows(r.styles ?? []))
-        .catch((e: Error) => { setErr(e.message); setRows([]) })
+      // A saved export reads its SNAPSHOT, never the live catalogue — reproducing what was
+      // actually sent is the only reason it was kept.
+      const load = exportId
+        ? getCatalogExport(exportId).then((r) => { setTitle(r.title); return r.styles ?? [] })
+        : getLookbook().then((r) => r.styles ?? [])
+      load.then(setRows).catch((e: Error) => { setErr(e.message); setRows([]) })
     }, 0)
     return () => clearTimeout(t)
-  }, [])
+  }, [exportId])
+
+  const save = async () => {
+    if (!rows?.length) return
+    try {
+      const r = await saveCatalogExport({ styles: rows })
+      if (r.error) throw new Error(r.error)
+      setSaved(r.title || "Saved")
+    } catch (e) { setErr((e as Error).message) }
+  }
 
   return (
     // eg-print-root is load-bearing: globals.css prints with
@@ -41,13 +55,21 @@ export function CatalogPrint({ onClose }: { onClose: () => void }) {
     <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-neutral-100">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
         <span className="text-sm font-medium">
-          {rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`}
+          {title ?? (rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`)}
         </span>
+        {exportId && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">saved copy</span>}
         <span className="text-xs text-muted-foreground">
           Print → <strong>Save as PDF</strong>. Tick <strong>Background graphics</strong>, or the
           swatches and panels print white.
         </span>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          {saved && <span className="text-xs text-emerald-700">Saved — you can reopen this later.</span>}
+          {/* Saving is separate from printing on purpose. Printing is a preview you might do
+              five times; a saved copy is a record of what you SENT, and five identical rows
+              in the history is a worse record than none. */}
+          {!exportId && !saved && (
+            <Button size="sm" variant="outline" onClick={save} disabled={!rows?.length}>Save this version</Button>
+          )}
           <Button size="sm" onClick={() => window.print()} disabled={!rows?.length}>
             <Printer size={14} weight="bold" /> Print / Save as PDF
           </Button>

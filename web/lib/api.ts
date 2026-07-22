@@ -307,6 +307,26 @@ export function getLookbook() {
   return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)
 }
 
+/** A saved catalogue — what was in it and at what prices, on the day it was sent. */
+export type CatalogExport = {
+  id: string; createdAt: string; kind: string; title: string | null
+  styleCount: number; by?: string | null
+}
+export function getCatalogExports() {
+  return api<{ exports: CatalogExport[] }>(`/api/catalog/exports`)
+}
+export function saveCatalogExport(body: { styles: LookbookStyle[]; title?: string; kind?: string }) {
+  return api<{ ok?: boolean; id?: string; title?: string; error?: string }>(`/api/catalog/exports`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+/** Reopen one. Returns the SNAPSHOT, never the live catalogue — reproducing what was sent
+ *  is the whole reason it was kept. */
+export function getCatalogExport(id: string) {
+  return api<{ id: string; title: string | null; createdAt: string; styles: LookbookStyle[] }>(
+    `/api/catalog/exports/${encodeURIComponent(id)}`)
+}
+
 export type CatalogProduct = {
   id?: string | number
   name?: string

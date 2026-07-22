@@ -11,6 +11,7 @@ import {
 } from "@/lib/api"
 import { CatalogPrint } from "@/components/app/catalog-print"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
+import { CatalogExportHistory } from "@/components/app/catalog-export-history"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { colorsOf, swatchHex } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
@@ -40,6 +41,9 @@ export function CatalogView() {
   const [pct, setPct] = useState("60")
   const [draft, setDraft] = useState<Record<string, string>>({})
   const [printOpen, setPrintOpen] = useState(false)
+  // Which saved catalogue to reopen. Separate from printOpen because the two show
+  // different documents — one live, one as it was sent.
+  const [reopenId, setReopenId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     getCatalogProducts()
@@ -138,8 +142,10 @@ export function CatalogView() {
               a thing comes FROM, not about two separate catalogues. */}
           <TabsTrigger value="mine">Our products</TabsTrigger>
           <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
+          <TabsTrigger value="history">Sent catalogues</TabsTrigger>
         </TabsList>
         <TabsContent value="supplier"><SupplierStylesPicker /></TabsContent>
+        <TabsContent value="history"><CatalogExportHistory onOpen={setReopenId} /></TabsContent>
         <TabsContent value="mine">
       <div className="space-y-3 px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -287,6 +293,7 @@ export function CatalogView() {
         </TabsContent>
       </Tabs>
       {printOpen && <CatalogPrint onClose={() => setPrintOpen(false)} />}
+      {reopenId && <CatalogPrint exportId={reopenId} onClose={() => setReopenId(null)} />}
     </SectionCard>
   )
 }

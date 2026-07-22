@@ -198,6 +198,77 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
+   * EXPORT HISTORY — a catalogue you handed someone is a commercial document.
+   *
+   * Send a buyer a lookbook in July and they order from it in September: prices have moved,
+   * styles may have gone, and without a record there is no answering "what was on page 3".
+   * That gap surfaces during a dispute, which is the worst moment to find it.
+   *
+   * We SNAPSHOT the content, not the file. The PDF is made by the browser so there is no
+   * file here to keep, and storing one would mean asking the user to upload their own
+   * download back. A snapshot is a few KB, survives, and regenerates both the PDF and the
+   * CSV from one row.
+   *
+   * The honest limit: it reproduces the same CONTENT at the same PRICES, not the same
+   * bytes. Images are referenced, so a supplier withdrawing a photo changes how an old
+   * catalogue looks — the words and the numbers are what a dispute turns on.
+   */
+  q(`create table if not exists catalog_exports (
+       id bigserial primary key,
+       created_at timestamptz not null default now(),
+       created_by text,
+       kind text not null default 'lookbook',
+       title text,
+       style_count int not null default 0,
+       snapshot jsonb not null
+     )`).catch(() => {});
+
+  app.get('/api/catalog/exports', { preHandler: requireStaff }, async () => {
+    const r = await q(
+      `select e.id, e.created_at, e.kind, e.title, e.style_count,
+              (select u.name from users u where u.id::text = e.created_by) as by_name
+         from catalog_exports e order by e.created_at desc limit 100`
+    ).catch(() => ({ rows: [] }));
+    return {
+      exports: r.rows.map((x) => ({
+        id: String(x.id), createdAt: x.created_at, kind: x.kind,
+        title: x.title, styleCount: x.style_count, by: x.by_name || null,
+      })),
+    };
+  });
+
+  /** Save what was in the catalogue at this moment. */
+  app.post('/api/catalog/exports', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const styles = Array.isArray(b.styles) ? b.styles : [];
+    if (!styles.length) { reply.code(400); return { error: 'Nothing to save — the catalogue is empty.' }; }
+    const title = String(b.title || '').trim() || `Catalogue · ${new Date().toISOString().slice(0, 10)}`;
+    const r = await q(
+      `insert into catalog_exports (created_by, kind, title, style_count, snapshot)
+       values ($1,$2,$3,$4,$5) returning id, created_at`,
+      [String((req.user && req.user.sub) || ''), String(b.kind || 'lookbook'), title, styles.length,
+       JSON.stringify({ styles })]
+    );
+    audit(req, 'catalog.exported', { entityType: 'catalog', entityId: String(r.rows[0].id), after: { title, styles: styles.length } });
+    return { ok: true, id: String(r.rows[0].id), title, createdAt: r.rows[0].created_at };
+  });
+
+  /** Reopen one — the catalogue exactly as it was sent. */
+  app.get('/api/catalog/exports/:id', { preHandler: requireStaff }, async (req, reply) => {
+    const r = await q('select id, created_at, title, kind, style_count, snapshot from catalog_exports where id=$1::bigint',
+      [String(req.params.id)]).catch(() => ({ rows: [] }));
+    const row = r.rows[0];
+    if (!row) { reply.code(404); return { error: 'No such export.' }; }
+    return {
+      id: String(row.id), createdAt: row.created_at, title: row.title, kind: row.kind,
+      styleCount: row.style_count,
+      // The snapshot IS the answer — deliberately not re-read from the live catalogue,
+      // which is the entire point of having kept it.
+      styles: (row.snapshot && row.snapshot.styles) || [],
+    };
+  });
+
+  /**
    * Everything the printed lookbook needs, in one call.
    *
    * A spread per style: the hero shot, the description, the size run, and every colourway
