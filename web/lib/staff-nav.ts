@@ -58,8 +58,12 @@ const STAFF_TOOLS: StaffNavItem[] = [
   // Warehouse/admin only: it sets the prices outside buyers are shown, which is a
   // commercial decision rather than a floor one.
   // NOT /catalog — that path is the PUBLIC marketing catalogue in (marketing), and two
-  // pages resolving to one URL is a build error, not a runtime surprise. This is the
-  // staff-side curation of what that window shows.
+  // pages resolving to one URL is a build error, not a runtime surprise.
+  //
+  // The PAGE lives in app/(app)/, like every other entry in this list. (boards) gates on
+  // STAFF_ITEMS only, so a STAFF_TOOLS page placed there renders in the sidebar and then
+  // bounces to the landing board the moment you click it — visible, unreachable, and no
+  // error anywhere.
   { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
