@@ -1006,6 +1006,10 @@ export function aiDraft(threadId: string) {
  *  the method_* keys addressable by name from the settings form. */
 export type FactorySettings = {
   designer_payout?: number; ship_first?: number; ship_extra?: number; emb_price?: number
+  /** Seller-facing design charges. Exactly ONE of the three applies to a line, decided by
+   *  where the machine file came from — see factory_settings.js. */
+  design_fee_standard?: number; design_fee_complex?: number; check_fee?: number
+  emb_price_complex?: number
   ship_cap?: number; ship_heavy?: number; ship_garment?: number
   method_dtg?: number; method_dtf?: number; method_emb?: number; method_apl?: number; method_lsr?: number
   /** The warehouse's own return address, used as the label origin. Shared by the whole

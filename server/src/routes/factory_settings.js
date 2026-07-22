@@ -14,6 +14,15 @@ const KEYS = [
   // seller-facing design charge is now being added: two "design fees" meaning opposite
   // directions is a mistake waiting to be made in a money path.
   'designer_payout', 'ship_first', 'ship_extra', 'emb_price',
+  // SELLER-FACING design charges. Three mutually exclusive outcomes for one embroidered
+  // line, and which one applies is decided by where the machine file comes from:
+  //   we digitise it, ordinary          -> design_fee_standard
+  //   we digitise it, intricate         -> design_fee_complex   (quoted and accepted first)
+  //   the seller brought their own file -> check_fee            (we verify it, not cut it)
+  // Then the file itself is bought separately: emb_price, or emb_price_complex when the
+  // work was complex. Charging and downloading are different transactions — a seller can
+  // pay to have a file made and never download it.
+  'design_fee_standard', 'design_fee_complex', 'check_fee', 'emb_price_complex',
   // Flat shipping by garment class.
   'ship_cap', 'ship_heavy', 'ship_garment',
   // Print-method surcharge, keyed by the same codes pricing.js normalises to.
@@ -55,6 +64,13 @@ export const SETTING_DEFAULTS = {
   ship_extra: 2,       // every additional UNIT in that same parcel
   designer_payout: 2.5, // paid TO a designer per approved design (legacy eg_designer_fee_rate)
   emb_price: 0,        // what a SELLER pays to download an embroidery file; per-file overrides
+  // Placeholders, not policy. Every one of these is a real charge to a real seller, so
+  // they start at values that are obviously provisional rather than plausible — a wrong
+  // number that looks deliberate is harder to spot than one that looks unset.
+  design_fee_standard: 2,   // we digitise an ordinary design
+  design_fee_complex: 15,   // we digitise an intricate one — quoted, and accepted, first
+  check_fee: 1,             // the seller brought their own file and we verify it
+  emb_price_complex: 30,    // download price when the work was complex
   ship_cap: 5.99,      // caps / hats
   ship_heavy: 9.99,    // sweatshirts / hoodies / jackets
   ship_garment: 6.99,  // everything else

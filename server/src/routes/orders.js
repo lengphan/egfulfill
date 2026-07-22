@@ -343,6 +343,24 @@ export function ordersRoutes(app, requireAuth) {
   // Stable per-line id (client-generated) so a line item's design/image/status keys
   // never collide between identical-SKU siblings. Preserved across replaceItems.
   q('alter table order_items add column if not exists line_id text').catch(() => {});
+  /**
+   * Which design charge this line attracts. One field, three mutually exclusive outcomes:
+   *
+   *   'standard'  we cut the machine file from the seller's artwork  -> design_fee_standard
+   *   'complex'   same, but intricate — quoted and ACCEPTED first    -> design_fee_complex
+   *   'supplied'  the seller brought their own machine file          -> check_fee
+   *
+   * Null means undecided, which is the honest state for a line nobody has looked at yet —
+   * defaulting to 'standard' would assert a difficulty judgement no human has made, and
+   * that judgement is the difference between a $2 charge and a $15 one.
+   *
+   * NOTHING IS CHARGED FROM THIS COLUMN YET. It records the decision; the money moves in
+   * the quote flow, where the seller sees the number and accepts it. A tier that silently
+   * billed on write would make 'complex' a charge nobody agreed to.
+   */
+  q('alter table order_items add column if not exists design_tier text').catch(() => {});
+  q('alter table order_items add column if not exists design_tier_at timestamptz').catch(() => {});
+  q('alter table order_items add column if not exists design_tier_by text').catch(() => {});
   // Design uploads live SERVER-side, not in browser localStorage (~5MB, overflows
   // the moment a seller uploads a few images → "Browser storage is full"). One row
   // per (order, item, kind): kind='raster' for png/jpg/etc, 'emb' for stitch files.
@@ -949,6 +967,33 @@ export function ordersRoutes(app, requireAuth) {
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };
   });
+  /**
+   * Record which design charge a line attracts. Staff decide; the seller is billed later,
+   * and for 'complex' only after they accept the quote.
+   *
+   * Keyed by line_id, not sku — two lines of the same sku can genuinely differ here, one
+   * seller-supplied and one for us to cut.
+   */
+  app.post('/api/orders/:id/design-tier', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const b = req.body || {};
+    const tier = String(b.tier || '').trim();
+    const TIERS = ['standard', 'complex', 'supplied'];
+    if (!TIERS.includes(tier)) { reply.code(400); return { error: `tier must be one of: ${TIERS.join(', ')}` }; }
+    const lineId = b.line_id ? String(b.line_id) : null;
+    const sku = b.sku ? String(b.sku) : null;
+    if (!lineId && !sku) { reply.code(400); return { error: 'line_id or sku required' }; }
+    const key = lineId ? 'line_id' : 'sku';
+    const r = await q(
+      `update order_items set design_tier=$3, design_tier_at=now(), design_tier_by=$4
+        where order_id=$1 and ${key}=$2`,
+      [String(req.params.id), lineId || sku, tier, String((req.user && req.user.sub) || '')]);
+    if (!r.rowCount) { reply.code(404); return { error: 'No such line on this order.' }; }
+    audit(req, 'design.tier', { entityType: 'order', entityId: String(req.params.id), after: { tier, line_id: lineId, sku } });
+    egBroadcast({ type: 'orders' });
+    return { ok: true, tier, lines: r.rowCount };
+  });
+
   /**
    * Design rows we cannot attribute to a line.
    *

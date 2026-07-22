@@ -807,6 +807,10 @@ function Fold({ title, hint, children }: { title: string; hint?: string; childre
 function PlatformPanel() {
   const [loaded, setLoaded] = useState<FactorySettings | null>(null)
   const [designFee, setDesignFee] = useState("")
+  const [designStd, setDesignStd] = useState("")
+  const [designCx, setDesignCx] = useState("")
+  const [checkFee, setCheckFee] = useState("")
+  const [embCx, setEmbCx] = useState("")
   // base cost = supplier product cost + this. Lets a supplier sync fill in only what a
   // blank COSTS us, and the sell price follows from one number instead of a hand-typed
   // price per size per product.
@@ -846,6 +850,10 @@ function PlatformPanel() {
     getFactorySettings().then((r) => {
       setLoaded(r)
       setDesignFee(r.designer_payout != null ? String(r.designer_payout) : "")
+      setDesignStd(r.design_fee_standard != null ? String(r.design_fee_standard) : "")
+      setDesignCx(r.design_fee_complex != null ? String(r.design_fee_complex) : "")
+      setCheckFee(r.check_fee != null ? String(r.check_fee) : "")
+      setEmbCx(r.emb_price_complex != null ? String(r.emb_price_complex) : "")
       setBaseMarkup(r.base_markup != null ? String(r.base_markup) : "")
       setExpediteFee(r.expedite_fee != null ? String(r.expedite_fee) : "")
       setExpediteCost(r.expedite_cost != null ? String(r.expedite_cost) : "")
@@ -869,6 +877,10 @@ function PlatformPanel() {
     try {
       const r = await setFactorySettings({
         designer_payout: designFee === "" ? undefined : Number(designFee),
+        design_fee_standard: designStd === "" ? undefined : Number(designStd),
+        design_fee_complex: designCx === "" ? undefined : Number(designCx),
+        check_fee: checkFee === "" ? undefined : Number(checkFee),
+        emb_price_complex: embCx === "" ? undefined : Number(embCx),
         base_markup: baseMarkup === "" ? undefined : Number(baseMarkup),
         expedite_fee: expediteFee === "" ? undefined : Number(expediteFee),
         expedite_cost: expediteCost === "" ? undefined : Number(expediteCost),
@@ -918,12 +930,21 @@ function PlatformPanel() {
           </div>
         </div>
       </Fold>
-      <Fold title="Fees" hint="design payout, file price, default shipping">
-        {/* Design-side money together: what a designer is paid, then what a file costs
-            to download. The base-cost formula sits below them because it spans the row
-            and would otherwise split the pair. */}
+      <Fold title="Fees" hint="design charges, payout, file price, default shipping">
+        {/* MONEY OUT first, then money in, and the direction is written into every hint.
+            These sat together unlabelled when the payout was called "design fee", which is
+            how a rate paid TO a designer read as a charge made to a seller. */}
         <MoneyField label="Designer payout" hint="Paid TO a designer per approved design — money out, not a seller charge" value={designFee} onChange={setDesignFee} />
+
+        {/* The three seller-facing design charges. Exactly one applies to a line, decided
+            by where the machine file came from — so they are shown together and each hint
+            names its own case rather than describing a fee in the abstract. */}
+        <MoneyField label="Design fee — standard" hint="Seller pays this when WE cut the machine file from their artwork" value={designStd} onChange={setDesignStd} />
+        <MoneyField label="Design fee — complex" hint="Intricate artwork. Quoted to the seller and only charged once they accept" value={designCx} onChange={setDesignCx} />
+        <MoneyField label="Check fee" hint="Seller sent their own .emb — we verify it works rather than cut it" value={checkFee} onChange={setCheckFee} />
+
         <MoneyField label="Embroidery file price" hint="Charge to download a .pes/.emb file" value={embPrice} onChange={setEmbPrice} />
+        <MoneyField label="Embroidery file price — complex" hint="Download price when the design work was complex" value={embCx} onChange={setEmbCx} />
         <MarkupFormula value={baseMarkup} onChange={setBaseMarkup} />
         <MoneyField label="Default shipping — first item" value={shipFirst} onChange={setShipFirst} />
         <MoneyField label="Default shipping — each additional" value={shipExtra} onChange={setShipExtra} />
