@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
-import { PenNib, Stack, Sparkle } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
 import { getToken } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -18,14 +17,17 @@ import { cn } from "@/lib/utils"
  * tabpanel) that links can't honour. Styling comes from tabsTriggerVariants so the bar
  * can't drift from the real tab bars in Settings and Wallet.
  */
+// No icons. A toggle bar is three or four words the eye reads as a set; an icon in front
+// of each turns it into a row of competing marks, and none of them tell you anything the
+// word doesn't already say.
 const TABS = [
   // ?tab=library rather than a bare /design: navigating from ?tab=templates to a URL with
   // NO search params left useSearchParams() holding the old value, so the hook kept
   // reporting "templates" and clicking Library re-rendered the Templates panel. Both hrefs
   // carrying a param makes it a value change, which the hook does track.
-  { key: "library", label: "Library", href: "/design?tab=library", icon: PenNib },
-  { key: "templates", label: "Templates", href: "/design?tab=templates", icon: Stack },
-  { key: "maker", label: "Design maker", href: "/design/maker", icon: Sparkle },
+  { key: "library", label: "Library", href: "/design?tab=library" },
+  { key: "templates", label: "Templates", href: "/design?tab=templates" },
+  { key: "maker", label: "Design maker", href: "/design/maker" },
 ] as const
 
 export type DesignLabTab = (typeof TABS)[number]["key"]
@@ -50,13 +52,13 @@ export function DesignLabTabs({ className }: { className?: string }) {
 
   return (
     <nav aria-label="Design Lab sections" className={cn(tabsListVariants(), "h-8", className)}>
-      {TABS.map(({ key, label, href, icon: Icon }) => {
+      {TABS.map(({ key, label, href }) => {
         const on = key === active
         // The maker is the only surface that needs a session — it loads the catalog and
         // saves. Signed out it renders an empty stage with a Save that 401s, so it's
         // disabled here the way the old "Open maker" button was.
         const disabled = signedOut && key === "maker"
-        const body = <><Icon size={14} weight="bold" /> {label}</>
+        const body = label
         const classes = cn(tabsTriggerVariants({ active: on }), "px-3")
 
         // The active toggle is inert on purpose: navigating to a tab's bare href while

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, CaretRight, BellRinging } from "@phosphor-icons/react"
+import { Play, Key, Copy, Check, CircleNotch, Warning, Lightning, BookOpen, CaretRight, Eye, EyeSlash } from "@phosphor-icons/react"
 import { tabsListVariants, tabsTriggerVariants } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { SectionCard } from "@/components/app/section-card"
@@ -12,6 +12,23 @@ import { createApiKey } from "@/lib/api"
 import { API_ENDPOINTS, type ApiEndpoint } from "@/lib/api-endpoints"
 
 const KEY_STORE = "eg_playground_key" // convenience only — sessionStorage, never the JWT
+
+/**
+ * Show enough of a key to recognise it, never enough to use it.
+ *
+ * The prefix stays because it is how you tell a test key from a live one at a glance —
+ * and that distinction decides whether a call creates real orders. The last four
+ * identify WHICH key. Everything between is the secret.
+ */
+function maskKey(k: string): string {
+  const v = String(k || "")
+  if (!v) return ""
+  const m = v.match(/^(egk_(?:test|live)_)(.*)$/)
+  const prefix = m ? m[1] : v.slice(0, 4)
+  const body = m ? m[2] : v.slice(4)
+  if (body.length <= 8) return prefix + "•".repeat(Math.max(0, body.length))
+  return prefix + body.slice(0, 3) + "•".repeat(Math.min(12, body.length - 7)) + body.slice(-4)
+}
 
 const methodTone: Record<string, string> = {
   GET: "bg-emerald-100 text-emerald-700",
@@ -31,13 +48,15 @@ type DevTab = "api" | "webhooks"
  * Module scope, not defined during render (react-hooks/static-components).
  */
 function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
-  const items: { id: DevTab; label: string; icon: typeof Lightning }[] = [
-    { id: "api", label: "API playground", icon: Lightning },
-    { id: "webhooks", label: "Webhooks", icon: BellRinging },
+  // No icons — see the note in design-lab-tabs.tsx. Two words each; a mark in front of
+  // them is decoration competing with the label.
+  const items: { id: DevTab; label: string }[] = [
+    { id: "api", label: "API playground" },
+    { id: "webhooks", label: "Webhooks" },
   ]
   return (
     <nav aria-label="Developer sections" className={cn(tabsListVariants(), "h-8 w-fit")}>
-      {items.map(({ id, label, icon: Icon }) => (
+      {items.map(({ id, label }) => (
         <button
           key={id}
           type="button"
@@ -45,7 +64,7 @@ function DevTabs({ tab, onTab }: { tab: DevTab; onTab: (t: DevTab) => void }) {
           onClick={() => onTab(id)}
           className={cn(tabsTriggerVariants({ active: tab === id }), "px-3")}
         >
-          <Icon size={14} weight="bold" /> {label}
+          {label}
         </button>
       ))}
     </nav>
@@ -56,6 +75,10 @@ export function ApiPlayground() {
   const [tab, setTab] = useState<DevTab>("api")
   const [env, setEnv] = useState<"test" | "live">("test")
   const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
+  // Keys render masked. Revealing is deliberate and per-view, never remembered — a key
+  // left legible is a key that ends up in a screen share or a screenshot.
+  const [revealed, setRevealed] = useState(false)
+  const [freshRevealed, setFreshRevealed] = useState(false)
   const apiKey = keys[env]
   // ?endpoint=<id> preselects one, so "Try it" in the public docs lands on the call you
   // were reading instead of the top of the list. Read once at mount rather than through
@@ -196,13 +219,43 @@ export function ApiPlayground() {
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              {/* Masked by default. Still a real input while revealed so a key can be
+                  pasted or corrected; masked it is read-only, because typing into a
+                  masked field would silently replace the key with bullets. */}
               <Input
-                value={apiKey}
+                value={revealed || !apiKey ? apiKey : maskKey(apiKey)}
                 onChange={(e) => rememberKey(e.target.value)}
+                readOnly={!!apiKey && !revealed}
                 placeholder={env === "live" ? "Paste an egk_live_… key, or generate one" : "Paste an egk_test_… key, or generate one"}
-                className="pl-9 font-mono text-xs"
+                className="pl-9 pr-20 font-mono text-xs"
               />
+              {apiKey && (
+                <span className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setRevealed((v) => !v)}
+                    aria-label={revealed ? "Hide key" : "Reveal key"}
+                    title={revealed ? "Hide" : "Reveal"}
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {revealed ? <EyeSlash size={14} weight="bold" /> : <Eye size={14} weight="bold" />}
+                  </button>
+                  {/* Copies the REAL key whether or not it is on screen — the point of
+                      masking is that you never need to look at it. */}
+                  <button
+                    type="button"
+                    onClick={async () => { try { await navigator.clipboard.writeText(apiKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
+                    aria-label="Copy key"
+                    title="Copy"
+                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
+                  </button>
+                </span>
+              )}
             </div>
+            {/* disabled while in flight so a double-click can't mint two keys — every
+                press creates a real, permanent credential. */}
             <Button variant="outline" onClick={generateKey} disabled={genLoading}>
               {genLoading ? <CircleNotch size={15} className="animate-spin" /> : <Lightning size={15} weight="bold" />} Generate {env}
             </Button>
@@ -210,12 +263,19 @@ export function ApiPlayground() {
           {keyErr && <div className="flex items-center gap-1.5 text-sm text-destructive"><Warning size={14} weight="fill" /> {keyErr}</div>}
           {freshKey && (
             <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-              <code className="min-w-0 flex-1 truncate font-mono text-xs text-emerald-800">{freshKey}</code>
+              <code className="min-w-0 flex-1 truncate font-mono text-xs text-emerald-800">
+                {freshRevealed ? freshKey : maskKey(freshKey)}
+              </code>
               <span className="shrink-0 text-[11px] font-medium text-emerald-700">Copy now — shown once</span>
+              <Button size="sm" variant="outline" onClick={() => setFreshRevealed((v) => !v)}
+                aria-label={freshRevealed ? "Hide key" : "Reveal key"}>
+                {freshRevealed ? <EyeSlash size={13} weight="bold" /> : <Eye size={13} weight="bold" />}
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={async () => { try { await navigator.clipboard.writeText(freshKey); setCopied(true) } catch {} }}
+                onClick={async () => { try { await navigator.clipboard.writeText(freshKey); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch {} }}
+                aria-label="Copy key"
               >
                 {copied ? <Check size={13} weight="bold" /> : <Copy size={13} weight="bold" />}
               </Button>

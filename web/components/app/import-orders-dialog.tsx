@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, ClipboardText, GoogleLogo, CircleNotch } from "@phosphor-icons/react"
+import { UploadSimple, DownloadSimple, CheckCircle, WarningCircle, Table, CircleNotch } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -192,9 +192,9 @@ export function ImportOrdersDialog({
 
             <Tabs defaultValue="file">
               <TabsList className={sheetsEnabled ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
-                <TabsTrigger value="file"><UploadSimple size={14} className="mr-1.5" /> File</TabsTrigger>
-                <TabsTrigger value="paste"><ClipboardText size={14} className="mr-1.5" /> Paste</TabsTrigger>
-                {sheetsEnabled && <TabsTrigger value="sheet"><GoogleLogo size={14} className="mr-1.5" /> Sheet</TabsTrigger>}
+                <TabsTrigger value="file">File</TabsTrigger>
+                <TabsTrigger value="paste">Paste</TabsTrigger>
+                {sheetsEnabled && <TabsTrigger value="sheet">Sheet</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="file" className="mt-3">
