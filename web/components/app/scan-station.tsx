@@ -5,7 +5,7 @@ import { Barcode as BarcodeIcon, Camera, X, ArrowUp, ArrowDown, ArrowCounterCloc
 import { SectionCard } from "@/components/app/section-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getInventory, scanInventory, undoScan, type InventoryItem } from "@/lib/api"
+import { getInventory, getScanHistory, scanInventory, undoScan, type InventoryItem } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { parseScan, exactSkuReady, scanBeep, buzz, cameraSupported, startCameraScan, releaseCamera } from "@/lib/barcode-scan"
 
@@ -52,11 +52,44 @@ export function ScanStation() {
 
   const skus = useMemo(() => (items ?? []).map((i) => i.sku), [items])
 
+  /**
+   * Load what has ALREADY been scanned, by anyone, anywhere.
+   *
+   * This log was session-local: it only ever held what this tab had scanned since it
+   * opened. Every scan is persisted to scan_history server-side, and the phone writes to
+   * the same table — but the web station never read it, so six items scanned on a phone
+   * showed here as an empty list, and a refresh wiped the desktop's own work too. It
+   * looked like scans weren't syncing when they were simply never being asked for.
+   */
+  const loadHistory = useCallback(() => {
+    if (!getToken()) return
+    getScanHistory(undefined, 40)
+      .then((rows) => setLog((prev) => {
+        // Anything committed in THIS tab wins its own row — it already carries an
+        // optimistic label and an undo handle. Server rows fill in around them.
+        const mine = new Set(prev.filter((e) => e.scanId).map((e) => e.scanId))
+        const fromServer: Entry[] = (rows ?? [])
+          .filter((r) => !mine.has(r.id))
+          .map((r) => ({
+            key: `srv-${r.id}`, sku: r.sku, qty: Number(r.qty) || 0,
+            dir: r.direction === "out" ? "out" : "in", ok: true,
+            label: r.item_name || r.sku,
+            // created_at is optional on the type, so a missing one says so rather than
+            // rendering "Invalid Date" beside a scan that really happened.
+            sub: `${r.created_at ? new Date(r.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "earlier"}${r.by_name ? ` · ${r.by_name}` : ""}`,
+            scanId: r.id,
+          }))
+        return [...prev.filter((e) => !e.key.startsWith("srv-")), ...fromServer].slice(0, 60)
+      }))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     const id = setTimeout(() => {
       setHasCam(cameraSupported())
       if (!getToken()) { setItems([]); return }
       getInventory().then((r) => setItems(r ?? [])).catch(() => setItems([]))
+      loadHistory()
     }, 0)
     return () => clearTimeout(id)
   }, [])
@@ -265,7 +298,12 @@ export function ScanStation() {
             <video ref={videoRef} playsInline muted className="absolute inset-0 size-full object-cover" />
             {/* Aim box */}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className={"h-40 w-72 max-w-[80%] rounded-2xl border-4 transition-colors " + (flash === "ok" ? "border-emerald-400" : flash === "err" ? "border-red-500" : "border-white/70")} />
+              {/* SQUARE, not a letterbox. It was 288×160, which is the shape of a 1D
+                  barcode — aiming a QR inside it meant holding the phone far enough back
+                  that the code was too small to decode, or cropping it and decoding
+                  nothing. A square fits both: a barcode sits across the middle of it
+                  quite happily, a QR fills it. */}
+              <div className={"aspect-square w-56 max-w-[70%] rounded-2xl border-4 transition-colors " + (flash === "ok" ? "border-emerald-400" : flash === "err" ? "border-red-500" : "border-white/70")} />
             </div>
             {camErr && <div className="absolute inset-x-4 top-4 rounded-lg bg-red-600 px-3 py-2 text-sm text-white">{camErr}</div>}
             {/* Reading, and with what. Says nothing once a scan has landed — by then the

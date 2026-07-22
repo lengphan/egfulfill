@@ -5,6 +5,7 @@ import { createPortal } from "react-dom"
 import { Printer, Minus, Plus } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Barcode } from "@/components/app/barcode"
+import { QrCode } from "@/components/app/qr-code"
 import { prettyColorName } from "@/lib/color-name"
 
 export type LabelSpec = { sku: string; name?: string | null; variant?: string | null; copies?: number }
@@ -52,6 +53,24 @@ export function LabelSheet({
   // the rest of the roll. Sizes are the common thermal stocks; "A4 sheet" keeps the old
   // multi-up behaviour for anyone printing on a laser.
   const [stock, setStock] = useState<StockId>("2x1")
+  /**
+   * Barcode or QR — an EXPLICIT choice, defaulted by device rather than decided by it.
+   *
+   * A gun reads Code-128 and cannot read a QR; a phone camera reads a QR easily and
+   * fights a 1D code held at any angle. So a phone should get QR — but these labels are
+   * PRINTED and stuck on stock that outlives the session, and letting the output silently
+   * depend on which device happened to press print is how a warehouse ends up with two
+   * incompatible label formats in one bin. Defaulted, visible, overridable.
+   */
+  const [codeType, setCodeType] = useState<"barcode" | "qr">("barcode")
+  useEffect(() => {
+    // Coarse pointer = finger. Resolved after mount because matchMedia doesn't exist
+    // during prerender and would render a different tree on server than client.
+    const t = setTimeout(() => {
+      if (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches) setCodeType("qr")
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
   const spec = STOCKS.find((s) => s.id === stock) ?? STOCKS[0]
   const oneUp = spec.id !== "a4"
   // Portalled to <body> so print CSS can display:none every OTHER body child. The
@@ -87,6 +106,20 @@ export function LabelSheet({
 
         <div className="ml-auto flex gap-2">
           <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+          {/* Which code, said out loud. A gun cannot read a QR and a phone fights a 1D
+              code — so the wrong choice here produces a bin of labels nothing can scan,
+              and that is not a discovery to make at the scanner. */}
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Code
+            <select
+              value={codeType}
+              onChange={(e) => setCodeType(e.target.value as "barcode" | "qr")}
+              className="eg-select h-8 rounded-2xl border border-border bg-card px-2 text-sm transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              <option value="barcode">Barcode — scanner guns</option>
+              <option value="qr">QR — phone cameras</option>
+            </select>
+          </label>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             Label stock
             <select
@@ -129,7 +162,13 @@ export function LabelSheet({
                 {l.variant && <div className="line-clamp-1 w-full text-[7px] leading-tight text-muted-foreground">{prettyVariant(l.variant)}</div>}
                 {/* fit → scales to the label. A long SKU otherwise renders ~450px wide
                     and spills across the card, printing a clipped, unscannable code. */}
-                {oneUp ? (
+                {codeType === "qr" ? (
+                  // Square, and centred in whatever slice the sticker allows. A QR has no
+                  // useful non-square rendering — stretching one stops it decoding.
+                  <div className={oneUp ? "flex min-h-0 w-full flex-1 items-center justify-center" : "mx-auto w-full max-w-[7rem]"}>
+                    <QrCode value={l.sku} className="aspect-square h-full [&>svg]:size-full" />
+                  </div>
+                ) : oneUp ? (
                   // Fixed slice of the sticker so the code can never crowd out the text.
                   <div className="w-full flex-1 min-h-0">
                     <Barcode value={l.sku} height={40} displayValue={false} fit stretch className="block size-full" />
