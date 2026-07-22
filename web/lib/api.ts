@@ -234,9 +234,47 @@ export function createTopupRequest(body: { amount: number; method: string; note?
 // ─────────────────────────── Catalog ───────────────────────────
 // GET /api/catalog_products → the full product objects (lossless `data` jsonb).
 // Field names mirror the static store, so keep this shape permissive.
+/**
+ * Publish/unpublish products in the shop-window catalogue. Separate from pricing on
+ * purpose — choosing what to show and choosing what to charge are different decisions.
+ */
+export function setCatalogSelection(ids: string[], include: boolean) {
+  return api<{ ok?: boolean; updated?: number; error?: string }>(`/api/catalog/selection`, {
+    method: "POST", body: JSON.stringify({ ids, include }),
+  })
+}
+
+/**
+ * Set the catalogue price — one product explicitly, or a markup over cost across a set.
+ *
+ * This never touches base_price, which is what bills orders. The markup is computed
+ * server-side from our supplier cost and only the result comes back, so neither the cost
+ * nor the percentage crosses the wire.
+ */
+export function setCatalogPrice(body: { id: string; price: number | null }) {
+  return api<{ ok?: boolean; catalogPrice?: number | null; error?: string }>(`/api/catalog/pricing`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+export function applyCatalogMarkup(ids: string[], markupPct: number) {
+  return api<{ ok?: boolean; priced?: number; skippedNoCost?: string[]; error?: string }>(`/api/catalog/pricing`, {
+    method: "POST", body: JSON.stringify({ ids, markupPct }),
+  })
+}
+
+/** The download. A plain link rather than a fetch — the browser handles the file, and
+ *  Content-Disposition names it. */
+export function catalogExportUrl(all = false) {
+  return `${API_BASE}/api/catalog/export${all ? "?all=1" : ""}`
+}
+
 export type CatalogProduct = {
   id?: string | number
   name?: string
+  /** Published in the shop-window catalogue, and the price shown there. Distinct from
+   *  base_price, which is what an order actually charges. */
+  inCatalog?: boolean
+  catalogPrice?: number | null
   sku?: string
   type?: string
   method?: string
