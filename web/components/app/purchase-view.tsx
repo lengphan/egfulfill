@@ -1122,13 +1122,20 @@ export function PurchaseView() {
                                 const key = `${l.sku}:${w.abbr}`
                                 const taken = split[key] ?? ""
                                 return (
-                                  <span key={w.abbr}
+                                  /* STACKED, not a strip. Four facts per warehouse — code,
+                                     stock, arrival date and how many to take — read as one
+                                     run-on line when laid out horizontally, and the input
+                                     was the only thing that looked interactive so the rest
+                                     read as decoration.
+                                     No green fill: covering the line is worth marking but it
+                                     is not a success state, and a row of green pills next to
+                                     an amber total reads as an alarm about nothing. The
+                                     covering warehouse gets a ring in the theme's own accent
+                                     instead. */
+                                  <label key={w.abbr}
                                     title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
-                                    className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] " + (
-                                      covers ? "bg-emerald-50 text-emerald-800" : "bg-muted text-muted-foreground")}>
-                                    <span className="font-medium">{w.abbr}</span>
-                                    <span className="tabular-nums opacity-70">{w.qty}</span>
-                                    {eta.deliveryAt && <span className="opacity-70">{fmtEta(eta.deliveryAt)}</span>}
+                                    className={"flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border px-1.5 py-1.5 transition-colors " + (
+                                      covers ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40")}>
                                     {/* Take THIS many from THIS warehouse. Blank means "no
                                         preference", which is the default and leaves S&S to
                                         split the line as before — typing anywhere turns the
@@ -1140,14 +1147,33 @@ export function PurchaseView() {
                                       onChange={(e) => {
                                         const v = e.target.value.replace(/[^0-9]/g, "")
                                         const capped = v === "" ? "" : String(Math.min(Number(v), w.qty))
-                                        setSplit((p) => ({ ...p, [key]: capped }))
+                                        const next = { ...split, [key]: capped }
+                                        setSplit(next)
+                                        // THE PICKS ARE THE QUANTITY. The header read "5 of 0
+                                        // picked · 5 over" because the line's own qty stayed
+                                        // where it was while the splits moved — two numbers
+                                        // for one fact, disagreeing. Choosing per warehouse
+                                        // IS choosing how many, so the line follows the sum.
+                                        const sum = stock[l.sku].warehouses
+                                          .reduce((a, x) => a + Number(next[`${l.sku}:${x.abbr}`] || 0), 0)
+                                        if (sum > 0) setSavedQty(l.sku, sum)
                                       }}
-                                      placeholder="qty"
+                                      placeholder="0"
                                       inputMode="numeric"
                                       aria-label={`Quantity to take from ${w.abbr}`}
-                                      className="ml-0.5 h-5 w-12 rounded border border-border bg-background px-1 text-right text-[11px] tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                      className="h-6 w-full rounded-full border border-border bg-background px-2 text-center text-xs tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                                     />
-                                  </span>
+                                    <span className="flex items-baseline gap-1 text-[11px] leading-none">
+                                      <span className="font-medium">{w.abbr}</span>
+                                      <span className="tabular-nums text-muted-foreground">{w.qty}</span>
+                                    </span>
+                                    {/* Always rendered, so the chips stay the same height and
+                                        the row doesn't comb up and down. Says which of the
+                                        two it is rather than leaving a gap. */}
+                                    <span className="text-[10px] leading-none text-muted-foreground">
+                                      {eta.deliveryAt ? fmtEta(eta.deliveryAt) : "no ETA"}
+                                    </span>
+                                  </label>
                                 )
                               })}
                             {/* What the picks add up to, against what the line needs. Shown
@@ -1164,8 +1190,8 @@ export function PurchaseView() {
                               const want = num(l.qty)
                               const ok = total === want
                               return (
-                                <span className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium " + (
-                                  ok ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")}>
+                                <span className={"inline-flex items-center gap-1 self-center rounded-lg px-2 py-1 text-[11px] font-medium " + (
+                                  ok ? "bg-muted text-foreground" : "bg-amber-50 text-amber-800")}>
                                   {total} of {want} picked
                                   {!ok && (total < want ? ` · ${want - total} unassigned` : ` · ${total - want} over`)}
                                 </span>
