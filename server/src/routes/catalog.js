@@ -69,6 +69,87 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
+   * Download the published catalogue.
+   *
+   * ONE ROW PER VARIANT, because that is what an importer needs: a buyer pasting this into
+   * their own system wants a line per orderable thing, not a product with sizes buried in a
+   * cell they have to split. Reading it is the secondary use; the row-per-product version
+   * is a report, and this is a price list.
+   *
+   * Goes through sellerSafe for everyone, staff included. That is deliberate: this file
+   * leaves the building. A staff member exporting "for themselves" and forwarding it is the
+   * exact path by which our supplier cost reaches a customer, and the export has no way to
+   * know where it ends up. The margin readouts stay in the app, where the audience is known.
+   *
+   * IMAGES ARE PROXIED. S&S CDN links are CORP-blocked, so a sheet full of raw supplier URLs
+   * looks complete and half of it fails to open — the same failure that made catalogue
+   * images silently blank before.
+   */
+  app.get('/api/catalog/export', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const qy = req.query || {};
+    // Published only, unless staff explicitly ask for everything — an export that quietly
+    // included unpublished drafts would put products in front of a buyer that nobody chose.
+    const all = String(qy.all || '') === '1';
+    const rows = (await q(
+      `select data, catalog_price from catalog_products
+        ${all ? '' : 'where in_catalog = true'}
+        order by created_at desc`
+    ).catch(() => ({ rows: [] }))).rows;
+
+    const base = String(process.env.APP_URL || 'https://app.egful.store').replace(/\/$/, '');
+    // Route supplier images through our proxy so they actually load for the recipient.
+    const img = (u) => {
+      const v = String(u || '').trim();
+      if (!v) return '';
+      if (/^https?:\/\/(www\.)?(cdn\.)?ssactivewear\.com/i.test(v) || /ottocap\.com/i.test(v)) {
+        // /api/ss/img — the shared supplier proxy, used by Otto's images too (ottocap.js
+        // routes through the same one). Guessing /api/img would have produced a sheet of
+        // dead links that looked perfectly well-formed.
+        return `${base}/api/ss/img?u=${encodeURIComponent(v)}`;
+      }
+      return v;
+    };
+
+    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const head = ['sku', 'product', 'description', 'colour', 'size', 'price', 'currency', 'image', 'variant_image', 'supplier'];
+    const out = [head.map(esc).join(',')];
+
+    let variants = 0;
+    for (const row of rows) {
+      const d = sellerSafe(row.data) || {};
+      // The catalogue price is the whole point of this file. A product included but never
+      // priced is exported with an empty price rather than base_price — quietly
+      // substituting the seller's billing price into a trade brochure is precisely the
+      // mix-up catalog_price exists to prevent.
+      const price = row.catalog_price == null ? '' : Number(row.catalog_price).toFixed(2);
+      const tiers = Array.isArray(d.sizePrices) && d.sizePrices.length ? d.sizePrices : [null];
+      const colours = Array.isArray(d.colors) && d.colors.length ? d.colors : [null];
+      for (const c of colours) {
+        for (const t of tiers) {
+          const colour = c && (c.name || c.color || c) || '';
+          const size = t && (t.size || '') || '';
+          out.push([
+            d.sku ?? d.id ?? '', d.name ?? '', d.description ?? '',
+            typeof colour === 'string' ? colour : '', size,
+            price, 'USD',
+            img(d.image ?? d.img ?? ''),
+            img((c && (c.image ?? c.img)) || ''),
+            d.supplier ?? d.brand ?? '',
+          ].map(esc).join(','));
+          variants++;
+        }
+      }
+    }
+
+    audit(req, 'catalog.export', { entityType: 'catalog', entityId: 'export', after: { products: rows.length, variants, all } });
+    const name = `catalog-${new Date().toISOString().slice(0, 10)}.csv`;
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename="${name}"`);
+    return out.join('\n');
+  });
+
+  /**
    * Include or exclude products from the published catalogue.
    *
    * Staff-only, and separate from the price routes: choosing what to show and choosing what
