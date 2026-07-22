@@ -139,7 +139,10 @@ export function AllSuppliers() {
   }
 
   const cardData = (it: Item) => it.supplier === "ss"
-    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: detailSizes[`ss:${it.ss.styleID}`] ?? [], favorited: it.ss.favorited }
+    // Favourites arrive WITH their sizes joined from the synced skus, so prefer those over
+    // the lazily-fetched detail — the favourites tab was showing em-dashes because it was
+    // waiting on a detail call that only fires when you open a card.
+    ? { id: it.ss.styleID, title: it.ss.title, brand: it.ss.brand, subtitle: it.ss.category, image: it.ss.image, price: it.ss.price, priceMax: it.ss.priceMax, colors: it.ss.colors, sizes: (it.ss.sizes?.length ? it.ss.sizes : detailSizes[`ss:${it.ss.styleID}`]) ?? [], sizesCount: it.ss.sizes?.length ?? undefined, favorited: it.ss.favorited }
     : { id: it.otto.style, title: it.otto.name || it.otto.style, brand: it.otto.brand || "Otto Cap", subtitle: it.otto.category || undefined, image: driveImg(it.otto.image), price: it.otto.price, priceMax: it.otto.price_max, colors: it.otto.colors, sizes: it.otto.sizes ?? [], sizesCount: it.otto.sizes?.length ?? 0, favorited: it.otto.favorited }
 
   const keyOf = (it: Item) => `${it.supplier}:${it.id}`
@@ -302,10 +305,6 @@ export function AllSuppliers() {
 
   return (
     <SectionCard title="All suppliers" description="S&S Activewear + Otto Cap in one feed — each card shows its supplier & brand">
-      {/* How much of the catalogue is actually searchable, and how to change that.
-          Sits above the search box because it's the answer to "why did my search find
-          nothing" — which is otherwise unanswerable from this screen. */}
-      <SsSyncPanel />
       <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
         <div className="relative max-w-md flex-1">
           <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -323,6 +322,11 @@ export function AllSuppliers() {
             </Button>
           </>
         )}
+        {/* The sync controls live in THIS row now. They had a strip of their own that was
+            empty whenever a sync wasn't running, which is nearly always — a full-width
+            border and 3rem of padding to hold one button. Progress still appears, but
+            below, and only while there is progress to show. */}
+        <SsSyncPanel />
       </div>
 
       {/* Filters — brand / category / price, applied to what's loaded */}

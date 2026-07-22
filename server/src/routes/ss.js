@@ -1292,7 +1292,10 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
         colorCount: x.color_count || 0,
         colors: x.colors || [],
         sizes: x.sizes || [],
-        priceMin: x.price_min, priceMax: x.price_max,
+        // Named `price`/`priceMax` to match every other style payload the cards already
+        // read — a favourite that needs its own field names is a favourite the card will
+        // render blank, which is what it was doing.
+        price: x.price_min, priceMax: x.price_max,
       })) };
     } catch (e) { reply.code(500); return { error: e.message }; }
   });

@@ -70,13 +70,12 @@ export function SsSyncPanel() {
    */
   if (!st) {
     return (
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 text-sm">
-        <span className="text-xs text-muted-foreground">Checking the sync…</span>
-        <Button size="sm" className="ml-auto" onClick={() => start(false)} disabled={busy}>
+      <>
+        <Button size="sm" variant="outline" onClick={() => start(false)} disabled={busy}>
           {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowsClockwise size={13} weight="bold" />}
           Sync all styles
         </Button>
-      </div>
+      </>
     )
   }
 
@@ -85,16 +84,18 @@ export function SsSyncPanel() {
   const left = st.running && st.total > st.done ? Math.ceil(((st.total - st.done) * 1.1) / 60) : 0
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 text-sm">
-      {/* IDLE SHOWS NOTHING BUT THE BUTTONS.
+    <>
+      {/* NO ROW OF ITS OWN. This was a full-width bordered strip holding one button, empty
+          whenever a sync wasn't running — which is nearly always. It now sits inline with
+          the other toolbar actions, and progress appears beneath only while it exists.
           The catalogue name, the "idle" tick and the product count were standing status for
           a thing that is almost always idle — a permanent row reporting that nothing is
           happening. Gone.
           What stays is the part that is only true while it matters: a sync takes the better
           part of an hour, and a long background job with no visible progress is a different
           bug from a noisy one. Errors stay too — those are the reason someone came here. */}
-      <div className="min-w-0 flex-1">
-        {st.running && (
+      {st.running && (
+        <div className="basis-full">
           <>
             <div className="text-xs text-muted-foreground">
               {st.done}/{st.total} styles{st.skipped ? ` (${st.skipped} already had)` : ""}{left ? ` · ~${left} min left` : ""}
@@ -103,13 +104,13 @@ export function SsSyncPanel() {
               <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
             </div>
           </>
-        )}
-        {!st.running && st.error && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
-            <Warning size={12} weight="fill" /> {st.error}
-          </span>
-        )}
-      </div>
+        </div>
+      )}
+      {!st.running && st.error && (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
+          <Warning size={12} weight="fill" /> {st.error}
+        </span>
+      )}
 
       {err && <span className="text-xs text-destructive">{err}</span>}
 
@@ -131,6 +132,6 @@ export function SsSyncPanel() {
           </button>
         </>
       )}
-    </div>
+    </>
   )
 }

@@ -435,7 +435,11 @@ export const colorNames = (colors?: SsColor[] | null): string[] =>
 /** `styleName` and `partNumber` are what a person actually types — "18500", "00760".
  *  They're now fetched with the style list so a style NUMBER is searchable, not just its
  *  marketing title. */
-export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; priceMax?: number | null; colors: SsColor[]; favorited?: boolean; styleName?: string; partNumber?: string }
+export type SsStyle = { styleID: string; brand: string; title: string; category?: string; image: string | null; price: number | null; priceMax?: number | null; colors: SsColor[]; favorited?: boolean; styleName?: string; partNumber?: string
+  /** Favourites carry these, joined from the synced skus. `synced: false` means the style
+   *  has never been pulled — different from a style with no colours, and only one of those
+   *  is fixed by pressing Sync. */
+  sizes?: string[]; synced?: boolean; colorCount?: number }
 export type SsStyleDetail = SsStyle & { sizes?: string[]; colorImages?: Record<string, string>; description?: string; extraImages?: string[]; error?: string }
 export function getSsStatus() {
   return api<{ configured?: boolean; synced_count?: number; last_sync?: string | null }>(`/api/ss/status`)
