@@ -87,6 +87,18 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
     const art = files.filter((f) => isArtFile(f.name))
     const rejected = files.filter((f) => !isMachineFile(f.name) && !isArtFile(f.name))
 
+    // REPLACING artwork is destructive and was silent. order_designs upserts on the line
+    // key, so a second image overwrites the first — and `artwork` is exactly how we know
+    // one is already there, since it is what this panel is displaying. The customer's file
+    // is the thing a machine file gets judged against; losing it to a stray drop is not
+    // recoverable from this screen.
+    if (art.length && artwork) {
+      const ok = window.confirm(
+        `This line already has artwork, and a line holds only one.\n\nReplace it with ${art.length > 1 ? art[art.length - 1].name : art[0].name}?`
+      )
+      if (!ok) return
+    }
+
     // A machine file on a line nobody marked embroidery is either a mis-drop or a
     // mislabelled line — and this route CHARGES. Ask before spending someone's money.
     // Embroidery is indicated by print_type, not a flag — same derivation orders-hub uses
@@ -120,9 +132,11 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
       saved.push(`${machine.length - failed.length} machine file${machine.length - failed.length === 1 ? "" : "s"}`)
     }
 
-    // Only the LAST image wins: order_designs upserts on (order, sku, kind), so dropping
+    // Only the LAST image wins: order_designs is keyed per LINE
+    // (order_id, coalesce(line_id, sku), kind), so a line holds ONE artwork and dropping
     // three would leave one row and two silently discarded uploads. Say so rather than
-    // appearing to have taken them all.
+    // appearing to have taken them all. Passing line_id matters — without it the key falls
+    // back to sku and two siblings of the same sku would overwrite each other.
     const artToSave = art.slice(-1)
     for (const f of artToSave) {
       try {
@@ -143,7 +157,7 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
     if (failed.length) setErr(`Couldn't upload: ${failed.join(", ")}`)
     if (notes.length) setDone(notes.join(" "))
     if (saved.length) onUploaded?.()
-  }, [order.id, item, onUploaded])
+  }, [order.id, item, onUploaded, artwork])
 
   const artName = `${numOf(order)}-${item.sku ?? "artwork"}`
 

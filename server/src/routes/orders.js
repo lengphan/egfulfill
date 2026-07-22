@@ -940,7 +940,13 @@ export function ordersRoutes(app, requireAuth) {
   });
 
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
-  // Save one design (data URL) for an order item. Upsert by (order, sku, kind).
+  // Save one design (data URL) for an order item.
+  //
+  // Upsert key is (order_id, coalesce(line_id, sku), kind) — LINE first. This comment used
+  // to say "(order, sku, kind)", which is the pre-line_id behaviour and is wrong: keyed on
+  // sku alone, two lines of the same sku share one artwork row and attaching art to one
+  // silently replaces the other's. The SQL was fixed; the comment was not, and it has since
+  // been believed by someone writing new code against it.
   app.post('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const { sku, data, name, kind, pos } = req.body || {};
