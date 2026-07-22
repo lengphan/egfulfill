@@ -671,18 +671,26 @@ export function OrdersHub() {
               const isCollapsed = !expandedIds.has(o.id)
               return (
                 <div key={o.id} className="p-5">
-                  {/* justify-between with exactly two children pushed them to opposite
-                      edges and left the middle empty — the dead space in the middle of
-                      every row. The identity block now GROWS to fill it, so the actions sit
-                      against content instead of against the far wall.
+                  {/* Growing the identity block to fill the row was the first fix for the
+                      dead middle, and it is not enough on a wide screen: justify-between
+                      still spends every spare pixel BETWEEN the two children, so at 1920 the
+                      identity ended at x≈654 and the actions began at x≈1454 — 800px of
+                      nothing between an order and the buttons that act on it.
+
+                      So: no justify-between, and the identity sizes to its content under a
+                      ceiling rather than filling the row. The actions sit immediately after
+                      it, and the leftover space collects at the END of the row, where it
+                      separates nothing. The ceiling is the width the identity already took
+                      at 1440 (where this always read fine), so narrower screens are
+                      unchanged and only the surplus on a wide screen is reclaimed.
 
                       The identity line is a grid, not a wrap: order number, customer and
                       the rest land on the same x-position in every row, so the eye can run
                       down a column instead of re-reading each row. Wide things (photos,
                       address, tracking) stay in the full-width strip below, where they have
                       room — which is why this isn't a strict table. */}
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
+                  <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-2 sm:flex-nowrap">
+                    <div className="min-w-0 max-w-3xl">
                       <div className="grid grid-cols-[auto_auto_minmax(7rem,auto)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
                         {/* A box on EVERY row, disabled where it can't be used.
                             Rendering it only on dispatchable rows was tried, and reads as
@@ -772,7 +780,7 @@ export function OrdersHub() {
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
                         ⋯ menu so the row isn't a wall of buttons. */}
                     {allShipped ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle size={14} weight="fill" /> Shipped</span>
                     ) : (() => {
                       const opts = stageOptionsFor(role, stage)
                       const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
@@ -787,7 +795,7 @@ export function OrdersHub() {
                         canStart ? "start" : canShip ? "ship" : canAdvance ? "advance" : null
                       const busyO = busy?.startsWith(o.id)
                       return (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 sm:shrink-0">
                           {/* Readiness sits with the actions, not in the metadata line: the
                               left of a row is identity, the right is state and what to do
                               about it. Sharing a line with store/date/address made five
@@ -954,7 +962,11 @@ export function OrdersHub() {
                           <span className="text-xs text-muted-foreground">H in</span>
                           <Input type="number" min={1} value={pkg.height} onChange={(e) => setPkg({ ...pkg, height: Number(e.target.value) })} className="h-9" />
                         </label>
-                        <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}`} className="ml-auto">
+                        {/* No ml-auto. This button buys a label FROM the five fields to its
+                            left, so flinging it to the far edge (x≈1655, 846px past the
+                            last field at 1920) separated it from its own inputs. It reads
+                            as the end of the form now, because it is. */}
+                        <Button size="sm" onClick={() => buyLabel(o)} disabled={busy === `label:${o.id}`}>
                           {busy === `label:${o.id}` ? <CircleNotch size={14} className="animate-spin" /> : <><Printer size={14} weight="bold" /> Buy USPS label</>}
                         </Button>
                       </div>
@@ -1036,8 +1048,13 @@ export function OrdersHub() {
                     {items.map((it, i) => {
                       const key = lineKey(o, it)
                       const art = artworkFor(o, it)
+                      // wrap on mobile (the actions drop to their own full-width line),
+                      // NOWRAP from sm up. With flex-wrap a content-sized identity WRAPS
+                      // rather than shrinks, so at 1440 a long line name pushed the actions
+                      // onto a second row. nowrap makes the identity give up width instead,
+                      // which is what truncate is already there for.
                       return (
-                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
+                        <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border p-2.5 sm:flex-nowrap">
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
                               only to the roles whose job it is; warehouse gets the zoom.
@@ -1047,7 +1064,7 @@ export function OrdersHub() {
                               describes and pushed the artwork off its position. It now
                               overlays the image corner on hover (below), so it costs no
                               space and stays where the image already is. */}
-                          <div className="group/art relative self-start">
+                          <div className="group/art relative shrink-0 self-start">
                           <ItemAvatar
                             item={it}
                             designs={designs[o.id]}
@@ -1079,7 +1096,28 @@ export function OrdersHub() {
                               and the tile carries one control instead of two stacked on the
                               same 24px. */}
                           </div>
-                          <div className="min-w-0 flex-1">
+                          {/* Sizes to its CONTENT, with a ceiling — deliberately not flex-1.
+                              Unbounded, this column ate the whole row: a short line name
+                              ("Short tee") ended at x≈469 while its Board button started at
+                              x≈1587, so the item and the controls acting on it sat 1118px
+                              apart and stopped reading as one thing.
+
+                              A flex-1 column with a max-width only half-fixes it — long
+                              names cluster, but a short one still leaves the dead space
+                              INSIDE the box, because the box always fills the cap. Dropping
+                              flex-1 lets a short line be short, so the actions follow the
+                              item's actual width. The cap is what this column already took
+                              at 1440, so long names truncate exactly as they did and no
+                              narrower screen moves.
+
+                              The floor is why there are two bounds and not one: pure
+                              shrink-to-fit put three sibling lines' controls at three
+                              different x-positions (1200/715/651), and a list you compare
+                              down wants its selects in a column. The floor aligns the
+                              ordinary rows and only a genuinely long title reaches past it.
+                              sm-scoped: 20rem is wider than a phone's content box, so
+                              applying it unconditionally would force a horizontal scroll. */}
+                          <div className="min-w-0 max-w-3xl sm:min-w-[20rem]">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
                                 artwork review (canDesign) picks it here while the order is
@@ -1145,7 +1183,7 @@ export function OrdersHub() {
                               </>
                             )}
                           </div>
-                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
                           {/* Own icon + a visible word. The pen-nib is the sidebar's
                               Board/Design Lab glyph — reusing it here made one symbol
                               mean three different things. */}
