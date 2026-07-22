@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, MagnifyingGlassPlus } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
+import { ArtworkZoom } from "@/components/app/artwork-zoom"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
@@ -212,6 +213,8 @@ export function OrdersHub() {
   }, [load])
   // Catalog powers the variant picker on factory-owned marketplace orders (which arrive
   // with no blank chosen). Loaded once.
+  // The line whose artwork is open at full size. Null = shut.
+  const [zoom, setZoom] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   useEffect(() => { getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => {}) }, [])
   // Blank stock, once for the board — so each line can say whether we can actually make it.
@@ -979,6 +982,18 @@ export function OrdersHub() {
                       const art = artworkFor(o, it)
                       return (
                         <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
+                          {/* Zoom is its own control rather than the avatar's click. The
+                              avatar already means "edit the placement" for the roles that
+                              can, and overloading it would make the same click do different
+                              things depending on who you are. */}
+                          <button
+                            onClick={() => setZoom({ order: o, item: it })}
+                            className="eg-tap self-start rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                            title="Open the artwork, download it, or attach a machine file"
+                            aria-label={`Open artwork for ${it.name || it.sku || "this line"}`}
+                          >
+                            <MagnifyingGlassPlus size={14} weight="bold" />
+                          </button>
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
                               only to the roles whose job it is; warehouse gets the zoom. */}
@@ -1268,6 +1283,21 @@ export function OrdersHub() {
       />
 
       <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>
+
+      {/* Keyed on the line so reopening on a different item can't show the previous one's
+          artwork for a frame. */}
+      {zoom && (
+        <ArtworkZoom
+          key={`${zoom.order.id}:${zoom.item.line_id ?? zoom.item.sku ?? ""}`}
+          order={zoom.order}
+          item={zoom.item}
+          artwork={artworkFor(zoom.order, zoom.item) || null}
+          open
+          onOpenChange={(v) => { if (!v) setZoom(null) }}
+          onUploaded={() => { setNote("Machine file attached."); load() }}
+          onSendToDesigner={canDesign ? () => { const z = zoom; setZoom(null); if (z) void sendToDesigner(z.order, z.item) } : undefined}
+        />
+      )}
     </div>
   )
 }

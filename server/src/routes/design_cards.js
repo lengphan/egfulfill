@@ -5,6 +5,7 @@ import { q } from '../db.js';
 import { isStaff } from '../auth.js';
 import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
+import { notify } from './notifications.js';
 import { bookDesignCost } from './pinkdesign.js';
 import { storageEnabled, fromDataUrl, designUrlTtlDays, presignGet, publicUrl } from '../storage.js';
 import { putObject } from '../storage.js';
@@ -249,17 +250,26 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     // send vendor:null and claim it anyway. Factory roles are untouched: operator,
     // warehouse and admin can still move, delete, and attach files to these cards.
     const isDesigner = (req.user && req.user.role) === 'designer';
+    // Named apart from the `ids` used by the prune below: that one is the set to KEEP,
+    // this one is the set to read lanes from. Same shape, opposite purpose.
+    const priorIds = rows.map((c) => c.id).filter((v) => v != null).map(String);
+    // Read the CURRENT lanes before writing. A card coming back — approved, or bounced to
+    // Fix — was completely silent: this endpoint is the only place lanes change, and it
+    // notified nobody, so "when the design comes back you'd know" was only true for someone
+    // already staring at the board. The before/after pair is the only place that transition
+    // is visible; once the upsert runs it's gone.
+    const before = new Map();
+    if (priorIds.length) {
+      const ex = await q(
+        'select id, vendor, vendor_ref, claimed_by, col, title, order_id from design_cards where id = any($1::bigint[])',
+        [priorIds]
+      ).catch(() => ({ rows: [] }));
+      for (const r of ex.rows) before.set(String(r.id), r);
+    }
     let guarded = null;
     if (isDesigner) {
-      const ids = rows.map((c) => c.id).filter((v) => v != null).map(String);
       guarded = new Map();
-      if (ids.length) {
-        const ex = await q(
-          'select id, vendor, vendor_ref, claimed_by, col from design_cards where id = any($1::bigint[])',
-          [ids]
-        ).catch(() => ({ rows: [] }));
-        for (const r of ex.rows) if (r.vendor) guarded.set(String(r.id), r);
-      }
+      for (const [id, r] of before.entries()) if (r.vendor) guarded.set(id, r);
     }
     for (const c of rows) {
       if (c.id == null) continue;
@@ -319,6 +329,44 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
       for (const c of approved.rows) {
         await bookDesignCost({ orderId: c.order_id, sku: c.sku, cardId: c.id, vendor: c.vendor }).catch(() => {});
       }
+    }
+    /**
+     * Tell the floor when a card comes back.
+     *
+     * Only the transitions someone is waiting on. A card moving incoming → in progress is
+     * a designer picking up work and needs no announcement; approved and fix are the two
+     * that hand the job BACK, and they were both silent.
+     *
+     * Role fan-out to operator/warehouse/admin, excluding whoever moved it — the person
+     * who dragged the card does not need telling what they just did, and in a shared queue
+     * that self-notification is most of the noise.
+     */
+    for (const c of rows) {
+      if (c.id == null) continue;
+      const prev = before.get(String(c.id));
+      if (!prev) continue;
+      const from = String(prev.col || '').toLowerCase();
+      const to = String(c.col || '').toLowerCase();
+      if (from === to) continue;
+      const label = prev.title || c.title || `Card ${c.id}`;
+      if (to === 'approved') {
+        notify({
+          roles: ['operator', 'warehouse', 'admin'], excludeUserId: req.user && req.user.sub,
+          type: 'design-card', title: 'Design approved',
+          body: label, entityId: String(c.id),
+          href: c.order_id || prev.order_id ? `/operator?order=${c.order_id || prev.order_id}` : '/designer',
+        }).catch(() => {});
+      } else if (to === 'fix') {
+        notify({
+          roles: ['operator', 'warehouse', 'admin'], excludeUserId: req.user && req.user.sub,
+          // Says what is needed, not just what happened — "sent back" without "needs
+          // changes" reads as a status rather than a request.
+          type: 'design-card', title: 'Design sent back — needs changes',
+          body: label, entityId: String(c.id),
+          href: c.order_id || prev.order_id ? `/operator?order=${c.order_id || prev.order_id}` : '/designer',
+        }).catch(() => {});
+      }
+      audit(req, 'design.lane', { entityType: 'design_card', entityId: String(c.id), before: { col: from }, after: { col: to } });
     }
     return { ok: true, count: rows.length };
   });
