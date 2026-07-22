@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { CheckCircle, XCircle, CircleNotch } from "@phosphor-icons/react"
-import { exchangeEtsy, exchangeShopify } from "@/lib/api"
+import { exchangeEtsy, exchangeShopify, exchangeTiktok } from "@/lib/api"
 import { readPkce, clearPkce } from "@/lib/etsy-oauth"
 import { getToken } from "@/lib/auth"
 import { clearShopifyOAuth } from "@/lib/shopify-oauth"
@@ -21,7 +21,12 @@ export default function OAuthCallbackPage() {
     // they're deferred, not synchronous mount renders.
     const run = async () => {
       const params = new URLSearchParams(window.location.search)
-      const code = params.get("code")
+      // TikTok Shop returns `auth_code`; Etsy and Shopify return `code`. Reading only
+      // `code` is why TikTok never worked here — the guard below fired before any
+      // provider branch was reached, and the flow died on "No authorization code
+      // returned" with nothing to say which provider or why.
+      const authCode = params.get("auth_code")
+      const code = params.get("code") ?? authCode
       const returnedState = params.get("state")
       const oauthErr = params.get("error")
 
@@ -46,6 +51,32 @@ export default function OAuthCallbackPage() {
           setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
         } catch (e: unknown) {
           clearShopifyOAuth()
+          setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
+        }
+        return
+      }
+
+      // TIKTOK SHOP. Identified by the `auth_code` param, the same shape-detection the
+      // legacy callback used — TikTok sends no `shop` (that's Shopify's marker) and no
+      // PKCE verifier is involved, so the parameter name is what distinguishes it.
+      //
+      // Checked BEFORE the sign-in guard below only in ordering, not in strictness: the
+      // guard applies here too, and is repeated inside this branch, because attaching a
+      // shop to an account is impossible without one.
+      if (authCode) {
+        if (!getToken()) {
+          setState({
+            kind: "error",
+            message: "You're signed out, so we can't attach this shop to your account. Sign in, then start the connection again from Stores.",
+          })
+          return
+        }
+        try {
+          const data = await exchangeTiktok({ auth_code: authCode })
+          if (data.error) throw new Error(data.error)
+          setState({ kind: "ok", shop: data.shop_name || "your TikTok shop" })
+          setTimeout(() => { window.location.href = "/stores?connected=1" }, 1200)
+        } catch (e: unknown) {
           setState({ kind: "error", message: e instanceof Error ? e.message : "Connection failed." })
         }
         return
@@ -94,7 +125,9 @@ export default function OAuthCallbackPage() {
           <>
             <CircleNotch size={40} weight="bold" className="mx-auto animate-spin text-primary" />
             <h1 className="mt-4 text-lg font-semibold">Connecting your shop…</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Exchanging your Etsy authorization. One moment.</p>
+            {/* Was "Exchanging your Etsy authorization" on every provider — it now says
+                what is actually happening. */}
+            <p className="mt-1 text-sm text-muted-foreground">Exchanging your authorization. One moment.</p>
           </>
         )}
         {state.kind === "ok" && (

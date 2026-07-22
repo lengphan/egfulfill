@@ -1590,6 +1590,22 @@ export function disconnectShopify(shopId: string) {
   return api<{ ok: boolean }>(`/api/shopify/connections/${encodeURIComponent(shopId)}`, { method: "DELETE" })
 }
 
+/**
+ * Finish a TikTok Shop connection.
+ *
+ * TikTok returns `auth_code`, NOT the `code` every other provider uses — which is why the
+ * React callback rejected TikTok outright before this existed: its `if (!code)` guard
+ * fired first and the flow died on "No authorization code returned". The server accepts
+ * either name, so this sends the one TikTok actually gave us.
+ *
+ * Authenticated, like the Etsy and Shopify exchanges: the shop attaches to an account, so
+ * it cannot complete while signed out.
+ */
+export function exchangeTiktok(body: { auth_code: string }) {
+  return api<{ ok?: boolean; shop_id?: string; shop_name?: string; scopes?: string; error?: string }>(
+    `/api/tiktok/exchange`, { method: "POST", body: JSON.stringify(body) })
+}
+
 export function exchangeEtsy(body: { code: string; code_verifier: string; redirect_uri: string }) {
   return api<{ shop_name?: string; error?: string }>(`/api/etsy/exchange`, {
     method: "POST",
