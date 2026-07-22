@@ -33,6 +33,13 @@ export function ScanStation() {
   const [busy, setBusy] = useState(false)
   const [camOpen, setCamOpen] = useState(false)
   const [camErr, setCamErr] = useState<string | null>(null)
+  // Which decoder started, and whether anything has decoded yet. A live picture that
+  // reads nothing looks exactly like a broken camera — that ambiguity hid an iOS-only
+  // failure, so the overlay now says which engine is running and speaks up if a while
+  // passes with no read.
+  const [engine, setEngine] = useState<"native" | "zxing" | null>(null)
+  const [sawScan, setSawScan] = useState(false)
+  const [stale, setStale] = useState(false)
   const [flash, setFlash] = useState<"ok" | "err" | null>(null)
   // Resolved after mount: `navigator` doesn't exist during prerender, so testing
   // for camera support inline would render a different tree on server vs client.
@@ -130,12 +137,14 @@ export function ScanStation() {
     let cancelled = false
     const v = videoRef.current
     if (!v) return
-    setCamErr(null)
-    startCameraScan(v, (code) => { commit(code, modeRef.current) })
+    setCamErr(null); setEngine(null); setSawScan(false); setStale(false)
+    const nudge = setTimeout(() => setStale(true), 12000)
+    startCameraScan(v, (code) => { clearTimeout(nudge); setSawScan(true); setStale(false); commit(code, modeRef.current) }, (e) => setEngine(e))
       .then((stop) => { if (cancelled) stop(); else stopRef.current = stop })
       .catch(() => { if (!cancelled) setCamErr("Could not start the camera — check permissions, or use the input below.") })
     return () => {
       cancelled = true
+      clearTimeout(nudge)
       stopRef.current?.(); stopRef.current = null
     }
   }, [camOpen, commit])
@@ -259,6 +268,17 @@ export function ScanStation() {
               <div className={"h-40 w-72 max-w-[80%] rounded-2xl border-4 transition-colors " + (flash === "ok" ? "border-emerald-400" : flash === "err" ? "border-red-500" : "border-white/70")} />
             </div>
             {camErr && <div className="absolute inset-x-4 top-4 rounded-lg bg-red-600 px-3 py-2 text-sm text-white">{camErr}</div>}
+            {/* Reading, and with what. Says nothing once a scan has landed — by then the
+                log below is the feedback and this would just be noise. */}
+            {!camErr && !sawScan && (
+              <div className="absolute inset-x-4 bottom-4 rounded-lg bg-black/70 px-3 py-2 text-xs text-white">
+                {engine === null
+                  ? "Starting the camera…"
+                  : stale
+                    ? `Reading (${engine === "native" ? "built-in" : "fallback"}) but nothing decoded yet. Fill the frame with the barcode, tap an inventory code to enlarge it first, and keep 15–25cm away.`
+                    : `Reading (${engine === "native" ? "built-in" : "fallback"} decoder) — point at a barcode.`}
+              </div>
+            )}
             {log[0] && (
               <div className={"absolute inset-x-4 bottom-4 rounded-xl px-4 py-3 text-white " + (log[0].ok ? "bg-emerald-600" : "bg-red-600")}>
                 <div className="flex items-center gap-2 text-sm font-semibold">

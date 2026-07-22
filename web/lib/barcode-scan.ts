@@ -90,12 +90,21 @@ export function releaseCamera() {
  * Returns a stop() that halts decoding but keeps the stream warm (no re-prompt
  * on reopen); call releaseCamera() to actually free the camera.
  */
-export async function startCameraScan(video: HTMLVideoElement, onScan: (value: string) => void): Promise<() => void> {
+export async function startCameraScan(
+  video: HTMLVideoElement,
+  onScan: (value: string) => void,
+  /** Which decoder actually started. Surfaced in the UI because "a live picture that
+   *  decodes nothing" and "a broken camera" look identical, and that ambiguity hid an
+   *  iOS-only failure for as long as it existed. */
+  onEngine?: (engine: "native" | "zxing") => void,
+): Promise<() => void> {
   const s = await getCamera()
-  video.srcObject = s
+  // Attributes only — NOT srcObject, and NOT play(). iOS refuses to autoplay a video
+  // inline without playsinline + muted, so those must be set before anything plays; but
+  // the stream is attached per-engine below, and doing it here breaks the ZXing path.
   video.setAttribute("playsinline", "true")
+  video.playsInline = true
   video.muted = true
-  await video.play().catch(() => {})
 
   // Same code within 2.5s is the same physical scan, not a second one.
   let lastHit = ""
@@ -112,6 +121,10 @@ export async function startCameraScan(video: HTMLVideoElement, onScan: (value: s
     let detector: BarcodeDetectorLike | null = null
     try { detector = new Ctor({ formats: FORMATS }) } catch { try { detector = new Ctor() } catch { detector = null } }
     if (detector) {
+      // The native detector reads frames off a video WE drive, so attach and play here.
+      video.srcObject = s
+      void video.play().catch(() => {})
+      onEngine?.("native")
       let raf = 0
       let alive = true
       const tick = () => {
@@ -124,9 +137,17 @@ export async function startCameraScan(video: HTMLVideoElement, onScan: (value: s
     }
   }
 
-  // iOS Safari path — ZXing decodes the same stream. Dynamic import keeps it out
-  // of the main bundle for the scanner-gun desktop station.
+  // iOS Safari path — no BarcodeDetector in WebKit, so ZXing decodes the stream.
+  //
+  // decodeFromStream ATTACHES THE STREAM ITSELF and then waits for the video to signal
+  // it can play. We used to assign srcObject and call play() above, before this line —
+  // so by the time ZXing attached its listener the event had already fired, the promise
+  // it awaits never settled, and decodeFromStream never returned. The camera showed a
+  // live picture and decoded nothing, with no error to explain it. That is why scanning
+  // worked on Chromium (native detector, never reaches here) and silently failed on
+  // every iPhone. Leave the attaching to ZXing.
   const { BrowserMultiFormatReader } = await import("@zxing/browser")
+  onEngine?.("zxing")
   const reader = new BrowserMultiFormatReader()
   const controls = await reader.decodeFromStream(s, video, (result) => { if (result) emit(result.getText()) })
   return () => { try { controls.stop() } catch {}; try { video.pause() } catch {} }
