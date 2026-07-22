@@ -12,6 +12,7 @@ import {
 import { CatalogPrint } from "@/components/app/catalog-print"
 import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
 import { CatalogExportHistory } from "@/components/app/catalog-export-history"
+import { CatalogSummaryBar } from "@/components/app/catalog-summary-bar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { colorsOf, swatchHex } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
@@ -44,6 +45,9 @@ export function CatalogView() {
   // Which saved catalogue to reopen. Separate from printOpen because the two show
   // different documents — one live, one as it was sent.
   const [reopenId, setReopenId] = useState<string | null>(null)
+  // Bumped whenever something is published, priced or removed, so the bar can't drift from
+  // the tables under it.
+  const [summaryTick, setSummaryTick] = useState(0)
 
   const load = useCallback(() => {
     getCatalogProducts()
@@ -76,7 +80,7 @@ export function CatalogView() {
       const r = await setCatalogSelection(chosen, include)
       if (r.error) throw new Error(r.error)
       setNote(`${r.updated ?? 0} ${include ? "published" : "removed from the catalogue"}.`)
-      load()
+      setSummaryTick((t) => t + 1); load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -94,7 +98,7 @@ export function CatalogView() {
       setNote(skipped
         ? `Priced ${r.priced ?? 0}. ${skipped} skipped — no supplier cost on record, so there was nothing to mark up: ${r.skippedNoCost!.slice(0, 4).join(", ")}${skipped > 4 ? "…" : ""}`
         : `Priced ${r.priced ?? 0} at cost + ${n}%.`)
-      load()
+      setSummaryTick((t) => t + 1); load()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -134,6 +138,11 @@ export function CatalogView() {
         </div>
       }
     >
+      {/* WHAT IS IN THE CATALOGUE, always on screen.
+          Publishing is persistent — closing the lookbook unpublishes nothing — but nothing
+          said so, so the only way to know was to open the preview and count. That is how
+          you add two, close the window, add a third, and find three. */}
+      <CatalogSummaryBar refresh={summaryTick} />
       <Tabs defaultValue="mine">
         <TabsList className="mx-5 mt-4">
           {/* TWO SOURCES, ONE CATALOGUE. Products we built carry our own SKU and print

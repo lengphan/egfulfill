@@ -15,7 +15,7 @@ import { ssImgUrl } from './ss.js';
 const PRICE_OWNERS = new Set(['admin', 'warehouse']);
 const money = (v) => Number(v || 0);
 
-export function catalogRoutes(app, requireAuth, requireStaff) {
+export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) {
   // Add the lossless `data` column if an older schema doesn't have it (idempotent).
   q('alter table catalog_products add column if not exists data jsonb').catch(() => {});
   /**
@@ -195,6 +195,42 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
       [source, refs, pct]).catch(() => ({ rowCount: 0 }));
     audit(req, 'catalog.pick.markup', { entityType: 'catalog', entityId: 'picks', after: { markupPct: pct, priced: r.rowCount } });
     return { ok: true, priced: r.rowCount, skippedNoCost: refs.length - r.rowCount };
+  });
+
+  /**
+   * WHAT IS IN THE CATALOGUE RIGHT NOW.
+   *
+   * Publishing is persistent — closing the lookbook does not unpublish anything — but
+   * nothing on the page said so, so the only way to learn what was in it was to open the
+   * preview and count. That is how someone adds two, closes the window, adds a third, and
+   * is surprised to see three.
+   *
+   * `unpriced` matters as much as the count: a published style with no price prints a blank
+   * where a number should be, and that is the kind of thing you notice after sending it.
+   */
+  app.get('/api/catalog/summary', { preHandler: requireStaff }, async () => {
+    const prod = await q(
+      `select count(*)::int as n, count(*) filter (where catalog_price is null)::int as unpriced
+         from catalog_products where in_catalog = true`
+    ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
+    const picks = await q(
+      `select count(*)::int as n, count(*) filter (where catalog_price is null)::int as unpriced
+         from catalog_picks`
+    ).then((r) => r.rows[0] || { n: 0, unpriced: 0 }).catch(() => ({ n: 0, unpriced: 0 }));
+    return {
+      products: prod.n, styles: picks.n, total: prod.n + picks.n,
+      unpriced: (prod.unpriced || 0) + (picks.unpriced || 0),
+    };
+  });
+
+  /** Empty the catalogue. Warehouse/admin only — it is one click that undoes an afternoon
+   *  of curation, and it should not be reachable by whoever happens to be logged in. */
+  app.delete('/api/catalog/summary', { preHandler: requireWarehouse }, async (req) => {
+    const a = await q('update catalog_products set in_catalog=false where in_catalog=true').catch(() => ({ rowCount: 0 }));
+    const b = await q('delete from catalog_picks').catch(() => ({ rowCount: 0 }));
+    const cleared = (a.rowCount || 0) + (b.rowCount || 0);
+    audit(req, 'catalog.cleared', { entityType: 'catalog', entityId: 'all', after: { cleared } });
+    return { ok: true, cleared };
   });
 
   /**

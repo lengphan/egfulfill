@@ -295,7 +295,7 @@ ordersRoutes(app, requireAuth);
 orderRefundRoutes(app, requireAuth);                    // itemised per-order charges + partial refunds back to the seller's wallet (admin/warehouse only)
 inventoryRoutes(app, requireStaff, requireWarehouse);
 designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse);
-catalogRoutes(app, requireAuth, requireStaff);
+catalogRoutes(app, requireAuth, requireStaff, requireWarehouse);
 etsyRoutes(app, requireAuth, requireStaff);
 tiktokRoutes(app, requireAuth, requireStaff);   // TikTok Shop OAuth connect (seller + admin connect their own shop)
 shopifyRoutes(app, requireAuth, requireStaff);  // Shopify per-store OAuth connect (seller + admin connect their own store)

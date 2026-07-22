@@ -327,6 +327,16 @@ export function getCatalogExport(id: string) {
     `/api/catalog/exports/${encodeURIComponent(id)}`)
 }
 
+/** What is currently IN the catalogue, from both sources. Read on every catalogue screen
+ *  so the state is never something you have to open a preview to discover. */
+export function getCatalogSummary() {
+  return api<{ products: number; styles: number; total: number; unpriced: number }>(
+    `/api/catalog/summary`)
+}
+export function clearCatalog() {
+  return api<{ ok?: boolean; cleared?: number; error?: string }>(`/api/catalog/summary`, { method: "DELETE" })
+}
+
 export type CatalogProduct = {
   id?: string | number
   name?: string
