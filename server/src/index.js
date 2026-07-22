@@ -45,6 +45,7 @@ import { dispatchRoutes } from './routes/dispatch.js';
 import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
 import { manifestRoutes } from './routes/manifests.js';
+import { manualSupplierRoutes } from './routes/manual_suppliers.js';
 import { pinkDesignRoutes } from './routes/pinkdesign.js';
 import { addClient } from './events.js';
 import { storageEnabled, putObject, deleteObject, presignGet, publicUrl, designUrlTtlDays } from './storage.js';
@@ -331,6 +332,7 @@ notificationRoutes(app, requireAuth);                  // per-user bell + read s
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
+manualSupplierRoutes(app, requireStaff, requireWarehouse); // shops with no API — saved links + prices
 
 /**
  * Ask S&S whether our open orders are still open.
