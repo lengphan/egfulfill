@@ -4,11 +4,11 @@ import { useEffect, useState } from "react"
 import { X, Printer, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
+import { sizesOf } from "@/lib/variant-resolve"
+import { colorsOf, swatchHex } from "@/components/app/products-catalog"
 
 const money = (n: number | string | null | undefined) =>
   n == null || n === "" ? "" : `$${(Number(n) || 0).toFixed(2)}`
-
-type Swatch = { name?: string; color?: string; image?: string; img?: string; hex?: string }
 
 /**
  * The catalogue as a printable document — a lookbook, not a spreadsheet.
@@ -35,19 +35,20 @@ export function CatalogPrint({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(t)
   }, [])
 
-  const variantsOf = (p: CatalogProduct) => {
-    const raw = (p as unknown as { colors?: Swatch[] }).colors
-    return Array.isArray(raw) ? raw.filter(Boolean) : []
-  }
-  const sizesOf = (p: CatalogProduct) => {
-    const raw = (p as unknown as { sizePrices?: { size?: string }[] }).sizePrices
-    return Array.isArray(raw) ? raw.map((s) => s?.size).filter(Boolean) as string[] : []
-  }
+  // The SAME accessors the product grid uses. I invented `colors` and `sizePrices` here
+  // and got empty arrays on every product — the colours live in `colorImages`, keyed by
+  // name with the variant photo as the value, and sizes come from the shared resolver
+  // which merges `sizes` and `sizePrices`. Reusing them is also what stops this drifting
+  // the next time a product shape changes.
   const imageOf = (p: CatalogProduct) =>
     (p as unknown as { image?: string; img?: string }).image ?? (p as unknown as { img?: string }).img ?? ""
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
+    // eg-print-root is not decoration: globals.css prints with
+    // `body > *:not(.eg-print-root) { display: none }`, so an overlay without this class
+    // is hidden outright and the printer emits a blank sheet. That is exactly what
+    // happened — the preview looked right on screen and printed nothing.
+    <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-white">
       {/* The toolbar is screen-only — @media print hides anything outside .print-area, so
           the printed document starts at the first product rather than with a button. */}
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
@@ -87,8 +88,9 @@ export function CatalogPrint({ onClose }: { onClose: () => void }) {
           <div className="space-y-6">
             {rows.map((p) => {
               const id = String(p.id ?? "")
-              const colours = variantsOf(p)
+              const colours = colorsOf(p)
               const sizes = sizesOf(p)
+              const colourImg = (p as unknown as { colorImages?: Record<string, string> }).colorImages ?? {}
               const img = imageOf(p)
               return (
                 // break-inside-avoid keeps a product whole: a card split across a page
@@ -122,16 +124,19 @@ export function CatalogPrint({ onClose }: { onClose: () => void }) {
                       <div className="mt-3">
                         <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Colours</div>
                         <div className="mt-1 flex flex-wrap gap-2">
-                          {colours.slice(0, 24).map((c, i) => (
-                            <span key={i} className="flex items-center gap-1.5 text-[11px]">
-                              {(c.image || c.img) ? (
+                          {colours.slice(0, 24).map((name) => (
+                            <span key={name} className="flex items-center gap-1.5 text-[11px]">
+                              {colourImg[name] ? (
+                                // The supplier's own photo of that colourway — the thing
+                                // a buyer is actually choosing between.
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={c.image || c.img} alt="" className="size-5 rounded-full border border-black/10 object-cover" />
+                                <img src={colourImg[name]} alt="" className="size-6 rounded-full border border-black/10 object-cover" />
                               ) : (
+                                // No photo: a named swatch still says more than nothing.
                                 <span className="size-4 rounded-full border border-black/10"
-                                  style={{ background: c.hex || c.color || "#eee" }} />
+                                  style={{ background: swatchHex(name) }} />
                               )}
-                              {c.name || c.color}
+                              {name}
                             </span>
                           ))}
                         </div>
