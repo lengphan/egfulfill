@@ -272,7 +272,26 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
  */
 const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'in_queue', 'queued', 'prescan'];
 
-async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
+/**
+ * `to` is the address the parcel was ACTUALLY sent to, and it is written back onto the
+ * order — which nothing did before.
+ *
+ * Buying a label was the one moment we provably knew where an order was going, and we
+ * threw it away: the recipient went to the carrier and the order's own `address` column
+ * stayed exactly as empty as it started. So an order could carry a tracking number, a
+ * label URL and a postage charge while the row still read "No address" — and it did, on
+ * every Etsy order held behind the PII gate, which is most of them. Nobody could answer
+ * "where did this one go?" from our own data.
+ *
+ * ONLY WHEN EMPTY. If the order already has a street we leave it alone: a marketplace
+ * address is richer than the flattened one the ship panel sends, and silently replacing
+ * what the sync authored is the thing that must never happen. This fills a hole; it does
+ * not overwrite a fact.
+ *
+ * Tagged `source: 'label'` so the row can say where it came from, the same way an Etsy or
+ * CSV address does, rather than appearing as though someone typed it by hand.
+ */
+async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref, to) {
   if (!orderId) return { shipped: false };
   // Book the postage as it's bought. The carrier tells us the price exactly once, in the
   // buy response — if we don't write it down here it's gone, and no report can recover
@@ -287,6 +306,34 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
        ${advance ? ", factory_status='awaiting_scan'" : ''}
      where id=$4`,
     [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
+
+  // Backfill the destination, only into an order that hasn't got one. Separate statement
+  // and best-effort for the same reason as the label reference below: the label is already
+  // bought and paid for, and failing to record where it went must not turn a successful
+  // purchase into a failed one.
+  //
+  // The guard is in SQL rather than a read-then-write so two labels bought at once can't
+  // both see "empty" and race. jsonb_strip_nulls keeps absent fields out of the object
+  // instead of storing nulls that every reader would then have to filter.
+  if (to && (to.street || to.street1) && (to.zip || to.postal_code)) {
+    await q(
+      `update orders
+          set address = jsonb_strip_nulls($1::jsonb)
+        where id = $2
+          and coalesce(address->>'street', address->>'street1', address->>'line1',
+                       address->>'first_line', address->>'address1', '') = ''`,
+      [JSON.stringify({
+        name: to.name || null,
+        street: to.street || to.street1 || null,
+        street2: to.street2 || null,
+        city: to.city || null,
+        state: to.state || null,
+        zip: to.zip || to.postal_code || null,
+        country: to.country || null,
+        source: 'label',
+      }), orderId]
+    ).catch(() => {});
+  }
 
   // The provider's own reference for this label. Like the cost above, it is told to us
   // exactly once — in the buy response — and cannot be recovered afterwards from the
@@ -325,7 +372,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy, b.to);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502);
@@ -361,7 +408,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
           + '<div style="text-align:center;font-family:monospace;font-weight:700;font-size:15px;margin-top:4px">' + t + '</div>'
           + ((b.refNo || b.refNo2 || b.contents) ? '<div style="border-top:1px dashed #bbb;margin-top:10px;padding-top:6px;font-size:10px;color:#555;line-height:1.5">' + [b.refNo ? 'Ref 1: ' + e(b.refNo) : '', b.refNo2 ? 'Ref 2: ' + e(b.refNo2) : '', b.contents ? e(b.contents) : ''].filter(Boolean).join('<br>') + '</div>' : '')
           + '<div style="text-align:center;font-size:10px;color:#999;margin-top:10px">NOT VALID FOR POSTAGE · TEST LABEL</div></div>';
-        const rec = await recordLabel(b.orderId, t, 'USPS');
+        const rec = await recordLabel(b.orderId, t, 'USPS', null, null, null, b.to);
         return { ok: true, mock: true, trackingNumber: t, imageType: 'HTML', labelHtml: html };
       }
       const oauth = await oauthToken();
@@ -410,7 +457,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
       }
       // Persist tracking onto the order if one was passed.
       if (b.orderId && tracking) {
-        await recordLabel(b.orderId, tracking, 'USPS');
+        await recordLabel(b.orderId, tracking, 'USPS', null, null, null, b.to);
       }
       return { ok: true, trackingNumber: tracking, imageType: imgType, labelImage, cost, contentType: ct };
     } catch (e) { reply.code(400); return { error: e.message }; }

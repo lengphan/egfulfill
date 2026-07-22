@@ -107,13 +107,17 @@ export const trackUrl = (carrier?: string | null, tracking?: string | null) => {
 /** Where an order's address came from, so a board can say whether it synced or was
  *  filled in by hand. Etsy withholds buyer addresses from the API, so "how did we get
  *  this" is genuinely useful operational information, not trivia. */
-export type AddressSource = "etsy" | "csv" | "email" | "manual" | "none"
+export type AddressSource = "etsy" | "csv" | "email" | "label" | "manual" | "none"
 export const addressSource = (o: OrderRow): AddressSource => {
   const a = (o.address ?? {}) as Record<string, string>
   const has = !!(a.street || a.first_line || a.line1 || a.address1)
   if (!has) return "none"
   if (a.source === "etsy-csv") return "csv"
   if (a.source === "etsy-email") return "email"
+  // Backfilled from the label we actually bought (usps.js recordLabel). Distinct from
+  // "manual": nobody typed it onto the ORDER — it is where the parcel was really sent,
+  // which is worth saying, and it only exists because the order had no address at all.
+  if (a.source === "label") return "label"
   // Came straight off the marketplace sync — the Etsy shape uses line1/first_line.
   if (a.first_line || a.line1) return "etsy"
   return "manual"
@@ -123,6 +127,7 @@ export const ADDRESS_SOURCE_LABEL: Record<AddressSource, string> = {
   etsy: "from Etsy",
   csv: "from CSV import",
   email: "from sale email",
+  label: "from the label",
   manual: "entered by hand",
   none: "no address yet",
 }
