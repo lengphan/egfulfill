@@ -428,6 +428,24 @@ export function ottoCapRoutes(app, requireAuth, requireStaff, requireAdmin, requ
     // in a form the person is looking at, rather than as a rejection from Otto.
     let card;
     if (String(b.payment_method || '').toLowerCase().replace(/[^a-z]/g, '') === 'creditcard') {
+      // ── PCI gate ──────────────────────────────────────────────────────────
+      // Taking a card here means this server PROCESSES and TRANSMITS a PAN, which is
+      // PCI DSS scope — SAQ D, not SAQ A. Not storing it avoids one of the three verbs,
+      // not the obligation. Otto expose no saved-card profile the way S&S do, so there
+      // is no token to send instead; the only ways out are their account terms, or Otto
+      // holding the card on their side.
+      //
+      // OFF unless deliberately enabled, because otherwise anyone with purchase access
+      // puts the business in scope by choosing an option in a dropdown. That should be a
+      // decision someone makes on purpose.
+      if (String(process.env.OTTO_CARD_ORDERS || '') !== '1') {
+        reply.code(400);
+        return {
+          error: 'Card payments to Otto are turned off.',
+          code: 'card_orders_disabled',
+          detail: 'Sending a card through EGFULFILL would put it inside PCI DSS scope, so this is disabled unless someone sets OTTO_CARD_ORDERS=1 on the server. Use Otto account terms instead — pick one in Settings › Suppliers — or ask Otto to keep the card on their side and bill it.',
+        };
+      }
       const c = b.card_details || {};
       const number = String(c.card_number || '').replace(/\D/g, '');
       const cvv = String(c.cvv || '').replace(/\D/g, '');

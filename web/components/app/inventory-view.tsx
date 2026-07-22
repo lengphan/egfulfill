@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Barcode } from "@/components/app/barcode"
+import { ScanQr } from "@/components/app/scan-code"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { getInventory, patchInventoryItem, addInventoryItem, deleteInventoryItem, getScanHistory, type InventoryItem, type ScanRow } from "@/lib/api"
@@ -307,14 +308,22 @@ function BarcodeZoom({ sku, onClose }: { sku: string | null; onClose: () => void
           <div className="space-y-3 pb-2">
             {/* Generous white padding IS the quiet zone — Code-128 needs a clear margin
                 either side or the scanner can't find the start/stop guards. */}
-            <div className="rounded-xl bg-white px-6 py-8">
-              {/* No in-SVG text: the SKU is rendered below in a larger face, and the
-                  baked-in label competes with the quiet zone for viewBox space. */}
-              <Barcode value={sku} height={130} width={3} fontSize={0} displayValue={false} fit />
+            {/* QR, not Code-128 — this is a SCREEN.
+                A 25-character SKU is 310 Code-128 modules, which in this box is 0.8px per
+                bar against the ~2px a camera needs. It was never scannable, whatever the
+                decoder did. The same SKU as a QR is 29 modules, about 8.5px each. The
+                1D code is still what goes on a PRINTED label, where the physical width
+                is there to spend. */}
+            <div className="flex flex-col items-center gap-4 rounded-xl bg-white px-6 py-8">
+              <ScanQr value={sku} size={260} />
+              {/* Kept underneath for a handheld gun, which reads 1D off a screen far
+                  better than a phone camera does. */}
+              <Barcode value={sku} height={70} width={2} fontSize={0} displayValue={false} fit />
             </div>
             <p className="text-center font-mono text-sm text-white/70">{sku}</p>
             <p className="text-center text-xs text-white/50">
-              Hold the phone 15–25cm away. Turn screen brightness up if it won&apos;t read.
+              Phone camera: use the square code. Handheld gun: either. Hold 15–25cm away and
+              turn screen brightness up if it won&apos;t read.
             </p>
           </div>
         )}
