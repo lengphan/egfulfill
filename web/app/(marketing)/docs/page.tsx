@@ -79,7 +79,13 @@ export default function DocsPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <header className="max-w-2xl space-y-3 pb-10">
-        <h1 className="text-3xl font-semibold tracking-tight">API reference</h1>
+        {/* Lowercase, and only the brand word carries the display serif — that echoes the
+            wordmark in the header instead of competing with it, which is what "The
+            EGFULFILL API" in all-caps Fraunces was doing. "API" stays in the body face so
+            the line reads as a label, not a second logo. */}
+        <h1 className="text-3xl font-semibold tracking-tight">
+          <span className="font-display">egfulfill</span> API
+        </h1>
         <p className="text-muted-foreground">
           Push orders into our factory and get production status and tracking back. REST over HTTPS,
           JSON in and out, API-key auth, signed webhooks.
