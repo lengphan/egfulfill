@@ -16,7 +16,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
-import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason } from "@/lib/factory-status"
+import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
@@ -326,6 +326,43 @@ export function OrdersHub() {
     } finally { setBusy(null) }
   }
   // Order-level status: flag / hold / advance every line at once.
+  /** The catch-up awaiting confirmation. Held rather than run, because skipping the
+   *  pipeline is the one stage change nobody should make by a single click. */
+  const [catchUp, setCatchUp] = useState<{ order: OrderRow; to: string; label: string } | null>(null)
+  const [catchingUp, setCatchingUp] = useState(false)
+
+  /**
+   * Walk an order forward, WRITING EVERY STAGE on the way rather than jumping.
+   *
+   * This is the sanctioned fast path for the case the no-skip rule would otherwise make
+   * painful: work that really did happen while the system wasn't watching — a backfill
+   * after downtime, a same-day job that was boxed on arrival, an order a partner shipped.
+   * The record still says what happened to the goods; only the click cost changes.
+   *
+   * Sequential ON PURPOSE. Each hop is an ordinary, individually-legal move, so the server
+   * rule stays strict and needs no exemption for this path, and audit_log gets a row per
+   * stage instead of one entry that says "shipped" and loses the rest. Firing them in
+   * parallel would race the per-item writes inside setOrderStatus and could leave the
+   * order at whichever finished last.
+   */
+  const runCatchUp = async () => {
+    if (!catchUp) return
+    const { order, to } = catchUp
+    const path = stagePath(order.factory_status ?? orderStage(order.items ?? []), to)
+    if (!path) { setCatchUp(null); return }
+    setCatchingUp(true)
+    try {
+      for (const s of path) await setOrderStatus(order, s)
+      setNote(`${numOf(order)} caught up to ${catchUp.label} — ${path.length} stages recorded.`)
+      setCatchUp(null)
+      load()
+    } catch (e) {
+      // Partial progress is REAL progress: the stages already written stand, and the order
+      // sits wherever it got to. Say so rather than implying the whole walk rolled back.
+      setActionErr(`Catch-up stopped partway: ${e instanceof Error ? e.message : "unknown error"}. The order is at whichever stage it reached.`)
+    } finally { setCatchingUp(false) }
+  }
+
   const setOrderStatus = async (o: OrderRow, to: string) => {
     setBusy(`ord:${o.id}`)
     try {
@@ -827,7 +864,14 @@ export function OrdersHub() {
                        * stageDenial), so what the tooltip says is what the API would say.
                        */
                       const withReason = (list: typeof FACTORY_STAGES) =>
-                        list.map((s) => ({ ...s, deny: stageDenialReason(role, stage, s.id) }))
+                        list.map((s) => {
+                          const deny = stageDenialReason(role, stage, s.id)
+                          // A skip this role could legally WALK isn't refused outright — it
+                          // becomes a catch-up, behind a confirmation. Every other refusal
+                          // stands: canWalk requires each intermediate hop to be permitted,
+                          // so an operator can't reach Shipped by calling it a catch-up.
+                          return { ...s, deny, walk: !!deny && canWalk(role, stage, s.id) }
+                        })
                       const prod = withReason([{ id: "", label: "Received", tone: "new" as const }, ...FACTORY_STAGES])
                       const exc = withReason(EXCEPTION_STAGES)
                       /**
@@ -941,11 +985,19 @@ export function OrdersHub() {
                                     {prod.map((s) => (
                                       <DropdownMenuItem
                                         key={s.id || "new"}
-                                        disabled={!!s.deny || normalizeStage(stage) === s.id}
-                                        title={s.deny ?? (normalizeStage(stage) === s.id ? "Already at this stage" : undefined)}
-                                        onClick={() => { if (!s.deny) setOrderStatus(o, s.id) }}
+                                        disabled={(!!s.deny && !s.walk) || normalizeStage(stage) === s.id}
+                                        title={s.walk
+                                          ? `Records every stage up to ${s.label} — asks first`
+                                          : s.deny ?? (normalizeStage(stage) === s.id ? "Already at this stage" : undefined)}
+                                        onClick={() => {
+                                          if (s.walk) { setCatchUp({ order: o, to: s.id, label: s.label }); return }
+                                          if (!s.deny) setOrderStatus(o, s.id)
+                                        }}
                                       >
                                         {s.label}
+                                        {/* Marked, so a catch-up is never mistaken for an
+                                            ordinary one-step move before it's clicked. */}
+                                        {s.walk && <span className="ml-auto text-[10px] text-muted-foreground">catch up</span>}
                                       </DropdownMenuItem>
                                     ))}
                                   </DropdownMenuGroup>
@@ -1526,6 +1578,50 @@ export function OrdersHub() {
             copies: Number(it.qty) || 1,
           }))}
       />
+
+      {/* THE CONFIRMATION. Skipping the pipeline is the one status change that should
+          never happen on a single click, so it names the order, the destination and every
+          stage about to be written — and says plainly that this records the work as done
+          rather than merely moving a label. */}
+      <Dialog open={!!catchUp} onOpenChange={(v) => { if (!v && !catchingUp) setCatchUp(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Catch up to {catchUp?.label}?</DialogTitle>
+          </DialogHeader>
+          {catchUp && (() => {
+            const from = catchUp.order.factory_status ?? orderStage(catchUp.order.items ?? [])
+            const path = stagePath(from, catchUp.to) ?? []
+            return (
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  {numOf(catchUp.order)} is at <span className="font-medium text-foreground">{stageMeta(normalizeStage(from))?.label ?? "Received"}</span>.
+                  {" "}This records <span className="font-medium text-foreground">{path.length} stages</span>, in order:
+                </p>
+                <ol className="space-y-1 rounded-lg border border-border bg-muted/30 p-3">
+                  {path.map((s, i) => (
+                    <li key={s || "new"} className="flex items-center gap-2 text-xs">
+                      <span className="grid size-4 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-medium text-primary">{i + 1}</span>
+                      {stageMeta(s)?.label ?? s}
+                    </li>
+                  ))}
+                </ol>
+                {/* The honest warning. Every stage here is a claim about what physically
+                    happened to the goods, and this writes all of them at once. */}
+                <p className="text-xs text-amber-700">
+                  Each stage is a record that the work was done. Only catch up when it really was —
+                  the floor and the seller both read this as what happened.
+                </p>
+              </div>
+            )
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCatchUp(null)} disabled={catchingUp}>Cancel</Button>
+            <Button onClick={() => void runCatchUp()} disabled={catchingUp}>
+              {catchingUp ? <><CircleNotch size={14} className="animate-spin" /> Recording…</> : `Record all stages`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>
 

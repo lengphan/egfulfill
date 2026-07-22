@@ -162,6 +162,40 @@ export function canSetStage(role: string, current: string | null | undefined, ta
   return stageDenialReason(role, current, target) === null
 }
 
+/**
+ * The stages to WRITE, in order, to get from here to there one step at a time.
+ *
+ * null when the move isn't a forward walk along the line — either end being a stop, or the
+ * target being backwards or the current stage. Those are single moves, not catch-ups.
+ */
+export function stagePath(current: string | null | undefined, target: string): string[] | null {
+  const ai = posOf(current), ti = posOf(target)
+  if (ai < 0 || ti < 0 || ti <= ai) return null
+  return LINE.slice(ai + 1, ti + 1)
+}
+
+/**
+ * Could this role reach `target` by walking, recording every stage on the way?
+ *
+ * This is the test behind the catch-up offer, and it is deliberately stricter than "is the
+ * destination allowed": EVERY intermediate step must be permitted too. An operator cannot
+ * catch an order up to Shipped by pretending the steps they may not make are incidental —
+ * if any single hop is refused, so is the walk.
+ *
+ * Only true for a genuine SKIP (two or more steps). One step is an ordinary move and
+ * doesn't need a confirmation.
+ */
+export function canWalk(role: string, current: string | null | undefined, target: string): boolean {
+  const path = stagePath(current, target)
+  if (!path || path.length < 2) return false
+  let at = normalizeStage(current)
+  for (const s of path) {
+    if (stageDenialReason(role, at, s) !== null) return false
+    at = s
+  }
+  return true
+}
+
 // Does this role get a status CONTROL for an item at this stage, or a read-only badge?
 // An operator past Awaiting scan keeps only the stop options, never the pipeline.
 export function stageOptionsFor(role: string, current: string | null | undefined): FactoryStage[] {
