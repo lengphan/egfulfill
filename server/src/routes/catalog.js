@@ -7,6 +7,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
+import { ssImgUrl } from './ss.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -66,6 +67,120 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
       // consumer can't hold a product and miss whether it's published.
       .map((row) => ({ ...row.data, inCatalog: !!row.in_catalog, catalogPrice: row.catalog_price == null ? null : Number(row.catalog_price) }));
     return isStaff(req.user) ? rows : rows.map(sellerSafe);
+  });
+
+  /**
+   * PUBLISHING A SUPPLIER STYLE, without copying it.
+   *
+   * catalog_products holds products WE built — priced, named, print method chosen. Turning
+   * 825 synced S&S styles into products to publish them would mean 825 rows of duplicated
+   * supplier data that goes stale the moment they re-sync, on a box with 1GB of RAM.
+   *
+   * So a pick is one small row: which supplier, which style, what we charge for it.
+   * Everything shown — images, colourways, sizes, names — is READ from ss_products at
+   * export time, which is already synced and already current. Nothing is copied, so
+   * nothing can drift.
+   */
+  q(`create table if not exists catalog_picks (
+       source text not null,
+       ref text not null,
+       catalog_price numeric(12,2),
+       created_at timestamptz default now(),
+       primary key (source, ref)
+     )`).catch(() => {});
+
+  /** Browse the synced supplier catalogue, style by style. Paged, because 825 styles is
+   *  not a dropdown and the box holding them has 1GB of RAM. */
+  app.get('/api/catalog/supplier-styles', { preHandler: requireStaff }, async (req) => {
+    const qy = req.query || {};
+    const term = String(qy.q || '').trim().toLowerCase();
+    const limit = Math.min(100, Math.max(1, Number(qy.limit) || 40));
+    const offset = Math.max(0, Number(qy.offset) || 0);
+    const args = [];
+    let where = "where p.style_id is not null and p.style_id <> ''";
+    if (term) {
+      args.push('%' + term + '%');
+      where += ` and (lower(p.style_name) like $${args.length} or lower(p.brand) like $${args.length} or lower(p.style_id) like $${args.length})`;
+    }
+    args.push(limit, offset);
+    // One row per STYLE, with its colourways and sizes rolled up. Aggregated in SQL rather
+    // than fetched and grouped in Node — 825 styles across ~30k skus is not a thing to pull
+    // into memory on this box.
+    const r = await q(
+      `select p.style_id, min(p.brand) as brand, min(p.style_name) as style_name,
+              min(p.category) as category,
+              max(p.image) filter (where p.image is not null and p.image <> '') as image,
+              array_agg(distinct p.color) filter (where p.color is not null and p.color <> '') as colors,
+              array_agg(distinct p.size)  filter (where p.size  is not null and p.size  <> '') as sizes,
+              max(p.price)::float as max_price,
+              (select cp.catalog_price from catalog_picks cp where cp.source='ss' and cp.ref = p.style_id) as catalog_price,
+              exists (select 1 from catalog_picks cp where cp.source='ss' and cp.ref = p.style_id) as picked
+         from ss_products p
+         ${where}
+        group by p.style_id
+        order by min(p.style_name)
+        limit $${args.length - 1} offset $${args.length}`, args
+    ).catch(() => ({ rows: [] }));
+    const total = await q(`select count(distinct style_id)::int as n from ss_products ${term ? '' : ''}`)
+      .then((x) => x.rows[0]?.n ?? 0).catch(() => 0);
+    return {
+      total,
+      styles: r.rows.map((x) => ({
+        source: 'ss', ref: x.style_id, name: x.style_name, brand: x.brand,
+        category: x.category, image: ssImgUrl(x.image), colors: x.colors || [], sizes: x.sizes || [],
+        // Our COST, staff-only — this route is requireStaff and never reaches a seller.
+        maxCost: x.max_price, catalogPrice: x.catalog_price == null ? null : Number(x.catalog_price),
+        picked: !!x.picked,
+      })),
+    };
+  });
+
+  /** Publish or unpublish supplier styles. */
+  app.post('/api/catalog/picks', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const refs = Array.isArray(b.refs) ? b.refs.map(String).filter(Boolean) : [];
+    const source = String(b.source || 'ss');
+    if (!refs.length) { reply.code(400); return { error: 'Nothing selected.' }; }
+    if (b.include === false) {
+      const r = await q('delete from catalog_picks where source=$1 and ref = any($2::text[])', [source, refs]);
+      audit(req, 'catalog.pick', { entityType: 'catalog', entityId: 'picks', after: { source, removed: r.rowCount } });
+      return { ok: true, removed: r.rowCount };
+    }
+    let added = 0;
+    for (const ref of refs) {
+      const r = await q(
+        `insert into catalog_picks (source, ref) values ($1,$2) on conflict (source, ref) do nothing`,
+        [source, ref]).catch(() => null);
+      if (r && r.rowCount) added++;
+    }
+    audit(req, 'catalog.pick', { entityType: 'catalog', entityId: 'picks', after: { source, added } });
+    return { ok: true, added, already: refs.length - added };
+  });
+
+  /** Price picked styles — explicitly, or a markup over what they cost us. */
+  app.post('/api/catalog/picks/pricing', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const source = String(b.source || 'ss');
+    if (b.ref && b.price !== undefined) {
+      const price = b.price === null || b.price === '' ? null : Math.max(0, Number(b.price));
+      await q('update catalog_picks set catalog_price=$3 where source=$1 and ref=$2', [source, String(b.ref), price]);
+      return { ok: true, ref: String(b.ref), catalogPrice: price };
+    }
+    const refs = Array.isArray(b.refs) ? b.refs.map(String).filter(Boolean) : [];
+    const pct = Number(b.markupPct);
+    if (!refs.length || !isFinite(pct) || pct < 0) { reply.code(400); return { error: 'Send {ref, price} or {refs, markupPct} with a non-negative percent.' }; }
+    // Cost is the HIGHEST sku price in the style — one catalogue price stands for every
+    // size, and deriving it from the cheapest would sell the largest sizes under cost.
+    const r = await q(
+      `update catalog_picks cp
+          set catalog_price = round((c.cost * (1 + $3::numeric / 100))::numeric, 2)
+         from (select style_id, max(price) as cost from ss_products
+                where style_id = any($2::text[]) and price is not null
+                group by style_id) c
+        where cp.source = $1 and cp.ref = c.style_id and c.cost > 0`,
+      [source, refs, pct]).catch(() => ({ rowCount: 0 }));
+    audit(req, 'catalog.pick.markup', { entityType: 'catalog', entityId: 'picks', after: { markupPct: pct, priced: r.rowCount } });
+    return { ok: true, priced: r.rowCount, skippedNoCost: refs.length - r.rowCount };
   });
 
   /**
@@ -142,7 +257,40 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
       }
     }
 
-    audit(req, 'catalog.export', { entityType: 'catalog', entityId: 'export', after: { products: rows.length, variants, all } });
+    /**
+     * Picked SUPPLIER STYLES, joined live rather than copied.
+     *
+     * A pick stores only (source, ref, price); the name, image, colourways and sizes are
+     * read from ss_products here, at export time. So a re-sync updates the catalogue for
+     * free and nothing can go stale — which is the entire reason a pick is three columns
+     * instead of a duplicated product row.
+     */
+    const picks = (await q(
+      `select cp.ref, cp.catalog_price,
+              min(p.style_name) as name, min(p.brand) as brand,
+              max(p.image) filter (where p.image is not null and p.image <> '') as image,
+              array_agg(distinct p.color) filter (where p.color is not null and p.color <> '') as colors,
+              array_agg(distinct p.size)  filter (where p.size  is not null and p.size  <> '') as sizes
+         from catalog_picks cp
+         join ss_products p on p.style_id = cp.ref
+        where cp.source = 'ss'
+        group by cp.ref, cp.catalog_price`
+    ).catch(() => ({ rows: [] }))).rows;
+
+    for (const p of picks) {
+      const price = p.catalog_price == null ? '' : Number(p.catalog_price).toFixed(2);
+      const colours = (p.colors && p.colors.length) ? p.colors : [''];
+      const sizes = (p.sizes && p.sizes.length) ? p.sizes : [''];
+      for (const c of colours) {
+        for (const z of sizes) {
+          out.push([p.ref, p.name || '', '', c || '', z || '', price, 'USD', img(p.image || ''), '', p.brand || 'S&S']
+            .map(esc).join(','));
+          variants++;
+        }
+      }
+    }
+
+    audit(req, 'catalog.export', { entityType: 'catalog', entityId: 'export', after: { products: rows.length, picks: picks.length, variants, all } });
     const name = `catalog-${new Date().toISOString().slice(0, 10)}.csv`;
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     reply.header('Content-Disposition', `attachment; filename="${name}"`);
