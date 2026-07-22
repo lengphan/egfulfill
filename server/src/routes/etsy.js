@@ -267,7 +267,7 @@ async function importReceipt(conn, rc, connectedSec, imgCache, isFactory) {
           await q(
             `insert into order_designs (order_id, sku, kind, data, name, pos, updated_at)
              values ($1,$2,'raster',$3,$4,$5, now())
-             on conflict (order_id, (coalesce(line_id, sku)), kind) do nothing`,
+             on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do nothing`,
             [id, tr.sku || null, built.design_data, 'Published artwork', built.design_pos || null]
           ).catch(() => {});
         }

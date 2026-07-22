@@ -388,6 +388,10 @@ export function ordersRoutes(app, requireAuth) {
   // every POST /api/orders/:id/designs died on `column "storage_key" does not exist`.
   // It self-healed on the next boot (the table existed by then), which is exactly what
   // made it hard to see: broken on fresh deploys only.
+  // ONE definition of the design key. It appears in the index and in every ON CONFLICT
+  // that writes artwork; a copy that drifts by one character throws 42P10 at runtime, on a
+  // path nobody exercises until a seller uploads.
+  const DESIGN_KEY = "coalesce('L:' || line_id, 'S:' || sku)";
   q(`create table if not exists order_designs (
        order_id text not null, sku text not null, kind text not null default 'raster',
        data text, name text, updated_at timestamptz default now(),
@@ -413,10 +417,14 @@ export function ordersRoutes(app, requireAuth) {
      * order_items has carried line_id for a while and item status is already keyed on it
      * (see setItemStatus); the design store never learned. This closes that.
      *
-     * The key becomes (order_id, coalesce(line_id, sku), kind), so rows that predate the
-     * column keep working on sku while new ones key on the line. Safe to create: before the
-     * backfill every line_id is null, so coalesce() is exactly the old key and no duplicate
-     * can exist.
+     * The key is (order_id, coalesce('L:'||line_id, 'S:'||sku), kind) — rows predating the
+     * column keep working on sku while new ones key on the line.
+     *
+     * THE PREFIXES ARE LOAD-BEARING. Plain coalesce(line_id, sku) mixes two identifier
+     * namespaces, and Etsy uses the same id shape for both: one row's line_id equalled
+     * another row's sku on the same order, so the index refused to build and every design
+     * save returned 500 with nothing for ON CONFLICT to match. Prefixing makes the two
+     * spaces disjoint by construction rather than by luck.
      */
     .then(() => q('alter table order_designs add column if not exists line_id text'))
     .then(async () => {
@@ -454,7 +462,7 @@ export function ordersRoutes(app, requireAuth) {
     .then(async () => {
       await q('alter table order_designs drop constraint if exists order_designs_pkey')
         .catch((e) => console.error('[order_designs] could not drop the old primary key:', e.message));
-      await q('create unique index if not exists order_designs_line_key on order_designs (order_id, (coalesce(line_id, sku)), kind)')
+      await q(`create unique index if not exists order_designs_line_key on order_designs (order_id, (${DESIGN_KEY}), kind)`)
         .catch((e) => console.error('[order_designs] COULD NOT CREATE order_designs_line_key — design saves will fail with 42P10 until this exists:', e.message));
       // Assert it, loudly. This index is load-bearing for every artwork write, and the
       // failure mode is a 500 on a path nobody tests until a seller uses it.
@@ -965,7 +973,8 @@ export function ordersRoutes(app, requireAuth) {
   // ── Design uploads (server-stored, so localStorage size is irrelevant) ──────
   // Save one design (data URL) for an order item.
   //
-  // Upsert key is (order_id, coalesce(line_id, sku), kind) — LINE first. This comment used
+  // Upsert key is (order_id, coalesce('L:'||line_id, 'S:'||sku), kind) — LINE first, and the
+  // prefixes keep the two id namespaces apart. This comment used
   // to say "(order, sku, kind)", which is the pre-line_id behaviour and is wrong: keyed on
   // sku alone, two lines of the same sku share one artwork row and attaching art to one
   // silently replaces the other's. The SQL was fixed; the comment was not, and it has since
@@ -1006,7 +1015,7 @@ export function ordersRoutes(app, requireAuth) {
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
        values ($1,$2,$10,$3,$4,$9,$5,$6,$7,$8, now())
-       on conflict (order_id, (coalesce(line_id, sku)), kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
+       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
       [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId]
     );

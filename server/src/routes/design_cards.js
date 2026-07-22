@@ -145,7 +145,7 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
     await q(
       `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, art_hash, updated_at)
        values ($1,$2,$7,'raster',$3,$4,$5,$6, now())
-       on conflict (order_id, (coalesce(line_id, sku)), kind) do update set
+       on conflict (order_id, (coalesce('L:' || line_id, 'S:' || sku)), kind) do update set
          data=excluded.data, storage_key=excluded.storage_key, name=excluded.name,
          art_hash=excluded.art_hash, updated_at=now()`,
       [orderId, sku, card.art_data || null, card.art_key || null, card.title || null, card.art_hash || null, lineId]
