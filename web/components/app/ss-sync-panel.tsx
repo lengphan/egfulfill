@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { CircleNotch, ArrowsClockwise, Stop, Warning, CheckCircle } from "@phosphor-icons/react"
+import { CircleNotch, ArrowsClockwise, Stop, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { getSsSyncStatus, startSsSyncAll, stopSsSyncAll, type SsSyncStatus } from "@/lib/api"
 
@@ -63,25 +63,28 @@ export function SsSyncPanel() {
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 text-sm">
+      {/* IDLE SHOWS NOTHING BUT THE BUTTONS.
+          The catalogue name, the "idle" tick and the product count were standing status for
+          a thing that is almost always idle — a permanent row reporting that nothing is
+          happening. Gone.
+          What stays is the part that is only true while it matters: a sync takes the better
+          part of an hour, and a long background job with no visible progress is a different
+          bug from a noisy one. Errors stay too — those are the reason someone came here. */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 font-medium">
-          Catalogue
-          {st.running
-            ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700">syncing</span>
-            : st.error
-              ? <span className="inline-flex items-center gap-1 text-[11px] font-medium text-destructive"><Warning size={11} weight="fill" /> {st.error}</span>
-              : <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><CheckCircle size={11} weight="fill" /> idle</span>}
-        </div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {/* State what's actually searchable. "26 products" is the number that explains
-              why a search came back empty, so it belongs on screen, not in a database. */}
-          {st.productsInDb.toLocaleString()} products across {st.stylesInDb.toLocaleString()} styles are searchable
-          {st.running && <> · {st.done}/{st.total} styles{st.skipped ? ` (${st.skipped} already had)` : ""}{left ? ` · ~${left} min left` : ""}</>}
-        </div>
         {st.running && (
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-          </div>
+          <>
+            <div className="text-xs text-muted-foreground">
+              {st.done}/{st.total} styles{st.skipped ? ` (${st.skipped} already had)` : ""}{left ? ` · ~${left} min left` : ""}
+            </div>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+            </div>
+          </>
+        )}
+        {!st.running && st.error && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive">
+            <Warning size={12} weight="fill" /> {st.error}
+          </span>
         )}
       </div>
 
