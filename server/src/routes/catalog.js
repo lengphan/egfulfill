@@ -184,6 +184,77 @@ export function catalogRoutes(app, requireAuth, requireStaff) {
   });
 
   /**
+   * Everything the printed lookbook needs, in one call.
+   *
+   * A spread per style: the hero shot, the description, the size run, and every colourway
+   * with its own photo, name and sku. The export CSV answers "what can I import"; this
+   * answers "what does it look like", and they need different shapes — a flat variant list
+   * cannot be laid out as a page.
+   *
+   * Colourways come from ss_products, grouped per style, so a picked style carries the
+   * supplier's own photo of each colour rather than one image repeated ten times.
+   */
+  app.get('/api/catalog/lookbook', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+
+    // Our own products.
+    const mine = (await q(
+      `select data, catalog_price from catalog_products where in_catalog = true order by created_at desc`
+    ).catch(() => ({ rows: [] }))).rows.map((row) => {
+      const d = sellerSafe(row.data) || {};
+      const ci = (d.colorImages && typeof d.colorImages === 'object') ? d.colorImages : {};
+      return {
+        ref: String(d.id ?? d.sku ?? ''), name: d.name || '', sku: d.sku || '',
+        description: d.description || '', brand: d.brand || '',
+        image: d.image || d.img || '',
+        price: row.catalog_price == null ? null : Number(row.catalog_price),
+        sizes: Array.isArray(d.sizes) ? d.sizes
+          : (Array.isArray(d.sizePrices) ? d.sizePrices.map((t) => t && t.size).filter(Boolean) : []),
+        colors: Object.keys(ci).map((name) => ({ name, sku: '', image: ci[name] || '' })),
+      };
+    });
+
+    // Picked supplier styles — colourways rolled up from their sku rows. One row per
+    // COLOUR, not per sku, so a style with 5 colours x 6 sizes gives 5 swatches and not 30.
+    const picked = (await q(
+      `select cp.ref, cp.catalog_price,
+              min(p.style_name) as name, min(p.brand) as brand,
+              max(p.image) filter (where p.image is not null and p.image <> '') as image,
+              array_agg(distinct p.size) filter (where p.size is not null and p.size <> '') as sizes
+         from catalog_picks cp
+         join ss_products p on p.style_id = cp.ref
+        where cp.source = 'ss'
+        group by cp.ref, cp.catalog_price`
+    ).catch(() => ({ rows: [] }))).rows;
+
+    const styleRefs = picked.map((p) => p.ref);
+    const coloursByStyle = new Map();
+    if (styleRefs.length) {
+      const cr = await q(
+        `select distinct on (style_id, color) style_id, color, sku, image
+           from ss_products
+          where style_id = any($1::text[]) and color is not null and color <> ''
+          order by style_id, color, (image is null), sku`, [styleRefs]
+      ).catch(() => ({ rows: [] }));
+      for (const row of cr.rows) {
+        if (!coloursByStyle.has(row.style_id)) coloursByStyle.set(row.style_id, []);
+        coloursByStyle.get(row.style_id).push({ name: row.color, sku: row.sku, image: ssImgUrl(row.image) });
+      }
+    }
+
+    const supplier = picked.map((p) => ({
+      ref: p.ref, name: p.name || p.ref, sku: p.ref,
+      description: '', brand: p.brand || 'S&S',
+      image: ssImgUrl(p.image),
+      price: p.catalog_price == null ? null : Number(p.catalog_price),
+      sizes: p.sizes || [],
+      colors: coloursByStyle.get(p.ref) || [],
+    }));
+
+    return { styles: [...mine, ...supplier] };
+  });
+
+  /**
    * Download the published catalogue.
    *
    * ONE ROW PER VARIANT, because that is what an importer needs: a buyer pasting this into

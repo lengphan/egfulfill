@@ -295,6 +295,18 @@ export function priceCatalogPicks(body: { refs?: string[]; markupPct?: number; r
     `/api/catalog/picks/pricing`, { method: "POST", body: JSON.stringify({ ...body, source: "ss" }) })
 }
 
+/** One spread in the printed lookbook: hero shot, sizes, and every colourway with its
+ *  own photo, name and sku. Shaped for a PAGE, not for an import — a flat variant list
+ *  cannot be laid out. */
+export type LookbookStyle = {
+  ref: string; name: string; sku: string; description: string; brand: string
+  image: string; price: number | null; sizes: string[]
+  colors: { name: string; sku: string; image: string }[]
+}
+export function getLookbook() {
+  return api<{ styles: LookbookStyle[] }>(`/api/catalog/lookbook`)
+}
+
 export type CatalogProduct = {
   id?: string | number
   name?: string

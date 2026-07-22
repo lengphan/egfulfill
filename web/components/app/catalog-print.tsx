@@ -3,60 +3,49 @@
 import { useEffect, useState } from "react"
 import { X, Printer, CircleNotch } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-import { getCatalogProducts, type CatalogProduct } from "@/lib/api"
-import { sizesOf } from "@/lib/variant-resolve"
-import { colorsOf, swatchHex } from "@/components/app/products-catalog"
+import { getLookbook, type LookbookStyle } from "@/lib/api"
 
-const money = (n: number | string | null | undefined) =>
-  n == null || n === "" ? "" : `$${(Number(n) || 0).toFixed(2)}`
+const money = (n: number | null | undefined) =>
+  n == null ? "" : `$${(Number(n) || 0).toFixed(2)}`
 
 /**
- * The catalogue as a printable document — a lookbook, not a spreadsheet.
+ * The catalogue as a printed lookbook — a page per style.
  *
- * PRINTED BY THE BROWSER, not rendered on the server. Generating PDFs server-side means
- * either a headless browser (which will not fit on a 1GB droplet alongside Postgres) or a
- * PDF library that would need its own layout engine and its own image fetching. The browser
- * already has both, has the images in cache, and produces a real PDF through Save as PDF.
- * The label sheet in this codebase prints the same way, so the print CSS already exists.
+ * LAID OUT AS A SPREAD, not a list. Hero shot and copy on the left, the colourway grid on
+ * the right, each swatch captioned with its own sku and colour name. That grid is the page:
+ * a buyer picks a colour by looking at it, and a list that names ten colours in a row of
+ * text is asking them to imagine the product instead of showing it.
  *
- * The CSV stays. It is for importing into someone else's system; this is for showing a
- * buyer what the product looks like. They are different jobs and the same file cannot do
- * both — a spreadsheet of image URLs is not a catalogue, which is the gap this closes.
+ * PRINTED BY THE BROWSER. Server-side PDF means a headless browser, which will not fit on a
+ * 1GB droplet beside Postgres, or a PDF library that needs its own layout engine and image
+ * fetching. The browser has both, has the images cached, and Save as PDF produces a real
+ * file. The label sheet prints the same way, so the print CSS already exists.
  */
 export function CatalogPrint({ onClose }: { onClose: () => void }) {
-  const [rows, setRows] = useState<CatalogProduct[] | null>(null)
+  const [rows, setRows] = useState<LookbookStyle[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setTimeout(() => {
-      getCatalogProducts()
-        .then((r) => setRows((r ?? []).filter((p) => p.inCatalog)))
-        .catch(() => setRows([]))
+      getLookbook()
+        .then((r) => setRows(r.styles ?? []))
+        .catch((e: Error) => { setErr(e.message); setRows([]) })
     }, 0)
     return () => clearTimeout(t)
   }, [])
 
-  // The SAME accessors the product grid uses. I invented `colors` and `sizePrices` here
-  // and got empty arrays on every product — the colours live in `colorImages`, keyed by
-  // name with the variant photo as the value, and sizes come from the shared resolver
-  // which merges `sizes` and `sizePrices`. Reusing them is also what stops this drifting
-  // the next time a product shape changes.
-  const imageOf = (p: CatalogProduct) =>
-    (p as unknown as { image?: string; img?: string }).image ?? (p as unknown as { img?: string }).img ?? ""
-
   return (
-    // eg-print-root is not decoration: globals.css prints with
-    // `body > *:not(.eg-print-root) { display: none }`, so an overlay without this class
-    // is hidden outright and the printer emits a blank sheet. That is exactly what
-    // happened — the preview looked right on screen and printed nothing.
-    <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-white">
-      {/* The toolbar is screen-only — @media print hides anything outside .print-area, so
-          the printed document starts at the first product rather than with a button. */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
+    // eg-print-root is load-bearing: globals.css prints with
+    // `body > *:not(.eg-print-root) { display: none }`, so an overlay without it is hidden
+    // and the printer emits a blank sheet.
+    <div className="eg-print-root fixed inset-0 z-50 overflow-y-auto bg-neutral-100">
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-3 print:hidden">
         <span className="text-sm font-medium">
-          {rows === null ? "Loading…" : `${rows.length} product${rows.length === 1 ? "" : "s"}`}
+          {rows === null ? "Loading…" : `${rows.length} style${rows.length === 1 ? "" : "s"}`}
         </span>
         <span className="text-xs text-muted-foreground">
-          Print → <strong>Save as PDF</strong>. Tick &ldquo;Background graphics&rdquo; or the swatches print blank.
+          Print → <strong>Save as PDF</strong>. Tick <strong>Background graphics</strong>, or the
+          swatches and panels print white.
         </span>
         <div className="ml-auto flex gap-2">
           <Button size="sm" onClick={() => window.print()} disabled={!rows?.length}>
@@ -66,100 +55,132 @@ export function CatalogPrint({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      {/* Fixed A4 width so what's on screen is what lands on the page. Sizing by viewport
-          would reflow at print time and the preview would be a guess. */}
-      <div className="print-area mx-auto w-[210mm] px-8 py-8">
-        <header className="mb-8 border-b border-black/10 pb-4">
-          <h1 className="font-display text-3xl font-semibold">EGFULFILL</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Product catalogue · {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-          </p>
-        </header>
-
+      <div className="print-area mx-auto">
         {rows === null ? (
-          <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
-            <CircleNotch size={16} className="animate-spin" /> Loading the catalogue…
+          <div className="flex items-center justify-center gap-2 py-24 text-sm text-muted-foreground">
+            <CircleNotch size={16} className="animate-spin" /> Building the catalogue…
           </div>
+        ) : err ? (
+          <p className="py-24 text-center text-sm text-destructive">Couldn&apos;t load the catalogue: {err}</p>
         ) : rows.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            Nothing is published yet — tick some products and publish them first.
+          <p className="py-24 text-center text-sm text-muted-foreground">
+            Nothing is published yet — publish some products or supplier styles first.
           </p>
         ) : (
-          <div className="space-y-6">
-            {rows.map((p) => {
-              const id = String(p.id ?? "")
-              const colours = colorsOf(p)
-              const sizes = sizesOf(p)
-              const colourImg = (p as unknown as { colorImages?: Record<string, string> }).colorImages ?? {}
-              const img = imageOf(p)
-              return (
-                // break-inside-avoid keeps a product whole: a card split across a page
-                // fold shows an image on one sheet and its price on the next.
-                <article key={id} className="flex gap-5 break-inside-avoid border-b border-black/5 pb-6 last:border-0">
-                  <div className="size-40 shrink-0 overflow-hidden rounded-lg border border-black/10 bg-neutral-50">
-                    {img ? (
+          rows.map((st) => (
+            // ONE STYLE PER PAGE. A4 at 210×297mm with the page break forced after each,
+            // so a colourway grid never starts on one sheet and finishes on the next —
+            // which is the one thing that makes a printed catalogue look homemade.
+            <section
+              key={st.ref}
+              className="eg-sheet mx-auto mb-6 flex w-[210mm] flex-col bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
+              style={{ minHeight: "297mm" }}
+            >
+              <div className="grid flex-1 grid-cols-2 gap-8">
+                {/* LEFT — the product itself, big. */}
+                <div className="flex flex-col">
+                  <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50">
+                    {st.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img} alt={p.name || id} className="size-full object-contain" />
+                      <img src={st.image} alt={st.name} className="size-full object-contain" />
                     ) : (
-                      <div className="flex size-full items-center justify-center text-xs text-muted-foreground">no image</div>
+                      <span className="text-xs text-neutral-400">no image</span>
                     )}
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-3">
-                      <h2 className="min-w-0 flex-1 text-lg font-semibold leading-tight">{p.name || id}</h2>
-                      {/* The catalogue price, never base_price. This document goes to
-                          buyers who are not our sellers. */}
-                      <span className="shrink-0 text-lg font-semibold tabular-nums">{money(p.catalogPrice)}</span>
+                  <h2 className="mt-5 font-display text-2xl font-bold uppercase leading-tight tracking-tight">
+                    {st.name}
+                  </h2>
+                  <div className="mt-1 flex items-baseline gap-2 text-xs text-neutral-500">
+                    <span className="font-mono">{st.sku}</span>
+                    {st.brand && <span>· {st.brand}</span>}
+                  </div>
+
+                  {st.description && (
+                    <p className="mt-3 text-[11px] leading-relaxed text-neutral-600">{st.description}</p>
+                  )}
+
+                  {st.sizes.length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                        Available sizes
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {st.sizes.map((z) => (
+                          <span key={z} className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-medium">
+                            {z}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <div className="mt-0.5 font-mono text-xs text-muted-foreground">{p.sku || id}</div>
+                  )}
 
-                    {(p as unknown as { description?: string }).description && (
-                      <p className="mt-2 text-sm leading-snug text-neutral-700">
-                        {(p as unknown as { description?: string }).description}
-                      </p>
-                    )}
+                  {/* The price sits with the product, not in the colour grid — it's the
+                      same for every colourway, and repeating it under ten swatches reads
+                      as ten different prices. */}
+                  {st.price != null && (
+                    <div className="mt-auto pt-4 text-2xl font-semibold tabular-nums">{money(st.price)}</div>
+                  )}
+                </div>
 
-                    {colours.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Colours</div>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {colours.slice(0, 24).map((name) => (
-                            <span key={name} className="flex items-center gap-1.5 text-[11px]">
-                              {colourImg[name] ? (
-                                // The supplier's own photo of that colourway — the thing
-                                // a buyer is actually choosing between.
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={colourImg[name]} alt="" className="size-6 rounded-full border border-black/10 object-cover" />
-                              ) : (
-                                // No photo: a named swatch still says more than nothing.
-                                <span className="size-4 rounded-full border border-black/10"
-                                  style={{ background: swatchHex(name) }} />
-                              )}
-                              {name}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {sizes.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Sizes</div>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {sizes.map((s) => (
-                            <span key={s} className="rounded border border-black/10 px-1.5 py-0.5 text-[11px]">{s}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                {/* RIGHT — every colourway, captioned. */}
+                <div className="flex flex-col">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
+                    Available colours
                   </div>
-                </article>
-              )
-            })}
-          </div>
+                  {st.colors.length === 0 ? (
+                    <p className="mt-2 text-[11px] text-neutral-400">
+                      No colourway images on this style.
+                    </p>
+                  ) : (
+                    // Five columns, capped at 20. Past that a page stops being readable and
+                    // the overflow is stated rather than silently dropped.
+                    <div className="mt-2 grid grid-cols-5 gap-x-2 gap-y-3">
+                      {st.colors.slice(0, 20).map((c) => (
+                        <div key={c.name + c.sku} className="flex flex-col items-center">
+                          <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded bg-neutral-50">
+                            {c.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={c.image} alt={c.name} className="size-full object-contain" />
+                            ) : (
+                              <span className="px-1 text-center text-[7px] leading-tight text-neutral-400">{c.name}</span>
+                            )}
+                          </div>
+                          {/* SKU then colour, the way a buyer reads it back to you when
+                              they order — the name alone is not orderable. */}
+                          {c.sku && <div className="mt-1 w-full truncate text-center font-mono text-[6px] text-neutral-500">{c.sku}</div>}
+                          <div className="w-full truncate text-center text-[7px] leading-tight text-neutral-700">{c.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {st.colors.length > 20 && (
+                    <p className="mt-2 text-[9px] text-neutral-500">
+                      + {st.colors.length - 20} more colours — ask us for the full range.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <footer className="mt-6 flex items-center justify-between border-t border-neutral-200 pt-3 text-[9px] text-neutral-400">
+                <span className="font-display text-sm font-semibold tracking-tight text-neutral-700">EGFULFILL</span>
+                <span>{new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+              </footer>
+            </section>
+          ))
         )}
       </div>
+
+      {/* One sheet per page, and the shadow/gap that make it look like paper on screen are
+          removed in print — a printed drop shadow is a grey smear. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 0; }
+          .eg-sheet { break-after: page; page-break-after: always; box-shadow: none !important; margin: 0 !important; }
+          .eg-sheet:last-child { break-after: auto; page-break-after: auto; }
+          .eg-print-root { background: #fff !important; }
+        }
+      `}</style>
     </div>
   )
 }
