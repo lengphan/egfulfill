@@ -180,6 +180,27 @@ function safePayload(p) {
   };
 }
 
+/**
+ * Render one item from an Otto error array.
+ *
+ * `[].join()` stringifies an object as "[object Object]", which is exactly what a
+ * rejected order looked like: "options: [object Object] [object Object] …". Otto were
+ * listing the shipping services that WOULD have worked, and we threw that away — the one
+ * piece of information that makes the failure fixable. Their option objects are shaped
+ * like { code/id, name/label/description }, so name the pair when we can and fall back to
+ * compact JSON rather than to nothing.
+ */
+function describeOttoValue(v) {
+  if (v == null) return '';
+  if (typeof v !== 'object') return String(v);
+  const code = v.code ?? v.id ?? v.value ?? v.service ?? v.shipping_method ?? null;
+  const name = v.name ?? v.label ?? v.description ?? v.title ?? null;
+  if (code != null && name) return `${name} (${code})`;
+  if (name) return String(name);
+  if (code != null) return String(code);
+  return JSON.stringify(v).slice(0, 120);
+}
+
 function describeOttoError(d, prefix = '') {
   if (d == null) return 'no detail returned';
   if (typeof d === 'string') return d.slice(0, 400);
@@ -191,11 +212,11 @@ function describeOttoError(d, prefix = '') {
   const parts = [];
   for (const [field, val] of Object.entries(d)) {
     const label = prefix ? `${prefix}.${field}` : field;
-    if (Array.isArray(val)) parts.push(`${label}: ${val.join(' ')}`);
+    if (Array.isArray(val)) parts.push(`${label}: ${val.map(describeOttoValue).join(', ')}`);
     else if (val && typeof val === 'object') parts.push(describeOttoError(val, label));
     else if (val != null) parts.push(`${label}: ${val}`);
   }
-  return parts.join(' · ').slice(0, 500) || JSON.stringify(d).slice(0, 400);
+  return parts.join(' · ').slice(0, 700) || JSON.stringify(d).slice(0, 400);
 }
 
 function ottoImg(u) {
