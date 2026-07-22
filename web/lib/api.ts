@@ -1034,6 +1034,33 @@ export function updateProfile(patch: { name?: string; username?: string | null; 
 // Design cards — the Designer board (kanban). Staff see all; sellers see their own.
 // The POST is a WHOLE-BOARD replace (upsert all + delete the rest), so always send the
 // full array of the raw rows (with your edits) to avoid wiping other cards/fields.
+/**
+ * Create a card that belongs to no order yet — artwork that arrived before the job did.
+ *
+ * Separate from the bulk board save on purpose: that endpoint replaces the whole board
+ * from client state, so a create routed through it would race any other tab saving at the
+ * same moment, and a just-uploaded design lost to someone else's stale board is not
+ * recoverable.
+ */
+export function createDesignCard(body: { title: string; data?: string; type?: string; sku?: string }) {
+  return api<DesignCard & { error?: string }>(`/api/design_cards/new`, {
+    method: "POST", body: JSON.stringify(body),
+  })
+}
+
+/**
+ * Attach a card to an order line.
+ *
+ * Writes the artwork into the order's designs in the same request — setting the order id
+ * alone would leave the order's design tag reading empty while the board claimed the work
+ * was done, with both tables honestly reporting their own contents.
+ */
+export function assignDesignCard(id: string, body: { orderId: string; sku: string; lineId?: string }) {
+  return api<{ ok?: boolean; orderId?: string; sku?: string; error?: string }>(
+    `/api/design_cards/${encodeURIComponent(id)}/assign`,
+    { method: "POST", body: JSON.stringify(body) })
+}
+
 export type DesignCard = {
   id: number | string
   title?: string

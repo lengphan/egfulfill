@@ -6,6 +6,9 @@ import { isStaff } from '../auth.js';
 import { moveFunds } from './wallet.js';
 import { audit } from '../audit.js';
 import { bookDesignCost } from './pinkdesign.js';
+import { storageEnabled, fromDataUrl, designUrlTtlDays, presignGet, publicUrl } from '../storage.js';
+import { putObject } from '../storage.js';
+import { hashOf } from '../fingerprint.js';
 
 export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // Where this card's design work happens. null = our own designers (the default and the
@@ -20,11 +23,150 @@ export function designCardsRoutes(app, requireAuth, requireStaff, requireAdmin, 
   // matching on sku alone — and two lines of the same sku are different jobs, so a second
   // line either silently reused the first card or duplicated it. See CLAUDE.md §5.
   q('alter table design_cards add column if not exists line_id text').catch(() => {});
+  // A MANUAL card carries its own artwork, because it exists before any order does. The
+  // bytes go to object storage under the SAME namespace order designs use — identical
+  // content whichever door it came in by — so assigning the card to an order later is a
+  // key copy rather than a re-upload.
+  q('alter table design_cards add column if not exists art_key text').catch(() => {});
+  q('alter table design_cards add column if not exists art_hash text').catch(() => {});
+  q('alter table design_cards add column if not exists art_data text').catch(() => {});
+  // Who made it and when — a manual card has no order to inherit provenance from.
+  q('alter table design_cards add column if not exists created_by text').catch(() => {});
+  q('alter table design_cards add column if not exists created_at timestamptz default now()').catch(() => {});
+
+  const artUrlOf = (row) => {
+    if (!row || !row.art_key) return null;
+    return designUrlTtlDays() > 0 ? presignGet(row.art_key) : publicUrl(row.art_key);
+  };
+  const extFromMime = (mime) => {
+    const m = String(mime || '').toLowerCase();
+    if (m.includes('png')) return '.png';
+    if (m.includes('jpeg') || m.includes('jpg')) return '.jpg';
+    if (m.includes('webp')) return '.webp';
+    if (m.includes('svg')) return '.svg';
+    if (m.includes('pdf')) return '.pdf';
+    return '';
+  };
+
+  /**
+   * Create ONE card that belongs to no order.
+   *
+   * Every card until now was born from an order line, and the whole-list upsert below
+   * skips rows with no id — so there was no way to create one at all. This is the door for
+   * work that arrives before an order exists: a seller emails artwork, someone drops a file
+   * on the board, a design gets made speculatively.
+   *
+   * Deliberately NOT part of the bulk upsert. That endpoint replaces the board wholesale
+   * from client state; a create that went through it would race any other tab saving at the
+   * same time, and losing a just-uploaded design to someone else's stale board is not a
+   * recoverable mistake.
+   */
+  app.post('/api/design_cards/new', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    if (!title) { reply.code(400); return { error: 'Give the card a name — an untitled card is unfindable the moment there are two.' }; }
+    const data = b.data ? String(b.data) : null;
+
+    let artKey = null, artHash = null, artData = null;
+    if (data) {
+      artHash = hashOf(data);
+      if (storageEnabled()) {
+        try {
+          const parsed = fromDataUrl(data);
+          // Same namespace as order designs: the bytes are the same thing, and assigning
+          // this card to an order should not have to move or duplicate them.
+          const key = `order-designs/${artHash}${extFromMime(parsed.mime)}`;
+          await putObject(key, parsed.buffer, parsed.mime, designUrlTtlDays() > 0 ? 'private' : 'public-read');
+          artKey = key;
+        } catch (e) {
+          // Storage off or failing must not lose the upload — fall back to inline, exactly
+          // as the order-design path does.
+          req.log?.warn?.({ err: e }, 'manual design card upload failed - keeping inline');
+          artData = data;
+        }
+      } else {
+        artData = data;
+      }
+    }
+
+    const r = await q(
+      `insert into design_cards (title, type, col, sku, order_id, line_id, art_key, art_hash, art_data, thumb, created_by)
+       values ($1,$2,'incoming',$3,null,null,$4,$5,$6,$7,$8)
+       returning *`,
+      [title, b.type ? String(b.type) : null, b.sku ? String(b.sku) : null,
+       artKey, artHash, artData, artKey ? null : artData, String((req.user && req.user.sub) || '')]
+    ).catch((e) => { reply.code(500); return { error: e.message }; });
+    if (!r || r.error) return r || { error: 'Could not create the card.' };
+
+    const row = r.rows[0];
+    audit(req, 'design.card.created', { entityType: 'design_card', entityId: String(row.id), after: { title, manual: true } });
+    return { ...row, thumb: artUrlOf(row) || row.art_data || row.thumb };
+  });
+
+  /**
+   * Attach a card to an order line.
+   *
+   * THE JOIN BETWEEN THE TWO SYSTEMS, and the part most likely to go quietly wrong. Setting
+   * order_id alone would give you a card that points at an order whose design tag still
+   * reads empty — the board says the work is done, the order says no artwork was ever
+   * attached, and both are reading their own table honestly. So the artwork is written into
+   * order_designs in the same request, which is what every reader of "does this line have a
+   * design" actually consults.
+   *
+   * No re-upload: the card already stored its bytes under the order-design namespace, so
+   * this copies the key. When storage is off both sides hold the same inline data.
+   */
+  app.post('/api/design_cards/:id/assign', { preHandler: requireStaff }, async (req, reply) => {
+    const b = req.body || {};
+    const orderId = String(b.orderId || '').trim();
+    const sku = String(b.sku || '').trim();
+    if (!orderId || !sku) { reply.code(400); return { error: 'An order and a line are both required — a card on an order but no line belongs to no job.' }; }
+
+    const card = await q('select * from design_cards where id=$1::bigint', [String(req.params.id)])
+      .then((r) => r.rows[0]).catch(() => null);
+    if (!card) { reply.code(404); return { error: 'Card not found.' }; }
+    if (card.order_id) { reply.code(409); return { error: `Already assigned to order ${card.order_id}. Detach it there first — silently moving a design between orders is how one seller's artwork ends up on another's job.` }; }
+
+    const order = await q('select id from orders where id=$1', [orderId]).then((r) => r.rows[0]).catch(() => null);
+    if (!order) { reply.code(404); return { error: 'No such order.' }; }
+
+    // The artwork has to exist, or this "assignment" attaches nothing and the order's
+    // design tag stays dark while the board claims otherwise.
+    if (!card.art_key && !card.art_data && !card.thumb) {
+      reply.code(400);
+      return { error: 'This card has no artwork, so there is nothing to attach to the order.' };
+    }
+
+    await q(
+      `insert into order_designs (order_id, sku, kind, data, storage_key, name, art_hash, updated_at)
+       values ($1,$2,'raster',$3,$4,$5,$6, now())
+       on conflict (order_id, sku, kind) do update set
+         data=excluded.data, storage_key=excluded.storage_key, name=excluded.name,
+         art_hash=excluded.art_hash, updated_at=now()`,
+      [orderId, sku, card.art_data || null, card.art_key || null, card.title || null, card.art_hash || null]
+    );
+
+    await q('update design_cards set order_id=$2, line_id=$3, sku=$4 where id=$1::bigint',
+      [String(card.id), orderId, b.lineId ? String(b.lineId) : null, sku]);
+
+    audit(req, 'design.card.assigned', {
+      entityType: 'design_card', entityId: String(card.id),
+      after: { orderId, sku, lineId: b.lineId || null },
+    });
+    // Audited against the ORDER too. Someone auditing an order should not have to know a
+    // design board exists to find out where its artwork came from.
+    audit(req, 'design.saved', { entityType: 'order', entityId: orderId, after: { sku, via: 'design-card', cardId: String(card.id) } });
+    return { ok: true, orderId, sku };
+  });
+
 
   app.get('/api/design_cards', { preHandler: requireAuth }, async (req) => {
     if (isStaff(req.user)) {
       const r = await q('select * from design_cards order by id');
-      return r.rows;
+      // Manual cards keep their artwork in object storage, and a signed URL expires — so it
+      // is minted per read rather than stored. `thumb` is what every client already renders,
+      // so the URL goes there and nothing downstream needs to know where it came from.
+      return r.rows.map((row) => ({ ...row, thumb: artUrlOf(row) || row.art_data || row.thumb }));
     }
     // seller → only cards for their own orders
     const r = await q(

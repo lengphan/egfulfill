@@ -1,14 +1,15 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square } from "@phosphor-icons/react"
+import { PenNib, X, CircleNotch, Needle, CurrencyDollar, CheckCircle, ArrowRight, ArrowClockwise, Hand, Columns, CheckSquare, Square, LinkSimple, PaperPlaneTilt } from "@phosphor-icons/react"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, type DesignCard } from "@/lib/api"
+import { getDesignCards, saveDesignCards, deleteDesignCard, creditDesignCard, walletTransfer, getFactorySettings, createDesignCard, type DesignCard } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { DesignFilesPanel } from "@/components/app/design-files-panel"
+import { AssignCardDialog } from "@/components/app/assign-card-dialog"
 import { PushToPartnerDialog } from "@/components/app/push-to-partner-dialog"
 import { OrderHistory } from "@/components/app/order-history"
 import { useConfirm } from "@/components/app/confirm-dialog"
@@ -52,6 +53,11 @@ export function DesignerBoard() {
   const [cards, setCards] = useState<DesignCard[] | null>(null)
   const [dragId, setDragId] = useState<string | number | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
+  // Board-level, distinct from the card panel's own busy/err further down: an upload
+  // failing has to be visible on the board, not inside a card that was never created.
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [assignCard, setAssignCard] = useState<DesignCard | null>(null)
   const [openId, setOpenId] = useState<string | number | null>(null)
   const [view, setView] = useState<"board" | "list">("board")
   const [designFee, setDesignFee] = useState(0) // platform default payout per design
@@ -142,6 +148,49 @@ export function DesignerBoard() {
     }
   }, [patch, designFee])
 
+  /**
+   * A FILE dropped on a lane becomes a new card there.
+   *
+   * The board only ever accepted its own cards being dragged between lanes, so dropping a
+   * PNG on it did nothing at all — no error, no card, which reads as the feature being
+   * broken rather than absent. Artwork often arrives before the order does (a seller emails
+   * a design, someone makes one speculatively), and this is the door for it.
+   *
+   * Images only: the card's whole purpose is showing the design, and a .zip renders as a
+   * blank tile that looks like a failed upload forever.
+   */
+  const dropFiles = async (files: File[], col: string) => {
+    const images = files.filter((f) => f.type.startsWith("image/"))
+    if (!images.length) {
+      setErr(files.length ? "Only image files become cards — drop a PNG, JPG or WEBP." : null)
+      return
+    }
+    setBusy(true); setErr(null)
+    const failed: string[] = []
+    for (const f of images) {
+      try {
+        const data = await new Promise<string>((res, rej) => {
+          const r = new FileReader()
+          r.onload = () => res(String(r.result))
+          r.onerror = () => rej(new Error("unreadable"))
+          r.readAsDataURL(f)
+        })
+        // The filename minus its extension is the card's name. It is what the person who
+        // sent the file called it, which beats "Untitled 3" every time.
+        const title = f.name.replace(/\.[^.]+$/, "") || "Untitled design"
+        const r = await createDesignCard({ title, data })
+        if (r?.error) throw new Error(r.error)
+        // Cards land in Incoming regardless of which lane took the drop: a brand-new design
+        // has not been started, and letting a drop declare it in-progress would make the
+        // lane a lie the moment someone drops onto the wrong column.
+        void col
+      } catch { failed.push(f.name) }
+    }
+    setBusy(false)
+    if (failed.length) setErr(`Couldn't add ${failed.length} file${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}`)
+    load()
+  }
+
   const drop = (col: string) => {
     setOverCol(null)
     if (dragId == null) return
@@ -200,6 +249,23 @@ export function DesignerBoard() {
         onPushed={() => { setPushCard(null); load() }}
       />
 
+      {/* Assigning writes the artwork into the order's designs server-side, so the order's
+          design tag lights in the same action — see assign-card-dialog. */}
+      <AssignCardDialog
+        card={assignCard}
+        open={!!assignCard}
+        onOpenChange={(v) => { if (!v) setAssignCard(null) }}
+        onDone={() => { setAssignCard(null); load() }}
+      />
+
+      {(err || busy) && (
+        <div className={"flex items-center gap-2 rounded-lg border px-3 py-2 text-xs " +
+          (err ? "border-amber-300 bg-amber-50 text-amber-800" : "border-border text-muted-foreground")}>
+          {busy && <CircleNotch size={13} className="animate-spin" />}
+          {err ?? "Adding artwork to the board…"}
+        </div>
+      )}
+
       {cards === null ? (
         <div className="flex items-center justify-center py-24 text-muted-foreground"><CircleNotch size={24} className="animate-spin" /></div>
       ) : view === "list" ? (
@@ -213,7 +279,13 @@ export function DesignerBoard() {
                 key={col.id}
                 onDragOver={(e) => { e.preventDefault(); setOverCol(col.id) }}
                 onDragLeave={() => setOverCol((c) => (c === col.id ? null : c))}
-                onDrop={() => drop(col.id)}
+                onDrop={(e) => {
+                  // A file drop and a card drag both land here. Files win when present —
+                  // dragId can be stale from an earlier drag that never cleared.
+                  const files = Array.from(e.dataTransfer?.files ?? [])
+                  if (files.length) { e.preventDefault(); setOverCol(null); void dropFiles(files, col.id); return }
+                  drop(col.id)
+                }}
                 className={"flex w-72 shrink-0 flex-col rounded-2xl border bg-card transition-colors " + (overCol === col.id ? "border-primary bg-primary/5" : "border-border")}
               >
                 <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
@@ -223,7 +295,7 @@ export function DesignerBoard() {
                 </div>
                 <div className="flex min-h-24 flex-1 flex-col gap-2 p-2">
                   {list.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards here</div>
+                    <div className="py-6 text-center text-xs text-muted-foreground/60">Drop cards or artwork here</div>
                   ) : (
                     list.map((c) => (
                       <button
@@ -294,7 +366,9 @@ export function DesignerBoard() {
           <button onClick={() => setDelErr(null)} className="ml-2 underline">dismiss</button>
         </div>
       )}
-      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)} />}
+      {openCard && <CardDialog card={openCard} me={me} designFee={designFee} onClose={() => setOpenId(null)} patch={patch} onMove={moveCard} remove={(id) => void removeCard(id)}
+        onAssign={() => { setAssignCard(openCard); setOpenId(null) }}
+        onPush={() => { setPushCard(openCard); setOpenId(null) }} canPush={showPartner} />}
     </div>
   )
 }
@@ -403,7 +477,7 @@ function DesignerList({ cards, onOpen }: { cards: DesignCard[]; onOpen: (id: str
 }
 
 // Card detail — claim, move, set payout. Approving auto-credits the designer (via onMove).
-function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { card: DesignCard; me: string; designFee: number; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void }) {
+function CardDialog({ card, me, designFee, onClose, patch, onMove, remove, onAssign, onPush, canPush }: { card: DesignCard; me: string; designFee: number; onClose: () => void; patch: (id: string | number, p: Partial<DesignCard>) => void; onMove: (card: DesignCard, to: string, extra?: Partial<DesignCard>) => void; remove: (id: string | number) => void; onAssign: () => void; onPush: () => void; canPush: boolean }) {
   // Default the payout to the platform Design fee when the card hasn't set one.
   const [pay, setPay] = useState(String(amt(card.payment) || designFee || ""))
   const [busy, setBusy] = useState(false)
@@ -449,10 +523,37 @@ function CardDialog({ card, me, designFee, onClose, patch, onMove, remove }: { c
               {card.priority && card.priority !== "normal" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{String(card.priority)}</span>}
             </div>
             <div className="text-muted-foreground">{card.product || card.type || "—"}</div>
-            {card.order_id && <div className="text-muted-foreground">Order <span className="font-mono text-foreground">{String(card.order_id)}</span></div>}
+            {card.order_id
+              ? <div className="text-muted-foreground">Order <span className="font-mono text-foreground">{String(card.order_id)}</span></div>
+              // Saying it belongs to no order, rather than leaving a gap. An orderless card
+              // is a normal state here, not missing data — and it's the one state where
+              // "Assign to an order" is the obvious next move.
+              : <div className="text-muted-foreground">Not attached to an order yet</div>}
             {card.customer && <div className="text-muted-foreground">{String(card.customer)}</div>}
             {card.claimed_by && <div className="text-xs text-muted-foreground">Claimed by {String(card.claimed_by)}</div>}
           </div>
+        </div>
+
+        {/* THE THREE ROUTES OUT OF A CARD, in one row because they are alternatives, not a
+            sequence. Assign is offered only while the card has no order — reassigning is a
+            different and far more dangerous operation (one seller's artwork landing on
+            another's job), so it is deliberately not a click away. */}
+        <div className="flex flex-wrap gap-2">
+          {!card.order_id && (
+            <Button size="sm" variant="outline" onClick={onAssign}>
+              <LinkSimple size={14} weight="bold" /> Assign to an order
+            </Button>
+          )}
+          {canPush && !card.vendor && (
+            <Button size="sm" variant="outline" onClick={onPush}>
+              <PaperPlaneTilt size={14} weight="bold" /> Send to Pink Design
+            </Button>
+          )}
+          {card.vendor && (
+            <span className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted-foreground">
+              With {String(card.vendor)} — paid by invoice, so approving it credits no designer
+            </span>
+          )}
         </div>
 
         {canFee ? (
