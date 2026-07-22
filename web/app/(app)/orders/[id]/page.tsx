@@ -310,9 +310,11 @@ export default function OrderDetailPage() {
                                 onChanged={loadDesignStatus}
                               />
                             )}
-                            <Button size="sm" variant="outline" onClick={() => setCustomize(it)}>
-                              <PenNib size={13} weight="bold" /> {artwork ? "Edit design" : "Customize"}
-                            </Button>
+                            {/* The Customize button is gone: the item's own image opens the
+                                same designer (onEdit above), so this was a second door to
+                                one room sitting in a row that is already busy. The image is
+                                the more discoverable of the two — it's the thing people
+                                click when they want to change the artwork. */}
                           </div>
                         )}
                       </div>

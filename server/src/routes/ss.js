@@ -327,6 +327,51 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
    * Keyed by a hash of the SOURCE URL — which is per sku and colour, so each variant keeps
    * its own picture and an identical image fetched twice collapses to one object.
    */
+  /**
+   * Does S&S expose size charts? Ask them, once.
+   *
+   * Their public docs are behind a 403 and none of the mirrors document a specs endpoint,
+   * so the only honest way to answer "can we print a real measurement chart" is to try the
+   * plausible paths against a live key and report what came back. Reading the code cannot
+   * settle it and guessing would put invented measurements on a garment.
+   *
+   * A handful of GETs, staff-only, run on request — not on a timer and not at boot.
+   */
+  app.get('/api/ss/specs-probe', { preHandler: requireStaff }, async (req, reply) => {
+    if (!creds()) { reply.code(400); return { error: 'S&S not configured.' }; }
+    const style = String((req.query || {}).style || '').trim();
+    if (!style) { reply.code(400); return { error: 'Pass ?style=<a real styleID>, e.g. 9183.' }; }
+
+    const paths = [
+      `/specs/${encodeURIComponent(style)}?mediatype=json`,
+      `/specs?styleid=${encodeURIComponent(style)}&mediatype=json`,
+      `/sizecharts/${encodeURIComponent(style)}?mediatype=json`,
+      `/styles/${encodeURIComponent(style)}?fields=styleID,title,description,specs,sizeChart,specSheet&mediatype=json`,
+    ];
+    const out = [];
+    for (const path of paths) {
+      const r = await ssGet(path).catch((e) => ({ ok: false, status: 0, error: e.message }));
+      // The SHAPE matters more than the status: a 200 carrying no measurement fields is a
+      // "no" that looks like a "yes", and that is the answer most likely to mislead.
+      const sample = r && r.data ? JSON.stringify(Array.isArray(r.data) ? r.data[0] : r.data).slice(0, 400) : null;
+      out.push({
+        path,
+        status: r ? r.status : 0,
+        ok: !!(r && r.ok),
+        looksLikeMeasurements: !!(sample && /chest|bodyLength|sleeve|width|measurement/i.test(sample)),
+        sample,
+      });
+    }
+    const hit = out.find((x) => x.ok && x.looksLikeMeasurements);
+    return {
+      style,
+      verdict: hit
+        ? `Measurements available at ${hit.path} — a real size chart can be built.`
+        : 'No endpoint returned measurement fields. A size chart would have to be entered by hand, or taken from their spec sheets, which are PDFs rather than API data.',
+      tried: out,
+    };
+  });
+
   app.get('/api/ss/img', async (req, reply) => {
     const u = String((req.query && req.query.u) || '');
     // Their docs give image URLs as https://www.ssactivewear.com/{Image}; our sync built
@@ -1172,8 +1217,40 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
   // ── Favorites (staff-shared shortlist of S&S styles) ─────────────────────────
   app.get('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
     try {
-      const r = await q('select style_id, brand, style_name, category, image from ss_favorites order by created_at desc');
-      return { favorites: r.rows.map((x) => ({ styleID: x.style_id, brand: x.brand, title: x.style_name, category: x.category, image: x.image, favorited: true })) };
+      /**
+       * Favourites, WITH what you need to decide on them.
+       *
+       * The card showed a name, a picture and two em-dashes: no colours, no sizes, no
+       * price. Choosing what to put in a catalogue from that is guesswork, and the data
+       * was there the whole time — ss_products holds every sku of every synced style.
+       *
+       * JOINED, not copied. Favouriting stays one small row; the variants are read at list
+       * time so a re-sync updates them for free. A style that isn't synced yet returns
+       * nulls, and the card says so rather than showing a confident dash.
+       */
+      const r = await q(`
+        select f.style_id, f.brand, f.style_name, f.category, f.image,
+               count(distinct p.color) filter (where p.color is not null and p.color <> '')::int as color_count,
+               array_agg(distinct p.color) filter (where p.color is not null and p.color <> '') as colors,
+               array_agg(distinct p.size)  filter (where p.size  is not null and p.size  <> '') as sizes,
+               min(p.price)::float as price_min,
+               max(p.price)::float as price_max,
+               count(p.sku)::int as sku_count
+          from ss_favorites f
+          left join ss_products p on p.style_id = f.style_id
+         group by f.style_id, f.brand, f.style_name, f.category, f.image, f.created_at
+         order by f.created_at desc`);
+      return { favorites: r.rows.map((x) => ({
+        styleID: x.style_id, brand: x.brand, title: x.style_name, category: x.category,
+        image: x.image, favorited: true,
+        // `synced` is the honest flag: null variant data means this style has not been
+        // pulled yet, which is a different thing from a style with no colours.
+        synced: (x.sku_count || 0) > 0,
+        colorCount: x.color_count || 0,
+        colors: x.colors || [],
+        sizes: x.sizes || [],
+        priceMin: x.price_min, priceMax: x.price_max,
+      })) };
     } catch (e) { reply.code(500); return { error: e.message }; }
   });
   app.post('/api/ss/favorites', { preHandler: requireStaff }, async (req, reply) => {
