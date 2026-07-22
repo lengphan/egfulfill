@@ -355,11 +355,6 @@ app.post("/hooks/egfulfill", express.raw({ type: "application/json" }), (req, re
         </Section>
         </div>
       </div>
-
-      <footer className="mt-16 border-t border-border pt-6 text-sm text-muted-foreground">
-        Something missing or wrong here? Tell us — this page is the contract, and a doc that lies is
-        worse than no doc.
-      </footer>
     </div>
   )
 }
