@@ -10,6 +10,8 @@ import {
   catalogExportUrl, type CatalogProduct,
 } from "@/lib/api"
 import { CatalogPrint } from "@/components/app/catalog-print"
+import { SupplierStylesPicker } from "@/components/app/supplier-styles-picker"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { colorsOf, swatchHex } from "@/components/app/products-catalog"
 import { sizesOf } from "@/lib/variant-resolve"
 
@@ -128,6 +130,17 @@ export function CatalogView() {
         </div>
       }
     >
+      <Tabs defaultValue="mine">
+        <TabsList className="mx-5 mt-4">
+          {/* TWO SOURCES, ONE CATALOGUE. Products we built carry our own SKU and print
+              method; supplier styles are published by reference and read live from the
+              sync. Both land in the same PDF and the same CSV — the tabs are about where
+              a thing comes FROM, not about two separate catalogues. */}
+          <TabsTrigger value="mine">Our products</TabsTrigger>
+          <TabsTrigger value="supplier">Supplier styles</TabsTrigger>
+        </TabsList>
+        <TabsContent value="supplier"><SupplierStylesPicker /></TabsContent>
+        <TabsContent value="mine">
       <div className="space-y-3 px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -163,8 +176,16 @@ export function CatalogView() {
             <CircleNotch size={16} className="animate-spin" /> Loading products…
           </div>
         ) : shown.length === 0 ? (
+          // THREE different nothings, and they must not read alike: the read failed, the
+          // search matched nothing, or there genuinely are no products. This was printing
+          // "No products in the catalogue yet" directly under its own "Not signed in"
+          // banner — asserting a fact about data it had just said it couldn't read. Same
+          // mistake the shipments list made; worth not making twice.
           <p className="py-12 text-center text-sm text-muted-foreground">
-            {q ? `Nothing matches “${q}”.` : "No products in the catalogue yet."}
+            {err
+              ? "Couldn't load products, so this isn't empty — it's unknown."
+              : q ? `Nothing matches “${q}”.`
+                : "No products in the catalogue yet."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -263,6 +284,8 @@ export function CatalogView() {
           </div>
         )}
       </div>
+        </TabsContent>
+      </Tabs>
       {printOpen && <CatalogPrint onClose={() => setPrintOpen(false)} />}
     </SectionCard>
   )

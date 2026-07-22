@@ -268,6 +268,33 @@ export function catalogExportUrl(all = false) {
   return `${API_BASE}/api/catalog/export${all ? "?all=1" : ""}`
 }
 
+/**
+ * A supplier style, rolled up from the synced sku rows. `picked` is whether it's published.
+ *
+ * `maxCost` is OUR supplier cost and this route is staff-only — it exists so the markup
+ * preview can show what a percentage produces, and it must never reach a seller surface.
+ */
+export type SupplierStyle = {
+  source: string; ref: string; name?: string; brand?: string; category?: string
+  image?: string; colors: string[]; sizes: string[]
+  maxCost?: number | null; catalogPrice?: number | null; picked: boolean
+}
+export function getSupplierStyles(p: { q?: string; limit?: number; offset?: number } = {}) {
+  const s = new URLSearchParams()
+  if (p.q) s.set("q", p.q)
+  s.set("limit", String(p.limit ?? 40))
+  s.set("offset", String(p.offset ?? 0))
+  return api<{ total: number; styles: SupplierStyle[] }>(`/api/catalog/supplier-styles?${s}`)
+}
+export function setCatalogPicks(refs: string[], include: boolean, source = "ss") {
+  return api<{ ok?: boolean; added?: number; removed?: number; already?: number; error?: string }>(
+    `/api/catalog/picks`, { method: "POST", body: JSON.stringify({ refs, include, source }) })
+}
+export function priceCatalogPicks(body: { refs?: string[]; markupPct?: number; ref?: string; price?: number | null }) {
+  return api<{ ok?: boolean; priced?: number; skippedNoCost?: number; error?: string }>(
+    `/api/catalog/picks/pricing`, { method: "POST", body: JSON.stringify({ ...body, source: "ss" }) })
+}
+
 export type CatalogProduct = {
   id?: string | number
   name?: string
