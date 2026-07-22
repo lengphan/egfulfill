@@ -272,10 +272,35 @@ export function DesignStage({
   )
 }
 
+/**
+ * The real ceiling on artwork, and where it comes from.
+ *
+ * The file is sent as a base64 data URL, which inflates it by exactly 4/3, and the API's
+ * body limit is 60MB. Measured: a 44MB file lands at 58.7MB on the wire — it fits, with
+ * 1.3MB to spare, which is not headroom. And the box running the API has 1GB of RAM that
+ * has to hold the parsed body while it works.
+ *
+ * 32MB goes over at 42.7MB, leaving ~17MB of margin. That is the number this is set to.
+ *
+ * 12MB was well under what the pipeline takes, and it refused ordinary print work: a
+ * 4500×5400 PNG at 300dpi is a normal front print and routinely lands between 15 and 25MB.
+ * Worse, it told people to COMPRESS — which for a file that is about to be printed is
+ * advice that quietly costs them quality to solve a problem we invented.
+ *
+ * The honest long-term fix is a presigned upload straight to object storage, so artwork
+ * never travels through the API at all — the same reason api.egful.store exists for print
+ * files. Until then this is the true limit, stated as such.
+ */
+const MAX_ARTWORK_MB = 32
+
 // Reads a File → data URL, guarding type/size. Returns via callback.
 export function readImageFile(file: File | null | undefined, onData: (url: string) => void, onErr: (m: string) => void) {
   if (!file || !file.type.startsWith("image/")) { onErr("Please choose an image (PNG/JPG/SVG)."); return }
-  if (file.size > 12 * 1024 * 1024) { onErr("Artwork is over 12MB — please compress it."); return }
+  if (file.size > MAX_ARTWORK_MB * 1024 * 1024) {
+    // Says the size, the limit, and what to do that ISN'T "lose quality on a print file".
+    onErr(`That file is ${(file.size / 1024 / 1024).toFixed(1)}MB and the limit is ${MAX_ARTWORK_MB}MB. If it's a photo, saving as JPEG instead of PNG usually cuts it by most of that with no visible loss. If it's flat artwork, flattening layers or dropping to 8-bit colour will do it — don't reduce the resolution, we need it for print.`)
+    return
+  }
   const reader = new FileReader()
   reader.onload = () => onData(String(reader.result || ""))
   reader.readAsDataURL(file)

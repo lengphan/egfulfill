@@ -18,9 +18,11 @@ const money = (n: number | string | null | undefined) => `$${(Number(n) || 0).to
  * and what it will cost to download afterwards — because someone deciding whether it's
  * worth it needs the total, not the first instalment.
  *
- * Declining does not cancel the line here. It tells the factory, who cancel through the
- * path that already handles the refund; a second, hastier refund is how the wrong amount
- * gets paid back.
+ * DECLINING TURNS DOWN THE DESIGN WORK, NOT THE ORDER. It records the answer and tells
+ * the floor, and stops there. Cancelling an order moves money and is the seller's call to
+ * make — doing it for them off the back of a "no thanks" to one fee takes a decision away
+ * from the person whose money it is, and a second, hastier refund path is how the wrong
+ * amount gets paid back.
  */
 export function DesignQuoteBanner({ order, item, onAnswered }: {
   order: OrderRow
@@ -47,7 +49,10 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
       }
       setDone(decision === "accept"
         ? `Accepted — ${money(r.charged)} charged. We'll start on it.`
-        : "Declined. The factory has been told; they'll be in touch about cancelling this line.")
+        // Says what did NOT happen. "We'll be in touch about cancelling" reads as though
+        // cancellation is already in motion, and it isn't — declining the digitising is not
+        // declining the order, and only the seller gets to make that second call.
+        : "Declined — we won't digitise this one. Your order is untouched. Send us your own machine file if you have one, or cancel the order yourself if you'd rather not go ahead.")
       onAnswered?.()
     } catch (e) { setErr((e as Error).message) } finally { setBusy(null) }
   }
@@ -74,8 +79,9 @@ export function DesignQuoteBanner({ order, item, onAnswered }: {
             {Number(item.design_quote_download) > 0 && <>, and <strong>{money(item.design_quote_download)}</strong> if you later want to download it</>}.
           </p>
           <p className="mt-1 text-[11px] text-amber-700">
-            Nothing has been charged. If you&apos;d rather not, decline and we&apos;ll sort out
-            cancelling this line with you — the rest of your order is unaffected.
+            Nothing has been charged. Declining turns down <strong>the design work only</strong> —
+            your order stays exactly as it is. If you&apos;d rather cancel it, that&apos;s yours
+            to do, and we won&apos;t do it for you.
           </p>
 
           <div className="mt-2 flex flex-wrap gap-2">
