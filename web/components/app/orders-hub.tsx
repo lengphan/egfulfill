@@ -689,9 +689,19 @@ export function OrdersHub() {
                       down a column instead of re-reading each row. Wide things (photos,
                       address, tracking) stay in the full-width strip below, where they have
                       room — which is why this isn't a strict table. */}
-                  <div className="mb-3 flex flex-wrap items-start gap-x-4 gap-y-2 sm:flex-nowrap">
-                    <div className="min-w-0 max-w-3xl">
-                      <div className="grid grid-cols-[auto_auto_minmax(7rem,auto)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
+                  <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
+                    <div className="min-w-0">
+                      {/* The template has to MATCH the cell count, and the checkbox is
+                          conditional — so it is declared per mode rather than left at six
+                          columns. With dispatch off, five children filled a six-column
+                          template and everything shifted one track left: the customer
+                          landed in an `auto` column and sized to its own text, so the
+                          address after it started at a different x in every row (757, 790,
+                          748, 690 measured). Two templates, each exact, and the two
+                          flexible tracks stay flexible in both. */}
+                      <div className={"grid items-center gap-x-3 gap-y-1 " + (dispatchOn
+                        ? "grid-cols-[auto_auto_minmax(7rem,auto)_auto_minmax(0,0.7fr)_minmax(0,1.3fr)]"
+                        : "grid-cols-[auto_minmax(7rem,auto)_auto_minmax(0,0.7fr)_minmax(0,1.3fr)]")}>
                         {/* A box on EVERY row, disabled where it can't be used.
                             Rendering it only on dispatchable rows was tried, and reads as
                             a half-built feature: most orders have no label yet, so most
@@ -725,6 +735,25 @@ export function OrdersHub() {
                         <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
                         <StageBadge status={stage} />
                         <span className="truncate text-sm font-medium">{o.customer?.name || "—"}</span>
+                        {/* ADDRESS AS A COLUMN, not another chip in the wrapped meta line
+                            below. It was down there competing with the platform, the date
+                            and the item count, so its position moved with the length of
+                            everything before it and it could not be read down the page. Up
+                            here it lands on one x in every row, and it fills the width that
+                            was previously dead space between the customer and the buttons —
+                            the gap stops being a void and starts being information. */}
+                        <span className="min-w-0 truncate text-xs text-muted-foreground" title={addrLine(o) || undefined}>
+                          {addrLine(o) ? (
+                            <span className="inline-flex min-w-0 items-center gap-1">
+                              <MapPin size={11} weight="fill" className="shrink-0" />
+                              <span className="truncate">{addrLine(o)}</span>
+                            </span>
+                          ) : (
+                            // Named, not blank. An empty cell here reads as a layout hole;
+                            // "no address" is a real state that blocks shipping.
+                            <span className="text-muted-foreground/60">No address</span>
+                          )}
+                        </span>
                       </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                         {/* Platform fused with the shop, not a separate flag on the row
@@ -739,15 +768,12 @@ export function OrdersHub() {
                         </span>
                         <span>{fmtDate(o.created_at)}</span>
                         <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
-                        {/* Address + how we got it. The MISSING case is no longer flagged
-                            here — the readiness strip already names it, and saying it twice
-                            on one row is noise. This shows provenance when there IS one. */}
+                        {/* The address itself has moved UP into its own column, so only its
+                            provenance stays here — the two were one long run of text that
+                            pushed everything after it out of alignment. */}
                         {addrLine(o) && (
-                          <span className="inline-flex items-center gap-0.5" title={`Address ${ADDRESS_SOURCE_LABEL[addressSource(o)]}`}>
-                            <MapPin size={11} weight="fill" /> {addrLine(o)}
-                            <span className="ml-1 rounded bg-muted px-1 text-[10px] text-muted-foreground">
-                              {ADDRESS_SOURCE_LABEL[addressSource(o)]}
-                            </span>
+                          <span className="rounded bg-muted px-1 text-[10px]" title={`Address ${ADDRESS_SOURCE_LABEL[addressSource(o)]}`}>
+                            {ADDRESS_SOURCE_LABEL[addressSource(o)]}
                           </span>
                         )}
                         {track && (
@@ -770,9 +796,16 @@ export function OrdersHub() {
                           drift. Thumbs lead with the listing photo (it reads better at
                           32px than a composite does) and clicking one opens the detail
                           window on the attached design. */}
+                      {/* OVERLAPPED, and small. This strip used to be 56px tiles laid out
+                          flat on a line of their own, which cost every order about a third
+                          of its row height — on a queue you scan by scrolling, that is the
+                          expensive kind of space. Overlapping fans them from one point, so
+                          four items take barely more width than one, and the row stays a
+                          row. The artwork is still one click from here, and expanding still
+                          shows a 64px avatar per line. */}
                       {isCollapsed && items.length > 0 && (
-                        <div className="mt-2">
-                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} size={56} max={4} overlap={false} />
+                        <div className="mt-1.5">
+                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} size={32} max={4} overlap />
                         </div>
                       )}
                     </div>
