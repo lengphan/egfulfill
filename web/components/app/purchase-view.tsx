@@ -1191,7 +1191,13 @@ export function PurchaseView() {
                                   <label key={w.abbr}
                                     title={`${w.qty} in ${w.abbr}${t?.cutOff ? ` · order by ${t.cutOff}` : ""}${covers ? "" : " — not enough for this line on its own"}`}
                                     className={"flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border px-1.5 py-1.5 transition-colors " + (
-                                      covers ? "border-primary/40 bg-primary/5" : "border-border bg-muted/40")}>
+                                      // No fill. The chip already contains an input, which
+                                      // has its own surface — a tinted box around a box made
+                                      // the input harder to find, not easier, and a row of
+                                      // them read as a block of colour rather than as
+                                      // separate choices. The covering warehouse is marked by
+                                      // its border alone.
+                                      covers ? "border-primary/50" : "border-border")}>
                                     {/* Take THIS many from THIS warehouse. Blank means "no
                                         preference", which is the default and leaves S&S to
                                         split the line as before — typing anywhere turns the
@@ -1271,7 +1277,7 @@ export function PurchaseView() {
                               title={ottoStock[l.sku] == null
                                 ? "Otto didn't return a stock figure we could read"
                                 : `${ottoStock[l.sku]} available from Otto`}
-                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border border-border bg-muted/40 px-1.5 py-1.5 transition-colors">
+                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border border-border px-1.5 py-1.5 transition-colors">
                               <Input
                                 value={String(num(l.qty) || "")}
                                 onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
