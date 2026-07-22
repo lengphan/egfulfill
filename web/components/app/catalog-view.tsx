@@ -10,6 +10,8 @@ import {
   catalogExportUrl, type CatalogProduct,
 } from "@/lib/api"
 import { CatalogPrint } from "@/components/app/catalog-print"
+import { colorsOf, swatchHex } from "@/components/app/products-catalog"
+import { sizesOf } from "@/lib/variant-resolve"
 
 const money = (n: number | string | null | undefined) =>
   n == null || n === "" ? "—" : `$${(Number(n) || 0).toFixed(2)}`
@@ -49,6 +51,8 @@ export function CatalogView() {
   }, [load])
 
   const idOf = (p: CatalogProduct) => String(p.id ?? "")
+  const imageOf = (p: CatalogProduct) =>
+    (p as unknown as { image?: string; img?: string }).image ?? (p as unknown as { img?: string }).img ?? ""
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase()
     const list = rows ?? []
@@ -181,7 +185,11 @@ export function CatalogView() {
                   const id = idOf(p)
                   const on = picked.has(id)
                   return (
-                    <tr key={id} className={"border-b border-border/60 last:border-0 " + (p.inCatalog ? "" : "opacity-60")}>
+                    // NOT dimmed when unpublished. Fading a row is the language of
+                    // "unavailable", and these are the rows you are here to pick — it read
+                    // as two of three products being disabled. Published is stated by the
+                    // chip instead, which says the thing rather than implying it.
+                    <tr key={id} className="border-b border-border/60 last:border-0">
                       <td className="px-2 py-2">
                         <input type="checkbox" checked={on} aria-label={`Select ${p.name || id}`}
                           onChange={(e) => setPicked((s) => {
@@ -189,10 +197,47 @@ export function CatalogView() {
                           })} />
                       </td>
                       <td className="px-2 py-2">
-                        <div className="max-w-[22rem] truncate font-medium">{p.name || id}</div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <span className="font-mono">{p.sku || id}</span>
-                          {p.inCatalog && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
+                        {/* The picture, the colourways and the sizes — the things you are
+                            actually choosing between. A name and a SKU is a spreadsheet;
+                            a catalogue is chosen by eye. */}
+                        <div className="flex items-start gap-3">
+                          <div className="size-14 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                            {imageOf(p) ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={imageOf(p)} alt="" className="size-full object-contain" />
+                            ) : (
+                              <div className="flex size-full items-center justify-center text-[9px] text-muted-foreground">no image</div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="max-w-[20rem] truncate font-medium">{p.name || id}</div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span className="font-mono">{p.sku || id}</span>
+                              {p.inCatalog && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">published</span>}
+                            </div>
+                            {/* Colourways as their own supplier photos where we have them.
+                                Capped at eight with a count — a 40-colour style would
+                                otherwise make one row taller than the rest of the table. */}
+                            {colorsOf(p).length > 0 && (
+                              <div className="mt-1 flex items-center gap-1">
+                                {colorsOf(p).slice(0, 8).map((c) => {
+                                  const ci = (p as unknown as { colorImages?: Record<string, string> }).colorImages?.[c]
+                                  return ci
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    ? <img key={c} src={ci} alt={c} title={c} className="size-4 rounded-full border border-border object-cover" />
+                                    : <span key={c} title={c} className="size-3.5 rounded-full border border-border" style={{ background: swatchHex(c) }} />
+                                })}
+                                {colorsOf(p).length > 8 && (
+                                  <span className="text-[10px] text-muted-foreground">+{colorsOf(p).length - 8}</span>
+                                )}
+                              </div>
+                            )}
+                            {sizesOf(p).length > 0 && (
+                              <div className="mt-1 truncate text-[10px] text-muted-foreground">
+                                {sizesOf(p).join(" · ")}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-2 py-2">
