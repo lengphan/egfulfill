@@ -16,6 +16,7 @@ import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
+import { DEFAULT_FACTORY_COLS, FACTORY_COLS, factoryGridTemplate } from "@/lib/order-columns"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage, stageDenialReason, canWalk, stagePath, stageMeta } from "@/lib/factory-status"
 import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
@@ -475,6 +476,11 @@ export function OrdersHub() {
 
   // Only orders with a bought label can be dispatched — there's nothing to scan otherwise.
   const dispatchable = (o: OrderRow) => !!o.tracking && !o.label_scanned_at
+
+  /** One grid template for the header and every row. The lead tracks are the expand caret
+   *  plus, when dispatch is configured, its checkbox — declared here rather than baked into
+   *  each grid so the two can never disagree about how many columns precede Status. */
+  const gridTmpl = factoryGridTemplate(DEFAULT_FACTORY_COLS, dispatchOn ? 2 : 1)
   const selectableOnPage = paged.pageItems.filter(dispatchable)
   const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every((o) => selected.has(o.id))
 
@@ -697,6 +703,17 @@ export function OrdersHub() {
               )}
             </div>
           )}
+          {/* THE HEADER. What the card list never had, and the reason it read as
+              clutter: columns with no titles are just text at different x-positions.
+              Same template as every row below, from the same list of ids. */}
+          <div
+            className="grid items-center gap-x-3 border-b border-border bg-muted/30 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+            style={{ gridTemplateColumns: gridTmpl }}
+          >
+            {dispatchOn && <span />}
+            <span />
+            {DEFAULT_FACTORY_COLS.map((id) => <span key={id} className="truncate">{FACTORY_COLS[id].label}</span>)}
+          </div>
           <div className="divide-y divide-border">
             {paged.pageItems.map((o) => {
               const items = o.items ?? []
@@ -726,127 +743,103 @@ export function OrdersHub() {
                       down a column instead of re-reading each row. Wide things (photos,
                       address, tracking) stay in the full-width strip below, where they have
                       room — which is why this isn't a strict table. */}
-                  <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2">
+                  {/* THE ROW, as columns. One grid template, shared with the header above
+                      the list (factoryGridTemplate), so a cell cannot exist in the header
+                      and not the row or land under the wrong title.
+
+                      This was a card: identity stacked over a wrapped meta line, with the
+                      actions flung to the far side. Three passes tried to make that read as
+                      a table — clustering, then a grid on the identity line alone, then
+                      flex-1 — and each was a refinement of the wrong shape. The seller
+                      table has been a real table all along; this is the same idea, driven
+                      from the same lib/order-columns.ts. */}
+                  <div className="mb-3 grid items-center gap-x-3 gap-y-1" style={{ gridTemplateColumns: gridTmpl }}>
+                    {/* A box on EVERY row, disabled where it can't be used. Rendering it
+                        only on dispatchable rows reads as a half-built feature: most orders
+                        have no label yet, so most rows had no box, and a column that appears
+                        on a minority of rows looks broken rather than selective. */}
+                    {dispatchOn && (
+                      <input
+                        type="checkbox"
+                        checked={selected.has(o.id)}
+                        disabled={!dispatchable(o)}
+                        onChange={() => toggleOne(o.id)}
+                        aria-label={dispatchable(o)
+                          ? `Select ${numOf(o)} for dispatch`
+                          : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : "no label bought yet"}`}
+                        title={dispatchable(o) ? undefined
+                          : o.label_scanned_at
+                            ? "Already pre-scanned — its tracking is live."
+                            : "No label bought yet, so there's nothing for the partner to scan."}
+                        className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
+                      />
+                    )}
+                    <button
+                      onClick={() => toggleCollapse(o.id)}
+                      aria-expanded={!isCollapsed}
+                      aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
+                      className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
+                    </button>
+
+                    {/* STATUS */}
+                    <StageBadge status={stage} />
+
+                    {/* ORDER — the id, with what was the wrapped meta line folded underneath
+                        it as one quiet second line. Platform and shop are one fact
+                        ("CustomBabeUSA, on Etsy"), so they stay fused. */}
                     <div className="min-w-0">
-                      {/* The template has to MATCH the cell count, and the checkbox is
-                          conditional — so it is declared per mode rather than left at six
-                          columns. With dispatch off, five children filled a six-column
-                          template and everything shifted one track left: the customer
-                          landed in an `auto` column and sized to its own text, so the
-                          address after it started at a different x in every row (757, 790,
-                          748, 690 measured). Two templates, each exact, and the two
-                          flexible tracks stay flexible in both. */}
-                      <div className={"grid items-center gap-x-3 gap-y-1 " + (dispatchOn
-                        ? "grid-cols-[auto_auto_minmax(7rem,auto)_auto_minmax(0,0.7fr)_minmax(0,1.3fr)]"
-                        : "grid-cols-[auto_minmax(7rem,auto)_auto_minmax(0,0.7fr)_minmax(0,1.3fr)]")}>
-                        {/* A box on EVERY row, disabled where it can't be used.
-                            Rendering it only on dispatchable rows was tried, and reads as
-                            a half-built feature: most orders have no label yet, so most
-                            rows had no box, and a column that appears on a minority of
-                            rows looks broken rather than selective. Disabled-with-a-reason
-                            says "not this one, and here's why"; absent says nothing. */}
-                        {dispatchOn && (
-                          <input
-                            type="checkbox"
-                            checked={selected.has(o.id)}
-                            disabled={!dispatchable(o)}
-                            onChange={() => toggleOne(o.id)}
-                            aria-label={dispatchable(o)
-                              ? `Select ${numOf(o)} for dispatch`
-                              : `${numOf(o)} can't be dispatched — ${o.label_scanned_at ? "already pre-scanned" : "no label bought yet"}`}
-                            title={dispatchable(o) ? undefined
-                              : o.label_scanned_at
-                                ? "Already pre-scanned — its tracking is live."
-                                : "No label bought yet, so there's nothing for the partner to scan."}
-                            className="size-4 shrink-0 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
-                          />
-                        )}
-                        <button
-                          onClick={() => toggleCollapse(o.id)}
-                          aria-expanded={!isCollapsed}
-                          aria-label={isCollapsed ? `Expand ${numOf(o)}` : `Collapse ${numOf(o)}`}
-                          className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        >
-                          <CaretRight size={13} weight="bold" className={"transition-transform " + (isCollapsed ? "" : "rotate-90")} />
-                        </button>
-                        <span className="font-mono text-sm font-semibold">{numOf(o)}</span>
-                        <StageBadge status={stage} />
-                        <span className="truncate text-sm font-medium">{o.customer?.name || "—"}</span>
-                        {/* ADDRESS AS A COLUMN, not another chip in the wrapped meta line
-                            below. It was down there competing with the platform, the date
-                            and the item count, so its position moved with the length of
-                            everything before it and it could not be read down the page. Up
-                            here it lands on one x in every row, and it fills the width that
-                            was previously dead space between the customer and the buttons —
-                            the gap stops being a void and starts being information. */}
-                        <span className="min-w-0 truncate text-xs text-muted-foreground" title={addrLine(o) || undefined}>
-                          {addrLine(o) ? (
-                            <span className="inline-flex min-w-0 items-center gap-1">
-                              <MapPin size={11} weight="fill" className="shrink-0" />
-                              <span className="truncate">{addrLine(o)}</span>
-                            </span>
-                          ) : (
-                            // Named, not blank. An empty cell here reads as a layout hole;
-                            // "no address" is a real state that blocks shipping.
-                            <span className="text-muted-foreground/60">No address</span>
-                          )}
-                        </span>
+                      <div className="truncate font-mono text-sm font-semibold">{numOf(o)}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {platformOf(o)}
+                        {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && <> · <span className="capitalize">{o.store}</span></>}
+                        {" · "}{fmtDate(o.created_at)}
                       </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                        {/* Platform fused with the shop, not a separate flag on the row
-                            above: they're one fact ("CustomBabeUSA, on Etsy"), and a
-                            per-row brand logo would put 50 colour spots in competition
-                            with the status badges, which are what should stand out. */}
-                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium">
-                          <span className="text-muted-foreground">{platformOf(o)}</span>
-                          {o.store && o.store.toLowerCase() !== platformOf(o).toLowerCase() && (
-                            <> · <span className="capitalize">{o.store}</span></>
-                          )}
-                        </span>
-                        <span>{fmtDate(o.created_at)}</span>
-                        <span>· {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}</span>
-                        {/* The address itself has moved UP into its own column, so only its
-                            provenance stays here — the two were one long run of text that
-                            pushed everything after it out of alignment. */}
-                        {addrLine(o) && (
-                          <span className="rounded bg-muted px-1 text-[10px]" title={`Address ${ADDRESS_SOURCE_LABEL[addressSource(o)]}`}>
-                            {ADDRESS_SOURCE_LABEL[addressSource(o)]}
-                          </span>
-                        )}
+                    </div>
+
+                    {/* CUSTOMER */}
+                    <div className="min-w-0 truncate text-sm font-medium">{o.customer?.name || "—"}</div>
+
+                    {/* ADDRESS — named when absent, because an empty cell reads as a layout
+                        hole while "No address" is a real state that blocks shipping. */}
+                    <div className="min-w-0 text-xs text-muted-foreground" title={addrLine(o) || undefined}>
+                      {addrLine(o) ? (
+                        <>
+                          <div className="truncate">{addrLine(o)}</div>
+                          <div className="truncate text-[10px] text-muted-foreground/70">{ADDRESS_SOURCE_LABEL[addressSource(o)]}</div>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground/60">No address</span>
+                      )}
+                    </div>
+
+                    {/* ITEMS — the photos plus the count, the same shape the seller table
+                        uses for this column. Tracking lives here too: it belongs to what
+                        was shipped, and it only exists once a label has been bought. */}
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      {items.length > 0 && <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={3} overlap />}
+                      <div className="min-w-0">
+                        <div className="truncate text-xs text-muted-foreground">
+                          {items.length} item{items.length === 1 ? "" : "s"} · {units} unit{units === 1 ? "" : "s"}
+                        </div>
                         {track && (
                           <a
                             href={trackUrl(o.carrier || label?.carrier, track)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-0.5 font-medium text-emerald-600 hover:underline"
+                            className="inline-flex items-center gap-0.5 truncate text-[11px] font-medium text-emerald-600 hover:underline"
                           >
-                            <Truck size={11} weight="fill" /> {o.carrier || label?.carrier || "USPS"} {track} <ArrowSquareOut size={9} weight="bold" />
+                            <Truck size={10} weight="fill" /> {track} <ArrowSquareOut size={8} weight="bold" />
                           </a>
                         )}
                       </div>
-
-                      {/* Photos on the COLLAPSED row only. Expanding already shows a
-                          64px avatar per line, so rendering the strip there too would say
-                          the same thing twice; collapsed, the row was text-only and you
-                          had to open an order to see what was in it.
-                          Same PhotoStack the seller table uses, so the two surfaces can't
-                          drift. Thumbs lead with the listing photo (it reads better at
-                          32px than a composite does) and clicking one opens the detail
-                          window on the attached design. */}
-                      {/* The row's PRIMARY image, at the shared PhotoStack size — no local
-                          override. It was pinned to 32px here, SMALLER than the 64px avatar
-                          inside an expanded line, so the picture you scan by was the least
-                          legible one on the page while the one you'd already chosen to open
-                          was the biggest. Borderless too: a frame around a small photo reads
-                          as a chip, and four of them read as a strip of chips rather than as
-                          the products. Still overlapped, so four items cost barely more width
-                          than one and the row stays a row. */}
-                      {isCollapsed && items.length > 0 && (
-                        <div className="mt-1.5">
-                          <PhotoStack items={items} designs={designs[o.id]} catalog={catalog} max={4} overlap />
-                        </div>
-                      )}
                     </div>
+
+                    {/* READY — its own column now, so the chips line up down the page
+                        instead of riding on the front of the action cluster. */}
+                    <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} />
+
                     {/* One PRIMARY action for the current stage/role; everything rarer
                         (flag/status, labels, the non-primary of ship/advance) tucks into a
                         ⋯ menu so the row isn't a wall of buttons. */}
@@ -930,7 +923,6 @@ export function OrdersHub() {
                               dots read as more clutter rather than a summary. */}
                           {/* Ours ends at shipped; the carrier's status carries on from there. */}
                         <DeliveryBadge order={o} onRefreshed={load} className="mr-1" />
-                        <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} className="mr-1" />
                           {/* SAYS the row is stopped, rather than just going blank where
                               every other row has a button. A missing control and a broken
                               one look identical; this names which it is, and points at the
