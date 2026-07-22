@@ -12,6 +12,12 @@ import { getUser } from "@/lib/auth"
 const idFor = (orderId: string, sku: string | undefined, name: string) =>
   `DF-${orderId}-${sku || "x"}-${name}`.replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 120)
 
+// What counts as a machine file, in one place — the seller drop zone tests names against
+// the regex and offers the same list in its accept attribute, so the picker can never
+// suggest a type the handler then refuses.
+const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
+const MACHINE_ACCEPT = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
+
 const KIND_META: Record<string, { label: string; hint: string; cls: string; icon: React.ReactNode }> = {
   pes: { label: "PES", hint: "seller deliverable · paid", cls: "bg-violet-100 text-violet-700", icon: <FileArrowDown size={12} weight="fill" /> },
   emb: { label: "EMB", hint: "factory working file", cls: "bg-amber-100 text-amber-700", icon: <FileZip size={12} weight="fill" /> },
@@ -159,16 +165,97 @@ export function DesignFilesPanel({ orderId, sku, compact }: { orderId: string; s
   )
 }
 
-/** Seller-side: their .pes deliverables for one order, bought from the wallet. */
+/**
+ * Seller-side: their .pes deliverables for one order, bought from the wallet — and, now,
+ * the place they can hand US a machine file.
+ *
+ * It used to be read-only and `return null` when empty, which left the "Design files" card
+ * on the order page rendering a heading, the words "download once purchased", and nothing
+ * at all. A seller could not tell that apart from a broken fetch. It now always says which
+ * of the two it is, and the empty state does something useful instead of looking faulty.
+ *
+ * Taking uploads here is safe on the money side, and that is worth stating because it very
+ * nearly isn't: a seller's own .pes is classified `kind: 'pes'` — the PAYWALLED kind — so
+ * the obvious fear is that they'd have to buy back the file they just sent. They don't.
+ * `price` defaults to 0, the download route only charges when `price > 0`, and only
+ * admin/warehouse can ever set a price. Verified against design_files.js, not assumed.
+ */
 export function SellerDesignFiles({ orderId }: { orderId: string }) {
   const [files, setFiles] = useState<DesignFileRow[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [over, setOver] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(() => {
     getDesignFiles(orderId).then((r) => setFiles(r ?? [])).catch(() => setFiles([]))
   }, [orderId])
   useEffect(() => { const id = setTimeout(load, 0); return () => clearTimeout(id) }, [load])
+
+  /**
+   * Send us a machine file. Refused BY NAME if it isn't one — this panel sits under a
+   * heading about machine files, so an image dropped here is a mistake worth naming rather
+   * than storing as a mockup the seller will never see again.
+   */
+  const send = async (list: FileList | File[]) => {
+    const arr = Array.from(list)
+    if (!arr.length) return
+    setErr(null); setSent(null)
+    const wrong = arr.filter((f) => !MACHINE_RE.test(f.name))
+    const ok = arr.filter((f) => MACHINE_RE.test(f.name))
+    if (wrong.length) {
+      setErr(`${wrong.map((f) => f.name).join(", ")} — not a machine file. Artwork goes on the item itself, through Customize.`)
+    }
+    for (const f of ok) {
+      // 50MB: the body limit is 60MB and base64 inflates by about a third, so a bigger
+      // file returns a server error that says nothing useful.
+      if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large — 50 MB is the limit.`); continue }
+      setBusy(f.name)
+      try {
+        const data = await new Promise<string>((res, rej) => {
+          const fr = new FileReader()
+          fr.onload = () => res(String(fr.result))
+          fr.onerror = () => rej(new Error("Could not read the file"))
+          fr.readAsDataURL(f)
+        })
+        const r = await uploadDesignFile({ designId: idFor(orderId, undefined, f.name), orderId, name: f.name, mime: f.type || undefined, data })
+        if (r?.error) throw new Error(r.error)
+        // Says what happens NEXT. The file landing is not the outcome the seller cares
+        // about — being checked before production is.
+        setSent(`${f.name} sent. We'll check it before production and come back to you if anything's wrong.`)
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : `Could not send ${f.name}`)
+      } finally { setBusy(null) }
+    }
+    load()
+  }
+
+  const dropZone = (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); void send(e.dataTransfer.files) }}
+      onClick={() => inputRef.current?.click()}
+      className={
+        "flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center transition-colors " +
+        (over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-accent/40")
+      }
+    >
+      {busy ? <CircleNotch size={18} className="animate-spin text-muted-foreground" /> : <UploadSimple size={18} weight="bold" className="text-muted-foreground" />}
+      <span className="text-xs font-medium">{busy ? `Sending ${busy}…` : "Already have a machine file? Drop it here"}</span>
+      <span className="text-[10px] text-muted-foreground">.pes · .dst · .emb · .exp · .jef — we check it, and charge the check fee instead of digitising</span>
+      <input ref={inputRef} type="file" multiple accept={MACHINE_ACCEPT} className="hidden"
+        onChange={(e) => { if (e.target.files) void send(e.target.files); e.target.value = "" }} />
+    </div>
+  )
+
+  const notices = (
+    <>
+      {err && <div className="flex items-start gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive"><Warning size={12} weight="fill" className="mt-0.5 shrink-0" /> {err}</div>}
+      {sent && <div className="flex items-start gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800"><Sparkle size={12} weight="fill" className="mt-0.5 shrink-0" /> {sent}</div>}
+    </>
+  )
 
   const buyAndGet = async (f: DesignFileRow) => {
     setBusy(f.designId); setErr(null)
@@ -191,11 +278,25 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
   }
 
   if (files === null) return <div className="flex justify-center py-4 text-muted-foreground"><CircleNotch size={16} className="animate-spin" /></div>
-  if (!files.length) return null
+
+  // NOTHING TO BUY is a real state and it now says so. Returning null here left the card
+  // above it showing a title and blank space — a promise of files with no files and no
+  // explanation, which reads exactly like a fetch that failed.
+  if (!files.length) {
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          No machine files on this order yet. They appear here once we&apos;ve cut them — or send us your own.
+        </p>
+        {dropZone}
+        {notices}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
-      {err && <div className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"><Warning size={12} weight="fill" /> {err}</div>}
+      {notices}
       {files.map((f) => (
         <div key={f.designId} className="flex items-center gap-3 rounded-xl border border-border p-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700"><Sparkle size={14} weight="fill" /></span>
@@ -210,6 +311,9 @@ export function SellerDesignFiles({ orderId }: { orderId: string }) {
           </Button>
         </div>
       ))}
+      {/* Offered alongside existing files too, not only when the list is empty — a seller
+          may send a corrected file after we've already delivered one. */}
+      {dropZone}
     </div>
   )
 }

@@ -451,6 +451,12 @@ export function OrdersList() {
           initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
           initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
           catalog={catalog}
+          // Sellers get "use on every line" too — ten shirts from one file is their case
+          // more than the factory's. No onSendToDesigner: that spends factory time and
+          // opens a payable card, so it stays staff-only and the prop is simply absent.
+          siblings={(editing.order.items ?? []).filter((it) =>
+            (it.line_id ?? it.sku) !== (editing.item.line_id ?? editing.item.sku))}
+          designs={designs[editing.order.id]}
           onSaved={() => reloadDesigns(editing.order.id)}
         />
       )}

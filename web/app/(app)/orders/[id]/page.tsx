@@ -483,6 +483,8 @@ export default function OrderDetailPage() {
           item={customize}
           initialDesign={designSrc(designs[customize.sku ?? ""]?.data)}
           initialPos={designs[customize.sku ?? ""]?.pos}
+          siblings={items.filter((it) => (it.line_id ?? it.sku) !== (customize.line_id ?? customize.sku))}
+          designs={designs}
           onSaved={reloadDesigns}
           catalog={catalog}
         />

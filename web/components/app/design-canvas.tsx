@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen, ArrowSquareOut } from "@phosphor-icons/react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { UploadSimple, ArrowsOutCardinal, ArrowClockwise, X, CircleNotch, Image as ImageIcon, FolderOpen, ArrowSquareOut, DownloadSimple, CopySimple, PaperPlaneTilt, Sparkle, CaretDown } from "@phosphor-icons/react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
-import { uploadDesignFile, postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { uploadDesignFile, postOrderDesign, postOrderThreads, setDesignTier, getFactorySettings, getDesignFiles, type DesignPos, type DesignTier, type OrderItem, type CatalogProduct } from "@/lib/api"
+import { getUser } from "@/lib/auth"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
-import { decodeEntities } from "@/lib/order-format"
+import { decodeEntities, usd } from "@/lib/order-format"
 import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
@@ -284,9 +285,29 @@ export function readImageFile(file: File | null | undefined, onData: (url: strin
 /** Machine-file extensions, matched on NAME because browsers report no useful mime type
  *  for them — a .emb arrives as application/octet-stream or an empty string. */
 const MACHINE_RE = /\.(emb|pes|dst|exp|jef|vp3|xxx|hus)$/i
+/** The same list the regex tests, as an accept attribute. Derived from one source so the
+ *  picker can't start offering a type the drop handler refuses (or the reverse). */
+const MACHINE_EXT_LIST = ".emb,.pes,.dst,.exp,.jef,.vp3,.xxx,.hus"
+
+/** The three tiers, in the factory's own words. Mirrors the mapping in
+ *  server/src/routes/orders.js — tier → fee — so the label and the debit can't disagree. */
+const TIER_LABEL: Record<DesignTier, string> = {
+  standard: "Standard",
+  complex: "Complex",
+  supplied: "Their file",
+}
+const TIER_WHY: Record<DesignTier, string> = {
+  standard: "We cut the machine file from their artwork — ordinary work",
+  complex: "We cut it, but it's intricate. Quotes the seller and waits for them to accept",
+  supplied: "They sent their own machine file — we only check it",
+}
+/** null while settings are still loading, so a price never renders as a confident $0. */
+const feeFor = (t: DesignTier, fees: { standard: number; complex: number; check: number } | null) =>
+  fees ? (t === "standard" ? fees.standard : t === "complex" ? fees.complex : fees.check) : null
 
 export function DesignCanvasDialog({
   open, onOpenChange, orderId, item, initialDesign, initialPos, onSaved, catalog,
+  siblings, designs, onSendToDesigner,
 }: {
   open: boolean
   onOpenChange: (v: boolean) => void
@@ -296,6 +317,15 @@ export function DesignCanvasDialog({
   initialPos?: DesignPos | null
   onSaved?: () => void
   catalog?: CatalogProduct[]
+  /** The order's OTHER lines, for "use on every line". Absent → the control isn't offered,
+   *  which is right for a surface that only ever holds one line. */
+  siblings?: OrderItem[]
+  /** Every design on the order, keyed as the server keys them (line first, sku as fallback).
+   *  Only used to count how many lines "use on every line" would OVERWRITE before it does. */
+  designs?: Record<string, { data?: string } | undefined> | null
+  /** Staff-only. Offered only when the line has artwork — there is nothing to digitise
+   *  otherwise. Absent → not offered at all. */
+  onSendToDesigner?: () => void
 }) {
   const [designUrl, setDesignUrl] = useState(initialDesign ?? "")
   const [pos, setPos] = useState<Pos>(initialPos ? { x: initialPos.x, y: initialPos.y, w: initialPos.w, r: initialPos.r } : DEFAULT_POS)
@@ -398,6 +428,165 @@ export function DesignCanvasDialog({
   const [attached, setAttached] = useState<string | null>(null)
   const [libOpen, setLibOpen] = useState(false)
   const [over, setOver] = useState(false)
+  /** The explicit machine-file picker. Dropping one already worked; there was no BUTTON,
+   *  so a seller who had cut their own file and didn't think to drag it had no route. */
+  const machineRef = useRef<HTMLInputElement | null>(null)
+  /** The artwork picker, driven by the stage overlay rather than by a button of its own. */
+  const uploadRef = useRef<HTMLInputElement | null>(null)
+
+  /**
+   * Whether the VIEWER is factory staff.
+   *
+   * Two things below are staff-only and the reason is the same for both: the design charge
+   * decides what the SELLER pays, so the person being charged must not be the one setting
+   * it; and sending a line to a designer spends factory time. Read from the session rather
+   * than passed in — a caller that forgot the prop would silently expose both, and that
+   * failure looks exactly like a working screen. The server gates these routes too; this is
+   * only the UI half.
+   */
+  const [isStaff, setIsStaff] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const role = getUser()?.role
+      setIsStaff(role === "admin" || role === "operator" || role === "warehouse" || role === "designer")
+    }, 0)
+    return () => clearTimeout(t)
+  }, [])
+
+  /** What each tier costs the seller. Rendered only once loaded, so a slow fetch never
+   *  shows a confident $0 next to a button that moves money. */
+  const [fees, setFees] = useState<{ standard: number; complex: number; check: number } | null>(null)
+  useEffect(() => {
+    if (!open || !isStaff) return
+    const t = setTimeout(() => {
+      getFactorySettings()
+        .then((f) => setFees({
+          standard: Number(f.design_fee_standard) || 0,
+          complex: Number(f.design_fee_complex) || 0,
+          check: Number(f.check_fee) || 0,
+        }))
+        .catch(() => setFees(null))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open, isStaff])
+
+  /**
+   * Does THIS LINE already have a machine file? The only honest input to the suggestion
+   * below, and it has to be asked of the server — an order item carries no such field, so
+   * inferring it from anything on `item` would be a guess dressed as a fact.
+   *
+   * Filtered by sku AND by kind: an image on the line is artwork, not a deliverable, and
+   * counting it would recommend the check fee for a file nobody supplied. `attached` ORs
+   * in so a file filed moments ago in this window counts without a refetch.
+   */
+  const [hasFile, setHasFile] = useState(false)
+  useEffect(() => {
+    if (!open || !isStaff) return
+    const t = setTimeout(() => {
+      getDesignFiles(orderId)
+        .then((rows) => setHasFile((rows ?? []).some((f) =>
+          (f.kind === "emb" || f.kind === "pes") &&
+          (!f.sku || !item.sku || f.sku === item.sku))))
+        .catch(() => setHasFile(false))
+    }, 0)
+    return () => clearTimeout(t)
+  }, [open, isStaff, orderId, item.sku])
+  const hasMachineFile = hasFile || !!attached
+
+  const [tier, setTier] = useState<DesignTier | null>((item.design_tier as DesignTier | null) ?? null)
+  const [tierBusy, setTierBusy] = useState<DesignTier | null>(null)
+  const [chargeOpen, setChargeOpen] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const quote = item.design_quote_status ?? null
+
+  /**
+   * The tier we RECOMMEND, from the one signal that actually distinguishes them: who cut
+   * the machine file.
+   *
+   *   a machine file is on the line  → 'supplied'  — they brought it, we only check it
+   *   otherwise                      → 'standard'  — we cut it from their artwork
+   *
+   * 'complex' is deliberately NEVER suggested. It is the expensive tier AND it fires a
+   * quote that blocks the line until the seller accepts, so proposing it automatically
+   * would put a large charge and a stalled order behind nobody's judgement. Intricacy is
+   * the one thing here a person has to look at the artwork to decide.
+   *
+   * This only HIGHLIGHTS. It must never call setDesignTier on its own: that route debits
+   * the wallet, so an auto-applied suggestion would mean merely OPENING this window
+   * charged the seller. Staff still click; the suggestion just makes the common case the
+   * obvious one instead of a price list recalled from memory.
+   */
+  const suggested: DesignTier = hasMachineFile ? "supplied" : "standard"
+
+  /**
+   * File a MACHINE file against this line.
+   *
+   * One implementation for both routes into it — the drop anywhere in the window, and the
+   * explicit button. They were about to be two copies of the same twenty lines, and the
+   * copy that drifts is always the one that stops setting `sku`, which silently files the
+   * deliverable against the order instead of the line.
+   *
+   * The canvas is deliberately NOT touched: a stitch file has nothing to position. Saying
+   * so is the whole point of `attached` — without a word, a window that looks identical
+   * before and after reads as the upload having failed.
+   */
+  const attachMachineFile = useCallback(async (f: File) => {
+    // 50MB: the API body limit is 60MB and base64 inflates by about a third, so anything
+    // larger comes back as a confusing server rejection rather than this sentence.
+    if (f.size > 50 * 1024 * 1024) { setErr(`${f.name} is too large — 50 MB is the limit.`); return }
+    const designId = `EMB-${item.line_id ?? item.sku ?? "line"}-${f.name.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
+    try {
+      const data = await new Promise<string>((res, rej) => {
+        const r = new FileReader()
+        r.onload = () => res(String(r.result))
+        r.onerror = () => rej(new Error("couldn't be read"))
+        r.readAsDataURL(f)
+      })
+      const r = await uploadDesignFile({
+        designId, orderId, sku: item.sku ?? undefined,
+        name: f.name, mime: f.type || undefined, data,
+      })
+      if (r?.error) throw new Error(r.error)
+      setErr(null)
+      setAttached(`${f.name} is filed against this line as the machine file. It isn't placed on the mockup — a stitch file has nothing to position. We'll check it before production.`)
+    } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
+  }, [orderId, item.line_id, item.sku])
+
+  /**
+   * Put THIS line's artwork on every other line of the order.
+   *
+   * One row PER LINE, never one write against the sku: order_designs is keyed on
+   * (order_id, coalesce(line_id, sku), kind), so a single sku-keyed write would collapse
+   * identical-sku siblings into one row and undo the exact thing that key exists for.
+   *
+   * Counts what it would OVERWRITE and says so first. This is one click and it can replace
+   * artwork on lines nobody is currently looking at.
+   */
+  const applyToAll = useCallback(async () => {
+    const others = siblings ?? []
+    if (!designUrl || !others.length) return
+    const willReplace = others.filter((it) => !!designs?.[(it.line_id ?? it.sku) as string]?.data).length
+    const ok = window.confirm(
+      `Use this artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?` +
+      (willReplace ? `\n\n${willReplace} of them already ${willReplace === 1 ? "has artwork and it" : "have artwork and they"} will be replaced.` : "")
+    )
+    if (!ok) return
+    setApplying(true); setErr(null)
+    const failed: string[] = []
+    for (const it of others) {
+      try {
+        const r = await postOrderDesign(orderId, {
+          sku: it.sku ?? "", line_id: it.line_id ?? undefined, data: designUrl,
+          name: item.name ?? undefined, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r },
+        })
+        if (r?.error) throw new Error(r.error)
+      } catch (e) { failed.push(`${it.sku ?? "line"}${e instanceof Error ? ` (${e.message})` : ""}`) }
+    }
+    setApplying(false)
+    if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
+    const done = others.length - failed.length
+    if (done > 0) { setAttached(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onSaved?.() }
+  }, [designUrl, siblings, designs, orderId, item.name, pos, onSaved])
 
   const save = async () => {
     if (!designUrl || !item.sku) { setErr("Upload artwork first."); return }
@@ -444,24 +633,7 @@ export function DesignCanvasDialog({
           // The intent is unambiguous: they have a machine file and dropped it on the
           // window that was open. So take it, file it against this line, and say which of
           // the two things happened.
-          if (MACHINE_RE.test(f.name)) {
-            const designId = `EMB-${item.line_id ?? item.sku ?? "line"}-${f.name.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
-            const reader = new FileReader()
-            reader.onload = async () => {
-              try {
-                const r = await uploadDesignFile({
-                  designId, orderId, sku: item.sku ?? undefined,
-                  name: f.name, mime: f.type || undefined, data: String(reader.result),
-                })
-                if (r?.error) throw new Error(r.error)
-                setErr(null)
-                setAttached(`${f.name} attached to this line as your machine file. We'll check it before production — it isn't placed on the mockup because a stitch file has nothing to position.`)
-              } catch (e) { setErr(`Couldn't attach ${f.name}: ${(e as Error).message}`) }
-            }
-            reader.onerror = () => setErr(`Couldn't read ${f.name}.`)
-            reader.readAsDataURL(f)
-            return
-          }
+          if (MACHINE_RE.test(f.name)) { void attachMachineFile(f); return }
           if (!/^image\//.test(f.type)) {
             setErr(`${f.name} isn't an image or a machine file, so there's nothing to do with it here.`)
             return
@@ -488,7 +660,39 @@ export function DesignCanvasDialog({
             ))}
           </div>
         )}
-        <div className="mx-auto w-full"><DesignStage className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor} /></div>
+        {/* THE STAGE IS THE DROP TARGET.
+            Empty, it was a mockup doing nothing while a separate Upload button did the
+            work — so the biggest, most obvious surface in the window was the one thing you
+            couldn't click. The dashed box sits at DEFAULT_POS, the exact spot and size the
+            artwork will land at, so the empty state teaches placement before there is
+            anything to place. Once art is on, the overlay is gone entirely and the stage
+            goes back to being a stage. */}
+        <div className="relative mx-auto w-full">
+          <DesignStage className="w-full" mockup={activeMockup} designUrl={designUrl} pos={pos} setPos={setPos} onRemove={() => setDesignUrl("")} picking={picking} onPickColor={onPickColor} />
+          {!designUrl && (
+            <button
+              type="button"
+              onClick={() => uploadRef.current?.click()}
+              aria-label="Add artwork — drop a file here or click to browse"
+              className="absolute inset-0 grid place-items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {/* Same %-geometry the artwork itself uses, so this is a preview of the
+                  placement rather than a decorative box that happens to be centred. */}
+              <span
+                className={"pointer-events-none absolute flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-3 text-center transition-colors " +
+                  (over ? "border-primary bg-primary/10 text-foreground" : "border-muted-foreground/35 bg-background/60 text-muted-foreground")}
+                style={{
+                  left: `${DEFAULT_POS.x}%`, top: `${DEFAULT_POS.y}%`,
+                  width: `${DEFAULT_POS.w}%`, aspectRatio: "1",
+                  transform: "translate(-50%,-50%)",
+                }}
+              >
+                <UploadSimple size={20} weight="duotone" />
+                <span className="text-xs font-medium leading-tight">Drop artwork<br />or click to browse</span>
+              </span>
+            </button>
+          )}
+        </div>
         {/* Thread match — EMB only. Each chip is a dominant design colour mapped to the
             nearest in-stock cone; saved with the design so the floor loads the right threads. */}
         {isEmb && (
@@ -646,23 +850,163 @@ export function DesignCanvasDialog({
           </div>
         )}
         <div className="space-y-3">
+          {/* The artwork input the STAGE opens. No visible Upload button while the stage is
+              empty — the stage already is one, and two controls for one job is how the old
+              layout got noisy. It comes back as "Replace" once there's art to replace. */}
+          <input ref={uploadRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr); e.target.value = "" }} />
+          <input ref={machineRef} type="file" accept={MACHINE_EXT_LIST} className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void attachMachineFile(f); e.target.value = "" }} />
+
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">
-              <UploadSimple size={15} weight="bold" /> {designUrl ? "Replace" : "Upload"}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => readImageFile(e.target.files?.[0], (u) => { setErr(null); setDesignUrl(u); setPos(DEFAULT_POS) }, setErr)} />
-            </label>
+            {designUrl && (
+              <Button variant="outline" size="sm" onClick={() => uploadRef.current?.click()}>
+                <UploadSimple size={15} weight="bold" /> Replace
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => setLibOpen(true)}>
-              <FolderOpen size={15} weight="bold" /> From library
+              <FolderOpen size={15} weight="bold" /> Library
             </Button>
-            {designUrl
-              ? <span className="text-xs text-muted-foreground">Drag · corner resizes · top rotates</span>
-              : <span className="text-xs text-muted-foreground">…or drop an image anywhere here</span>}
+            {/* The seller's own-file route, now a BUTTON. Dropping one always worked, but
+                a drop is only discoverable if you already suspect it exists — which is why
+                the seller who had cut their own .pes had nowhere to go. */}
+            <Button variant="outline" size="sm" onClick={() => machineRef.current?.click()}>
+              <Sparkle size={15} weight="bold" /> Machine file
+            </Button>
+            {designUrl && (
+              // `download` with a filename: without it a signed storage URL just opens in a
+              // tab and a data-URL saves as "download", neither of which is usable later.
+              <a href={designUrl} download={`${orderId}-${item.sku ?? "artwork"}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium transition-colors hover:bg-accent">
+                <DownloadSimple size={14} weight="bold" /> Download
+              </a>
+            )}
+            {/* Ten shirts, one file. Only when there IS another line, so a single-line
+                order doesn't carry a control that would do nothing. */}
+            {designUrl && !!siblings?.length && (
+              <Button variant="outline" size="sm" disabled={applying} onClick={() => void applyToAll()}>
+                {applying ? <CircleNotch size={14} className="animate-spin" /> : <CopySimple size={14} weight="bold" />} Use on every line
+              </Button>
+            )}
           </div>
+          {designUrl && <p className="text-xs text-muted-foreground">Drag to move · corner resizes · top rotates</p>}
           {err && <div className="text-sm text-destructive">{err}</div>}
           {/* A machine file was filed. Green, not red, and it says what it did AND what it
               deliberately didn't — the canvas is unchanged, which without a word reads as
               the drop having failed. */}
           {attached && <div className="text-sm text-emerald-700">{attached}</div>}
+          {/* WHAT THE SELLER PAYS. Staff only — the person being charged must not be the
+              one setting the charge. Collapsed by default so the seller-shaped window stays
+              a design window; the summary line carries the answer, so staff only expand
+              when they disagree with it. */}
+          {isStaff && (
+            <div className="rounded-lg border border-border">
+              <button
+                type="button"
+                onClick={() => setChargeOpen((v) => !v)}
+                aria-expanded={chargeOpen}
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent"
+              >
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium">Design charge</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {tier
+                      ? `${TIER_LABEL[tier]}${feeFor(tier, fees) !== null ? ` · ${usd(feeFor(tier, fees)!)}` : ""}${quote === "pending" ? " · awaiting the seller" : ""}`
+                      : `Suggested: ${TIER_LABEL[suggested]}${feeFor(suggested, fees) !== null ? ` · ${usd(feeFor(suggested, fees)!)}` : ""} — not charged yet`}
+                  </span>
+                </span>
+                <CaretDown size={14} weight="bold" className={"shrink-0 text-muted-foreground transition-transform " + (chargeOpen ? "rotate-180" : "")} />
+              </button>
+
+              {chargeOpen && (
+                <div className="border-t border-border p-3">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(["standard", "complex", "supplied"] as DesignTier[]).map((id) => {
+                      const isSet = tier === id
+                      // Highlighted, NOT applied. Nothing here has debited anything until
+                      // someone clicks — see the note on `suggested`.
+                      const isSuggested = !tier && id === suggested
+                      const fee = feeFor(id, fees)
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          title={TIER_WHY[id]}
+                          disabled={!!tierBusy || quote === "accepted"}
+                          onClick={async () => {
+                            setTierBusy(id); setErr(null)
+                            try {
+                              const r = await setDesignTier(orderId, {
+                                tier: id, line_id: item.line_id, sku: item.line_id ? undefined : item.sku,
+                              })
+                              if (r?.error) throw new Error(r.error)
+                              setTier(id)
+                              setAttached(r.quoted
+                                // Says what has NOT happened. "Marked complex" reads as done,
+                                // and the money has not moved and may never.
+                                ? "Quoted to the seller. Nothing is charged until they accept, and they may decline."
+                                : r.charged?.charged
+                                  ? `Charged ${usd(Number(r.charged.charged))} to the seller.`
+                                  : r.charged?.reason === "already-charged"
+                                    ? "Re-filed. This line was already charged, so nothing moved."
+                                    : r.charged?.reason === "no-fee-set"
+                                      ? "Filed. No fee is set for this tier, so nothing was charged."
+                                      : "Filed.")
+                              onSaved?.()
+                            } catch (e) { setErr((e as Error).message) } finally { setTierBusy(null) }
+                          }}
+                          className={"relative rounded-lg border px-2 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-50 " +
+                            (isSet ? "border-primary bg-primary/10 text-primary"
+                              : isSuggested ? "border-primary/50 bg-primary/5 text-foreground"
+                              : "border-border text-muted-foreground hover:bg-accent")}
+                        >
+                          {tierBusy === id ? <CircleNotch size={12} className="mx-auto animate-spin" /> : (
+                            <>
+                              <span className="block">{TIER_LABEL[id]}</span>
+                              {/* The number, not just the word — Complex is several times
+                                  Standard, and a charge chosen by someone who can't see the
+                                  amount is a charge made blind. Only once fees load. */}
+                              {fee !== null && (
+                                <span className="block text-[10px] font-normal tabular-nums opacity-70">{usd(fee)}</span>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {!tier && (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {hasMachineFile
+                        ? "A machine file is already on this line, so they supplied it — we only check it."
+                        : "No machine file on this line, so we cut it from their artwork."}
+                      {" "}Suggested, not applied — nothing is charged until you pick one.
+                    </p>
+                  )}
+                  {/* The quote's own state, in words. A "complex" chip alone can't tell
+                      waiting-on-the-seller from already-paid from refused. */}
+                  {quote === "pending" && <p className="mt-2 text-[11px] text-amber-700">Waiting on the seller to accept — don&apos;t start work yet.</p>}
+                  {quote === "declined" && <p className="mt-2 text-[11px] text-rose-700">The seller declined. Cancel the line, or agree something else with them.</p>}
+                  {quote === "accepted" && <p className="mt-2 text-[11px] text-emerald-700">Accepted and paid — cleared to digitise. The tier is locked.</p>}
+
+                  {/* The ALTERNATIVE to uploading, not a step after it. Offering both without
+                      saying so is how a line ends up with a finished file AND an open card
+                      nobody closes. */}
+                  {onSendToDesigner && (
+                    <div className="mt-3 border-t border-border pt-3">
+                      <p className="mb-1.5 text-[11px] text-muted-foreground">Don&apos;t have the file yet?</p>
+                      <Button size="sm" variant="outline" onClick={onSendToDesigner} disabled={!designUrl}>
+                        <PaperPlaneTilt size={14} weight="bold" /> Send this line to a designer
+                      </Button>
+                      {!designUrl && <p className="mt-1 text-[11px] text-muted-foreground">Needs artwork first — there&apos;s nothing to digitise.</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={save} disabled={saving || !designUrl}>{saving ? <CircleNotch size={15} className="animate-spin" /> : "Save design"}</Button>

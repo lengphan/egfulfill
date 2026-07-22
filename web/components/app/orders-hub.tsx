@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { onLive } from "@/lib/live"
 import { useRouter } from "next/navigation"
-import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X, MagnifyingGlassPlus } from "@phosphor-icons/react"
+import { Package, Plus, UploadSimple, CircleNotch, CheckCircle, Truck, Printer, Warning, Flag, MapPin, ArrowSquareOut, SkipForward, PaperPlaneTilt, FileArrowDown, Barcode, DotsThree, CaretRight, TrayArrowDown, X } from "@phosphor-icons/react"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { SectionCard } from "@/components/app/section-card"
 import { parseBlock } from "@/lib/address-paste"
@@ -28,7 +28,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
-import { ArtworkZoom } from "@/components/app/artwork-zoom"
 
 const nowId = () => Date.now()
 const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"]
@@ -214,7 +213,6 @@ export function OrdersHub() {
   // Catalog powers the variant picker on factory-owned marketplace orders (which arrive
   // with no blank chosen). Loaded once.
   // The line whose artwork is open at full size. Null = shut.
-  const [zoom, setZoom] = useState<{ order: OrderRow; item: OrderItem } | null>(null)
   const [catalog, setCatalog] = useState<CatalogProduct[]>([])
   useEffect(() => { getCatalogProducts().then((c) => setCatalog(c ?? [])).catch(() => {}) }, [])
   // Blank stock, once for the board — so each line can say whether we can actually make it.
@@ -1045,22 +1043,15 @@ export function OrdersHub() {
                                 .catch(() => setActionErr("Couldn't attach that artwork."))
                             } : undefined}
                           />
-                          {/* Overlays the image corner, revealed on hover and always
-                              present for keyboard focus. Same treatment the app uses
-                              elsewhere for a secondary action on a tile: a small tonal
-                              circle on the surface colour, not a bordered button competing
-                              with the artwork. */}
-                          <button
-                            onClick={() => setZoom({ order: o, item: it })}
-                            title="Open the artwork, download it, or attach a machine file"
-                            aria-label={`Open artwork for ${it.name || it.sku || "this line"}`}
-                            // TOP-right. item-avatar puts its listing/design SWAP control at -bottom-1 -right-1,
-                            // so putting this there too stacked two controls on the same
-                            // 24px of tile — "matching the pattern" was landing on top of it.
-                            className="eg-tap absolute -right-1 -top-1 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/art:opacity-100"
-                          >
-                            <MagnifyingGlassPlus size={12} weight="bold" />
-                          </button>
+                          {/* The magnifier that used to sit here opened a SECOND window —
+                              a separate "artwork panel" holding the download, the machine
+                              file and the design charge, while clicking the avatar opened
+                              the designer. One line, two windows, and only one of them
+                              reachable by a seller: the designer's own error message used
+                              to send sellers to a panel that doesn't exist for them.
+                              Both are now the same window, so the avatar is the only door
+                              and the tile carries one control instead of two stacked on the
+                              same 24px. */}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
@@ -1282,8 +1273,22 @@ export function OrdersHub() {
               initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
               initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
               catalog={catalog}
+              // The order's OTHER lines, so "use on every line" exists here rather than in
+              // a second window — and the designs map so it can say how many it would
+              // overwrite. Same map the readiness tag reads; no second copy.
+              siblings={(editing.order.items ?? []).filter((it) =>
+                (it.line_id ?? it.sku) !== (editing.item.line_id ?? editing.item.sku))}
+              designs={designs[editing.order.id]}
+              onSendToDesigner={canDesign ? () => {
+                const e = editing; setEditing(null)
+                if (e) void sendToDesigner(e.order, e.item)
+              } : undefined}
               onSaved={() => {
                 const oid = editing.order.id
+                // Refresh the SHARED file list too — this is what makes a machine file
+                // filed in the designer show up in the readiness tag and the order details
+                // without a page reload.
+                loadFiles(oid, true)
                 getOrderDesigns(oid).then((r) => {
                   const list = Array.isArray(r) ? r : (r?.designs ?? [])
                   const bySku: Record<string, OrderDesign> = {}
@@ -1328,29 +1333,6 @@ export function OrdersHub() {
 
       <p className="text-center text-xs text-muted-foreground">Stages: {FACTORY_STAGES.map((s) => s.label).join(" → ")}</p>
 
-      {/* Keyed on the line so reopening on a different item can't show the previous one's
-          artwork for a frame. */}
-      {zoom && (
-        <ArtworkZoom
-          key={`${zoom.order.id}:${zoom.item.line_id ?? zoom.item.sku ?? ""}`}
-          order={zoom.order}
-          item={zoom.item}
-          artwork={artworkFor(zoom.order, zoom.item) || null}
-          // The order's designs, so "Use on all lines" can say how many it would replace
-          // before it does. Same map the readiness tag reads — one source, no second copy.
-          designs={designs[zoom.order.id]}
-          open
-          onOpenChange={(v) => { if (!v) setZoom(null) }}
-          onUploaded={() => {
-            setNote("Machine file attached.")
-            // Refresh the SHARED list, not just the orders — this is what makes the .emb
-            // appear in the readiness tag and the order details without a page reload.
-            if (zoom?.order.id) loadFiles(zoom.order.id, true)
-            load()
-          }}
-          onSendToDesigner={canDesign ? () => { const z = zoom; setZoom(null); if (z) void sendToDesigner(z.order, z.item) } : undefined}
-        />
-      )}
     </div>
   )
 }
