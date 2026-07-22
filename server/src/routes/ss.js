@@ -269,6 +269,29 @@ export function parseSsBarcode(raw) {
   };
 }
 
+/**
+ * Read ONE order's status, without a request behind it.
+ *
+ * The route above answers the same question but needs a req/reply pair, so the background
+ * poller would have had to duplicate the fetch — and a second copy of "how do we ask S&S
+ * about an order" is a second copy to get wrong. Returns null when S&S can't be reached or
+ * doesn't know the order, so a caller can tell "no answer" from "cancelled".
+ */
+export async function ssOrderStatus(num) {
+  if (!creds()) return null;
+  const r = await ssGet('/orders/' + encodeURIComponent(String(num)) + '?mediatype=json').catch(() => null);
+  if (!r || !r.ok) return null;
+  const rows = Array.isArray(r.data) ? r.data : [r.data].filter(Boolean);
+  const o = rows[0];
+  if (!o) return null;
+  return {
+    orderNumber: String(o.orderNumber ?? ''),
+    orderStatus: o.orderStatus || null,
+    deliveryStatus: o.deliveryStatus || null,
+    tracking: o.trackingNumber || null,
+  };
+}
+
 export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
   // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),

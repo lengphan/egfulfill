@@ -42,6 +42,8 @@ import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
 import { dispatchRoutes } from './routes/dispatch.js';
+import { ssOrderStatus } from './routes/ss.js';
+import { startSupplierPoll } from './supplier-poll.js';
 import { manifestRoutes } from './routes/manifests.js';
 import { pinkDesignRoutes } from './routes/pinkdesign.js';
 import { addClient } from './events.js';
@@ -329,6 +331,22 @@ notificationRoutes(app, requireAuth);                  // per-user bell + read s
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
+
+/**
+ * Ask S&S whether our open orders are still open.
+ *
+ * They have no webhook — no receiver here, nothing registered there — so an order they
+ * cancelled stayed "Placed" on our board indefinitely. Not a missed callback: nothing was
+ * ever listening.
+ *
+ * Deliberately small: 8 orders every 5 minutes, spaced 1.5s apart, which is well under one
+ * request a minute against their 60/min ceiling. A poller that eats the budget breaks rate
+ * shopping and label buying, which people are actually waiting on.
+ */
+startSupplierPoll({
+  enabled: () => !!(process.env.SS_ACCOUNT_NUMBER && process.env.SS_API_KEY),
+  ssOrderStatus,
+});
 pinkDesignRoutes(app, requireAuth, requireStaff);      // Pink Design: outsourced DTG/DTF artwork
 
 const port = Number(process.env.PORT) || 3000;
