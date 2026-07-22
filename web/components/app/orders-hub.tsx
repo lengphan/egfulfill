@@ -490,21 +490,43 @@ export function OrdersHub() {
 
   // Threads and machine files for the orders actually OPEN. Still scoped to expansion:
   // these are the heavy two, and nobody is looking at them on a closed row.
+  // Separate from threadsRef: an upload must be able to refresh FILES without dragging
+  // the thread history along with it.
+  const filesRef = useRef<Record<string, boolean>>({})
   const visibleIds = paged.pageItems.filter((o) => expandedIds.has(o.id)).map((o) => o.id).join(",")
+  /**
+   * ONE design-file list per order, shared by everything that shows one.
+   *
+   * The readiness tag, the expanded order details and the artwork panel all read this
+   * same `dfiles` map — none of them fetch their own copy, so they cannot disagree about
+   * whether a machine file exists, and one upload refreshes all three.
+   *
+   * `force` exists because the fetch is deduped by a ref that is set once and never
+   * cleared. That is right for scrolling (don't refetch on every expand) and wrong after
+   * an upload: the .emb landed, the list still said none, and the tag kept reporting
+   * "no machine file" until a full reload.
+   */
+  const loadFiles = useCallback((oid: string, force = false) => {
+    if (!oid) return
+    if (!force && filesRef.current[oid]) return
+    filesRef.current[oid] = true
+    getDesignFiles(oid).then((r) => setDfiles((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
+  }, [])
+
   useEffect(() => {
     const id = setTimeout(() => {
       for (const oid of visibleIds ? visibleIds.split(",") : []) {
+        loadFiles(oid)
         if (threadsRef.current[oid]) continue
         threadsRef.current[oid] = true
         getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
-        getDesignFiles(oid).then((r) => setDfiles((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})
         // Designs are fetched by the page-level effect above and deduped in its own ref,
         // so expanding a row no longer re-requests them.
         loadDesigns(oid)
       }
     }, 0)
     return () => clearTimeout(id)
-  }, [visibleIds, loadDesigns])
+  }, [visibleIds, loadDesigns, loadFiles])
 
   const subtitle = isAdmin
     ? "Every order across the team — production to shipping."
@@ -1294,7 +1316,13 @@ export function OrdersHub() {
           artwork={artworkFor(zoom.order, zoom.item) || null}
           open
           onOpenChange={(v) => { if (!v) setZoom(null) }}
-          onUploaded={() => { setNote("Machine file attached."); load() }}
+          onUploaded={() => {
+            setNote("Machine file attached.")
+            // Refresh the SHARED list, not just the orders — this is what makes the .emb
+            // appear in the readiness tag and the order details without a page reload.
+            if (zoom?.order.id) loadFiles(zoom.order.id, true)
+            load()
+          }}
           onSendToDesigner={canDesign ? () => { const z = zoom; setZoom(null); if (z) void sendToDesigner(z.order, z.item) } : undefined}
         />
       )}
