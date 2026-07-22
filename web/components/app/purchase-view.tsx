@@ -437,8 +437,15 @@ export function PurchaseView() {
     // Only warn about phoning the supplier when there IS an order at the supplier.
     // Telling someone to chase a dry run sends them looking for something that was never
     // there — which is exactly what happened.
+    // The warning has to match what the code below actually does, which it did not: it
+    // said "does NOT cancel the order with the supplier" while cancelPO asks S&S FIRST
+    // and refuses to touch our record if they decline. Someone read that, believed the
+    // order was still live, and phoned a supplier who had already cancelled it.
+    const isSsPo = /s&s|activewear/i.test(po.supplier || "")
     if (wasPlaced && sent && !window.confirm(
-      `Cancel ${po.num}?\n\nThis marks OUR record cancelled. It does NOT cancel the order with ${po.supplier || "the supplier"} — contact them directly if the goods haven't shipped.`
+      isSsPo
+        ? `Cancel ${po.num}?\n\nWe'll ask S&S to cancel it first. If they refuse — usually because it's already picked — nothing changes here and you'll see their reason.`
+        : `Cancel ${po.num}?\n\nThis marks OUR record cancelled. ${po.supplier || "This supplier"} has no cancel API, so contact them directly if the goods haven't shipped.`
     )) return
     setBusy(po.num); setMsg(null)
     try {
@@ -838,18 +845,22 @@ export function PurchaseView() {
                         {(() => {
                           const mins = minutesSincePlaced(po)
                           const ss = /s&s|activewear/i.test(po.supplier || "")
-                          // Past ten minutes S&S will refuse, so say so on the button
-                          // rather than letting someone press it and read a rejection.
-                          const tooLate = ss && reallySent(po) && mins != null && mins >= 10
+                          const sentSs = ss && reallySent(po)
+                          // Past their documented 10 minutes S&S USUALLY refuse — but only
+                          // usually. Labelling it "(our record only)" stated an outcome we
+                          // had not asked for, and S&S then cancelled for real, so the app
+                          // said one thing and the supplier did another. The button no
+                          // longer predicts: it asks, and reports whatever comes back.
+                          const past = sentSs && mins != null && mins >= 10
                           return (
                             <button onClick={() => cancelPO(po)} disabled={busy === po.num}
                               className="text-xs font-medium text-muted-foreground hover:text-red-600"
-                              title={tooLate
-                                ? "Past S&S's 10-minute cancellation window — this will only cancel our record"
-                                : ss && reallySent(po)
-                                  ? `Cancels with S&S too — ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
+                              title={past
+                                ? "Past S&S's usual 10-minute window — we'll still ask them, and tell you what they say"
+                                : sentSs
+                                  ? `Cancels with S&S too — about ${Math.max(0, 10 - (mins ?? 0))} min left of their window`
                                   : "Cancel our record of this order"}>
-                              Cancel{tooLate ? " (our record only)" : ""}
+                              Cancel
                             </button>
                           )
                         })()}
