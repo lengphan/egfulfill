@@ -818,9 +818,47 @@ export function OrdersHub() {
                       const opts = stageOptionsFor(role, stage)
                       const prod = opts.filter((s) => !EXCEPTION_STAGES.some((x) => x.id === s.id))
                       const exc = opts.filter((s) => EXCEPTION_STAGES.some((x) => x.id === s.id))
-                      const canShip = canFulfill && shipOpen !== o.id
-                      const canAdvance = canSetStage(role, stage, nextStage(stage) ?? "")
-                      const canStart = canFulfill && stage === ""
+                      /**
+                       * A STOPPED order has no obvious next move — that is what stopping it
+                       * meant.
+                       *
+                       * flagged/on_hold is the andon cord: someone pulled it deliberately
+                       * because this order must not proceed until a human decides. But the
+                       * primary action never consulted the stage — canShip asked only
+                       * "is this role allowed to fulfil, and is the ship panel closed?" —
+                       * so a flagged order presented "Create new label" as the obvious next
+                       * step, in primary colour, exactly where every moving order shows its
+                       * go-button. The stop was visible in the badge and contradicted by
+                       * the loudest control on the row.
+                       *
+                       * The server does NOT gate this: /api/shipping/label takes an address
+                       * and a parcel and never looks at factory_status, so buying that
+                       * label would have SUCCEEDED. Nothing here is defence-in-depth; it is
+                       * the only thing standing between a stopped order and a bought label.
+                       *
+                       * Nothing is taken away. Every stage remains in the ⋯ menu, so the way
+                       * forward is the honest one: resolve the stop, then ship.
+                       */
+                      const stopped = isException(stage)
+                      const canShip = canFulfill && shipOpen !== o.id && !stopped
+                      /**
+                       * No next stage means no Next-stage button.
+                       *
+                       * `nextStage()` returns null once an order is shipped OR stopped —
+                       * there genuinely is no linear step from an exception, which is the
+                       * point of one. The `?? ""` fallback here quietly turned that null
+                       * into "advance to Received", so a flagged order offered "Next stage"
+                       * and warehouse/admin passed the permission check (moving to "" is
+                       * not a money stage). It only surfaced once the ship button stood
+                       * down and the primary fell through to advance.
+                       *
+                       * Asking canSetStage about a target that does not exist can only
+                       * produce a wrong answer, so the existence of the step is checked
+                       * first and the permission second.
+                       */
+                      const next = nextStage(stage)
+                      const canAdvance = !!next && canSetStage(role, stage, next)
+                      const canStart = canFulfill && stage === "" && !stopped
                       const canLabels = canFulfill && items.some((it) => it.sku && variantOf(it))
                       // Primary = the one obvious next move. Intake → Start; ready → ship;
                       // otherwise advance a stage.
@@ -836,6 +874,17 @@ export function OrdersHub() {
                           {/* Ours ends at shipped; the carrier's status carries on from there. */}
                         <DeliveryBadge order={o} onRefreshed={load} className="mr-1" />
                         <ReadinessStrip order={o} designs={designs[o.id]} files={dfiles[o.id]} className="mr-1" />
+                          {/* SAYS the row is stopped, rather than just going blank where
+                              every other row has a button. A missing control and a broken
+                              one look identical; this names which it is, and points at the
+                              ⋯ menu that resolves it. Muted, not primary — it is a state,
+                              not something to click. */}
+                          {stopped && (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-700">
+                              <Warning size={13} weight="fill" />
+                              {normalizeStage(stage) === "on_hold" ? "On hold" : "Flagged"} — resolve in ⋯
+                            </span>
+                          )}
                           {primary === "start" && <Button size="sm" onClick={() => receiveOrder(o)} disabled={busyO}>Start order</Button>}
                           {primary === "ship" && <Button size="sm" onClick={() => openFulfill(o)}>Create new label</Button>}
                           {primary === "advance" && <Button size="sm" onClick={() => advanceOrder(o)} title="Move every item one step further.">Next stage</Button>}
