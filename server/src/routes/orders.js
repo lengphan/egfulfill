@@ -437,8 +437,31 @@ export function ordersRoutes(app, requireAuth) {
          where d.order_id = x.order_id and d.sku = x.sku and d.line_id is null`);
       if (r && r.rowCount) console.log(`[order_designs] backfilled line_id on ${r.rowCount} rows`);
     })
-    .then(() => q('alter table order_designs drop constraint if exists order_designs_pkey'))
-    .then(() => q('create unique index if not exists order_designs_line_key on order_designs (order_id, (coalesce(line_id, sku)), kind)'))
+    /**
+     * THE KEY SWAP, made independent of everything before it.
+     *
+     * These two were links in the same long .then() chain, under a single trailing
+     * .catch(() => {}). The backfill above sits between them, and if it threw — for any
+     * reason, on any deployment — every later step was skipped in silence. The result was
+     * not a missing feature: the insert below uses ON CONFLICT against this index, so
+     * without it Postgres raises 42P10 and EVERY design save returns 500. A migration that
+     * quietly half-applies took artwork uploads down.
+     *
+     * Now each statement runs on its own and reports its own failure. The old primary key
+     * being dropped and the new index existing are separate facts; neither should depend
+     * on the other having gone well, and neither should depend on a backfill.
+     */
+    .then(async () => {
+      await q('alter table order_designs drop constraint if exists order_designs_pkey')
+        .catch((e) => console.error('[order_designs] could not drop the old primary key:', e.message));
+      await q('create unique index if not exists order_designs_line_key on order_designs (order_id, (coalesce(line_id, sku)), kind)')
+        .catch((e) => console.error('[order_designs] COULD NOT CREATE order_designs_line_key — design saves will fail with 42P10 until this exists:', e.message));
+      // Assert it, loudly. This index is load-bearing for every artwork write, and the
+      // failure mode is a 500 on a path nobody tests until a seller uses it.
+      const ok = await q("select 1 from pg_indexes where tablename='order_designs' and indexname='order_designs_line_key'")
+        .then((r) => r.rowCount).catch(() => 0);
+      if (!ok) console.error('[order_designs] order_designs_line_key IS MISSING. Artwork uploads are broken. Create it by hand.');
+    })
     .then(async () => {
       // Say out loud how much is left unattributable. Silence here would read as "clean".
       const r = await q(`
