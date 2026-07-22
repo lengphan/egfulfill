@@ -117,10 +117,16 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 )}
               </div>
 
-              <div className="grid flex-1 grid-cols-2 gap-8">
+              {/* flex-1 on the grid was not enough — the CHILDREN also have to stretch, or
+                  a short left column leaves the sheet half empty regardless of how tall the
+                  grid is. items-stretch plus min-h-0 lets both columns own the page. */}
+              <div className="grid min-h-0 flex-1 grid-cols-2 items-stretch gap-8">
                 {/* LEFT — the product itself, big. */}
                 <div className="flex flex-col">
-                  <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50">
+                  {/* No fixed aspect: the hero takes the room the copy doesn't. On a style
+                      with no description that is most of the column, which is exactly the
+                      gap that made the page look unfinished. */}
+                  <div className="flex min-h-[80mm] flex-1 w-full items-center justify-center overflow-hidden rounded-lg bg-neutral-50">
                     {st.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={st.image} alt={st.name} className="size-full object-contain" />
@@ -159,7 +165,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                 </div>
 
                 {/* RIGHT — every colourway, captioned. */}
-                <div className="flex flex-col">
+                <div className="flex min-h-0 flex-col">
                   <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
                     Available colours
                   </div>
@@ -170,7 +176,9 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   ) : (
                     // Five columns, capped at 20. Past that a page stops being readable and
                     // the overflow is stated rather than silently dropped.
-                    <div className="mt-2 grid grid-cols-4 gap-x-3 gap-y-4">
+                    // auto-rows-min keeps swatches their natural height while the column
+                    // stretches, so they sit at the top rather than smearing down the page.
+                    <div className="mt-2 grid auto-rows-min grid-cols-4 gap-x-3 gap-y-4">
                       {st.colors.slice(0, 20).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
                           <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded bg-neutral-50">

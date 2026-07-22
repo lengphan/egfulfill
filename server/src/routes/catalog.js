@@ -7,7 +7,7 @@ import { isStaff } from '../auth.js';
 import { quoteSpec } from '../pricing.js';
 import { notify } from './notifications.js';
 import { audit } from '../audit.js';
-import { ssImgUrl } from './ss.js';
+import { ssImgUrl, ssStyleDescriptions } from './ss.js';
 
 // Roles that OWN pricing. A change by anyone else is legitimate — operators build
 // products, and that is the point — but it should not happen unseen, because a base
@@ -410,9 +410,15 @@ export function catalogRoutes(app, requireAuth, requireStaff, requireWarehouse) 
       }
     }
 
+    // Descriptions, from the per-style cache. Absent for styles nobody has opened — the
+    // text lives on /styles/:id, not in the product feed, so it is stored the first time
+    // someone views that style. Missing is left EMPTY rather than filled with the style
+    // name dressed up as prose.
+    const descs = await ssStyleDescriptions(styleRefs).catch(() => new Map());
+
     const supplier = picked.map((p) => ({
       ref: p.ref, name: p.name || p.ref, sku: p.ref,
-      description: '', brand: p.brand || 'S&S',
+      description: descs.get(p.ref) || '', brand: p.brand || 'S&S',
       image: ssImgUrl(p.image),
       price: p.catalog_price == null ? null : Number(p.catalog_price),
       sizes: p.sizes || [],

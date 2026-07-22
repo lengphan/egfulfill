@@ -292,6 +292,18 @@ export async function ssOrderStatus(num) {
   };
 }
 
+/** Cached style descriptions, by style id. Empty for styles nobody has opened yet — the
+ *  text only exists on /styles/:id and is stored the first time it's fetched. */
+export async function ssStyleDescriptions(ids) {
+  if (!Array.isArray(ids) || !ids.length) return new Map();
+  const r = await q(
+    `select style_id, description from ss_style_images
+      where style_id = any($1::text[]) and description is not null and description <> ''`,
+    [ids.map(String)]
+  ).catch(() => ({ rows: [] }));
+  return new Map(r.rows.map((x) => [x.style_id, x.description]));
+}
+
 export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWarehouse) {
   // ── Image proxy (PUBLIC) ──────────────────────────────────────────────────
   // S&S's CDN refuses cross-origin browser loads (403 + Cross-Origin-Resource-Policy),
@@ -417,6 +429,11 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
        at timestamptz default now()
      )`).catch(() => {});
   q(`alter table ss_style_images add column if not exists colors jsonb`).catch(() => {});
+  // The style DESCRIPTION. Not carried by the product feed at all — it only exists on
+  // /styles/:id, one call per style — so the sync has never stored it and the printed
+  // catalogue had nothing to put in the left column. Cached here beside the image, filled
+  // lazily by whoever needs it first.
+  q(`alter table ss_style_images add column if not exists description text`).catch(() => {});
   // Style-level price RANGE (min/max piecePrice across the style's SKUs). S&S has no
   // price on the /styles list — only per-SKU on /products — so the New In grid showed no
   // price at all next to Otto's. Resolved lazily in the SAME products call that fetches
@@ -894,7 +911,14 @@ export function ssRoutes(app, requireAuth, requireStaff, requireAdmin, requireWa
           const mTitle = meta.title || styleName || '';
           const t = ((mBrand ? mBrand + ' ' : '') + mTitle).trim();
           if (t) title = t;
-          if (meta.description) description = cleanDesc(meta.description);
+          if (meta.description) {
+            description = cleanDesc(meta.description);
+            // Keep it. The next reader — the printed catalogue especially — should not have
+            // to spend an S&S call to learn something we already fetched.
+            q(`insert into ss_style_images (style_id, description) values ($1,$2)
+               on conflict (style_id) do update set description = excluded.description`,
+              [String(id), description]).catch(() => {});
+          }
           if (!image) { const im = ssImg(meta.styleImage); if (im) image = im; }
         }
       } catch (e) {}
