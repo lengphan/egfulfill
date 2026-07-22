@@ -3,25 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Camera, X, Warning } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
-
-/** The browser's native barcode reader. Not in the DOM types yet, so declared narrowly —
- *  only what's used, so a wrong guess about the rest can't compile. */
-type DetectedBarcode = { rawValue: string }
-type BarcodeDetectorLike = { detect: (s: CanvasImageSource) => Promise<DetectedBarcode[]> }
-type BarcodeDetectorCtor = {
-  new (opts?: { formats?: string[] }): BarcodeDetectorLike
-  getSupportedFormats?: () => Promise<string[]>
-}
-const getCtor = (): BarcodeDetectorCtor | null =>
-  (globalThis as unknown as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector ?? null
+import { startCameraScan, releaseCamera, cameraSupported } from "@/lib/barcode-scan"
 
 /**
  * Read a carton barcode with the device camera.
  *
- * Uses the browser's built-in BarcodeDetector rather than a scanning library: no
- * dependency to install, nothing loaded from a CDN (which the CSP would block anyway),
- * and it's hardware-accelerated. It isn't in every browser, so an unsupported one says so
- * and leaves typing available — a scanner that silently does nothing is worse than none.
+ * Decoding goes through the SHARED startCameraScan, which is the whole point of this
+ * change: this component used BarcodeDetector directly, and WebKit has never shipped
+ * BarcodeDetector — so every iPhone hit "this browser can't scan" while the Scan station,
+ * which already had a ZXing fallback, worked fine on the same handset. Two scanners with
+ * two engines meant one of them was quietly iOS-only-broken.
+ *
+ * startCameraScan uses the native detector on Android/Chromium and lazy-loads ZXing on
+ * Safari, so both platforms decode here now.
  *
  * The camera is released on every exit path — unmount, close, successful scan. A receiving
  * bench tablet left with the torch-adjacent camera stream open is both a battery and a
@@ -39,59 +33,36 @@ export function BarcodeCamera({ onScan, onClose }: { onScan: (value: string) => 
     stopped.current = true
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
+    // startCameraScan keeps ONE warm stream per session so reopening doesn't re-prompt
+    // for permission. A receiving bench must not leave it running, so release it here.
+    releaseCamera()
   }, [])
 
   useEffect(() => {
-    const Ctor = getCtor()
-    if (!Ctor) {
-      // Deferred, like every other setState in an effect here — a synchronous one
-      // cascades a second render.
-      const t = setTimeout(() => setErr("This browser can't scan with the camera. Chrome or Edge on Android, or Safari on iOS 17+, can — or use a handheld scanner, or type the code."), 0)
-      return () => clearTimeout(t)
-    }
-    let detector: BarcodeDetectorLike
-    try {
-      // The formats S&S labels actually use. Narrowing the list makes detection faster
-      // and stops a stray QR code on the carton being read as the barcode.
-      detector = new Ctor({ formats: ["code_128", "code_39", "itf", "codabar"] })
-    } catch {
-      const t = setTimeout(() => setErr("Couldn't start the barcode reader on this device."), 0)
+    // getUserMedia itself is the capability that matters now — not BarcodeDetector, which
+    // half the phones in a warehouse don't have.
+    if (!cameraSupported()) {
+      const t = setTimeout(() => setErr("This device has no camera the browser can use. Use a handheld scanner, or type the code."), 0)
       return () => clearTimeout(t)
     }
 
-    let raf = 0
+    let stopFn: (() => void) | null = null
     ;(async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          // Rear camera on a phone or tablet; falls back to whatever exists on a laptop.
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
-          audio: false,
+        const v = videoRef.current
+        if (!v) return
+        stopFn = await startCameraScan(v, (raw) => {
+          // Carton labels only. A stray QR or a price barcode on the same box would
+          // otherwise be accepted as the carton id.
+          const value = String(raw || "").trim()
+          if (!/\d{6,}[.\-]\d/.test(value)) return
+          // Stop BEFORE handing the value up: the parent closes this, and a decode loop
+          // still running against a torn-down video throws on every frame.
+          stop()
+          onScan(value)
         })
-        if (stopped.current) { stream.getTracks().forEach((t) => t.stop()); return }
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play().catch(() => {})
-          // Deferred: setting state straight from an effect cascades a second render.
-          setTimeout(() => { if (!stopped.current) setReady(true) }, 0)
-        }
-
-        const tick = async () => {
-          if (stopped.current || !videoRef.current) return
-          try {
-            const hits = await detector.detect(videoRef.current)
-            const hit = hits.find((h) => h.rawValue && /\d{6,}[.\-]\d/.test(h.rawValue))
-            if (hit) {
-              // Stop BEFORE handing the value up: the parent closes this, and a detect
-              // loop still running against a torn-down video throws on every frame.
-              stop()
-              onScan(hit.rawValue.trim())
-              return
-            }
-          } catch { /* a frame that won't decode is normal — keep looking */ }
-          raf = requestAnimationFrame(() => { void tick() })
-        }
-        void tick()
+        if (stopped.current) { stopFn?.(); return }
+        setTimeout(() => { if (!stopped.current) setReady(true) }, 0)
       } catch (e) {
         const name = (e as { name?: string })?.name
         const msg = (name === "NotAllowedError"
@@ -103,13 +74,12 @@ export function BarcodeCamera({ onScan, onClose }: { onScan: (value: string) => 
       }
     })()
 
-    return () => { cancelAnimationFrame(raf); stop() }
+    return () => { stopFn?.(); stop() }
   }, [onScan, stop])
 
   return (
     <div className="space-y-2">
       <div className="relative overflow-hidden rounded-lg border border-border bg-black">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video ref={videoRef} playsInline muted className="aspect-video w-full object-cover" />
         {/* A guide box: people aim at the middle, and a barcode filling the frame edge-to-
             edge decodes far more reliably than one held at arm's length. */}
