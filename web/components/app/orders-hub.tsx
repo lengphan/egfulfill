@@ -1004,21 +1004,16 @@ export function OrdersHub() {
                       const art = artworkFor(o, it)
                       return (
                         <div key={it.line_id ?? it.sku ?? i} className="flex flex-wrap items-center gap-2 rounded-xl border border-border p-2.5">
-                          {/* Zoom is its own control rather than the avatar's click. The
-                              avatar already means "edit the placement" for the roles that
-                              can, and overloading it would make the same click do different
-                              things depending on who you are. */}
-                          <button
-                            onClick={() => setZoom({ order: o, item: it })}
-                            className="eg-tap self-start rounded-lg border border-border p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                            title="Open the artwork, download it, or attach a machine file"
-                            aria-label={`Open artwork for ${it.name || it.sku || "this line"}`}
-                          >
-                            <MagnifyingGlassPlus size={14} weight="bold" />
-                          </button>
                           {/* Shows the blank with its artwork placed — what actually gets
                               made — not the marketplace listing photo. Editing is offered
-                              only to the roles whose job it is; warehouse gets the zoom. */}
+                              only to the roles whose job it is; warehouse gets the zoom.
+
+                              The zoom control used to sit HERE as its own button, ahead of
+                              the image — it took layout space in front of the thing it
+                              describes and pushed the artwork off its position. It now
+                              overlays the image corner on hover (below), so it costs no
+                              space and stays where the image already is. */}
+                          <div className="group/art relative self-start">
                           <ItemAvatar
                             item={it}
                             designs={designs[o.id]}
@@ -1040,6 +1035,20 @@ export function OrdersHub() {
                                 .catch(() => setActionErr("Couldn't attach that artwork."))
                             } : undefined}
                           />
+                          {/* Overlays the image corner, revealed on hover and always
+                              present for keyboard focus. Same treatment the app uses
+                              elsewhere for a secondary action on a tile: a small tonal
+                              circle on the surface colour, not a bordered button competing
+                              with the artwork. */}
+                          <button
+                            onClick={() => setZoom({ order: o, item: it })}
+                            title="Open the artwork, download it, or attach a machine file"
+                            aria-label={`Open artwork for ${it.name || it.sku || "this line"}`}
+                            className="eg-tap absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full border border-border bg-background text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/art:opacity-100"
+                          >
+                            <MagnifyingGlassPlus size={12} weight="bold" />
+                          </button>
+                          </div>
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium">{it.name || it.sku || "Item"}</div>
                             {/* Factory-owned marketplace orders arrive with no blank chosen;
