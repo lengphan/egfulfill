@@ -17,7 +17,7 @@ import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
 import { VariantStrip } from "@/components/app/variant-field"
 import { FACTORY_STAGES, EXCEPTION_STAGES, normalizeStage, nextStage, orderStage, isException, stageOptionsFor, canSetStage } from "@/lib/factory-status"
-import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL } from "@/lib/order-format"
+import { numOf, platformOf, variantOf, addrLine, fmtDate, trackUrl, addressSource, ADDRESS_SOURCE_LABEL, decodeEntities } from "@/lib/order-format"
 import { usePaged, Pagination } from "@/components/app/pagination"
 import { LabelSheet } from "@/components/app/label-sheet"
 import { ThreadBreakdown } from "@/components/app/thread-breakdown"
@@ -994,7 +994,7 @@ export function OrdersHub() {
                           {personal.length > 0 && (
                             <div>
                               <div className="mb-0.5 font-semibold uppercase tracking-wide text-muted-foreground">Personalisation</div>
-                              {personal.map((p, i) => <div key={i} className="leading-relaxed">{p}</div>)}
+                              {personal.map((p, i) => <div key={i} className="leading-relaxed">{decodeEntities(p)}</div>)}
                             </div>
                           )}
                           {notes && (

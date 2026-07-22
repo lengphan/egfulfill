@@ -9,6 +9,36 @@ import { type OrderRow, type OrderItem } from "@/lib/api"
 export const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 /**
+ * Un-escape marketplace text so a HUMAN reads what the BUYER typed.
+ *
+ * Etsy returns buyer-entered strings HTML-escaped, so a personalization of
+ *   "MRS. AUSTIN "
+ * arrives and is stored as
+ *   &quot;MRS. AUSTIN &quot;
+ * React escapes on render (correctly — that's what stops the injection), so the ampersand
+ * survives and the floor reads the entity verbatim.
+ *
+ * This is not cosmetic. Personalization is an INSTRUCTION: it is the text that gets
+ * embroidered or printed. A line that reads &quot;MRS. AUSTIN &quot; is a line someone
+ * can stitch onto an apron exactly as written, and it ships.
+ *
+ * Decoded on DISPLAY, never written back to the row — sync owns that column, and rewriting
+ * what an integration authored is the one thing sync must never do. It also means existing
+ * orders read correctly immediately, with no backfill.
+ *
+ * A fixed table, not `innerHTML` — that trick executes markup, runs only in the browser
+ * (this module is imported during the prerender), and would turn buyer-controlled text into
+ * a script vector. Etsy emits this handful and nothing else. `&amp;` is decoded LAST so
+ * "&amp;quot;" resolves to the literal "&quot;" rather than a stray double-quote.
+ */
+const ENTITIES: [RegExp, string][] = [
+  [/&quot;/g, '"'], [/&#0?39;/g, "'"], [/&apos;/g, "'"],
+  [/&lt;/g, "<"], [/&gt;/g, ">"], [/&nbsp;/g, " "], [/&amp;/g, "&"],
+]
+export const decodeEntities = (s: string | null | undefined) =>
+  s ? ENTITIES.reduce((out, [re, ch]) => out.replace(re, ch), s) : ""
+
+/**
  * Display id. NB: o.id !== o.num for marketplace orders — sellers know the seq.
  *
  * Marketplace ids are stored prefixed (`etsy-4119530158`) because the prefix is

@@ -43,6 +43,21 @@ function DialogOverlay({
 // to reach its buttons — it's centred with translate(-50%,-50%), so the overflow goes both
 // directions and the page behind can't scroll to it either. Capped to the viewport (dvh,
 // so mobile browser chrome is accounted for) and scrolls internally.
+//
+// `*:min-w-0` is the horizontal half of the same problem, and it belongs HERE rather than
+// on any one dialog. This popup is a GRID, so every child is a grid item with the default
+// `min-width: auto` — it refuses to shrink below its own min-content width. A child holding
+// anything unbreakable (a `truncate` title, which is `white-space: nowrap`, or a long SKU)
+// therefore reports the WHOLE string as its minimum and blows the track past the popup's
+// max-width. And because `overflow-y-auto` forces `overflow-x` to `auto` too, the result is
+// a horizontal scrollbar inside the dialog with the right-hand column clipped off — the
+// title truncating not at the dialog edge but somewhere past it.
+//
+// Measured on a 835px viewport with a real product title: content width 1035px inside an
+// 818px popup, and 816px once these children are allowed to shrink.
+//
+// Per-dialog `max-w-*` patches never fixed this because max-width was never what was
+// breaking; the automatic minimum size overrides it.
 function DialogContent({
   className,
   children,
@@ -57,7 +72,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto overscroll-contain rounded-[min(var(--radius-4xl),24px)] bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto overscroll-contain *:min-w-0 rounded-[min(var(--radius-4xl),24px)] bg-popover p-6 text-sm text-popover-foreground shadow-xl ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md dark:ring-foreground/10 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

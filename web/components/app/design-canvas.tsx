@@ -8,6 +8,7 @@ import { LibraryPickerDialog } from "@/components/app/library-picker-dialog"
 import { uploadDesignFile, postOrderDesign, postOrderThreads, type DesignPos, type OrderItem, type CatalogProduct } from "@/lib/api"
 import { resolveProduct, mockupFaces } from "@/lib/variant-resolve"
 import { perceptualHash } from "@/lib/phash"
+import { decodeEntities } from "@/lib/order-format"
 import { matchThreadColors, nearestThread, hexToRgb, matchQuality, matchThreadRegions, type Thread, type ThreadRegion } from "@/lib/thread-match"
 import { loadThreadPalette } from "@/lib/thread-palette-load"
 import { Eyedropper, MapPinSimple } from "@phosphor-icons/react"
@@ -628,7 +629,7 @@ export function DesignCanvasDialog({
             )}
             <div className="min-w-0 flex-1">
               <div className="text-xs font-semibold text-foreground">Customer&apos;s file</div>
-              {item.personalization && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{item.personalization}”</div>}
+              {item.personalization && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{decodeEntities(item.personalization)}”</div>}
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {item.design_src && (
                   <button onClick={() => { setErr(null); setDesignUrl(item.design_src!); setPos(DEFAULT_POS) }}
