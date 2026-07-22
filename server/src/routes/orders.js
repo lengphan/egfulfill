@@ -322,6 +322,10 @@ async function refundForCancel(orderId, sellerId, by) {
   return { ok: true, refunded: out.refunded };
 }
 
+/** Money as a seller reads it. Bare numbers in a sentence about a charge read as
+ *  quantities — "came to 2" is not a price. */
+const fmtMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
+
 export function ordersRoutes(app, requireAuth) {
   // Idempotent: ensure the factory_order column exists (also created in etsy.js).
   q('alter table orders add column if not exists factory_order boolean not null default false').catch(() => {});
@@ -1065,17 +1069,51 @@ export function ordersRoutes(app, requireAuth) {
      */
     if (row.factory_order) return { charged: 0, reason: 'factory-order' };
 
+    // The line's own name, for the ledger. A seller reading their statement sees "Design
+    // work · Unisex Tee · #4099", not "design-work · FF-12jt… · G5000-COPY-WHT-S" — the
+    // second is the same fact and unreadable, which is how a legitimate charge becomes a
+    // support ticket.
+    const line = await q(
+      `select i.name, o.seq from order_items i join orders o on o.id = i.order_id
+        where i.order_id=$1 and i.${key}=$2 limit 1`, [orderId, lineId || sku])
+      .then((r) => r.rows[0]).catch(() => null);
+    const orderLabel = line && line.seq ? `#${line.seq}` : orderId;
+    const itemLabel = (line && line.name) || sku || lineId;
+
     const ref = `design-${orderId}-${lineId || sku}`;
     try {
       await moveFunds({
         from: row.seller_id, to: 'factory', amount,
         type: 'design-work', ref,
-        note: `Design ${tier === 'supplied' ? 'check' : 'work'} · ${orderId} · ${sku || lineId}`,
+        note: `${tier === 'supplied' ? 'Design file check' : 'Design work'} · ${itemLabel} · ${orderLabel}`,
         by: req.user && req.user.sub,
       });
     } catch (e) {
       return { charged: 0, reason: 'wallet-failed', error: e.message };
     }
+
+    /**
+     * Say WHY, on the order, in the seller's own thread.
+     *
+     * A charge they can see but not account for is worse than a surprise — it reads as an
+     * error, and the first thing they do is ask. The tier itself stays internal: "your
+     * design was classified complex" invites an argument about the classification rather
+     * than about the price, and the classification is our judgement to make.
+     *
+     * Posted automatically. A note somebody has to remember to write is a note that mostly
+     * doesn't get written, and the charge lands either way.
+     */
+    const why = tier === 'supplied'
+      ? `You sent your own machine file for ${itemLabel}. We open and check every one before it goes near a machine — wrong size, wrong format and wrong machine type are all common and all expensive to find at the press. That check is ${fmtMoney(amount)}, which is less than having us digitise it.`
+      : tier === 'complex'
+        ? `Digitising the artwork for ${itemLabel} came to ${fmtMoney(amount)} — this one needed more work than a standard design, which you approved before we started.`
+        : `Digitising the artwork for ${itemLabel} came to ${fmtMoney(amount)}. That's our standard rate for turning a picture into a stitch file.`;
+    await q(
+      `insert into order_messages (order_id, sender_id, sender_role, body, meta)
+       values ($1, null, 'assistant', $2, $3)`,
+      [orderId, why, JSON.stringify({ by: 'Billing', design_fee: amount, order_ref: orderId })]
+    ).catch(() => {});
+    egBroadcast({ type: 'order-message' });
     await q(`update order_items set design_charged_at = now() where order_id=$1 and ${key}=$2`,
       [orderId, lineId || sku]).catch(() => {});
     audit(req, 'design.charged', { entityType: 'order', entityId: orderId, after: { tier, amount, line_id: lineId, sku } });
