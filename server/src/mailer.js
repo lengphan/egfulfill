@@ -26,7 +26,12 @@ async function sendViaBrevoApi(opts) {
         sender: { email: from.email, name: from.name },
         to: [{ email: opts.to }],
         subject: opts.subject || '',
-        htmlContent: opts.html || opts.text || ''
+        htmlContent: opts.html || opts.text || '',
+        // Custom headers. Bulk mail needs List-Unsubscribe + List-Unsubscribe-Post or
+        // Gmail rejects it outright at volume, and those can only ride as headers —
+        // there is no Brevo field for them. nodemailer takes `headers` natively, so
+        // the two transports agree on the same option name.
+        ...(opts.headers ? { headers: opts.headers } : {})
       }),
       signal: ctrl.signal
     });

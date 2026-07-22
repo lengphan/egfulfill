@@ -2208,3 +2208,58 @@ export function getShipments(p: { search?: string; limit?: number } = {}) {
   if (p.limit) s.set("limit", String(p.limit))
   return api<{ shipments: ShipmentRow[] }>(`/api/shipments?${s.toString()}`)
 }
+
+// ── Broadcasts — one-to-many email to sellers ────────────────────────────────
+// Named apart from `ads` campaigns on purpose: those are Meta/Google ad spend, this is
+// mail. See server/src/routes/broadcasts.js.
+
+/** {} means every seller. Every field NARROWS — none can widen past role='seller'. */
+export type BroadcastAudience = {
+  /** Deactivated accounts are excluded unless this is explicitly true. */
+  includeInactive?: boolean
+  /** true = sellers who have ever had an order; false = sellers who never have. */
+  hasOrders?: boolean
+  /** A hand-picked set. Combines with the other filters as an AND. */
+  sellerIds?: string[]
+}
+
+export type Broadcast = {
+  id: string | number
+  subject: string
+  body: string
+  audience: BroadcastAudience
+  status: "draft" | "sending" | "sent" | "failed"
+  /** Null until it sends — the count is resolved AT SEND, so a draft honestly has none. */
+  recipient_count: number | null
+  sent_count: number
+  failed_count: number
+  created_by: string | null
+  created_by_name: string | null
+  created_at: string
+  sent_at: string | null
+}
+
+export function getBroadcasts() {
+  return api<{ broadcasts: Broadcast[]; mailConfigured: boolean }>(`/api/broadcasts`)
+}
+/** Counts an audience WITHOUT sending — same resolver the send uses, so the number shown
+ *  in the confirm dialog cannot drift from the number actually mailed. */
+export function previewBroadcastAudience(audience: BroadcastAudience) {
+  return api<{ count: number; optedOut: number; sample: string[] }>(`/api/broadcasts/preview`, {
+    method: "POST", body: JSON.stringify({ audience }),
+  })
+}
+export function createBroadcast(b: { subject: string; body: string; audience?: BroadcastAudience }) {
+  return api<Broadcast>(`/api/broadcasts`, { method: "POST", body: JSON.stringify(b) })
+}
+export function updateBroadcast(id: string | number, b: { subject?: string; body?: string; audience?: BroadcastAudience }) {
+  return api<Broadcast>(`/api/broadcasts/${id}`, { method: "PATCH", body: JSON.stringify(b) })
+}
+export function deleteBroadcast(id: string | number) {
+  return api<{ ok: boolean }>(`/api/broadcasts/${id}`, { method: "DELETE" })
+}
+/** Admin only. Returns as soon as the audience is resolved — the send continues server-side,
+ *  so poll getBroadcasts() for sent_count rather than expecting this to wait. */
+export function sendBroadcast(id: string | number) {
+  return api<{ id: string; recipientCount: number; status?: string; note?: string }>(`/api/broadcasts/${id}/send`, { method: "POST" })
+}

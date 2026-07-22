@@ -41,6 +41,7 @@ import { purchaseRoutes } from './routes/purchase.js';
 import { spydeckRoutes } from './routes/spydeck.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { adsRoutes } from './routes/ads.js';
+import { broadcastsRoutes } from './routes/broadcasts.js';
 import { dispatchRoutes } from './routes/dispatch.js';
 import { ssOrderStatus } from './routes/ss.js';
 import { startSupplierPoll } from './supplier-poll.js';
@@ -67,6 +68,15 @@ app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, 
   if (req.headers['x-shopify-hmac-sha256']) req.rawBody = body;
   if (!body || body.length === 0) { done(null, {}); return; }
   try { done(null, JSON.parse(body.toString('utf8'))); }
+  catch (e) { e.statusCode = 400; done(e, undefined); }
+});
+
+// Form-encoded bodies. Nothing in the app posts one — this exists for RFC 8058 one-click
+// unsubscribe: Gmail and Yahoo POST `List-Unsubscribe=One-Click` as x-www-form-urlencoded,
+// and with no parser registered Fastify answers 415 before the route is ever reached. A
+// bulk sender whose one-click endpoint 415s gets its mail throttled.
+app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (req, body, done) => {
+  try { done(null, Object.fromEntries(new URLSearchParams(body))); }
   catch (e) { e.statusCode = 400; done(e, undefined); }
 });
 
@@ -330,6 +340,7 @@ purchaseRoutes(app, requireAuth, requireStaff, requireWarehouse);        // purc
 spydeckRoutes(app, requireAuth);                       // SpyDeck saved/favorited research listings (server-authoritative, per-seller)
 notificationRoutes(app, requireAuth);                  // per-user bell + read state, pushed over the existing SSE hub
 adsRoutes(app, requireStaff);                          // Meta + Google Ads: connect, read spend/ROAS, create + pause campaigns
+broadcastsRoutes(app, requireStaff, requireAdmin);     // seller email broadcasts — staff draft, ADMIN sends; PUBLIC one-click unsubscribe at /api/broadcasts/unsubscribe
 dispatchRoutes(app, requireAuth, requireWarehouse);    // byeastside: push labels for pre-scan, poll PICKED
 manifestRoutes(app, requireWarehouse);                  // USPS SCAN forms via Shippo manifests
 manualSupplierRoutes(app, requireStaff, requireWarehouse); // shops with no API — saved links + prices

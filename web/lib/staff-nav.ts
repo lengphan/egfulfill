@@ -1,4 +1,4 @@
-import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, type Icon } from "@phosphor-icons/react"
+import { Printer, PenNib, Storefront, CurrencyDollar, Binoculars, Tag, SquaresFour, ShoppingBag, ChartBar, Wallet, Code, Package, Barcode, Megaphone, Truck, Receipt, EnvelopeSimple, type Icon } from "@phosphor-icons/react"
 
 export type StaffNavItem = { label: string; href: string; icon: Icon; roles: string[] }
 
@@ -30,6 +30,10 @@ const STAFF_ITEMS: StaffNavItem[] = [
   // connect an ad account yet, so the page can only show an empty shell. The route and
   // component are intact; restore the roles here to bring it back.
   { label: "Campaigns", href: "/campaigns", icon: Megaphone, roles: [] },
+  // Broadcasts is seller EMAIL, not ad spend — a different thing from Campaigns above,
+  // which is why it gets its own entry rather than a tab inside it. The team can draft;
+  // only an admin can send, so this is visible to staff and the send button is not.
+  { label: "Broadcasts", href: "/broadcasts", icon: EnvelopeSimple, roles: ["admin"] },
   // Console retired — Users + Activity live in Settings, Top-ups in Wallet, Products at /products.
 ]
 
