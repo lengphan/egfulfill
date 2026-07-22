@@ -85,7 +85,10 @@ async function epBuy(shipmentId, rateId) {
     labelUrl: (d.postage_label && (d.postage_label.label_url || d.postage_label.label_pdf_url)) || '',
     // The provider's own id, needed to void the label later. Tracking alone can't
     // address a refund with either provider.
-    providerId: d.id || shipmentId
+    providerId: d.id || shipmentId,
+    // EasyPost has no manifest concept in this integration; recorded as empty so the
+    // manifest route can tell "wrong provider" from "we forgot to store it".
+    carrierAccount: ''
   };
 }
 
@@ -121,7 +124,11 @@ async function shBuy(rateObjectId) {
     provider: 'shippo', carrier: (d.rate && d.rate.provider) || '', service: (d.rate && d.rate.servicelevel && d.rate.servicelevel.name) || '',
     cost: (d.rate && Number(d.rate.amount)) || null, tracking: d.tracking_number || '',
     labelUrl: d.label_url || '',
-    providerId: d.object_id || ''
+    providerId: d.object_id || '',
+    // The carrier account this rate was bought under. A manifest (USPS SCAN form) is
+    // scoped to ONE carrier account, and there is no way to recover which one a
+    // transaction used after the fact — so it is captured here or not at all.
+    carrierAccount: (d.rate && d.rate.carrier_account) || ''
   };
 }
 
@@ -352,6 +359,30 @@ export function shippingRoutes(app, requireAuth, requireStaff) {
     const detail = (d.tracking_status && d.tracking_status.status_details) || m.detail;
     await q('update orders set delivery_status=$1, delivery_detail=$2, delivery_checked_at=now() where id=$3',
       [m.status, detail || null, orderId]).catch(() => {});
+
+    // THE ACCEPTANCE SCAN. PRE_TRANSIT means the label exists and the carrier has never
+    // touched the parcel; anything past it means they have it. That transition IS the
+    // scan — and unlike the other two routes, this one is the carrier saying so rather
+    // than us or a partner asserting it on their behalf.
+    //
+    // This is what closes the SCAN-form loop: creating a manifest deliberately records
+    // only manifested_at, because the form being printed says nothing about whether the
+    // pile went out. The parcel moving is what says that.
+    //
+    // Only fills a NULL, so it can never overwrite an in-house or partner scan with a
+    // later timestamp — the first person to scan is the one who did it. Best-effort:
+    // failing to record the scan must not lose the delivery status written above.
+    if (raw === 'TRANSIT' || raw === 'DELIVERED') {
+      // Prefer the carrier's own acceptance time over now(). Polling on a timer can see a
+      // move hours after it happened, and "scanned at 09:04" is the fact that settles a
+      // dispute about whether we handed it over on time.
+      const hist = Array.isArray(d.tracking_history) ? d.tracking_history : [];
+      const accepted = hist.find((h) => h && h.status === 'TRANSIT' && h.status_date);
+      await q(
+        `update orders set label_scanned_at = coalesce($1::timestamptz, now()), scanned_via = coalesce(scanned_via, 'carrier')
+          where id = $2 and label_scanned_at is null`,
+        [accepted ? accepted.status_date : null, orderId]).catch(() => {});
+    }
     return { ok: true, carrier_status: raw, status: m.status, detail };
   };
 

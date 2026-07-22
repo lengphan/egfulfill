@@ -265,14 +265,22 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   // problems with different people to chase.
   const withPartner = !!(order as { dispatch_pdf_id?: string | null }).dispatch_pdf_id
   const queuedHere = String(order.factory_status || "") === "awaiting_scan"
-  const scanPending = !preScanned && (withPartner || queuedHere)
+  // On a USPS SCAN form. Amber, not violet: the form is a document we printed, and USPS
+  // scanning it is a separate event that happens at handover — or doesn't, if the pile
+  // never goes out. Recording the form as a scan would be us making the carrier's claim
+  // for them, which is exactly the thing these tags exist not to do.
+  const manifested = !!(order as { manifested_at?: string | null }).manifested_at
+  const scanPending = !preScanned && (withPartner || queuedHere || manifested)
 
   const scanTitle = preScanned
     // VIOLET the moment a scan is actually recorded, whoever did it. The route is a
     // detail; the fact is that the buyer's tracking has started.
     ? `Scanned ${new Date(order.label_scanned_at as string).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${
         (order as { scanned_via?: string | null }).scanned_via === "partner" ? " by the dispatch partner" :
-        (order as { scanned_via?: string | null }).scanned_via === "in-house" ? " here" : ""
+        (order as { scanned_via?: string | null }).scanned_via === "in-house" ? " here" :
+        // The carrier's own acceptance scan, arriving through tracking. Worth naming:
+        // it's the only one of the three routes nobody here asserted.
+        (order as { scanned_via?: string | null }).scanned_via === "carrier" ? " by the carrier" : ""
       } — tracking is live for the buyer. The parcel may still be in production.`
     // AMBER covers both queued cases, and stays amber while the partner holds it. Their
     // receiving it is not their scanning it — the buyer's tracking hasn't moved until
@@ -281,7 +289,11 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
     : scanPending
       ? withPartner
         ? "With the dispatch partner — in their queue, not scanned yet."
-        : "On the dispatch board, waiting to be scanned."
+        // Deliberately says what's still missing rather than "manifested". The form being
+        // printed is not the parcel being accepted, and only one of those the buyer sees.
+        : manifested
+          ? "On today's USPS SCAN form — printed, but the carrier hasn't accepted it yet."
+          : "On the dispatch board, waiting to be scanned."
       : order.tracking
         ? "Label exists but hasn't been scanned — the buyer's tracking has not started."
         : "No label yet, so nothing to scan."

@@ -1861,6 +1861,55 @@ export function markScannedInHouse(orderId: string, undo = false) {
     `/api/orders/${encodeURIComponent(orderId)}/scanned`, { method: "POST", body: JSON.stringify({ undo }) })
 }
 
+// ── USPS SCAN forms (Shippo manifests) ────────────────────────────────────────
+/**
+ * A SCAN form is a DOCUMENT, not a scan. Creating one records `manifested_at`; the parcel
+ * only counts as scanned when the carrier reports it moving, which the tracking path
+ * fills in. Keep that distinction in the UI — it is the whole reason this route exists
+ * separately from marking a scan ourselves.
+ */
+export type ManifestSkip = { id: string; num: string; reason: string }
+export type ManifestGroup = {
+  carrierAccount: string; count: number
+  orders: { id: string; num: string; tracking: string | null }[]
+}
+export type ManifestRow = {
+  id: string; createdAt: string; createdBy: string | null
+  shipmentDate: string; status: string; pdf: string | null
+  count: number; orderIds: string[]
+}
+export type ManifestDetail = {
+  id: string; createdAt: string; shipmentDate: string; status: string; pdf: string | null
+  count: number
+  orders: { id: string; num: string; tracking: string | null
+            /** The carrier has actually accepted this one — as opposed to it merely being
+             *  printed on the form. */
+            accepted: boolean; acceptedAt: string | null; delivery: string | null }[]
+}
+
+/** What would go on the form, and why anything else can't — without creating it. */
+export function previewManifest(orderIds: string[]) {
+  return api<{ groups: ManifestGroup[]; skipped: ManifestSkip[]; error?: string }>(
+    `/api/manifests/preview`, { method: "POST", body: JSON.stringify({ orderIds }) })
+}
+
+/** Create the form(s). One per carrier account — Shippo requires every label on a
+ *  manifest to share address, ship date and carrier account. */
+export function createManifest(orderIds: string[], shipmentDate?: string) {
+  return api<{ ok?: boolean
+               manifests: { id: string; status: string; pdf: string | null; count: number }[]
+               failed: { carrierAccount: string; count: number; error: string }[]
+               skipped: ManifestSkip[]; error?: string }>(
+    `/api/manifests`, { method: "POST", body: JSON.stringify({ orderIds, shipmentDate }) })
+}
+
+export function getManifests() {
+  return api<ManifestRow[]>(`/api/manifests`)
+}
+export function getManifest(id: string) {
+  return api<ManifestDetail>(`/api/manifests/${encodeURIComponent(id)}`)
+}
+
 // ── Dispatch history + shipments ───────────────────────────────────────────────
 export type DispatchScanRow = {
   id: string; num: string; customer: string | null

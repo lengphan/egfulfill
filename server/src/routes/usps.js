@@ -272,7 +272,7 @@ export function uspsRoutes(app, requireAuth, requireStaff) {
  */
 const PRE_SCAN = ['', 'new', 'draft', 'in_review', 'approved', 'ready_print', 'in_queue', 'queued', 'prescan'];
 
-async function recordLabel(orderId, tracking, carrier, labelUrl, cost) {
+async function recordLabel(orderId, tracking, carrier, labelUrl, cost, ref) {
   if (!orderId) return { shipped: false };
   // Book the postage as it's bought. The carrier tells us the price exactly once, in the
   // buy response — if we don't write it down here it's gone, and no report can recover
@@ -287,6 +287,19 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost) {
        ${advance ? ", factory_status='awaiting_scan'" : ''}
      where id=$4`,
     [tracking, carrier || 'USPS', labelUrl || null, orderId]).catch(() => {});
+
+  // The provider's own reference for this label. Like the cost above, it is told to us
+  // exactly once — in the buy response — and cannot be recovered afterwards from the
+  // tracking number. Without it a label can be neither voided nor put on a SCAN form,
+  // which is why both of those were unbuildable.
+  //
+  // Separate statement, best-effort: the label is already bought and recorded, and losing
+  // its reference must not turn a successful purchase into a failed one.
+  if (ref && ref.providerId) {
+    await q(
+      `update orders set label_provider=$1, label_ref=$2, label_carrier_account=$3 where id=$4`,
+      [ref.provider || null, ref.providerId, ref.carrierAccount || null, orderId]).catch(() => {});
+  }
   return { shipped: false, stage: advance ? 'awaiting_scan' : cur };
 }
 
@@ -312,7 +325,7 @@ async function recordLabel(orderId, tracking, carrier, labelUrl, cost) {
             { weightOz: b.weightOz, length: b.length, width: b.width, height: b.height },
             { carrierPref: 'usps', servicePref: _svcPref(b.mailClass) });
           if (buy && buy.tracking) {
-            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost);
+            const rec = await recordLabel(b.orderId, buy.tracking, buy.carrier, buy.labelUrl, buy.cost, buy);
             return { ok: true, trackingNumber: buy.tracking, labelUrl: buy.labelUrl, imageType: 'PDF', carrier: buy.carrier, service: buy.service, cost: buy.cost, provider: buy.provider, ...rec };
           }
           reply.code(502);

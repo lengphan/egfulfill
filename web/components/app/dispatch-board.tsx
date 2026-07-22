@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { onLive } from "@/lib/live"
-import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X } from "@phosphor-icons/react"
+import { ManifestDialog } from "@/components/app/manifest-dialog"
+import { Truck, CircleNotch, Printer, CheckCircle, Warning, ArrowSquareOut, ListChecks, ArrowUUpLeft, TrayArrowDown, X, Barcode } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { Button } from "@/components/ui/button"
@@ -277,6 +278,7 @@ export function DispatchBoard() {
   }
 
   const canAdvance = canSetStage(role, STAGE, NEXT)
+  const [manifestOpen, setManifestOpen] = useState(false)
 
   if (orders === null) {
     return <div className="flex items-center justify-center py-20 text-muted-foreground"><CircleNotch size={22} className="animate-spin" /></div>
@@ -322,6 +324,15 @@ export function DispatchBoard() {
               <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={sendToPartner}
                 title="Upload these labels to byeastside's pre-scan queue — charges the expedite fee per label">
                 {busy ? <CircleNotch size={14} className="animate-spin" /> : <><TrayArrowDown size={14} weight="bold" /> Send to byeastside</>}
+              </Button>
+            )}
+            {/* THE THIRD ROUTE. Unlike the other two this asserts nothing about the
+                parcel — it prints the document USPS scans at handover. So it sits beside
+                them but doesn't advance the stage or touch the scan. */}
+            {canScanOut && (
+              <Button size="sm" variant="outline" disabled={!chosenWithLabel.length || busy} onClick={() => setManifestOpen(true)}
+                title="Print one barcode covering these labels — USPS scans it once when they collect">
+                <Barcode size={14} weight="bold" /> Create SCAN form
               </Button>
             )}
             {canScanOut && (
@@ -416,6 +427,16 @@ export function DispatchBoard() {
           </div>
         )}
       </SectionCard>
+
+      {/* Keyed on the selection so reopening after a different pick can't show the
+          previous batch's preview for a frame. */}
+      <ManifestDialog
+        key={chosenWithLabel.map((o) => o.id).join(",")}
+        orderIds={chosenWithLabel.map((o) => o.id)}
+        open={manifestOpen}
+        onOpenChange={setManifestOpen}
+        onDone={() => { setPicked(new Set()); load() }}
+      />
     </div>
   )
 }
