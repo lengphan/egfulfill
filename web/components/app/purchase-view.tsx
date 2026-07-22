@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   getInventory, saveInventory, getPurchaseOrders, savePurchaseOrder, deletePurchaseOrder,
-  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsInventory, getSsDaysInTransit, type PoReturn, type SsShipment,
+  getFactoryList, saveFactoryList, creditPoReturn, getSsTracking, cancelSsOrder, getSsInventory, getSsDaysInTransit, getOttoInventory, type PoReturn, type SsShipment,
   ssOrder, ottoOrder, resolveSuppliers, getSupplierOptions, type InventoryItem, type PurchaseOrder, type POLine, type SavedPOLine,
 } from "@/lib/api"
 import { POAddItems } from "@/components/app/po-add-items"
@@ -112,6 +112,38 @@ function SourceTags({ line }: { line: POLine }) {
       {src.length > 4 && <span className="text-[10px] text-muted-foreground">+{src.length - 4} more</span>}
     </span>
   )
+}
+
+/**
+ * Pull a quantity out of Otto's inventory response.
+ *
+ * Their route is a passthrough and the payload has never been seen against a live account,
+ * so this tries the names a stock field plausibly has and returns null when none of them
+ * hold a number. Null renders as "stock unknown", never as 0 — a fabricated zero reads as
+ * "don't order this", which is the opposite of what an unreadable response means.
+ *
+ * Once one real response has been seen, replace this with the actual field.
+ */
+function ottoQty(r: unknown): number | null {
+  const seen = new Set<unknown>()
+  const walk = (v: unknown, depth: number): number | null => {
+    if (v == null || depth > 4 || typeof v !== "object" || seen.has(v)) return null
+    seen.add(v)
+    if (Array.isArray(v)) {
+      // A list of variants: sum what we can read, but only if we read at least one.
+      let total = 0, found = false
+      for (const item of v) { const n = walk(item, depth + 1); if (n != null) { total += n; found = true } }
+      return found ? total : null
+    }
+    const o = v as Record<string, unknown>
+    for (const k of ["quantity", "qty", "available", "availableQuantity", "stock", "inventory", "onHand", "on_hand"]) {
+      const n = Number(o[k])
+      if (o[k] != null && isFinite(n)) return n
+    }
+    for (const val of Object.values(o)) { const n = walk(val, depth + 1); if (n != null) return n }
+    return null
+  }
+  return walk(r, 0)
 }
 
 export function PurchaseView() {
@@ -540,6 +572,30 @@ export function PurchaseView() {
       getSsDaysInTransit()
         .then((r) => setTransit(Object.fromEntries((r.warehouses ?? []).map((w) => [w.warehouse, { days: w.days, cutOff: w.cutOff }]))))
         .catch(() => {})
+    }, 0)
+    return () => clearTimeout(t)
+  }, [saved, supByS])
+
+  /**
+   * Otto stock, one call per sku — their endpoint takes a single sku, so this is capped
+   * rather than run over an unbounded pool.
+   *
+   * `null` means WE COULD NOT READ IT, and that is deliberately not 0. Otto's route is a
+   * raw passthrough typed `unknown`; the field holding the count has never been seen
+   * against a live account, so ottoQty below tries the plausible names and gives up
+   * honestly rather than reporting a zero it invented. "Out of stock" and "we don't know"
+   * lead to opposite decisions, and only one of them is ours to guess at.
+   */
+  const [ottoStock, setOttoStock] = useState<Record<string, number | null>>({})
+  useEffect(() => {
+    const skus = saved.filter((l) => supByS[l.sku]?.api === "otto").map((l) => l.sku).slice(0, 20)
+    if (!skus.length) return
+    const t = setTimeout(() => {
+      for (const sku of skus) {
+        getOttoInventory(sku)
+          .then((r) => setOttoStock((p) => ({ ...p, [sku]: ottoQty(r) })))
+          .catch(() => setOttoStock((p) => ({ ...p, [sku]: null })))
+      }
     }, 0)
     return () => clearTimeout(t)
   }, [saved, supByS])
@@ -1202,6 +1258,35 @@ export function PurchaseView() {
                                 </span>
                               )
                             })()}
+                          </div>
+                        )}
+                        {/* OTTO: one source, so one chip — same shape as the S&S ones so the
+                            two suppliers don't read as two different products. No warehouse
+                            code and no ETA, because Otto's inventory is per-sku and tells us
+                            neither; inventing a placeholder for them would imply we asked
+                            and got nothing back. */}
+                        {g.api === "otto" && (
+                          <div className="mt-1.5 flex flex-wrap items-start gap-1.5">
+                            <label
+                              title={ottoStock[l.sku] == null
+                                ? "Otto didn't return a stock figure we could read"
+                                : `${ottoStock[l.sku]} available from Otto`}
+                              className="flex w-[5.5rem] shrink-0 cursor-text flex-col items-center gap-1 rounded-lg border border-border bg-muted/40 px-1.5 py-1.5 transition-colors">
+                              <Input
+                                value={String(num(l.qty) || "")}
+                                onChange={(e) => setSavedQty(l.sku, Number(e.target.value.replace(/[^0-9]/g, "")) || 0)}
+                                placeholder="0"
+                                inputMode="numeric"
+                                aria-label={`Quantity to order from Otto for ${l.sku}`}
+                                className="h-7 w-full px-1 text-center text-xs tabular-nums"
+                              />
+                              <span className="text-[11px] font-medium leading-none">Otto</span>
+                              {/* Says which of the two it is. A blank or a 0 here would both
+                                  read as "none in stock", and one of them would be a lie. */}
+                              <span className="text-[10px] leading-none text-muted-foreground">
+                                {ottoStock[l.sku] == null ? "stock unknown" : `${ottoStock[l.sku]} avail`}
+                              </span>
+                            </label>
                           </div>
                         )}
                         {g.api === "ss" && stock[l.sku] && (
