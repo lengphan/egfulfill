@@ -57,7 +57,15 @@ export function ApiPlayground() {
   const [env, setEnv] = useState<"test" | "live">("test")
   const [keys, setKeys] = useState<{ test: string; live: string }>({ test: "", live: "" })
   const apiKey = keys[env]
-  const [selected, setSelected] = useState<ApiEndpoint>(API_ENDPOINTS[0])
+  // ?endpoint=<id> preselects one, so "Try it" in the public docs lands on the call you
+  // were reading instead of the top of the list. Read once at mount rather than through
+  // useSearchParams, which would need a Suspense boundary for a value that never changes
+  // after load. Unknown ids fall back to the first entry.
+  const [selected, setSelected] = useState<ApiEndpoint>(() => {
+    if (typeof window === "undefined") return API_ENDPOINTS[0]
+    const want = new URLSearchParams(window.location.search).get("endpoint")
+    return API_ENDPOINTS.find((e) => e.id === want) ?? API_ENDPOINTS[0]
+  })
   const [body, setBody] = useState(selected.body ?? "")
   const [param, setParam] = useState(selected.param?.placeholder ?? "")
   const [sending, setSending] = useState(false)

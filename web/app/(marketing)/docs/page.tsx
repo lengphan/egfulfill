@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { API_ENDPOINTS } from "@/lib/api-endpoints"
 import { DocsNav } from "./docs-nav"
+import { EndpointCard } from "./endpoint-card"
 
 export const metadata: Metadata = {
   title: "API — EGFULFILL",
@@ -175,29 +176,7 @@ export default function DocsPage() {
           </p>
           <div className="space-y-3">
             {API_ENDPOINTS.map((e) => (
-              <div key={e.id} className="rounded-lg border border-border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={
-                    "rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold " +
-                    (e.method === "GET" ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700")
-                  }>{e.method}</span>
-                  <code className="font-mono text-sm">{e.path}</code>
-                  <span className="ml-auto text-sm font-medium">{e.title}</span>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">{e.description}</p>
-                {e.body && (
-                  <div className="mt-3">
-                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Request</div>
-                    <Block>{e.body}</Block>
-                  </div>
-                )}
-                {e.response && (
-                  <div className="mt-3">
-                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Response</div>
-                    <Block>{e.response}</Block>
-                  </div>
-                )}
-              </div>
+              <EndpointCard key={e.id} endpoint={e} />
             ))}
           </div>
         </Section>
