@@ -27,11 +27,19 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Load once per open, so a freshly-created order shows up without a stale cache.
+  //
+  // Deferred, like every other session-dependent read in this app: setting state
+  // synchronously in an effect body cascades a second render before paint, which
+  // react-hooks/set-state-in-effect rejects outright. The focus call stays inside the
+  // timeout too — the input is only in the DOM once this has committed.
   useEffect(() => {
-    if (!open) { setQy(""); setActive(0); return }
-    inputRef.current?.focus()
-    if (!getToken()) { setOrders([]); return }
-    getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
+    const t = setTimeout(() => {
+      if (!open) { setQy(""); setActive(0); return }
+      inputRef.current?.focus()
+      if (!getToken()) { setOrders([]); return }
+      getOrders().then((r) => setOrders(r ?? [])).catch(() => setOrders([]))
+    }, 0)
+    return () => clearTimeout(t)
   }, [open])
 
   const results = useMemo(() => {
@@ -48,7 +56,13 @@ export function OrderSearch({ open, onClose }: { open: boolean; onClose: () => v
       .slice(0, 8)
   }, [qy, orders])
 
-  useEffect(() => { setActive(0) }, [qy])
+  // Retyping puts the highlight back on the first result — holding row 5 of the OLD list
+  // over a new one highlights something the person never chose. Deferred for the same
+  // reason as above.
+  useEffect(() => {
+    const t = setTimeout(() => setActive(0), 0)
+    return () => clearTimeout(t)
+  }, [qy])
 
   if (!open) return null
 
