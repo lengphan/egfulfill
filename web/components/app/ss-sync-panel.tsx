@@ -25,7 +25,10 @@ export function SsSyncPanel() {
 
   /** One status read. Kept trivial so both the first load and the poll share it. */
   const load = useCallback(async () => {
-    try { setSt(await getSsSyncStatus()) } catch { /* keep the last known state */ }
+    try { setSt(await getSsSyncStatus()) } catch {
+      // Keep the last known state, but STOP being null — see the render guard below.
+      setSt((prev) => prev ?? { running: false, total: 0, done: 0, skipped: 0, error: null, stylesInDb: 0, productsInDb: 0 } as SsSyncStatus)
+    }
   }, [])
 
   useEffect(() => { const t = setTimeout(load, 0); return () => clearTimeout(t) }, [load])
@@ -55,7 +58,27 @@ export function SsSyncPanel() {
     try { await stopSsSyncAll(); load() } finally { setBusy(false) }
   }
 
-  if (!st) return null
+  /**
+   * NEVER return null here.
+   *
+   * This bailed until a status read succeeded — so when the status call failed, or hadn't
+   * landed yet, the entire panel disappeared and with it the Sync button. A feature that
+   * vanishes when a status endpoint hiccups looks like a feature that was never built, and
+   * the one thing a user needs from this panel is the button, not the status.
+   *
+   * The status is the optional part. The button is the point.
+   */
+  if (!st) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 text-sm">
+        <span className="text-xs text-muted-foreground">Checking the sync…</span>
+        <Button size="sm" className="ml-auto" onClick={() => start(false)} disabled={busy}>
+          {busy ? <CircleNotch size={13} className="animate-spin" /> : <ArrowsClockwise size={13} weight="bold" />}
+          Sync all styles
+        </Button>
+      </div>
+    )
+  }
 
   const pct = st.total > 0 ? Math.min(100, Math.round((st.done / st.total) * 100)) : 0
   // Their rate limit sets the pace, so remaining time is arithmetic rather than a guess.

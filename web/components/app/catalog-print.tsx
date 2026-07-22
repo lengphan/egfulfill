@@ -98,6 +98,25 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
               className="eg-sheet mx-auto mb-6 flex w-[210mm] flex-col bg-white p-[14mm] shadow-sm print:mb-0 print:shadow-none"
               style={{ minHeight: "297mm" }}
             >
+              {/* PRICE FIRST, top right, in the display face. It was tucked at the foot of
+                  the left column where a buyer had to hunt for it — on a page whose job is
+                  to sell, the number belongs where the eye lands. */}
+              <div className="mb-6 flex items-start justify-between gap-6 border-b border-neutral-200 pb-4">
+                <div className="min-w-0">
+                  <h2 className="font-display text-3xl font-bold uppercase leading-none tracking-tight">{st.name}</h2>
+                  <div className="mt-1.5 flex items-baseline gap-2 text-xs text-neutral-500">
+                    <span className="font-mono">{st.sku}</span>
+                    {st.brand && <span>· {st.brand}</span>}
+                  </div>
+                </div>
+                {st.price != null && (
+                  <div className="shrink-0 text-right">
+                    <div className="font-display text-4xl font-bold leading-none tabular-nums">{money(st.price)}</div>
+                    <div className="mt-1 text-[9px] uppercase tracking-widest text-neutral-400">per unit</div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid flex-1 grid-cols-2 gap-8">
                 {/* LEFT — the product itself, big. */}
                 <div className="flex flex-col">
@@ -110,38 +129,32 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                     )}
                   </div>
 
-                  <h2 className="mt-5 font-display text-2xl font-bold uppercase leading-tight tracking-tight">
-                    {st.name}
-                  </h2>
-                  <div className="mt-1 flex items-baseline gap-2 text-xs text-neutral-500">
-                    <span className="font-mono">{st.sku}</span>
-                    {st.brand && <span>· {st.brand}</span>}
-                  </div>
-
-                  {st.description && (
-                    <p className="mt-3 text-[11px] leading-relaxed text-neutral-600">{st.description}</p>
-                  )}
+                  {st.description
+                    ? <p className="mt-4 text-[11px] leading-relaxed text-neutral-600">{st.description}</p>
+                    // No description on most supplier styles, and an empty column reads as
+                    // an unfinished page. The size run fills it as a chart instead, which
+                    // is the thing a buyer would otherwise have to ask for.
+                    : null}
 
                   {st.sizes.length > 0 && (
-                    <div className="mt-4">
+                    <div className="mt-5">
                       <div className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
                         Available sizes
                       </div>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
+                      {/* A CHART, not a row of chips. The chips left a band of white across
+                          the page; a bordered strip fills it and reads as a spec table,
+                          which is what a buyer is looking for anyway. */}
+                      <div className="mt-2 flex overflow-hidden rounded border border-neutral-300">
                         {st.sizes.map((z) => (
-                          <span key={z} className="rounded border border-neutral-300 px-2 py-0.5 text-[11px] font-medium">
+                          <div key={z} className="flex-1 border-r border-neutral-200 px-1 py-2 text-center text-[11px] font-semibold last:border-r-0">
                             {z}
-                          </span>
+                          </div>
                         ))}
                       </div>
+                      <div className="mt-1.5 text-[9px] text-neutral-400">
+                        {st.colors.length} colourway{st.colors.length === 1 ? "" : "s"} · {st.sizes.length} size{st.sizes.length === 1 ? "" : "s"} available
+                      </div>
                     </div>
-                  )}
-
-                  {/* The price sits with the product, not in the colour grid — it's the
-                      same for every colourway, and repeating it under ten swatches reads
-                      as ten different prices. */}
-                  {st.price != null && (
-                    <div className="mt-auto pt-4 text-2xl font-semibold tabular-nums">{money(st.price)}</div>
                   )}
                 </div>
 
@@ -157,7 +170,7 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                   ) : (
                     // Five columns, capped at 20. Past that a page stops being readable and
                     // the overflow is stated rather than silently dropped.
-                    <div className="mt-2 grid grid-cols-5 gap-x-2 gap-y-3">
+                    <div className="mt-2 grid grid-cols-4 gap-x-3 gap-y-4">
                       {st.colors.slice(0, 20).map((c) => (
                         <div key={c.name + c.sku} className="flex flex-col items-center">
                           <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded bg-neutral-50">
@@ -170,8 +183,8 @@ export function CatalogPrint({ onClose, exportId }: { onClose: () => void; expor
                           </div>
                           {/* SKU then colour, the way a buyer reads it back to you when
                               they order — the name alone is not orderable. */}
-                          {c.sku && <div className="mt-1 w-full truncate text-center font-mono text-[6px] text-neutral-500">{c.sku}</div>}
-                          <div className="w-full truncate text-center text-[7px] leading-tight text-neutral-700">{c.name}</div>
+                          {c.sku && <div className="mt-1.5 w-full truncate text-center font-mono text-[7px] text-neutral-500">{c.sku}</div>}
+                          <div className="w-full truncate text-center text-[8px] font-medium leading-tight text-neutral-700">{c.name}</div>
                         </div>
                       ))}
                     </div>
