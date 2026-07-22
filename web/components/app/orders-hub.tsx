@@ -647,9 +647,19 @@ export function OrdersHub() {
               const isCollapsed = !expandedIds.has(o.id)
               return (
                 <div key={o.id} className="p-5">
+                  {/* justify-between with exactly two children pushed them to opposite
+                      edges and left the middle empty — the dead space in the middle of
+                      every row. The identity block now GROWS to fill it, so the actions sit
+                      against content instead of against the far wall.
+
+                      The identity line is a grid, not a wrap: order number, customer and
+                      the rest land on the same x-position in every row, so the eye can run
+                      down a column instead of re-reading each row. Wide things (photos,
+                      address, tracking) stay in the full-width strip below, where they have
+                      room — which is why this isn't a strict table. */}
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="grid grid-cols-[auto_auto_minmax(7rem,auto)_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1">
                         {/* A box on EVERY row, disabled where it can't be used.
                             Rendering it only on dispatchable rows was tried, and reads as
                             a half-built feature: most orders have no label yet, so most
