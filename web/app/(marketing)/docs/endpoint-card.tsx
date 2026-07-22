@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Check, Copy, ArrowSquareOut } from "@phosphor-icons/react"
 import type { ApiEndpoint } from "@/lib/api-endpoints"
-import { Block } from "./code-block"
+import { Block, CODE_SURFACE } from "./code-block"
 
 const BASE = "https://api.egful.store"
 const KEY = "egk_test_..."
@@ -113,7 +113,12 @@ export function EndpointCard({ endpoint: e }: { endpoint: ApiEndpoint }) {
               aria-pressed={lang === id}
               className={
                 "rounded px-2 py-0.5 text-[11px] font-medium transition-colors " +
-                (lang === id ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground")
+                // The ACTIVE tab wears the panel's own colour, so the chip and the block
+                // below it read as one object. It was bg-foreground — pure black — which
+                // was invisible against a black panel and then, once the panel took the
+                // accent's hue, became a second dark colour sitting a few percent off the
+                // first. Two darks that nearly match look like a bug.
+                (lang === id ? CODE_SURFACE : "text-muted-foreground hover:bg-accent hover:text-foreground")
               }
             >
               {label}
