@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown } from "@phosphor-icons/react"
+import { Package, MagnifyingGlass, Plus, Printer, Trash, CircleNotch, Check, ClockCounterClockwise, ArrowUp, ArrowDown, Barcode as BarcodeIcon } from "@phosphor-icons/react"
 import { SectionCard } from "@/components/app/section-card"
 import { ConsignmentPanel } from "@/components/app/consignment-panel"
 import { StatCard, StatGrid } from "@/components/app/stat-card"
@@ -200,31 +200,27 @@ export function InventoryView() {
                         />
                       </td>
                       <td className="px-4 py-2">
-                        {/* Tap to enlarge. The inline code is a thumbnail — at 22px tall
-                            with 1px bars nothing can read it off a phone screen, which is
-                            what "the barcode won't scan" actually was. `fit` matters as
-                            much as the size: without it JsBarcode writes a fixed pixel
-                            width and no viewBox, so max-w clipped the bars outright. */}
-                        {/* Width lives on the WRAPPER, not the svg: `fit` sets an inline
-                            style="width:100%" that beats any class on the barcode itself,
-                            so sizing it there silently did nothing and the code grew to
-                            fill the column (and grew the row with it). */}
-                        <button
-                          type="button"
-                          onClick={() => setZoomSku(it.sku)}
-                          title="Tap to enlarge for scanning"
-                          className="flex w-[130px] flex-col gap-0.5 text-left transition-opacity hover:opacity-70"
-                        >
-                          <span className="font-mono text-xs font-medium">{it.sku}</span>
-                          {/* Fixed-height slot + `stretch`: height:auto never collapsed to
-                              the viewBox ratio here, so the code kept its full 150px and
-                              dragged the row with it. stretch lets Y fill this box while X
-                              still scales uniformly, so bar RATIOS survive — the thumbnail
-                              only has to be recognisable; the overlay is what gets scanned. */}
-                          <div className="h-6 w-full">
-                            <Barcode value={it.sku} height={22} width={1} fontSize={0} displayValue={false} fit stretch />
-                          </div>
-                        </button>
+                        {/* SKU as TEXT, with the code one tap away.
+                            The inline barcode was a 22px-tall thumbnail — unreadable by any
+                            scanner, which is worse than showing none: it looks scannable, so
+                            people aim a phone at it and conclude the scanner is broken. It
+                            also cost the column ~24px of height on every row for a picture
+                            nobody could use.
+                            The SKU itself is the thing people read off this table; the code
+                            is for the one moment someone wants to scan, and that now opens
+                            at a size that actually decodes. */}
+                        <div className="flex w-[150px] items-center gap-1.5">
+                          <span className="min-w-0 flex-1 break-all font-mono text-xs font-medium">{it.sku}</span>
+                          <button
+                            type="button"
+                            onClick={() => setZoomSku(it.sku)}
+                            title={`Show a scannable code for ${it.sku}`}
+                            aria-label={`Show a scannable code for ${it.sku}`}
+                            className="eg-tap shrink-0 rounded-md border border-border p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            <BarcodeIcon size={14} weight="bold" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-2"><div className="max-w-[220px] truncate font-medium">{it.name || "—"}</div>{it.variant && <div className="max-w-[220px] truncate text-xs text-muted-foreground">{it.variant}</div>}</td>
                       <td className="px-2 py-2 text-center">
