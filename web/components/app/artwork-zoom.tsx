@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { CircleNotch, Warning, CheckCircle, DownloadSimple, UploadSimple, PaperPlaneTilt, PenNib } from "@phosphor-icons/react"
+import { CircleNotch, Warning, CheckCircle, DownloadSimple, UploadSimple, PaperPlaneTilt, PenNib, CopySimple } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -42,11 +42,14 @@ const readAsDataUrl = (f: File) => new Promise<string>((res, rej) => {
  * Machine files only — an image dropped here would be stored as `kind: 'image'` and quietly
  * fail to count as a deliverable anywhere, which looks identical to a successful upload.
  */
-export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUploaded, onSendToDesigner }: {
+export function ArtworkZoom({ order, item, artwork, designs, open, onOpenChange, onUploaded, onSendToDesigner }: {
   order: OrderRow
   item: OrderItem
   /** The customer's artwork — a URL or data-URL, whichever the designs map holds. */
   artwork: string | null
+  /** Every design on the order, keyed the same way the server keys them (line first).
+   *  Used to say how many lines "apply to all" would overwrite before it does. */
+  designs?: Record<string, { data?: string } | undefined> | null
   open: boolean
   onOpenChange: (v: boolean) => void
   onUploaded?: () => void
@@ -161,6 +164,49 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
 
   const artName = `${numOf(order)}-${item.sku ?? "artwork"}`
 
+  /**
+   * Put THIS line's artwork on every other line of the order.
+   *
+   * Ten shirts from one uploaded file is the common case, and doing it by hand is ten
+   * drops into ten panels. The legacy tool had this (applyAll in eg-design-tools) and it
+   * was lost in the port.
+   *
+   * One row PER LINE, because order_designs is keyed on
+   * (order_id, coalesce(line_id, sku), kind) — writing once against the sku would collapse
+   * identical-sku siblings into a single row and undo the very thing that key exists for.
+   *
+   * Counts what it would OVERWRITE and says so before doing it: applying to all is one
+   * click and can silently replace artwork on lines nobody was looking at.
+   */
+  const applyToAll = useCallback(async () => {
+    if (!artwork) return
+    const others = (order.items ?? []).filter((it) =>
+      (it.line_id ?? it.sku) !== (item.line_id ?? item.sku))
+    if (!others.length) return
+    const willReplace = others.filter((it) => !!designs?.[(it.line_id ?? it.sku) as string]?.data).length
+    const ok = window.confirm(
+      `Use this artwork on all ${others.length} other line${others.length === 1 ? "" : "s"}?` +
+      (willReplace ? `\n\n${willReplace} of them already ${willReplace === 1 ? "has" : "have"} artwork and will be replaced.` : "")
+    )
+    if (!ok) return
+    setBusy(true); setErr(null); setDone(null)
+    const failed: string[] = []
+    for (const it of others) {
+      try {
+        const r = await postOrderDesign(order.id, {
+          sku: it.sku ?? "", line_id: it.line_id ?? undefined, data: artwork,
+          name: `${artName}.png`, kind: "raster",
+        })
+        if (r?.error) throw new Error(r.error)
+      } catch (e) { failed.push(`${it.sku ?? "line"}${e instanceof Error ? ` (${e.message})` : ""}`) }
+    }
+    setBusy(false)
+    if (failed.length) setErr(`Couldn't apply to: ${failed.join(", ")}`)
+    const done = others.length - failed.length
+    if (done > 0) { setDone(`Applied to ${done} other line${done === 1 ? "" : "s"}.`); onUploaded?.() }
+  }, [artwork, order, item, designs, artName, onUploaded])
+
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* sm: prefix matters. A bare max-w-3xl is 48rem at EVERY width, so on a window
@@ -211,10 +257,20 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
             {artwork && (
               // `download` with a filename — without it a signed storage URL opens in a tab
               // and a data-URL saves as "download", neither of which is usable later.
-              <a href={artwork} download={artName}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
-                <DownloadSimple size={14} weight="bold" /> Download the customer&apos;s file
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <a href={artwork} download={artName}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent">
+                  <DownloadSimple size={14} weight="bold" /> Download the customer&apos;s file
+                </a>
+                {/* Ten shirts, one uploaded file. Only offered when there IS another line,
+                    so a single-line order doesn't carry a button that would do nothing. */}
+                {(order.items ?? []).some((it) => (it.line_id ?? it.sku) !== (item.line_id ?? item.sku)) && (
+                  <button type="button" onClick={() => void applyToAll()} disabled={busy}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50">
+                    <CopySimple size={14} weight="bold" /> Use on all lines
+                  </button>
+                )}
+              </div>
             )}
           </div>
 

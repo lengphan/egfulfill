@@ -1314,6 +1314,9 @@ export function OrdersHub() {
           order={zoom.order}
           item={zoom.item}
           artwork={artworkFor(zoom.order, zoom.item) || null}
+          // The order's designs, so "Use on all lines" can say how many it would replace
+          // before it does. Same map the readiness tag reads — one source, no second copy.
+          designs={designs[zoom.order.id]}
           open
           onOpenChange={(v) => { if (!v) setZoom(null) }}
           onUploaded={() => {
