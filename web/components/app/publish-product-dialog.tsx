@@ -131,6 +131,10 @@ export function PublishProductDialog({
   // One quote per size, not one for "the priced size": cost varies by size, so a single
   // margin figure was only ever true for whichever size happened to be selected.
   const [sizeQuotes, setSizeQuotes] = useState<Record<string, SpecQuote>>({})
+  // Per-size retail overrides. Empty means "use the single Retail price above", so a
+  // seller who wants one price everywhere still types it once — but a bigger size that
+  // costs more can be charged more, which is the whole reason cost varies by size.
+  const [sizeRetail, setSizeRetail] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -210,10 +214,14 @@ export function PublishProductDialog({
   const sizeRows = useMemo(() => pickedSizes.map((s) => {
     const q = sizeQuotes[s] ?? null
     const total = q?.total ?? null
-    const m = total != null && retailN > 0 ? retailN - total : null
-    return { size: s, unitCost: q?.unitCost ?? null, shipping: q?.shipping ?? null, total, margin: m,
-             pct: m != null && retailN > 0 ? (m / retailN) * 100 : null }
-  }), [pickedSizes, sizeQuotes, retailN])
+    // The override wins; the shared Retail field is the fallback. Margin is computed
+    // against whichever actually applies, so the percentage moves as you type.
+    const override = Number(sizeRetail[s])
+    const price = sizeRetail[s] !== undefined && sizeRetail[s] !== "" && override > 0 ? override : retailN
+    const m = total != null && price > 0 ? price - total : null
+    return { size: s, unitCost: q?.unitCost ?? null, shipping: q?.shipping ?? null, total, price,
+             margin: m, pct: m != null && price > 0 ? (m / price) * 100 : null }
+  }), [pickedSizes, sizeQuotes, retailN, sizeRetail])
 
   const anyLoss = sizeRows.some((r) => r.margin != null && r.margin < 0)
 
@@ -260,6 +268,12 @@ export function PublishProductDialog({
         // resolution path when there's more than one.
         color: pickedColors.length === 1 ? pickedColors[0] : undefined,
         size: pickedSizes.length === 1 ? pickedSizes[0] : undefined,
+        // Per-size retail, so the price a seller typed against a size is the price that
+        // size actually lists at. Without this the table would show a margin the listing
+        // doesn't charge — a number that moves on screen and nowhere else.
+        size_prices: Object.fromEntries(
+          sizeRows.filter((r) => r.price > 0).map((r) => [r.size, r.price])
+        ),
       })
       if (r.error) throw new Error(r.error)
 
@@ -294,7 +308,7 @@ export function PublishProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-5xl">
         <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
 
         {result?.ok ? (
@@ -450,21 +464,34 @@ export function PublishProductDialog({
                       <table className="w-full text-xs tabular-nums">
                         <thead>
                           <tr className="text-muted-foreground">
-                            <th className="pb-1 text-left font-medium">Size</th>
-                            <th className="pb-1 text-right font-medium">Production</th>
-                            <th className="pb-1 text-right font-medium">Shipping</th>
-                            <th className="pb-1 text-right font-medium">Your cost</th>
-                            <th className="pb-1 text-right font-medium">Profit</th>
+                            {/* px-2 matters: with no horizontal padding these ran together
+                                as "SizeProductionShipping". */}
+                            <th className="px-2 pb-1 text-left font-medium">Size</th>
+                            <th className="px-2 pb-1 text-right font-medium">Production</th>
+                            <th className="px-2 pb-1 text-right font-medium">Shipping</th>
+                            <th className="px-2 pb-1 text-right font-medium">Your cost</th>
+                            <th className="px-2 pb-1 text-right font-medium">Retail</th>
+                            <th className="px-2 pb-1 text-right font-medium">Profit</th>
                           </tr>
                         </thead>
                         <tbody>
                           {sizeRows.map((r) => (
                             <tr key={r.size} className="border-t border-border">
-                              <td className="py-1 text-left font-medium">{r.size || "One size"}</td>
-                              <td className="py-1 text-right">{r.unitCost == null ? "—" : usd(r.unitCost)}</td>
-                              <td className="py-1 text-right">{r.shipping == null ? "—" : usd(r.shipping)}</td>
-                              <td className="py-1 text-right font-medium">{r.total == null ? "—" : usd(r.total)}</td>
-                              <td className={"py-1 text-right font-semibold " + (r.margin != null && r.margin < 0 ? "text-destructive" : "")}>
+                              <td className="px-2 py-1 text-left font-medium">{r.size || "One size"}</td>
+                              <td className="px-2 py-1 text-right">{r.unitCost == null ? "—" : usd(r.unitCost)}</td>
+                              <td className="px-2 py-1 text-right">{r.shipping == null ? "—" : usd(r.shipping)}</td>
+                              <td className="px-2 py-1 text-right font-medium">{r.total == null ? "—" : usd(r.total)}</td>
+                              <td className="px-2 py-1 text-right">
+                                <input
+                                  value={sizeRetail[r.size] ?? ""}
+                                  onChange={(e) => setSizeRetail((p) => ({ ...p, [r.size]: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  placeholder={retailN > 0 ? retailN.toFixed(2) : "—"}
+                                  inputMode="decimal"
+                                  aria-label={`Retail price for size ${r.size || "one size"}`}
+                                  className="h-7 w-20 rounded border border-input bg-transparent px-1.5 text-right text-xs tabular-nums transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                />
+                              </td>
+                              <td className={"px-2 py-1 text-right font-semibold " + (r.margin != null && r.margin < 0 ? "text-destructive" : "")}>
                                 {r.margin == null ? "—" : `${usd(r.margin)}${r.pct != null ? ` · ${r.pct.toFixed(0)}%` : ""}`}
                               </td>
                             </tr>
@@ -477,7 +504,12 @@ export function PublishProductDialog({
                     {sizeRows.some((r) => r.total == null) && (
                       <p className="text-xs text-amber-700">Some sizes have no price set on the blank — add pricing in Products.</p>
                     )}
-                    {retailN <= 0 && <p className="text-xs text-muted-foreground">Enter a retail price to see profit per size.</p>}
+                    {retailN <= 0 && !Object.values(sizeRetail).some((v) => Number(v) > 0) && (
+                      <p className="text-xs text-muted-foreground">Enter a retail price to see profit per size.</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Retail is per size — leave a row blank to use the price above. Profit updates as you type.
+                    </p>
                     {anyLoss && <p className="text-xs text-destructive">Sizes shown in red sell at a loss at this retail price.</p>}
                   </div>
                 ) : quote?.unitCost == null ? (

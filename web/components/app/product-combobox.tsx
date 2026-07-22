@@ -64,13 +64,24 @@ export function ProductCombobox({
     return () => document.removeEventListener("mousedown", onDown)
   }, [open])
 
+  // The label of the last thing PICKED, so re-opening can tell "this is the current
+  // selection" from "this is something the user typed". State, not a ref: `matches` reads
+  // it during render, and a ref read there neither triggers a re-render nor is guaranteed
+  // to reflect the latest value.
+  const [pickedLabel, setPickedLabel] = useState<string | null>(null)
+
   // Every match, not a top-N slice — the list scrolls, so capping it just hid products
   // and forced a trip through the browse dialog to find them.
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase()
     if (!q) return products
+    // After picking, `value` IS the chosen product's name — so filtering by it matched
+    // exactly one row and the list showed only the blank you already had. There was no
+    // way to switch blanks without manually clearing the field first, which looked like
+    // "no other products exist". An untouched selection shows the whole list again.
+    if (pickedLabel && value === pickedLabel) return products
     return products.filter((p) => `${p.name ?? ""} ${p.sku ?? ""} ${p.type ?? ""}`.toLowerCase().includes(q))
-  }, [products, value])
+  }, [products, value, pickedLabel])
 
   // The list is unbounded now, so the highlighted row can sit outside the scroll window.
   useEffect(() => {
@@ -79,7 +90,9 @@ export function ProductCombobox({
   }, [cursor, open])
 
   const choose = (p: CatalogProduct) => {
-    onPick(toPickedProduct(p))
+    const picked = toPickedProduct(p)
+    setPickedLabel(picked.name)
+    onPick(picked)
     setOpen(false)
   }
 
@@ -87,12 +100,17 @@ export function ProductCombobox({
     <div ref={boxRef} className="relative">
       <Input
         value={value}
-        onChange={(e) => { onText(e.target.value); setOpen(true); setCursor(0) }}
+        onChange={(e) => { setPickedLabel(null); onText(e.target.value); setOpen(true); setCursor(0) }}
         // Open on focus even when empty. Gating this on `value.trim()` meant an untouched
         // field showed nothing until you guessed a character — and in the publish dialog,
         // whose caret has no browse handler, that left NO way to reach the catalog at all.
         // An empty query already returns the full list (see `matches`).
-        onFocus={() => setOpen(true)}
+        onFocus={(e) => {
+          setOpen(true)
+          // Select the current selection so the first keystroke replaces it rather than
+          // appending to a product name.
+          if (pickedLabel && e.target.value === pickedLabel) e.target.select()
+        }}
         onKeyDown={(e) => {
           if (!open && (e.key === "ArrowDown" || e.key === "Enter")) { setOpen(true); return }
           if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, matches.length - 1)) }

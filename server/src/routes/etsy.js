@@ -1449,7 +1449,12 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             // draft is left flat with its variants dropped, which is exactly what a listing
             // that published but has no colours/sizes looks like. We already resolved a
             // valid id for this shop when creating the draft above; reuse it.
-            const offering = { price, quantity: Number(b.quantity) || 999, is_enabled: true };
+            // Per-size price when the seller set one, else the single retail price. A
+            // bigger size costs us more to make, so charging one price across a size run
+            // means the largest either loses money or the smallest is overpriced.
+            const sizePrice = (z && b.size_prices && Number(b.size_prices[z]) > 0)
+              ? Number(b.size_prices[z]) : price;
+            const offering = { price: sizePrice, quantity: Number(b.quantity) || 999, is_enabled: true };
             const rid = Number(readinessId);
             if (Number.isFinite(rid) && rid > 0) offering.readiness_state_id = rid;
             products.push({ sku, property_values, offerings: [offering] });
@@ -1465,9 +1470,12 @@ export function etsyRoutes(app, requireAuth, requireStaff) {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               products,
-              // Price/quantity stay uniform across variants; only the sku varies, which is
-              // all we need for resolution. Per-variant pricing can be layered on later.
-              price_on_property: [], quantity_on_property: [],
+              // Etsy IGNORES per-offering prices unless told which property they vary on.
+              // Declared only when we actually sent differing prices, because naming a
+              // property with uniform prices makes Etsy demand one per value.
+              price_on_property: (vSizes.length && b.size_prices
+                && vSizes.some((z) => Number(b.size_prices[z]) > 0)) ? [514] : [],
+              quantity_on_property: [],
               // The sku varies on whichever properties we actually sent.
               sku_on_property: [vColors.length ? 513 : null, vSizes.length ? 514 : null].filter((n) => n != null),
             }),

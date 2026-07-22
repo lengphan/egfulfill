@@ -1276,7 +1276,7 @@ export type EtsyConfig = {
  * anonymous — priced only by luck (variant sku match) and unable to reach the Design
  * board at all, because a line with no artwork can't be sent to a designer.
  */
-export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string }) {
+export function publishEtsy(body: { title: string; description?: string; price: number; quantity?: number; image: string; images?: string[]; tags?: string[]; taxonomy_id?: number | string; colors?: string[]; sizes?: string[]; sku_base?: string; size_prices?: Record<string, number>; blank?: string; designId?: string | number; designUrl?: string; designPos?: unknown; printType?: string; color?: string; size?: string }) {
   return api<{ listing_id?: number; url?: string; error?: string; variants_applied?: number; variant_skus?: string[]; variants_error?: string | null }>(`/api/etsy/publish`, { method: "POST", body: JSON.stringify(body) })
 }
 export function getEtsyConnections() {
