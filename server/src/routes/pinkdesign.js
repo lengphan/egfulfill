@@ -436,7 +436,7 @@ export function pinkDesignRoutes(app, requireAuth, requireStaff) {
       await q(
         `insert into order_designs (order_id, sku, kind, data, storage_key, name, updated_at)
          values ($1,$2,'partner',$3,$4,$5, now())
-         on conflict (order_id, sku, kind) do update set
+         on conflict (order_id, (coalesce(line_id, sku)), kind) do update set
            data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, updated_at=now()`,
         [card.order_id, card.sku, storageKey ? null : url, storageKey, 'Pink Design deliverable']
       ).catch(() => {});

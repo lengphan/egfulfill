@@ -792,7 +792,43 @@ export type NewOrderItem = {
 }
 // %-coords for placing artwork on a mockup: center x/y, width w, rotation r (degrees).
 export type DesignPos = { x: number; y: number; w: number; h?: number; r: number }
-export type OrderDesign = { sku?: string; kind?: string; data?: string; name?: string; pos?: DesignPos | null }
+/** Artwork on one order LINE. `line_id` is the identity; `sku` is what rows saved before
+ *  line tracking have, and is only a fallback. Look up as `map[line_id] ?? map[sku]`. */
+export type OrderDesign = { sku?: string; line_id?: string | null; kind?: string; data?: string; name?: string; pos?: DesignPos | null }
+
+/**
+ * Index designs so both keys resolve. A line-keyed row is stored under its line_id AND
+ * (as a fallback) its sku when no line-keyed row has claimed that sku yet.
+ *
+ * Two lines of the same SKU are different jobs, so keying on sku alone made the second
+ * line's artwork overwrite the first in this map exactly as it did in the database.
+ */
+export function indexDesigns(list: OrderDesign[]): Record<string, OrderDesign> {
+  const by: Record<string, OrderDesign> = {}
+  // The sku slot holds ONLY unattributed rows. A line-keyed row is filed under its line and
+  // nowhere else — deliberately, and this is the crux of the whole fix.
+  //
+  // Letting a line-keyed row also occupy the sku slot looks harmless and reintroduces the
+  // exact bug: order with two lines of one sku, artwork on the first only. The second line
+  // has no row of its own, falls back to the sku slot, finds its SIBLING's design and
+  // renders it — so the tag reads "artwork attached" for a line that has none, and the
+  // floor prints the wrong garment. A caught test, not a hypothetical.
+  //
+  // So the fallback can only ever reach a genuinely unattributed row, which is what it is
+  // for: artwork saved before lines were tracked, where the sku is all we have.
+  for (const d of list) if (!d?.line_id && d?.sku) by[d.sku] = d
+  for (const d of list) if (d?.line_id) by[d.line_id] = d
+  return by
+}
+
+/** The artwork for one line: its own, else whatever is filed under its SKU. */
+export function designForLine(
+  map: Record<string, OrderDesign> | undefined,
+  line: { line_id?: string; sku?: string },
+): OrderDesign | undefined {
+  if (!map) return undefined
+  return (line.line_id ? map[line.line_id] : undefined) ?? (line.sku ? map[line.sku] : undefined)
+}
 // What this order costs the seller to produce: Σ(base cost × qty) + first item's
 // shipping + ship_extra per additional unit. Priced by server/src/pricing.js — the SAME
 // quote the charge uses, so what the seller is shown is what they're billed.
@@ -896,7 +932,9 @@ export function postOrderThreads(id: string, sku: string, threads: { code: strin
 export function getOrderDesigns(id: string) {
   return api<OrderDesign[] | { designs?: OrderDesign[] }>(`/api/orders/${encodeURIComponent(id)}/designs`)
 }
-export function postOrderDesign(id: string, body: { sku: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
+/** Attach artwork to a LINE. Pass `line_id` — without it the design keys on sku alone
+ *  and two lines of the same sku overwrite each other. */
+export function postOrderDesign(id: string, body: { sku: string; line_id?: string; data: string; name?: string; pos?: DesignPos; kind?: string; phash?: string | null }) {
   return api<{ ok?: boolean; error?: string }>(`/api/orders/${encodeURIComponent(id)}/designs`, {
     method: "POST",
     body: JSON.stringify(body),

@@ -369,6 +369,52 @@ export function ordersRoutes(app, requireAuth) {
     // storage, not Postgres. Readers take url ?? data.
     .then(() => q('alter table order_designs add column if not exists storage_key text'))
     .then(() => q('create index if not exists order_designs_art_hash on order_designs (art_hash)'))
+    /**
+     * LINE IDENTITY. The primary key was (order_id, sku, kind), so two lines of the SAME
+     * sku on one order shared ONE design row — attaching artwork to the second silently
+     * overwrote the first, and both lines then rendered the same image. A customer buying
+     * two of the same hoodie with different personalisation got one of them printed twice.
+     *
+     * order_items has carried line_id for a while and item status is already keyed on it
+     * (see setItemStatus); the design store never learned. This closes that.
+     *
+     * The key becomes (order_id, coalesce(line_id, sku), kind), so rows that predate the
+     * column keep working on sku while new ones key on the line. Safe to create: before the
+     * backfill every line_id is null, so coalesce() is exactly the old key and no duplicate
+     * can exist.
+     */
+    .then(() => q('alter table order_designs add column if not exists line_id text'))
+    .then(async () => {
+      // Backfill ONLY where it is certain: a sku appearing exactly once on its order maps
+      // to exactly one line. Where a sku repeats, the row genuinely cannot be attributed —
+      // the information was never stored — and guessing would print one line's artwork on
+      // its sibling, which is worse than the ambiguity. Those stay null and get surfaced.
+      const r = await q(`
+        update order_designs d
+           set line_id = x.line_id
+          from (
+            select i.order_id, i.sku, min(i.line_id) as line_id
+              from order_items i
+             where i.line_id is not null and i.sku is not null
+             group by i.order_id, i.sku
+            having count(*) = 1
+          ) x
+         where d.order_id = x.order_id and d.sku = x.sku and d.line_id is null`);
+      if (r && r.rowCount) console.log(`[order_designs] backfilled line_id on ${r.rowCount} rows`);
+    })
+    .then(() => q('alter table order_designs drop constraint if exists order_designs_pkey'))
+    .then(() => q('create unique index if not exists order_designs_line_key on order_designs (order_id, (coalesce(line_id, sku)), kind)'))
+    .then(async () => {
+      // Say out loud how much is left unattributable. Silence here would read as "clean".
+      const r = await q(`
+        select count(*)::int as n from order_designs d
+         where d.line_id is null
+           and exists (select 1 from order_items i
+                        where i.order_id = d.order_id and i.sku = d.sku
+                        group by i.order_id, i.sku having count(*) > 1)`).catch(() => null);
+      const n = r && r.rows[0] ? r.rows[0].n : 0;
+      if (n) console.warn(`[order_designs] ${n} design rows sit on orders with repeated SKUs and cannot be attributed to a line — see GET /api/orders/designs/ambiguous`);
+    })
     .then(async () => {
       // Backfill in bounded batches: without it, every design saved before this feature
       // is invisible to reuse, which is most of them.
@@ -864,6 +910,9 @@ export function ordersRoutes(app, requireAuth) {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
     const { sku, data, name, kind, pos } = req.body || {};
     if (!sku || !data) return { error: 'sku and data required' };
+    // Line identity, when the caller knows it. Falls back to sku-keying so older clients
+    // and marketplace sync keep working — see the migration above.
+    const lineId = (req.body || {}).line_id ? String((req.body || {}).line_id) : null;
     const posJson = (pos && typeof pos === 'object') ? JSON.stringify(pos) : null;
     // Exact hash is ours, never the client's — it decides whether an already-produced
     // machine file may be reused, so a forged one would attach the wrong deliverable.
@@ -891,26 +940,94 @@ export function ordersRoutes(app, requireAuth) {
       }
     }
     await q(
-      `insert into order_designs (order_id, sku, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
-       values ($1,$2,$3,$4,$9,$5,$6,$7,$8, now())
-       on conflict (order_id, sku, kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
+      `insert into order_designs (order_id, sku, line_id, kind, data, storage_key, name, pos, art_hash, art_phash, updated_at)
+       values ($1,$2,$10,$3,$4,$9,$5,$6,$7,$8, now())
+       on conflict (order_id, (coalesce(line_id, sku)), kind) do update set data=excluded.data, storage_key=excluded.storage_key, name=excluded.name, pos=excluded.pos,
          art_hash=excluded.art_hash, art_phash=coalesce(excluded.art_phash, order_designs.art_phash), updated_at=now()`,
-      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey]
+      [req.params.id, sku, kind || 'raster', storedData, name || null, posJson, artHash, artPhash, storedKey, lineId]
     );
     audit(req, 'design.saved', { entityType: 'order', entityId: req.params.id, after: { sku, kind: kind || 'raster', name: name || null } });
     return { ok: true };
   });
+  /**
+   * Design rows we cannot attribute to a line.
+   *
+   * These are artwork saved before line_id existed, on orders where the same SKU appears
+   * more than once. The row is real; which of the siblings it belongs to was never
+   * recorded, and no amount of querying recovers it — so this lists them for a human
+   * rather than letting the app pick one and print the wrong hoodie.
+   *
+   * `saves` counts design.saved audits for that (order, sku). More than one means a second
+   * design was attached and OVERWROTE the first — so the sibling's artwork is not merely
+   * unattributed, it is gone and needs re-uploading. One means only one line was ever
+   * decorated and the row just needs pointing at the right line.
+   */
+  app.get('/api/orders/designs/ambiguous', { preHandler: requireAuth }, async (req, reply) => {
+    // ordersRoutes only receives requireAuth; every other staff gate in this file is
+    // checked in-handler, so this follows the same shape rather than inventing a preHandler
+    // the file was never given.
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const r = await q(`
+      select d.order_id, d.sku, d.name, d.updated_at,
+             o.seq,
+             (select count(*)::int from order_items i
+               where i.order_id = d.order_id and i.sku = d.sku) as lines,
+             (select count(*)::int from audit_log a
+               where a.entity_type = 'order' and a.entity_id = d.order_id
+                 and a.action = 'design.saved' and a.after::text like '%' || d.sku || '%') as saves
+        from order_designs d
+        join orders o on o.id = d.order_id
+       where d.line_id is null
+         and (select count(*) from order_items i
+               where i.order_id = d.order_id and i.sku = d.sku) > 1
+         -- Not SUPERSEDED. Once every line of that sku has its own line-keyed design, the
+         -- unattributed row is never read (lookup is line_id first, sku only as fallback),
+         -- so asking a human to attribute it is asking about something already resolved.
+         -- Without this the list never empties and stops being read.
+         and (select count(*) from order_designs x
+               where x.order_id = d.order_id and x.sku = d.sku and x.line_id is not null)
+             < (select count(*) from order_items i
+                 where i.order_id = d.order_id and i.sku = d.sku)
+       order by d.updated_at desc nulls last
+       limit 500`).catch(() => ({ rows: [] }));
+    return {
+      rows: r.rows.map((x) => ({
+        orderId: x.order_id, num: x.seq ? '#' + x.seq : x.order_id,
+        sku: x.sku, name: x.name, updatedAt: x.updated_at, lines: x.lines,
+        // Stated as what it means, not as a count nobody can interpret.
+        overwritten: x.saves > 1,
+      })),
+    };
+  });
+
+  /** Point an unattributed design row at the line it belongs to. A human decides; this
+   *  only records the decision. */
+  app.post('/api/orders/:id/designs/attribute', { preHandler: requireAuth }, async (req, reply) => {
+    if (!isStaff(req.user)) { reply.code(403); return { error: 'Staff only' }; }
+    const b = req.body || {};
+    const sku = String(b.sku || '').trim(), lineId = String(b.lineId || '').trim();
+    if (!sku || !lineId) { reply.code(400); return { error: 'sku and lineId are both required.' }; }
+    const owns = await q('select 1 from order_items where order_id=$1 and line_id=$2 and sku=$3',
+      [String(req.params.id), lineId, sku]).then((r) => r.rowCount).catch(() => 0);
+    if (!owns) { reply.code(400); return { error: 'That line is not on this order, or its SKU differs.' }; }
+    const r = await q('update order_designs set line_id=$3 where order_id=$1 and sku=$2 and line_id is null',
+      [String(req.params.id), sku, lineId]);
+    audit(req, 'design.attributed', { entityType: 'order', entityId: String(req.params.id), after: { sku, lineId } });
+    return { ok: true, updated: r.rowCount };
+  });
+
   // Fetch all designs for one order — called lazily when the order is opened, so a
   // big base64 payload never rides along on the main /api/orders list.
   app.get('/api/orders/:id/designs', { preHandler: requireAuth }, async (req, reply) => {
     if (!(await canSeeOrder(req.user, req.params.id))) { reply.code(403); return { error: 'forbidden' }; }
-    const r = await q(`select sku, kind, data, storage_key, name, pos from order_designs where order_id=$1`, [req.params.id]);
+    const r = await q(`select sku, line_id, kind, data, storage_key, name, pos from order_designs where order_id=$1`, [req.params.id]);
     // Minted per read, not stored: a signed URL expires, so a persisted one would go
     // stale. Returned through `data` because that's what every client already renders
     // (an <img src> takes a URL or a data-URL either way).
     return r.rows.map((row) => {
       const url = designUrlOf(row);
-      return { sku: row.sku, kind: row.kind, name: row.name, pos: row.pos, data: url || row.data, url };
+      // line_id is what a caller should key on; sku stays for rows that predate it.
+      return { sku: row.sku, line_id: row.line_id, kind: row.kind, name: row.name, pos: row.pos, data: url || row.data, url };
     });
   });
 

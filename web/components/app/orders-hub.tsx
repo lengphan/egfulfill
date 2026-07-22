@@ -11,7 +11,7 @@ import { StatCard, StatGrid } from "@/components/app/stat-card"
 import { StageBadge } from "@/components/app/stage-badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
+import { getDispatchStatus, getOrders, postItemStatus, updateOrder, getDesignCards, saveDesignCards, buyUspsLabel, getDesignReuse, reuseDesignFile, getFactorySettings, setFactorySettings, getCatalogProducts, getOrderThreads, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getDesignFiles, getInventory, type OrderRow, type OrderItem, type DesignCard, type ShipAddress, type UspsLabelResult, type CatalogProduct, type OrderThreadRow, type DesignFileRow, type OrderDesign, type ReuseMatch } from "@/lib/api"
 import { getToken, getUser } from "@/lib/auth"
 import { VariantPicker } from "@/components/app/variant-picker"
 import { resolveProduct } from "@/lib/variant-resolve"
@@ -158,7 +158,8 @@ export function OrdersHub() {
    * Anything without one of these has nothing to print and nothing to digitise.
    */
   const artworkFor = useCallback((o: OrderRow, it: OrderItem): string => {
-    const placed = it.sku ? designs[o.id]?.[it.sku]?.data : undefined
+    // Line first, sku as fallback — two lines of the same sku are different jobs.
+    const placed = designForLine(designs[o.id], it)?.data
     if (placed) return placed
     // design_src is whatever the marketplace put in an upload-looking variation, and
     // Etsy's match is loose enough to catch the LISTING photo (see etsy.js — any http
@@ -473,7 +474,7 @@ export function OrdersHub() {
     getOrderDesigns(oid).then((r) => {
       const list = Array.isArray(r) ? r : (r?.designs ?? [])
       const bySku: Record<string, OrderDesign> = {}
-      for (const d of list) if (d?.sku) bySku[d.sku] = d
+      Object.assign(bySku, indexDesigns(list))
       setDesigns((p) => ({ ...p, [oid]: bySku }))
     }).catch(() => {})
   }, [])
@@ -988,7 +989,7 @@ export function OrdersHub() {
                             size={64}
                             onEdit={canDesign ? () => setEditing({ order: o, item: it }) : undefined}
                             onDropImage={canDesign && it.sku ? (dataUrl) => {
-                              postOrderDesign(o.id, { sku: it.sku!, data: dataUrl, name: it.name })
+                              postOrderDesign(o.id, { sku: it.sku!, line_id: it.line_id, data: dataUrl, name: it.name })
                                 .then(() => {
                                   setNote(`Artwork attached to ${it.name || it.sku}.`)
                                   return getOrderDesigns(o.id)
@@ -996,7 +997,7 @@ export function OrdersHub() {
                                 .then((r) => {
                                   const list = Array.isArray(r) ? r : (r?.designs ?? [])
                                   const bySku: Record<string, OrderDesign> = {}
-                                  for (const d of list) if (d?.sku) bySku[d.sku] = d
+                                  Object.assign(bySku, indexDesigns(list))
                                   setDesigns((p) => ({ ...p, [o.id]: bySku }))
                                 })
                                 .catch(() => setActionErr("Couldn't attach that artwork."))
@@ -1219,15 +1220,15 @@ export function OrdersHub() {
               onOpenChange={(v) => { if (!v) setEditing(null) }}
               orderId={editing.order.id}
               item={editing.item}
-              initialDesign={designs[editing.order.id]?.[editing.item.sku ?? ""]?.data}
-              initialPos={designs[editing.order.id]?.[editing.item.sku ?? ""]?.pos}
+              initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
+              initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
               catalog={catalog}
               onSaved={() => {
                 const oid = editing.order.id
                 getOrderDesigns(oid).then((r) => {
                   const list = Array.isArray(r) ? r : (r?.designs ?? [])
                   const bySku: Record<string, OrderDesign> = {}
-                  for (const d of list) if (d?.sku) bySku[d.sku] = d
+                  Object.assign(bySku, indexDesigns(list))
                   setDesigns((p) => ({ ...p, [oid]: bySku }))
                 }).catch(() => {})
                 getOrderThreads(oid).then((r) => setThreads((p) => ({ ...p, [oid]: r ?? [] }))).catch(() => {})

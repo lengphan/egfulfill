@@ -309,7 +309,12 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
   // while the order detail, which reads order_designs, correctly showed nothing. The tag
   // was the thing lying. A buyer upload is still real evidence, so it moves into the
   // tag's file list below rather than being thrown away.
-  const withArt = decorated.filter((it) => it.sku && designs?.[it.sku]?.data)
+  // LINE FIRST. Keyed on sku alone, two lines of the same sku both resolved to whichever
+  // design was stored last — so an order with one decorated line and one bare sibling read
+  // as fully covered, and the tag said the artwork was in hand for a line that had none.
+  const artFor = (it: OrderItem) =>
+    (it.line_id ? designs?.[it.line_id] : undefined) ?? (it.sku ? designs?.[it.sku] : undefined)
+  const withArt = decorated.filter((it) => artFor(it)?.data)
   const buyerUploads = list.filter((it) => it.design_src)
   const approved = (files ?? []).some((f) => f.kind === "pes" || f.kind === "emb")
 
@@ -339,7 +344,7 @@ export function ReadinessStrip({ order, items, designs, files, className }: {
     ...withArt.map((it) => ({
       key: `art-${it.line_id ?? it.sku}`,
       name: `Artwork — ${it.name || it.sku}`,
-      href: designs?.[it.sku as string]?.data,
+      href: artFor(it)?.data,
     })),
     // The buyer's own upload. Labelled as theirs so nobody mistakes it for a production
     // file: it's what they sent, not what we made.

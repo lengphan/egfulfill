@@ -19,8 +19,20 @@ export function itemImage(it: Pick<OrderItem, "img">): string {
   return it.img || ""
 }
 
-// The item's attached artwork, resolved from the order's designs map (keyed by sku).
-export function itemArtwork(designs: Record<string, DesignBlob> | undefined, it: Pick<OrderItem, "sku">): string {
-  if (!designs || !it.sku) return ""
-  return designSrc(designs[it.sku]?.data)
+/**
+ * The item's attached artwork.
+ *
+ * LINE FIRST, sku only as a fallback. The map is built by indexDesigns() in lib/api, which
+ * files a line-keyed design under its line_id and leaves the sku slot for rows saved before
+ * lines were tracked. Reading by sku alone meant two lines of the same sku resolved to the
+ * same image — one of them wrong, and printed that way.
+ *
+ * Kept as a local lookup rather than importing designForLine: this module's DesignBlob is
+ * looser than OrderDesign, and widening it to match would spread that looseness rather than
+ * contain it.
+ */
+export function itemArtwork(designs: Record<string, DesignBlob> | undefined, it: Pick<OrderItem, "sku" | "line_id">): string {
+  if (!designs) return ""
+  const d = (it.line_id ? designs[it.line_id] : undefined) ?? (it.sku ? designs[it.sku] : undefined)
+  return designSrc(d?.data)
 }

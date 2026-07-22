@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { getOrders, getCatalogProducts, getOrderDesigns, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
+import { getOrders, getCatalogProducts, getOrderDesigns, indexDesigns, designForLine, postOrderDesign, getMyAccess, type OrderRow, type OrderItem, type CatalogProduct, type OrderDesign } from "@/lib/api"
 import { ItemAvatar } from "@/components/app/item-avatar"
 import { PhotoStack } from "@/components/app/photo-stack"
 import { DesignCanvasDialog } from "@/components/app/design-canvas"
@@ -93,7 +93,7 @@ export function OrdersList() {
     getOrderDesigns(oid).then((r) => {
       const list = Array.isArray(r) ? r : (r?.designs ?? [])
       const bySku: Record<string, OrderDesign> = {}
-      for (const d of list) if (d?.sku) bySku[d.sku] = d
+      Object.assign(bySku, indexDesigns(list))
       setDesigns((p) => ({ ...p, [oid]: bySku }))
     }).catch(() => {})
   }, [])
@@ -104,7 +104,7 @@ export function OrdersList() {
       getOrderDesigns(oid).then((r) => {
         const list = Array.isArray(r) ? r : (r?.designs ?? [])
         const bySku: Record<string, OrderDesign> = {}
-        for (const d of list) if (d?.sku) bySku[d.sku] = d
+        Object.assign(bySku, indexDesigns(list))
         setDesigns((p) => ({ ...p, [oid]: bySku }))
       }).catch(() => {})
     }, 0)
@@ -346,7 +346,7 @@ export function OrdersList() {
                                       onEdit={() => setEditing({ order: o, item: it })}
                                       onDropImage={(dataUrl) => {
                                         if (!it.sku) return
-                                        postOrderDesign(o.id, { sku: it.sku, data: dataUrl, name: it.name })
+                                        postOrderDesign(o.id, { sku: it.sku, line_id: it.line_id, data: dataUrl, name: it.name })
                                           .then(() => reloadDesigns(o.id))
                                           .catch(() => {})
                                       }}
@@ -418,8 +418,8 @@ export function OrdersList() {
           onOpenChange={(v) => { if (!v) setEditing(null) }}
           orderId={editing.order.id}
           item={editing.item}
-          initialDesign={designs[editing.order.id]?.[editing.item.sku ?? ""]?.data}
-          initialPos={designs[editing.order.id]?.[editing.item.sku ?? ""]?.pos}
+          initialDesign={designForLine(designs[editing.order.id], editing.item)?.data}
+          initialPos={designForLine(designs[editing.order.id], editing.item)?.pos}
           catalog={catalog}
           onSaved={() => reloadDesigns(editing.order.id)}
         />

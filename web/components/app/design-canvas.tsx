@@ -397,7 +397,7 @@ export function DesignCanvasDialog({
       // design has already been digitised. Best-effort: a null phash costs us fuzzy
       // matching, never the save.
       const phash = await perceptualHash(designUrl).catch(() => null)
-      const r = await postOrderDesign(orderId, { sku: item.sku, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
+      const r = await postOrderDesign(orderId, { sku: item.sku, line_id: item.line_id, data: designUrl, name: item.name, pos: { x: pos.x, y: pos.y, w: pos.w, r: pos.r }, phash })
       if (r.error) throw new Error(r.error)
       // Persist the matched threads alongside the design so the factory loads the right
       // cones. Best-effort — a design still saves even if the thread write hiccups.
