@@ -54,6 +54,13 @@ export function isStaffRole(role?: string | null): boolean {
 const STAFF_TOOLS: StaffNavItem[] = [
   { label: "SpyDeck", href: "/spydeck", icon: Binoculars, roles: ["warehouse", "admin"] },
   { label: "Products", href: "/products", icon: Tag, roles: ["operator", "warehouse", "admin"] },
+  // The shop window we publish OUTWARD — curated selection, trade prices, CSV export.
+  // Warehouse/admin only: it sets the prices outside buyers are shown, which is a
+  // commercial decision rather than a floor one.
+  // NOT /catalog — that path is the PUBLIC marketing catalogue in (marketing), and two
+  // pages resolving to one URL is a build error, not a runtime surprise. This is the
+  // staff-side curation of what that window shows.
+  { label: "Catalogue", href: "/published-catalog", icon: Storefront, roles: ["warehouse", "admin"] },
   { label: "Design Lab", href: "/design", icon: PenNib, roles: ["operator", "warehouse", "admin"] },
   // Admin-only seller pages (full superuser access). (Seller "Orders"/Dashboard are
   // redundant with the factory Orders hub, so they're intentionally not here.)

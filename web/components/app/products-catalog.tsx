@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash, Storefront } from "@phosphor-icons/react"
+import { MagnifyingGlass, Plus, Package, Sparkle, PenNib, PencilSimple, Trash } from "@phosphor-icons/react"
 import { motion, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,6 @@ const priceOf = (p: CatalogProduct) =>
   Number(p.price ?? p.basePrice ?? p.base_price ?? 0) || 0
 
 import { sizesOf } from "@/lib/variant-resolve"
-import { CatalogPublishPanel } from "@/components/app/catalog-publish-panel"
 
 const usd = (n: number | string | null | undefined) => `$${(Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -58,7 +57,6 @@ export function ProductsCatalog() {
   const router = useRouter()
   const reduce = useReducedMotion()
   const [products, setProducts] = useState<CatalogProduct[] | null>(null)
-  const [publishOpen, setPublishOpen] = useState(false)
   const [isDemo, setIsDemo] = useState(false)
   const [query, setQuery] = useState("")
   const [cat, setCat] = useState<string>("All")
@@ -146,17 +144,6 @@ export function ProductsCatalog() {
 
   return (
     <div className="space-y-5">
-      {/* The shop window is a different job from managing products, so it opens as its own
-          window rather than adding two more columns to this grid. Staff only — it sets
-          prices shown to outside buyers. */}
-      {isStaff && (
-        <div className="flex justify-end">
-          <Button size="sm" variant="outline" onClick={() => setPublishOpen(true)}>
-            <Storefront size={14} weight="bold" /> Published catalogue
-          </Button>
-        </div>
-      )}
-      <CatalogPublishPanel open={publishOpen} onOpenChange={setPublishOpen} />
       <StatGrid>
         <StatCard label="Products" value={String(stats.total)} sub="in your catalog" />
         <StatCard label="Categories" value={String(stats.cats)} sub="product types" />
