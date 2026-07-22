@@ -1,17 +1,40 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { AuthShell } from "@/components/auth/auth-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { landingFor } from "@/lib/staff-nav"
 import { GoogleSignIn } from "@/components/auth/google-signin"
 import { signupUser } from "@/lib/api"
-import { setSession } from "@/lib/auth"
+import { getToken, getUser, setSession } from "@/lib/auth"
+
+/** Same-origin relative paths only — see the note in app/login/page.tsx. */
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null
+  return raw
+}
 
 export default function SignupPage() {
   const router = useRouter()
+  const [next, setNext] = useState<string | null>(null)
+
+  // Carry an intended destination through signup too, and don't show a signup form to
+  // someone who already has a session.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const want = safeNext(new URLSearchParams(window.location.search).get("next"))
+      setNext(want)
+      if (getToken()) {
+        const role = getUser()?.role
+        router.replace(want ?? landingFor(typeof role === "string" ? role : null))
+      }
+    }, 0)
+    return () => clearTimeout(id)
+  }, [router])
   const [store, setStore] = useState("")
   const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
@@ -32,9 +55,10 @@ export default function SignupPage() {
       if (r.error) throw new Error(r.error)
       if (r.token) {
         setSession(r.token, r.user ?? {})
-        router.push("/dashboard")
+        const role = (r.user as { role?: string } | undefined)?.role
+        router.push(next ?? landingFor(typeof role === "string" ? role : null))
       } else {
-        router.push("/login")
+        router.push(next ? `/login?next=${encodeURIComponent(next)}` : "/login")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create your account.")
@@ -76,7 +100,16 @@ export default function SignupPage() {
 
         {/* No divider here — GoogleSignIn renders its own, so this page was showing
             two "or" separators stacked. */}
-        <GoogleSignIn onSuccess={() => router.push("/dashboard")} onError={setError} />
+        {/* Google here is a sign-IN for anyone who already has an account, so it routes
+            by role like login does — hardcoding /dashboard dropped staff on the seller
+            board. */}
+        <GoogleSignIn
+          onSuccess={() => {
+            const role = getUser()?.role
+            router.push(next ?? landingFor(typeof role === "string" ? role : null))
+          }}
+          onError={setError}
+        />
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
