@@ -6,13 +6,25 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { setDesignTier, uploadDesignFile, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
+import { setDesignTier, uploadDesignFile, postOrderDesign, type DesignTier, type OrderItem, type OrderRow } from "@/lib/api"
 import { numOf } from "@/lib/order-format"
 
 /** Machine-file extensions the embroidery side actually uses. Kept in one place so the
  *  accept attribute, the drop filter and the error message can't drift apart. */
 const MACHINE_EXT = [".emb", ".pes", ".dst", ".exp", ".jef", ".vp3", ".xxx", ".hus"]
 const isMachineFile = (name: string) => MACHINE_EXT.some((e) => name.toLowerCase().endsWith(e))
+
+/** Artwork the customer's design can be. Anything else is refused BY NAME rather than
+ *  ignored — a file that vanishes silently is the worst outcome of a drop target. */
+const ART_EXT = [".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"]
+const isArtFile = (name: string) => ART_EXT.some((e) => name.toLowerCase().endsWith(e))
+
+const readAsDataUrl = (f: File) => new Promise<string>((res, rej) => {
+  const r = new FileReader()
+  r.onload = () => res(String(r.result))
+  r.onerror = () => rej(new Error("unreadable"))
+  r.readAsDataURL(f)
+})
 
 /**
  * The artwork, big, with the two things you actually need while looking at it.
@@ -56,24 +68,45 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
     return () => clearTimeout(t)
   }, [open])
 
+  /**
+   * ONE drop target, TWO destinations — routed by extension, never merged.
+   *
+   * A machine file is a billable deliverable: it goes to /api/design_files, is priced
+   * from emb_price and is permission-checked against the order's owner. Artwork is
+   * reference input: it goes to /api/orders/:id/designs, is free, and carries the
+   * placement and perceptual hash that cross-seller duplicate detection depends on.
+   * Sending either down the other's route would bill for artwork or make a deliverable
+   * free — so the UI merges and the backends stay apart.
+   *
+   * Nothing is accepted silently. Every file is reported as artwork, machine file, or
+   * refused by name.
+   */
   const upload = useCallback(async (files: File[]) => {
+    if (!files.length) return
     const machine = files.filter((f) => isMachineFile(f.name))
-    if (!machine.length) {
-      setErr(files.length
-        ? `Only machine files go here (${MACHINE_EXT.join(", ")}). An image dropped here would be stored but wouldn't count as a deliverable.`
-        : null)
-      return
+    const art = files.filter((f) => isArtFile(f.name))
+    const rejected = files.filter((f) => !isMachineFile(f.name) && !isArtFile(f.name))
+
+    // A machine file on a line nobody marked embroidery is either a mis-drop or a
+    // mislabelled line — and this route CHARGES. Ask before spending someone's money.
+    // Embroidery is indicated by print_type, not a flag — same derivation orders-hub uses
+    // when it builds a design card (/emb/i.test(print_type)). There is no is_emb on an
+    // order item; that field belongs to design_cards.
+    const isEmbLine = /emb/i.test(item.print_type || "")
+    if (machine.length && !isEmbLine) {
+      const ok = window.confirm(
+        `This line isn't marked as embroidery, and filing a machine file bills it at the machine-file rate.\n\nAttach ${machine.length} file${machine.length === 1 ? "" : "s"} anyway?`
+      )
+      if (!ok) return
     }
+
     setBusy(true); setErr(null); setDone(null)
     const failed: string[] = []
+    const saved: string[] = []
+
     for (const f of machine) {
       try {
-        const data = await new Promise<string>((res, rej) => {
-          const r = new FileReader()
-          r.onload = () => res(String(r.result))
-          r.onerror = () => rej(new Error("unreadable"))
-          r.readAsDataURL(f)
-        })
+        const data = await readAsDataUrl(f)
         // designId is per FILE, and carries the line so two siblings of the same SKU get
         // distinct deliverables rather than one overwriting the other.
         const designId = `EMB-${item.line_id ?? item.sku ?? "line"}-${f.name.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}`
@@ -83,12 +116,33 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
         if (r?.error) throw new Error(r.error)
       } catch (e) { failed.push(`${f.name}${e instanceof Error ? ` (${e.message})` : ""}`) }
     }
-    setBusy(false)
-    if (failed.length) setErr(`Couldn't upload: ${failed.join(", ")}`)
-    else {
-      setDone(`${machine.length} file${machine.length === 1 ? "" : "s"} attached to this line.`)
-      onUploaded?.()
+    if (machine.length && machine.length > failed.length) {
+      saved.push(`${machine.length - failed.length} machine file${machine.length - failed.length === 1 ? "" : "s"}`)
     }
+
+    // Only the LAST image wins: order_designs upserts on (order, sku, kind), so dropping
+    // three would leave one row and two silently discarded uploads. Say so rather than
+    // appearing to have taken them all.
+    const artToSave = art.slice(-1)
+    for (const f of artToSave) {
+      try {
+        const data = await readAsDataUrl(f)
+        const r = await postOrderDesign(order.id, {
+          sku: item.sku ?? "", line_id: item.line_id ?? undefined, data, name: f.name, kind: "raster",
+        })
+        if (r?.error) throw new Error(r.error)
+        saved.push("artwork")
+      } catch (e) { failed.push(`${f.name}${e instanceof Error ? ` (${e.message})` : ""}`) }
+    }
+
+    setBusy(false)
+    const notes: string[] = []
+    if (saved.length) notes.push(`Saved ${saved.join(" and ")}.`)
+    if (art.length > 1) notes.push(`Only the last image was kept — a line holds one artwork.`)
+    if (rejected.length) notes.push(`Ignored ${rejected.map((f) => f.name).join(", ")} — not artwork or a machine file.`)
+    if (failed.length) setErr(`Couldn't upload: ${failed.join(", ")}`)
+    if (notes.length) setDone(notes.join(" "))
+    if (saved.length) onUploaded?.()
   }, [order.id, item, onUploaded])
 
   const artName = `${numOf(order)}-${item.sku ?? "artwork"}`
@@ -101,7 +155,22 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
           screens keep the primitive's responsive default and only wide ones go to 3xl.
           The height cap plus scroll is the same problem vertically: this dialog carries an
           image, a drop zone and two panels, which is easily taller than a laptop. */}
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
+        // The WHOLE panel takes a drop, so there is no separate window to open and no
+        // hunting for the right rectangle. The zone below stays as the discoverable
+        // affordance — drop-anywhere alone is invisible to anyone who wasn't told.
+        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+        onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false) }}
+        onDrop={(e) => { e.preventDefault(); setOver(false); void upload(Array.from(e.dataTransfer?.files ?? [])) }}
+      >
+        {over && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
+            <span className="rounded-lg bg-background px-3 py-1.5 text-sm font-medium shadow-sm">
+              Drop to attach — images become artwork, {MACHINE_EXT[0]}/{MACHINE_EXT[1]} become the machine file
+            </span>
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle className="truncate pr-6">{item.name ?? item.sku ?? "Artwork"}</DialogTitle>
           <DialogDescription>
@@ -137,7 +206,9 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
 
           <div className="space-y-3">
             <div>
-              <span className="mb-1 block text-xs font-medium">Machine file</span>
+              <span className="mb-1 block text-xs font-medium">
+                {/emb/i.test(item.print_type || "") ? "Machine file" : "Attach a file"}
+              </span>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
@@ -148,14 +219,22 @@ export function ArtworkZoom({ order, item, artwork, open, onOpenChange, onUpload
                   (over ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:bg-accent")}
               >
                 {busy ? <CircleNotch size={18} className="animate-spin" /> : <UploadSimple size={18} weight="duotone" />}
-                <span>{busy ? "Uploading…" : "Drop the .emb here, or click to choose"}</span>
-                <span className="text-[11px] text-muted-foreground/80">{MACHINE_EXT.join(" · ")}</span>
+                <span>{busy ? "Uploading…" : "Drop a file here, or click to choose"}</span>
+                {/* Both lists, because this one target now takes both — and a person needs
+                    to know which of the two a file will become before they let go. */}
+                <span className="text-[11px] text-muted-foreground/80">
+                  Artwork: {ART_EXT.slice(0, 4).join(" · ")}
+                </span>
+                <span className="text-[11px] text-muted-foreground/80">
+                  Machine: {MACHINE_EXT.slice(0, 5).join(" · ")}
+                </span>
               </button>
-              <input ref={fileRef} type="file" multiple accept={MACHINE_EXT.join(",")} className="hidden"
+              <input ref={fileRef} type="file" multiple accept={[...ART_EXT, ...MACHINE_EXT].join(",")} className="hidden"
                 onChange={(e) => { void upload(Array.from(e.target.files ?? [])); e.target.value = "" }} />
               <p className="mt-1.5 text-[11px] text-muted-foreground">
-                Filing it here counts as done for this line. Nobody is credited — a payout
-                follows a card someone claimed, and this path has no card.
+                An image is saved as this line&apos;s artwork. A machine file counts the line
+                as done and is billable — nobody is credited for it, because a payout follows
+                a card someone claimed and this path has no card.
               </p>
             </div>
 
