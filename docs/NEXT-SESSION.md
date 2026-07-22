@@ -91,8 +91,11 @@ is the one action here that cannot be undone.
 
 ## Housekeeping the user still owes
 
-- **Set the five fee values.** `emb_price` is `0`, so every embroidery file downloads free;
-  the four design fees are placeholder numbers I invented.
+- ~~Set the five fee values~~ — **done 2026-07-22.** designer_payout 2.50 · design standard
+  2 · design complex 15 · check 1 · emb_price 5 · emb_price_complex 30.
+  Note: `emb_price` applies to files created AFTER it was set. Existing `design_file_data`
+  rows keep the price they were stored with, which for everything produced before today is
+  `0`. If those should be chargeable too, they need a one-off update.
 - **Rotate exposed secrets** — account password, `SHOPIFY_API_SECRET`, `SMTP_PASS`,
   `GOOGLE_SHEETS_API_KEY`, and an admin JWT. All appeared in screenshots or shell history.
   Shopify first: it can act on a connected shop.
